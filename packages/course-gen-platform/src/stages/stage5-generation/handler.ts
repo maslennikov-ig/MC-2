@@ -51,6 +51,9 @@ import { isPipelineInterrupt } from '@/shared/errors';
 import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
 import { notifyCourseError } from '@/shared/notifications';
 import { z } from 'zod';
+import { createProductionStage5EvidenceEnricher } from './evidence/production';
+import { buildEvidencePersistencePlan } from './evidence/persistence';
+import { isDocumentEvidenceStage5EnrichmentEnabled } from './evidence/rollout';
 
 // Import helpers extracted from this file
 import {
@@ -115,7 +118,7 @@ const JobDataSchema = z.union([
  * Processes STRUCTURE_GENERATION jobs by executing the 4-phase LangGraph
  * orchestrator and storing results in the database.
  */
-class Stage5GenerationHandler {
+export class Stage5GenerationHandler {
   /**
    * Process the STRUCTURE_GENERATION job
    *
@@ -227,6 +230,7 @@ class Stage5GenerationHandler {
           user_id,
           sanitizedStructure,
           result,
+          input.analysis_result,
           course,
           lockGuard,
           jobLogger
@@ -279,12 +283,16 @@ class Stage5GenerationHandler {
 
     // Initialize services with optional RAG context
     const qdrantClientInstance = input.vectorized_documents ? qdrantClient : undefined;
+    const evidenceEnricher = isDocumentEvidenceStage5EnrichmentEnabled(input.course_id)
+      ? createProductionStage5EvidenceEnricher()
+      : undefined;
 
     const orchestrator = new GenerationOrchestrator(
       new MetadataGenerator(),
       new SectionBatchGenerator(),
       new QualityValidator(),
-      qdrantClientInstance
+      qdrantClientInstance,
+      evidenceEnricher
     );
 
     // Update status transitions
@@ -365,6 +373,7 @@ class Stage5GenerationHandler {
     _userId: string | undefined,
     sanitizedStructure: GenerationResult['course_structure'],
     result: GenerationResult,
+    analysisResult: GenerationJobInput['analysis_result'],
     course: { pause_at_stage_5: boolean },
     lockGuard: { heartbeatInterval: ReturnType<typeof setInterval>; release: () => Promise<void> },
     jobLogger: pino.Logger
@@ -382,14 +391,21 @@ class Stage5GenerationHandler {
       // Set schema_version to 2 (plan:105) — indicates stable IDs present
       schema_version: 2 as const,
     };
+    const evidencePersistence = buildEvidencePersistencePlan(
+      analysisResult,
+      result.generation_metadata.document_evidence_enrichment
+    );
 
     // Save structure + sync LLM-generated title/description back to courses table
     // This ensures courses.title matches the target language even when user input was in a different language
-    const { error: structureError } = await supabaseAdmin
+    const structureUpdate = supabaseAdmin
       .from('courses')
       .update({
         course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
+        ...(evidencePersistence.analysisResultUpdate
+          ? { analysis_result: evidencePersistence.analysisResultUpdate }
+          : {}),
         ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
         ...(structureWithIds.course_description
           ? { course_description: structureWithIds.course_description }
@@ -397,6 +413,21 @@ class Stage5GenerationHandler {
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);
+
+    let structureError: { message: string } | null;
+    if (evidencePersistence.expectedAnalysisResultJson) {
+      const result = await structureUpdate
+        .filter('analysis_result', 'eq', evidencePersistence.expectedAnalysisResultJson)
+        .select('id')
+        .maybeSingle();
+      structureError = result.error;
+      if (!result.data && !structureError) {
+        throw new Error('Failed to save structure: document evidence snapshot changed');
+      }
+    } else {
+      const result = await structureUpdate;
+      structureError = result.error;
+    }
 
     if (structureError) {
       throw new Error(`Failed to save structure: ${structureError.message}`);
@@ -546,7 +577,10 @@ class Stage5GenerationHandler {
         await notifyCourseError(courseId, 5, error.message);
       } catch (notifyError) {
         jobLogger.warn(
-          { courseId, error: notifyError instanceof Error ? notifyError.message : String(notifyError) },
+          {
+            courseId,
+            error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+          },
           'Failed to send Stage 5 required-RAG outage notification'
         );
       }

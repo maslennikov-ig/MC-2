@@ -43,6 +43,587 @@ import { ClarifyingQuestionsInterrupt } from '@/shared/errors';
 import { logTrace } from '../../shared/trace-logger';
 import type { AnalysisContext } from './orchestrator-helpers';
 import { getErrorMessage } from '@/shared/workspace-utils';
+import {
+  runDocumentEvidencePreflight,
+  verifyEvidenceSourcesWithQdrant,
+  type DocumentEvidencePreflightDependencies,
+  type DocumentEvidencePreflightInput,
+  type DocumentEvidencePreflightResult,
+} from './evidence/preflight';
+import {
+  createDocumentEvidenceRepository,
+  type DocumentEvidenceDatabaseClient,
+} from './evidence/repository';
+import { fetchFullTextDocuments, type DocumentSummaryResult } from './handler-helpers';
+import {
+  createProductionEvidenceExtractor,
+  createProductionStructuredEvidencePort,
+} from './evidence/card-generator';
+import { resolveDownstreamDocumentSummaries } from './evidence/downstream-context';
+import { createHash } from 'node:crypto';
+import {
+  createProductionConflictDetectionPort,
+  ConflictDetectionExecutionError,
+  detectDocumentConflicts,
+  type ConflictMetricDeltas,
+  type DetectDocumentConflictsDependencies,
+  type DetectDocumentConflictsInput,
+} from './evidence/conflict-detector';
+import {
+  resolveDocumentEvidenceDecisions,
+  type ResolveDocumentEvidenceDecisionsDependencies,
+  type ResolveDocumentEvidenceDecisionsInput,
+} from './evidence/decision-service';
+import {
+  publishDocumentEvidenceMetricsSafely,
+  type DocumentEvidenceMetricEvent,
+  type Stage4DurableTotals,
+} from '@/shared/metrics/document-evidence-textfile';
+
+export interface DocumentEvidencePhaseOverrides {
+  enabled?: boolean;
+  mode?: 'shadow' | 'active';
+  runPreflight?: (
+    input: DocumentEvidencePreflightInput,
+    dependencies: DocumentEvidencePreflightDependencies
+  ) => Promise<DocumentEvidencePreflightResult>;
+  preflightDependencies?: DocumentEvidencePreflightDependencies;
+  detectConflicts?: typeof detectDocumentConflicts;
+  conflictDependencies?: DetectDocumentConflictsDependencies;
+  resolveDecisions?: typeof resolveDocumentEvidenceDecisions;
+  decisionDependencies?: ResolveDocumentEvidenceDecisionsDependencies;
+  decisionMode?: 'manual' | 'automatic';
+  retryDirective?: DocumentEvidencePreflightInput['retryDirective'];
+  retryCoordinator?: Pick<
+    ReturnType<typeof createDocumentEvidenceRepository>,
+    | 'getDegradedRetryState'
+    | 'recordAutomaticRetry'
+    | 'getPendingRetryDirectives'
+    | 'consumeRetryDirectives'
+  >;
+  publishMetrics?: typeof publishDocumentEvidenceMetricsSafely;
+  loadCriticalConflictState?: () => Promise<{
+    unresolved: number;
+    oldestUnixSeconds: number;
+    observedAtUnixMilliseconds: number;
+  }>;
+  loadDecisionTotals?: () => Promise<{
+    user: number;
+    system: number;
+    degradedAutomatic: number;
+  }>;
+  loadDurableTotals?: () => Promise<Stage4DurableTotals>;
+}
+
+export function buildPhase1DocumentSummaries(documents: DocumentSummaryResult[]): Array<{
+  document_id: string;
+  file_name: string;
+  processed_content: string;
+}> {
+  return documents
+    .filter(document => document.sourceFailure === undefined)
+    .map(document => ({
+      document_id: document.document_id,
+      file_name: document.file_name,
+      processed_content: document.processed_content,
+    }));
+}
+
+function stableUuidV8(value: string): string {
+  const chars = createHash('sha256').update(value).digest('hex').slice(0, 32).split('');
+  chars[12] = '8';
+  chars[16] = ((Number.parseInt(chars[16], 16) & 0x3) | 0x8).toString(16);
+  return `${chars.slice(0, 8).join('')}-${chars.slice(8, 12).join('')}-${chars
+    .slice(12, 16)
+    .join('')}-${chars.slice(16, 20).join('')}-${chars.slice(20).join('')}`;
+}
+
+function evidenceEnabled(overrides?: DocumentEvidencePhaseOverrides): boolean {
+  return overrides?.enabled ?? process.env.DOCUMENT_EVIDENCE_ENABLED === 'true';
+}
+
+function failedStage4Metric(
+  mode: 'shadow' | 'active',
+  durationSeconds: number,
+  sourceCount: number,
+  durableTotals?: Stage4DurableTotals,
+  failureDeltas?: ConflictMetricDeltas
+): DocumentEvidenceMetricEvent {
+  return {
+    stage: 'stage4',
+    status: 'failed',
+    mode,
+    runDelta: 1,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+    coverage: { source: sourceCount, assessed: 0, degraded: 0, failed: 0 },
+    documentDeltas: { source: 0, assessed: 0, degraded: 0, failed: 0 },
+    processingModes: {
+      full_text: 0,
+      hierarchical_summary: 0,
+      summary: 0,
+      targeted_retrieval: 0,
+      metadata_only: 0,
+    },
+    batches: failureDeltas?.batches ?? 0,
+    inputTokens: failureDeltas?.usage.input_tokens ?? 0,
+    outputTokens: failureDeltas?.usage.output_tokens ?? 0,
+    modelCalls: failureDeltas?.usage.model_calls ?? 0,
+    costUsd: failureDeltas?.usage.total_cost_usd ?? 0,
+    durationSeconds,
+    conflicts: failureDeltas?.conflicts ?? {
+      critical: 0,
+      important: 0,
+      informational: 0,
+    },
+    decisions: { user: 0, system: 0, degradedAutomatic: 0 },
+    ...(durableTotals ? { durableTotals } : {}),
+  };
+}
+
+async function loadDurableCriticalConflictState(context: AnalysisContext): Promise<{
+  unresolved: number;
+  oldestUnixSeconds: number;
+  observedAtUnixMilliseconds: number;
+}> {
+  const { data, error, count } = await context.supabase
+    .from('clarifying_questions')
+    .select('created_at', { count: 'exact' })
+    .eq('question_category', 'document_conflicts')
+    .eq('question_priority', 'critical')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (error) throw new Error('Critical conflict metrics reconciliation failed');
+  const unresolved = count ?? data?.length ?? 0;
+  const createdAt = data?.[0]?.created_at;
+  const oldestUnixSeconds =
+    unresolved > 0 && typeof createdAt === 'string'
+      ? Math.floor(new Date(createdAt).getTime() / 1000)
+      : 0;
+  if (unresolved > 0 && (!Number.isSafeInteger(oldestUnixSeconds) || oldestUnixSeconds <= 0)) {
+    throw new Error('Critical conflict metrics reconciliation returned an invalid timestamp');
+  }
+  return {
+    unresolved,
+    oldestUnixSeconds,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+  };
+}
+
+async function loadDurableStage4Totals(context: AnalysisContext): Promise<Stage4DurableTotals> {
+  type DurableTotalsClient = {
+    rpc(
+      functionName: 'get_document_evidence_observability_totals'
+    ): Promise<{ data: unknown; error: unknown }>;
+  };
+  const totalsClient = context.supabase as unknown as DurableTotalsClient;
+  const { data, error } = await totalsClient.rpc('get_document_evidence_observability_totals');
+  if (error || !data) throw new Error('Document evidence metrics reconciliation failed');
+  const row = data as Record<string, unknown>;
+  const count = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
+  };
+  const amount = (column: string): number => {
+    const value = Number(row[column]);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error('Document evidence metrics reconciliation returned invalid totals');
+    }
+    return value;
+  };
+  return {
+    databaseStartUnixMilliseconds: count('database_start_unix_milliseconds'),
+    generation: count('generation'),
+    revision: count('revision'),
+    runs: { accepted: count('accepted_runs'), failed: count('failed_runs') },
+    documents: {
+      source: count('source_documents'),
+      assessed: count('assessed_documents'),
+      degraded: count('degraded_documents'),
+      failed: count('failed_documents'),
+    },
+    latestCoverage: {
+      source: count('latest_coverage_source'),
+      assessed: count('latest_coverage_assessed'),
+      degraded: count('latest_coverage_degraded'),
+      failed: count('latest_coverage_failed'),
+    },
+    processingModes: {
+      full_text: count('full_text_documents'),
+      hierarchical_summary: count('hierarchical_summary_documents'),
+      summary: count('summary_documents'),
+      targeted_retrieval: count('targeted_retrieval_documents'),
+      metadata_only: count('metadata_only_documents'),
+    },
+    batches: count('batches'),
+    modelCalls: count('model_calls'),
+    inputTokens: count('input_tokens'),
+    outputTokens: count('output_tokens'),
+    costUsd: amount('total_cost_usd'),
+    durationSeconds: amount('duration_seconds'),
+    conflicts: {
+      critical: count('critical_conflicts'),
+      important: count('important_conflicts'),
+      informational: count('informational_conflicts'),
+    },
+    decisions: {
+      user: count('user_decisions'),
+      system: count('system_decisions'),
+      degradedAutomatic: count('degraded_automatic_decisions'),
+    },
+  };
+}
+
+async function tryLoadDurableTotals(
+  context: AnalysisContext,
+  overrides?: DocumentEvidencePhaseOverrides
+): Promise<Stage4DurableTotals | undefined> {
+  try {
+    return await (overrides?.loadDurableTotals ?? (() => loadDurableStage4Totals(context)))();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Runs after Phase 1 and before the existing Phase 0.5 pause/resume boundary. */
+export async function runDocumentEvidencePhase(
+  context: AnalysisContext,
+  overrides?: DocumentEvidencePhaseOverrides
+): Promise<void> {
+  if (!evidenceEnabled(overrides) || context.originalDocumentSummaries.length === 0) return;
+  const startedAt = Date.now();
+  const mode =
+    overrides?.mode ?? (process.env.DOCUMENT_EVIDENCE_MODE === 'active' ? 'active' : 'shadow');
+  const publishMetrics = overrides?.publishMetrics ?? publishDocumentEvidenceMetricsSafely;
+  try {
+    const metric = await runDocumentEvidencePhaseCore(context, overrides, mode, startedAt);
+    await publishMetrics(metric, context.orchestrationLogger);
+  } catch (error) {
+    const durableTotals = await tryLoadDurableTotals(context, overrides);
+    const failureDeltas =
+      error instanceof ConflictDetectionExecutionError ? error.metricDeltas : undefined;
+    await publishMetrics(
+      failedStage4Metric(
+        mode,
+        Math.max(0, (Date.now() - startedAt) / 1000),
+        context.originalDocumentSummaries.length,
+        durableTotals,
+        failureDeltas
+      ),
+      context.orchestrationLogger
+    );
+    throw error;
+  }
+}
+
+async function runDocumentEvidencePhaseCore(
+  context: AnalysisContext,
+  overrides: DocumentEvidencePhaseOverrides | undefined,
+  mode: 'shadow' | 'active',
+  startedAt: number
+): Promise<DocumentEvidenceMetricEvent> {
+  if (!context.phase1Output) throw new Error('Phase 1 output required for document evidence');
+
+  const allocationById = new Map(
+    context.budgetAllocation?.documents.map(document => [document.file_id, document]) ?? []
+  );
+  const sources = context.originalDocumentSummaries.map(document => {
+    if (!document.source_version_hash) {
+      throw new Error(`Document ${document.document_id} is missing a source version hash`);
+    }
+    const allocatedPriority = allocationById.get(document.document_id)?.priority;
+    const source = {
+      documentId: document.document_id,
+      documentName: document.file_name,
+      sourceVersionHash: document.source_version_hash,
+      priority: document.stage3_priority ?? allocatedPriority ?? 'SUPPLEMENTARY',
+      authorityScope: 'course_source' as const,
+      contentQuality: document.summary_metadata.quality_score,
+      originalTokens: document.summary_metadata.original_tokens,
+      summaryTokens: document.summary_metadata.summary_tokens,
+      importanceScore: document.stage3_importance_score ?? document.summary_metadata.quality_score,
+    };
+    if (document.sourceFailure) {
+      return { ...source, sourceFailure: document.sourceFailure };
+    }
+    return {
+      ...source,
+      stage3Summary: document.processed_content || undefined,
+      stage3SummaryVersionHash: document.summary_source_version_hash,
+    };
+  });
+
+  const decisionMode =
+    overrides?.decisionMode ??
+    (mode === 'active' &&
+    !overrides?.preflightDependencies &&
+    (await getClarifyingConfig(context.courseId)).isAutomatic
+      ? 'automatic'
+      : 'manual');
+  const evidenceRepository = createDocumentEvidenceRepository(
+    context.supabase as unknown as DocumentEvidenceDatabaseClient
+  );
+  const dependencies =
+    overrides?.preflightDependencies ??
+    (() => {
+      const modelId = context.budgetAllocation?.modelSelection.modelId;
+      if (!modelId) throw new Error('Configured Stage 4 model is required for document evidence');
+      return {
+        repository: evidenceRepository,
+        structuredPort: createProductionStructuredEvidencePort(modelId),
+        extractor: createProductionEvidenceExtractor(modelId),
+        verifyTargetedSources: verifyEvidenceSourcesWithQdrant,
+        loadSourceContents: async ({ documentIds }) =>
+          fetchFullTextDocuments(documentIds, context.courseId),
+      } satisfies DocumentEvidencePreflightDependencies;
+    })();
+  const retryCoordinator = overrides?.retryCoordinator ?? evidenceRepository;
+  const pendingRetryDirectives = overrides?.retryDirective
+    ? [overrides.retryDirective]
+    : mode === 'active' && (!overrides?.preflightDependencies || overrides.retryCoordinator)
+      ? await retryCoordinator.getPendingRetryDirectives(context.courseId, 2)
+      : [];
+  const runPreflight = overrides?.runPreflight ?? runDocumentEvidencePreflight;
+  const preflightInput: DocumentEvidencePreflightInput = {
+    courseId: context.courseId,
+    organizationId: context.organizationId,
+    topic: context.input.topic,
+    language: context.input.language === 'en' ? 'en' : 'ru',
+    evidenceVersion: 'document-evidence-v1',
+    modelId: context.budgetAllocation?.modelSelection.modelId,
+    classificationContext: context.phase1Output,
+    sources,
+    modelContext: context.budgetAllocation?.modelSelection.maxContext ?? 700_000,
+    promptReserve: 10_000,
+    outputReserve: 16_000,
+    maxBatchTokens: 32_000,
+    maxRetries: 2,
+    maxVerificationDocumentIds: 100,
+    requireBoundedDownstreamContext: mode === 'active' && context.legacyBudgetFits === false,
+    ...(pendingRetryDirectives.length > 0 ? { retryDirectives: pendingRetryDirectives } : {}),
+  };
+  let result = await runPreflight(preflightInput, dependencies);
+  if (result.status === 'accepted' && result.runId && pendingRetryDirectives.length > 0) {
+    await retryCoordinator.consumeRetryDirectives({
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      targetRunId: result.runId,
+      decisionIds: pendingRetryDirectives.map(value => value.decisionId),
+    });
+  }
+  if (mode === 'active' && decisionMode === 'automatic') {
+    const maxAutomaticRetryRounds = sources.length * 2;
+    for (let round = 0; round < maxAutomaticRetryRounds; round += 1) {
+      if (result.status !== 'accepted' || !result.runId) break;
+      const directives: NonNullable<DocumentEvidencePreflightInput['retryDirectives']> = [];
+      for (const card of result.cards
+        .filter(
+          card =>
+            (card.coverage_status === 'degraded' || card.coverage_status === 'failed') &&
+            card.coverage_reason !== 'source_file_unrecoverable'
+        )
+        .sort((left, right) => left.document_id.localeCompare(right.document_id))) {
+        const state = await retryCoordinator.getDegradedRetryState({
+          runId: result.runId,
+          documentId: card.document_id,
+          configuredMaxAttempts: 2,
+        });
+        if (state.attempt >= state.maxAttempts) continue;
+        directives.push(
+          await retryCoordinator.recordAutomaticRetry({
+            runId: result.runId,
+            courseId: context.courseId,
+            organizationId: context.organizationId,
+            documentId: card.document_id,
+            configuredMaxAttempts: state.maxAttempts,
+            idempotencyKey: stableUuidV8(
+              `document-evidence-auto-retry-v1:${result.runId}:${card.document_id}:${state.attempt + 1}`
+            ),
+          })
+        );
+      }
+      if (directives.length === 0) break;
+      const durableDirectives = await retryCoordinator.getPendingRetryDirectives(
+        context.courseId,
+        2
+      );
+      if (
+        durableDirectives.length !== directives.length ||
+        durableDirectives.some(
+          (directive, index) => directive.decisionId !== directives[index]?.decisionId
+        )
+      ) {
+        throw new Error('Durable evidence retry set changed before preflight');
+      }
+      result = await runPreflight(
+        {
+          ...preflightInput,
+          retryDirective: undefined,
+          retryDirectives: durableDirectives,
+        },
+        dependencies
+      );
+      if (result.status !== 'accepted' || !result.runId) break;
+      await retryCoordinator.consumeRetryDirectives({
+        courseId: context.courseId,
+        organizationId: context.organizationId,
+        targetRunId: result.runId,
+        decisionIds: durableDirectives.map(value => value.decisionId),
+      });
+    }
+  }
+  context.documentEvidencePreflight = result;
+  context.documentEvidenceMode = mode;
+  let conflictResult: Awaited<ReturnType<typeof detectDocumentConflicts>> | undefined;
+  if (result.status === 'accepted' && result.runId) {
+    const repository = evidenceRepository;
+    const modelId = context.budgetAllocation?.modelSelection.modelId;
+    const conflictDependencies =
+      overrides?.conflictDependencies ??
+      ({
+        repository,
+        port: createProductionConflictDetectionPort({ modelId, maxRetries: 2 }),
+        verifyMaterialSources: verifyEvidenceSourcesWithQdrant,
+        log: context.orchestrationLogger,
+      } satisfies DetectDocumentConflictsDependencies);
+    const conflictInput: DetectDocumentConflictsInput = {
+      runId: result.runId,
+      courseId: context.courseId,
+      organizationId: context.organizationId,
+      language: context.input.language === 'en' ? 'en' : 'ru',
+      detectionModel: modelId ?? 'custom-conflict-port',
+      detectionVersion: 'document-conflict-v1',
+      maxClaimsPerMapBatch: 128,
+      maxValueGroupsPerComparison: 16,
+      reductionFanIn: 8,
+      maxModelCalls: 256,
+      maxInputTokens: 32_000,
+      maxOutputTokens: 8_000,
+    };
+    conflictResult = await (overrides?.detectConflicts ?? detectDocumentConflicts)(
+      conflictInput,
+      conflictDependencies
+    );
+    if (mode === 'active') {
+      const decisionInput: ResolveDocumentEvidenceDecisionsInput = {
+        runId: result.runId,
+        courseId: context.courseId,
+        organizationId: context.organizationId,
+        language: context.input.language === 'en' ? 'en' : 'ru',
+        mode: decisionMode,
+        maxUiExcerptChars: 600,
+        maxSourceRefsPerSide: 8,
+        maxDocumentsInMetadata: 16,
+        maxEvidenceRetryAttempts: 2,
+        automaticCapacityPolicy: 'continue_limited',
+      };
+      context.documentEvidenceDecisions = await (
+        overrides?.resolveDecisions ?? resolveDocumentEvidenceDecisions
+      )(
+        decisionInput,
+        overrides?.decisionDependencies ?? { repository, log: context.orchestrationLogger }
+      );
+    }
+  }
+  context.orchestrationLogger.info(
+    {
+      evidenceMode: mode,
+      evidenceStatus: result.status,
+      sourceCount: result.coverage.source_count,
+      assessedCount: result.coverage.assessed_count,
+      degradedCount: result.coverage.degraded_count,
+      failedCount: result.coverage.failed_count,
+    },
+    'Document evidence preflight complete'
+  );
+  const processingModes = {
+    full_text: 0,
+    hierarchical_summary: 0,
+    summary: 0,
+    targeted_retrieval: 0,
+    metadata_only: 0,
+  };
+  for (const card of result.cards) {
+    if (card.processing_mode in processingModes) {
+      processingModes[card.processing_mode] += 1;
+    }
+  }
+  const conflicts = conflictResult?.conflicts ?? [];
+  const preflightMetricDeltas = result.metricDeltas ?? {
+    acceptedRun: 1 as const,
+    documents: {
+      source: result.coverage.source_count,
+      assessed: result.coverage.assessed_count,
+      degraded: result.coverage.degraded_count,
+      failed: result.coverage.failed_count,
+    },
+    processingModes,
+    batches: result.batchDocumentIds.length,
+    generationMetrics: result.generationMetrics,
+  };
+  const conflictMetricDeltas = conflictResult?.metricDeltas ?? {
+    batches: conflictResult?.batchCount ?? 0,
+    usage: conflictResult?.usage,
+    conflicts: {
+      critical: conflicts.filter(conflict => conflict.severity === 'critical').length,
+      important: conflicts.filter(conflict => conflict.severity === 'important').length,
+      informational: conflicts.filter(conflict => conflict.severity === 'informational').length,
+    },
+  };
+  const conflictUsage = conflictMetricDeltas.usage;
+  let criticalConflictState:
+    | { unresolved: number; oldestUnixSeconds: number; observedAtUnixMilliseconds: number }
+    | undefined;
+  try {
+    criticalConflictState = await (
+      overrides?.loadCriticalConflictState ?? (() => loadDurableCriticalConflictState(context))
+    )();
+  } catch {
+    // A failed reconciliation must never clear a previously published unresolved state.
+  }
+  const durableTotals = await tryLoadDurableTotals(context, overrides);
+  let decisionTotals = durableTotals?.decisions;
+  if (!decisionTotals && overrides?.loadDecisionTotals) {
+    try {
+      decisionTotals = await overrides.loadDecisionTotals();
+    } catch {
+      // A failed totals reconciliation must not change monotonic decision counters.
+    }
+  }
+  return {
+    stage: 'stage4',
+    status: 'accepted',
+    mode,
+    runDelta: preflightMetricDeltas.acceptedRun,
+    observedAtUnixMilliseconds: performance.timeOrigin + performance.now(),
+    coverage: {
+      source: result.coverage.source_count,
+      assessed: result.coverage.assessed_count,
+      degraded: result.coverage.degraded_count,
+      failed: result.coverage.failed_count,
+    },
+    documentDeltas: preflightMetricDeltas.documents,
+    processingModes: preflightMetricDeltas.processingModes,
+    batches: preflightMetricDeltas.batches + conflictMetricDeltas.batches,
+    inputTokens:
+      preflightMetricDeltas.generationMetrics.inputTokens + (conflictUsage?.input_tokens ?? 0),
+    outputTokens:
+      preflightMetricDeltas.generationMetrics.outputTokens + (conflictUsage?.output_tokens ?? 0),
+    modelCalls:
+      preflightMetricDeltas.generationMetrics.modelCalls + (conflictUsage?.model_calls ?? 0),
+    costUsd:
+      preflightMetricDeltas.generationMetrics.totalCostUsd + (conflictUsage?.total_cost_usd ?? 0),
+    durationSeconds:
+      preflightMetricDeltas.acceptedRun === 1 ? Math.max(0, (Date.now() - startedAt) / 1000) : 0,
+    conflicts: conflictMetricDeltas.conflicts,
+    ...(decisionTotals ? { decisions: decisionTotals } : {}),
+    ...(durableTotals ? { durableTotals } : {}),
+    ...(criticalConflictState ? { criticalConflictState } : {}),
+  };
+}
 
 /**
  * Complete a phase and log its trace data
@@ -101,7 +682,7 @@ async function completePhaseWithTrace<
  * Phase 1: Basic Classification (12-25%)
  */
 export async function runClassificationPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, originalDocumentSummaries } = context;
+  const { courseId, input, supabase, orchestrationLogger, resolvedDocumentSummaries } = context;
   const phase1CacheKey = `phase1_cache:${courseId}`;
   const redis = getRedisClient();
 
@@ -146,6 +727,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
 
   if (!usedCache) {
     await startPhase(1, courseId, supabase, orchestrationLogger);
+    const phase1DocumentSummaries = buildPhase1DocumentSummaries(resolvedDocumentSummaries);
 
     phase1Output = await executePhaseWithRetry(
       'phase1_classification',
@@ -154,12 +736,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
           course_id: courseId,
           language: input.language,
           topic: input.topic,
-          document_summaries:
-            originalDocumentSummaries?.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })) || null,
+          document_summaries: phase1DocumentSummaries.length > 0 ? phase1DocumentSummaries : null,
           target_audience: input.target_audience,
           lesson_duration_minutes: input.lesson_duration_minutes,
           course_description: input.course_description,
@@ -210,6 +787,35 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
  * Run Phase 0.5 clarifying questions
  * Phase 0.5: Clarifying Questions (25-28%)
  */
+async function transitionToClarifyingStatus(context: AnalysisContext): Promise<void> {
+  const { courseId, supabase, orchestrationLogger } = context;
+  const { data: currentCourse } = await supabase
+    .from('courses')
+    .select('generation_progress')
+    .eq('id', courseId)
+    .single();
+  const currentProgress = (currentCourse?.generation_progress ?? {}) as Record<string, unknown>;
+  const { error: statusError } = await supabase
+    .from('courses')
+    .update({
+      generation_status: 'stage_4_clarifying',
+      generation_progress: {
+        ...currentProgress,
+        message: PROGRESS_MESSAGES.step_0_5_waiting,
+      },
+      last_progress_update: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', courseId);
+  if (statusError) {
+    orchestrationLogger.error(
+      { error: statusError.message },
+      'Failed to transition to stage_4_clarifying'
+    );
+    throw new Error('Failed to persist the clarifying question boundary');
+  }
+}
+
 export async function runClarifyingPhase(context: AnalysisContext): Promise<void> {
   const {
     courseId,
@@ -227,7 +833,8 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
 
   const clarifyingConfig = await getClarifyingConfig(courseId);
 
-  if (!clarifyingConfig.enabled || clarifyingConfig.skipped) {
+  const conflictPauseRequired = context.documentEvidenceDecisions?.pauseRequired === true;
+  if ((!clarifyingConfig.enabled || clarifyingConfig.skipped) && !conflictPauseRequired) {
     orchestrationLogger.info('Clarifying questions disabled or skipped');
     return;
   }
@@ -239,9 +846,16 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
 
   const pendingQuestions = await getPendingQuestions(courseId);
   const answeredQuestions = await getAnsweredQuestions(courseId);
-  const hasExistingQuestions = pendingQuestions.length > 0 || answeredQuestions.length > 0;
+  const ordinaryPendingQuestions = pendingQuestions.filter(
+    question => question.question_category !== 'document_conflicts'
+  );
+  const ordinaryAnsweredQuestions = answeredQuestions.filter(
+    question => question.question_category !== 'document_conflicts'
+  );
+  const hasExistingQuestions =
+    ordinaryPendingQuestions.length > 0 || ordinaryAnsweredQuestions.length > 0;
 
-  if (!hasExistingQuestions) {
+  if (clarifyingConfig.enabled && !clarifyingConfig.skipped && !hasExistingQuestions) {
     // Generate questions
     orchestrationLogger.info('Generating clarifying questions');
     await updateCourseProgress(
@@ -279,37 +893,10 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         supabase
       );
     } else {
-      // Transition to clarifying status + update progress message directly
-      // Cannot use updateCourseProgress RPC here because:
-      // - RPC rejects non-standard statuses like 'stage_4_clarifying'
-      // - Using 'in_progress' would overwrite generation_status to 'stage_4_analyzing'
-      const { data: currentCourse } = await supabase
-        .from('courses')
-        .select('generation_progress')
-        .eq('id', courseId)
-        .single();
-
-      const currentProgress = (currentCourse?.generation_progress ?? {}) as Record<string, unknown>;
-
-      const { error: statusError } = await supabase
-        .from('courses')
-        .update({
-          generation_status: 'stage_4_clarifying',
-          generation_progress: {
-            ...currentProgress,
-            message: PROGRESS_MESSAGES.step_0_5_waiting,
-          },
-          last_progress_update: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', courseId);
-
-      if (statusError) {
-        orchestrationLogger.error(
-          { error: statusError.message },
-          'Failed to transition to stage_4_clarifying'
-        );
-      }
+      // The status/progress write is the durable resume boundary. It must also be
+      // used when ordinary clarifying generation is disabled but evidence added
+      // required questions.
+      await transitionToClarifyingStatus(context);
 
       const generatedQuestions = await getPendingQuestions(courseId);
       const criticalCount = generatedQuestions.filter(
@@ -328,6 +915,7 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         const answeredCount = await autoAnswerAllQuestions(courseId);
         orchestrationLogger.info({ answeredCount }, 'Automatic mode: auto-answered remaining');
       } else {
+        await transitionToClarifyingStatus(context);
         throw new ClarifyingQuestionsInterrupt(
           criticalPending.length,
           pendingQuestions.length,
@@ -380,6 +968,12 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
   if (!phase1Output) {
     throw new Error('Phase 1 output required for scope phase');
   }
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
 
   await startPhase(2, courseId, supabase, orchestrationLogger);
 
@@ -395,7 +989,7 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
           course_id: courseId,
           language: input.language,
           topic: input.topic,
-          document_summaries: resolvedDocumentSummaries?.map(ds => ds.processed_content) || null,
+          document_summaries: downstreamDocumentSummaries.map(ds => ds.processed_content),
           phase1_output: phase1Output,
           course_size: input.course_size,
           target_lessons: input.target_lessons,
@@ -510,7 +1104,17 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(3, courseId, supabase, orchestrationLogger);
 
-  const documentSummariesText = resolvedDocumentSummaries?.map(ds => ds.processed_content) || null;
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
+  const documentSummariesText = downstreamDocumentSummaries.map(ds => ds.processed_content);
+  const boundedRepresentation =
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined;
 
   const phase3Output: Phase3Output = await executePhaseWithRetry(
     'phase3_expert',
@@ -523,28 +1127,40 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         clarifying_answers: clarifyingAnswers,
-        budget_context: context.budgetAllocation
+        budget_context: boundedRepresentation
           ? {
-              documents: context.budgetAllocation.documents.map(d => {
-                const docSummary = resolvedDocumentSummaries?.find(
-                  ds => ds.document_id === d.file_id
-                );
-                if (!docSummary) {
-                  orchestrationLogger.warn(
-                    { file_id: d.file_id, priority: d.priority },
-                    'Budget document not found in resolvedDocumentSummaries, using file_id as name'
-                  );
-                }
-                return {
-                  file_name: docSummary?.file_name || d.file_id,
-                  mode: d.mode,
-                  priority: d.priority,
-                  tokens: d.tokens,
-                };
-              }),
-              totalTokens: context.budgetAllocation.totalTokens,
+              documents: [
+                {
+                  file_name: 'Synthetic advisory evidence digest (not an uploaded document)',
+                  mode: 'summary',
+                  priority: 'SUPPLEMENTARY',
+                  tokens: boundedRepresentation.tokenCount,
+                },
+              ],
+              totalTokens: boundedRepresentation.tokenCount,
             }
-          : undefined,
+          : context.budgetAllocation
+            ? {
+                documents: context.budgetAllocation.documents.map(d => {
+                  const docSummary = downstreamDocumentSummaries.find(
+                    ds => ds.document_id === d.file_id
+                  );
+                  if (!docSummary) {
+                    orchestrationLogger.warn(
+                      { file_id: d.file_id, priority: d.priority },
+                      'Budget document not found in resolvedDocumentSummaries, using file_id as name'
+                    );
+                  }
+                  return {
+                    file_name: docSummary?.file_name || d.file_id,
+                    mode: d.mode,
+                    priority: d.priority,
+                    tokens: d.tokens,
+                  };
+                }),
+                totalTokens: context.budgetAllocation.totalTokens,
+              }
+            : undefined,
       }),
     orchestrationLogger
   );
@@ -586,6 +1202,12 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
   if (!phase1Output || !phase2Output || !phase3Output) {
     throw new Error('Phase 1, 2, and 3 outputs required for synthesis phase');
   }
+  const downstreamDocumentSummaries = resolveDownstreamDocumentSummaries(
+    resolvedDocumentSummaries,
+    context.documentEvidenceMode === 'active'
+      ? context.documentEvidencePreflight?.downstreamRepresentation
+      : undefined
+  );
 
   await startPhase(4, courseId, supabase, orchestrationLogger);
 
@@ -596,7 +1218,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
         course_id: courseId,
         language: input.language,
         topic: input.topic,
-        document_summaries: resolvedDocumentSummaries || null,
+        document_summaries: downstreamDocumentSummaries,
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         phase3_output: phase3Output,

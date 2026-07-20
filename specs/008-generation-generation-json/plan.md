@@ -1,3 +1,5 @@
+> **SUPERSEDED PLAN — NOT RUNTIME GUIDANCE.** Hosted Qdrant assumptions below are retained as history and replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Implementation Plan: Generation Phase - Course Structure JSON Generation
 
 **Branch**: `008-generation-generation-json` | **Date**: 2025-11-05 | **Spec**: [spec.md](spec.md)

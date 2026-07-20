@@ -1,3 +1,5 @@
+> **SUPERSEDED DATA-MODEL NOTE — NOT RUNTIME GUIDANCE.** Hosted Qdrant references below are replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Data Model: Stage 3 - Document Summarization
 
 **Feature**: Stage 3 - Document Summarization

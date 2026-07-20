@@ -6,12 +6,53 @@ import type { RAGChunk as SectionRAGChunk } from '@/stages/stage5-generation/uti
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
+import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { rerankChunks } from './reranking';
 import { calculateLessonCoverage } from './coverage';
+import {
+  getStage6EvidenceProvenance,
+  isStage6EvidenceChunkAllowed,
+  Stage6EvidenceScopeError,
+  type Stage6AcceptedEvidenceContext,
+} from './evidence-context';
+
+function requireTenantScope(organizationId: string | undefined): string {
+  if (!organizationId) {
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 document retrieval requires an organization tenant scope'
+    );
+  }
+  return organizationId;
+}
+
+function assertEvidenceSearchResult(input: {
+  result: { chunk_id: string; document_id: string; payload?: Record<string, unknown> };
+  courseId: string;
+  organizationId: string;
+  evidenceContext: Stage6AcceptedEvidenceContext;
+}): void {
+  const { result, courseId, organizationId, evidenceContext } = input;
+  const payload = result.payload;
+  if (!evidenceContext.allowedDocumentIds.includes(result.document_id)) {
+    throw new Stage6EvidenceScopeError('Stage 6 Qdrant result is outside the accepted run scope');
+  }
+  if (!payload || payload.organization_id !== organizationId || payload.course_id !== courseId) {
+    throw new Stage6EvidenceScopeError('Stage 6 Qdrant result failed tenant/course validation');
+  }
+  if (payload.version_hash !== evidenceContext.sourceVersionByDocumentId[result.document_id]) {
+    throw new Stage6EvidenceScopeError('Stage 6 Qdrant result has a stale source version');
+  }
+  if (!isStage6EvidenceChunkAllowed(evidenceContext, result.document_id, result.chunk_id)) {
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 Qdrant result is outside the accepted source-ref/chunk scope'
+    );
+  }
+}
 
 /**
  * Retrieve RAG context for a single lesson
@@ -22,14 +63,18 @@ import { calculateLessonCoverage } from './coverage';
  * @param params - Lesson retrieval parameters
  * @returns LessonRAGResult with chunks and metrics
  */
-export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {
+async function retrieveLessonContextCore(
+  params: LessonRAGParams
+): Promise<LessonRAGResult & { fallbackUsed?: boolean }> {
   const startTime = Date.now();
   const {
     courseId,
+    organizationId,
     lessonSpec,
     targetChunks = LESSON_RAG_CONFIG.TARGET_CHUNKS,
     useCache = true,
     enablePriorityBoost = true, // Default: boost CORE/IMPORTANT documents
+    evidenceContext,
   } = params;
 
   logger.debug(
@@ -46,10 +91,24 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
   // Preserve existing resilience: if a lesson already has cached RAG context,
   // reuse it without touching live Qdrant.
   if (useCache && lessonSpec.rag_context) {
-    const ragContextId = generateCacheKey(courseId, lessonSpec.lesson_id);
+    const ragContextId = generateCacheKey(
+      courseId,
+      lessonSpec.lesson_id,
+      evidenceContext?.cacheIdentity
+    );
     const cached = await ragContextCache.get(ragContextId);
 
     if (cached) {
+      if (
+        evidenceContext &&
+        cached.chunks.some(
+          chunk => !isStage6EvidenceChunkAllowed(evidenceContext, chunk.documentId, chunk.chunkId)
+        )
+      ) {
+        throw new Stage6EvidenceScopeError(
+          'Stage 6 cache contains a document outside the current accepted evidence scope'
+        );
+      }
       logger.debug(
         {
           lessonId: lessonSpec.lesson_id,
@@ -89,6 +148,13 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         relevance_score: chunk.score,
         metadata: {
           matched_query: chunk.matchedQuery,
+          ...(evidenceContext && {
+            evidence_provenance: getStage6EvidenceProvenance(
+              evidenceContext,
+              chunk.documentId,
+              chunk.chunkId
+            ),
+          }),
         },
       }));
 
@@ -119,6 +185,18 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
   }
 
+  const tenantOrganizationId = requireTenantScope(organizationId);
+  if (evidenceContext && evidenceContext.allowedDocumentIds.length === 0) {
+    logger.info(
+      {
+        outcome: 'empty',
+        allowedDocumentCount: 0,
+      },
+      '[Lesson RAG] Accepted evidence decisions exclude all document refs'
+    );
+    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+  }
+
   // Build search queries from lesson specification
   const queries = buildLessonQueries(lessonSpec);
 
@@ -142,9 +220,25 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
   const allChunks: LessonRAGChunk[] = [];
   const seenChunkIds = new Set<string>();
   const queriesUsed: string[] = [];
+  let queryFailureCount = 0;
 
   // Shared filter config for all queries
-  const primaryDocIds = lessonSpec.rag_context?.primary_documents;
+  const specifiedPrimaryDocIds = lessonSpec.rag_context?.primary_documents;
+  const primaryDocIds = evidenceContext
+    ? specifiedPrimaryDocIds && specifiedPrimaryDocIds.length > 0
+      ? specifiedPrimaryDocIds.filter(documentId =>
+          evidenceContext.allowedDocumentIds.includes(documentId)
+        )
+      : evidenceContext.allowedDocumentIds
+    : specifiedPrimaryDocIds;
+  if (
+    evidenceContext &&
+    specifiedPrimaryDocIds &&
+    specifiedPrimaryDocIds.length > 0 &&
+    primaryDocIds?.length === 0
+  ) {
+    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+  }
   const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
 
   logger.debug(
@@ -181,14 +275,26 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
           enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
           enable_priority_boost: enablePriorityBoost,
           filters: {
+            organization_id: tenantOrganizationId,
             course_id: courseId,
             ...(filteringByDocs && { document_ids: primaryDocIds }),
           },
+          include_payload: Boolean(evidenceContext),
+          group_by_document: true,
+          group_size: 2,
         };
 
         const response = await searchChunks(query, searchOptions);
 
         for (const result of response.results) {
+          if (evidenceContext) {
+            assertEvidenceSearchResult({
+              result,
+              courseId,
+              organizationId: tenantOrganizationId,
+              evidenceContext,
+            });
+          }
           if (!seenChunkIds.has(result.chunk_id)) {
             seenChunkIds.add(result.chunk_id);
             allChunks.push({
@@ -207,7 +313,6 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         logger.debug(
           {
             lessonId: lessonSpec.lesson_id,
-            query: query.substring(0, 50),
             resultsCount: response.results.length,
             totalUnique: allChunks.length,
             tier: 1,
@@ -215,10 +320,11 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
           '[Lesson RAG] Tier 1 query executed'
         );
       } catch (error) {
+        if (error instanceof Stage6EvidenceScopeError) throw error;
+        queryFailureCount += 1;
         logger.warn(
           {
             err: error instanceof Error ? error.message : String(error),
-            query: query.substring(0, 50),
             lessonId: lessonSpec.lesson_id,
             tier: 1,
           },
@@ -231,6 +337,13 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
 
     // Strike-Two: if ALL Tier 1 queries returned 0 chunks → early exit
     if (allChunks.length === 0) {
+      if (ragAvailability.ragRequired && queryFailureCount > 0) {
+        throw new RequiredRagUnavailableError(
+          courseId,
+          'qdrant_service_unavailable',
+          'All Stage 6 retrieval queries failed after required-RAG preflight'
+        );
+      }
       logger.info(
         {
           lessonId: lessonSpec.lesson_id,
@@ -268,7 +381,10 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         // Don't fail on trace error
       }
 
-      return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+      return {
+        ...createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime),
+        fallbackUsed: queryFailureCount > 0,
+      };
     }
 
     // Compute Tier 1 max score for threshold tuning data
@@ -325,14 +441,26 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
         enable_priority_boost: enablePriorityBoost,
         filters: {
+          organization_id: tenantOrganizationId,
           course_id: courseId,
           ...(filteringByDocs && { document_ids: primaryDocIds }),
         },
+        include_payload: Boolean(evidenceContext),
+        group_by_document: true,
+        group_size: 2,
       };
 
       const response = await searchChunks(query, searchOptions);
 
       for (const result of response.results) {
+        if (evidenceContext) {
+          assertEvidenceSearchResult({
+            result,
+            courseId,
+            organizationId: tenantOrganizationId,
+            evidenceContext,
+          });
+        }
         if (!seenChunkIds.has(result.chunk_id)) {
           seenChunkIds.add(result.chunk_id);
           allChunks.push({
@@ -351,7 +479,6 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
       logger.debug(
         {
           lessonId: lessonSpec.lesson_id,
-          query: query.substring(0, 50),
           resultsCount: response.results.length,
           totalUnique: allChunks.length,
           tier: 2,
@@ -359,10 +486,11 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         '[Lesson RAG] Tier 2 query executed'
       );
     } catch (error) {
+      if (error instanceof Stage6EvidenceScopeError) throw error;
+      queryFailureCount += 1;
       logger.warn(
         {
           err: error instanceof Error ? error.message : String(error),
-          query: query.substring(0, 50),
           lessonId: lessonSpec.lesson_id,
           tier: 2,
         },
@@ -372,6 +500,14 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
 
     // Stop if we have enough candidates
     if (allChunks.length >= Math.min(candidateCount * 1.5, LESSON_RAG_CONFIG.MAX_CHUNKS * 4)) break;
+  }
+
+  if (ragAvailability.ragRequired && queryFailureCount > 0) {
+    throw new RequiredRagUnavailableError(
+      courseId,
+      'qdrant_service_unavailable',
+      'Stage 6 required evidence retrieval was incomplete'
+    );
   }
 
   // Track candidates before reranking for metrics
@@ -401,6 +537,13 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     relevance_score: chunk.similarity_score,
     metadata: {
       matched_query: chunk.matched_query,
+      ...(evidenceContext && {
+        evidence_provenance: getStage6EvidenceProvenance(
+          evidenceContext,
+          chunk.document_id,
+          chunk.chunk_id
+        ),
+      }),
     },
   }));
 
@@ -457,22 +600,29 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
   // Cache the result if enabled
   if (useCache) {
     try {
-      await ragContextCache.store(courseId, lessonSpec.lesson_id, {
-        sectionId: lessonSpec.lesson_id,
-        chunks: sortedChunks.map(c => ({
-          chunkId: c.chunk_id,
-          documentId: c.document_id,
-          documentName: c.document_name,
-          content: c.content,
-          headingPath: c.heading_path,
-          score: c.similarity_score,
-          matchedQuery: c.matched_query,
-        })),
-        totalRetrieved: ragChunks.length,
-        searchQueriesUsed: [...new Set(queriesUsed)],
-        coverageScore,
-        retrievalDurationMs,
-      });
+      const cacheIdentity = generateCacheKey(
+        courseId,
+        lessonSpec.lesson_id,
+        evidenceContext?.cacheIdentity
+      );
+      await ragContextCache.getOrRetrieve(courseId, lessonSpec.lesson_id, cacheIdentity, () =>
+        Promise.resolve({
+          sectionId: lessonSpec.lesson_id,
+          chunks: sortedChunks.map(c => ({
+            chunkId: c.chunk_id,
+            documentId: c.document_id,
+            documentName: c.document_name,
+            content: c.content,
+            headingPath: c.heading_path,
+            score: c.similarity_score,
+            matchedQuery: c.matched_query,
+          })),
+          totalRetrieved: ragChunks.length,
+          searchQueriesUsed: [...new Set(queriesUsed)],
+          coverageScore,
+          retrievalDurationMs,
+        })
+      );
     } catch (cacheError) {
       logger.warn(
         {
@@ -503,7 +653,33 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     coverageScore,
     retrievalDurationMs,
     cached: false,
+    fallbackUsed: queryFailureCount > 0,
   };
+}
+
+export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {
+  try {
+    const result = await retrieveLessonContextCore(params);
+    const status = result.cached
+      ? 'cached'
+      : result.fallbackUsed
+        ? 'fallback'
+        : result.totalRetrieved > 0
+          ? 'success'
+          : 'empty';
+    await publishDocumentEvidenceMetricsSafely(
+      { stage: 'stage6', status, retrievals: 1, fallbacks: status === 'fallback' ? 1 : 0 },
+      logger
+    );
+    const { fallbackUsed: _fallbackUsed, ...publicResult } = result;
+    return publicResult;
+  } catch (error) {
+    await publishDocumentEvidenceMetricsSafely(
+      { stage: 'stage6', status: 'failed', retrievals: 1, fallbacks: 0 },
+      logger
+    );
+    throw error;
+  }
 }
 
 /**

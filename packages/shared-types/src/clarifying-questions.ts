@@ -11,6 +11,7 @@
  * - Migration: 20260127_question_types.sql
  */
 
+import { z } from 'zod';
 import type { Database } from './database.types';
 
 /**
@@ -31,7 +32,27 @@ export type QuestionStatus = 'pending' | 'answered' | 'skipped';
 /**
  * Answer source tracking
  */
-export type AnswerSource = 'suggested' | 'modified' | 'custom';
+export const AnswerSourceSchema = z.enum(['suggested', 'modified', 'custom', 'system']);
+export type AnswerSource = z.infer<typeof AnswerSourceSchema>;
+
+/**
+ * Canonical Stage 4 clarifying-question categories.
+ *
+ * `document_conflicts` is kept separate so clients can render material evidence
+ * conflicts in their own required-question block.
+ */
+export const ClarifyingQuestionCategorySchema = z.enum([
+  'company_context',
+  'audience',
+  'expected_outcomes',
+  'content_structure',
+  'focus_priorities',
+  'business_goals',
+  'practical_application',
+  'constraints',
+  'document_conflicts',
+]);
+export type ClarifyingQuestionCategory = z.infer<typeof ClarifyingQuestionCategorySchema>;
 
 /**
  * User answer stored in JSONB format (user_answer column)
@@ -62,6 +83,8 @@ export interface UserAnswerValue {
 export interface SuggestedAnswer {
   /** The suggested answer text */
   text: string;
+  /** Stable machine value persisted by document-evidence decisions */
+  value?: string;
   /** Rationale explaining why this is suggested */
   rationale?: string;
   /** Flag indicating if this is the AI-recommended answer */
@@ -77,6 +100,8 @@ export interface SuggestedAnswer {
 export interface QuestionMetadata {
   /** Selected suggestion indexes for multi_choice questions */
   selected_suggestion_indexes?: number[];
+  /** Current append-only decision used as the optimistic concurrency token */
+  current_decision_id?: string;
   /** Additional metadata fields can be added here */
   [key: string]: unknown;
 }

@@ -29,6 +29,7 @@ function makeDoc(
 ): DocumentSummaryResult {
   return {
     file_name: 'test.pdf',
+    source_version_hash: `sha256:${overrides.document_id}`,
     processed_content: 'summary content',
     processing_method: 'balanced',
     summary_metadata: {

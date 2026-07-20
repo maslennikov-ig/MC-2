@@ -174,6 +174,7 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
             chunksRetrieved: formattedChunks.length,
             totalResults: response.metadata.total_results,
             searchType: response.metadata.search_type,
+            fallbackUsed: response.metadata.fallback_used,
           },
           '[RAG Tool] Search completed successfully'
         );
@@ -183,6 +184,7 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           metadata: {
             total_results: response.metadata.total_results,
             search_type: response.metadata.search_type,
+            fallback_used: response.metadata.fallback_used,
           },
         };
       } catch (error) {
@@ -202,6 +204,7 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           metadata: {
             total_results: 0,
             search_type: 'error',
+            fallback_used: false,
           },
         };
       }

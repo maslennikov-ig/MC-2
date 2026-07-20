@@ -13,6 +13,10 @@ import { z } from 'zod';
 
 // Import from common-enums.ts (single source of truth)
 import { courseLevelSchema, type CourseLevel } from './common-enums';
+import {
+  DocumentEvidenceEnrichmentStatusSchema,
+  EvidenceSourceRefSchema,
+} from './document-evidence';
 
 // ============================================================================
 // VALIDATION SEVERITY SYSTEM
@@ -879,6 +883,114 @@ export const RetryCountSchema = z.object({
 
 export type RetryCount = z.infer<typeof RetryCountSchema>;
 
+const Stage5EvidenceRefSchema = EvidenceSourceRefSchema;
+
+const Stage5SectionEvidenceSchema = z
+  .object({
+    section_number: z.number().int().positive(),
+    search_queries: z.array(z.string().min(3).max(300)).max(4),
+    evidence_refs: z.array(Stage5EvidenceRefSchema).max(16),
+  })
+  .strict()
+  .superRefine((section, context) => {
+    if (new Set(section.search_queries).size !== section.search_queries.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['search_queries'],
+        message: 'Stage 5 evidence search queries must be unique',
+      });
+    }
+    const refKeys = section.evidence_refs.map(ref => JSON.stringify(ref));
+    if (new Set(refKeys).size !== refKeys.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['evidence_refs'],
+        message: 'Stage 5 evidence refs must be unique',
+      });
+    }
+  });
+
+/**
+ * Durable, privacy-safe audit of the Stage 5 advisory evidence pass.
+ * Source and claim bodies deliberately remain in tenant-scoped evidence storage.
+ */
+export const Stage5DocumentEvidenceEnrichmentSchema = z
+  .object({
+    schema_version: z.literal('stage5-document-evidence-enrichment-v1'),
+    status: DocumentEvidenceEnrichmentStatusSchema,
+    accepted_run_id: z.string().uuid().nullable(),
+    accepted_decision_ids: z.array(z.string().uuid()).max(1_000),
+    section_evidence: z.array(Stage5SectionEvidenceSchema).max(30),
+    provenance_hash: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+    attempted_patches: z.number().int().min(0).max(2),
+    retrieved_ref_count: z.number().int().nonnegative().max(480),
+    fallback_section_count: z.number().int().nonnegative().max(30),
+  })
+  .strict()
+  .superRefine((record, context) => {
+    const sortedDecisions = [...record.accepted_decision_ids].sort();
+    if (
+      new Set(record.accepted_decision_ids).size !== record.accepted_decision_ids.length ||
+      sortedDecisions.some(
+        (decisionId, index) => decisionId !== record.accepted_decision_ids[index]
+      )
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['accepted_decision_ids'],
+        message: 'Stage 5 accepted decision IDs must be sorted and unique',
+      });
+    }
+    const sectionNumbers = record.section_evidence.map(section => section.section_number);
+    if (
+      new Set(sectionNumbers).size !== sectionNumbers.length ||
+      sectionNumbers.some(
+        (sectionNumber, index) => index > 0 && sectionNumber <= sectionNumbers[index - 1]
+      )
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['section_evidence'],
+        message: 'Stage 5 section evidence must be sorted and unique by section number',
+      });
+    }
+    const refCount = record.section_evidence.reduce(
+      (total, section) => total + section.evidence_refs.length,
+      0
+    );
+    if (record.retrieved_ref_count !== refCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['retrieved_ref_count'],
+        message: 'Stage 5 retrieved ref count must equal persisted section refs',
+      });
+    }
+    if (record.status === 'not_applicable') {
+      if (
+        record.accepted_run_id !== null ||
+        record.accepted_decision_ids.length > 0 ||
+        record.section_evidence.length > 0 ||
+        record.attempted_patches !== 0 ||
+        record.fallback_section_count !== 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'not_applicable Stage 5 evidence cannot reference a run, decisions, or evidence',
+        });
+      }
+    } else if (record.accepted_run_id === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['accepted_run_id'],
+        message: 'Applicable Stage 5 evidence requires an accepted run',
+      });
+    }
+  });
+
+export type Stage5DocumentEvidenceEnrichment = z.infer<
+  typeof Stage5DocumentEvidenceEnrichmentSchema
+>;
+
 /**
  * Complete generation metadata schema (FR-025)
  * Stored in courses.generation_metadata JSONB column
@@ -891,6 +1003,7 @@ export const GenerationMetadataSchema = z.object({
   quality_scores: QualityScoresSchema,
   batch_count: z.number().int().positive().describe('Number of section batches processed'),
   retry_count: RetryCountSchema,
+  document_evidence_enrichment: Stage5DocumentEvidenceEnrichmentSchema.optional(),
   created_at: z.string().datetime().describe('ISO 8601 timestamp of generation completion'),
 });
 

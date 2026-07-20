@@ -19,6 +19,15 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `.codex/project-index.md` - this stable navigation map.
 - `graphify-out/GRAPH_REPORT.md` - local ignored Graphify orientation report for architecture, impact, and unfamiliar-code navigation.
 - `.graphifyignore` - Graphify source filter for dependencies, runtime state, generated output, secrets, and noisy artifacts.
+- `docs/superpowers/specs/` - approved design specifications for agentic implementation stages.
+- `docs/superpowers/plans/` - task-by-task implementation plans with verification and delivery gates.
+- `docs/superpowers/prompts/` - validated manual start prompts for fresh orchestrator tasks.
+- Self-hosted Qdrant platform design/plan: `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md` and `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`.
+- Advisory document evidence design/plan: `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md` and `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`.
+- Document-evidence operator runbook: `docs/operations/document-evidence.md`; self-hosted Qdrant runtime/recovery runbook: `docs/operations/qdrant-self-hosted.md`.
+- Qdrant developer setup and module contracts: `packages/course-gen-platform/docs/qdrant-setup.md` and `packages/course-gen-platform/src/shared/qdrant/README.md`.
+- Qdrant schema/retrieval source: `packages/course-gen-platform/src/shared/qdrant/config.ts`, `collection-schema.ts`, `collection-manager.ts`, and `search-operations.ts`; reindex/recovery CLIs: `packages/course-gen-platform/tools/qdrant/`.
+- Qdrant operations assets: `deploy/qdrant/`, `deploy/systemd/`, and `ops/qdrant/`; guarded source-recovery host entrypoint: `deploy/qdrant/source-recovery-run.sh`; local-disk Supabase backup operator: `deploy/postgres/backup-supabase.sh`; Qdrant server image ledger: `deploy/qdrant/image-lock.json`; monitoring image ledger: `ops/qdrant/image-lock.json`.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
 - `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
@@ -63,6 +72,11 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
 - Shared Career Playbook contracts: `packages/shared-types/src/career-playbook.ts`.
+- Shared document-evidence contracts: `packages/shared-types/src/document-evidence.ts`; compact Stage 5 audit contract: `packages/shared-types/src/generation-result.ts`.
+- Stage 4 evidence ownership: `packages/course-gen-platform/src/stages/stage4-analysis/evidence/`, with production ordering in `orchestrator.ts` / `orchestrator-phase-helpers.ts` and durable behavior in `stage4-analysis/README.md`.
+- Document-conflict question UI: `packages/web/components/generation-graph/panels/clarifying/`; canonical question and answer-source contracts: `packages/shared-types/src/clarifying-questions.ts`.
+- Stage 5 advisory evidence ownership: `packages/course-gen-platform/src/stages/stage5-generation/evidence/`, with the live handler/orchestrator entrypoint and durable behavior in `stage5-generation/README.md`; shared active gating lives in `packages/course-gen-platform/src/shared/document-evidence/rollout.ts` and deterministic Stage 5 cohort selection in `packages/course-gen-platform/src/stages/stage5-generation/evidence/rollout.ts`.
+- Stage 6 decision-aware retrieval ownership: `packages/course-gen-platform/src/stages/stage6-lesson-content/rag/`, with the live caller in `services/job-processor.ts` and durable behavior in `stage6-lesson-content/README.md`.
 
 ## Integrations And Sources Of Truth
 

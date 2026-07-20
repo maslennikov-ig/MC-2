@@ -1,0 +1,591 @@
+{
+  "schema_version": "megacampus.q12.command-manifest/v1",
+  "commands": {
+    "barrier.install": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "install",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "0caafb416a252f5b00d606e813ac2d4c021415e1137ecb6b7c5383e058db373b",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.verify-after-base": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "verify-extended",
+        "--after-migration",
+        "20260711140000",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "a9eb8d69416dbc8102e473d1b6c9716d5604392b4140581a18b65137210eea1e",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.verify-after-observability": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "verify-extended",
+        "--after-migration",
+        "20260711151000",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "0dfd3b80aac5674cbb77a1c708e8f4751dff96f4465362c3a4c0862b78ab321d",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.prepare-recovery": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "prepare-recovery",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "b45a23caaa74f197a0779e52b460079c53ea246ba1951456fd8f04856673021c",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "barrier.activate": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/q12-database-barrier.sh",
+        "activate",
+        "--run-id",
+        "<run-id>",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--expected-post-migration-catalog",
+        "/opt/megacampus/backups/q12/<run-id>/expected-post-migration-catalog.json",
+        "--expected-post-migration-catalog-sha256",
+        "<expected-post-migration-catalog-sha256>"
+      ],
+      "argv_sha256": "f267f1dc9889ae85171257b2ddaf553cb372fe97be9deb7e201b7e5bcc69c191",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "operator.self-check": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/operator-compose.sh",
+        "--project-directory",
+        "/opt/megacampus",
+        "-f",
+        "/opt/megacampus/docker-compose.infra.yml",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--profile",
+        "operator",
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "qdrant-operator",
+        "self-check"
+      ],
+      "argv_sha256": "6223400747c639f7eae91e1a1f20f61431bf4babf4cc83a840ffb8c9b2e57afb",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "writers.quiesce": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/source-recovery-run.sh",
+        "--operation",
+        "quiesce-writers-only",
+        "--run-id",
+        "<run-id>"
+      ],
+      "argv_sha256": "dad57df0a5675c989ec3e05e9e575249aa821a33e0c29ad60c4625f47b12a85c",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root",
+        "Q12_EXTERNAL_QUIESCE_LEASE_FD": "9"
+      }
+    },
+    "pg.backup": {
+      "argv": [
+        "/opt/megacampus/deploy/postgres/backup-supabase.sh",
+        "--q12-run-id",
+        "<run-id>",
+        "--snapshot",
+        "<exported-id>"
+      ],
+      "argv_sha256": "3dd4599a8aa4d6f9fba7e475d015b75256c0d4eb71e0e7162910147551585960",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "pg.restore": {
+      "argv": [
+        "/opt/megacampus/deploy/postgres/restore-supabase-drill.sh",
+        "--generation",
+        "<immutable-generation>",
+        "--run-id",
+        "<run-id>",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability"
+      ],
+      "argv_sha256": "61546d6d71fafa69267bf51c88a3ca7dcc1845ced0f76144043fa29d32d9ad4d",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "migration.base.apply": {
+      "argv": [
+        "/usr/bin/pnpm",
+        "--filter",
+        "@megacampus/course-gen-platform",
+        "migration:document-evidence-approved:apply",
+        "--",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--allow-remote",
+        "--confirm",
+        "APPLY REMOTE DOCUMENT EVIDENCE BASE 20260711120000 20260711130000 20260711140000"
+      ],
+      "argv_sha256": "f92be7227da6fc3421d88311c9fae4ec066870e6490a2ea3cda4d940506114f0",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "migration.observability.apply": {
+      "argv": [
+        "/usr/bin/pnpm",
+        "--filter",
+        "@megacampus/course-gen-platform",
+        "migration:document-evidence-observability:apply",
+        "--",
+        "--db-url-file",
+        "/opt/megacampus/secrets/supabase_db_url",
+        "--ca-file",
+        "/opt/megacampus/secrets/prod-ca-2021.crt",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--allow-remote",
+        "--confirm",
+        "APPLY REMOTE DOCUMENT EVIDENCE OBSERVABILITY 20260711150000 20260711151000"
+      ],
+      "argv_sha256": "e38db36e0c13f00857e205a58ae876e40a1bf20c5adf33b98da1c20f92b547b1",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "source.forward": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/source-recovery-run.sh",
+        "--operation",
+        "forward",
+        "--run-id",
+        "<recovery-run-id>",
+        "--project-directory",
+        "/opt/megacampus",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--plan-input",
+        "/var/lib/megacampus-source-recovery/plan-input.json",
+        "--manifest",
+        "/var/lib/megacampus-source-recovery/state/manifest.json",
+        "--progress-directory",
+        "/var/lib/megacampus-source-recovery/state/progress",
+        "--development-root",
+        "/opt/megacampus/data/uploads-dev",
+        "--production-root",
+        "/opt/megacampus/data/uploads",
+        "--capability-directory",
+        "/opt/megacampus/data/source-recovery-capability",
+        "--q12-db-capability-file",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability",
+        "--external-quiesce-manifest",
+        "<quiesce-manifest>",
+        "--database-barrier-receipt",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-receipt.json"
+      ],
+      "argv_sha256": "9e41f5b4d3114a29e8a64ecb524a6bb4a8525b8382a5afc151eb6e3327c8a3fe",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "reindex.plan": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/operator-compose.sh",
+        "--project-directory",
+        "/opt/megacampus",
+        "-f",
+        "/opt/megacampus/docker-compose.infra.yml",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--profile",
+        "operator",
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability:/run/secrets/q12_db_capability:ro",
+        "-e",
+        "Q12_DB_CAPABILITY_FILE=/run/secrets/q12_db_capability",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-receipt.json:/run/secrets/q12_database_barrier_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_RECEIPT_FILE=/run/secrets/q12_database_barrier_receipt",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-probe-receipt.json:/run/secrets/q12_database_barrier_probe_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE=/run/secrets/q12_database_barrier_probe_receipt",
+        "qdrant-operator",
+        "reindex",
+        "plan",
+        "--run-id",
+        "<run-id>",
+        "--artifact",
+        "/var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json",
+        "--recovery-manifest-path",
+        "/var/lib/megacampus-source-recovery/state/manifest.json",
+        "--recovery-journal-path",
+        "/var/lib/megacampus-source-recovery/state/progress/journal.json",
+        "--recovery-run-id",
+        "<recovery-run-id>",
+        "--recovery-manifest-sha256",
+        "<accepted-recovery-manifest-sha256>",
+        "--accepted-coverage-fingerprint",
+        "<accepted-coverage-fingerprint>",
+        "--accepted-coverage-run",
+        "<accepted-coverage-run>"
+      ],
+      "argv_sha256": "10d709ad168f51966d54f80e6e4948be575d85a509929a9dba0d19967dad0209",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "reindex.worker.create": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/operator-compose.sh",
+        "--project-directory",
+        "/opt/megacampus",
+        "-f",
+        "/opt/megacampus/docker-compose.infra.yml",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--profile",
+        "operator",
+        "run",
+        "--no-deps",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability:/run/secrets/q12_db_capability:ro",
+        "-e",
+        "Q12_DB_CAPABILITY_FILE=/run/secrets/q12_db_capability",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-receipt.json:/run/secrets/q12_database_barrier_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_RECEIPT_FILE=/run/secrets/q12_database_barrier_receipt",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-probe-receipt.json:/run/secrets/q12_database_barrier_probe_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE=/run/secrets/q12_database_barrier_probe_receipt",
+        "-d",
+        "--name",
+        "megacampus-qdrant-reindex-<run-id>",
+        "-e",
+        "BULLMQ_QUEUE_NAME=qdrant-reindex-<run-id>",
+        "-e",
+        "QDRANT_REINDEX_TARGET_COLLECTION=course_embeddings_v1",
+        "qdrant-operator",
+        "reindex-worker"
+      ],
+      "argv_sha256": "5c993e0caf460cdccaf4b6a64fcfba457b0f1f5ef323b5da446100e2c7bd2b1e",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "reindex.execute": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/operator-compose.sh",
+        "--project-directory",
+        "/opt/megacampus",
+        "-f",
+        "/opt/megacampus/docker-compose.infra.yml",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--profile",
+        "operator",
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability:/run/secrets/q12_db_capability:ro",
+        "-e",
+        "Q12_DB_CAPABILITY_FILE=/run/secrets/q12_db_capability",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-receipt.json:/run/secrets/q12_database_barrier_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_RECEIPT_FILE=/run/secrets/q12_database_barrier_receipt",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-probe-receipt.json:/run/secrets/q12_database_barrier_probe_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE=/run/secrets/q12_database_barrier_probe_receipt",
+        "-e",
+        "BULLMQ_QUEUE_NAME=qdrant-reindex-<run-id>",
+        "qdrant-operator",
+        "reindex",
+        "execute",
+        "--target-collection",
+        "course_embeddings_v1",
+        "--run-id",
+        "<run-id>",
+        "--artifact",
+        "/var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json",
+        "--recovery-manifest-path",
+        "/var/lib/megacampus-source-recovery/state/manifest.json",
+        "--recovery-journal-path",
+        "/var/lib/megacampus-source-recovery/state/progress/journal.json",
+        "--recovery-run-id",
+        "<recovery-run-id>",
+        "--recovery-manifest-sha256",
+        "<accepted-recovery-manifest-sha256>",
+        "--accepted-coverage-fingerprint",
+        "<accepted-coverage-fingerprint>",
+        "--accepted-coverage-run",
+        "<accepted-coverage-run>"
+      ],
+      "argv_sha256": "4245cacadbb22ffa934f0a486049be89cc11958ae1ca61903f05b04159f1eb21",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "reindex.verify": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/operator-compose.sh",
+        "--project-directory",
+        "/opt/megacampus",
+        "-f",
+        "/opt/megacampus/docker-compose.infra.yml",
+        "--env-file",
+        "/opt/megacampus/.env.production",
+        "--profile",
+        "operator",
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/secrets/db-capability:/run/secrets/q12_db_capability:ro",
+        "-e",
+        "Q12_DB_CAPABILITY_FILE=/run/secrets/q12_db_capability",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-receipt.json:/run/secrets/q12_database_barrier_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_RECEIPT_FILE=/run/secrets/q12_database_barrier_receipt",
+        "-v",
+        "/opt/megacampus/backups/q12/<run-id>/database-barrier-probe-receipt.json:/run/secrets/q12_database_barrier_probe_receipt:ro",
+        "-e",
+        "Q12_DATABASE_BARRIER_PROBE_RECEIPT_FILE=/run/secrets/q12_database_barrier_probe_receipt",
+        "qdrant-operator",
+        "reindex",
+        "verify",
+        "--target-collection",
+        "course_embeddings_v1",
+        "--run-id",
+        "<run-id>",
+        "--artifact",
+        "/var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json",
+        "--recovery-manifest-path",
+        "/var/lib/megacampus-source-recovery/state/manifest.json",
+        "--recovery-journal-path",
+        "/var/lib/megacampus-source-recovery/state/progress/journal.json",
+        "--recovery-run-id",
+        "<recovery-run-id>",
+        "--recovery-manifest-sha256",
+        "<accepted-recovery-manifest-sha256>",
+        "--accepted-coverage-fingerprint",
+        "<accepted-coverage-fingerprint>",
+        "--accepted-coverage-run",
+        "<accepted-coverage-run>"
+      ],
+      "argv_sha256": "a5ab3cccf03f6f856a0f420deb337ae07302b6615cc7e3213982b19b1f3192d6",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "deploy.prepare": {
+      "argv": [
+        "/opt/megacampus/scripts/deploy_blue_green.sh",
+        "--q12-mode",
+        "prepare-quiesced",
+        "--run-id",
+        "<run-id>",
+        "--release-sha",
+        "<release-sha>",
+        "--external-quiesce-manifest",
+        "<quiesce-manifest>"
+      ],
+      "argv_sha256": "90d0e635d179cf2318542956c1f0ea633bec3b09769787b00c46df846c3f5844",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "deploy.commit": {
+      "argv": [
+        "/opt/megacampus/scripts/deploy_blue_green.sh",
+        "--q12-mode",
+        "commit-quiesced",
+        "--run-id",
+        "<run-id>",
+        "--release-sha",
+        "<release-sha>",
+        "--external-quiesce-manifest",
+        "<quiesce-manifest>"
+      ],
+      "argv_sha256": "a1d641ebc324b165e105a95dc7d12b03c6f1cfadce74d888d496f5a22e6d2e59",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root"
+      }
+    },
+    "writers.resume.forward": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/source-recovery-run.sh",
+        "--operation",
+        "resume-writers-only",
+        "--resume-mode",
+        "forward",
+        "--run-id",
+        "<run-id>"
+      ],
+      "argv_sha256": "e6d310c69468287cd298d954a59a556bd20812418b3c0bae0cd21973e6331f77",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root",
+        "Q12_EXTERNAL_QUIESCE_LEASE_FD": "9"
+      }
+    },
+    "writers.resume.rollback": {
+      "argv": [
+        "/opt/megacampus/deploy/qdrant/source-recovery-run.sh",
+        "--operation",
+        "resume-writers-only",
+        "--resume-mode",
+        "rollback",
+        "--run-id",
+        "<run-id>"
+      ],
+      "argv_sha256": "029a88e92bc4cc88afcb6dbcba56dce8aa0da32b7f825cbe1eb1a60eda7639e9",
+      "env": {
+        "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "HOME": "/root",
+        "Q12_EXTERNAL_QUIESCE_LEASE_FD": "9"
+      }
+    }
+  }
+}

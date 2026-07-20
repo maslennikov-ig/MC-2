@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "image": "qdrant/qdrant",
+  "tag": "v1.18.2",
+  "index_digest": "sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c",
+  "platform": "linux/amd64",
+  "child_digest": "sha256:da65a06bc75e42702f80c992b99c5144b0fbd675ae7a96d2991de0bf957b7071"
+}

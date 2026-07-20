@@ -1,254 +1,279 @@
 /**
- * Qdrant search operations
+ * Qdrant search operations.
+ *
+ * Native hybrid retrieval is executed entirely by Qdrant: multilingual BM25
+ * and dense candidates are fused with RRF, then optionally re-ranked by a
+ * Formula Query. Application code never mutates returned scores.
  *
  * @module shared/qdrant/search-operations
  */
 
+import type { Schemas } from '@qdrant/js-client-rest';
 import { qdrantClient } from './client';
 import { generateQueryEmbedding } from '../embeddings/generate';
-import { getGlobalBM25Scorer } from '../embeddings/bm25';
-import type { SearchOptions, SearchFilters } from './search-types';
+import type { ResolvedSearchOptions } from './search-types';
 import type { QdrantScoredPoint } from './types';
-import { buildQdrantFilter, reciprocalRankFusion } from './search-helpers';
+import { buildQdrantFilter } from './search-helpers';
 import { logger } from '../logger/index.js';
+import { createBm25Document } from './config';
+import { recordHybridSearchOutcome } from './metrics-textfile';
+
+const MIN_PREFETCH_LIMIT = 30;
+const PREFETCH_LIMIT_MULTIPLIER = 3;
+
+export interface HybridSearchOutcome {
+  points: QdrantScoredPoint[];
+  fallbackUsed: boolean;
+}
+
+function getPrefetchLimit(limit: number): number {
+  return Math.max(limit * PREFETCH_LIMIT_MULTIPLIER, MIN_PREFETCH_LIMIT);
+}
+
+/** Build the two candidate sources consumed by server-side RRF. */
+export function buildHybridPrefetch(
+  queryText: string,
+  denseVector: number[],
+  options: ResolvedSearchOptions
+): Schemas['Prefetch'][] {
+  const filter = buildQdrantFilter(options.filters);
+  const limit = getPrefetchLimit(options.limit);
+
+  return [
+    {
+      query: createBm25Document(queryText),
+      using: 'sparse',
+      limit,
+      filter,
+    },
+    {
+      query: denseVector,
+      using: 'dense',
+      limit,
+      filter,
+      score_threshold: options.score_threshold,
+    },
+  ];
+}
 
 /**
- * Performs dense semantic search using Jina-v3 embeddings
+ * Build the approved server-side priority formula.
+ *
+ * Qdrant 1.18.2 has no clamp/min/max expression. Q3 validates stored values
+ * in [0.5, 1.0]; Formula defaults cover only a missing payload field.
  */
+export function buildPriorityFormula(boostFactor: number): Schemas['FormulaQuery'] {
+  return {
+    formula: {
+      mult: [
+        '$score',
+        {
+          sum: [1, { mult: [{ sum: ['document_weight', -0.5] }, boostFactor] }],
+        },
+      ],
+    },
+    defaults: { document_weight: 0.5 },
+  };
+}
+
+/** Flatten Qdrant document groups by rank across groups, capped to caller limit. */
+export function flattenDocumentGroups(
+  groups: Schemas['GroupsResult']['groups'],
+  limit: number
+): QdrantScoredPoint[] {
+  if (limit <= 0 || groups.length === 0) return [];
+
+  const flattened: QdrantScoredPoint[] = [];
+  const maxGroupSize = Math.max(...groups.map(group => group.hits.length));
+
+  for (let hitIndex = 0; hitIndex < maxGroupSize && flattened.length < limit; hitIndex += 1) {
+    for (const group of groups) {
+      const hit = group.hits[hitIndex];
+      if (hit) flattened.push(hit);
+      if (flattened.length === limit) break;
+    }
+  }
+
+  return flattened;
+}
+
+/** Performs dense semantic search using Jina-v3 embeddings. */
 export async function denseSearch(
   queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
+  options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
-  // Generate query embedding
   const embeddingStartTime = Date.now();
   const queryVector = await generateQueryEmbedding(queryText);
   const embeddingTime = Date.now() - embeddingStartTime;
+  const filter = buildQdrantFilter(options.filters);
 
   logger.debug({ embeddingTimeMs: embeddingTime }, 'Query embedding generated');
 
-  // Build filter
-  const filter = buildQdrantFilter(options.filters);
-
-  // Search Qdrant using named vector 'dense'
   const searchStartTime = Date.now();
-  const searchResults = await qdrantClient.search(options.collection_name, {
-    vector: {
-      name: 'dense',
-      vector: queryVector,
-    },
-    filter,
-    limit: options.limit,
-    score_threshold: options.score_threshold,
-    with_payload: true,
-  });
-  const searchTime = Date.now() - searchStartTime;
+  let searchResults: QdrantScoredPoint[];
+
+  if (options.enable_priority_boost) {
+    const results = await qdrantClient.query(options.collection_name, {
+      prefetch: {
+        query: queryVector,
+        using: 'dense',
+        filter,
+        score_threshold: options.score_threshold,
+        limit: getPrefetchLimit(options.limit),
+      },
+      query: buildPriorityFormula(options.priority_boost_factor),
+      limit: options.limit,
+      with_payload: true,
+    });
+    searchResults = results.points;
+  } else {
+    searchResults = await qdrantClient.search(options.collection_name, {
+      vector: { name: 'dense', vector: queryVector },
+      filter,
+      limit: options.limit,
+      score_threshold: options.score_threshold,
+      with_payload: true,
+    });
+  }
 
   logger.info(
-    { searchTimeMs: searchTime, resultCount: searchResults.length },
+    { searchTimeMs: Date.now() - searchStartTime, resultCount: searchResults.length },
     'Dense search completed'
   );
 
   return searchResults;
 }
 
-/**
- * Performs sparse BM25 search for lexical matching
- */
+/** Performs sparse search through Qdrant-native multilingual BM25 inference. */
 export async function sparseSearch(
   queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
+  options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
-  // Generate sparse vector using BM25
-  const bm25Scorer = getGlobalBM25Scorer();
-  const querySparseVector = bm25Scorer.generateSparseVector(queryText);
-
-  logger.debug({ termCount: querySparseVector.indices.length }, 'Query sparse vector generated');
-
-  // Build filter
   const filter = buildQdrantFilter(options.filters);
-
-  // Search Qdrant using named vector 'sparse'
   const searchStartTime = Date.now();
-  const searchResults = await qdrantClient.search(options.collection_name, {
-    vector: {
-      name: 'sparse',
-      vector: querySparseVector,
-    },
+  const searchResults = await qdrantClient.query(options.collection_name, {
+    query: createBm25Document(queryText),
+    using: 'sparse',
     filter,
     limit: options.limit,
     with_payload: true,
   });
-  const searchTime = Date.now() - searchStartTime;
 
   logger.info(
-    { searchTimeMs: searchTime, resultCount: searchResults.length },
+    { searchTimeMs: Date.now() - searchStartTime, resultCount: searchResults.points.length },
     'Sparse search completed'
   );
 
-  return searchResults;
+  return searchResults.points;
 }
 
-/**
- * Performs hybrid search using Qdrant's native Query API with server-side RRF
- *
- * Key difference from client-side RRF:
- * - Uses Qdrant's `query()` method with `prefetch` for server-side RRF fusion
- * - Applies score_threshold ONLY to dense prefetch (pre-fusion filtering)
- * - Uses limit (top-K) for final results, NOT score_threshold (post-fusion)
- *
- * Why this matters:
- * - RRF scores are tiny (max ~0.033 with k=60)
- * - Score thresholds like 0.25 would filter out ALL results if applied post-fusion
- * - Server-side RRF is more efficient (single round-trip)
- */
+/** Performs native BM25+dense retrieval, RRF, optional Formula and grouping. */
 export async function hybridSearchNative(
   queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
+  options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
-  // Generate both vectors in parallel
-  const [queryVector, sparseVector] = await Promise.all([
-    generateQueryEmbedding(queryText),
-    Promise.resolve(getGlobalBM25Scorer().generateSparseVector(queryText)),
-  ]);
+  const queryVector = await generateQueryEmbedding(queryText);
+  const prefetch = buildHybridPrefetch(queryText, queryVector, options);
+  const prefetchLimit = getPrefetchLimit(options.limit);
+  const rrfQuery: Schemas['RrfQuery'] = { rrf: {} };
 
-  const filter = buildQdrantFilter(options.filters);
-  const prefetchLimit = Math.max(options.limit * 3, 30); // Fetch more for better RRF
+  const rankedRequest = options.enable_priority_boost
+    ? {
+        prefetch: { prefetch, query: rrfQuery, limit: prefetchLimit },
+        query: buildPriorityFormula(options.priority_boost_factor),
+      }
+    : { prefetch, query: rrfQuery };
 
   logger.debug(
     {
-      sparseTermCount: sparseVector.indices.length,
       prefetchLimit,
       scoreThreshold: options.score_threshold,
+      priorityBoost: options.enable_priority_boost,
+      grouped: options.group_by_document,
     },
     'Preparing native hybrid search'
   );
 
-  // Use Qdrant's native query API with prefetch for server-side RRF
+  if (options.group_by_document) {
+    const grouped = await qdrantClient.queryGroups(options.collection_name, {
+      ...rankedRequest,
+      group_by: 'document_id',
+      group_size: options.group_size,
+      limit: options.limit,
+      with_payload: true,
+    });
+    const points = flattenDocumentGroups(grouped.groups, options.limit);
+    logger.info(
+      { resultCount: points.length, groupCount: grouped.groups.length, method: 'native-rrf' },
+      'Grouped native hybrid search completed'
+    );
+    return points;
+  }
+
   const results = await qdrantClient.query(options.collection_name, {
-    prefetch: [
-      {
-        query: {
-          values: sparseVector.values,
-          indices: sparseVector.indices,
-        },
-        using: 'sparse',
-        limit: prefetchLimit,
-        filter,
-        // No score_threshold for sparse (BM25 scores are not comparable)
-      },
-      {
-        query: queryVector,
-        using: 'dense',
-        limit: prefetchLimit,
-        filter,
-        score_threshold: options.score_threshold, // Apply to dense ONLY (pre-fusion)
-      },
-    ],
-    query: { fusion: 'rrf' },
-    limit: options.limit, // Top-K, NOT score_threshold (RRF scores are tiny)
+    ...rankedRequest,
+    limit: options.limit,
     with_payload: true,
   });
 
   logger.info(
-    {
-      resultCount: results.points.length,
-      method: 'native-rrf',
-    },
+    { resultCount: results.points.length, method: 'native-rrf' },
     'Native hybrid search completed'
   );
-
   return results.points;
 }
 
-/**
- * Hybrid search with graceful fallback to dense-only search
- *
- * Tries native hybrid search first, falls back to dense-only if:
- * - Hybrid returns 0 results (sparse vectors may be missing)
- * - Any error occurs during hybrid search
- */
+/** Native hybrid search with explicit dense-only degradation metadata. */
 export async function hybridSearchWithFallback(
   queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
-): Promise<QdrantScoredPoint[]> {
-  try {
-    const results = await hybridSearchNative(queryText, options);
-
-    // If hybrid returned results, use them
-    if (results.length > 0) {
-      logger.debug({ count: results.length }, 'Hybrid search returned results');
-      return results;
+  options: ResolvedSearchOptions
+): Promise<HybridSearchOutcome> {
+  const recordOutcome = async (fallbackUsed: boolean): Promise<void> => {
+    try {
+      await recordHybridSearchOutcome(fallbackUsed);
+    } catch (metricsError) {
+      logger.warn(
+        { error: metricsError instanceof Error ? metricsError.message : String(metricsError) },
+        'Qdrant hybrid metrics update failed'
+      );
     }
+  };
 
-    // Fallback to dense-only if hybrid returns empty
-    logger.info({}, 'Hybrid search empty, falling back to dense-only');
-    return denseSearch(queryText, options);
+  let points: QdrantScoredPoint[];
+  try {
+    points = await hybridSearchNative(queryText, options);
   } catch (error) {
-    // On any error, fallback to dense-only
     logger.warn(
       { error: error instanceof Error ? error.message : String(error) },
       'Hybrid search failed, falling back to dense-only'
     );
-    return denseSearch(queryText, options);
+    await recordOutcome(true);
+    return {
+      points: await denseSearch(queryText, { ...options, enable_priority_boost: false }),
+      fallbackUsed: true,
+    };
   }
+
+  if (points.length > 0) {
+    logger.debug({ count: points.length }, 'Hybrid search returned results');
+    await recordOutcome(false);
+    return { points, fallbackUsed: false };
+  }
+
+  logger.info({}, 'Hybrid search empty, falling back to dense-only');
+  await recordOutcome(true);
+  return { points: await denseSearch(queryText, options), fallbackUsed: true };
 }
 
-/**
- * Performs hybrid search (dense + sparse with RRF)
- *
- * Now uses Qdrant's native Query API for server-side RRF fusion
- * with automatic fallback to dense-only search.
- *
- * @deprecated Use hybridSearchNative() for direct access to native RRF,
- *             or hybridSearchWithFallback() for explicit fallback behavior.
- */
+/** @deprecated Use hybridSearchWithFallback() to retain fallback metadata. */
 export async function hybridSearch(
   queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
+  options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
   logger.info(
     { method: 'native-RRF', queryText: queryText.slice(0, 50) },
     'Performing hybrid search'
   );
-  return hybridSearchWithFallback(queryText, options);
-}
-
-/**
- * Performs hybrid search using client-side RRF (legacy implementation)
- *
- * @deprecated Use hybridSearchNative() instead. This function applies
- *             score_threshold AFTER RRF fusion, which is incorrect because
- *             RRF scores are tiny (max ~0.033 with k=60).
- */
-export async function hybridSearchClientSideRRF(
-  queryText: string,
-  options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
-): Promise<QdrantScoredPoint[]> {
-  logger.info({ method: 'client-RRF', queryText }, 'Performing hybrid search (client-side RRF)');
-
-  // Increase limit for each search to ensure good RRF merging
-  const searchLimit = options.limit * 2;
-  const searchOptions = { ...options, limit: searchLimit };
-
-  // Perform both searches in parallel for efficiency
-  const [denseResults, sparseResults] = await Promise.all([
-    denseSearch(queryText, searchOptions),
-    sparseSearch(queryText, searchOptions),
-  ]);
-
-  logger.debug(
-    {
-      denseCount: denseResults.length,
-      sparseCount: sparseResults.length,
-    },
-    'Search results obtained'
-  );
-
-  // Merge results using Reciprocal Rank Fusion
-  const mergedResults = reciprocalRankFusion(denseResults, sparseResults);
-
-  logger.info({ mergedCount: mergedResults.length }, 'RRF merge completed');
-
-  // Return top N results after merging
-  return mergedResults.slice(0, options.limit);
+  const result = await hybridSearchWithFallback(queryText, options);
+  return result.points;
 }

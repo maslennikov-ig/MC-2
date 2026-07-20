@@ -2,6 +2,72 @@ import { mergeConfig, defineConfig } from 'vitest/config';
 import path from 'path';
 import sharedConfig from '../../vitest.shared';
 
+const QDRANT_INTEGRATION_TEST = 'tests/integration/qdrant.test.ts';
+const PACKAGE_RELATIVE_PREFIX = 'packages/course-gen-platform/';
+const OPTIONS_WITH_SEPARATE_VALUES = new Set([
+  '--config',
+  '-c',
+  '--dir',
+  '--environment',
+  '--outputFile',
+  '--project',
+  '--reporter',
+  '--root',
+  '--workspace',
+]);
+
+function normalizeSlashes(value: string): string {
+  return value.replaceAll('\\', '/').replace(/^\.\//u, '');
+}
+
+function packageTestSelection(argument: string, packageRoot: string): string | null {
+  if (argument.startsWith('-')) return null;
+
+  const normalized = normalizeSlashes(argument);
+  if (normalized.startsWith(PACKAGE_RELATIVE_PREFIX)) {
+    return normalized.slice(PACKAGE_RELATIVE_PREFIX.length);
+  }
+  if (normalized.startsWith('tests/')) return normalized;
+  if (!path.isAbsolute(argument)) return null;
+
+  const relative = normalizeSlashes(path.relative(packageRoot, argument));
+  return relative.startsWith('tests/') ? relative : null;
+}
+
+/** True only for an explicit one-file Qdrant integration CLI selection. */
+export function isQdrantOnlyIntegrationSelection(
+  argv: readonly string[],
+  packageRoot: string = __dirname
+): boolean {
+  const runIndex = argv.lastIndexOf('run');
+  if (runIndex === -1) return false;
+
+  const selections: string[] = [];
+  let skipOptionValue = false;
+
+  for (const argument of argv.slice(runIndex + 1)) {
+    if (skipOptionValue) {
+      skipOptionValue = false;
+      continue;
+    }
+    if (OPTIONS_WITH_SEPARATE_VALUES.has(argument)) {
+      skipOptionValue = true;
+      continue;
+    }
+
+    const selection = packageTestSelection(argument, packageRoot);
+    if (selection === null) {
+      if (!argument.startsWith('-')) return false;
+      continue;
+    }
+    selections.push(selection);
+  }
+
+  return selections.length === 1 && selections[0] === QDRANT_INTEGRATION_TEST;
+}
+
+const qdrantOnlyIntegration = isQdrantOnlyIntegrationSelection(process.argv);
+
 /**
  * Vitest config for INTEGRATION tests (full pipeline with real services).
  * - globalSetup starts BullMQ worker
@@ -13,8 +79,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['tests/**/*.test.ts'],
-      setupFiles: ['./tests/setup.ts'],
-      globalSetup: ['./tests/global-setup.ts'],
+      setupFiles: qdrantOnlyIntegration ? [] : ['./tests/setup.ts'],
+      globalSetup: qdrantOnlyIntegration ? [] : ['./tests/global-setup.ts'],
       reporters: ['default', 'hanging-process'],
       testTimeout: 120000,
       hookTimeout: 60000,

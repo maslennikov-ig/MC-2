@@ -15,7 +15,12 @@ import { qdrantClient } from './client';
 import { COLLECTION_CONFIG } from './create-collection';
 import { cache } from '../cache/redis';
 import type { QdrantScoredPoint, QdrantPointOrScored, QdrantChunkPayload } from './types';
-import type { SearchResult, SearchOptions, SearchFilters, SearchResponse } from './search-types';
+import type {
+  ResolvedSearchOptions,
+  SearchResult,
+  SearchOptions,
+  SearchResponse,
+} from './search-types';
 import { generateSearchCacheKey, extractPayload } from './search-helpers';
 import { denseSearch, hybridSearchWithFallback } from './search-operations';
 import { logger } from '../logger/index.js';
@@ -33,9 +38,7 @@ const MIN_CACHEABLE_QUERY_LENGTH = 3;
 /**
  * Default search options
  */
-const DEFAULT_SEARCH_OPTIONS: Required<Omit<SearchOptions, 'filters'>> & {
-  filters: SearchFilters;
-} = {
+const DEFAULT_SEARCH_OPTIONS: ResolvedSearchOptions = {
   limit: 10,
   score_threshold: 0.7,
   collection_name: COLLECTION_CONFIG.name,
@@ -44,6 +47,8 @@ const DEFAULT_SEARCH_OPTIONS: Required<Omit<SearchOptions, 'filters'>> & {
   filters: {},
   enable_priority_boost: false,
   priority_boost_factor: 0.4,
+  group_by_document: false,
+  group_size: 2,
 };
 
 /**
@@ -148,37 +153,14 @@ export async function searchChunks(
   try {
     // Perform search (dense or hybrid)
     let searchResults: QdrantScoredPoint[];
+    let fallbackUsed = false;
 
     if (config.enable_hybrid) {
-      searchResults = await hybridSearchWithFallback(queryText, config);
+      const hybridResult = await hybridSearchWithFallback(queryText, config);
+      searchResults = hybridResult.points;
+      fallbackUsed = hybridResult.fallbackUsed;
     } else {
       searchResults = await denseSearch(queryText, config);
-    }
-
-    // Apply priority boosting if enabled (immutable - creates new objects)
-    // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
-    if (config.enable_priority_boost) {
-      const boostFactor = config.priority_boost_factor;
-      // Apply boost immutably - create new objects instead of mutating
-      searchResults = searchResults
-        .map(point => {
-          const payload = point.payload as Record<string, unknown> | undefined;
-          const weight = (payload?.document_weight as number) ?? 0.5;
-          // Validate weight bounds (should be 0.5-1.0)
-          const validWeight = Math.max(0.5, Math.min(1.0, weight));
-          // Apply boost: CORE (1.0) gets +20% with 0.4 factor, SUPPLEMENTARY (0.5) gets 0%
-          const boostedScore = point.score * (1 + (validWeight - 0.5) * boostFactor);
-          return { ...point, score: boostedScore };
-        })
-        .sort((a, b) => b.score - a.score);
-
-      logger.debug(
-        {
-          boostFactor,
-          resultCount: searchResults.length,
-        },
-        'Priority boosting applied (immutable)'
-      );
     }
 
     // Convert to search results
@@ -194,6 +176,7 @@ export async function searchChunks(
         embedding_time_ms: totalTime,
         search_time_ms: totalTime,
         filters_applied: config.filters,
+        fallback_used: fallbackUsed,
       },
     };
 
@@ -344,4 +327,5 @@ export type {
   SearchFilters,
   SearchResponse,
   SearchMetadata,
+  ResolvedSearchOptions,
 } from './search-types';

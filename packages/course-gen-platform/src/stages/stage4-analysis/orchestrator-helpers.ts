@@ -40,6 +40,7 @@ import type {
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
 import type { DocumentSummaryResult } from './handler-helpers';
+import type { DocumentEvidencePreflightResult } from './evidence/preflight';
 
 /**
  * Analysis orchestration context
@@ -60,12 +61,72 @@ export interface AnalysisContext {
   phase2Output?: Phase2Output;
   phase3Output?: Phase3Output;
   phase4Output?: Phase4Output;
+  documentEvidencePreflight?: DocumentEvidencePreflightResult;
+  documentEvidenceMode?: 'shadow' | 'active';
+  documentEvidenceDecisions?: {
+    pauseRequired: boolean;
+    requiredQuestionIds: string[];
+    currentDecisionIds: string[];
+    unresolvedInformationalConflictIds: string[];
+    decisionSummary?: { user: number; system: number; degradedAutomatic: number };
+    unresolvedCriticalConflictCount?: number;
+  };
+  /** False only when the enabled evidence preflight owns legacy context overflow. */
+  legacyBudgetFits?: boolean;
   clarifyingAnswers: Array<{
     question: string;
     answer: string;
     priority: string;
     category: string;
   }>;
+}
+
+export function attachDocumentEvidenceSnapshot(
+  analysisResult: AnalysisResult,
+  preflight: DocumentEvidencePreflightResult | undefined,
+  decisions?: AnalysisContext['documentEvidenceDecisions']
+): AnalysisResult {
+  if (preflight?.status !== 'accepted' || !preflight.runId) return analysisResult;
+  return {
+    ...analysisResult,
+    document_evidence: {
+      accepted_run_id: preflight.runId,
+      coverage: preflight.coverage,
+      current_decision_ids: decisions?.currentDecisionIds ?? [],
+      unresolved_informational_conflict_ids: decisions?.unresolvedInformationalConflictIds ?? [],
+      enrichment_status: 'not_applicable',
+    },
+  };
+}
+
+/**
+ * The legacy single-prompt budget remains strict unless the complete evidence
+ * preflight is enabled. In evidence mode an overflow is handed to the bounded
+ * map/reduce ledger instead of aborting before that ledger can run.
+ */
+export function validateLegacyBudgetForEvidencePreflight(
+  allocation: Stage4BudgetAllocation,
+  evidenceEnabled: boolean
+): boolean {
+  try {
+    validateStage4Budget(allocation);
+    return true;
+  } catch (error) {
+    if (
+      !evidenceEnabled ||
+      !(error instanceof Error) ||
+      !/effective context/iu.test(error.message)
+    ) {
+      throw error;
+    }
+    return false;
+  }
+}
+
+export function selectSemanticDocumentSummaries(
+  documents: DocumentSummaryResult[]
+): DocumentSummaryResult[] {
+  return documents.filter(document => document.sourceFailure === undefined);
 }
 
 /**
@@ -132,16 +193,22 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
 
   // Budget allocation
   let budgetAllocation: Stage4BudgetAllocation | null = null;
+  let legacyBudgetFits = true;
   let tierConfig: Stage4TierConfig | undefined;
 
   // Extract DocumentSummaryResult[] early — has stage3_priority from fetchDocumentSummaries
   const originalDocumentSummaries =
     (input.document_summaries as unknown as DocumentSummaryResult[]) || [];
+  const semanticDocumentSummaries = selectSemanticDocumentSummaries(originalDocumentSummaries);
 
-  if (originalDocumentSummaries.length > 0) {
-    const withStage3 = originalDocumentSummaries.filter(d => d.stage3_priority != null).length;
+  if (semanticDocumentSummaries.length > 0) {
+    const withStage3 = semanticDocumentSummaries.filter(d => d.stage3_priority != null).length;
     orchestrationLogger.info(
-      { documentCount: originalDocumentSummaries.length, withStage3Priority: withStage3 },
+      {
+        documentCount: semanticDocumentSummaries.length,
+        auditedFailureCount: originalDocumentSummaries.length - semanticDocumentSummaries.length,
+        withStage3Priority: withStage3,
+      },
       'Starting budget allocation'
     );
 
@@ -156,7 +223,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       );
     }
 
-    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(originalDocumentSummaries);
+    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(semanticDocumentSummaries);
 
     try {
       budgetAllocation = allocateStage4Budget(
@@ -164,7 +231,17 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
         validateLocale(input.language),
         tierConfig
       );
-      validateStage4Budget(budgetAllocation);
+      legacyBudgetFits = validateLegacyBudgetForEvidencePreflight(
+        budgetAllocation,
+        process.env.DOCUMENT_EVIDENCE_ENABLED === 'true' &&
+          process.env.DOCUMENT_EVIDENCE_MODE === 'active'
+      );
+      if (!legacyBudgetFits) {
+        orchestrationLogger.warn(
+          { totalTokens: budgetAllocation.totalTokens },
+          'Legacy Stage 4 context exceeds its single-prompt budget; document evidence preflight owns bounded full-corpus processing'
+        );
+      }
     } catch (budgetError) {
       orchestrationLogger.error(
         {
@@ -197,7 +274,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       phase: 'budget_allocation',
       stepName: 'allocate_budget',
       inputData: {
-        documentCount: originalDocumentSummaries.length,
+        documentCount: semanticDocumentSummaries.length,
         language: input.language,
       },
       outputData: {
@@ -209,18 +286,18 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
   }
 
   // Resolve document content: replace processed_content with markdown_content for full_text documents
-  let resolvedDocumentSummaries = originalDocumentSummaries;
+  let resolvedDocumentSummaries = semanticDocumentSummaries;
 
   if (budgetAllocation) {
     const { resolveDocumentContent } = await import('./handler-helpers');
     resolvedDocumentSummaries = await resolveDocumentContent(
       budgetAllocation,
-      originalDocumentSummaries,
+      semanticDocumentSummaries,
       courseId
     );
     orchestrationLogger.info(
       {
-        totalDocs: originalDocumentSummaries.length,
+        totalDocs: semanticDocumentSummaries.length,
         fullTextDocs: budgetAllocation.documents.filter(d => d.mode === 'full_text').length,
       },
       'Document content resolved with budget allocator decisions'
@@ -238,6 +315,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     budgetAllocation,
     originalDocumentSummaries,
     resolvedDocumentSummaries,
+    legacyBudgetFits,
     clarifyingAnswers: [],
   };
 }
@@ -283,7 +361,7 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
 
   const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
 
-  const analysisResult: AnalysisResult = assembleAnalysisResult({
+  let analysisResult: AnalysisResult = assembleAnalysisResult({
     course_id: courseId,
     language: input.language,
     topic: input.topic,
@@ -298,6 +376,11 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
     total_tokens: totalTokens,
     total_cost_usd: 0,
   });
+  analysisResult = attachDocumentEvidenceSnapshot(
+    analysisResult,
+    context.documentEvidencePreflight,
+    context.documentEvidenceDecisions
+  );
 
   await completePhase(5, courseId, supabase, orchestrationLogger, {
     total_duration_ms: analysisResult.metadata.total_duration_ms,
@@ -476,6 +559,7 @@ function prepareWithSizeHeuristic(
 // Re-export phase functions for orchestrator.ts
 export {
   runClassificationPhase,
+  runDocumentEvidencePhase,
   runClarifyingPhase,
   runScopePhase,
   runExpertPhase,

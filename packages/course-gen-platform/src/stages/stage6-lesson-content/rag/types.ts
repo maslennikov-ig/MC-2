@@ -1,5 +1,6 @@
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type { Stage6AcceptedEvidenceContext } from './evidence-context';
 
 /**
  * Internal RAG chunk representation for lesson retrieval
@@ -66,6 +67,8 @@ export interface LessonRAGResult {
 export interface LessonRAGParams {
   /** Course UUID */
   courseId: string;
+  /** Organization UUID required before any tenant-scoped Qdrant call. */
+  organizationId?: string;
   /** Lesson specification from Stage 5 */
   lessonSpec: LessonSpecificationV2;
   /** Target number of chunks (default: 7) */
@@ -78,6 +81,8 @@ export interface LessonRAGParams {
    * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
    */
   enablePriorityBoost?: boolean;
+  /** Accepted E3 decision/ref projection for document-backed courses. */
+  evidenceContext?: Stage6AcceptedEvidenceContext;
 }
 
 /**

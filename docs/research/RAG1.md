@@ -1,3 +1,5 @@
+> **HISTORICAL RESEARCH — NOT RUNTIME GUIDANCE.** Hosted Qdrant provisioning assumptions below are superseded by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Optimal Document Chunking Strategies for Production RAG Systems (2025)
 
 ## Russian Educational Content with Jina-v3 + Qdrant

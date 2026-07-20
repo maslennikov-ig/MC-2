@@ -27,6 +27,7 @@ const {
   mockSaveSourceDocuments,
   mockCheckAndSetStage6Complete,
   mockGetModelForPhase,
+  mockLoadStage6EvidenceForCourse,
 } = vi.hoisted(() => ({
   mockExecuteStage6Orchestrator: vi.fn(),
   mockRetrieveLessonContext: vi.fn(),
@@ -40,6 +41,7 @@ const {
   mockSaveSourceDocuments: vi.fn().mockResolvedValue(undefined),
   mockCheckAndSetStage6Complete: vi.fn().mockResolvedValue(undefined),
   mockGetModelForPhase: vi.fn(),
+  mockLoadStage6EvidenceForCourse: vi.fn(),
 }));
 
 const mockSupabase = {
@@ -87,6 +89,10 @@ vi.mock('@/stages/stage6-lesson-content/orchestrator', () => ({
 vi.mock('@/stages/stage6-lesson-content/utils/lesson-rag-retriever', () => ({
   retrieveLessonContext: mockRetrieveLessonContext,
   extractSourceDocuments: mockExtractSourceDocuments,
+}));
+
+vi.mock('@/stages/stage6-lesson-content/rag/evidence-loader', () => ({
+  loadStage6EvidenceForCourse: mockLoadStage6EvidenceForCourse,
 }));
 
 vi.mock('@/stages/stage6-lesson-content/utils/sanity-check', () => ({
@@ -220,6 +226,10 @@ describe('Completed-course Stage 6 regeneration', () => {
       retrievalDurationMs: 10,
     });
     mockExtractSourceDocuments.mockReturnValue([]);
+    mockLoadStage6EvidenceForCourse.mockResolvedValue({
+      organizationId: 'organization-1',
+      evidenceContext: undefined,
+    });
 
     mockSelectStage6ModelTier.mockResolvedValue({
       tier: 'normal',

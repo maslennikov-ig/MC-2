@@ -112,6 +112,8 @@ export const getQuestionsSchema = z.object({
  */
 export const submitAnswerSchema = z.object({
   questionId: z.string().uuid('Invalid question ID'),
+  /** Optimistic concurrency guard for durable document-evidence decisions. */
+  expectedCurrentDecisionId: z.string().uuid('Invalid current decision ID').optional(),
   // MEDIUM-005: Stricter validation with sanitization
   // Single answer for open/single_choice
   answer: z
@@ -158,6 +160,8 @@ export const submitMultipleAnswersSchema = z.object({
     .array(
       z.object({
         questionId: z.string().uuid('Invalid question ID'),
+        /** Required when superseding an existing document-evidence decision. */
+        expectedCurrentDecisionId: z.string().uuid('Invalid current decision ID').optional(),
         // MEDIUM-005: Consistent sanitization in batch endpoint
         answer: z
           .string()

@@ -8,11 +8,17 @@
  */
 
 export { qdrantClient, type QdrantClient } from './client';
+export { createCourseEmbeddingsCollection, COLLECTION_CONFIG } from './create-collection';
 export {
-  createCourseEmbeddingsCollection,
-  COLLECTION_CONFIG,
-  PAYLOAD_INDEXES,
-} from './create-collection';
+  ensureCourseEmbeddingsCollection,
+  verifyCourseEmbeddingsCollection,
+  verifyPhysicalCourseEmbeddingsCollection,
+  type EnsureCollectionOptions,
+  type VerifyPhysicalCollectionOptions,
+  type PhysicalSchemaVerificationResult,
+  type SchemaVerificationResult,
+} from './collection-manager';
+export { COLLECTION_CREATE_PARAMS, PAYLOAD_INDEXES } from './collection-schema';
 
 // Upload utilities
 export {
@@ -33,6 +39,7 @@ export {
   type SearchResult,
   type SearchFilters,
   type SearchOptions,
+  type ResolvedSearchOptions,
   type SearchMetadata,
   type SearchResponse,
 } from './search';

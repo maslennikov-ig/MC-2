@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
@@ -10,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
+import { parseDocumentEvidenceQuestionMetadata } from './DocumentEvidenceDetails'
+import { DocumentConflictSection } from './DocumentConflictSection'
 import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
 import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
@@ -20,6 +21,7 @@ type QuestionType = 'open' | 'single_choice' | 'multi_choice'
 
 interface SuggestedAnswer {
   text: string
+  value?: string
   rationale?: string
   is_recommended?: boolean
 }
@@ -34,6 +36,9 @@ interface Question {
   currentAnswers?: string[] // For multi_choice
   category?: string
   isAnswered: boolean
+  evidenceMetadata?: NonNullable<ReturnType<typeof parseDocumentEvidenceQuestionMetadata>>
+  evidenceMetadataInvalid?: boolean
+  answerSource?: 'suggested' | 'modified' | 'custom' | 'system'
 }
 
 /** Payload for submitting a single answer or multi-choice answers */
@@ -43,12 +48,14 @@ type AnswerPayload =
       answerSource: 'suggested' | 'modified' | 'custom'
       answer: string
       selectedSuggestionIndex?: number
+      expectedCurrentDecisionId?: string
     }
   | {
       questionId: string
       answerSource: 'suggested' | 'modified' | 'custom'
       answers: string[]
       selectedSuggestionIndexes?: number[]
+      expectedCurrentDecisionId?: string
     }
 
 interface ClarifyingPanelProps {
@@ -65,6 +72,17 @@ const UserAnswerSchema = z.union([
   z.string(), // Legacy format
 ])
 
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/g
+
+/**
+ * Keep this client boundary browser-free. Every returned value is rendered by
+ * React as a text node (never raw HTML), so markup is escaped while unsafe
+ * control characters are removed without pulling server-only jsdom into SSR.
+ */
+function sanitizeTextNode(value: string): string {
+  return value.replace(CONTROL_CHARACTERS, '')
+}
+
 /**
  * Safely parse user_answer from JSONB with Zod validation
  */
@@ -75,13 +93,13 @@ function parseUserAnswer(raw: unknown): { currentAnswer?: string; currentAnswers
     const validated = UserAnswerSchema.parse(raw)
 
     if (typeof validated === 'string') {
-      return { currentAnswer: DOMPurify.sanitize(validated) }
+      return { currentAnswer: sanitizeTextNode(validated) }
     }
     if ('value' in validated) {
-      return { currentAnswer: DOMPurify.sanitize(validated.value) }
+      return { currentAnswer: sanitizeTextNode(validated.value) }
     }
     if ('values' in validated) {
-      const sanitizedValues = validated.values.map((v) => DOMPurify.sanitize(v))
+      const sanitizedValues = validated.values.map(sanitizeTextNode)
       return {
         currentAnswers: sanitizedValues,
         currentAnswer: sanitizedValues.join(', '),
@@ -204,37 +222,71 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
   // tRPC infers ClarifyingQuestionRow from backend (shared-types) — no manual cast needed
   const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
     // HIGH-004 fix: Use Zod-validated parser instead of inline logic
-    const { currentAnswer, currentAnswers } = parseUserAnswer(rawQ.user_answer)
+    const parsedAnswer = parseUserAnswer(rawQ.user_answer)
+    const suggestedAnswers = Array.isArray(rawQ.suggested_answers)
+      ? rawQ.suggested_answers.map((item) => ({
+          text: sanitizeTextNode(item.text),
+          value: typeof item.value === 'string' ? item.value : undefined,
+          rationale: item.rationale,
+          is_recommended: item.is_recommended,
+        }))
+      : []
+    const answerSource =
+      rawQ.answer_source === 'suggested' ||
+      rawQ.answer_source === 'modified' ||
+      rawQ.answer_source === 'custom' ||
+      rawQ.answer_source === 'system'
+        ? rawQ.answer_source
+        : undefined
+    const evidenceMetadata =
+      rawQ.question_category === 'document_conflicts'
+        ? (parseDocumentEvidenceQuestionMetadata(rawQ.metadata) ?? undefined)
+        : undefined
+    const mappedSystemAnswer =
+      rawQ.question_category === 'document_conflicts' &&
+      answerSource === 'system' &&
+      parsedAnswer.currentAnswer
+        ? (suggestedAnswers.find((answer) => answer.value === parsedAnswer.currentAnswer)?.text ??
+          t('documentEvidence.decisionLabelUnavailable'))
+        : parsedAnswer.currentAnswer
 
     return {
       id: rawQ.id,
-      text: DOMPurify.sanitize(rawQ.question_text),
+      text: sanitizeTextNode(rawQ.question_text),
       type: rawQ.question_type || 'open',
       priority: rawQ.question_priority as QuestionPriority,
-      suggestedAnswers: Array.isArray(rawQ.suggested_answers)
-        ? rawQ.suggested_answers.map((item) => ({
-            text: DOMPurify.sanitize(item.text),
-            rationale: item.rationale,
-            is_recommended: item.is_recommended,
-          }))
-        : [],
-      currentAnswer,
-      currentAnswers,
+      suggestedAnswers,
+      currentAnswer: mappedSystemAnswer,
+      currentAnswers: parsedAnswer.currentAnswers,
       category: rawQ.question_category || undefined,
       isAnswered: rawQ.status === 'answered',
+      evidenceMetadata,
+      evidenceMetadataInvalid: rawQ.question_category === 'document_conflicts' && !evidenceMetadata,
+      answerSource,
     }
   })
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
 
-  // Sort questions by priority
+  // Keep document decisions in their own leading block, then preserve priority order.
   const sortedQuestions = useMemo(
     () =>
       [...questions].sort((a, b) => {
+        const aConflict = a.category === 'document_conflicts' ? 0 : 1
+        const bConflict = b.category === 'document_conflicts' ? 0 : 1
+        if (aConflict !== bConflict) return aConflict - bConflict
         const order = { critical: 0, important: 1, nice_to_have: 2 }
         return order[a.priority] - order[b.priority]
       }),
     [questions]
+  )
+  const conflictQuestions = useMemo(
+    () => sortedQuestions.filter((question) => question.category === 'document_conflicts'),
+    [sortedQuestions]
+  )
+  const ordinaryQuestions = useMemo(
+    () => sortedQuestions.filter((question) => question.category !== 'document_conflicts'),
+    [sortedQuestions]
   )
 
   // Current question index state - start with first unanswered
@@ -301,20 +353,33 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
   // Calculate progress
   const totalQuestions = sortedQuestions.length
   const answeredCount = answeredQuestions.size
-  const isComplete = answeredCount === totalQuestions
+  const isAllAnswered = answeredCount === totalQuestions
+  const canProceed = sortedQuestions.every(
+    (question) =>
+      !question.evidenceMetadataInvalid &&
+      (question.isAnswered ||
+        answeredQuestions.has(question.id) ||
+        (question.category === 'document_conflicts' && question.priority === 'nice_to_have'))
+  )
+  const pendingRequiredConflicts = conflictQuestions.filter(
+    (question) =>
+      (question.priority !== 'nice_to_have' || question.evidenceMetadataInvalid) &&
+      !question.isAnswered &&
+      !answeredQuestions.has(question.id)
+  )
 
   // Trigger confetti on 100% completion - only ONCE ever per course
   useEffect(() => {
     // On first render with data, check if already complete
     if (wasAlreadyCompleteOnMount.current === null && totalQuestions > 0) {
-      wasAlreadyCompleteOnMount.current = isComplete
+      wasAlreadyCompleteOnMount.current = isAllAnswered
     }
 
     // Only show confetti if:
     // 1. All questions are answered
     // 2. Haven't shown confetti ever (persisted in localStorage)
     // 3. Questions were NOT already complete when component mounted (user completed them now)
-    if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
+    if (isAllAnswered && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
       // Persist to localStorage so confetti never shows again for this course
       localStorage.setItem(confettiStorageKey, 'true')
@@ -326,7 +391,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- confettiStorageKey is derived from courseId which is already in deps
-  }, [isComplete, hasShownConfetti, totalQuestions, courseId])
+  }, [isAllAnswered, hasShownConfetti, totalQuestions, courseId])
 
   // Navigation handlers
   const handlePrev = () => {
@@ -341,58 +406,73 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     setCurrentIndex(index)
   }
 
-  const handleAnswer = (
+  const focusQuestion = (index: number) => {
+    setCurrentIndex(index)
+    const questionId = sortedQuestions[index]?.id
+    if (questionId) {
+      document.getElementById(`clarifying-question-${questionId}`)?.focus()
+      window.requestAnimationFrame(() => {
+        document.getElementById(`clarifying-question-${questionId}`)?.focus()
+      })
+    }
+  }
+
+  const handleAnswer = async (
     questionId: string,
     answer: string | string[],
     source: 'suggested' | 'modified' | 'custom',
     selectedSuggestionIndex?: number,
     selectedSuggestionIndexes?: number[]
-  ) => {
+  ): Promise<boolean> => {
     // Determine if this is a multi_choice answer
     const isMultiChoice = Array.isArray(answer)
 
     // Build mutation payload based on answer type
+    const question = sortedQuestions.find((candidate) => candidate.id === questionId)
+    const expectedCurrentDecisionId = question?.evidenceMetadata?.current_decision_id
     const payload: AnswerPayload = isMultiChoice
       ? {
           questionId,
           answerSource: source,
           answers: answer,
           selectedSuggestionIndexes,
+          expectedCurrentDecisionId,
         }
       : {
           questionId,
           answerSource: source,
           answer: answer,
           selectedSuggestionIndex,
+          expectedCurrentDecisionId,
         }
 
     // Track which question is being processed for per-card loading state
     setProcessingQuestionId(questionId)
 
-    void submitAnswerMutation
-      .mutateAsync(payload)
-      .then(async () => {
-        setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+    try {
+      await submitAnswerMutation.mutateAsync(payload)
+      setAnsweredQuestions((prev) => new Set(prev).add(questionId))
 
-        // Auto-advance to next unanswered question
-        const nextUnanswered = sortedQuestions.findIndex(
-          (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
-        )
-        if (nextUnanswered >= 0) {
-          setCurrentIndex(nextUnanswered)
-        }
+      // Auto-advance to next unanswered question
+      const nextUnanswered = sortedQuestions.findIndex(
+        (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
+      )
+      if (nextUnanswered >= 0) {
+        setCurrentIndex(nextUnanswered)
+      }
 
-        // Invalidate cache to force refetch with updated currentAnswer
-        await invalidateAndRefetch()
+      // Invalidate cache to force refetch with updated currentAnswer
+      await invalidateAndRefetch()
+      return true
+    } catch (error) {
+      const submissionError = error as Error
+      toast.error(t('saveError'), {
+        description: submissionError.message || t('tryAgain'),
       })
-      .catch((error: Error) => {
-        toast.error(t('saveError'), {
-          description: error.message || t('tryAgain'),
-        })
-      })
-      .finally(() => {
-        setProcessingQuestionId(null)
-      })
+      return false
+    } finally {
+      setProcessingQuestionId(null)
+    }
   }
 
   const handleSkip = (questionId: string) => {
@@ -428,7 +508,10 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     // Auto-select first suggested answer for all unanswered questions
     // Uses batch endpoint to submit all answers in a single API call (fixes HIGH-002 rate limit issue)
     const unanswered = sortedQuestions.filter(
-      (q) => !answeredQuestions.has(q.id) && q.suggestedAnswers.length > 0
+      (q) =>
+        q.category !== 'document_conflicts' &&
+        !answeredQuestions.has(q.id) &&
+        q.suggestedAnswers.length > 0
     )
 
     if (unanswered.length === 0) {
@@ -526,7 +609,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                   {readOnly ? t('titleReadOnly') : t('title')}
                 </CardTitle>
               </div>
-              {isComplete && (
+              {isAllAnswered && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -541,18 +624,32 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         </Card>
 
         {/* Quick Actions - hidden in read-only mode */}
-        {!isComplete && !readOnly && (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void handleAcceptAll()}
-              disabled={submitAnswerMutation.isPending || submitMultipleAnswersMutation.isPending}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {t('acceptAllRecommendations')}
-            </Button>
-          </div>
+        {!isAllAnswered &&
+          !readOnly &&
+          ordinaryQuestions.some(
+            (question) => !question.isAnswered && !answeredQuestions.has(question.id)
+          ) && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleAcceptAll()}
+                disabled={submitAnswerMutation.isPending || submitMultipleAnswersMutation.isPending}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {t('acceptAllRecommendations')}
+              </Button>
+            </div>
+          )}
+
+        {conflictQuestions.length > 0 && (
+          <DocumentConflictSection
+            pendingRequiredCount={pendingRequiredConflicts.length}
+            readOnly={readOnly}
+            onReviewFirst={() =>
+              focusQuestion(sortedQuestions.indexOf(pendingRequiredConflicts[0]))
+            }
+          />
         )}
 
         {/* Wizard Layout */}
@@ -563,7 +660,8 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
               id: q.id,
               text: q.text,
               priority: q.priority,
-              isAnswered: answeredQuestions.has(q.id),
+              isAnswered: q.isAnswered || answeredQuestions.has(q.id),
+              isDocumentConflict: q.category === 'document_conflicts',
             }))}
             currentIndex={currentIndex}
             onSelect={handleSelectQuestion}
@@ -577,6 +675,16 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
               totalQuestions={totalQuestions}
               answeredCount={answeredCount}
               priorityCounts={priorityCounts}
+              conflictCounts={
+                conflictQuestions.length > 0
+                  ? {
+                      total: conflictQuestions.length,
+                      answered: conflictQuestions.filter(
+                        (question) => question.isAnswered || answeredQuestions.has(question.id)
+                      ).length,
+                    }
+                  : undefined
+              }
             />
 
             {/* Current question - ONLY ONE card */}
@@ -593,7 +701,9 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                     question={currentQuestion}
                     onAnswer={handleAnswer}
                     onSkip={handleSkip}
-                    isAnswered={answeredQuestions.has(currentQuestion.id)}
+                    isAnswered={
+                      currentQuestion.isAnswered || answeredQuestions.has(currentQuestion.id)
+                    }
                     isProcessing={processingQuestionId === currentQuestion.id}
                     readOnly={readOnly}
                   />
@@ -608,14 +718,14 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 currentIndex={currentIndex}
                 totalQuestions={totalQuestions}
                 questionsStatus={sortedQuestions.map((q) => ({
-                  isAnswered: answeredQuestions.has(q.id),
+                  isAnswered: q.isAnswered || answeredQuestions.has(q.id),
                   priority: q.priority,
                 }))}
                 onPrev={handlePrev}
                 onNext={handleNext}
                 onContinue={() => {}}
                 isProcessing={false}
-                isComplete={isComplete}
+                isComplete={canProceed}
                 hideContinueButton
               />
             ) : (
@@ -624,14 +734,14 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 currentIndex={currentIndex}
                 totalQuestions={totalQuestions}
                 questionsStatus={sortedQuestions.map((q) => ({
-                  isAnswered: answeredQuestions.has(q.id),
+                  isAnswered: q.isAnswered || answeredQuestions.has(q.id),
                   priority: q.priority,
                 }))}
                 onPrev={handlePrev}
                 onNext={handleNext}
                 onContinue={handleContinue}
                 isProcessing={approveAndProceedMutation.isPending}
-                isComplete={isComplete}
+                isComplete={canProceed}
                 canSkipCurrent={
                   !!currentQuestion &&
                   currentQuestion.priority === 'nice_to_have' &&

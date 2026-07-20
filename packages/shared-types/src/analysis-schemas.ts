@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { DocumentEvidenceSnapshotSchema } from './document-evidence';
 
 /**
  * Known visual types for generation guidance.
@@ -742,6 +743,10 @@ export const AnalysisResultSchema = z.object({
   }),
 
   document_relevance_mapping: DocumentRelevanceMappingSchema.optional().default({}),
+
+  // Compact reference only. Full evidence cards, conflicts, and decision history
+  // remain in the tenant-scoped document_evidence_* tables.
+  document_evidence: DocumentEvidenceSnapshotSchema.optional(),
 
   metadata: z.object({
     analysis_version: z.string(),

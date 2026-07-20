@@ -196,6 +196,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false, // Disable cache to test retrieval logic
     });
@@ -255,6 +256,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false,
     });
@@ -303,6 +305,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false,
     });
@@ -335,6 +338,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false,
     });
@@ -373,6 +377,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false,
     });
@@ -419,6 +424,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: true, // Enable cache
     });
@@ -436,7 +442,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
   // TEST 7: Query Failure Resilience
   // ==========================================================================
 
-  it('should continue to Tier 2 when Tier 1 query throws error', async () => {
+  it('fails required evidence retrieval when any planned query remains incomplete', async () => {
     const lessonSpec = createMockLessonSpec({
       rag_context: {
         primary_documents: [],
@@ -462,20 +468,23 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
       .mockResolvedValueOnce(createMockSearchResult(1)) // Tier 1 query 2 - success
       .mockResolvedValue(createMockSearchResult(2)); // All Tier 2 queries
 
-    const result = await retrieveLessonContext({
-      courseId: mockCourseId,
-      lessonSpec,
-      useCache: false,
+    await expect(
+      retrieveLessonContext({
+        courseId: mockCourseId,
+        organizationId: 'organization-1',
+        lessonSpec,
+        useCache: false,
+      })
+    ).rejects.toMatchObject({
+      reason: 'qdrant_service_unavailable',
+      retryable: true,
     });
 
     // Verify searchChunks called 10 times (not aborted by error)
     expect(searchChunks).toHaveBeenCalledTimes(10);
 
-    // Verify rerankChunks called (second Tier 1 query saved us)
-    expect(rerankChunks).toHaveBeenCalledTimes(1);
-
-    // Verify result has chunks
-    expect(result.chunks.length).toBeGreaterThan(0);
+    // Retrieval executes the bounded plan, then rejects it before stale partial evidence is reranked.
+    expect(rerankChunks).not.toHaveBeenCalled();
   });
 
   // ==========================================================================
@@ -507,6 +516,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     await retrieveLessonContext({
       courseId: mockCourseId,
+      organizationId: 'organization-1',
       lessonSpec,
       useCache: false,
     });

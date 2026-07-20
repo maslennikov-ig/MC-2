@@ -60,6 +60,78 @@ add_service_once() {
     CORE_SERVICES+=("$service")
 }
 
+read_secret_file() {
+    local path="$1"
+    local label="$2"
+    local mode
+    local value
+
+    if [[ "$path" != /* ]]; then
+        path="$BASE_PATH/${path#./}"
+    fi
+    [ -f "$path" ] && [ -r "$path" ] || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
+    mode="$(stat -c '%a' "$path")"
+    (( (8#$mode & 077) == 0 )) || { echo "ERROR: $label file permissions are unsafe" >&2; return 1; }
+    value="$(cat -- "$path"; printf x)"
+    value="${value%x}"
+    if [[ "$value" == *$'\r\n' ]]; then
+        value="${value%$'\r\n'}"
+    elif [[ "$value" == *$'\n' ]]; then
+        value="${value%$'\n'}"
+    fi
+    [ -n "$value" ] && [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || {
+        echo "ERROR: $label file must contain exactly one non-empty line" >&2
+        return 1
+    }
+    REPLY="$value"
+}
+
+configured_path() {
+    local env_file="$1"
+    local key="$2"
+    local fallback="$3"
+    local value=''
+
+    if [ -r "$env_file" ]; then
+        value="$(awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2) }' "$env_file" | tail -n 1)"
+    fi
+    printf '%s' "${value:-$fallback}"
+}
+
+qdrant_dev_gate() {
+    local read_only_key admin_key read_only_path admin_path
+
+    echo "   Qdrant readiness endpoint..."
+    for i in {1..12}; do
+        if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:6333/readyz > /dev/null 2>&1; then
+            break
+        fi
+        [ "$i" -lt 12 ] || { echo "ERROR: Qdrant readiness failed" >&2; return 1; }
+        sleep 5
+    done
+
+    read_only_path="${QDRANT_READ_ONLY_API_KEY_FILE:-$(configured_path "$BASE_PATH/.env.dev" QDRANT_READ_ONLY_API_KEY_FILE "$BASE_PATH/secrets/qdrant_read_only_api_key")}"
+    read_secret_file "$read_only_path" 'Qdrant read-only API key'
+    read_only_key="$REPLY"
+    unset REPLY
+    echo "   Qdrant authenticated collections endpoint..."
+    curl --fail --silent --show-error --max-time 5 \
+        -H "api-key: $read_only_key" http://127.0.0.1:6333/collections > /dev/null
+    unset read_only_key
+
+    admin_path="${QDRANT_API_KEY_FILE:-$(configured_path "$BASE_PATH/.env.dev" QDRANT_API_KEY_FILE "$BASE_PATH/secrets/qdrant_api_key")}"
+    read_secret_file "$admin_path" 'Qdrant admin API key'
+    admin_key="$REPLY"
+    unset REPLY
+    echo "   Running qdrant:verify..."
+    QDRANT_URL=http://qdrant-dev:6333 QDRANT_API_KEY="$admin_key" \
+        $DEV_COMPOSE run --rm --no-deps -T \
+        -e QDRANT_URL -e QDRANT_API_KEY \
+        --entrypoint node api-dev \
+        dist/shared/qdrant/create-collection.js --verify-only
+    unset admin_key
+}
+
 # 1. Docker Login to GHCR (if GITHUB_TOKEN provided)
 if [ -n "$GITHUB_TOKEN" ]; then
     echo "Logging in to GHCR..."
@@ -113,7 +185,8 @@ echo "   Directories ready."
 
 # 5. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
-docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
+docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.production" \
+    up -d redis docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
 echo "   Infrastructure ready."
 echo ""
 
@@ -137,6 +210,7 @@ fi
 # then start workers.
 echo "Ensuring Qdrant dev container is compose-managed..."
 $DEV_COMPOSE up -d qdrant-dev
+qdrant_dev_gate
 
 if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     CORE_SERVICES=()
@@ -178,22 +252,7 @@ fi
 # 8. Health Check — wait for API and Web before starting workers
 echo "Performing Health Checks..."
 
-# Check Qdrant readiness before accepting the deployment.
-QDRANT_HEALTHY=false
-QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
-if [ -z "$QDRANT_API_KEY_VALUE" ] && [ -f "$BASE_PATH/.env.dev" ]; then
-    QDRANT_API_KEY_VALUE="$(grep -E '^QDRANT_API_KEY=' "$BASE_PATH/.env.dev" | tail -n 1 | cut -d= -f2-)"
-fi
-echo "   Checking Qdrant on localhost:6333..."
-for i in {1..12}; do
-    if curl -s -f -H "api-key: $QDRANT_API_KEY_VALUE" "http://localhost:6333/collections" > /dev/null 2>&1; then
-        echo "   Qdrant health check passed!"
-        QDRANT_HEALTHY=true
-        break
-    fi
-    echo "   Waiting for Qdrant... ($i/12)"
-    sleep 5
-done
+QDRANT_HEALTHY=true
 
 # Check API health
 API_HEALTHY=false

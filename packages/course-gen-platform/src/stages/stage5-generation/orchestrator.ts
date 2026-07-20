@@ -44,6 +44,10 @@ import {
   reconcileCourseMetadata,
   validateStructuralQuality,
 } from './validators/structural-quality-validator';
+import type { Stage5EvidenceEnricher } from './evidence/types';
+import { Stage5EvidenceEnrichmentFailure } from './evidence/types';
+import { buildEvidenceFailureRecord } from './evidence/advisory-enrichment';
+import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -146,7 +150,9 @@ export class GenerationOrchestrator {
     metadataGenerator: MetadataGenerator,
     sectionBatchGenerator: SectionBatchGenerator,
     qualityValidator: QualityValidator,
-    qdrantClient?: QdrantClient
+    qdrantClient?: QdrantClient,
+    private readonly evidenceEnricher?: Stage5EvidenceEnricher,
+    private readonly evidenceMetricsPublisher: typeof publishDocumentEvidenceMetricsSafely = publishDocumentEvidenceMetricsSafely
   ) {
     this.logger = pino({
       name: 'generation-orchestrator',
@@ -224,7 +230,7 @@ export class GenerationOrchestrator {
       finalState.sections,
       input,
       this.logger,
-      finalState.metadata!
+      finalState.metadata as NonNullable<typeof finalState.metadata>
     );
 
     this.logQualityGateResults(input, qualityGateResults);
@@ -243,7 +249,11 @@ export class GenerationOrchestrator {
         : finalState;
     const finalStructuralResult = validateStructuralQuality({
       input,
-      metadata: reconcileCourseMetadata(finalState.metadata!, stateForAssembly.sections, input),
+      metadata: reconcileCourseMetadata(
+        finalState.metadata as NonNullable<typeof finalState.metadata>,
+        stateForAssembly.sections,
+        input
+      ),
       sections: stateForAssembly.sections,
     });
     stateForAssembly.qualityScores = {
@@ -553,7 +563,7 @@ export class GenerationOrchestrator {
     totalDuration: number
   ): Promise<GenerationResult> {
     const { courseStructure, generationMetadata } = assembleGenerationResult(
-      finalState.metadata!,
+      finalState.metadata as NonNullable<typeof finalState.metadata>,
       finalState.sections,
       finalState.tokenUsage,
       finalState.modelUsed,
@@ -564,8 +574,90 @@ export class GenerationOrchestrator {
       input
     );
 
+    let finalCourseStructure = courseStructure;
+    let evidenceRetrievalAttempts = 0;
+    if (this.evidenceEnricher) {
+      const baselineCriticalCodes = new Set(
+        generationMetadata.quality_scores.structure?.criticalIssues.map(issue => issue.code) ?? []
+      );
+      try {
+        const enriched = await this.evidenceEnricher({
+          courseId: input.course_id,
+          organizationId: input.organization_id,
+          language: input.frontend_parameters.language ?? 'en',
+          baseline: courseStructure,
+          snapshot: input.analysis_result?.document_evidence,
+          validateCandidate: candidate => {
+            const result = validateStructuralQuality({
+              input,
+              metadata: reconcileCourseMetadata(
+                finalState.metadata as NonNullable<typeof finalState.metadata>,
+                candidate.sections,
+                input
+              ),
+              sections: candidate.sections,
+            });
+            return result.criticalIssues
+              .filter(issue => !baselineCriticalCodes.has(issue.code))
+              .map(issue => `structural:${issue.code}`);
+          },
+        });
+        evidenceRetrievalAttempts = enriched.retrievalAttempts;
+        finalCourseStructure = enriched.courseStructure;
+        generationMetadata.document_evidence_enrichment = enriched.enrichment;
+        const enrichedStructuralResult = validateStructuralQuality({
+          input,
+          metadata: reconcileCourseMetadata(
+            finalState.metadata as NonNullable<typeof finalState.metadata>,
+            finalCourseStructure.sections,
+            input
+          ),
+          sections: finalCourseStructure.sections,
+        });
+        const newCriticalIssues = enrichedStructuralResult.criticalIssues.filter(
+          issue => !baselineCriticalCodes.has(issue.code)
+        );
+        if (newCriticalIssues.length > 0) {
+          throw new Error(
+            `Stage 5 evidence enrichment escaped structural validation: ${newCriticalIssues
+              .map(issue => issue.code)
+              .join(',')}`
+          );
+        }
+        generationMetadata.quality_scores.structure = enrichedStructuralResult;
+      } catch (error) {
+        if (error instanceof Stage5EvidenceEnrichmentFailure) {
+          evidenceRetrievalAttempts = error.retrievalAttempts;
+        }
+        this.logger.warn(
+          {
+            outcome: 'evidence_enrichment_failed',
+          },
+          'Stage 5 advisory evidence pass failed open'
+        );
+        finalCourseStructure = courseStructure;
+        const snapshot = input.analysis_result?.document_evidence;
+        if (snapshot) {
+          generationMetadata.document_evidence_enrichment = buildEvidenceFailureRecord(snapshot);
+        }
+      }
+    }
+
+    const evidenceAudit = generationMetadata.document_evidence_enrichment;
+    if (this.evidenceEnricher && evidenceAudit) {
+      await this.evidenceMetricsPublisher(
+        {
+          stage: 'stage5',
+          status: evidenceAudit.status,
+          retrievals: evidenceRetrievalAttempts,
+          fallbacks: evidenceAudit.fallback_section_count,
+        },
+        this.logger
+      );
+    }
+
     const result: GenerationResult = {
-      course_structure: courseStructure,
+      course_structure: finalCourseStructure,
       generation_metadata: generationMetadata,
     };
 
@@ -577,7 +669,31 @@ export class GenerationOrchestrator {
       phase: 'complete',
       stepName: 'finish',
       inputData: { courseId: input.course_id },
-      outputData: courseStructure,
+      outputData: {
+        sectionsCount: finalCourseStructure.sections.length,
+        totalLessons: finalCourseStructure.sections.reduce(
+          (total, section) => total + section.lessons.length,
+          0
+        ),
+        structural: generationMetadata.quality_scores.structure
+          ? {
+              passed: generationMetadata.quality_scores.structure.passed,
+              criticalCount: generationMetadata.quality_scores.structure.criticalIssues.length,
+              warningCount: generationMetadata.quality_scores.structure.warnings.length,
+            }
+          : undefined,
+        documentEvidence: generationMetadata.document_evidence_enrichment
+          ? {
+              status: generationMetadata.document_evidence_enrichment.status,
+              decisionCount:
+                generationMetadata.document_evidence_enrichment.accepted_decision_ids.length,
+              sectionCount: generationMetadata.document_evidence_enrichment.section_evidence.length,
+              refCount: generationMetadata.document_evidence_enrichment.retrieved_ref_count,
+              fallbackSectionCount:
+                generationMetadata.document_evidence_enrichment.fallback_section_count,
+            }
+          : undefined,
+      },
       costUsd: generationMetadata.cost_usd,
       tokensUsed: generationMetadata.total_tokens.total,
       durationMs: totalDuration,

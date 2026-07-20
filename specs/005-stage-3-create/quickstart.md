@@ -1,3 +1,5 @@
+> **SUPERSEDED QUICKSTART — NOT RUNTIME GUIDANCE.** Do not use the hosted Qdrant endpoint below; use private pinned Qdrant 1.18.2 via `docs/quickstart.md` and `docs/operations/qdrant-self-hosted.md`.
+
 # Quickstart Guide: Stage 3 - Document Summarization
 
 **Feature**: Stage 3 - Document Summarization

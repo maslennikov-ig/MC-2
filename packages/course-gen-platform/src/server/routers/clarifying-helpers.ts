@@ -18,6 +18,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { ClarifyingQuestionRow, UserAnswerValue, Database } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../utils/supabase-query-guard';
+import { createHash } from 'node:crypto';
 
 // Re-export approve-and-proceed helpers so the router can import from one place
 export {
@@ -381,6 +382,91 @@ export async function persistAnswer(params: PersistAnswerParams): Promise<void> 
       message: 'Failed to submit answer',
     });
   }
+}
+
+export interface DocumentEvidenceAnswerSubmission {
+  questionId: string;
+  subjectKey: string;
+  answer: string;
+  answerSource: 'suggested' | 'modified' | 'custom';
+  selectedSuggestionIndex?: number;
+  expectedCurrentDecisionId?: string;
+}
+
+function stableAnswerIdempotencyKey(input: {
+  courseId: string;
+  actorUserId: string;
+  answer: DocumentEvidenceAnswerSubmission;
+}): string {
+  const hex = createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 32).split('');
+  hex[12] = '8';
+  hex[16] = ((Number.parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex
+    .slice(12, 16)
+    .join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`;
+}
+
+/** Atomically answers one or more document-evidence questions and appends user decisions. */
+export async function persistDocumentEvidenceAnswersAtomic(params: {
+  courseId: string;
+  actorUserId: string;
+  answers: DocumentEvidenceAnswerSubmission[];
+  requestId: string;
+}): Promise<{ answeredQuestionIds: string[] }> {
+  if (params.answers.some(answer => !answer.subjectKey.trim())) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Document decision subject is missing' });
+  }
+  const supabase = getSupabaseAdmin();
+  const payload = params.answers.map(answer => ({
+    question_id: answer.questionId,
+    answer: answer.answer,
+    answer_source: answer.answerSource,
+    selected_suggestion_index: answer.selectedSuggestionIndex ?? null,
+    expected_current_decision_id: answer.expectedCurrentDecisionId ?? null,
+    idempotency_key: stableAnswerIdempotencyKey({
+      courseId: params.courseId,
+      actorUserId: params.actorUserId,
+      answer,
+    }),
+  }));
+  const callDocumentEvidenceAnswers = supabase.rpc as unknown as (
+    name: 'answer_document_evidence_questions_atomic',
+    args: { p_course_id: string; p_answers: typeof payload; p_actor_user_id: string }
+  ) => Promise<{ data: unknown; error: { code?: string } | null }>;
+  const { data, error } = await callDocumentEvidenceAnswers(
+    'answer_document_evidence_questions_atomic',
+    {
+    p_course_id: params.courseId,
+    p_answers: payload,
+    p_actor_user_id: params.actorUserId,
+    }
+  );
+  if (error) {
+    logger.error(
+      {
+        requestId: params.requestId,
+        courseId: params.courseId,
+        questionCount: params.answers.length,
+        code: error.code,
+      },
+      'Atomic document evidence answer failed'
+    );
+    throw new TRPCError({
+      code: error.code === '40001' ? 'CONFLICT' : 'INTERNAL_SERVER_ERROR',
+      message:
+        error.code === '40001'
+          ? 'The document decision changed. Reload and retry.'
+          : 'Failed to submit answer',
+    });
+  }
+  const result = data as unknown as { answered_question_ids?: unknown };
+  if (
+    !Array.isArray(result?.answered_question_ids) ||
+    result.answered_question_ids.some(value => typeof value !== 'string')
+  ) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Invalid answer result' });
+  }
+  return { answeredQuestionIds: result.answered_question_ids as string[] };
 }
 
 /**

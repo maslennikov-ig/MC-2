@@ -8,10 +8,11 @@ Merge **current branch** into master and push to trigger Blue/Green deployment.
 **What happens:**
 
 1. Merges your branch → master
-2. CI/CD builds Docker images (web, api)
+2. CI/CD builds required images, including the deploy-relevant Qdrant operator
 3. Server deploys to inactive color (Blue/Green switch)
 4. Health check → nginx switches traffic
-5. Zero downtime, instant rollback available
+5. Existing bootstrapped deployments use Blue/Green switching; rollback is
+   release-bound and recreates API/web/main/Stage 6 coherently
 
 **Workflow:**
 
@@ -33,6 +34,14 @@ develop → push → dev.ai.megacampus.ru (Rolling)
 - Creates merge commit with deployment info
 - Switches back to source branch after deploy
 
+**Q12 boundary:** the owner authorized staging activation, but `/deploy` is not
+the first-bootstrap command. Current project-CA, off-host-S3, and authoritative
+source-path NO-GO inputs must be resolved first. Initial activation must publish
+and pre-pull the exact operator digest, apply the guarded five-migration chain,
+start Qdrant/monitoring only, bootstrap before verify, complete gap-free reindex,
+and prove snapshot/restore/rollback. `--force` skips local quality checks only;
+it cannot bypass these runtime gates.
+
 **Flags:**
 
 - `--force` / `-f`: Skip quality checks (type-check, build)
@@ -42,8 +51,13 @@ develop → push → dev.ai.megacampus.ru (Rolling)
 **Rollback:** If deploy fails, run on server:
 
 ```bash
-ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"
+ssh megacampus-prod \
+  "bash /opt/megacampus/scripts/rollback_blue_green.sh production '<failed-40-character-release-commit>'"
 ```
+
+Rollback requires the matching switched/accepted `deploy_state`, immutable
+color images, and coherent main/Stage 6 worker recreation before nginx moves.
+It is not a database, evidence, or Qdrant alias rollback.
 
 **Usage:**
 
