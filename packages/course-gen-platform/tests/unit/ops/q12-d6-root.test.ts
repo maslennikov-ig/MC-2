@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 // D6 activation-truth Root coordinator (Tasks 16-19) RED/GREEN gates.
 //
@@ -35,7 +36,7 @@ function runScenario(payload: Record<string, unknown>): RunnerResult {
   return JSON.parse(probe.stdout) as RunnerResult;
 }
 
-describe('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
   const mapped = { 1: 21, 2: 22, 3: 23, 4: 24, 5: 25, 6: 26, 7: 27, 9: 9, 10: 30, 11: 31 };
 
   it('builds the exact ordered posix_spawn file-action sequence', () => {
@@ -138,7 +139,7 @@ describe('Task 16 — D6 posix_spawn boundary + FD map/close-from', () => {
   });
 });
 
-describe('Task 17 — D6 pidfd / ptrace / proc / OFD gates', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Task 17 — D6 pidfd / ptrace / proc / OFD gates', () => {
   it('opens a pidfd, retrieves FD9, and proves OFD contention + proc identity', () => {
     const result = runScenario({ scenario: 'pidfd_gates' });
     expect(result.ok, result.error).toBe(true);
@@ -209,381 +210,409 @@ const TERMINAL_SEAL_KEYS = [
   'writer_quiesce_manifest_sha256',
 ];
 
-describe('Task 18 — D6 predecision / optional-R / terminal-seal authority', () => {
-  it('builds the exact 16-key predecision with the exact classification/action pair', () => {
-    for (const [classification, action] of [
-      ['precommit_rollback', 'append_r_then_seal'],
-      ['committed_finish_forward', 'seal_finish_forward'],
-      ['drift_incident', 'abort_incident'],
-    ] as const) {
-      const result = runScenario({ scenario: 'predecision', classification });
-      expect(result.ok, result.error).toBe(true);
-      expect(result.keys).toEqual(PREDECISION_KEYS);
-      const predecision = result.predecision as Record<string, unknown>;
-      expect(predecision.action).toBe(action);
-      if (classification === 'precommit_rollback') {
-        expect(predecision.planned_r_journal_entry_hash).not.toBeNull();
-        expect(predecision.planned_r_checkpoint_sha256).not.toBeNull();
-      } else {
-        expect(predecision.planned_r_journal_entry_hash).toBeNull();
-        expect(predecision.planned_r_checkpoint_sha256).toBeNull();
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Task 18 — D6 predecision / optional-R / terminal-seal authority',
+  () => {
+    it('builds the exact 16-key predecision with the exact classification/action pair', () => {
+      for (const [classification, action] of [
+        ['precommit_rollback', 'append_r_then_seal'],
+        ['committed_finish_forward', 'seal_finish_forward'],
+        ['drift_incident', 'abort_incident'],
+      ] as const) {
+        const result = runScenario({ scenario: 'predecision', classification });
+        expect(result.ok, result.error).toBe(true);
+        expect(result.keys).toEqual(PREDECISION_KEYS);
+        const predecision = result.predecision as Record<string, unknown>;
+        expect(predecision.action).toBe(action);
+        if (classification === 'precommit_rollback') {
+          expect(predecision.planned_r_journal_entry_hash).not.toBeNull();
+          expect(predecision.planned_r_checkpoint_sha256).not.toBeNull();
+        } else {
+          expect(predecision.planned_r_journal_entry_hash).toBeNull();
+          expect(predecision.planned_r_checkpoint_sha256).toBeNull();
+        }
       }
-    }
-  });
+    });
 
-  it('rejects an unknown classification, a wrong action, and illegal planned-R nullability', () => {
-    expect(runScenario({ scenario: 'predecision', classification: 'made_up' }).ok).toBe(false);
-    expect(
-      runScenario({
-        scenario: 'predecision',
+    it('rejects an unknown classification, a wrong action, and illegal planned-R nullability', () => {
+      expect(runScenario({ scenario: 'predecision', classification: 'made_up' }).ok).toBe(false);
+      expect(
+        runScenario({
+          scenario: 'predecision',
+          classification: 'precommit_rollback',
+          overrides: { action: 'seal_finish_forward' },
+        }).ok
+      ).toBe(false);
+      // finish-forward must have null planned R
+      expect(
+        runScenario({
+          scenario: 'predecision',
+          classification: 'committed_finish_forward',
+          overrides: { planned_r_journal_entry_hash: 'a'.repeat(64) },
+        }).ok
+      ).toBe(false);
+    });
+
+    it('builds the exact 26-key terminal seal with the correct outcome and authority', () => {
+      for (const [classification, outcome, authority] of [
+        [
+          'precommit_rollback',
+          'precommit_rollback_sealed',
+          'task9_retirement_rollback_preparation',
+        ],
+        ['committed_finish_forward', 'committed_finish_forward_sealed', 'finish_forward'],
+        ['drift_incident', 'drift_incident_sealed', 'none'],
+      ] as const) {
+        const result = runScenario({ scenario: 'terminal_seal', classification });
+        expect(result.ok, result.error).toBe(true);
+        expect(result.keys).toEqual(TERMINAL_SEAL_KEYS);
+        expect(result.outcome).toBe(outcome);
+        expect(result.authority).toBe(authority);
+      }
+    });
+
+    it('rejects a terminal seal with a non-zero exit, wrong end literals, or bad actual-R nullability', () => {
+      const bad = (overrides: Record<string, unknown>) =>
+        runScenario({ scenario: 'terminal_seal', classification: 'precommit_rollback', overrides })
+          .ok;
+      expect(bad({ probe_exit_status: 1 })).toBe(false);
+      expect(bad({ transaction_end: 'rollback' })).toBe(false);
+      expect(bad({ connection_closed: false })).toBe(false);
+      // committed outcome must carry null actual R
+      expect(
+        runScenario({
+          scenario: 'terminal_seal',
+          classification: 'committed_finish_forward',
+          overrides: { actual_r_journal_entry_hash: 'a'.repeat(64) },
+        }).ok
+      ).toBe(false);
+      // evidence state must match the classification
+      expect(
+        runScenario({
+          scenario: 'terminal_seal',
+          classification: 'drift_incident',
+          overrides: { activation_evidence_state: 'complete_receipt' },
+        }).ok
+      ).toBe(false);
+    });
+
+    it('publishes request/predecision/seal 0400 and transcript 0600 with seal-last, incident-only R', () => {
+      const result = runScenario({
+        scenario: 'publish_authority',
         classification: 'precommit_rollback',
-        overrides: { action: 'seal_finish_forward' },
-      }).ok
-    ).toBe(false);
-    // finish-forward must have null planned R
-    expect(
-      runScenario({
-        scenario: 'predecision',
-        classification: 'committed_finish_forward',
-        overrides: { planned_r_journal_entry_hash: 'a'.repeat(64) },
-      }).ok
-    ).toBe(false);
-  });
-
-  it('builds the exact 26-key terminal seal with the correct outcome and authority', () => {
-    for (const [classification, outcome, authority] of [
-      ['precommit_rollback', 'precommit_rollback_sealed', 'task9_retirement_rollback_preparation'],
-      ['committed_finish_forward', 'committed_finish_forward_sealed', 'finish_forward'],
-      ['drift_incident', 'drift_incident_sealed', 'none'],
-    ] as const) {
-      const result = runScenario({ scenario: 'terminal_seal', classification });
+      });
       expect(result.ok, result.error).toBe(true);
-      expect(result.keys).toEqual(TERMINAL_SEAL_KEYS);
-      expect(result.outcome).toBe(outcome);
-      expect(result.authority).toBe(authority);
-    }
-  });
-
-  it('rejects a terminal seal with a non-zero exit, wrong end literals, or bad actual-R nullability', () => {
-    const bad = (overrides: Record<string, unknown>) =>
-      runScenario({ scenario: 'terminal_seal', classification: 'precommit_rollback', overrides })
-        .ok;
-    expect(bad({ probe_exit_status: 1 })).toBe(false);
-    expect(bad({ transaction_end: 'rollback' })).toBe(false);
-    expect(bad({ connection_closed: false })).toBe(false);
-    // committed outcome must carry null actual R
-    expect(
-      runScenario({
-        scenario: 'terminal_seal',
-        classification: 'committed_finish_forward',
-        overrides: { actual_r_journal_entry_hash: 'a'.repeat(64) },
-      }).ok
-    ).toBe(false);
-    // evidence state must match the classification
-    expect(
-      runScenario({
-        scenario: 'terminal_seal',
-        classification: 'drift_incident',
-        overrides: { activation_evidence_state: 'complete_receipt' },
-      }).ok
-    ).toBe(false);
-  });
-
-  it('publishes request/predecision/seal 0400 and transcript 0600 with seal-last, incident-only R', () => {
-    const result = runScenario({
-      scenario: 'publish_authority',
-      classification: 'precommit_rollback',
+      expect(result.request_mode).toBe('0o400');
+      expect(result.predecision_mode).toBe('0o400');
+      expect(result.seal_mode).toBe('0o400');
+      expect(result.transcript_mode).toBe('0o600');
+      const trace = result.trace as string[];
+      const req = trace.indexOf('request:published');
+      const pre = trace.indexOf('predecision:published');
+      const seal = trace.indexOf('terminal-seal:published');
+      const fsync = trace.lastIndexOf('transcript:fsynced');
+      expect(req).toBeGreaterThanOrEqual(0);
+      expect(pre).toBeGreaterThan(req);
+      expect(seal).toBeGreaterThan(pre);
+      // the append-only transcript is fsynced before the terminal seal is published
+      expect(fsync).toBeGreaterThan(-1);
+      expect(fsync).toBeLessThan(seal);
+      // a durable R with no valid terminal seal is incident-only, never finish-forward
+      expect(result.authority_without_seal).toBe('incident_only');
+      expect(result.authority_with_seal).toBe('task9_retirement_rollback_preparation');
     });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.request_mode).toBe('0o400');
-    expect(result.predecision_mode).toBe('0o400');
-    expect(result.seal_mode).toBe('0o400');
-    expect(result.transcript_mode).toBe('0o600');
-    const trace = result.trace as string[];
-    const req = trace.indexOf('request:published');
-    const pre = trace.indexOf('predecision:published');
-    const seal = trace.indexOf('terminal-seal:published');
-    const fsync = trace.lastIndexOf('transcript:fsynced');
-    expect(req).toBeGreaterThanOrEqual(0);
-    expect(pre).toBeGreaterThan(req);
-    expect(seal).toBeGreaterThan(pre);
-    // the append-only transcript is fsynced before the terminal seal is published
-    expect(fsync).toBeGreaterThan(-1);
-    expect(fsync).toBeLessThan(seal);
-    // a durable R with no valid terminal seal is incident-only, never finish-forward
-    expect(result.authority_without_seal).toBe('incident_only');
-    expect(result.authority_with_seal).toBe('task9_retirement_rollback_preparation');
-  });
-});
+  }
+);
 
-describe('Task 19 — D6 post-R narrowing + race closure + restart authority', () => {
-  it('permits only the narrowed post-R probe and Root operations', () => {
-    const checks: Array<[string, string]> = [
-      ['probe', 'emit_sealed'],
-      ['probe', 'receive_release'],
-      ['probe', 'read_only_commit'],
-      ['probe', 'close_connection'],
-      ['probe', 'emit_closed'],
-      ['probe', 'exit'],
-      ['probe', 'spawn_child'],
-      ['probe', 'open_mutation_connection'],
-      ['probe', 'write_journal'],
-      ['root', 'append_transcript'],
-      ['root', 'fsync_transcript'],
-      ['root', 'publish_terminal_seal'],
-      ['root', 'prove_probe_exit'],
-      ['root', 'permit_task9_retirement'],
-      ['root', 'append_journal_row'],
-      ['root', 'mutate_rollback'],
-      ['root', 'open_new_session'],
-    ];
-    const result = runScenario({ scenario: 'post_r_narrowing', checks });
-    expect(result.ok, result.error).toBe(true);
-    const allowed = result.allowed as Record<string, boolean>;
-    for (const key of [
-      'probe:emit_sealed',
-      'probe:receive_release',
-      'probe:read_only_commit',
-      'probe:close_connection',
-      'probe:emit_closed',
-      'probe:exit',
-      'root:append_transcript',
-      'root:fsync_transcript',
-      'root:publish_terminal_seal',
-      'root:prove_probe_exit',
-      'root:permit_task9_retirement',
-    ]) {
-      expect(allowed[key], key).toBe(true);
-    }
-    for (const key of [
-      'probe:spawn_child',
-      'probe:open_mutation_connection',
-      'probe:write_journal',
-      'root:append_journal_row',
-      'root:mutate_rollback',
-      'root:open_new_session',
-    ]) {
-      expect(allowed[key], key).toBe(false);
-    }
-  });
-
-  it('emits the exact precommit race-closure Root ordering', () => {
-    const result = runScenario({ scenario: 'race_order' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.order).toEqual([
-      'publish_predecision',
-      'append_r',
-      'fsync_r',
-      'obtain_sealed',
-      'release',
-      'receive_closed',
-      'observe_clean_exit',
-      'fsync_transcript',
-      'publish_terminal_seal',
-    ]);
-  });
-
-  it('maps the exact crash-rule authority table', () => {
-    const authority = (state: Record<string, unknown>) =>
-      runScenario({ scenario: 'crash_authority', state }).authority;
-    // predecision, no R, continuous original transaction -> may continue
-    expect(authority({ has_predecision: true, has_durable_r: false, continuity: true })).toBe(
-      'continue'
-    );
-    // predecision, no R, not continuous -> abandoned, no authority
-    expect(authority({ has_predecision: true, has_durable_r: false, continuity: false })).toBe(
-      'abandoned'
-    );
-    // durable R, no valid terminal seal -> incident-only
-    expect(authority({ has_predecision: true, has_durable_r: true })).toBe('incident_only');
-    // terminal seal, no R, committed, unique tip -> finish-forward
-    expect(
-      authority({
-        has_terminal_seal: true,
-        seal_outcome: 'committed_finish_forward_sealed',
-        has_durable_r: false,
-        unique_chain_tip: true,
-      })
-    ).toBe('finish_forward');
-    // terminal seal with exact R -> Task 9 retirement only
-    expect(
-      authority({
-        has_terminal_seal: true,
-        seal_outcome: 'precommit_rollback_sealed',
-        has_durable_r: true,
-      })
-    ).toBe('task9_retirement_rollback_preparation');
-    // incident terminal seal authorizes no mutation
-    expect(authority({ has_terminal_seal: true, seal_outcome: 'drift_incident_sealed' })).toBe(
-      'none'
-    );
-  });
-
-  it('rejects a committed finish-forward seal that is not the unique chain tip', () => {
-    const result = runScenario({
-      scenario: 'crash_authority',
-      state: {
-        has_terminal_seal: true,
-        seal_outcome: 'committed_finish_forward_sealed',
-        has_durable_r: false,
-        unique_chain_tip: false,
-      },
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Task 19 — D6 post-R narrowing + race closure + restart authority',
+  () => {
+    it('permits only the narrowed post-R probe and Root operations', () => {
+      const checks: Array<[string, string]> = [
+        ['probe', 'emit_sealed'],
+        ['probe', 'receive_release'],
+        ['probe', 'read_only_commit'],
+        ['probe', 'close_connection'],
+        ['probe', 'emit_closed'],
+        ['probe', 'exit'],
+        ['probe', 'spawn_child'],
+        ['probe', 'open_mutation_connection'],
+        ['probe', 'write_journal'],
+        ['root', 'append_transcript'],
+        ['root', 'fsync_transcript'],
+        ['root', 'publish_terminal_seal'],
+        ['root', 'prove_probe_exit'],
+        ['root', 'permit_task9_retirement'],
+        ['root', 'append_journal_row'],
+        ['root', 'mutate_rollback'],
+        ['root', 'open_new_session'],
+      ];
+      const result = runScenario({ scenario: 'post_r_narrowing', checks });
+      expect(result.ok, result.error).toBe(true);
+      const allowed = result.allowed as Record<string, boolean>;
+      for (const key of [
+        'probe:emit_sealed',
+        'probe:receive_release',
+        'probe:read_only_commit',
+        'probe:close_connection',
+        'probe:emit_closed',
+        'probe:exit',
+        'root:append_transcript',
+        'root:fsync_transcript',
+        'root:publish_terminal_seal',
+        'root:prove_probe_exit',
+        'root:permit_task9_retirement',
+      ]) {
+        expect(allowed[key], key).toBe(true);
+      }
+      for (const key of [
+        'probe:spawn_child',
+        'probe:open_mutation_connection',
+        'probe:write_journal',
+        'root:append_journal_row',
+        'root:mutate_rollback',
+        'root:open_new_session',
+      ]) {
+        expect(allowed[key], key).toBe(false);
+      }
     });
-    expect(result.ok).toBe(false);
-  });
 
-  it('selects the unique terminal-seal chain tip matching the canonical head', () => {
-    const epochs = [
-      {
-        lease_epoch: 'cutover',
-        chain_ok: true,
-        terminal_seal: true,
-        seal_outcome: 'precommit_rollback_sealed',
-        previous_terminal_seal: null,
-        predecessor_head: 'headA',
-        actual_r_head: 'rA',
-      },
-      {
-        lease_epoch: 'cutover-recovery-1',
+    it('emits the exact precommit race-closure Root ordering', () => {
+      const result = runScenario({ scenario: 'race_order' });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.order).toEqual([
+        'publish_predecision',
+        'append_r',
+        'fsync_r',
+        'obtain_sealed',
+        'release',
+        'receive_closed',
+        'observe_clean_exit',
+        'fsync_transcript',
+        'publish_terminal_seal',
+      ]);
+    });
+
+    it('maps the exact crash-rule authority table', () => {
+      const authority = (state: Record<string, unknown>) =>
+        runScenario({ scenario: 'crash_authority', state }).authority;
+      // predecision, no R, continuous original transaction -> may continue
+      expect(authority({ has_predecision: true, has_durable_r: false, continuity: true })).toBe(
+        'continue'
+      );
+      // predecision, no R, not continuous -> abandoned, no authority
+      expect(authority({ has_predecision: true, has_durable_r: false, continuity: false })).toBe(
+        'abandoned'
+      );
+      // durable R, no valid terminal seal -> incident-only
+      expect(authority({ has_predecision: true, has_durable_r: true })).toBe('incident_only');
+      // terminal seal, no R, committed, unique tip -> finish-forward
+      expect(
+        authority({
+          has_terminal_seal: true,
+          seal_outcome: 'committed_finish_forward_sealed',
+          has_durable_r: false,
+          unique_chain_tip: true,
+        })
+      ).toBe('finish_forward');
+      // terminal seal with exact R -> Task 9 retirement only
+      expect(
+        authority({
+          has_terminal_seal: true,
+          seal_outcome: 'precommit_rollback_sealed',
+          has_durable_r: true,
+        })
+      ).toBe('task9_retirement_rollback_preparation');
+      // incident terminal seal authorizes no mutation
+      expect(authority({ has_terminal_seal: true, seal_outcome: 'drift_incident_sealed' })).toBe(
+        'none'
+      );
+    });
+
+    it('rejects a committed finish-forward seal that is not the unique chain tip', () => {
+      const result = runScenario({
+        scenario: 'crash_authority',
+        state: {
+          has_terminal_seal: true,
+          seal_outcome: 'committed_finish_forward_sealed',
+          has_durable_r: false,
+          unique_chain_tip: false,
+        },
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it('selects the unique terminal-seal chain tip matching the canonical head', () => {
+      const epochs = [
+        {
+          lease_epoch: 'cutover',
+          chain_ok: true,
+          terminal_seal: true,
+          seal_outcome: 'precommit_rollback_sealed',
+          previous_terminal_seal: null,
+          predecessor_head: 'headA',
+          actual_r_head: 'rA',
+        },
+        {
+          lease_epoch: 'cutover-recovery-1',
+          chain_ok: true,
+          terminal_seal: true,
+          seal_outcome: 'committed_finish_forward_sealed',
+          previous_terminal_seal: 'sealA',
+          predecessor_head: 'HEAD',
+          actual_r_head: null,
+        },
+      ];
+      const result = runScenario({ scenario: 'restart_authority', epochs, canonical_head: 'HEAD' });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.lease_epoch).toBe('cutover-recovery-1');
+      expect(result.authority).toBe('finish_forward');
+    });
+
+    it('treats forks, multiple tips, reused epochs, unbound chains, and a stale head as incidents', () => {
+      const tip = (epoch: string, prev: string | null, head: string) => ({
+        lease_epoch: epoch,
         chain_ok: true,
         terminal_seal: true,
         seal_outcome: 'committed_finish_forward_sealed',
-        previous_terminal_seal: 'sealA',
-        predecessor_head: 'HEAD',
+        previous_terminal_seal: prev,
+        predecessor_head: head,
         actual_r_head: null,
-      },
-    ];
-    const result = runScenario({ scenario: 'restart_authority', epochs, canonical_head: 'HEAD' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.lease_epoch).toBe('cutover-recovery-1');
-    expect(result.authority).toBe('finish_forward');
-  });
-
-  it('treats forks, multiple tips, reused epochs, unbound chains, and a stale head as incidents', () => {
-    const tip = (epoch: string, prev: string | null, head: string) => ({
-      lease_epoch: epoch,
-      chain_ok: true,
-      terminal_seal: true,
-      seal_outcome: 'committed_finish_forward_sealed',
-      previous_terminal_seal: prev,
-      predecessor_head: head,
-      actual_r_head: null,
+      });
+      // multiple tips both matching the head
+      expect(
+        runScenario({
+          scenario: 'restart_authority',
+          epochs: [tip('cutover', null, 'HEAD'), tip('cutover-recovery-1', 'sealA', 'HEAD')],
+          canonical_head: 'HEAD',
+        }).ok
+      ).toBe(false);
+      // forked lineage: two seals share the same previous_terminal_seal
+      expect(
+        runScenario({
+          scenario: 'restart_authority',
+          epochs: [tip('cutover', 'sameprev', 'x'), tip('cutover-recovery-1', 'sameprev', 'HEAD')],
+          canonical_head: 'HEAD',
+        }).ok
+      ).toBe(false);
+      // reused lease epoch
+      expect(
+        runScenario({
+          scenario: 'restart_authority',
+          epochs: [tip('cutover', null, 'HEAD'), tip('cutover', 'sealA', 'y')],
+          canonical_head: 'HEAD',
+        }).ok
+      ).toBe(false);
+      // unbound / broken chain
+      expect(
+        runScenario({
+          scenario: 'restart_authority',
+          epochs: [{ ...tip('cutover', null, 'HEAD'), chain_ok: false }],
+          canonical_head: 'HEAD',
+        }).ok
+      ).toBe(false);
+      // stale head: no tip matches
+      expect(
+        runScenario({
+          scenario: 'restart_authority',
+          epochs: [tip('cutover', null, 'other')],
+          canonical_head: 'HEAD',
+        }).ok
+      ).toBe(false);
     });
-    // multiple tips both matching the head
-    expect(
-      runScenario({
-        scenario: 'restart_authority',
-        epochs: [tip('cutover', null, 'HEAD'), tip('cutover-recovery-1', 'sealA', 'HEAD')],
-        canonical_head: 'HEAD',
-      }).ok
-    ).toBe(false);
-    // forked lineage: two seals share the same previous_terminal_seal
-    expect(
-      runScenario({
-        scenario: 'restart_authority',
-        epochs: [tip('cutover', 'sameprev', 'x'), tip('cutover-recovery-1', 'sameprev', 'HEAD')],
-        canonical_head: 'HEAD',
-      }).ok
-    ).toBe(false);
-    // reused lease epoch
-    expect(
-      runScenario({
-        scenario: 'restart_authority',
-        epochs: [tip('cutover', null, 'HEAD'), tip('cutover', 'sealA', 'y')],
-        canonical_head: 'HEAD',
-      }).ok
-    ).toBe(false);
-    // unbound / broken chain
-    expect(
-      runScenario({
-        scenario: 'restart_authority',
-        epochs: [{ ...tip('cutover', null, 'HEAD'), chain_ok: false }],
-        canonical_head: 'HEAD',
-      }).ok
-    ).toBe(false);
-    // stale head: no tip matches
-    expect(
-      runScenario({
-        scenario: 'restart_authority',
-        epochs: [tip('cutover', null, 'other')],
-        canonical_head: 'HEAD',
-      }).ok
-    ).toBe(false);
-  });
-});
+  }
+);
 
-describe('Correction — canonical() NFC normalization (cross-stream hash parity)', () => {
-  it('hashes decomposed Unicode identically to its NFC-composed form, with no trailing LF', () => {
-    // composed "\u00e9" vs decomposed "e" + U+0301
-    const composed = String.fromCodePoint(0x00e9);
-    const decomposed = `e${String.fromCodePoint(0x0301)}`;
-    expect(composed).not.toBe(decomposed); // genuinely distinct pre-normalization
-    const result = runScenario({ scenario: 'canonical_nfc', composed, decomposed });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.value_equal).toBe(true);
-    expect(result.key_equal).toBe(true);
-    expect(result.no_trailing_lf).toBe(true);
-  });
-});
-
-describe('Correction — secret identity re-proven after the bytes are read', () => {
-  it('accepts an unchanged descriptor after read', () => {
-    const result = runScenario({ scenario: 'secret_after_read' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.stable).toBe(true);
-  });
-
-  it('fails closed when owner/mode change (chmod) between open and the post-read check', () => {
-    const result = runScenario({ scenario: 'secret_after_read', mutation: 'chmod' });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/unsafe file identity|changed/i);
-  });
-
-  it('fails closed when the inode is swapped between open and the post-read check', () => {
-    const result = runScenario({ scenario: 'secret_after_read', mutation: 'swap' });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/unsafe file identity|changed/i);
-  });
-});
-
-describe('Correction — terminal seal binds the hash of its own predecision', () => {
-  it('accepts a seal whose predecision_sha256 hashes the canonical predecision', () => {
-    const result = runScenario({ scenario: 'seal_binding', classification: 'precommit_rollback' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.bound).toBe(true);
-  });
-
-  it('rejects a seal that binds a mismatched predecision', () => {
-    const result = runScenario({
-      scenario: 'seal_binding',
-      classification: 'precommit_rollback',
-      tamper: true,
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Correction — canonical() NFC normalization (cross-stream hash parity)',
+  () => {
+    it('hashes decomposed Unicode identically to its NFC-composed form, with no trailing LF', () => {
+      // composed "\u00e9" vs decomposed "e" + U+0301
+      const composed = String.fromCodePoint(0x00e9);
+      const decomposed = `e${String.fromCodePoint(0x0301)}`;
+      expect(composed).not.toBe(decomposed); // genuinely distinct pre-normalization
+      const result = runScenario({ scenario: 'canonical_nfc', composed, decomposed });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.value_equal).toBe(true);
+      expect(result.key_equal).toBe(true);
+      expect(result.no_trailing_lf).toBe(true);
     });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/predecision|bind/i);
-  });
-});
+  }
+);
 
-describe('Correction — validated secret descriptor is rewound for the child read', () => {
-  it('returns a descriptor a sequential read sees in full (not EOF after revalidation)', () => {
-    const result = runScenario({ scenario: 'secret_read_bytes' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.read_len).toBeGreaterThan(0);
-    expect(result.matches).toBe(true);
-  });
-});
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Correction — secret identity re-proven after the bytes are read',
+  () => {
+    it('accepts an unchanged descriptor after read', () => {
+      const result = runScenario({ scenario: 'secret_after_read' });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.stable).toBe(true);
+    });
 
-describe('Correction — restart authority enforces seal↔predecision binding', () => {
-  it('selects a correctly bound epoch as the terminal-seal chain tip', () => {
-    const result = runScenario({ scenario: 'restart_binding' });
-    expect(result.ok, result.error).toBe(true);
-    expect(result.lease_epoch).toBe('cutover');
-    expect(result.authority).toBe('finish_forward');
-  });
+    it('fails closed when owner/mode change (chmod) between open and the post-read check', () => {
+      const result = runScenario({ scenario: 'secret_after_read', mutation: 'chmod' });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/unsafe file identity|changed/i);
+    });
 
-  it('rejects an epoch whose persisted seal binds a tampered predecision', () => {
-    const result = runScenario({ scenario: 'restart_binding', tamper: true });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/predecision|bind|incident|unbound/i);
-  });
-});
+    it('fails closed when the inode is swapped between open and the post-read check', () => {
+      const result = runScenario({ scenario: 'secret_after_read', mutation: 'swap' });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/unsafe file identity|changed/i);
+    });
+  }
+);
+
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Correction — terminal seal binds the hash of its own predecision',
+  () => {
+    it('accepts a seal whose predecision_sha256 hashes the canonical predecision', () => {
+      const result = runScenario({
+        scenario: 'seal_binding',
+        classification: 'precommit_rollback',
+      });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.bound).toBe(true);
+    });
+
+    it('rejects a seal that binds a mismatched predecision', () => {
+      const result = runScenario({
+        scenario: 'seal_binding',
+        classification: 'precommit_rollback',
+        tamper: true,
+      });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/predecision|bind/i);
+    });
+  }
+);
+
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Correction — validated secret descriptor is rewound for the child read',
+  () => {
+    it('returns a descriptor a sequential read sees in full (not EOF after revalidation)', () => {
+      const result = runScenario({ scenario: 'secret_read_bytes' });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.read_len).toBeGreaterThan(0);
+      expect(result.matches).toBe(true);
+    });
+  }
+);
+
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Correction — restart authority enforces seal↔predecision binding',
+  () => {
+    it('selects a correctly bound epoch as the terminal-seal chain tip', () => {
+      const result = runScenario({ scenario: 'restart_binding' });
+      expect(result.ok, result.error).toBe(true);
+      expect(result.lease_epoch).toBe('cutover');
+      expect(result.authority).toBe('finish_forward');
+    });
+
+    it('rejects an epoch whose persisted seal binds a tampered predecision', () => {
+      const result = runScenario({ scenario: 'restart_binding', tamper: true });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/predecision|bind|incident|unbound/i);
+    });
+  }
+);

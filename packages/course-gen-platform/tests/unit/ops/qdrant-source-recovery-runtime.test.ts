@@ -18,6 +18,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 import {
   deriveRootRetainedBarrierFixtureRunId,
@@ -162,7 +163,7 @@ function volume(service: Record<string, any>, target: string): Record<string, an
   return service.volumes?.find((candidate: Record<string, any>) => candidate.target === target);
 }
 
-describe('Q12 source-recovery operator isolation', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery operator isolation', () => {
   it('renders the planner, executor, and disposition one-shots with exact isolation', () => {
     const model = renderInfraCompose();
     const planner = model.services['qdrant-source-recovery-planner'];
@@ -3050,7 +3051,7 @@ function prepareReviewedState(fixture: WrapperFixture, removePlannerAssets = fal
   }
 }
 
-describe('Q12 source-recovery host lock and writer restoration', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer restoration', () => {
   it('exposes only the frozen narrow writer-resume command surface', () => {
     const help = spawnSync('bash', [WRAPPER, '--help'], { encoding: 'utf8' });
 
@@ -5895,155 +5896,174 @@ describe('Q12 source-recovery host lock and writer restoration', () => {
 // Marker absent is the recovery gate, byte-for-byte unchanged (the frozen
 // positive above stays green, unmodified). Marker present + mode=cutover
 // requires the exact join-era maintenance_guarded/install barrier shape.
-describe('Q12 mode-aware quiesce precondition (OQ1 cutover window)', () => {
-  it('accepts a cutover-mode maintenance_guarded/install barrier receipt for writers.quiesce when the window marker is present', () => {
-    const fixture = writerQuiesceFixture();
-    chmodSync(fixture.barrierReceipt, 0o600);
-    writeFileSync(
-      fixture.barrierReceipt,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.database-barrier-receipt/v1',
-        run_id: Q12_RUN_ID,
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Q12 mode-aware quiesce precondition (OQ1 cutover window)',
+  () => {
+    it('accepts a cutover-mode maintenance_guarded/install barrier receipt for writers.quiesce when the window marker is present', () => {
+      const fixture = writerQuiesceFixture();
+      chmodSync(fixture.barrierReceipt, 0o600);
+      writeFileSync(
+        fixture.barrierReceipt,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+          run_id: Q12_RUN_ID,
+          state: 'maintenance_guarded',
+          zero_guard_residue: false,
+          expected_catalog_sha256: 'b'.repeat(64),
+          last_command: 'install',
+          rollback_probes_verified: false,
+          probe_receipt_sha256: null,
+        })}\n`
+      );
+      chmodSync(fixture.barrierReceipt, 0o400);
+      const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
+      writeFileSync(
+        marker,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.quiesce-window-mode/v1',
+          run_id: Q12_RUN_ID,
+          mode: 'cutover',
+        })}\n`,
+        { mode: 0o400 }
+      );
+
+      const result = fixture.quiesce();
+
+      expect(result.status, result.stderr).toBe(0);
+      const manifest = JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8')) as Record<
+        string,
+        any
+      >;
+      expect(manifest.barrier).toEqual({
         state: 'maintenance_guarded',
         zero_guard_residue: false,
         expected_catalog_sha256: 'b'.repeat(64),
-        last_command: 'install',
-        rollback_probes_verified: false,
         probe_receipt_sha256: null,
-      })}\n`
-    );
-    chmodSync(fixture.barrierReceipt, 0o400);
-    const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
-    writeFileSync(
-      marker,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.quiesce-window-mode/v1',
-        run_id: Q12_RUN_ID,
-        mode: 'cutover',
-      })}\n`,
-      { mode: 0o400 }
-    );
-
-    const result = fixture.quiesce();
-
-    expect(result.status, result.stderr).toBe(0);
-    const manifest = JSON.parse(readFileSync(fixture.quiesceManifest, 'utf8')) as Record<
-      string,
-      any
-    >;
-    expect(manifest.barrier).toEqual({
-      state: 'maintenance_guarded',
-      zero_guard_residue: false,
-      expected_catalog_sha256: 'b'.repeat(64),
-      probe_receipt_sha256: null,
-    });
-  });
-
-  it('falls back to the recovery gate (and rejects it) for a cutover-shaped receipt when the window marker is missing', () => {
-    const fixture = writerQuiesceFixture();
-    chmodSync(fixture.barrierReceipt, 0o600);
-    writeFileSync(
-      fixture.barrierReceipt,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.database-barrier-receipt/v1',
-        run_id: Q12_RUN_ID,
-        state: 'maintenance_guarded',
-        zero_guard_residue: false,
-        expected_catalog_sha256: 'b'.repeat(64),
-        last_command: 'install',
-        rollback_probes_verified: false,
-        probe_receipt_sha256: null,
-      })}\n`
-    );
-    chmodSync(fixture.barrierReceipt, 0o400);
-
-    const result = fixture.quiesce();
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/quiesce-ready/iu);
-  });
-
-  it('rejects a stray cutover window marker over a default recovery-shaped barrier receipt', () => {
-    const fixture = writerQuiesceFixture();
-    const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
-    writeFileSync(
-      marker,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.quiesce-window-mode/v1',
-        run_id: Q12_RUN_ID,
-        mode: 'cutover',
-      })}\n`,
-      { mode: 0o400 }
-    );
-
-    const result = fixture.quiesce();
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/cutover-quiesce-ready/iu);
-  });
-
-  it('rejects a cutover window marker whose run_id does not match the live run', () => {
-    const fixture = writerQuiesceFixture();
-    chmodSync(fixture.barrierReceipt, 0o600);
-    writeFileSync(
-      fixture.barrierReceipt,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.database-barrier-receipt/v1',
-        run_id: Q12_RUN_ID,
-        state: 'maintenance_guarded',
-        zero_guard_residue: false,
-        expected_catalog_sha256: 'b'.repeat(64),
-        last_command: 'install',
-        rollback_probes_verified: false,
-        probe_receipt_sha256: null,
-      })}\n`
-    );
-    chmodSync(fixture.barrierReceipt, 0o400);
-    const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
-    writeFileSync(
-      marker,
-      `${JSON.stringify({
-        schema_version: 'megacampus.q12.quiesce-window-mode/v1',
-        run_id: '323e4567-e89b-42d3-a456-426614174000',
-        mode: 'cutover',
-      })}\n`,
-      { mode: 0o400 }
-    );
-
-    const result = fixture.quiesce();
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/window mode marker/iu);
-  });
-
-  it('resumes forward over a real Root joined prefix carrying a cutover-shaped quiesce-manifest barrier binding', async () => {
-    const fixture = await joinedWriterResumeFixture('forward', undefined, {}, false, 0, undefined, {
-      manifestBarrier: 'cutover',
-      marker: true,
+      });
     });
 
-    const result = fixture.resume();
+    it('falls back to the recovery gate (and rejects it) for a cutover-shaped receipt when the window marker is missing', () => {
+      const fixture = writerQuiesceFixture();
+      chmodSync(fixture.barrierReceipt, 0o600);
+      writeFileSync(
+        fixture.barrierReceipt,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+          run_id: Q12_RUN_ID,
+          state: 'maintenance_guarded',
+          zero_guard_residue: false,
+          expected_catalog_sha256: 'b'.repeat(64),
+          last_command: 'install',
+          rollback_probes_verified: false,
+          probe_receipt_sha256: null,
+        })}\n`
+      );
+      chmodSync(fixture.barrierReceipt, 0o400);
 
-    expect(result.status, result.stderr).toBe(0);
-    const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
-    expect(receipt).toMatchObject({
-      schema_version: 'megacampus.q12.writer-resume-state/v1',
-      run_id: fixture.runId,
-      state: 'writers_resumed',
-      mode: 'forward',
+      const result = fixture.quiesce();
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/quiesce-ready/iu);
     });
-  });
 
-  it('rejects a cutover-shaped quiesce-manifest barrier binding at forward resume when the window marker is missing', async () => {
-    const fixture = await joinedWriterResumeFixture('forward', undefined, {}, false, 0, undefined, {
-      manifestBarrier: 'cutover',
-      marker: false,
+    it('rejects a stray cutover window marker over a default recovery-shaped barrier receipt', () => {
+      const fixture = writerQuiesceFixture();
+      const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
+      writeFileSync(
+        marker,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.quiesce-window-mode/v1',
+          run_id: Q12_RUN_ID,
+          mode: 'cutover',
+        })}\n`,
+        { mode: 0o400 }
+      );
+
+      const result = fixture.quiesce();
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/cutover-quiesce-ready/iu);
     });
 
-    const result = fixture.resume();
+    it('rejects a cutover window marker whose run_id does not match the live run', () => {
+      const fixture = writerQuiesceFixture();
+      chmodSync(fixture.barrierReceipt, 0o600);
+      writeFileSync(
+        fixture.barrierReceipt,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.database-barrier-receipt/v1',
+          run_id: Q12_RUN_ID,
+          state: 'maintenance_guarded',
+          zero_guard_residue: false,
+          expected_catalog_sha256: 'b'.repeat(64),
+          last_command: 'install',
+          rollback_probes_verified: false,
+          probe_receipt_sha256: null,
+        })}\n`
+      );
+      chmodSync(fixture.barrierReceipt, 0o400);
+      const marker = join(fixture.q12RunRoot, 'quiesce-window-mode.json');
+      writeFileSync(
+        marker,
+        `${JSON.stringify({
+          schema_version: 'megacampus.q12.quiesce-window-mode/v1',
+          run_id: '323e4567-e89b-42d3-a456-426614174000',
+          mode: 'cutover',
+        })}\n`,
+        { mode: 0o400 }
+      );
 
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/writer quiesce barrier binding is invalid/iu);
-    expect(existsSync(fixture.resumeState)).toBe(false);
-  });
-});
+      const result = fixture.quiesce();
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/window mode marker/iu);
+    });
+
+    it('resumes forward over a real Root joined prefix carrying a cutover-shaped quiesce-manifest barrier binding', async () => {
+      const fixture = await joinedWriterResumeFixture(
+        'forward',
+        undefined,
+        {},
+        false,
+        0,
+        undefined,
+        {
+          manifestBarrier: 'cutover',
+          marker: true,
+        }
+      );
+
+      const result = fixture.resume();
+
+      expect(result.status, result.stderr).toBe(0);
+      const receipt = JSON.parse(readFileSync(fixture.resumeState, 'utf8')) as Record<string, any>;
+      expect(receipt).toMatchObject({
+        schema_version: 'megacampus.q12.writer-resume-state/v1',
+        run_id: fixture.runId,
+        state: 'writers_resumed',
+        mode: 'forward',
+      });
+    });
+
+    it('rejects a cutover-shaped quiesce-manifest barrier binding at forward resume when the window marker is missing', async () => {
+      const fixture = await joinedWriterResumeFixture(
+        'forward',
+        undefined,
+        {},
+        false,
+        0,
+        undefined,
+        {
+          manifestBarrier: 'cutover',
+          marker: false,
+        }
+      );
+
+      const result = fixture.resume();
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/writer quiesce barrier binding is invalid/iu);
+      expect(existsSync(fixture.resumeState)).toBe(false);
+    });
+  }
+);

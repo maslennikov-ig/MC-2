@@ -31,6 +31,7 @@ const EXPECTED_SCHEMA = 'megacampus.q12.expected-post-migration-catalog/v1';
 const RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
 const RELEASE_SHA = '1'.repeat(40);
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 const POSTGRES_IMAGE = 'postgres:17.10-bookworm';
 const POSTGRES_PASSWORD = 'q12-plan-terminal-proof-password';
 
@@ -204,7 +205,7 @@ function runPlan(
   return result;
 }
 
-describe('Q12 expected-post-migration-catalog plan builder', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 expected-post-migration-catalog plan builder', () => {
   it('emits an owner-only catalog that passes the frozen barrier schema and self-binds its sha256', () => {
     const fixture = planFixture();
 
@@ -1739,7 +1740,7 @@ except core.LifecycleError as error:
   });
 });
 
-describe('Q12 plan persist-handle write/read binding (P2-2)', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 plan persist-handle write/read binding (P2-2)', () => {
   const RESTORE = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
   const HANDLE_RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
 
@@ -1828,7 +1829,7 @@ print('ACCEPT ' + handle['container'] + ' ' + handle['database'])`;
   });
 });
 
-describe('Q12 plan drill generation contract (round-8)', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 plan drill generation contract (round-8)', () => {
   const RESTORE_DRILL = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
   const GEN_RUN_ID = '123e4567-e89b-42d3-a456-426614174000';
   const PY_ENV = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };

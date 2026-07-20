@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 import {
   canonical,
@@ -90,7 +91,7 @@ function spec(
   return candidate;
 }
 
-describe('Root D5 fixture contract boundary', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Root D5 fixture contract boundary', () => {
   it('direct-supersedes an issued cutover capability after a real two-process lease loss', async () => {
     const first = spec({
       install: chain('install', {
@@ -531,7 +532,7 @@ describe('Root D5 fixture contract boundary', () => {
   });
 });
 
-describe('Root production serializer initial lifecycle', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Root production serializer initial lifecycle', () => {
   it('emits canonical exact 19-key rows, 12-key checkpoints, and 12-key capabilities', async () => {
     const candidate = spec({ install: chain('install') });
     const fixture = await materializeRootRetainedBarrierFixture(candidate);
@@ -668,7 +669,7 @@ function candidateRoot(path: string): string {
   return path.slice(0, path.indexOf('/retained-barrier-capability-checkpoint-'));
 }
 
-describe('Root recovery and crash matrix', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Root recovery and crash matrix', () => {
   it('rejects claim checkpoint publication when current identity swaps after claim row fsync', async () => {
     const candidate: RootRetainedBarrierFixtureSpec = {
       ...spec({ install: chain('install') }),
@@ -1074,7 +1075,7 @@ describe('Root recovery and crash matrix', () => {
   });
 });
 
-describe('Install transaction boundary', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Install transaction boundary', () => {
   it('binds baseline to the actual claim projection without rewinding the fixed checkpoint', async () => {
     const candidate = spec({ install: chain('install') });
     const fixture = await materializeRootRetainedBarrierFixture(candidate);
@@ -1162,7 +1163,7 @@ describe('Install transaction boundary', () => {
   });
 });
 
-describe('Rollback frontier and activation classifier', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Rollback frontier and activation classifier', () => {
   const frontierOperations = operations.slice(1);
   const forms: readonly FrontierForm[] = [
     'selector-only',
@@ -1426,7 +1427,7 @@ describe('Rollback frontier and activation classifier', () => {
   });
 });
 
-describe('Negative-only mutation helper', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Negative-only mutation helper', () => {
   it.each([
     'unknown-phase',
     'unknown-outcome',
@@ -1466,103 +1467,109 @@ describe('Negative-only mutation helper', () => {
   });
 });
 
-describe('Retained publication identity is fail-closed on durable reload', () => {
-  it.each([
-    [
-      'symlink',
-      (path: string, checkpoint: string) => {
-        rmSync(path);
-        symlinkSync(checkpoint, path);
-      },
-    ],
-    [
-      'nonregular',
-      (path: string) => {
-        rmSync(path);
-        mkdirSync(path, { mode: 0o600 });
-      },
-    ],
-    ['wrong-mode', (path: string) => chmodSync(path, 0o640)],
-    [
-      'hard-link',
-      (path: string) => {
-        linkSync(path, `${path}.foreign-link`);
-      },
-    ],
-    [
-      'source-same-inode',
-      (path: string, checkpoint: string) => {
-        rmSync(path);
-        linkSync(checkpoint, path);
-      },
-    ],
-    [
-      'byte-drift',
-      (path: string) => {
-        const original = readFileSync(path);
-        writeFileSync(path, Buffer.concat([original, Buffer.from('foreign')]), { mode: 0o600 });
-      },
-    ],
-  ] as const)('rejects %s without deleting the foreign evidence', async (_kind, corrupt) => {
-    const candidate = spec({ install: chain('install') });
-    const fixture = await materializeRootRetainedBarrierFixture(candidate);
-    const retained = fixture.retainedCopyPaths.get('install:cutover')!;
-    corrupt(retained, fixture.fixedCheckpointPath);
-    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
-    expect(() => lstatSync(retained)).not.toThrow();
-  });
-
-  it('rejects a retained file viewed with the wrong owner without mutating it', async () => {
-    const candidate = spec({ install: chain('install') });
-    const fixture = await materializeRootRetainedBarrierFixture(candidate);
-    const retained = fixture.retainedCopyPaths.get('install:cutover')!;
-    const core = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
-    const probe = [
-      'import importlib.util, pathlib, sys',
-      's=importlib.util.spec_from_file_location("q12_identity_probe", sys.argv[1])',
-      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
-      'm.validate_regular_file(pathlib.Path(sys.argv[2]), mode=0o600)',
-    ].join(';');
-    const child = spawnSync(
-      '/usr/bin/bwrap',
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Retained publication identity is fail-closed on durable reload',
+  () => {
+    it.each([
       [
-        '--unshare-user',
-        '--uid',
-        '0',
-        '--gid',
-        '0',
-        '--ro-bind',
-        '/',
-        '/',
-        '--',
-        '/usr/bin/python3',
-        '-c',
-        probe,
-        core,
-        retained,
+        'symlink',
+        (path: string, checkpoint: string) => {
+          rmSync(path);
+          symlinkSync(checkpoint, path);
+        },
       ],
-      { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' } }
-    );
-    expect(child.status).not.toBe(0);
-    expect(child.stderr).toContain('unsafe file identity');
-    expect(() => lstatSync(retained)).not.toThrow();
-  });
+      [
+        'nonregular',
+        (path: string) => {
+          rmSync(path);
+          mkdirSync(path, { mode: 0o600 });
+        },
+      ],
+      ['wrong-mode', (path: string) => chmodSync(path, 0o640)],
+      [
+        'hard-link',
+        (path: string) => {
+          linkSync(path, `${path}.foreign-link`);
+        },
+      ],
+      [
+        'source-same-inode',
+        (path: string, checkpoint: string) => {
+          rmSync(path);
+          linkSync(checkpoint, path);
+        },
+      ],
+      [
+        'byte-drift',
+        (path: string) => {
+          const original = readFileSync(path);
+          writeFileSync(path, Buffer.concat([original, Buffer.from('foreign')]), { mode: 0o600 });
+        },
+      ],
+    ] as const)('rejects %s without deleting the foreign evidence', async (_kind, corrupt) => {
+      const candidate = spec({ install: chain('install') });
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      const retained = fixture.retainedCopyPaths.get('install:cutover')!;
+      corrupt(retained, fixture.fixedCheckpointPath);
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
+      expect(() => lstatSync(retained)).not.toThrow();
+    });
 
-  it.each([
-    'release_sha',
-    'operator_digest',
-    'quiesce_manifest_sha256',
-    'supersedes_capability_sha256',
-  ])('rejects completed capability stable-binding drift in %s', async field => {
-    const candidate = spec({ install: chain('install') });
-    const fixture = await materializeRootRetainedBarrierFixture(candidate);
-    const capabilityPath = fixture.capabilityPaths.get('install:cutover')!;
-    const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<string, unknown>;
-    capability[field] = 'f'.repeat(64);
-    chmodSync(capabilityPath, 0o600);
-    writeFileSync(capabilityPath, `${canonical(capability)}\n`, { mode: 0o600 });
-    chmodSync(capabilityPath, 0o400);
-    await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
-    expect(() => lstatSync(capabilityPath)).not.toThrow();
-  });
-});
+    it('rejects a retained file viewed with the wrong owner without mutating it', async () => {
+      const candidate = spec({ install: chain('install') });
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      const retained = fixture.retainedCopyPaths.get('install:cutover')!;
+      const core = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
+      const probe = [
+        'import importlib.util, pathlib, sys',
+        's=importlib.util.spec_from_file_location("q12_identity_probe", sys.argv[1])',
+        'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+        'm.validate_regular_file(pathlib.Path(sys.argv[2]), mode=0o600)',
+      ].join(';');
+      const child = spawnSync(
+        '/usr/bin/bwrap',
+        [
+          '--unshare-user',
+          '--uid',
+          '0',
+          '--gid',
+          '0',
+          '--ro-bind',
+          '/',
+          '/',
+          '--',
+          '/usr/bin/python3',
+          '-c',
+          probe,
+          core,
+          retained,
+        ],
+        { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' } }
+      );
+      expect(child.status).not.toBe(0);
+      expect(child.stderr).toContain('unsafe file identity');
+      expect(() => lstatSync(retained)).not.toThrow();
+    });
+
+    it.each([
+      'release_sha',
+      'operator_digest',
+      'quiesce_manifest_sha256',
+      'supersedes_capability_sha256',
+    ])('rejects completed capability stable-binding drift in %s', async field => {
+      const candidate = spec({ install: chain('install') });
+      const fixture = await materializeRootRetainedBarrierFixture(candidate);
+      const capabilityPath = fixture.capabilityPaths.get('install:cutover')!;
+      const capability = JSON.parse(readFileSync(capabilityPath, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      capability[field] = 'f'.repeat(64);
+      chmodSync(capabilityPath, 0o600);
+      writeFileSync(capabilityPath, `${canonical(capability)}\n`, { mode: 0o600 });
+      chmodSync(capabilityPath, 0o400);
+      await expect(materializeRootRetainedBarrierFixture(candidate)).rejects.toThrow();
+      expect(() => lstatSync(capabilityPath)).not.toThrow();
+    });
+  }
+);

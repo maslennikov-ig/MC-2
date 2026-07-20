@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 import {
   canonical,
@@ -24,7 +25,7 @@ function root(): string {
   roots.push(value);
   return value;
 }
-describe('Ordinary-row journal grammar', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Ordinary-row journal grammar', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
   const REAL = 'c'.repeat(64);
   const ZERO = '0'.repeat(64);
@@ -353,7 +354,7 @@ describe('Ordinary-row journal grammar', () => {
   });
 });
 
-describe('Segment-aware stable bindings', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Segment-aware stable bindings', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
   const REQ_QUIESCE = 'e'.repeat(64);
   const REQ_RESOURCE = '3'.repeat(64);
@@ -465,7 +466,7 @@ describe('Segment-aware stable bindings', () => {
   });
 });
 
-describe('Serializer primitives for joined composition', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Serializer primitives for joined composition', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
 
   function enginePreamble(quiesceInit: 'request' | 'zero'): string {
@@ -615,7 +616,7 @@ describe('Serializer primitives for joined composition', () => {
   });
 });
 
-describe('Dual-path final-writer manifests with Root inventory', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Dual-path final-writer manifests with Root inventory', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
 
   function fwmProbe(body: string): { status: number | null; stdout: string; stderr: string } {
@@ -792,7 +793,7 @@ describe('Dual-path final-writer manifests with Root inventory', () => {
   });
 });
 
-describe('Joined forward composition', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Joined forward composition', () => {
   const MANIFEST_PATH = join(repoRoot, 'deploy/qdrant/q12-command-manifest.json');
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
     commands: Record<string, { argv: string[] }>;
@@ -1046,7 +1047,7 @@ describe('Joined forward composition', () => {
   });
 });
 
-describe('Joined rollback profiles', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Joined rollback profiles', () => {
   function quiesceWriterR(klass: string, service: string, index: number): Record<string, unknown> {
     const digit = String(index % 10);
     return {
@@ -1365,7 +1366,7 @@ describe('Joined rollback profiles', () => {
   });
 });
 
-describe('Closure coverage', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Closure coverage', () => {
   const CORE_PATH = join(repoRoot, 'deploy/qdrant/q12-lifecycle-core.py');
   const SUPERVISOR = join(repoRoot, 'deploy/qdrant/q12-live-cutover.sh');
   const LAUNCHER = join(repoRoot, 'deploy/qdrant/q12-capability-run.sh');

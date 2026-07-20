@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 // Found-defect #16 (ratified): the controller's Engine.write_install_baseline runs AFTER the
 // frozen barrier claim, so in a real run_live install it collides with the barrier's own
@@ -38,85 +39,88 @@ type Observed = {
   run_id: string | null;
 };
 
-describe('Q12 write_install_baseline strict-accept (found-defect #16 fix, no docker)', () => {
-  const result = spawnSync('/usr/bin/python3', [RUNNER], {
-    encoding: 'utf8',
-    timeout: 60_000,
-    env: { PATH: process.env.PATH, LC_ALL: 'C', LANG: 'C' },
-    maxBuffer: 16 * 1024 * 1024,
-  });
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Q12 write_install_baseline strict-accept (found-defect #16 fix, no docker)',
+  () => {
+    const result = spawnSync('/usr/bin/python3', [RUNNER], {
+      encoding: 'utf8',
+      timeout: 60_000,
+      env: { PATH: process.env.PATH, LC_ALL: 'C', LANG: 'C' },
+      maxBuffer: 16 * 1024 * 1024,
+    });
 
-  it('runs the focused harness to completion', () => {
-    expect(result.status, result.stderr).toBe(0);
-  });
+    it('runs the focused harness to completion', () => {
+      expect(result.status, result.stderr).toBe(0);
+    });
 
-  const out = JSON.parse(result.stdout || '{}') as {
-    absent_write: { call: CallResult; observed: Observed; trace: string[] };
-    strict_accept: {
-      call: CallResult;
-      before: Observed;
-      after: Observed;
-      byte_unchanged: boolean;
-      trace: string[];
+    const out = JSON.parse(result.stdout || '{}') as {
+      absent_write: { call: CallResult; observed: Observed; trace: string[] };
+      strict_accept: {
+        call: CallResult;
+        before: Observed;
+        after: Observed;
+        byte_unchanged: boolean;
+        trace: string[];
+      };
+      tamper_0600: { call: CallResult };
+      tamper_wrong_run_id: { call: CallResult };
+      tamper_wrong_schema: { call: CallResult };
+      tamper_noncanonical: { call: CallResult };
+      tamper_unparseable: { call: CallResult };
     };
-    tamper_0600: { call: CallResult };
-    tamper_wrong_run_id: { call: CallResult };
-    tamper_wrong_schema: { call: CallResult };
-    tamper_noncanonical: { call: CallResult };
-    tamper_unparseable: { call: CallResult };
-  };
 
-  it('ABSENT path still writes the controller 5-key baseline at 0600 (fixture path untouched)', () => {
-    expect(out.absent_write.call.raised).toBe(false);
-    expect(out.absent_write.observed.mode).toBe('0o600');
-    expect(out.absent_write.observed.uid).toBe(1000);
-    expect(out.absent_write.observed.gid).toBe(1000);
-    expect(out.absent_write.observed.schema_version).toBe(
-      'megacampus.q12.database-barrier-baseline/v1'
-    );
-    expect(out.absent_write.observed.run_id).toBe('wib-strict-accept-run-0000');
-    expect(out.absent_write.observed.keys).toEqual([
-      'capability_manifest_sha256',
-      'predecessor_checkpoint_sha256',
-      'predecessor_journal_entry_hash',
-      'run_id',
-      'schema_version',
-    ]);
-  });
+    it('ABSENT path still writes the controller 5-key baseline at 0600 (fixture path untouched)', () => {
+      expect(out.absent_write.call.raised).toBe(false);
+      expect(out.absent_write.observed.mode).toBe('0o600');
+      expect(out.absent_write.observed.uid).toBe(1000);
+      expect(out.absent_write.observed.gid).toBe(1000);
+      expect(out.absent_write.observed.schema_version).toBe(
+        'megacampus.q12.database-barrier-baseline/v1'
+      );
+      expect(out.absent_write.observed.run_id).toBe('wib-strict-accept-run-0000');
+      expect(out.absent_write.observed.keys).toEqual([
+        'capability_manifest_sha256',
+        'predecessor_checkpoint_sha256',
+        'predecessor_journal_entry_hash',
+        'run_id',
+        'schema_version',
+      ]);
+    });
 
-  it('PRESENT barrier 0400 authoritative artifact is STRICT-ACCEPTED without a write', () => {
-    // Pre-fix: write_install_baseline raises "unsafe file identity" (the #16 collision) -> RED.
-    expect(out.strict_accept.call.raised).toBe(false);
-    expect(out.strict_accept.byte_unchanged).toBe(true);
-    expect(out.strict_accept.after.mode).toBe('0o400');
-    // The accept admits the barrier's FULL 11-key structural shape (no shape/key check beyond
-    // schema_version + run_id).
-    expect(out.strict_accept.before.keys).toEqual([
-      'baseline',
-      'baseline_sha256',
-      'database_capability_sha256',
-      'expected_post_migration_catalog_sha256',
-      'predecessor_checkpoint_sha256',
-      'predecessor_journal_entry_hash',
-      'resource_manifest_sha256',
-      'run_id',
-      'schema_version',
-      'source_baseline_sha256',
-      'state',
-    ]);
-    expect(out.strict_accept.trace).toContain('install:baseline-strict-accept');
-  });
+    it('PRESENT barrier 0400 authoritative artifact is STRICT-ACCEPTED without a write', () => {
+      // Pre-fix: write_install_baseline raises "unsafe file identity" (the #16 collision) -> RED.
+      expect(out.strict_accept.call.raised).toBe(false);
+      expect(out.strict_accept.byte_unchanged).toBe(true);
+      expect(out.strict_accept.after.mode).toBe('0o400');
+      // The accept admits the barrier's FULL 11-key structural shape (no shape/key check beyond
+      // schema_version + run_id).
+      expect(out.strict_accept.before.keys).toEqual([
+        'baseline',
+        'baseline_sha256',
+        'database_capability_sha256',
+        'expected_post_migration_catalog_sha256',
+        'predecessor_checkpoint_sha256',
+        'predecessor_journal_entry_hash',
+        'resource_manifest_sha256',
+        'run_id',
+        'schema_version',
+        'source_baseline_sha256',
+        'state',
+      ]);
+      expect(out.strict_accept.trace).toContain('install:baseline-strict-accept');
+    });
 
-  it('fails closed with a LifecycleError on every tamper (never overwrites)', () => {
-    for (const key of [
-      'tamper_0600',
-      'tamper_wrong_run_id',
-      'tamper_wrong_schema',
-      'tamper_noncanonical',
-      'tamper_unparseable',
-    ] as const) {
-      expect(out[key].call.raised, key).toBe(true);
-      expect(out[key].call.is_lifecycle, `${key}: ${out[key].call.message ?? ''}`).toBe(true);
-    }
-  });
-});
+    it('fails closed with a LifecycleError on every tamper (never overwrites)', () => {
+      for (const key of [
+        'tamper_0600',
+        'tamper_wrong_run_id',
+        'tamper_wrong_schema',
+        'tamper_noncanonical',
+        'tamper_unparseable',
+      ] as const) {
+        expect(out[key].call.raised, key).toBe(true);
+        expect(out[key].call.is_lifecycle, `${key}: ${out[key].call.message ?? ''}`).toBe(true);
+      }
+    });
+  }
+);

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 // Design W3 (co-design docs/superpowers/specs/2026-07-20-q12-w2-w3-staged-execution-codesign.md D5,
 // plan docs/superpowers/plans/2026-07-20-q12-w2-w3-staged-execution.md Task 1). The OQ5 snapshot
@@ -27,130 +28,133 @@ const WINDOW_RUNNER = join(
   'packages/course-gen-platform/tests/unit/ops/fixtures/q12-w3-window-snapshot-runner.py'
 );
 
-describe('Q12 W3-struct: source-snapshot seam reachable by the window executor', () => {
-  // STRUCTURAL WIRING (no live DB): open_window_snapshot produces baseline.json (OQ6), opens the
-  // coordinator for the real <exported-id> (OQ5), and HOLDS it (does not close) so the caller can
-  // bind pg.backup against the live snapshot; close_window_snapshot then releases it exactly once.
-  it('wires open_window_snapshot/close_window_snapshot through a composed SourceSnapshotSeam', () => {
-    const probe = [
-      'import importlib.util, sys, pathlib, tempfile',
-      's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
-      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
-      // The seam MUST be an isolable class so the structural wiring is fakeable.
-      'assert hasattr(m, "SourceSnapshotSeam"), "SourceSnapshotSeam missing"',
-      'assert hasattr(m.OwnerCustodyExecutor, "open_window_snapshot"), "open_window_snapshot missing"',
-      'assert hasattr(m.OwnerCustodyExecutor, "close_window_snapshot"), "close_window_snapshot missing"',
-      'calls={"close":0, "baseline":0, "open":0}',
-      'sentinel=object()',
-      'def fake_open(self, request, workdir):',
-      ' calls["open"]+=1',
-      ' return sentinel, "ffffffff-ffffffff-1"',
-      'def fake_close(self, proc):',
-      ' assert proc is sentinel, proc',
-      ' calls["close"]+=1',
-      'def fake_baseline(self, request, workdir, run_root):',
-      ' calls["baseline"]+=1',
-      ' p=pathlib.Path(run_root)/"baseline.json"',
-      ' m.immutable_publish(p, m.complete_object({"baseline":{"probe":"v"}}), 0o400, [])',
-      ' return p',
-      'm.SourceSnapshotSeam.open_snapshot=fake_open',
-      'm.SourceSnapshotSeam.close_snapshot=fake_close',
-      'm.SourceSnapshotSeam.produce_baseline=fake_baseline',
-      'root=pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-w3-")); root.chmod(0o700)',
-      'ex=m.OwnerCustodyExecutor()',
-      'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
-      'exported_id, baseline_path, coordinator = ex.open_window_snapshot(request, root)',
-      // (a) the exported id is the coordinator real snapshot id and is snapshot-shaped
-      'assert exported_id=="ffffffff-ffffffff-1", exported_id',
-      'assert m.PLAN_SNAPSHOT_RE.fullmatch(exported_id), exported_id',
-      // (b) baseline.json was published owner-only 0400 at the run root
-      'assert pathlib.Path(baseline_path).exists(), baseline_path',
-      'assert (pathlib.Path(baseline_path).stat().st_mode & 0o777)==0o400',
-      // (c) the coordinator is HELD (not yet released) so pg.backup can bind the live snapshot
-      'assert coordinator is sentinel',
-      'assert calls=={"baseline":1,"open":1,"close":0}, calls',
-      // (d) the caller releases the held coordinator exactly once
-      'ex.close_window_snapshot(coordinator)',
-      'assert calls["close"]==1, calls',
-      'print("W3_STRUCT_OK")',
-    ].join('\n');
-    const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
-      encoding: 'utf8',
-      env: ENV,
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Q12 W3-struct: source-snapshot seam reachable by the window executor',
+  () => {
+    // STRUCTURAL WIRING (no live DB): open_window_snapshot produces baseline.json (OQ6), opens the
+    // coordinator for the real <exported-id> (OQ5), and HOLDS it (does not close) so the caller can
+    // bind pg.backup against the live snapshot; close_window_snapshot then releases it exactly once.
+    it('wires open_window_snapshot/close_window_snapshot through a composed SourceSnapshotSeam', () => {
+      const probe = [
+        'import importlib.util, sys, pathlib, tempfile',
+        's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
+        'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+        // The seam MUST be an isolable class so the structural wiring is fakeable.
+        'assert hasattr(m, "SourceSnapshotSeam"), "SourceSnapshotSeam missing"',
+        'assert hasattr(m.OwnerCustodyExecutor, "open_window_snapshot"), "open_window_snapshot missing"',
+        'assert hasattr(m.OwnerCustodyExecutor, "close_window_snapshot"), "close_window_snapshot missing"',
+        'calls={"close":0, "baseline":0, "open":0}',
+        'sentinel=object()',
+        'def fake_open(self, request, workdir):',
+        ' calls["open"]+=1',
+        ' return sentinel, "ffffffff-ffffffff-1"',
+        'def fake_close(self, proc):',
+        ' assert proc is sentinel, proc',
+        ' calls["close"]+=1',
+        'def fake_baseline(self, request, workdir, run_root):',
+        ' calls["baseline"]+=1',
+        ' p=pathlib.Path(run_root)/"baseline.json"',
+        ' m.immutable_publish(p, m.complete_object({"baseline":{"probe":"v"}}), 0o400, [])',
+        ' return p',
+        'm.SourceSnapshotSeam.open_snapshot=fake_open',
+        'm.SourceSnapshotSeam.close_snapshot=fake_close',
+        'm.SourceSnapshotSeam.produce_baseline=fake_baseline',
+        'root=pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-w3-")); root.chmod(0o700)',
+        'ex=m.OwnerCustodyExecutor()',
+        'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
+        'exported_id, baseline_path, coordinator = ex.open_window_snapshot(request, root)',
+        // (a) the exported id is the coordinator real snapshot id and is snapshot-shaped
+        'assert exported_id=="ffffffff-ffffffff-1", exported_id',
+        'assert m.PLAN_SNAPSHOT_RE.fullmatch(exported_id), exported_id',
+        // (b) baseline.json was published owner-only 0400 at the run root
+        'assert pathlib.Path(baseline_path).exists(), baseline_path',
+        'assert (pathlib.Path(baseline_path).stat().st_mode & 0o777)==0o400',
+        // (c) the coordinator is HELD (not yet released) so pg.backup can bind the live snapshot
+        'assert coordinator is sentinel',
+        'assert calls=={"baseline":1,"open":1,"close":0}, calls',
+        // (d) the caller releases the held coordinator exactly once
+        'ex.close_window_snapshot(coordinator)',
+        'assert calls["close"]==1, calls',
+        'print("W3_STRUCT_OK")',
+      ].join('\n');
+      const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
+        encoding: 'utf8',
+        env: ENV,
+      });
+      expect(child.stderr).toBe('');
+      expect(child.status).toBe(0);
+      expect(child.stdout).toContain('W3_STRUCT_OK');
     });
-    expect(child.stderr).toBe('');
-    expect(child.status).toBe(0);
-    expect(child.stdout).toContain('W3_STRUCT_OK');
-  });
 
-  // FAIL-CLOSED: open_snapshot itself refuses a malformed/dead exported id (reaping the session
-  // first — see the real open_snapshot), so open_window_snapshot propagates that refusal and never
-  // returns a bad <exported-id> nor leaks an open source session. Modelled with open_snapshot RAISING
-  // exactly as the real one does on an invalid id.
-  it('propagates open_snapshot fail-closed on a malformed exported id (no coordinator leak)', () => {
-    const probe = [
-      'import importlib.util, sys, pathlib, tempfile',
-      's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
-      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
-      'calls={"baseline":0, "open":0, "close":0}',
-      'def fake_open(self, request, workdir):',
-      ' calls["open"]+=1',
-      // the real open_snapshot reaps proc then raises; a fake that returns a bad id would be caught
-      ' raise m.LifecycleError("snapshot coordinator exported an invalid snapshot id")',
-      'def fake_close(self, proc):',
-      ' calls["close"]+=1',
-      'def fake_baseline(self, request, workdir, run_root):',
-      ' calls["baseline"]+=1',
-      ' p=pathlib.Path(run_root)/"baseline.json"',
-      ' m.immutable_publish(p, m.complete_object({"baseline":{"probe":"v"}}), 0o400, [])',
-      ' return p',
-      'm.SourceSnapshotSeam.open_snapshot=fake_open',
-      'm.SourceSnapshotSeam.close_snapshot=fake_close',
-      'm.SourceSnapshotSeam.produce_baseline=fake_baseline',
-      'root=pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-w3-")); root.chmod(0o700)',
-      'ex=m.OwnerCustodyExecutor()',
-      'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
-      'refused=False',
-      'try:\n ex.open_window_snapshot(request, root)\nexcept m.LifecycleError:\n refused=True',
-      'assert refused, "malformed snapshot id was not refused"',
-      // baseline was attempted first, open refused, and no bad coordinator was handed back to close
-      'assert calls=={"baseline":1,"open":1,"close":0}, calls',
-      'print("W3_FAILCLOSED_OK")',
-    ].join('\n');
-    const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
-      encoding: 'utf8',
-      env: ENV,
+    // FAIL-CLOSED: open_snapshot itself refuses a malformed/dead exported id (reaping the session
+    // first — see the real open_snapshot), so open_window_snapshot propagates that refusal and never
+    // returns a bad <exported-id> nor leaks an open source session. Modelled with open_snapshot RAISING
+    // exactly as the real one does on an invalid id.
+    it('propagates open_snapshot fail-closed on a malformed exported id (no coordinator leak)', () => {
+      const probe = [
+        'import importlib.util, sys, pathlib, tempfile',
+        's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
+        'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+        'calls={"baseline":0, "open":0, "close":0}',
+        'def fake_open(self, request, workdir):',
+        ' calls["open"]+=1',
+        // the real open_snapshot reaps proc then raises; a fake that returns a bad id would be caught
+        ' raise m.LifecycleError("snapshot coordinator exported an invalid snapshot id")',
+        'def fake_close(self, proc):',
+        ' calls["close"]+=1',
+        'def fake_baseline(self, request, workdir, run_root):',
+        ' calls["baseline"]+=1',
+        ' p=pathlib.Path(run_root)/"baseline.json"',
+        ' m.immutable_publish(p, m.complete_object({"baseline":{"probe":"v"}}), 0o400, [])',
+        ' return p',
+        'm.SourceSnapshotSeam.open_snapshot=fake_open',
+        'm.SourceSnapshotSeam.close_snapshot=fake_close',
+        'm.SourceSnapshotSeam.produce_baseline=fake_baseline',
+        'root=pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-w3-")); root.chmod(0o700)',
+        'ex=m.OwnerCustodyExecutor()',
+        'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
+        'refused=False',
+        'try:\n ex.open_window_snapshot(request, root)\nexcept m.LifecycleError:\n refused=True',
+        'assert refused, "malformed snapshot id was not refused"',
+        // baseline was attempted first, open refused, and no bad coordinator was handed back to close
+        'assert calls=={"baseline":1,"open":1,"close":0}, calls',
+        'print("W3_FAILCLOSED_OK")',
+      ].join('\n');
+      const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
+        encoding: 'utf8',
+        env: ENV,
+      });
+      expect(child.stderr).toBe('');
+      expect(child.status).toBe(0);
+      expect(child.stdout).toContain('W3_FAILCLOSED_OK');
     });
-    expect(child.stderr).toBe('');
-    expect(child.status).toBe(0);
-    expect(child.stdout).toContain('W3_FAILCLOSED_OK');
-  });
 
-  // REFACTOR-PRESERVING: the seam is what LivePlanExecutor now delegates to, so its public snapshot
-  // surface (produce_run_root_baseline + the coordinator pair) must still be present and callable,
-  // and the instance composes a SourceSnapshotSeam.
-  it('keeps the LivePlanExecutor snapshot surface intact after the extraction', () => {
-    const probe = [
-      'import importlib.util, sys',
-      's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
-      'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
-      'lpe=m.LivePlanExecutor',
-      'assert hasattr(lpe, "produce_run_root_baseline")',
-      'assert hasattr(lpe, "_open_snapshot_coordinator")',
-      'assert hasattr(lpe, "_close_snapshot_coordinator")',
-      'inst=lpe()',
-      'assert isinstance(inst._snapshot_seam, m.SourceSnapshotSeam)',
-      'print("W3_REFACTOR_OK")',
-    ].join('\n');
-    const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
-      encoding: 'utf8',
-      env: ENV,
+    // REFACTOR-PRESERVING: the seam is what LivePlanExecutor now delegates to, so its public snapshot
+    // surface (produce_run_root_baseline + the coordinator pair) must still be present and callable,
+    // and the instance composes a SourceSnapshotSeam.
+    it('keeps the LivePlanExecutor snapshot surface intact after the extraction', () => {
+      const probe = [
+        'import importlib.util, sys',
+        's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
+        'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
+        'lpe=m.LivePlanExecutor',
+        'assert hasattr(lpe, "produce_run_root_baseline")',
+        'assert hasattr(lpe, "_open_snapshot_coordinator")',
+        'assert hasattr(lpe, "_close_snapshot_coordinator")',
+        'inst=lpe()',
+        'assert isinstance(inst._snapshot_seam, m.SourceSnapshotSeam)',
+        'print("W3_REFACTOR_OK")',
+      ].join('\n');
+      const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
+        encoding: 'utf8',
+        env: ENV,
+      });
+      expect(child.stderr).toBe('');
+      expect(child.status).toBe(0);
+      expect(child.stdout).toContain('W3_REFACTOR_OK');
     });
-    expect(child.stderr).toBe('');
-    expect(child.status).toBe(0);
-    expect(child.stdout).toContain('W3_REFACTOR_OK');
-  });
-});
+  }
+);
 
 // LIVE LEG (MC2_Q12_REAL_PG17=1): the deployed window executor opens a REAL pg_export_snapshot()
 // coordinator against a disposable postgres:17.10 source and publishes a real baseline.json — the

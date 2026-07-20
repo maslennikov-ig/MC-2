@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RESTORE = resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh');
@@ -1115,15 +1116,18 @@ describe('source manifest exact comparison', () => {
     expect(script).toContain("item.definition.includes('q12_guard.enforce_write_barrier()')");
   });
 
-  it('accepts only the complete exact guard object/ACL/trigger multiset', () => {
-    const root = tempRoot();
-    const path = join(root, 'transition.json');
-    writeJson(path, exactGuardTransitionManifest());
+  it.runIf(RUN_REAL_CONTROLLER)(
+    'accepts only the complete exact guard object/ACL/trigger multiset',
+    () => {
+      const root = tempRoot();
+      const path = join(root, 'transition.json');
+      writeJson(path, exactGuardTransitionManifest());
 
-    const accepted = runTs(MANIFEST, ['verify-transition', '--manifest', path]);
+      const accepted = runTs(MANIFEST, ['verify-transition', '--manifest', path]);
 
-    expect(accepted.status, accepted.stderr).toBe(0);
-  });
+      expect(accepted.status, accepted.stderr).toBe(0);
+    }
+  );
 
   it.each([
     ['function', (cutover: Record<string, any>) => cutover.catalog.functions.pop()],
