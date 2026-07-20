@@ -730,6 +730,108 @@ def derive_joined_fixture_values(run_id: str, quiesce_manifest_path: str) -> dic
     }
 
 
+class StagedValueResolver:
+    """Design §W2 (co-design D2) — the production-path staged value source.
+
+    On a real cutover run the single upfront ``derive_joined_fixture_values`` dict cannot work: the
+    real ``<exported-id>`` is only known once the W3 snapshot coordinator opens (at pg.backup), the
+    real ``<immutable-generation>`` only after pg.backup runs, and the recovery-manifest sha +
+    coverage only after ``source.forward`` is accepted. This resolver holds the UPFRONT authorities
+    at construction and gains the staged authorities through lifecycle callbacks as the window
+    advances. It is a Mapping over the currently-resolved placeholders so it drops into
+    ``resolved_command``'s ``values`` slot unchanged: ``dict(resolver)`` yields exactly what is ready,
+    and a placeholder a command needs but that is not yet resolved stays ``<...>`` so
+    ``resolved_command`` fails closed with "unresolved command placeholder". Resolve-once: a
+    re-resolve with the same value is idempotent (deterministic recover re-drive), a different value
+    fails closed as drift. The fixture path keeps ``derive_joined_fixture_values`` verbatim as the
+    closed-composer parity oracle (D1); this resolver is only selected when ``request["production"]``
+    is True."""
+
+    def __init__(self, quiesce_manifest_path: str, recovery_run_id: str) -> None:
+        self._resolved: dict[str, str] = {}
+        # UPFRONT authorities (co-design §1.5): operator-supplied quiesce manifest path + the accepted
+        # pre-window .13.4.1 source-recovery run id.
+        self._set("<quiesce-manifest>", quiesce_manifest_path)
+        self._set("<recovery-run-id>", recovery_run_id)
+
+    def _set(self, placeholder: str, value: str) -> None:
+        if placeholder not in SUBSTITUTION_PLACEHOLDERS:
+            raise LifecycleError(f"staged resolver offered unknown placeholder: {placeholder}")
+        if not isinstance(value, str) or not value:
+            raise LifecycleError(f"staged value for {placeholder} is empty or non-string")
+        existing = self._resolved.get(placeholder)
+        if existing is not None and existing != value:
+            raise LifecycleError(f"staged value re-resolution drift for {placeholder}")
+        self._resolved[placeholder] = value
+
+    def value(self, placeholder: str) -> str:
+        try:
+            return self._resolved[placeholder]
+        except KeyError:
+            raise LifecycleError(f"staged value not yet resolved: {placeholder}") from None
+
+    def on_snapshot_open(self, exported_id: str) -> None:
+        """W3/OQ5: the live ``pg_export_snapshot()`` id, held across pg.backup."""
+        self._set("<exported-id>", exported_id)
+
+    def on_pg_backup_done(self, immutable_generation: str) -> None:
+        """The immutable generation dir the fresh pg.backup printed (restore-supabase-drill.sh:302-303)."""
+        self._set("<immutable-generation>", immutable_generation)
+
+    def on_source_forward_accepted(
+        self, recovery_manifest_sha256: str, coverage_fingerprint: str, coverage_run: str
+    ) -> None:
+        """After ``source.forward`` is accepted: the recovery manifest sha + accepted coverage
+        ``org:course:run`` from the recovery journal."""
+        self._set("<accepted-recovery-manifest-sha256>", recovery_manifest_sha256)
+        self._set("<accepted-coverage-fingerprint>", coverage_fingerprint)
+        self._set("<accepted-coverage-run>", coverage_run)
+
+    # Mapping protocol over the currently-resolved placeholders (dict(resolver) uses keys + getitem).
+    def keys(self):
+        return self._resolved.keys()
+
+    def __getitem__(self, placeholder: str) -> str:
+        return self.value(placeholder)
+
+    def __iter__(self):
+        return iter(dict(self._resolved))
+
+    def __len__(self) -> int:
+        return len(self._resolved)
+
+
+def resolve_window_values(
+    request: dict[str, Any],
+    executor: Any,
+    run_root: pathlib.Path,
+    quiesce_manifest_path: str,
+) -> tuple[Any, str, "subprocess.Popen[str] | None"]:
+    """Select the forward-window value source (design §W2 co-design D1/D2).
+
+    Fixture mode (default): the verbatim ``derive_joined_fixture_values`` upfront dict — the
+    closed-composer parity oracle — with no snapshot coordinator. Production mode
+    (``request["production"] is True``): a ``StagedValueResolver`` seeded with the UPFRONT
+    authorities (quiesce manifest path + accepted ``recovery_run_id``) and the W3 window snapshot
+    already opened — ``open_window_snapshot`` publishes ``baseline.json`` and yields the live
+    ``<exported-id>``, fed into the resolver via ``on_snapshot_open``. Returns
+    ``(values, exported_id, snapshot_coordinator)``; in production the caller MUST release the held
+    coordinator (``executor.close_window_snapshot``) after pg.backup consumes the snapshot. The
+    remaining staged authorities (``<immutable-generation>`` after pg.backup, the recovery-manifest
+    sha + coverage after ``source.forward``) are resolved by their lifecycle callbacks as the real
+    data-movement steps run (W5)."""
+    if request.get("production") is True:
+        recovery_run_id = request.get("recovery_run_id")
+        if not recovery_run_id:
+            raise LifecycleError("production live run requires an accepted request['recovery_run_id']")
+        resolver = StagedValueResolver(quiesce_manifest_path, recovery_run_id)
+        exported_id, _baseline_path, coordinator = executor.open_window_snapshot(request, run_root)
+        resolver.on_snapshot_open(exported_id)
+        return resolver, exported_id, coordinator
+    values = derive_joined_fixture_values(request["run_id"], quiesce_manifest_path)
+    return values, values["<exported-id>"], None
+
+
 def resolved_command(
     manifest: dict[str, Any],
     command_id: str,
@@ -4212,7 +4314,12 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
     if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
         raise LifecycleError("live quiesce manifest digest mismatch")
-    values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))
+    # W2 fork (co-design D1/D2): fixture mode returns the verbatim parity-oracle dict; production mode
+    # returns a StagedValueResolver with the W3 window snapshot already opened (real <exported-id> +
+    # baseline.json) and hands back the HELD coordinator to release after pg.backup.
+    values, exported_id, snapshot_coordinator = resolve_window_values(
+        request, executor, engine.run_root, str(quiesce_path)
+    )
     run_id = str(uuid.UUID(request["run_id"]))
     chains = request.get("chains") or {}
 
@@ -4250,7 +4357,6 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     request["resource_manifest_sha256"] = genesis_digest
     engine.current_resource_manifest_sha256 = genesis_digest
 
-    exported_id = values["<exported-id>"]
     # OQ4 targets identities: the five captured target identities are real deploy.prepare
     # evidence in production; seeded here (excluded VALUE-only from parity) so the artifact is
     # recomputable and the step topology is provable.
@@ -4266,22 +4372,28 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # Section 5 forward chronology groups 1-16 + the group-14 FWM + durable reload + output
     # augmentation + RULING R8-A journaled post-activate cleanup segment, all through the ONE
     # resumable driver run_recover also uses (§6b.2). resume_from=None => drive from group 1.
-    return drive_forward_sequence(
-        engine,
-        request,
-        manifest,
-        values,
-        quiesce_bytes,
-        run_id,
-        resource_manifest_paths,
-        marker_path,
-        exported_id,
-        target_identities,
-        ordinary,
-        d5,
-        resume_from=None,
-        stop_after=stop_after,
-    )
+    # W2: in production the held W3 snapshot coordinator is released once the window drive returns
+    # (pg.backup has consumed the snapshot by then); fixture mode has no coordinator to release.
+    try:
+        return drive_forward_sequence(
+            engine,
+            request,
+            manifest,
+            values,
+            quiesce_bytes,
+            run_id,
+            resource_manifest_paths,
+            marker_path,
+            exported_id,
+            target_identities,
+            ordinary,
+            d5,
+            resume_from=None,
+            stop_after=stop_after,
+        )
+    finally:
+        if snapshot_coordinator is not None:
+            executor.close_window_snapshot(snapshot_coordinator)
 
 
 def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
