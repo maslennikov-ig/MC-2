@@ -176,6 +176,39 @@ its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
   slices. This needs its own focused design pass; it was NOT rushed. Window stays
   CLOSED. Full map is on beads `mc2-j58wi` / `mc2-uha77`.
 
+### PROGRESS (2026-07-20, cont.) — W4 delivered; W2+W3 co-design written
+
+- **W4** (`mc2-dxcaa`) DONE, committed **`ffb7da5fc`**, pushed. Carved off from the
+  W2/W3 coupling: the `--stop-after` CLI exposure is architecturally INDEPENDENT
+  of the real-value work (the internal `stop_after` seam is already end-to-end;
+  `run_recover` never reads it). Exposed `--stop-after` on `live` ONLY,
+  choices-bound to `_STOP_AFTER_STEP`, reversible/#18 boundary operator-visible in
+  the flag help; plumbed into the production request via `getattr`. TDD
+  `q12-live-stop-after-cli.test.ts` (3 tests); behavioural stop-after + recover
+  convergence already covered by `q12-live-controller.test.ts`.
+  Correctness-reviewed: no P0/P1/P2. Focused q12-\* **654 passed / 72 skipped**;
+  type-check clean; manifest `aaec6fc2` intact. False W3→W4 dep removed.
+- **W3 finding (refines §2.5):** OQ5/OQ6 are NOT un-built — they already exist on
+  `LivePlanExecutor` (`q12-lifecycle-core.py:6840` `_open_snapshot_coordinator`,
+  `:6917` `produce_run_root_baseline` → `baseline.json` 0400). The real gap is that
+  the WINDOW executor (`ProductionExecutor`/`OwnerCustodyExecutor`) can't reach
+  them and the window `<exported-id>` is fixture-derived (`:720`,`:4018/:4144`).
+  W3 for the window = lift OQ5/OQ6 into the owner-custody path + feed the real
+  snapshot id into value resolution (W2), consistent with D5J on compose AND claim.
+- **W2+W3 CO-DESIGN WRITTEN:**
+  `docs/superpowers/specs/2026-07-20-q12-w2-w3-staged-execution-codesign.md` — the
+  focused design pass §W2/§W3 required. Decisions: clean `production`-gated
+  fixture/real FORK (parity oracle untouched); staged resolver advanced by
+  lifecycle callbacks (resolve-once, fail-closed on drift); compose↔claim
+  consistency via a run-root authority file read by both sides (D5J single
+  authority); locked real-run oracle; W3 lifts OQ5/OQ6 into `OwnerCustodyExecutor`
+  behind an isolable subprocess seam (W1 pattern).
+- **VERIFIABILITY BOUNDARY (honest):** the fork, resolver scaffold, and
+  compose↔claim byte-consistency are unit-verifiable HERE with fakes; the real
+  `pg_export_snapshot()`/baseline/generation/recovery-manifest/coverage legs and
+  the end-to-end real-run oracle are `MC2_Q12_REAL_PG17`-gated and/or IN-WINDOW-only
+  (#18), validated at W5 (rehearsal) and W7 (owner-gated). Window stays CLOSED.
+
 ### Historical context (Phase A/B complete; pre-open R8 rehearsals)
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
