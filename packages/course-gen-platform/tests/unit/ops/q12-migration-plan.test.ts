@@ -2130,7 +2130,7 @@ sys.stdout.write(core._structural_catalog_diff(json.loads(sys.argv[1]), json.loa
   });
 });
 
-describe('Q12 equality diagnostics preservation (round-12)', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 equality diagnostics preservation (round-12)', () => {
   const CORE12 = resolve(REPO_ROOT, 'deploy/qdrant/q12-lifecycle-core.py');
   const RUN_ID12 = '123e4567-e89b-42d3-a456-426614174000';
   const PY_ENV12 = { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' };
