@@ -209,6 +209,33 @@ its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
   the end-to-end real-run oracle are `MC2_Q12_REAL_PG17`-gated and/or IN-WINDOW-only
   (#18), validated at W5 (rehearsal) and W7 (owner-gated). Window stays CLOSED.
 
+### PROGRESS (2026-07-20, cont.²) — W2/W3 EXECUTABLE PLAN prepared; owner authorized real-data work
+
+- **Owner authorization (2026-07-20):** project pre-launch/testing — owner authorized
+  touching the production DB for whatever the wiring needs. The earlier "hold W2/W3
+  for a window-adjacent session" caveat is LIFTED. Preserved carve-out: the
+  irreversible `barrier.activate` / nginx switch (W7 / C9) still requires a fresh
+  pre-window `plan` + explicit owner "go".
+- **Empirical grounding (`9c49d8599`):** this box has docker 29.5.3 + local PG17; both
+  `MC2_Q12_REAL_PG17=1` gated suites (`q12-live-baseline-producer`,
+  `q12-live-real-full-window`) PASS against disposable `postgres:17.10`. The un-done
+  surface is precisely the data-movement commands (`pg.backup`/`pg.restore`/
+  `source.forward`/`reindex.*`/`deploy.*`), currently real-SHAPED stubs on fixture
+  values. All W2/W3 increments are now validatable HERE on disposable PG17.
+- **EXECUTABLE PLAN WRITTEN:**
+  `docs/superpowers/plans/2026-07-20-q12-w2-w3-staged-execution.md` — TDD, bite-sized,
+  7 tasks. T1 W3-struct (`mc2-58tnx`): extract `SourceSnapshotSeam` from
+  `LivePlanExecutor` → `OwnerCustodyExecutor.open_window_snapshot`. T2 W2-fork /
+  T3 W2-consistency / T4 W2-oracle (`mc2-j58wi`): `production`-gated
+  `StagedValueResolver`, run-root staged-values authority for compose↔claim
+  byte-parity, structural `accept_real_run` (D4). T5 W5 rehearsal (`mc2-v68w6`),
+  T6 W6 runbook (`mc2-naz8j`), T7 W7 owner-gated STOP (`mc2-i9h3y`).
+- **Beads sequencing fixed:** W3 (`mc2-58tnx`) is the ONLY ready increment; edge
+  reversed so W2 depends on W3 (T2 consumes `open_window_snapshot`); W5 depends on
+  W2+W3. Chain: W3 → W2 → W5 → W6 → W7.
+- **Next executable action:** implement Plan Task 1 (W3-struct), TDD against the fake
+  seam here + `MC2_Q12_REAL_PG17=1` live leg. Window stays CLOSED.
+
 ### Historical context (Phase A/B complete; pre-open R8 rehearsals)
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
