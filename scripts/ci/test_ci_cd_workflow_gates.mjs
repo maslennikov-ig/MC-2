@@ -224,9 +224,20 @@ for (const requiredGuard of [
     `deploy script must include immutable rollback guard: ${requiredGuard}`
   );
 }
+// The Q12 handoff mode (prepare-quiesced) also brings up shared infrastructure
+// earlier in the file, consuming the operator digest already persisted to
+// .env by a prior main-flow deploy. Scope this ordering check to the main
+// blue/green flow (after "# 1. Determine Active Color"), which is the path that
+// actually resolves and persists the digest, so the earlier Q12-mode occurrence
+// does not produce a false position mismatch.
+const mainDeployFlowStart = deployScript.indexOf('# 1. Determine Active Color');
 assert(
-  deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256') <
-    deployScript.indexOf('up -d redis qdrant prometheus grafana'),
+  mainDeployFlowStart !== -1,
+  'deploy script must contain the main blue/green flow marker "# 1. Determine Active Color"'
+);
+assert(
+  deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256', mainDeployFlowStart) <
+    deployScript.indexOf('up -d redis qdrant prometheus grafana', mainDeployFlowStart),
   'operator image digest must be resolved and persisted before infrastructure Compose starts'
 );
 assert(

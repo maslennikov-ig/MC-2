@@ -161,6 +161,10 @@ const RUNNER = resolve(
   REPO_ROOT,
   'packages/course-gen-platform/tests/unit/ops/fixtures/q12-retained-barrier-runner.py'
 );
+// The controller subprocess interpreter is overridable so the harness can be
+// exercised against multiple Python versions. CI (and the deploy server) run the
+// default /usr/bin/python3 (e.g. 3.12 on ubuntu-24.04); local dev may differ.
+const PYTHON3 = process.env.MC2_Q12_PYTHON3 ?? '/usr/bin/python3';
 const OPERATIONS: readonly RetainedBarrierOperation[] = [
   'install',
   'verify-after-base',
@@ -184,7 +188,7 @@ export function parseLeaseEpoch(value: string): LeaseEpoch {
 
 export function deriveRootRetainedBarrierFixtureRunId(runRoot: string): string {
   if (!resolve(runRoot).startsWith('/tmp/')) throw new Error('fixture runRoot must be below /tmp');
-  const child = spawnSync('/usr/bin/python3', [RUNNER, '--derive-run-id'], {
+  const child = spawnSync(PYTHON3, [RUNNER, '--derive-run-id'], {
     input: JSON.stringify({ runRoot }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -286,7 +290,7 @@ export async function materializeRootRetainedBarrierFixture(
 ): Promise<RootRetainedBarrierFixtureResult> {
   await Promise.resolve();
   validateSpec(spec);
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify(spec),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -505,7 +509,7 @@ export async function materializeJoinedRetainedBarrierFixture(
   spec: JoinedRetainedBarrierFixtureSpec
 ): Promise<JoinedRetainedBarrierFixtureResult> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify(spec),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -663,7 +667,7 @@ export async function materializeLiveController(spec: LiveControllerFixtureSpec)
   postActivate: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
 }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify({ liveController: true, ...spec }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -709,7 +713,7 @@ export async function materializeRecover(spec: RecoverControllerFixtureSpec): Pr
   postActivate: { cleanup: Record<string, unknown>; resume: Record<string, unknown> } | null;
 }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify({ recoverController: true, ...spec }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -752,7 +756,7 @@ export async function materializeSupervisor(
   spec: SupervisorControllerFixtureSpec
 ): Promise<{ journalEntries: Record<string, unknown>[] }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify({ supervisorController: true, ...spec }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -776,7 +780,7 @@ export async function runRecoverExpectingRefusal(
   spec: RecoverControllerFixtureSpec
 ): Promise<{ ok: boolean; error: string }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER], {
+  const child = spawnSync(PYTHON3, [RUNNER], {
     input: JSON.stringify({ recoverController: true, ...spec }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -800,7 +804,7 @@ export async function runFwmNegative(spec: {
   quiesceManifestPath?: string;
 }): Promise<{ ok: boolean; error: string }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER, '--fwm-negative'], {
+  const child = spawnSync(PYTHON3, [RUNNER, '--fwm-negative'], {
     input: JSON.stringify(spec),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
@@ -821,7 +825,7 @@ export async function validateStableBindingWalk(
   request: Record<string, unknown>
 ): Promise<{ ok: boolean; error: string }> {
   await Promise.resolve();
-  const child = spawnSync('/usr/bin/python3', [RUNNER, '--validate-walk'], {
+  const child = spawnSync(PYTHON3, [RUNNER, '--validate-walk'], {
     input: JSON.stringify({ journal, request }),
     encoding: 'utf8',
     env: { PATH: '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },

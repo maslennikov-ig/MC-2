@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 import {
   canonical,
@@ -110,7 +111,7 @@ function frontierSpec(operation: RetainedBarrierOperation): RootRetainedBarrierF
   };
 }
 
-describe('Root/W retained-barrier quiesce preimage seam', () => {
+describe.runIf(RUN_REAL_CONTROLLER)('Root/W retained-barrier quiesce preimage seam', () => {
   it('rejects the old all-five synthetic quiesce digest when no byte preimage exists', async () => {
     const candidate = spec(
       Object.fromEntries(operations.map(operation => [operation, chain(operation)]))

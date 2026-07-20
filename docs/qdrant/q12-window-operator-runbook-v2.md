@@ -37,8 +37,13 @@
 
 ## 2. Invocation
 
+The controller REQUIRES Python 3.13+ (the D6 descriptor-security path uses the
+atomic `os.POSIX_SPAWN_CLOSEFROM` file action with **no fallback**). The server's
+default `python3` is 3.12, so invoke the controller explicitly with
+`/usr/bin/python3.13` (installed alongside the system interpreter):
+
 ```bash
-deploy/qdrant/q12-lifecycle-core.py live \
+/usr/bin/python3.13 deploy/qdrant/q12-lifecycle-core.py live \
   --run-id <cutover-run-id> \
   --release-sha <release-sha> \
   --operator-digest <operator-digest> \
@@ -94,7 +99,7 @@ rollback-abort is still available at or before `final-writer-manifest`. Do **not
 If the forward run is interrupted (crash, stop-after, aborted stream), resume with `recover`:
 
 ```bash
-deploy/qdrant/q12-lifecycle-core.py recover \
+/usr/bin/python3.13 deploy/qdrant/q12-lifecycle-core.py recover \
   --run-id <cutover-run-id> --recovery-run-id <same-recovery-run-id> \
   --release-sha … --operator-digest … --resource-manifest-sha256 … \
   --quiesce-manifest-sha256 … --expected-catalog-sha256 … \
