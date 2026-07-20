@@ -1,3 +1,5 @@
+> **SUPERSEDED PLAN — NOT RUNTIME GUIDANCE.** Qdrant Cloud statements record the original Stage 0 decision and are replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Implementation Plan: Stage 0 - Foundation
 
 **Branch**: `001-stage-0-foundation` | **Date**: 2025-10-10 | **Spec**: [spec.md](./spec.md)

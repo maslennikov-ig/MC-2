@@ -1,3 +1,5 @@
+> **HISTORICAL RESEARCH — NOT RUNTIME GUIDANCE.** Qdrant Cloud comparisons below are retained as decision history and are superseded by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Research: Stage 0 - Foundation
 
 **Date**: 2025-10-10

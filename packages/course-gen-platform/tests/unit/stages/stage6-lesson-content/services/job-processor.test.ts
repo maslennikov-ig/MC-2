@@ -26,6 +26,7 @@ const {
   mockSaveSourceDocuments,
   mockCheckAndSetStage6Complete,
   mockGetModelForPhase,
+  mockLoadStage6EvidenceForCourse,
 } = vi.hoisted(() => ({
   mockExecuteStage6Orchestrator: vi.fn(),
   mockRetrieveLessonContext: vi.fn(),
@@ -39,6 +40,7 @@ const {
   mockSaveSourceDocuments: vi.fn().mockResolvedValue(undefined),
   mockCheckAndSetStage6Complete: vi.fn().mockResolvedValue(undefined),
   mockGetModelForPhase: vi.fn(),
+  mockLoadStage6EvidenceForCourse: vi.fn(),
 }));
 
 // Mock Supabase
@@ -93,6 +95,10 @@ vi.mock('@/stages/stage6-lesson-content/orchestrator', () => ({
 vi.mock('@/stages/stage6-lesson-content/utils/lesson-rag-retriever', () => ({
   retrieveLessonContext: mockRetrieveLessonContext,
   extractSourceDocuments: mockExtractSourceDocuments,
+}));
+
+vi.mock('@/stages/stage6-lesson-content/rag/evidence-loader', () => ({
+  loadStage6EvidenceForCourse: mockLoadStage6EvidenceForCourse,
 }));
 
 // Mock sanity check
@@ -334,6 +340,10 @@ describe('stage6/services/job-processor', () => {
       retrievalDurationMs: 100,
     });
     mockExtractSourceDocuments.mockReturnValue([]);
+    mockLoadStage6EvidenceForCourse.mockResolvedValue({
+      organizationId: 'resolved-organization',
+      evidenceContext: undefined,
+    });
 
     // Default model tier selection
     mockSelectStage6ModelTier.mockResolvedValue({
@@ -585,6 +595,39 @@ describe('stage6/services/job-processor', () => {
   // processStage6Job
   // --------------------------------------------------------------------------
   describe('processStage6Job', () => {
+    it('passes the current accepted evidence projection into the live retriever', async () => {
+      const evidenceContext = {
+        acceptedRunId: '10000000-0000-4000-8000-000000000001',
+        decisionIds: ['70000000-0000-4000-8000-000000000001'],
+        decisionQueries: [],
+        sourceRefs: [],
+        allowedDocumentIds: [],
+        sourceVersionByDocumentId: {},
+        cacheIdentity: 'current-evidence-identity',
+      };
+      mockLoadStage6EvidenceForCourse.mockResolvedValueOnce({
+        organizationId: 'organization-1',
+        evidenceContext,
+      });
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
+      const job = createMockJob({ organizationId: 'organization-1' });
+
+      const result = await processStage6Job(job);
+
+      expect(result.success).toBe(true);
+      expect(mockLoadStage6EvidenceForCourse).toHaveBeenCalledWith({
+        courseId: 'course-uuid',
+        requestedOrganizationId: 'organization-1',
+        providedAnalysisResult: undefined,
+      });
+      expect(mockRetrieveLessonContext).toHaveBeenCalledWith({
+        courseId: 'course-uuid',
+        organizationId: 'organization-1',
+        lessonSpec: job.data.lessonSpec,
+        evidenceContext,
+      });
+    });
+
     it('should return error for invalid job input (missing lessonSpec)', async () => {
       const job = createMockJob({
         lessonSpec: null as unknown as Stage6JobInput['lessonSpec'],
@@ -979,6 +1022,46 @@ describe('stage6/services/job-processor', () => {
       );
       expect(mockMarkForReview).not.toHaveBeenCalled();
       expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
+    });
+
+    it('fails the course on evidence tenant/version/ref scope violations instead of continuing', async () => {
+      const { Stage6EvidenceScopeError } = await import(
+        '@/stages/stage6-lesson-content/rag/evidence-context'
+      );
+      mockRetrieveLessonContext.mockRejectedValueOnce(
+        new Stage6EvidenceScopeError('Stage 6 Qdrant result is outside the accepted source refs')
+      );
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('outside the accepted source refs');
+      expect(mockFailStage6Course).toHaveBeenCalledWith(
+        'course-uuid',
+        expect.stringContaining('outside the accepted source refs')
+      );
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+    });
+
+    it('fails the course when current evidence loading detects a tenant or version scope violation', async () => {
+      const { Stage6EvidenceScopeError } = await import(
+        '@/stages/stage6-lesson-content/rag/evidence-context'
+      );
+      mockLoadStage6EvidenceForCourse.mockRejectedValueOnce(
+        new Stage6EvidenceScopeError('Stage 6 source ref version is stale')
+      );
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('source ref version is stale');
+      expect(mockFailStage6Course).toHaveBeenCalledWith(
+        'course-uuid',
+        expect.stringContaining('source ref version is stale')
+      );
+      expect(mockRetrieveLessonContext).not.toHaveBeenCalled();
       expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
     });
 

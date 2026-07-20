@@ -44,6 +44,11 @@ export interface LLMClientOptions {
   enableCaching?: boolean;
 }
 
+export interface LLMClientConstructionOptions {
+  /** Transport retry count. Defaults to 3; set to 0 when the caller owns retries. */
+  maxRetries?: number;
+}
+
 /**
  * Response from LLM completion
  */
@@ -86,7 +91,16 @@ export class LLMClient {
    * Constructor - uses sync fallback for initial setup
    * For proper database-first key resolution, use createLLMClient() factory
    */
-  constructor() {
+  constructor(options: LLMClientConstructionOptions = {}) {
+    const configuredRetries = options.maxRetries ?? 3;
+    if (
+      !Number.isSafeInteger(configuredRetries) ||
+      configuredRetries < 0 ||
+      configuredRetries > 10
+    ) {
+      throw new Error('maxRetries must be an integer between 0 and 10');
+    }
+    this.maxRetries = configuredRetries;
     // Use sync fallback for constructor (env var only)
     const apiKey = getApiKeySync('openrouter');
     if (apiKey) {
@@ -413,8 +427,10 @@ export const llmClient = new LLMClient();
  *
  * @returns Promise<LLMClient> - Initialized client with proper API key
  */
-export async function createLLMClient(): Promise<LLMClient> {
-  const client = new LLMClient();
+export async function createLLMClient(
+  options: LLMClientConstructionOptions = {}
+): Promise<LLMClient> {
+  const client = new LLMClient(options);
   await client.refreshApiKey();
   return client;
 }

@@ -196,13 +196,24 @@ async function buildPhase2Prompt(input: Phase2Input): Promise<{ role: string; co
 }
 
 /** Build documents context section */
-function buildDocumentsContext(documentSummaries: Phase2Input['document_summaries']): string {
+export function buildDocumentsContext(
+  documentSummaries: Phase2Input['document_summaries']
+): string {
   if (!documentSummaries || documentSummaries.length === 0) return '';
 
   const parts: string[] = [];
   parts.push(`\n\nAVAILABLE DOCUMENTS (${documentSummaries.length}):`);
-  parts.push('Use these documents as PRIMARY source for course structure.');
-  parts.push('Each section MUST be grounded in document content where possible.\n');
+  const syntheticAdvisory =
+    documentSummaries.length === 1 &&
+    documentSummaries[0].startsWith('SYNTHETIC ADVISORY DOCUMENT EVIDENCE');
+  if (syntheticAdvisory) {
+    parts.push(
+      'This synthetic evidence digest supplements the baseline topic and classification; it is not an uploaded document and must not replace baseline curriculum requirements.\n'
+    );
+  } else {
+    parts.push('Use these documents as PRIMARY source for course structure.');
+    parts.push('Each section MUST be grounded in document content where possible.\n');
+  }
 
   for (let i = 0; i < documentSummaries.length; i++) {
     parts.push(`[Document ${i + 1}]`);

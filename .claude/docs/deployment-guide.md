@@ -109,7 +109,9 @@ Browser → fetches from https://ai.megacampus.ru/storage/enrichments/...
 
 ## Blue/Green Deployment
 
-Zero-downtime deployment using nginx port switching.
+Release-bound deployment using immutable image digests and nginx port switching.
+It is zero-downtime only after shared infrastructure and Qdrant are already
+bootstrapped and verified; the ordinary deploy is not the first Q12 activation.
 
 ### Ports
 
@@ -119,21 +121,25 @@ Zero-downtime deployment using nginx port switching.
 | Green | 3002 | 4002 |
 | Dev   | 3010 | 4010 |
 
-### How It Works (13 steps)
+### Release-bound sequence
 
-1. **Read** active color from `active_color` file (default `blue`)
-2. **Check** docling-mcp image exists (fails hard if missing — 8GB, manually built)
-3. **Create** data dirs with `chown -R 1001:1001` (nodejs user in containers)
-4. **Start infra**: `docker compose -f docker-compose.infra.yml up -d`
-5. **Prepare** `.env.$NEW_COLOR` from `.env.production`
-6. **Docker login** to GHCR (if `$GITHUB_TOKEN` set)
-7. **Deploy app**: stop old color, pull images, `docker compose -f docker-compose.app.yml up --force-recreate`
-8. **Health check**: API (12 attempts x 5s = 60s), then Web (12 x 5s)
-9. **Switch nginx**: apply template via `sed`, test, reload
-10. **Update** `active_color` file
-11. **Stop** old color containers
-12. **Update workers**: pull+restart `worker`, `worker-stage6` from `production.yml`; `worker-stage7`, `notebooklm-bridge` from `infra.yml`
-13. **Cleanup**: `docker image prune -f` (dangling only), `builder prune --filter until=168h`, disk usage report
+1. Require the exact 40-character release commit and read the active color.
+2. Log in to GHCR when needed; pull the release-tagged `qdrant-operator`, resolve
+   its repository digest, validate 64 lowercase hex, and persist only
+   `QDRANT_OPERATOR_IMAGE_SHA256`.
+3. Verify the manually managed Docling image and prepare host data directories.
+4. Start the reviewed shared infrastructure with `.env.production`.
+5. Resolve immutable web/API digests for both current and target colors and
+   write mode-0600 color environment snapshots.
+6. Run the authenticated Qdrant readiness/collections/schema verify-only gate.
+   An empty first installation stops here; it must use the initial activation
+   procedure below.
+7. Recreate the inactive web/API color and health-check both services.
+8. Record `deploy_state=status=switched`, atomically switch nginx, and update
+   `active_color`.
+9. Recreate main and Stage 6 workers from the same accepted color environment,
+   update remaining changed background services, stop the old color, mark the
+   transaction accepted, and prune only safe dangling/build cache data.
 
 ### Files
 
@@ -170,11 +176,11 @@ Zero-downtime deployment using nginx port switching.
 ```bash
 cd /opt/megacampus
 
-# Deploy
-bash scripts/deploy_blue_green.sh production latest
+# Deploy one immutable release commit
+bash scripts/deploy_blue_green.sh production '<40-lowercase-hex-release-commit>'
 
-# Rollback to previous color
-bash scripts/rollback_blue_green.sh
+# Roll back only that switched/accepted release transaction
+bash scripts/rollback_blue_green.sh production '<same-40-character-release-commit>'
 ```
 
 ## CI/CD Pipeline
@@ -188,9 +194,11 @@ bash scripts/rollback_blue_green.sh
 3. **Parallel checks** — lint, type-check, security, test-unit (`continue-on-error: true`)
 4. **build** — Build all packages (depends on type-check)
 5. **ci-success** — Gate: all critical checks passed
-6. **build-docker** — Dynamic matrix build: only changed `web`, `api`, and/or `notebooklm-bridge` images → GHCR
-   - `master`: tags `latest` + `master-<sha>`
-   - `develop`: tags `develop` + `develop-<sha>`
+6. **build-docker** — Dynamic matrix build: changed `web`, `api`,
+   `notebooklm-bridge`, and the deploy-relevant `qdrant-operator` target → GHCR
+   - every release image receives the exact `${github.sha}` tag used by deploy;
+   - mutable convenience tags are never consumed by the Qdrant operator path;
+   - deploy resolves the operator tag to `repo@sha256:<digest>` and pre-pulls it;
    - `docling-mcp` is NOT built in CI (too large)
 7. **deploy** (master only, deploy-relevant changes only) — SCP files to server, run `deploy_blue_green.sh`
 8. **rollback** — Auto on deploy failure
@@ -281,23 +289,80 @@ docker image prune -a --filter "label!=docling"
 
 ## Rollback
 
-Instant rollback via nginx reload (9 steps):
+### Self-hosted Qdrant activation boundary
 
-1. Read active color, derive target (opposite)
-2. Verify `.env.$TARGET_COLOR` exists
-3. Start infra
-4. Start target app containers
-5. Health check target (6 attempts x 5s = 30s per service)
-6. Apply nginx template → target
-7. Update `active_color`
-8. Stop broken color
+The application runtime is designed for private, digest-pinned Qdrant `1.18.2`
+at `http://qdrant:6333`. The stable `course_embeddings` alias points to a
+versioned physical collection. Qdrant is a derived index: rebuild it from
+`file_catalog` and authoritative source files; do not attempt to recover or
+mutate the retired hosted proof-of-concept.
 
-**Time to rollback**: ~30 seconds
+The repository includes Compose, `deploy/qdrant`, `deploy/systemd`, and
+`ops/qdrant` assets. The owner authorized Q12 staging activation on 2026-07-12,
+including live reindex, recovery, real notification, and document evidence at
+`true/active/100`; no remote mutation has occurred. Activation remains NO-GO
+until the project CA for verified remote migrations, off-host S3 inputs, and the
+recorded authoritative source-path gaps are resolved.
 
-**Note**: Rollback does NOT restart workers (by design).
+Before an authorized activation, require:
+
+1. Qdrant 1.18.2 matches `deploy/qdrant/image-lock.json`; Prometheus 3.13.1
+   LTS, Grafana 12.4.5, node_exporter 1.12.0, and Alertmanager 0.33.1 match the
+   separate monitoring ledger `ops/qdrant/image-lock.json`.
+2. Target systemd is at least 247 (`LoadCredential`); verify the packaged
+   `/opt/megacampus/deploy/qdrant/operator-compose.sh`, exact root-owned
+   credentials, UID 1001 state, and conflict-free metrics GID. Host pnpm/source
+   are not production prerequisites.
+3. Qdrant, dashboard, Prometheus, Grafana, Alertmanager, and node_exporter are
+   private/loopback only; `/metrics` is authenticated on listener 6333.
+4. Native multilingual BM25/IDF, dense+sparse server RRF nested into Formula,
+   strict indexes including float `document_weight`, and tenant isolation pass.
+5. Reindex plan/execute/verify completes before atomic alias cutover; exact
+   version snapshot/isolated restore and alias recreation are proven separately.
+
+The exact preflight, monitoring, systemd, recovery, notification, and rollback
+commands are maintained in `docs/operations/qdrant-self-hosted.md`.
+
+### Q12 initial activation
+
+Do not invoke `/deploy` first on an empty Qdrant: deploy runs verify-only and
+must fail before traffic when the physical collection/alias is absent. After the
+CA/S3/source NO-GO inputs are resolved, use the operations runbooks to:
+
+1. apply and verify guarded migrations `120 -> 130 -> 140 -> 150 -> 151`;
+2. provision exact assets, identities, directories, and secret metadata;
+3. publish the release-SHA operator, resolve/persist/pre-pull its digest;
+4. start only Qdrant and monitoring, then run `self-check`/`metrics-check`;
+5. bootstrap before deploy verify, complete gap-free reindex and relevance/
+   isolation checks, then prove snapshot/isolated restore and notifications;
+6. invoke the normal release-bound deploy only after rollback evidence exists.
+
+`/deploy --force`, mutable tags, and the retired Cloud endpoint are not
+bootstrap alternatives.
+
+Release-bound rollback follows the script's exact nine steps:
+
+1. require the exact 40-character failed release commit and read active color;
+2. require matching `deploy_state` at `switched` or `accepted`, then derive its
+   recorded previous color;
+3. verify the target color environment contains immutable web/API digests;
+4. ensure shared infrastructure is running;
+5. recreate the target web/API color from its preserved environment snapshot;
+6. health-check both target services;
+7. recreate the main and Stage 6 workers from that same target-color environment
+   **before** traffic moves;
+8. test/reload nginx, update `active_color`, and mark the transaction rolled back;
+9. stop the broken app color while preserving diagnostics.
+
+Do not promise an instant or fixed-duration rollback: image availability, cold
+start, worker recreation, Qdrant/evidence containment, and health checks bound
+the duration. This app rollback is separate from queue-quiesced evidence
+containment and atomic alias rollback. It never down-migrates audit tables or
+restores a snapshot over the active collection.
 
 ```bash
-ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"
+ssh megacampus-prod \
+  "bash /opt/megacampus/scripts/rollback_blue_green.sh production '<40-character-release-commit>'"
 ```
 
 ## Nginx Configuration

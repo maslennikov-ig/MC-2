@@ -132,6 +132,8 @@ export const DocumentProcessingJobDataSchema = BaseJobDataSchema.extend({
   mimeType: z.string(),
   chunkSize: z.number().int().min(256).max(2048).default(512),
   chunkOverlap: z.number().int().min(0).max(512).default(50),
+  qdrantTargetCollection: z.string().min(1).max(255).optional(),
+  qdrantReindexRunId: z.string().uuid().optional(),
 });
 
 export type DocumentProcessingJobData = z.infer<typeof DocumentProcessingJobDataSchema>;

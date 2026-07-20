@@ -2,12 +2,12 @@
 /**
  * BM25 Hybrid Search Integration Test (T080.4)
  *
- * This script validates BM25 sparse vectors + RRF hybrid search implemented in T075.
- * Tests sparse vector generation, hybrid search, precision improvement, and RRF merging.
+ * This script validates Qdrant-native BM25 + RRF hybrid search implemented in T075.
+ * Tests the native document contract, hybrid search, precision improvement, and RRF merging.
  *
  * Test Coverage:
  * 1. Dense-only search (baseline)
- * 2. Sparse vector generation (BM25 with IDF)
+ * 2. Native BM25 document contract (collection-side IDF)
  * 3. Hybrid search (dense + sparse + RRF)
  * 4. Lexical matching quality
  * 5. Precision improvement measurement
@@ -47,7 +47,7 @@ import { uploadChunksToQdrant } from '../../src/shared/qdrant/upload';
 import { searchChunks } from '../../src/shared/qdrant/search';
 import { qdrantClient } from '../../src/shared/qdrant/client';
 import { COLLECTION_CONFIG } from '../../src/shared/qdrant/create-collection';
-import { BM25Scorer } from '../../src/shared/embeddings/bm25';
+import { createBm25Document } from '../../src/shared/qdrant/config';
 
 // UUID generator
 function generateUUID(): string {
@@ -103,8 +103,7 @@ interface TestStats {
   // Upload statistics
   documentsUploaded: number;
   chunksIndexed: number;
-  corpusSize: number;
-  uniqueTerms: number;
+  nativeBm25DocumentValidated: boolean;
 
   // Dense search (baseline)
   denseSearchCount: number;
@@ -137,8 +136,7 @@ interface TestStats {
 const stats: TestStats = {
   documentsUploaded: 0,
   chunksIndexed: 0,
-  corpusSize: 0,
-  uniqueTerms: 0,
+  nativeBm25DocumentValidated: false,
   denseSearchCount: 0,
   denseAvgLatency: 0,
   denseAvgPrecision: 0,
@@ -595,62 +593,33 @@ async function testDenseOnlyUpload(): Promise<void> {
 }
 
 /**
- * Test 2: Verify sparse vector generation
+ * Test 2: Verify the Qdrant-native BM25 document contract
  */
-async function testSparseVectorGeneration(): Promise<void> {
-  logStep(2, 5, 'Sparse Vector Generation (BM25 with IDF)');
+function testNativeBm25DocumentContract(): void {
+  logStep(2, 5, 'Native BM25 Document Contract (Collection-Side IDF)');
 
   try {
-    const bm25Scorer = new BM25Scorer();
-
-    // Build corpus statistics
-    const testDocs = createTestDocuments();
-    const documents = testDocs.map(doc => doc.content);
-
-    bm25Scorer.addDocuments(documents);
-
-    const corpusStats = bm25Scorer.getCorpusStats();
-
-    stats.corpusSize = corpusStats.total_documents;
-    stats.uniqueTerms = corpusStats.document_frequencies.size;
-
-    logSuccess('Corpus statistics built');
-    logInfo(`  Total documents: ${corpusStats.total_documents}`);
-    logInfo(`  Unique terms: ${corpusStats.document_frequencies.size}`);
-    logInfo(`  Average document length: ${corpusStats.average_document_length.toFixed(2)} tokens`);
-    logInfo(`  Total tokens: ${corpusStats.total_tokens}`);
-
-    // Test sparse vector generation
     const testText = 'neural network backpropagation gradient descent';
-    const sparseVector = bm25Scorer.generateSparseVector(testText);
+    const document = createBm25Document(testText);
 
-    logSuccess('Sparse vector generated');
-    logInfo(`  Input: "${testText}"`);
-    logInfo(`  Terms: ${sparseVector.indices.length}`);
-    logInfo(`  Indices: [${sparseVector.indices.slice(0, 5).join(', ')}...]`);
-    logInfo(
-      `  Values (BM25 scores): [${sparseVector.values
-        .slice(0, 5)
-        .map(v => v.toFixed(3))
-        .join(', ')}...]`
-    );
-
-    // Validate sparse vector
-    if (sparseVector.indices.length === 0 || sparseVector.values.length === 0) {
-      throw new Error('Sparse vector generation failed: empty vectors');
+    if (
+      document.text !== testText ||
+      document.model !== 'qdrant/bm25' ||
+      document.options.language !== 'none' ||
+      document.options.tokenizer !== 'multilingual' ||
+      document.options.lowercase !== true ||
+      document.options.k !== 1.2 ||
+      document.options.b !== 0.75 ||
+      document.options.avg_len !== 256
+    ) {
+      throw new Error('Native BM25 document does not match the production ingestion contract');
     }
 
-    if (sparseVector.indices.length !== sparseVector.values.length) {
-      throw new Error('Sparse vector mismatch: indices and values have different lengths');
-    }
-
-    // Verify BM25 scores are positive
-    const allPositive = sparseVector.values.every(v => v > 0);
-    if (!allPositive) {
-      throw new Error('BM25 scores should be positive');
-    }
-
-    logSuccess('Sparse vector validation passed');
+    stats.nativeBm25DocumentValidated = true;
+    logSuccess('Native BM25 document contract validated');
+    logInfo(`  Model: ${document.model}`);
+    logInfo(`  Language/tokenizer: ${document.options.language}/${document.options.tokenizer}`);
+    logInfo('  IDF is calculated by the configured Qdrant sparse vector at collection scope');
 
     stats.testsPassed++;
   } catch (error) {
@@ -708,7 +677,7 @@ async function testHybridUpload(): Promise<void> {
       // Upload WITH sparse vectors
       const uploadResult = await uploadChunksToQdrant(embeddingResult.embeddings, {
         batch_size: 100,
-        enable_sparse: true, // Enable BM25 sparse vectors
+        enable_sparse: true, // Enable Qdrant-native BM25 document inference
         wait: true,
       });
 
@@ -972,11 +941,9 @@ function displaySummary(): void {
     `  Tests failed: ${stats.testsFailed > 0 ? colors.red : colors.green}${stats.testsFailed}${colors.reset}/${stats.totalTests}`
   );
 
-  console.log(`\n${colors.bold}Corpus Statistics:${colors.reset}`);
+  console.log(`\n${colors.bold}Indexing Statistics:${colors.reset}`);
   console.log(`  Documents uploaded: ${colors.cyan}${stats.documentsUploaded}${colors.reset}`);
   console.log(`  Chunks indexed: ${colors.cyan}${stats.chunksIndexed}${colors.reset}`);
-  console.log(`  Corpus size: ${colors.cyan}${stats.corpusSize}${colors.reset} documents`);
-  console.log(`  Unique terms: ${colors.cyan}${stats.uniqueTerms}${colors.reset}`);
 
   console.log(`\n${colors.bold}Dense-Only Search (Baseline):${colors.reset}`);
   console.log(`  Queries executed: ${colors.cyan}${stats.denseSearchCount}${colors.reset}`);
@@ -1012,10 +979,7 @@ function displaySummary(): void {
 
   console.log(`\n${colors.bold}Acceptance Criteria:${colors.reset}`);
   console.log(
-    `  ${stats.corpusSize > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} BM25 sparse vectors generated`
-  );
-  console.log(
-    `  ${stats.uniqueTerms > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Corpus statistics tracked`
+    `  ${stats.nativeBm25DocumentValidated ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Native BM25 document contract validated`
   );
   console.log(
     `  ${stats.hybridSearchCount > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Hybrid search executed`
@@ -1094,7 +1058,7 @@ async function runHybridSearchTests(): Promise<void> {
 
     // Run tests
     await testDenseOnlyUpload();
-    await testSparseVectorGeneration();
+    testNativeBm25DocumentContract();
     await testHybridUpload();
     await testDenseOnlySearch();
     await testHybridSearch();
@@ -1134,4 +1098,4 @@ async function runHybridSearchTests(): Promise<void> {
 }
 
 // Run tests
-runHybridSearchTests();
+void runHybridSearchTests();

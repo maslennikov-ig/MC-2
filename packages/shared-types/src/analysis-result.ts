@@ -9,6 +9,7 @@
  */
 
 import type { ExerciseType } from './analysis-schemas';
+import type { DocumentEvidenceSnapshot } from './document-evidence';
 
 /**
  * Main analysis result structure stored in courses.analysis_result (JSONB column)
@@ -117,6 +118,9 @@ export interface AnalysisResult {
       };
     };
   };
+
+  // Accepted Stage 4 document-evidence snapshot. Optional for document-free and legacy courses.
+  document_evidence?: DocumentEvidenceSnapshot;
 
   // Research flags for time-sensitive content (Phase 3)
   research_flags: ResearchFlag[]; // Can be empty array

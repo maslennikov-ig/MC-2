@@ -9,7 +9,7 @@
 import { logger } from '@/shared/logger';
 
 const FENCE_DELIMITER = /^ {0,3}(```|~~~)/;
-const SEPARATOR_CHARSET = /^[\t :|\-]+$/;
+const SEPARATOR_CHARSET = /^[\t :|-]+$/;
 
 function hasPipeCharacter(line: string): boolean {
   return line.includes('|');

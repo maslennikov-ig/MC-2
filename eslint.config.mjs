@@ -61,12 +61,15 @@ export default tseslint.config(
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-base-to-string': 'error',
       '@typescript-eslint/require-await': 'error',
-      '@typescript-eslint/ban-ts-comment': ['error', {
-        'ts-ignore': true,
-        'ts-expect-error': 'allow-with-description',
-        'ts-nocheck': true,
-        minimumDescriptionLength: 5,
-      }],
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          'ts-ignore': true,
+          'ts-expect-error': 'allow-with-description',
+          'ts-nocheck': true,
+          minimumDescriptionLength: 5,
+        },
+      ],
       '@typescript-eslint/restrict-template-expressions': 'warn',
       'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
@@ -94,12 +97,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
-      '@typescript-eslint/ban-ts-comment': ['warn', {
-        'ts-ignore': true,
-        'ts-expect-error': 'allow-with-description',
-        'ts-nocheck': true,
-        minimumDescriptionLength: 3,
-      }],
+      '@typescript-eslint/ban-ts-comment': [
+        'warn',
+        {
+          'ts-ignore': true,
+          'ts-expect-error': 'allow-with-description',
+          'ts-nocheck': true,
+          minimumDescriptionLength: 3,
+        },
+      ],
       'max-lines': ['error', { max: 1500, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 1000, skipBlankLines: true, skipComments: true }],
       complexity: ['warn', 30],

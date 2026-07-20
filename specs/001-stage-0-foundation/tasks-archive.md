@@ -1,3 +1,5 @@
+> **HISTORICAL TASK ARCHIVE — NOT RUNTIME GUIDANCE.** Qdrant Cloud completion records below describe the retired proof-of-concept. Current guidance is `docs/operations/qdrant-self-hosted.md`.
+
 # Tasks Archive: Stage 0 - Foundation (Completed)
 
 **Last Updated**: 2025-10-14

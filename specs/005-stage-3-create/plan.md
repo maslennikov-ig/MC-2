@@ -1,3 +1,5 @@
+> **SUPERSEDED PLAN — NOT RUNTIME GUIDANCE.** Hosted Qdrant assumptions below are replaced by private pinned Qdrant 1.18.2. See `docs/operations/qdrant-self-hosted.md`.
+
 # Implementation Plan: Stage 3 - Document Summarization
 
 **Branch**: `005-stage-3-create` | **Date**: 2025-10-28 | **Spec**: [spec.md](./spec.md)

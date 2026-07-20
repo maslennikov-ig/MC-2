@@ -13,6 +13,9 @@ build
 database.types.ts
 *.tsbuildinfo
 
+# Exact-SHA-reviewed approval candidates
+docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md
+
 # Logs
 *.log
 test-results.log

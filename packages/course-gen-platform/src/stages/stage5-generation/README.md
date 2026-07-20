@@ -2,10 +2,10 @@
 
 ## Overview
 
-Stage 5 generates the complete course structure including metadata, sections, and lesson skeletons. It implements a 4-phase LangGraph StateGraph workflow with hybrid model routing, sequential section generation with digest accumulation, and quality validation.
+Stage 5 generates the complete course structure including metadata, sections, and lesson skeletons. It implements a 4-phase LangGraph StateGraph workflow with hybrid model routing, sequential section generation with digest accumulation, and quality validation. After that normal baseline passes its structural gate, an optional second pass may add bounded, decision-aware document evidence without replacing the baseline.
 
-**Input:** `AnalysisResult` from Stage 4, frontend parameters, optional document summaries
-**Output:** `CourseStructure` and `GenerationMetadata` stored in database
+**Input:** `AnalysisResult` from Stage 4, frontend parameters, and optional compact document-evidence snapshot
+**Output:** `CourseStructure` and `GenerationMetadata`, including an optional evidence-enrichment audit, stored in database
 
 ## Architecture
 
@@ -32,6 +32,12 @@ Phase 3: generate_sections (Sequential with Digest Accumulation)
     |
     v
 Phase 4: validate_quality (Embedding + Overlap Detection)
+    |
+    v
+Structural Gate (accepted baseline)
+    |
+    v
+Advisory Document-Evidence Pass (optional, bounded, non-destructive)
     |
     v
 CourseStructure -> courses.course_structure
@@ -136,11 +142,10 @@ at the concrete lesson level. This complements Stage 4's abstract-level anti-ove
   - `estimated_duration_minutes`: Lesson time
   - `key_topics[]`: Topics covered
 
-**RAG Integration (Optional):**
-
-- Uses `document_relevance_mapping` from Stage 4
-- Queries only relevant documents per section (SMART mode)
-- 45x cost savings vs full document queries
+**Document evidence (optional):** the section generator first completes the
+normal baseline. The production handler then injects
+`createProductionStage5EvidenceEnricher()`, which reloads the accepted Stage 4
+run and current append-only decisions before any section-level Qdrant query.
 
 ---
 
@@ -168,6 +173,67 @@ classification are stored in `generation_metadata.quality_scores.structure` and
 prevent Stage 6 progression. Stage 5 edit/regeneration and element mutation paths
 recompute the same structure quality metadata after saving a changed
 `course_structure`.
+
+---
+
+## Baseline-first advisory enrichment
+
+The live path is `handler.ts` -> `GenerationOrchestrator.execute()` ->
+`enrichBaselineWithDocumentEvidence()` under `evidence/`. It runs only after the
+four normal phases and structural validation have produced the baseline.
+
+The handler constructs the live evidence adapter only when both global values
+are exact (`DOCUMENT_EVIDENCE_ENABLED=true` and
+`DOCUMENT_EVIDENCE_MODE=active`) and the course is inside
+`DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT`. The cohort value must be an integer
+from `0` through `100`; absent, malformed, fractional, negative, or out-of-range
+values fail closed to `0`. `0` selects no course and `100` selects every course.
+Intermediate values use the stable versioned SHA-256 course bucket in
+`evidence/rollout.ts`, so changing the hash contract requires a new version.
+Outside the cohort, Stage 5 runs the ordinary baseline pipeline without
+constructing the evidence adapter.
+
+Compatibility and precedence are strict:
+
+- Inside the active cohort, a course without an accepted evidence snapshot
+  returns the byte-identical baseline and records `not_applicable`. Outside the
+  cohort, the ordinary baseline pipeline runs and adds no evidence audit.
+- If retrieval finds no accepted relevant evidence, the byte-identical baseline
+  is retained with `no_relevant_evidence`.
+- User decisions and requirements outrank evidence. Rejected conflict sides,
+  removed documents, unresolved degraded cards, stale decisions, stale source
+  versions, and cross-tenant rows cannot enter queries or patches.
+- Enrichment may append bounded, chunk-grounded advisory topics. It cannot
+  delete or reorder sections/lessons, rename baseline content, change objectives
+  or durations, remove required topic prefixes, or escape existing size and
+  structural rules.
+
+For each accepted section, retrieval uses hybrid Qdrant search with exact
+`organization_id` and `course_id` filters, an accepted document allowlist,
+`group_by_document: true`, and `group_size: 2`. Returned payloads must match the
+accepted document, chunk, and source-version provenance. Source/claim bodies are
+not written into ordinary logs or the compact audit record.
+
+Candidate patches are revalidated. A destructive or structurally invalid patch
+gets one bounded retry; the normal baseline is retained on exhaustion or
+retrieval failure. The durable status is one of:
+
+- `not_applicable` - no accepted document-evidence run;
+- `applied` - at least one validated advisory addition was committed;
+- `no_relevant_evidence` - no eligible grounded addition was found;
+- `degraded` - fallback or validation loss occurred and the baseline was kept;
+- `failed_open_with_decision` - the evidence pass failed but the accepted
+  decision permits preserving the baseline.
+
+`generation_metadata.document_evidence_enrichment` stores the accepted run and
+sorted decision IDs, bounded section refs/search queries, patch/fallback counts,
+and a deterministic provenance hash. The course update uses compare-and-swap
+against the original analysis snapshot so a concurrent decision cannot be
+overwritten.
+
+Rollout and rollback controls, unresolved owner thresholds, and Qdrant recovery
+checks are documented in
+[`docs/operations/document-evidence.md`](../../../../../docs/operations/document-evidence.md).
 
 ---
 
@@ -273,6 +339,26 @@ interface GenerationMetadata {
     metadata: number;
     sections: number[];
   };
+  document_evidence_enrichment?: {
+    schema_version: 'stage5-document-evidence-enrichment-v1';
+    status:
+      | 'not_applicable'
+      | 'applied'
+      | 'no_relevant_evidence'
+      | 'degraded'
+      | 'failed_open_with_decision';
+    accepted_run_id: string | null;
+    accepted_decision_ids: string[];
+    section_evidence: Array<{
+      section_number: number;
+      search_queries: string[];
+      evidence_refs: unknown[];
+    }>;
+    provenance_hash: string;
+    attempted_patches: number;
+    retrieved_ref_count: number;
+    fallback_section_count: number;
+  };
   created_at: string;
 }
 ```
@@ -370,7 +456,7 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 
 ### Unit Tests
 
-**Location:** `tests/unit/stages/stage5/`
+**Location:** `tests/unit/stages/stage5-generation/`
 
 **Coverage:**
 
@@ -378,12 +464,15 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 - Section batch generation
 - Quality validation scoring
 - Cost calculation
-- Analysis formatters (67 tests, 100% coverage)
+- Analysis formatters
+- Baseline-first document-evidence enrichment and persistence
 
 **Run:**
 
 ```bash
-pnpm test tests/unit/stages/stage5/
+pnpm --filter @megacampus/course-gen-platform exec vitest run \
+  --config vitest.config.unit.ts \
+  tests/unit/stages/stage5-generation
 ```
 
 ### Contract Tests
@@ -528,6 +617,6 @@ RT-006 validation failed: Maximum 5 learning objectives per lesson
 
 ---
 
-**Last Updated:** 2026-02-17
-**Version:** 2.0.0
+**Last Updated:** 2026-07-11
+**Version:** 2.1.0
 **Owner:** course-gen-platform team

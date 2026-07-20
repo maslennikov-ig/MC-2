@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { Stage6EvidenceScopeError } from '@/stages/stage6-lesson-content/rag/evidence-context';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -50,9 +51,40 @@ import {
   checkAndSetStage6Complete,
 } from './database-service';
 import { extractContentMarkdown } from './content-utils';
+import { loadStage6EvidenceForCourse } from '../rag/evidence-loader';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function createStage6RagFailureResult(
+  lessonId: string,
+  startTime: number,
+  errorMessage: string
+): Stage6JobResult {
+  return {
+    lessonId,
+    success: false,
+    lessonContent: null,
+    errors: [errorMessage],
+    metrics: {
+      tokensUsed: 0,
+      durationMs: Date.now() - startTime,
+      modelUsed: null,
+      selectedModel: null,
+      fallbackModel: null,
+      selectedModelTier: null,
+      selectedModelTierReason: null,
+      selectedModelPhase: null,
+      selectedModelSource: null,
+      qualityScore: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      regenerationMode: null,
+      attemptLadder: [],
+    },
+  };
 }
 
 type Stage6FailureDisposition = 'quality_review' | 'non_retryable' | 'retryable';
@@ -783,11 +815,25 @@ export async function processStage6Job(
   let ragChunks: RAGChunk[] = [];
   let ragContextId: string | null = null;
   let sourceDocuments: SourceDocument[] = [];
+  let stage6Evidence: Awaited<ReturnType<typeof loadStage6EvidenceForCourse>>;
+  try {
+    stage6Evidence = await loadStage6EvidenceForCourse({
+      courseId,
+      requestedOrganizationId: job.data.organizationId,
+      providedAnalysisResult: job.data.analysisResult,
+    });
+  } catch (error) {
+    if (!(error instanceof Stage6EvidenceScopeError)) throw error;
+    await failStage6Course(courseId, error.message);
+    return createStage6RagFailureResult(lessonSpec.lesson_id, startTime, error.message);
+  }
 
   try {
     const ragResult: LessonRAGResult = await retrieveLessonContext({
       courseId,
+      organizationId: stage6Evidence.organizationId,
       lessonSpec,
+      evidenceContext: stage6Evidence.evidenceContext,
       // Priority boost is enabled by default in retrieveLessonContext
     });
     ragChunks = ragResult.chunks;
@@ -811,34 +857,14 @@ export async function processStage6Job(
       'RAG context retrieved for lesson'
     );
   } catch (error) {
-    if (error instanceof RequiredRagUnavailableError) {
+    // Availability may be optional for courses without documents, but an evidence
+    // tenant/version/ref violation is never optional and must fail closed.
+    if (error instanceof RequiredRagUnavailableError || error instanceof Stage6EvidenceScopeError) {
       const errorMsg = error.message;
 
       await failStage6Course(courseId, errorMsg);
 
-      return {
-        lessonId: lessonSpec.lesson_id,
-        success: false,
-        lessonContent: null,
-        errors: [errorMsg],
-        metrics: {
-          tokensUsed: 0,
-          durationMs: Date.now() - startTime,
-          modelUsed: null,
-          selectedModel: null,
-          fallbackModel: null,
-          selectedModelTier: null,
-          selectedModelTierReason: null,
-          selectedModelPhase: null,
-          selectedModelSource: null,
-          qualityScore: 0,
-          regenerateCount: 0,
-          truncationCount: 0,
-          rejectedTokens: 0,
-          regenerationMode: null,
-          attemptLadder: [],
-        },
-      };
+      return createStage6RagFailureResult(lessonSpec.lesson_id, startTime, errorMsg);
     }
 
     logger.warn(

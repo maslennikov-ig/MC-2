@@ -74,10 +74,18 @@ RUN pnpm --filter @megacampus/course-gen-platform build
 # Prune dev dependencies
 RUN pnpm --filter @megacampus/course-gen-platform --prod deploy pruned
 
-# Stage 4: Production image
-FROM node:${NODE_VERSION}-bookworm-slim AS runner
+# Stage 4: Auditable production runtime tools
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime-tools
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init curl ca-certificates util-linux && \
+    flock --version && \
+    rm -rf /var/lib/apt/lists/*
+
+# Stage 5: Production image
+FROM runtime-tools AS runner
 
 # Metadata labels
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
@@ -89,11 +97,8 @@ LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.title="MegaCampus API Server"
 LABEL org.opencontainers.image.description="Express + tRPC API server for MegaCampusAI platform"
 
-# Install tsx for ESM module resolution and runtime tools
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends dumb-init curl ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    npm install -g tsx
+# Install the exact source-runner used by the separately published operator target.
+RUN npm install -g tsx@4.21.0
 
 # Create non-root user
 RUN groupadd --system --gid 1001 nodejs && \
@@ -156,3 +161,41 @@ ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 # Start application using tsx for proper ESM module resolution
 # Can be overridden for worker: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
 CMD ["tsx", "dist/server/index.js"]
+
+# Stage 6: On-demand Qdrant operator image. CI publishes this target under a
+# release-SHA tag; Compose never starts it without the explicit operator profile.
+FROM runner AS qdrant-operator
+
+USER root
+
+LABEL org.opencontainers.image.title="MegaCampus Qdrant Operator"
+LABEL org.opencontainers.image.description="Non-root Qdrant bootstrap, reindex, and recovery tools"
+
+# The production runner already carries pruned runtime dependencies, compiled
+# workers, shared packages, and the exact tsx binary. Operator CLIs remain source
+# entrypoints so their accepted package commands and direct-execution guards are
+# reused without a second implementation.
+COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src ./src
+COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tools ./tools
+COPY packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh /opt/megacampus/qdrant-operator-entrypoint.sh
+
+RUN install -d -o nodejs -g nodejs -m 0555 /run/source-recovery && \
+    install -d -o nodejs -g nodejs -m 0555 /var/lib/megacampus-source-recovery && \
+    chmod 0555 /opt/megacampus/qdrant-operator-entrypoint.sh && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh self-check && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh bootstrap --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh verify --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh reindex --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh source-recovery --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh snapshot --help >/dev/null && \
+    /opt/megacampus/qdrant-operator-entrypoint.sh restore-drill --help >/dev/null
+
+ENV QDRANT_URL=http://qdrant:6333
+ENV QDRANT_COLLECTION_NAME=course_embeddings
+ENV QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
+ENV DOCLING_UPLOADS_BASE_PATH=/opt/megacampus/data
+
+HEALTHCHECK NONE
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/opt/megacampus/qdrant-operator-entrypoint.sh"]
+CMD ["--help"]

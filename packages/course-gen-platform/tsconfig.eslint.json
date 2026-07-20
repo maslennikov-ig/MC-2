@@ -4,6 +4,13 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["src/**/*", "tests/**/*", "scripts/**/*.ts", "vitest.config.integration-ci.ts"],
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "scripts/**/*.ts",
+    "experiments/**/*.ts",
+    "tools/**/*.ts",
+    "vitest.config.integration-ci.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

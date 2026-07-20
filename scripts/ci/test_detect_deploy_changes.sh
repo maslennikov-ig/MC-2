@@ -61,6 +61,8 @@ assert_value "$web_only" should_build_docker true
 assert_value "$web_only" web_changed true
 assert_value "$web_only" api_changed false
 assert_contains "$web_only" '"image":"web"'
+assert_contains "$web_only" '"image":"qdrant-operator"'
+assert_contains "$web_only" '"target":"qdrant-operator"'
 
 api_only="$(run_case "api-only" packages/course-gen-platform/src/server/index.ts)"
 assert_value "$api_only" should_deploy true
@@ -68,6 +70,7 @@ assert_value "$api_only" should_build_docker true
 assert_value "$api_only" web_changed false
 assert_value "$api_only" api_changed true
 assert_contains "$api_only" '"image":"api"'
+assert_contains "$api_only" '"image":"qdrant-operator"'
 
 shared_types="$(run_case "shared-types" packages/shared-types/src/career-playbook.ts)"
 assert_value "$shared_types" should_deploy true
@@ -84,25 +87,32 @@ assert_value "$bridge_only" web_changed false
 assert_value "$bridge_only" api_changed false
 assert_value "$bridge_only" bridge_changed true
 assert_contains "$bridge_only" '"image":"notebooklm-bridge"'
+assert_contains "$bridge_only" '"image":"qdrant-operator"'
 
 deploy_config="$(run_case "deploy-config" deploy/nginx/megacampus.conf.template)"
 assert_value "$deploy_config" should_deploy true
-assert_value "$deploy_config" should_build_docker false
+assert_value "$deploy_config" should_build_docker true
 assert_value "$deploy_config" deploy_config_changed true
-assert_value "$deploy_config" docker_matrix '{"include":[]}'
+assert_contains "$deploy_config" '"image":"qdrant-operator"'
+
+qdrant_ops="$(run_case "qdrant-ops" ops/qdrant/prometheus/prometheus.yml)"
+assert_value "$qdrant_ops" should_deploy true
+assert_value "$qdrant_ops" should_build_docker true
+assert_value "$qdrant_ops" deploy_config_changed true
+assert_contains "$qdrant_ops" '"image":"qdrant-operator"'
 
 deploy_script="$(run_case "deploy-script" scripts/deploy_blue_green.sh scripts/deploy_dev.sh)"
 assert_value "$deploy_script" should_deploy true
-assert_value "$deploy_script" should_build_docker false
+assert_value "$deploy_script" should_build_docker true
 assert_value "$deploy_script" deploy_config_changed true
 assert_value "$deploy_script" api_changed false
-assert_value "$deploy_script" docker_matrix '{"include":[]}'
+assert_contains "$deploy_script" '"image":"qdrant-operator"'
 
 ci_only="$(run_case "ci-only" .github/workflows/ci-cd.yml scripts/ci/detect_deploy_changes.sh)"
 assert_value "$ci_only" should_deploy true
-assert_value "$ci_only" should_build_docker false
+assert_value "$ci_only" should_build_docker true
 assert_value "$ci_only" deploy_config_changed true
-assert_value "$ci_only" docker_matrix '{"include":[]}'
+assert_contains "$ci_only" '"image":"qdrant-operator"'
 
 root_deps="$(run_case "root-deps" package.json pnpm-lock.yaml)"
 assert_value "$root_deps" should_deploy true

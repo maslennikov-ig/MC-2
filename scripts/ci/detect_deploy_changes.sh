@@ -8,6 +8,7 @@ api_changed=false
 bridge_changed=false
 deploy_config_changed=false
 runtime_changed=false
+operator_changed=false
 
 changed_files=()
 
@@ -22,11 +23,13 @@ add_matrix_entry() {
   local image="$1"
   local dockerfile="$2"
   local context="$3"
-  local escaped_image escaped_dockerfile escaped_context
+  local target="${4:-}"
+  local escaped_image escaped_dockerfile escaped_context escaped_target
   escaped_image="$(json_escape "$image")"
   escaped_dockerfile="$(json_escape "$dockerfile")"
   escaped_context="$(json_escape "$context")"
-  matrix_entries+=("{\"image\":\"$escaped_image\",\"dockerfile\":\"$escaped_dockerfile\",\"context\":\"$escaped_context\"}")
+  escaped_target="$(json_escape "$target")"
+  matrix_entries+=("{\"image\":\"$escaped_image\",\"dockerfile\":\"$escaped_dockerfile\",\"context\":\"$escaped_context\",\"target\":\"$escaped_target\"}")
 }
 
 read_changed_files() {
@@ -81,7 +84,7 @@ classify_path() {
   fi
 
   case "$path" in
-    docker-compose*.yml|nginx-docling-proxy.conf|deploy/*|scripts/deploy*.sh|scripts/rollback_blue_green.sh)
+    docker-compose*.yml|nginx-docling-proxy.conf|deploy/*|ops/qdrant/*|scripts/deploy*.sh|scripts/rollback_blue_green.sh)
       deploy_config_changed=true
       return
       ;;
@@ -175,25 +178,29 @@ for path in "${changed_files[@]}"; do
   classify_path "$path"
 done
 
-should_build_docker=false
-if [ "$web_changed" = true ] || [ "$api_changed" = true ] || [ "$bridge_changed" = true ]; then
-  should_build_docker=true
-fi
-
 should_deploy=false
 if [ "$runtime_changed" = true ] || [ "$deploy_config_changed" = true ]; then
   should_deploy=true
+  operator_changed=true
+fi
+
+should_build_docker=false
+if [ "$web_changed" = true ] || [ "$api_changed" = true ] || [ "$bridge_changed" = true ] || [ "$operator_changed" = true ]; then
+  should_build_docker=true
 fi
 
 matrix_entries=()
 if [ "$web_changed" = true ]; then
-  add_matrix_entry "web" "./packages/web/Dockerfile" "."
+  add_matrix_entry "web" "./packages/web/Dockerfile" "." ""
 fi
 if [ "$api_changed" = true ]; then
-  add_matrix_entry "api" "./packages/course-gen-platform/Dockerfile" "."
+  add_matrix_entry "api" "./packages/course-gen-platform/Dockerfile" "." "runner"
 fi
 if [ "$bridge_changed" = true ]; then
-  add_matrix_entry "notebooklm-bridge" "./packages/course-gen-platform/docker/notebooklm-bridge/Dockerfile" "./packages/course-gen-platform/docker/notebooklm-bridge"
+  add_matrix_entry "notebooklm-bridge" "./packages/course-gen-platform/docker/notebooklm-bridge/Dockerfile" "./packages/course-gen-platform/docker/notebooklm-bridge" ""
+fi
+if [ "$operator_changed" = true ]; then
+  add_matrix_entry "qdrant-operator" "./packages/course-gen-platform/Dockerfile" "." "qdrant-operator"
 fi
 
 docker_matrix='{"include":[]}'
