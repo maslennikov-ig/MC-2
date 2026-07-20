@@ -83,22 +83,24 @@ describe('Q12 W3-struct: source-snapshot seam reachable by the window executor',
     expect(child.stdout).toContain('W3_STRUCT_OK');
   });
 
-  // FAIL-CLOSED: a coordinator that exports a non-snapshot-shaped id must refuse (the window executor
-  // never binds pg.backup to a malformed <exported-id>), and the held coordinator is released so the
-  // refusal never leaks an open source session.
-  it('fails closed on a malformed exported snapshot id and still releases the coordinator', () => {
+  // FAIL-CLOSED: open_snapshot itself refuses a malformed/dead exported id (reaping the session
+  // first — see the real open_snapshot), so open_window_snapshot propagates that refusal and never
+  // returns a bad <exported-id> nor leaks an open source session. Modelled with open_snapshot RAISING
+  // exactly as the real one does on an invalid id.
+  it('propagates open_snapshot fail-closed on a malformed exported id (no coordinator leak)', () => {
     const probe = [
       'import importlib.util, sys, pathlib, tempfile',
       's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
       'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
-      'calls={"close":0}',
-      'sentinel=object()',
+      'calls={"baseline":0, "open":0, "close":0}',
       'def fake_open(self, request, workdir):',
-      ' return sentinel, "not-a-valid-snapshot"',
+      ' calls["open"]+=1',
+      // the real open_snapshot reaps proc then raises; a fake that returns a bad id would be caught
+      ' raise m.LifecycleError("snapshot coordinator exported an invalid snapshot id")',
       'def fake_close(self, proc):',
-      ' assert proc is sentinel, proc',
       ' calls["close"]+=1',
       'def fake_baseline(self, request, workdir, run_root):',
+      ' calls["baseline"]+=1',
       ' p=pathlib.Path(run_root)/"baseline.json"',
       ' m.immutable_publish(p, m.complete_object({"baseline":{"probe":"v"}}), 0o400, [])',
       ' return p',
@@ -111,7 +113,8 @@ describe('Q12 W3-struct: source-snapshot seam reachable by the window executor',
       'refused=False',
       'try:\n ex.open_window_snapshot(request, root)\nexcept m.LifecycleError:\n refused=True',
       'assert refused, "malformed snapshot id was not refused"',
-      'assert calls["close"]==1, calls',
+      // baseline was attempted first, open refused, and no bad coordinator was handed back to close
+      'assert calls=={"baseline":1,"open":1,"close":0}, calls',
       'print("W3_FAILCLOSED_OK")',
     ].join('\n');
     const child = spawnSync('/usr/bin/python3', ['-c', probe, CORE], {
@@ -175,6 +178,7 @@ describe.runIf(REAL_PG17)('Q12 W3-struct against disposable PostgreSQL 17.10', (
       baseline_cron_active: number;
       baseline_cron_count: number;
       intermediate_removed: boolean;
+      no_libpq_at_rest_in_run_root: boolean;
       released: boolean;
     };
     // OQ5: a real pg_export_snapshot() id, snapshot-shaped, and still HELD (session open) for pg.backup.
@@ -186,6 +190,8 @@ describe.runIf(REAL_PG17)('Q12 W3-struct against disposable PostgreSQL 17.10', (
     expect(out.baseline_cron_count).toBe(8);
     expect(out.baseline_cron_active).toBe(8);
     expect(out.intermediate_removed).toBe(true);
+    // P2c: no source-connection (libpq) file is left at rest in the durable run_root.
+    expect(out.no_libpq_at_rest_in_run_root).toBe(true);
     // The held coordinator releases cleanly when the caller is done with the snapshot.
     expect(out.released).toBe(true);
   }, 260_000);

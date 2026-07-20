@@ -126,4 +126,21 @@ describe('Q12 W2-consistency: staged-values run-root authority (recover determin
     expect(status).toBe(0);
     expect(stdout).toContain('W2_MISSING_OK');
   });
+
+  // FAIL-CLOSED (named): a corrupt/truncated authority file raises LifecycleError (the documented
+  // failure type), not a raw json.JSONDecodeError that a LifecycleError-catching caller would miss.
+  it('fails closed with LifecycleError on a corrupt (non-JSON) authority file', () => {
+    const { status, stdout, stderr } = run([
+      'root=pathlib.Path(tempfile.mkdtemp())',
+      'p=m.staged_values_authority_path(root, RUNID)',
+      'p.write_bytes(b"{ this is not json")',
+      'kind=None',
+      'try:\n m.load_staged_values(root, RUNID, QM, RRID)\nexcept m.LifecycleError:\n kind="lifecycle"\nexcept Exception as e:\n kind=type(e).__name__',
+      'assert kind=="lifecycle", kind',
+      'print("W2_CORRUPT_OK")',
+    ]);
+    expect(stderr).toBe('');
+    expect(status).toBe(0);
+    expect(stdout).toContain('W2_CORRUPT_OK');
+  });
 });

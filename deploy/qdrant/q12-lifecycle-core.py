@@ -874,7 +874,10 @@ def load_staged_values(
     path = staged_values_authority_path(run_root, run_id)
     if not path.exists():
         raise LifecycleError("staged-values authority missing for production recover")
-    stored = json.loads(path.read_bytes())
+    try:
+        stored = json.loads(path.read_bytes())
+    except (json.JSONDecodeError, ValueError) as error:
+        raise LifecycleError("staged-values authority is not valid JSON") from error
     if not isinstance(stored, dict):
         raise LifecycleError("staged-values authority is not an object")
     resolver = StagedValueResolver(quiesce_manifest_path, recovery_run_id)
@@ -1054,10 +1057,16 @@ class SourceSnapshotSeam:
                 raise LifecycleError("snapshot coordinator did not export a snapshot within the timeout")
             snapshot = proc.stdout.readline().strip()
         except (BrokenPipeError, OSError) as error:
+            # Never leak the source session on failure: reap the coordinator before failing closed.
+            proc.kill()
+            proc.wait()
             raise LifecycleError("snapshot coordinator died before exporting a snapshot") from error
         if self._cfg.fault == "snapshot":
             snapshot = "not-a-valid-snapshot"
         if proc.poll() is not None or not PLAN_SNAPSHOT_RE.fullmatch(snapshot):
+            # A malformed/dead coordinator must not leave an open exporting session behind.
+            proc.kill()
+            proc.wait()
             raise LifecycleError("snapshot coordinator exported an invalid snapshot id")
         return proc, snapshot
 
@@ -1328,15 +1337,27 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
         session is open; backup-supabase.sh expects a LIVE id). Returns
         ``(exported_id, baseline_path, coordinator)``. The caller MUST release the held coordinator
-        via ``close_window_snapshot`` once pg.backup has consumed the snapshot. Fail-closed on a
-        malformed exported id, without leaking the open source session. The live psql/tsx legs are
-        MC2_Q12_REAL_PG17-gated; the structural wiring is unit-testable with the seam faked."""
+        via ``close_window_snapshot`` once pg.backup has consumed the snapshot. ``open_snapshot``
+        itself fails closed on a malformed/dead exported id (reaping the session first), so a refused
+        open never leaks a source transaction. The live psql/tsx legs are MC2_Q12_REAL_PG17-gated;
+        the structural wiring is unit-testable with the seam faked.
+
+        The source-password libpq service file is written into an EPHEMERAL workdir (not the durable
+        run_root): it only needs to exist while produce_baseline's tsx child and the coordinator psql
+        connect, so it never persists at rest next to baseline.json / staged-values."""
+        import shutil
+        import tempfile
+
         run_root = pathlib.Path(run_root)
-        baseline_path = self._snapshot_seam.produce_baseline(request, run_root, run_root)
-        coordinator, exported_id = self._snapshot_seam.open_snapshot(request, run_root)
-        if not PLAN_SNAPSHOT_RE.fullmatch(exported_id):
-            self._snapshot_seam.close_snapshot(coordinator)
-            raise LifecycleError("window snapshot coordinator exported an invalid snapshot id")
+        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-src-"))
+        try:
+            baseline_path = self._snapshot_seam.produce_baseline(request, workdir, run_root)
+            coordinator, exported_id = self._snapshot_seam.open_snapshot(request, workdir)
+        finally:
+            # Both children have connected (libpq read the service file at connect); drop the
+            # cleartext-password file and clear the cache so it never lives at rest in run_root.
+            shutil.rmtree(workdir, ignore_errors=True)
+            self._source_service = None
         return exported_id, baseline_path, coordinator
 
     def close_window_snapshot(self, coordinator: subprocess.Popen[str] | None) -> None:
@@ -4401,66 +4422,69 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     values, exported_id, snapshot_coordinator = resolve_window_values(
         request, executor, engine.run_root, str(quiesce_path)
     )
-    if request.get("production") is True:
-        # D3: persist the snapshot-stage staged values so a recover re-drive recomputes byte-identical
-        # ordinary command_sha256. The later staged authorities (<immutable-generation>, recovery +
-        # coverage) are persisted as their lifecycle callbacks fire during the real window drive (W5).
-        persist_staged_values(engine.run_root, request["run_id"], values)
-    run_id = str(uuid.UUID(request["run_id"]))
-    chains = request.get("chains") or {}
-
-    def d5(operation: str) -> None:
-        command = resolved_command(manifest, COMMANDS[operation], request)
-        chain = chains.get(operation) or default_joined_chain(operation)
-        engine.retained_chain(operation, chain, command, from_current_head=True)
-
-    def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
-        return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
-
-    # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
-    # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
-    # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
-    # crash/restart boundaries run_recover resumes from (§6b.2):
-    #   "writers.quiesce.pre"      -> stop after group 2 (barrier.install), BEFORE writers.quiesce
-    #   "barrier.verify-after-base"-> stop after group 7's verify-after-base barrier (R8-I-B)
-    #   "deploy.prepare"           -> stop at the C7 planned-exit head (deploy.prepare/completed)
-    #   "final-writer-manifest"    -> stop after the group-14 FWM accepted row (crash-after-FWM)
-    #   "barrier.activate"         -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
-    stop_after = request.get("stop_after")
-    if stop_after is not None and stop_after not in _STOP_AFTER_STEP:
-        raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
-
-    # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
-    # digest is the request-global initial value, so the stable-binding walk's first/last pin
-    # holds against a real controller-owned artifact (never the operator-supplied constant of
-    # the 5-invocation window).
-    engine.current_quiesce_manifest_sha256 = ZERO
-    resource_manifest_paths = {
-        stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
-        for stage in ("genesis", "snapshot", "targets")
-    }
-    genesis_digest = write_live_resource_manifest(engine, "genesis")
-    request["resource_manifest_sha256"] = genesis_digest
-    engine.current_resource_manifest_sha256 = genesis_digest
-
-    # OQ4 targets identities: the five captured target identities are real deploy.prepare
-    # evidence in production; seeded here (excluded VALUE-only from parity) so the artifact is
-    # recomputable and the step topology is provable.
-    target_identities = tuple(
-        sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
-    )
-
-    # Caller-declared cutover-window marker (design note §57): written BEFORE the group-3
-    # writers.quiesce command so the W-side run_quiesce/resume-forward gate opens the cutover
-    # window. Out-of-band side artifact, never a journal row (parity-neutral).
-    marker_path = write_quiesce_window_marker(engine)
-
-    # Section 5 forward chronology groups 1-16 + the group-14 FWM + durable reload + output
-    # augmentation + RULING R8-A journaled post-activate cleanup segment, all through the ONE
-    # resumable driver run_recover also uses (§6b.2). resume_from=None => drive from group 1.
     # W2: in production the held W3 snapshot coordinator is released once the window drive returns
-    # (pg.backup has consumed the snapshot by then); fixture mode has no coordinator to release.
+    # (pg.backup has consumed the snapshot by then); the finally guards EVERY path from acquisition
+    # onward (persist, setup, drive, exceptions, stop_after early-return) so the exporting source
+    # session never leaks. Fixture mode has no coordinator to release.
     try:
+        if request.get("production") is True:
+            # D3: persist the snapshot-stage staged values so a recover re-drive recomputes
+            # byte-identical ordinary command_sha256. The later staged authorities
+            # (<immutable-generation>, recovery + coverage) are persisted as their lifecycle
+            # callbacks fire during the real window drive (W5).
+            persist_staged_values(engine.run_root, request["run_id"], values)
+        run_id = str(uuid.UUID(request["run_id"]))
+        chains = request.get("chains") or {}
+
+        def d5(operation: str) -> None:
+            command = resolved_command(manifest, COMMANDS[operation], request)
+            chain = chains.get(operation) or default_joined_chain(operation)
+            engine.retained_chain(operation, chain, command, from_current_head=True)
+
+        def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
+            return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
+
+        # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
+        # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
+        # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
+        # crash/restart boundaries run_recover resumes from (§6b.2):
+        #   "writers.quiesce.pre"      -> stop after group 2 (barrier.install), BEFORE writers.quiesce
+        #   "barrier.verify-after-base"-> stop after group 7's verify-after-base barrier (R8-I-B)
+        #   "deploy.prepare"           -> stop at the C7 planned-exit head (deploy.prepare/completed)
+        #   "final-writer-manifest"    -> stop after the group-14 FWM accepted row (crash-after-FWM)
+        #   "barrier.activate"         -> stop after group 16 (barrier.activate), BEFORE cleanup (R8-I-B)
+        stop_after = request.get("stop_after")
+        if stop_after is not None and stop_after not in _STOP_AFTER_STEP:
+            raise LifecycleError(f"unknown live stop_after checkpoint: {stop_after}")
+
+        # OQ4 genesis: the empty-accepted resource manifest, fsynced before the first row. Its
+        # digest is the request-global initial value, so the stable-binding walk's first/last pin
+        # holds against a real controller-owned artifact (never the operator-supplied constant of
+        # the 5-invocation window).
+        engine.current_quiesce_manifest_sha256 = ZERO
+        resource_manifest_paths = {
+            stage: str(engine.run_root / f"resource-manifest-{stage}-{request['run_id']}.json")
+            for stage in ("genesis", "snapshot", "targets")
+        }
+        genesis_digest = write_live_resource_manifest(engine, "genesis")
+        request["resource_manifest_sha256"] = genesis_digest
+        engine.current_resource_manifest_sha256 = genesis_digest
+
+        # OQ4 targets identities: the five captured target identities are real deploy.prepare
+        # evidence in production; seeded here (excluded VALUE-only from parity) so the artifact is
+        # recomputable and the step topology is provable.
+        target_identities = tuple(
+            sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
+        )
+
+        # Caller-declared cutover-window marker (design note §57): written BEFORE the group-3
+        # writers.quiesce command so the W-side run_quiesce/resume-forward gate opens the cutover
+        # window. Out-of-band side artifact, never a journal row (parity-neutral).
+        marker_path = write_quiesce_window_marker(engine)
+
+        # Section 5 forward chronology groups 1-16 + the group-14 FWM + durable reload + output
+        # augmentation + RULING R8-A journaled post-activate cleanup segment, all through the ONE
+        # resumable driver run_recover also uses (§6b.2). resume_from=None => drive from group 1.
         return drive_forward_sequence(
             engine,
             request,
@@ -4547,9 +4571,12 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     if request.get("production") is True:
         # W2/D3: recover reloads the persisted staged values — the real <exported-id> and the other
         # staged authorities cannot be re-opened — so the resumed journal recomputes byte-identical
-        # ordinary command_sha256. Fail closed if the authority is absent.
+        # ordinary command_sha256. Fail closed (named) if the recovery id or the authority is absent.
+        recovery_run_id = request.get("recovery_run_id")
+        if not recovery_run_id:
+            raise LifecycleError("production recover requires an accepted request['recovery_run_id']")
         values = load_staged_values(
-            engine.run_root, request["run_id"], str(quiesce_path), request["recovery_run_id"]
+            engine.run_root, request["run_id"], str(quiesce_path), recovery_run_id
         )
     else:
         values = derive_joined_fixture_values(request["run_id"], str(quiesce_path))

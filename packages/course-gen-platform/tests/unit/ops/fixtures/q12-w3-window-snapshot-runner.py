@@ -114,6 +114,8 @@ def main() -> int:
             "baseline_cron_active": sum(1 for j in baseline_obj.get("cron_jobs", []) if j.get("active")),
             "baseline_cron_count": len(baseline_obj.get("cron_jobs", [])),
             "intermediate_removed": not (run_root / "source-manifest-baseline.json").exists(),
+            # P2c: the source-connection libpq file must never persist at rest in the durable run_root.
+            "no_libpq_at_rest_in_run_root": not any(run_root.glob("libpq*")),
         }
         # Release the held coordinator (COMMIT + close); it must exit cleanly.
         executor.close_window_snapshot(coordinator)
