@@ -136,6 +136,46 @@ STOP-point model + rehearsal + runbook), then W7 opens the window on an explicit
 owner go. The historical Phase-A/B and pre-open context below remains accurate;
 its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
 
+### PROGRESS (2026-07-20) — W0 + W1 delivered; W2/W3/W4 coupling found
+
+- **W0** (rehydrate/baseline) DONE: the §2 gap re-confirmed with fresh evidence
+  at HEAD `aeb9cb14a` (main() wires bare `ProductionExecutor()`; no
+  `execute_forward_resume`; fixture-derived substitution; no CLI `--stop-after`;
+  OQ1 resolved; OQ5/OQ6 open). Baseline matrix GREEN: focused Q12 suite 646
+  passed / 72 skipped; type-check clean; frozen manifest sha `aaec6fc2` intact.
+- **W1** (`mc2-yz3xe`) DONE, committed **`636e96346`**, pushed. Added
+  `OwnerCustodyExecutor(ProductionExecutor).execute_forward_resume` (full
+  fail-closed twin of `q12-writer-resume.py:1088-1134` incl. the probe/residue
+  nested projection, then drives the frozen manifest `writers.resume.forward`
+  under the inherited FD9 lease via `_invoke_resume`, returns
+  `validated_receipt_sha256`); `owner_custody_executor()` factory; `main()`
+  live/recover now use it; post-activate context carries `release_sha`. Resolved
+  the run-id question from frozen truth: resume uses `<run-id>` (cutover), not
+  `<recovery-run-id>`. TDD (5 new tests + fixture); correctness-reviewed
+  (no P0/P1; one P2 projection gap CLOSED by strengthening the gate; one P3
+  low-risk coverage residual noted). Focused Q12 651 passed / 72 skipped;
+  type-check clean; manifest `aaec6fc2` intact.
+- **W2 acceptance-oracle decision LOCKED (owner, 2026-07-20):** real-run oracle =
+  design default — accept iff (1) each real child exits 0 AND (2) barrier receipt
+  v2 reaches `guard_cleanup_complete` (state machine intact) AND (3) coverage
+  evidence (`org:course:run`) present in the recovery journal; the fixture
+  byte-parity suite is kept green separately.
+- **MATERIAL REPLAN (dependency finding from repo truth):** the plan framed W1
+  and W2/W3 as independent streams converging at W4. Repo truth shows otherwise:
+  the controller only COMPOSES the journal and freezes each capability's argv
+  (`command_sha256`); ordinary commands EXECUTE out-of-band via the separate
+  `claim` entrypoint (`run_claim:3240-3243`), which RE-RESOLVES argv from
+  manifest+request and byte-binds `command["command_sha256"]==capability`
+  (D5J 2026-07-15 contract). Mid-window real values (`<exported-id>` from the W3
+  coordinator, `<immutable-generation>` from `pg.backup`,
+  `<accepted-recovery-manifest-sha256>`/coverage after `source.forward`) are
+  unknown at a single upfront compose. Therefore the real path is a **staged
+  compose→claim→execute→compose** loop, and **W2 (`mc2-j58wi`) + W3
+  (`mc2-58tnx`) + W4 (`mc2-dxcaa`) must be CO-DESIGNED as one staged-execution
+  effort** intersecting the D5J claim-time binding — not delivered as independent
+  slices. This needs its own focused design pass; it was NOT rushed. Window stays
+  CLOSED. Full map is on beads `mc2-j58wi` / `mc2-uha77`.
+
 ### Historical context (Phase A/B complete; pre-open R8 rehearsals)
 
 The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
