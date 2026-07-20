@@ -398,7 +398,11 @@ function stableAnswerIdempotencyKey(input: {
   actorUserId: string;
   answer: DocumentEvidenceAnswerSubmission;
 }): string {
-  const hex = createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 32).split('');
+  const hex = createHash('sha256')
+    .update(JSON.stringify(input))
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
   hex[12] = '8';
   hex[16] = ((Number.parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
   return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex
@@ -429,18 +433,19 @@ export async function persistDocumentEvidenceAnswersAtomic(params: {
       answer,
     }),
   }));
-  const callDocumentEvidenceAnswers = supabase.rpc as unknown as (
-    name: 'answer_document_evidence_questions_atomic',
-    args: { p_course_id: string; p_answers: typeof payload; p_actor_user_id: string }
-  ) => Promise<{ data: unknown; error: { code?: string } | null }>;
-  const { data, error } = await callDocumentEvidenceAnswers(
-    'answer_document_evidence_questions_atomic',
-    {
+  // The atomic answer RPC is not in the generated Supabase types; cast the client
+  // (not the detached method — that would drop `this`) to a locally-typed rpc overload.
+  const rpcClient = supabase as unknown as {
+    rpc(
+      name: 'answer_document_evidence_questions_atomic',
+      args: { p_course_id: string; p_answers: typeof payload; p_actor_user_id: string }
+    ): Promise<{ data: unknown; error: { code?: string } | null }>;
+  };
+  const { data, error } = await rpcClient.rpc('answer_document_evidence_questions_atomic', {
     p_course_id: params.courseId,
     p_answers: payload,
     p_actor_user_id: params.actorUserId,
-    }
-  );
+  });
   if (error) {
     logger.error(
       {
@@ -459,7 +464,7 @@ export async function persistDocumentEvidenceAnswersAtomic(params: {
           : 'Failed to submit answer',
     });
   }
-  const result = data as unknown as { answered_question_ids?: unknown };
+  const result = data as { answered_question_ids?: unknown };
   if (
     !Array.isArray(result?.answered_question_ids) ||
     result.answered_question_ids.some(value => typeof value !== 'string')

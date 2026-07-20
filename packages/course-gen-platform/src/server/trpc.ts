@@ -75,7 +75,11 @@ function verifyJWTLocally(token: string, secret: string): { sub: string; email?:
 
     if (expectedSig !== signature) return null;
 
-    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      exp?: number;
+      sub?: string;
+      email?: string;
+    };
 
     // Check expiration
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
