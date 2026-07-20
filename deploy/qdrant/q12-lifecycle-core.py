@@ -757,6 +757,202 @@ def resolved_command(
     return {"argv": argv, "env": source["env"], "command_sha256": sha256(canonical(argv))}
 
 
+class SourceConnectionConfig:
+    """Shared source-connection helpers (design §W3 / co-design D5).
+
+    The read-only source libpq/docker plumbing that both the plan executor
+    (``LivePlanExecutor``) and the deployed window executor
+    (``OwnerCustodyExecutor``) need so the OQ5 snapshot coordinator + OQ6
+    baseline producer live ONCE (``SourceSnapshotSeam``) and both executors
+    reach them. Pure helpers (no executor-specific state); the host class owns
+    the ``docker``/``source_container``/``fault``/``repo_root``/``_source_service``
+    attributes the seam reads."""
+
+    def _base_env(self) -> dict[str, str]:
+        return {
+            "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
+            "LC_ALL": "C",
+            "LANG": "C",
+        }
+
+    def _source_service_env(self, request: dict[str, Any], workdir: pathlib.Path) -> dict[str, str]:
+        """Production: a mode-0600 libpq service file so the source password never
+        appears in argv/environment values (design §7)."""
+        import urllib.parse
+
+        raw = pathlib.Path(request["db_url_file"]).read_text(encoding="utf-8").strip()
+        parsed = urllib.parse.urlparse(raw)
+        if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname or not parsed.username:
+            raise LifecycleError("plan source URI is malformed")
+        password = urllib.parse.unquote(parsed.password or "")
+        service_path = workdir / "libpq-service"
+        descriptor = os.open(service_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            lines = [
+                "[q12plan]",
+                f"host={parsed.hostname}",
+                f"port={parsed.port or 5432}",
+                f"dbname={parsed.path.lstrip('/') or 'postgres'}",
+                f"user={urllib.parse.unquote(parsed.username)}",
+                f"password={password}",
+                "sslmode=verify-full",
+                f"sslrootcert={request['ca_file']}",
+                "",
+            ]
+            os.write(descriptor, "\n".join(lines).encode("utf-8"))
+        finally:
+            os.close(descriptor)
+        return {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12plan"}
+
+
+class SourceSnapshotSeam:
+    """OQ5 snapshot coordinator + OQ6 baseline producer, isolable behind one seam.
+
+    Lifted verbatim from ``LivePlanExecutor`` so the deployed window executor
+    (``OwnerCustodyExecutor``) can reach the same real primitives on the live
+    cutover path. It reads its source connection from a ``config`` provider (the
+    composing executor) at call time, so a test that mutates ``executor.docker`` /
+    ``executor._source_service`` post-construction still drives the seam. The
+    coordinator/baseline shells are the ONLY subprocess surface; the structural
+    wiring above them (``OwnerCustodyExecutor.open_window_snapshot``) is unit-
+    testable with this seam faked, and only the live legs are MC2_Q12_REAL_PG17-gated."""
+
+    def __init__(self, config: "SourceConnectionConfig") -> None:
+        self._cfg = config
+        self._coordinator: subprocess.Popen[str] | None = None
+
+    def open_snapshot(
+        self, request: dict[str, Any], workdir: pathlib.Path
+    ) -> tuple[subprocess.Popen[str], str]:
+        """Open one REPEATABLE READ READ ONLY session on the source, export a
+        snapshot, and keep the session open so the source capture, dump, and manifest
+        all read the same instant (mirrors backup-supabase.sh:853-883). Fail closed
+        on a dead coordinator or a malformed snapshot id."""
+        if self._cfg.source_container:
+            argv = [
+                self._cfg.docker,
+                "exec",
+                "-i",
+                self._cfg.source_container,
+                "psql",
+                "-X",
+                "--no-psqlrc",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "-tAq",
+                "-v",
+                "ON_ERROR_STOP=1",
+            ]
+            env = {**self._cfg._base_env(), "MC2_Q12_PLAN_DOCKER": self._cfg.docker}
+        else:
+            if self._cfg._source_service is None:
+                self._cfg._source_service = self._cfg._source_service_env(request, workdir)
+            binary = os.environ.get("MC2_Q12_PLAN_PSQL", "/usr/lib/postgresql/17/bin/psql")
+            argv = [binary, "-X", "--no-psqlrc", "--no-password", "-tAq", "-v", "ON_ERROR_STOP=1"]
+            env = {**self._cfg._base_env(), **self._cfg._source_service}
+        proc = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True
+        )
+        self._coordinator = proc
+        try:
+            assert proc.stdin is not None and proc.stdout is not None
+            proc.stdin.write(
+                "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n"
+            )
+            proc.stdin.flush()
+            import select
+
+            # Bounded wait so a stalled source psql fails closed instead of blocking.
+            ready, _, _ = select.select([proc.stdout], [], [], 30)
+            if not ready:
+                proc.kill()
+                raise LifecycleError("snapshot coordinator did not export a snapshot within the timeout")
+            snapshot = proc.stdout.readline().strip()
+        except (BrokenPipeError, OSError) as error:
+            raise LifecycleError("snapshot coordinator died before exporting a snapshot") from error
+        if self._cfg.fault == "snapshot":
+            snapshot = "not-a-valid-snapshot"
+        if proc.poll() is not None or not PLAN_SNAPSHOT_RE.fullmatch(snapshot):
+            raise LifecycleError("snapshot coordinator exported an invalid snapshot id")
+        return proc, snapshot
+
+    def close_snapshot(self, proc: subprocess.Popen[str] | None) -> None:
+        if proc is None:
+            return
+        self._coordinator = None
+        try:
+            if proc.stdin is not None and not proc.stdin.closed:
+                proc.stdin.write("COMMIT;\n\\q\n")
+                proc.stdin.flush()
+                proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        try:
+            returncode = proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise LifecycleError("snapshot coordinator did not release the snapshot")
+        if returncode != 0:
+            raise LifecycleError("snapshot coordinator session failed")
+
+    def produce_baseline(
+        self, request: dict[str, Any], workdir: pathlib.Path, run_root: pathlib.Path
+    ) -> pathlib.Path:
+        """OQ6: publish the run-root pre-maintenance source baseline that pg.backup q12
+        mode consumes (backup-supabase.sh:918-926). It is captured by reusing
+        q12-source-manifest.ts `capture` verbatim (its own projection, which
+        validateTransition later diffs the backup-time cutover against, :1258-1352) —
+        with no --baseline it sets baseline == cutover == the capture (:1449) — through a
+        held REPEATABLE READ snapshot from the shared coordinator. It MUST run before
+        barrier.install, the maintenance edge that deactivates cron (:1513) and sets
+        read-only (:1531/:1548), so the capture records cron active + writable.
+
+        The manifest tool connects via libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION
+        SNAPSHOT, q12-source-manifest.ts:154), so the config _source_service must be the
+        source libpq env; production derives it from the source DSN, a container test injects
+        a loopback env. The exported snapshot is visible cross-session, so the coordinator may
+        use the docker-exec or the libpq path. The file is published immutably 0400."""
+        tsx = self._cfg.repo_root / "packages/course-gen-platform/node_modules/.bin/tsx"
+        if not os.access(str(tsx), os.X_OK):
+            raise LifecycleError(f"tsx runner is unavailable: {tsx}")
+        tool = self._cfg.repo_root / "deploy/postgres/q12-source-manifest.ts"
+        if self._cfg._source_service is None:
+            self._cfg._source_service = self._cfg._source_service_env(request, workdir)
+        coordinator, snapshot = self.open_snapshot(request, workdir)
+        try:
+            # The manifest tool connects to the source through its own hardcoded PostgreSQL 17
+            # client over libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION SNAPSHOT); production
+            # supplies the source DSN, a real-PG17 test a loopback service file to a published
+            # container port. The tool byte is left untouched.
+            out = run_root / "source-manifest-baseline.json"
+            completed = subprocess.run(
+                [str(tsx), str(tool), "capture", "--snapshot", snapshot, "--output", str(out)],
+                cwd=str(self._cfg.repo_root),
+                env={**self._cfg._base_env(), **self._cfg._source_service, "TMPDIR": "/tmp"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise LifecycleError(
+                    "source baseline capture failed: "
+                    + completed.stderr.decode("utf-8", "replace").strip()
+                )
+            manifest = json.loads(out.read_bytes())
+            baseline = manifest.get("baseline") if isinstance(manifest, dict) else None
+            if not isinstance(baseline, dict):
+                raise LifecycleError("source baseline capture produced no baseline object")
+            out.unlink()
+            baseline_path = run_root / "baseline.json"
+            immutable_publish(baseline_path, complete_object(baseline), 0o400, [])
+        finally:
+            self.close_snapshot(coordinator)
+        return baseline_path
+
+
 class ProductionExecutor:
     """Executes only a command already resolved from the fixed manifest."""
 
@@ -912,7 +1108,7 @@ class ProductionExecutor:
         }
 
 
-class OwnerCustodyExecutor(ProductionExecutor):
+class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
     """Design §W1 — the deployed owner-custody executor for the live cutover window.
 
     Extends ``ProductionExecutor`` (inheriting the real ``execute``/``launch_claim`` and the real
@@ -924,7 +1120,46 @@ class OwnerCustodyExecutor(ProductionExecutor):
     This is what ``main()`` wires for ``live``/``recover`` so a production run passes
     ``require_post_activate_executor`` and can actually unpause the writers after activation (a bare
     ``ProductionExecutor`` stays fail-closed there — the resume half is deliberately owner-custody).
+
+    Design §W3: it ALSO composes the ``SourceSnapshotSeam`` so the window path can open the OQ5
+    snapshot coordinator and publish the OQ6 ``baseline.json`` (``open_window_snapshot``) — the
+    capability that previously lived only on ``LivePlanExecutor``. The source connection is read
+    from the same ``MC2_Q12_PLAN_*`` seam-injection env in tests and the source DSN in production.
     """
+
+    def __init__(self) -> None:
+        self.repo_root = pathlib.Path(__file__).resolve().parents[2]
+        self.docker = os.environ.get("MC2_Q12_PLAN_DOCKER") or "/usr/bin/docker"
+        self.source_container = os.environ.get("MC2_Q12_PLAN_SOURCE_CONTAINER") or None
+        self.fault = os.environ.get("MC2_Q12_PLAN_FAULT") or None
+        self._source_service: dict[str, str] | None = None
+        self._snapshot_seam = SourceSnapshotSeam(self)
+
+    def open_window_snapshot(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> tuple[str, pathlib.Path, subprocess.Popen[str]]:
+        """OQ5+OQ6 on the live cutover window path.
+
+        Publish the pre-maintenance ``baseline.json`` (OQ6) that pg.backup q12 mode consumes, then
+        open+HOLD one snapshot coordinator whose exported ``<exported-id>`` (OQ5) stays live for the
+        caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
+        session is open; backup-supabase.sh expects a LIVE id). Returns
+        ``(exported_id, baseline_path, coordinator)``. The caller MUST release the held coordinator
+        via ``close_window_snapshot`` once pg.backup has consumed the snapshot. Fail-closed on a
+        malformed exported id, without leaking the open source session. The live psql/tsx legs are
+        MC2_Q12_REAL_PG17-gated; the structural wiring is unit-testable with the seam faked."""
+        run_root = pathlib.Path(run_root)
+        baseline_path = self._snapshot_seam.produce_baseline(request, run_root, run_root)
+        coordinator, exported_id = self._snapshot_seam.open_snapshot(request, run_root)
+        if not PLAN_SNAPSHOT_RE.fullmatch(exported_id):
+            self._snapshot_seam.close_snapshot(coordinator)
+            raise LifecycleError("window snapshot coordinator exported an invalid snapshot id")
+        return exported_id, baseline_path, coordinator
+
+    def close_window_snapshot(self, coordinator: subprocess.Popen[str] | None) -> None:
+        """Release the held window snapshot coordinator (COMMIT + close) after pg.backup consumes
+        the exported snapshot. Idempotent for ``None``; fail-closed if the session will not release."""
+        self._snapshot_seam.close_snapshot(coordinator)
 
     def execute_forward_resume(
         self, context: dict[str, Any], cleanup: dict[str, Any]
@@ -6044,7 +6279,7 @@ def _compose_predicted_payload(
     return predicted
 
 
-class LivePlanExecutor:
+class LivePlanExecutor(SourceConnectionConfig):
     """Production plan capture: read-only source snapshot + isolated restore/migrate.
 
     Orchestrates the real live-window path per design §2: capture the read-only
@@ -6109,13 +6344,9 @@ class LivePlanExecutor:
         self._isolate_password: str | None = None
         self._source_service: dict[str, str] | None = None
         self._coordinator: subprocess.Popen[str] | None = None
-
-    def _base_env(self) -> dict[str, str]:
-        return {
-            "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
-            "LC_ALL": "C",
-            "LANG": "C",
-        }
+        # Design §W3: the OQ5 coordinator + OQ6 baseline producer now live on the shared seam
+        # (also composed by OwnerCustodyExecutor for the window path). This executor delegates to it.
+        self._snapshot_seam = SourceSnapshotSeam(self)
 
     def _docker_run(
         self, args: list[str], *, input_bytes: bytes | None = None, check: bool = True
@@ -6176,35 +6407,6 @@ class LivePlanExecutor:
     ) -> list[dict[str, Any]]:
         before_identities = {(rel["schema"], rel["name"]) for rel in before}
         return [rel for rel in after if (rel["schema"], rel["name"]) not in before_identities]
-
-    def _source_service_env(self, request: dict[str, Any], workdir: pathlib.Path) -> dict[str, str]:
-        """Production: a mode-0600 libpq service file so the source password never
-        appears in argv/environment values (design §7)."""
-        import urllib.parse
-
-        raw = pathlib.Path(request["db_url_file"]).read_text(encoding="utf-8").strip()
-        parsed = urllib.parse.urlparse(raw)
-        if parsed.scheme not in ("postgres", "postgresql") or not parsed.hostname or not parsed.username:
-            raise LifecycleError("plan source URI is malformed")
-        password = urllib.parse.unquote(parsed.password or "")
-        service_path = workdir / "libpq-service"
-        descriptor = os.open(service_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        try:
-            lines = [
-                "[q12plan]",
-                f"host={parsed.hostname}",
-                f"port={parsed.port or 5432}",
-                f"dbname={parsed.path.lstrip('/') or 'postgres'}",
-                f"user={urllib.parse.unquote(parsed.username)}",
-                f"password={password}",
-                "sslmode=verify-full",
-                f"sslrootcert={request['ca_file']}",
-                "",
-            ]
-            os.write(descriptor, "\n".join(lines).encode("utf-8"))
-        finally:
-            os.close(descriptor)
-        return {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12plan"}
 
     def _write_structural_payload(
         self,
@@ -6840,133 +7042,18 @@ class LivePlanExecutor:
     def _open_snapshot_coordinator(
         self, request: dict[str, Any], workdir: pathlib.Path
     ) -> tuple[subprocess.Popen[str], str]:
-        """Open one REPEATABLE READ READ ONLY session on the source, export a
-        snapshot, and keep the session open so the source capture, dump, and manifest
-        all read the same instant (mirrors backup-supabase.sh:853-883). Fail closed
-        on a dead coordinator or a malformed snapshot id."""
-        if self.source_container:
-            argv = [
-                self.docker,
-                "exec",
-                "-i",
-                self.source_container,
-                "psql",
-                "-X",
-                "--no-psqlrc",
-                "-U",
-                "postgres",
-                "-d",
-                "postgres",
-                "-tAq",
-                "-v",
-                "ON_ERROR_STOP=1",
-            ]
-            env = {**self._base_env(), "MC2_Q12_PLAN_DOCKER": self.docker}
-        else:
-            if self._source_service is None:
-                self._source_service = self._source_service_env(request, workdir)
-            binary = os.environ.get("MC2_Q12_PLAN_PSQL", "/usr/lib/postgresql/17/bin/psql")
-            argv = [binary, "-X", "--no-psqlrc", "--no-password", "-tAq", "-v", "ON_ERROR_STOP=1"]
-            env = {**self._base_env(), **self._source_service}
-        proc = subprocess.Popen(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True
-        )
-        self._coordinator = proc
-        try:
-            assert proc.stdin is not None and proc.stdout is not None
-            proc.stdin.write(
-                "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n"
-            )
-            proc.stdin.flush()
-            import select
-
-            # Bounded wait so a stalled source psql fails closed instead of blocking.
-            ready, _, _ = select.select([proc.stdout], [], [], 30)
-            if not ready:
-                proc.kill()
-                raise LifecycleError("snapshot coordinator did not export a snapshot within the timeout")
-            snapshot = proc.stdout.readline().strip()
-        except (BrokenPipeError, OSError) as error:
-            raise LifecycleError("snapshot coordinator died before exporting a snapshot") from error
-        if self.fault == "snapshot":
-            snapshot = "not-a-valid-snapshot"
-        if proc.poll() is not None or not PLAN_SNAPSHOT_RE.fullmatch(snapshot):
-            raise LifecycleError("snapshot coordinator exported an invalid snapshot id")
-        return proc, snapshot
+        """Delegate to the shared ``SourceSnapshotSeam`` (design §W3). Kept as a thin wrapper so the
+        drill flow and existing callers/tests that reach the coordinator directly are unchanged."""
+        return self._snapshot_seam.open_snapshot(request, workdir)
 
     def _close_snapshot_coordinator(self, proc: subprocess.Popen[str] | None) -> None:
-        if proc is None:
-            return
-        self._coordinator = None
-        try:
-            if proc.stdin is not None and not proc.stdin.closed:
-                proc.stdin.write("COMMIT;\n\\q\n")
-                proc.stdin.flush()
-                proc.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass
-        try:
-            returncode = proc.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            raise LifecycleError("snapshot coordinator did not release the snapshot")
-        if returncode != 0:
-            raise LifecycleError("snapshot coordinator session failed")
+        return self._snapshot_seam.close_snapshot(proc)
 
     def produce_run_root_baseline(
         self, request: dict[str, Any], workdir: pathlib.Path, run_root: pathlib.Path
     ) -> pathlib.Path:
-        """OQ6: publish the run-root pre-maintenance source baseline that pg.backup q12
-        mode consumes (backup-supabase.sh:918-926). It is captured by reusing
-        q12-source-manifest.ts `capture` verbatim (its own projection, which
-        validateTransition later diffs the backup-time cutover against, :1258-1352) —
-        with no --baseline it sets baseline == cutover == the capture (:1449) — through a
-        held REPEATABLE READ snapshot from the shared coordinator. It MUST run before
-        barrier.install, the maintenance edge that deactivates cron (:1513) and sets
-        read-only (:1531/:1548), so the capture records cron active + writable.
-
-        The manifest tool connects via libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION
-        SNAPSHOT, q12-source-manifest.ts:154), so self._source_service must be the source
-        libpq env; production derives it from the source DSN, a container test injects a
-        loopback env. The exported snapshot is visible cross-session, so the coordinator may
-        use the docker-exec or the libpq path. The file is published immutably 0400."""
-        tsx = self.repo_root / "packages/course-gen-platform/node_modules/.bin/tsx"
-        if not os.access(str(tsx), os.X_OK):
-            raise LifecycleError(f"tsx runner is unavailable: {tsx}")
-        tool = self.repo_root / "deploy/postgres/q12-source-manifest.ts"
-        if self._source_service is None:
-            self._source_service = self._source_service_env(request, workdir)
-        coordinator, snapshot = self._open_snapshot_coordinator(request, workdir)
-        try:
-            # The manifest tool connects to the source through its own hardcoded PostgreSQL 17
-            # client over libpq (PGSERVICE/PGSERVICEFILE + SET TRANSACTION SNAPSHOT); production
-            # supplies the source DSN, a real-PG17 test a loopback service file to a published
-            # container port. The tool byte is left untouched.
-            out = run_root / "source-manifest-baseline.json"
-            completed = subprocess.run(
-                [str(tsx), str(tool), "capture", "--snapshot", snapshot, "--output", str(out)],
-                cwd=str(self.repo_root),
-                env={**self._base_env(), **self._source_service, "TMPDIR": "/tmp"},
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-            if completed.returncode != 0:
-                raise LifecycleError(
-                    "source baseline capture failed: "
-                    + completed.stderr.decode("utf-8", "replace").strip()
-                )
-            manifest = json.loads(out.read_bytes())
-            baseline = manifest.get("baseline") if isinstance(manifest, dict) else None
-            if not isinstance(baseline, dict):
-                raise LifecycleError("source baseline capture produced no baseline object")
-            out.unlink()
-            baseline_path = run_root / "baseline.json"
-            immutable_publish(baseline_path, complete_object(baseline), 0o400, [])
-        finally:
-            self._close_snapshot_coordinator(coordinator)
-        return baseline_path
+        """Delegate to the shared ``SourceSnapshotSeam`` (design §W3); OQ6 baseline producer."""
+        return self._snapshot_seam.produce_baseline(request, workdir, run_root)
 
     def _drill_flow(
         self, request: dict[str, Any], workdir: pathlib.Path, run_id: str
