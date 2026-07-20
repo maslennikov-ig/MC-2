@@ -160,7 +160,7 @@ function findNextNonEmptyLine(lines: string[], startFrom: number): number {
  * Captures optional surrounding **, (), [] and trailing separators (—–:,-).
  */
 const LO_CODE_PATTERN =
-  /\*{0,2}\[?\(?\bLO-\d+\.\d+[-.]?\d*\b\)?\]?\*{0,2}[^\S\n]*[—–:,\-]?[^\S\n]*/g;
+  /\*{0,2}\[?\(?\bLO-\d+\.\d+[-.]?\d*\b\)?\]?\*{0,2}[^\S\n]*[—–:,-]?[^\S\n]*/g;
 
 /**
  * Strip internal Learning Objective codes from generated content.

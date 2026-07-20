@@ -513,15 +513,18 @@ export function replaceEnglishStructuralHeaders(
   const headerMap = getEnToRuHeaderMap();
 
   // Step 1: Replace known English labels with Russian equivalents in headers
-  let processed = safeContent.replace(/^(#{1,6}\s+)(.+)$/gm, (match, hashes, headerText) => {
-    const trimmed = headerText.trim().toLowerCase();
-    const replacement = headerMap.get(trimmed);
-    if (replacement) {
-      replacedCount++;
-      return `${hashes}${replacement}`;
+  let processed = safeContent.replace(
+    /^(#{1,6}\s+)(.+)$/gm,
+    (match: string, hashes: string, headerText: string) => {
+      const trimmed = headerText.trim().toLowerCase();
+      const replacement = headerMap.get(trimmed);
+      if (replacement) {
+        replacedCount++;
+        return `${hashes}${replacement}`;
+      }
+      return match;
     }
-    return match;
-  });
+  );
 
   // Step 2: Remove structural LLM artifact headers entirely (e.g. "## SECTION CONCLUSION")
   processed = processed.replace(createStructuralArtifactRegex(), () => {

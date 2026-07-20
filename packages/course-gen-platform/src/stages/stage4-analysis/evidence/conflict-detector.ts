@@ -1379,7 +1379,7 @@ async function detectDocumentConflictsCore(
     if (!claim) throw new Error('Conflict mapping output violated the persisted claim allowlist');
     const propositionKey = canonicalKey(proposition.proposition_key);
     const valueKey = canonicalKey(proposition.value_key);
-    const values = byProposition.get(propositionKey) ?? new Map();
+    const values = byProposition.get(propositionKey) ?? new Map<string, ConflictMapClaim[]>();
     values.set(valueKey, [...(values.get(valueKey) ?? []), claim]);
     byProposition.set(propositionKey, values);
   }

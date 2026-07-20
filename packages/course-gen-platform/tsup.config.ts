@@ -20,6 +20,12 @@ export default defineConfig({
   target: 'node20',
   splitting: false,
   sourcemap: true,
+  // Minify the sandboxed processor bundle. It is server-side Node worker code and
+  // sourcemap stays on, so stack traces remain mapped. keepNames (set in
+  // esbuildOptions) is REQUIRED because pipeline-errors.ts sets
+  // `this.name = this.constructor.name` and BullMQ retry/cancel routing keys off
+  // error class names — minify must not mangle them.
+  minify: true,
   clean: false, // Don't clean - tsc builds other files in dist/
   dts: false, // Types not needed for runtime processor
   external: [
@@ -74,5 +80,8 @@ export default defineConfig({
     options.platform = 'node';
     // Prefer ESM entry points
     options.mainFields = ['module', 'main'];
+    // Preserve class/function names so `this.constructor.name` and name-based
+    // error routing (BullMQ UnrecoverableError/JobCancelledError) survive minify.
+    options.keepNames = true;
   },
 });

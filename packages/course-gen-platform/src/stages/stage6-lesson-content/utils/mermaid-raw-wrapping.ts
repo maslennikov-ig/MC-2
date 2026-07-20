@@ -72,7 +72,7 @@ const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
   /^participant\s+\w/im, // "participant Alice" (sequence diagrams)
   /^actor\s+\w/im, // "actor User" (sequence diagrams)
   /"[^"]+"\s*:\s*\d/, // gantt/pie data: "Label" : 42
-  /^\s+\w+[\[({|]/m, // Indented node with shape bracket: "  A[text]"
+  /^\s+\w+[[({|]/m, // Indented node with shape bracket: "  A[text]"
 ];
 
 /**
@@ -88,7 +88,7 @@ const MERMAID_CONTINUATION_PATTERNS: RegExp[] = [
   /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow
   /^\s*end\s*$/m, // "end" alone on a line remains safe as a block continuation
   /"[^"]+"\s*:\s*\d/, // pie/gantt data
-  /^\s+\w+[\[({|]/m, // Indented node with shape bracket
+  /^\s+\w+[[({|]/m, // Indented node with shape bracket
 ];
 
 // ============================================================================

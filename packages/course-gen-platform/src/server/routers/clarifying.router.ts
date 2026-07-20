@@ -367,13 +367,14 @@ export const clarifyingRouter = router({
               message: 'Document conflict answers must be a user single choice',
             });
           }
+          const documentSubjectKeyRaw = question.metadata?.subject_key;
           await persistDocumentEvidenceAnswersAtomic({
             courseId: course.id,
             actorUserId: currentUser.id,
             answers: [
               {
                 questionId,
-                subjectKey: String(question.metadata?.subject_key ?? ''),
+                subjectKey: typeof documentSubjectKeyRaw === 'string' ? documentSubjectKeyRaw : '',
                 answer,
                 answerSource: effectiveAnswerSource as 'suggested' | 'modified' | 'custom',
                 selectedSuggestionIndex,
@@ -494,20 +495,24 @@ export const clarifyingRouter = router({
           });
         }
         if (conflictCount === questionList.length) {
-          const conflictQuestionMap = new Map(questionList.map(question => [question.id, question]));
+          const conflictQuestionMap = new Map(
+            questionList.map(question => [question.id, question])
+          );
           const answerResult = await persistDocumentEvidenceAnswersAtomic({
             courseId,
             actorUserId: currentUser.id,
-            answers: submissions.map(submission => ({
-              questionId: submission.questionId,
-              subjectKey: String(
-                conflictQuestionMap.get(submission.questionId)?.metadata?.subject_key ?? ''
-              ),
-              answer: submission.answer,
-              answerSource: submission.answerSource,
-              selectedSuggestionIndex: submission.selectedSuggestionIndex,
-              expectedCurrentDecisionId: submission.expectedCurrentDecisionId,
-            })),
+            answers: submissions.map(submission => {
+              const conflictSubjectKeyRaw = conflictQuestionMap.get(submission.questionId)?.metadata
+                ?.subject_key;
+              return {
+                questionId: submission.questionId,
+                subjectKey: typeof conflictSubjectKeyRaw === 'string' ? conflictSubjectKeyRaw : '',
+                answer: submission.answer,
+                answerSource: submission.answerSource,
+                selectedSuggestionIndex: submission.selectedSuggestionIndex,
+                expectedCurrentDecisionId: submission.expectedCurrentDecisionId,
+              };
+            }),
             requestId,
           });
           const answered = new Set(answerResult.answeredQuestionIds);
