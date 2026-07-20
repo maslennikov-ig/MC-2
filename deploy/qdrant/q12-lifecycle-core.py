@@ -883,6 +883,36 @@ def load_staged_values(
     return resolver
 
 
+def accept_real_run(
+    children_exit_codes: list[int],
+    barrier_receipt: dict[str, Any],
+    recovery_journal: dict[str, Any],
+) -> None:
+    """Design §W2 D4 (LOCKED, owner steer 2026-07-20) — the real-run acceptance oracle.
+
+    A real cutover run is accepted iff ALL of:
+      (1) every real child exited 0;
+      (2) the barrier receipt v2 reached ``state == "guard_cleanup_complete"`` (state machine
+          intact — the same terminal the owner-custody resume gate validates); AND
+      (3) coverage evidence is present in the recovery journal as an ``org:course:run`` triple
+          (three non-empty ``:``-separated tokens).
+    Byte-parity does NOT gate a real run — the fixture parity suite stays the mechanics oracle,
+    checked separately. Fail closed with a distinct named reason per condition."""
+    nonzero = [code for code in children_exit_codes if code != 0]
+    if nonzero:
+        raise LifecycleError(f"real run rejected: child(ren) exited non-zero {nonzero}")
+    if not isinstance(barrier_receipt, dict) or barrier_receipt.get("state") != "guard_cleanup_complete":
+        raise LifecycleError(
+            "real run rejected: barrier receipt did not reach guard_cleanup_complete"
+        )
+    coverage = recovery_journal.get("coverage") if isinstance(recovery_journal, dict) else None
+    parts = coverage.split(":") if isinstance(coverage, str) else []
+    if len(parts) != 3 or not all(parts):
+        raise LifecycleError(
+            "real run rejected: coverage evidence (org:course:run) absent or malformed"
+        )
+
+
 def resolved_command(
     manifest: dict[str, Any],
     command_id: str,
