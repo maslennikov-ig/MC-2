@@ -1,17 +1,31 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-19 (window executability verified NOT openable; W1-W7 handoff package prepared — see CURRENT STATE below)
+Updated: 2026-07-21 (W7a inc1-4 delivered; SINGLE SOURCE OF TRUTH consolidated onto `develop`)
+
+## Single Source of Truth (2026-07-21 — owner-directed consolidation)
+
+- **`develop` is the single source of truth** for all Q12 self-hosted-qdrant work. A
+  content-containment audit (2026-07-21) verified `develop` is the superset of every
+  Q12 line: it fully contains `origin/develop`, `codex/self-hosted-qdrant-platform`
+  (the former integration branch), `codex/q12-plan-builder`, and
+  `codex/q12-w-writer-barrier`, plus the W7a increments (inc1-4) and the three
+  orchestration-infra commits (`record_stage_telemetry.py`, `run_stage_closeout.py`,
+  `orchestrator.toml` baseline v2.16) cherry-picked in from the stale plan branch.
+- **`codex/self-hosted-qdrant-platform`** is the historical feature/integration branch —
+  **fully merged into `develop`**; keep for history, do not treat as authoritative.
+- **`codex/self-hosted-qdrant-platform-plan`** is **STALE** (≈850 commits behind, does NOT
+  contain `deploy/qdrant/q12-lifecycle-core.py`). Do NOT use it as a base or target. Note:
+  some environment/session metadata mislabels the working branch as this `-plan` branch —
+  ignore that; the working branch is `develop`.
+- The other `codex/q12-*` worktree branches and their two contentless merge bubbles
+  (`q12-live-controller`) carry no unique content missing from `develop`.
+
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: `codex/self-hosted-qdrant-platform` at the Root-join
-integration head `fcd05e27` (D6 slice `8717f7ac` pushed; the .13.13 docs
-slice pushes with this update).
-It carries the full accepted correction wave: D5J `66e41cb5`, W FLIP
-`60910053`, H blue/green handoff `70bf6103`, the W activation-tuple addendum
-`3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
-credential merge `a73a3651`. The preserved W branch/worktree
-`codex/q12-w-writer-barrier` is clean and pushed at `60910053` (its two
-formerly uncommitted files are committed and integrated). The dedicated
-integration worktree remains authoritative for Q12.
+
+Historical integration carry (now all in `develop`): the accepted correction wave D5J
+`66e41cb5`, W FLIP `60910053`, H blue/green handoff `70bf6103`, the W activation-tuple
+addendum `3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
+credential merge `a73a3651`; `codex/q12-w-writer-barrier` at `60910053` is clean/pushed.
 
 ## Product Truth
 
