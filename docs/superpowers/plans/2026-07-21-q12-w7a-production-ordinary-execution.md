@@ -48,38 +48,79 @@ Add `OwnerCustodyExecutor.execute_ordinary(command, capability)` that delegates 
 - [ ] Implement minimal `execute_ordinary` = `return self.execute(command, capability)`.
 - [ ] Green; then assert the fixture composer path is still byte-identical (parity neutrality).
 
-### Increment 2 — `pg.backup` / `pg.restore` against the held snapshot
+> **Scope correction (2026-07-21, after deep investigation).** Increment 1 wired the command-agnostic
+> `execute_ordinary` seam (proven). The remaining verifiable-here gap is NOT re-running the real
+> data-movement scripts on disposable infra (that re-tests the scripts' own hardened suites and needs a
+> full synthetic Supabase catalog — `verify_restored_pgtle_packages` demands exact pgTLE
+> `0.0.6`/`0.0.5`, pg_cron 8 jobs, etc.). The real gap is that `drive_forward_sequence`
+> (`q12-lifecycle-core.py:4241`) **never invokes** the staged resolver callbacks `on_pg_backup_done`
+> (`:777`) / `on_source_forward_accepted` (`:781`) — grep confirms only their definitions exist. So a
+> production `values=StagedValueResolver` run fails closed at `pg.restore` (`<immutable-generation>`
+> unresolved). Codesign §D2/§D3/§4 (`2026-07-20-q12-w2-w3-staged-execution-codesign.md`) is the
+> authority: the callbacks read an **on-disk authority** (the generation pointer / recovery
+> `manifest.json`), the resolved value is persisted to the run-root authority for compose↔claim
+> consistency, and **all of this is unit-testable HERE with FAKE authorities** (the W1 capture-subclass
+> pattern). The real leg (real `pg_export_snapshot`, real generation dir, real recovery sha) is
+> `MC2_Q12_REAL_PG17`-gated and validated only at W5 (rehearsal) / W7 (owner-gated) — an honest
+> verifiability boundary, not a shortcut. Increments 2-4 below are re-scoped to that gap; the real
+> end-to-end leg is Increment 5 (gated) and stays owner-gated for prod.
 
-Verify the snapshot coordinator (W3) has opened the real `<exported-id>` before `pg.backup` runs (resolver `on_snapshot_open`), and `pg.backup` uses `--snapshot <exported-id>`; `pg.restore` consumes the printed `<immutable-generation>` (resolver `on_pg_backup_done`).
+### Increment 2 — production drive-loop threads `on_pg_backup_done` (verifiable here, fake authority)
 
-- [ ] Failing test: driving `pg.backup` then `pg.restore` on disposable PG17 produces a labeled restore container and a generation dir; assert values reach the resolver.
-- [ ] Implement any per-command env/cwd needed (reuse `_source_service_env`); green.
+Wire `drive_forward_sequence` so that on the **production** path, after `ordinary("pg.backup")` and
+before `pg.restore`, the generation is read from the on-disk authority and fed to
+`resolver.on_pg_backup_done(...)`, then the resolver is re-persisted (`persist_staged_values`). Fixture
+mode stays a no-op (plain-dict `values` has all placeholders upfront — byte-parity untouched). Inject a
+production-aware staged hook from `run_live`/`run_recover` (alongside `ordinary`/`d5`) so
+`drive_forward_sequence` never reaches into the resolver directly and fixture runs are unaffected.
 
-### Increment 3 — `source.forward` + `reindex.*` against disposable Qdrant
+- [ ] Failing test (`q12-production-staged-threading.test.ts` + runner): drive the production forward
+      sequence with a **fake** `OwnerCustodyExecutor` subclass whose `execute_ordinary` writes a fake
+      generation pointer; assert (a) before the hook `resolved_command(pg.restore)` raises
+      "unresolved command placeholder", (b) after the hook the resolver holds the fake
+      `<immutable-generation>` and `pg.restore` argv resolves, (c) the run-root staged-values authority
+      now contains it. Run — watch it fail (drive loop never calls the callback).
+- [ ] Implement: a `on_pg_backup_done`-invoking step in `drive_forward_sequence` (production-gated via
+      the injected hook), reading the generation authority; re-persist. Green; assert fixture parity
+      byte-identical.
 
-`source.forward` runs the `.13.4.1` recovery (`--recovery-run-id`) writing into a disposable Qdrant behind the alias; `reindex.*` run `operator-compose.sh` (needs operator profile up + `SOURCE_RECOVERY_*` env). Resolver `on_source_forward_accepted` reads `manifest.json` sha + coverage.
+### Increment 3 — production drive-loop threads `on_source_forward_accepted` (verifiable here, fake authority)
 
-- [ ] Failing test: `source.forward` populates `course_embeddings_v1` in a disposable Qdrant; coverage `org:course:run` present; then `reindex.verify` passes behind alias.
-- [ ] Implement operator-profile prerequisite handling + green.
+Same pattern after `ordinary("source.forward")`: read the recovery `manifest.json` sha + coverage
+`org:course:run` from the on-disk recovery authority, feed `resolver.on_source_forward_accepted(...)`,
+re-persist. The downstream commands that consume `<accepted-recovery-manifest-sha256>` /
+`<accepted-coverage-fingerprint>` / `<accepted-coverage-run>` then resolve.
 
-### Increment 4 — `deploy.prepare` / `deploy.commit`
+- [ ] Failing test: production drive with a fake recovery authority; assert the three placeholders are
+      unresolved before the hook and resolved after, the first downstream consumer's argv resolves, and
+      the authority round-trips. Watch it fail.
+- [ ] Implement the source.forward staged step (production-gated); green; fixture parity byte-identical.
 
-Drive `deploy_blue_green.sh --q12-mode prepare-quiesced|commit-quiesced` against a dev app color; assert the `nginx_switch_intent` marker + activation receipt contract (H `.13.12`).
+### Increment 4 — recover determinism through the staged threading (verifiable here)
 
-- [ ] Failing test: prepare then commit produce the expected markers/receipt on a dev-shaped compose; green.
+A production `recover` reconstructs the resolver from the persisted authority (`load_staged_values`,
+`:867`) and re-drives the remaining tail byte-identically. Prove the staged callbacks are re-drive-safe:
+resolve-once means a recover that re-runs a staged step must byte-match the persisted value or fail
+closed as drift.
 
-### Increment 5 — crash / `recover` idempotency
+- [ ] Failing test: persist a staged-values authority from a stopped production forward run
+      (`--stop-after deploy.prepare` shape), then `recover`; assert the reconstructed resolver yields the
+      SAME `command_sha256` for `pg.restore` (compose↔claim equality) and a drifted authority value
+      fails closed. Watch it fail (if any re-drive path re-invokes a callback without resolve-once).
+- [ ] Implement/confirm resolve-once on the re-drive path; green.
 
-For each real command define the recover re-drive semantics (skip-if-done vs safe-redo). `recover` resumes from `deploy.prepare/completed` or `writers.resume.forward/accepted`; a mid-ordinary crash must converge without double-applying non-idempotent effects.
+### Increment 5 — real leg on disposable PG17 / Qdrant (GATED — `MC2_Q12_REAL_PG17=1`) + W7 owner-gated prod
 
-- [ ] Failing test: inject a crash after `pg.restore` real exit but before journal fsync; `recover` must not re-restore destructively; green.
+The honest verifiability boundary (codesign §4): the real `pg_export_snapshot()`, the real generation
+dir from a real `pg.backup`, the real recovery-manifest sha/coverage, and the D4 end-to-end acceptance
+oracle. This needs the disposable Supabase-shaped stack (or the shared source **read-only** for a DEV
+rehearsal) and is `MC2_Q12_REAL_PG17`-gated; the prod window itself stays **owner-gated (W7, `mc2-i9h3y`)**
+holding C9. NOT closed by local unit work.
 
-### Increment 6 — full real path on disposable + DEV rehearsal
-
-Run the whole forward window `live --stop-after deploy.prepare` with the production executor against the disposable stack, then a **DEV** rehearsal (real shared source **read-only**, dev Qdrant isolated write, dev app color) — the rehearsal W5 deferred. Bound any true residual explicitly.
-
-- [ ] `MC2_Q12_REAL_PG17=1` full-window green with production executor (not the fixture wrapper).
-- [ ] DEV rehearsal evidence captured; residual (if any) recorded in `mc2-uha77`.
+- [ ] `MC2_Q12_REAL_PG17=1` rehearsal (disposable stack or DEV: shared source read-only, dev Qdrant
+      isolated write, dev app color) drives `live --stop-after deploy.prepare` with the real
+      `OwnerCustodyExecutor`; real generation + recovery authorities feed the staged callbacks end-to-end.
+- [ ] Residual (if any) recorded in `mc2-uha77`; prod C9 remains held for explicit owner "go".
 
 ## Risks / open decisions (resolve in-increment, record on the bead)
 

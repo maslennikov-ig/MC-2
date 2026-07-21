@@ -24,6 +24,9 @@ from typing import Any, Protocol
 
 ZERO = "0" * 64
 EPOCH_RE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*)$")
+# W7a: the fresh pg.backup's published generation-dir basename (backup-supabase.sh generation-<ts>-<uuid>;
+# restore-supabase-drill.sh's --generation guard). The <immutable-generation> authority must match it.
+GENERATION_DIR_NAME_RE = re.compile(r"generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}")
 OPERATIONS = (
     "install",
     "verify-after-base",
@@ -886,6 +889,29 @@ def load_staged_values(
     return resolver
 
 
+def resolve_pg_backup_generation(
+    executor: Any,
+    resolver: "StagedValueResolver",
+    request: dict[str, Any],
+    run_root: pathlib.Path,
+) -> pathlib.Path:
+    """W7a: the production drive-loop staged step AFTER pg.backup and BEFORE pg.restore (codesign §D2).
+
+    pg.restore's manifest argv consumes ``<immutable-generation>`` — the absolute generation dir the
+    fresh pg.backup published — which is only known once pg.backup has run, so with a live
+    ``StagedValueResolver`` a production forward window would otherwise fail closed at ``pg.restore``
+    ("unresolved command placeholder"). This reads that on-disk authority through the executor's
+    isolable ``read_pg_backup_generation`` seam (a fake subclass overrides it for infra-free unit
+    wiring; the real ``latest.json`` read is the MC2_Q12_REAL_PG17 / W7-gated leg), feeds
+    ``resolver.on_pg_backup_done`` (resolve-once), and re-persists the run-root staged authority so a
+    recover re-drive recomputes byte-identical ordinary ``command_sha256`` (§D3, single authority).
+    Production path only — the fixture composer's upfront ``derive_joined_fixture_values`` dict already
+    carries every placeholder, so this is never invoked there (parity-neutral)."""
+    generation = executor.read_pg_backup_generation(request, run_root)
+    resolver.on_pg_backup_done(generation)
+    return persist_staged_values(run_root, request["run_id"], resolver)
+
+
 def accept_real_run(
     children_exit_codes: list[int],
     barrier_receipt: dict[str, Any],
@@ -1342,6 +1368,24 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         never the journal / checkpoint / capability digest.
         """
         return self.execute(command, capability)
+
+    def read_pg_backup_generation(self, request: dict[str, Any], run_root: pathlib.Path) -> str:
+        """W7a real leg (MC2_Q12_REAL_PG17 / W7-gated): the ``<immutable-generation>`` authority — the
+        absolute generation dir the fresh pg.backup published, read from the backup-dir ``latest.json``
+        pointer (backup-supabase.sh:743-762). ``run_root`` is unused here (the generation lands in the
+        backup dir, not the run root) but keeps the seam signature uniform. A fake subclass overrides
+        this method for the infra-free unit wiring test; here it reads the real on-disk pointer and
+        returns the absolute generation path restore-supabase-drill.sh's ``--generation`` guard demands.
+        Fail closed on a missing/malformed pointer."""
+        del run_root
+        backup_dir = pathlib.Path(
+            os.environ.get("MC2_Q12_SUPABASE_BACKUP_DIR") or "/opt/megacampus/backups/supabase"
+        )
+        pointer = json.loads((backup_dir / "latest.json").read_bytes())
+        generation = pointer.get("generation") if isinstance(pointer, dict) else None
+        if not isinstance(generation, str) or not GENERATION_DIR_NAME_RE.fullmatch(generation):
+            raise LifecycleError("pg.backup generation pointer is malformed")
+        return str(backup_dir / generation)
 
     def open_window_snapshot(
         self, request: dict[str, Any], run_root: pathlib.Path
@@ -4254,6 +4298,7 @@ def drive_forward_sequence(
     *,
     resume_from: str | None = None,
     stop_after: str | None = None,
+    on_staged: Callable[[str], None] = lambda _step: None,
 ) -> dict[str, Any]:
     """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
 
@@ -4288,6 +4333,10 @@ def drive_forward_sequence(
         snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
         engine.current_resource_manifest_sha256 = snapshot_digest
         ordinary("pg.backup")
+        # W7a: staged threading — on the production path this reads the fresh generation authority and
+        # advances the resolver's on_pg_backup_done so the next step (pg.restore) can resolve
+        # <immutable-generation>. Fixture mode is a no-op (its upfront dict already carries it).
+        on_staged("pg.backup")
 
     def step_deploy_prepare() -> None:
         # OQ4 step 2: record the five captured target identities and step the hash AT
@@ -4460,6 +4509,14 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
             return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
 
+        def on_staged(step_id: str) -> None:
+            # W7a (codesign §D2/§D3): production-only staged threading between real data-movement steps.
+            # The fixture path keeps its verbatim upfront dict (no callbacks) — parity-neutral no-op here.
+            if request.get("production") is not True:
+                return
+            if step_id == "pg.backup":
+                resolve_pg_backup_generation(executor, values, request, engine.run_root)
+
         # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
         # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
         # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
@@ -4516,6 +4573,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             d5,
             resume_from=None,
             stop_after=stop_after,
+            on_staged=on_staged,
         )
     finally:
         if snapshot_coordinator is not None:
