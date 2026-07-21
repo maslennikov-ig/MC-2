@@ -1327,6 +1327,22 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         self._source_service: dict[str, str] | None = None
         self._snapshot_seam = SourceSnapshotSeam(self)
 
+    def execute_ordinary(
+        self, command: dict[str, Any], capability: dict[str, Any]
+    ) -> dict[str, Any]:
+        """W7a: the deployed ordinary-execution seam (append_ordinary_lifecycle hook, :2494).
+
+        Runs the fully-resolved REAL manifest argv (pg.backup / pg.restore / migration.* /
+        source.forward / reindex.* / deploy.*) exactly as the barrier claim path shells a command —
+        via the inherited ``ProductionExecutor.execute``: fail-closed on non-zero exit, ``env``/argv
+        taken verbatim from the resolved command (real staged values on the production path per
+        W2/W3). The returned RESULT_KEYS object binds
+        ``capability_sha256 == sha256(complete_object(capability))`` so the caller's ``!= digest``
+        gate (:2497) accepts it, and it is parity-neutral: written ONLY to the per-command side file,
+        never the journal / checkpoint / capability digest.
+        """
+        return self.execute(command, capability)
+
     def open_window_snapshot(
         self, request: dict[str, Any], run_root: pathlib.Path
     ) -> tuple[str, pathlib.Path, subprocess.Popen[str]]:
