@@ -912,6 +912,30 @@ def resolve_pg_backup_generation(
     return persist_staged_values(run_root, request["run_id"], resolver)
 
 
+def resolve_source_forward_acceptance(
+    executor: Any,
+    resolver: "StagedValueResolver",
+    request: dict[str, Any],
+    run_root: pathlib.Path,
+) -> pathlib.Path:
+    """W7a: the production drive-loop staged step AFTER source.forward and BEFORE reindex.plan
+    (codesign §D2/§D3). reindex.plan's manifest argv consumes ``<accepted-recovery-manifest-sha256>``,
+    ``<accepted-coverage-fingerprint>`` and ``<accepted-coverage-run>`` — the accepted source.forward
+    binding, known only once the recovery run is accepted. This reads that authority through the
+    executor's isolable ``read_source_forward_acceptance`` seam (a fake subclass overrides it for the
+    infra-free unit wiring; the real read is the W5/W7-gated leg), feeds
+    ``resolver.on_source_forward_accepted`` (resolve-once), and re-persists the run-root staged
+    authority so a recover re-drive recomputes byte-identical ordinary ``command_sha256``. Production
+    path only — parity-neutral (never called on the fixture composer path)."""
+    recovery_manifest_sha256, coverage_fingerprint, coverage_run = (
+        executor.read_source_forward_acceptance(request, run_root)
+    )
+    resolver.on_source_forward_accepted(
+        recovery_manifest_sha256, coverage_fingerprint, coverage_run
+    )
+    return persist_staged_values(run_root, request["run_id"], resolver)
+
+
 def accept_real_run(
     children_exit_codes: list[int],
     barrier_receipt: dict[str, Any],
@@ -1386,6 +1410,27 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         if not isinstance(generation, str) or not GENERATION_DIR_NAME_RE.fullmatch(generation):
             raise LifecycleError("pg.backup generation pointer is malformed")
         return str(backup_dir / generation)
+
+    def read_source_forward_acceptance(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> tuple[str, str, str]:
+        """W7a real leg (deliberately W5/W7-gated) — the source.forward acceptance authority:
+        ``(<accepted-recovery-manifest-sha256>, <accepted-coverage-fingerprint>, <accepted-coverage-run>)``.
+
+        Unlike the pg.backup generation (a simple ``latest.json`` pointer), these three are a COMPUTED
+        binding owned by the TS source-recovery acceptance authority
+        (``tools/qdrant/source-recovery-reindex-adapters.ts``: canonical manifest sha256 +
+        ``calculateAcceptedFailedCoverageFingerprint`` + the unique ``org:course:run`` scopes). That
+        authority currently VALIDATES expected values rather than EMITTING them, so producing them for
+        the controller is real in-window/PG17 work (a source-recovery acceptance emit-entrypoint). To
+        avoid duplicating the TS fingerprint logic in Python (silent drift), this base seam fails closed
+        with a named W5/W7 refusal; the structural threading is proven here via a capture-subclass fake
+        (``resolve_source_forward_acceptance`` + the on_staged wiring), and the real read lands with the
+        W5 rehearsal / W7 owner-gated window. Tracked on mc2-1sns3."""
+        del request, run_root
+        raise LifecycleError(
+            "source.forward acceptance authority not wired here (real leg gated to W5 rehearsal / W7)"
+        )
 
     def open_window_snapshot(
         self, request: dict[str, Any], run_root: pathlib.Path
@@ -4372,7 +4417,7 @@ def drive_forward_sequence(
             manifest, "migrations_applied", "migration.observability.apply", values
         ),
         "prepare-recovery": lambda: d5("prepare-recovery"),
-        "source.forward": lambda: ordinary("source.forward"),
+        "source.forward": lambda: (ordinary("source.forward"), on_staged("source.forward")),
         "reindex.plan": lambda: ordinary("reindex.plan"),
         "reindex.worker.create": lambda: ordinary("reindex.worker.create"),
         "reindex.execute": lambda: ordinary("reindex.execute"),
@@ -4516,6 +4561,8 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
                 return
             if step_id == "pg.backup":
                 resolve_pg_backup_generation(executor, values, request, engine.run_root)
+            elif step_id == "source.forward":
+                resolve_source_forward_acceptance(executor, values, request, engine.run_root)
 
         # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
         # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
