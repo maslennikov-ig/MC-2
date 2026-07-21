@@ -129,7 +129,7 @@ qdrant_dev_gate() {
     QDRANT_URL=http://qdrant-dev:6333 QDRANT_API_KEY="$admin_key" \
         $DEV_COMPOSE run --rm --no-deps -T \
         -e QDRANT_URL -e QDRANT_API_KEY \
-        --entrypoint node api-dev \
+        --entrypoint tsx api-dev \
         dist/shared/qdrant/create-collection.js --verify-only
     unset admin_key
 }

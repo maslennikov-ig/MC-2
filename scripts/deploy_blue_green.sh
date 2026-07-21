@@ -576,7 +576,7 @@ qdrant_staging_gate() {
         docker compose -f "$BASE_PATH/docker-compose.app.yml" \
         --env-file "$BASE_PATH/.env.$NEW_COLOR" run --rm --no-deps -T \
         -e QDRANT_URL -e QDRANT_API_KEY \
-        --entrypoint node api \
+        --entrypoint tsx api \
         dist/shared/qdrant/create-collection.js --verify-only
     unset admin_key
 }
