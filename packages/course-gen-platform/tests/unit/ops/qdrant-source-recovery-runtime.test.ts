@@ -5517,10 +5517,43 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer re
     );
     const lease = join(fixture.directory, 'q12-cutover.lock');
     writeFileSync(lease, '', { mode: 0o600 });
+    // The Q12 forward tail now emits the source.forward acceptance authority; stage its
+    // operator-held inputs so this lease-focused test still reaches a clean forward exit.
+    writeFileSync(
+      join(fixture.q12RunRoot, 'accepted-coverage-run'),
+      '123e4567-e89b-42d3-a456-426614174101:123e4567-e89b-42d3-a456-426614174102:123e4567-e89b-42d3-a456-426614174103\n',
+      { mode: 0o400 }
+    );
+    const leaseEnvFile = fixture.args[fixture.args.indexOf('--env-file') + 1];
+    writeFileSync(
+      leaseEnvFile,
+      [
+        'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        'SUPABASE_URL=https://synthetic-project.supabase.invalid',
+        'SUPABASE_SERVICE_KEY=synthetic-service-role-key-value',
+        '',
+      ].join('\n')
+    );
+    const leaseEmitBin = join(fixture.directory, 'bin/emit-acceptance');
+    writeFileSync(
+      leaseEmitBin,
+      `#!/usr/bin/env bash
+set -euo pipefail
+output=''
+args=("$@")
+for ((i = 0; i < \${#args[@]}; i++)); do
+  [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+done
+printf '{"schema":"megacampus.q12.source-forward-acceptance/v1"}\n' > "$output"
+chmod 0400 "$output"
+`,
+      { mode: 0o700 }
+    );
     const command = `exec {fd}<>"$1"; flock "$fd"; SOURCE_RECOVERY_TEST_FORBIDDEN_FD="$fd" Q12_EXTERNAL_QUIESCE_LEASE_FD="$fd" exec bash "$2" --external-quiesce-manifest "$3" "\${@:4}"`;
     const externalEnvironment = {
       ...fixture.env,
       SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: lease,
+      SOURCE_RECOVERY_EMIT_BIN: leaseEmitBin,
     };
     const wrongPath = join(fixture.directory, 'wrong-run-external-quiesce.json');
     writeFileSync(wrongPath, `${JSON.stringify(externalPayload)}\n`, { mode: 0o400 });
@@ -6067,3 +6100,270 @@ describe.runIf(RUN_REAL_CONTROLLER)(
     });
   }
 );
+
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 source.forward acceptance emit wiring (W7a)', () => {
+  const COVERAGE_TRIPLE = [
+    '123e4567-e89b-42d3-a456-426614174101',
+    '123e4567-e89b-42d3-a456-426614174102',
+    '123e4567-e89b-42d3-a456-426614174103',
+  ].join(':');
+  const SYNTHETIC_SUPABASE_URL = 'https://synthetic-project.supabase.invalid';
+  const SYNTHETIC_SERVICE_KEY = 'synthetic-service-role-key-value';
+
+  interface AcceptanceEmitFixture extends ComposeWriterFixture {
+    lease: string;
+    external: string;
+    emitBin: string;
+    emitLog: string;
+    envFile: string;
+    coverageRunFile: string;
+    acceptanceOutput: string;
+    manifestPath: string;
+    journalPath: string;
+    run(extraEnv?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync>;
+  }
+
+  function acceptanceEmitFixture(): AcceptanceEmitFixture {
+    const fixture = composeWriterFixture();
+    const stopped = fixture.records();
+    for (const record of stopped) {
+      record.State.Running = false;
+      record.State.Status = 'exited';
+      record.HostConfig.RestartPolicy = { Name: 'no', MaximumRetryCount: 0 };
+    }
+    writeFileSync(fixture.recordsPath, `${JSON.stringify(stopped)}\n`, { mode: 0o600 });
+    const external = fixture.quiesceManifest;
+    writeFileSync(
+      external,
+      `${JSON.stringify({
+        schema_version: 'megacampus.q12.writer-quiesce/v1',
+        run_id: Q12_RUN_ID,
+        status: 'quiesced',
+        barrier: {
+          state: 'recovery_ready_guarded',
+          zero_guard_residue: false,
+          expected_catalog_sha256: 'b'.repeat(64),
+          probe_receipt_sha256: createHash('sha256')
+            .update(readFileSync(fixture.probeReceipt))
+            .digest('hex'),
+        },
+        writers: stopped.map((record, index) => ({
+          class:
+            index === 0
+              ? 'production-api'
+              : index === 1
+                ? 'production-web'
+                : index < 5
+                  ? 'production-worker'
+                  : index === 5
+                    ? 'development-api'
+                    : index === 6
+                      ? 'development-web'
+                      : 'development-worker',
+          id: record.Id,
+          name: record.Name,
+          project: record.Config.Labels['com.docker.compose.project'],
+          service: record.Config.Labels['com.docker.compose.service'],
+          config_files: record.Config.Labels['com.docker.compose.project.config_files'],
+          working_dir: record.Config.Labels['com.docker.compose.project.working_dir'],
+          image_id: record.Image,
+          image_ref: record.Config.Image,
+          prior_running: true,
+          prior_status: 'running',
+          healthcheck_present: true,
+          prior_health_status: 'healthy',
+          prior_restart_policy: { name: 'unless-stopped', maximum_retry_count: 0 },
+          temporary_restart_policy: { name: 'no', maximum_retry_count: 0 },
+        })),
+      })}\n`,
+      { mode: 0o400 }
+    );
+    const lease = join(fixture.directory, 'q12-cutover-emit.lock');
+    writeFileSync(lease, '', { mode: 0o600 });
+    const envFile = fixture.args[fixture.args.indexOf('--env-file') + 1];
+    writeFileSync(
+      envFile,
+      [
+        'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        `SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`,
+        `SUPABASE_SERVICE_KEY=${SYNTHETIC_SERVICE_KEY}`,
+        '',
+      ].join('\n')
+    );
+    const coverageRunFile = join(fixture.q12RunRoot, 'accepted-coverage-run');
+    writeFileSync(coverageRunFile, `${COVERAGE_TRIPLE}\n`, { mode: 0o400 });
+    const emitLog = join(fixture.directory, 'emit.log');
+    const emitBin = join(fixture.directory, 'bin/emit-acceptance');
+    writeFileSync(
+      emitBin,
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n "\${SOURCE_RECOVERY_TEST_FORBIDDEN_FD:-}" ]]; then
+  [[ -z "\${Q12_EXTERNAL_QUIESCE_LEASE_FD:-}" ]]
+  [[ ! -e "/proc/self/fd/$SOURCE_RECOVERY_TEST_FORBIDDEN_FD" ]]
+fi
+printf '%s\n' "$*" >> "$EMIT_LOG"
+printf 'env SUPABASE_URL=%s\n' "\${SUPABASE_URL:-unset}" >> "$EMIT_LOG"
+printf 'env SUPABASE_SERVICE_KEY=%s\n' "\${SUPABASE_SERVICE_KEY:-unset}" >> "$EMIT_LOG"
+if [[ -n "\${SOURCE_RECOVERY_TEST_EMIT_FAIL:-}" ]]; then
+  if [[ "\${SOURCE_RECOVERY_TEST_EMIT_FAIL}" == with-output ]]; then
+    output=''
+    args=("$@")
+    for ((i = 0; i < \${#args[@]}; i++)); do
+      [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+    done
+    printf '{"schema":"partial"}\n' > "$output"
+    chmod 0400 "$output"
+  fi
+  exit 82
+fi
+output=''
+args=("$@")
+for ((i = 0; i < \${#args[@]}; i++)); do
+  [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+done
+printf '{"schema":"megacampus.q12.source-forward-acceptance/v1"}\n' > "$output"
+chmod 0400 "$output"
+`,
+      { mode: 0o700 }
+    );
+    const manifestPath = fixture.args[fixture.args.indexOf('--manifest') + 1];
+    const journalPath = join(
+      fixture.args[fixture.args.indexOf('--progress-directory') + 1],
+      'journal.json'
+    );
+    const command = `exec {fd}<>"$1"; flock "$fd"; SOURCE_RECOVERY_TEST_FORBIDDEN_FD="$fd" Q12_EXTERNAL_QUIESCE_LEASE_FD="$fd" exec bash "$2" --external-quiesce-manifest "$3" "\${@:4}"`;
+    const run = (extraEnv: NodeJS.ProcessEnv = {}): ReturnType<typeof spawnSync> =>
+      spawnSync('bash', ['-c', command, 'q12-emit', lease, WRAPPER, external, ...fixture.args], {
+        env: {
+          ...fixture.env,
+          SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: lease,
+          SOURCE_RECOVERY_EMIT_BIN: emitBin,
+          EMIT_LOG: emitLog,
+          ...extraEnv,
+        },
+        encoding: 'utf8',
+      });
+    return {
+      ...fixture,
+      lease,
+      external,
+      emitBin,
+      emitLog,
+      envFile,
+      coverageRunFile,
+      acceptanceOutput: join(fixture.q12RunRoot, 'source-forward-acceptance.json'),
+      manifestPath,
+      journalPath,
+      run,
+    };
+  }
+
+  it('emits the acceptance authority after the verified Q12 forward with exact argv and scoped env', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run();
+    expect(result.status, result.stderr).toBe(0);
+    const emitLog = readFileSync(fixture.emitLog, 'utf8');
+    const invocations = emitLog.split('\n').filter(line => line.startsWith('--manifest'));
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]).toBe(
+      [
+        '--manifest',
+        fixture.manifestPath,
+        '--journal',
+        fixture.journalPath,
+        '--recovery-run-id',
+        '123e4567-e89b-42d3-a456-426614174000',
+        '--accepted-coverage-run',
+        COVERAGE_TRIPLE,
+        '--output',
+        fixture.acceptanceOutput,
+      ].join(' ')
+    );
+    expect(emitLog).toContain(`env SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`);
+    expect(emitLog).toContain(`env SUPABASE_SERVICE_KEY=${SYNTHETIC_SERVICE_KEY}`);
+    const stat = statSync(fixture.acceptanceOutput);
+    expect(stat.mode & 0o777).toBe(0o400);
+    const composeLog = readFileSync(fixture.composeLog, 'utf8');
+    expect(composeLog).toContain('source-recovery verify-dispositions');
+  });
+
+  it('fails closed without invoking emit when the coverage-run authority is missing', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    rmSync(fixture.coverageRunFile);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/accepted coverage-run authority/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed without invoking emit on a malformed coverage-run triple', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, 'not-a-triple\n');
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/organization:course:run/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails the forward run and leaves no acceptance file when emit exits non-zero', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_EMIT_FAIL: 'with-output' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/acceptance emit failed/iu);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed without invoking emit when the production env file lacks the Supabase values', () => {
+    const fixture = acceptanceEmitFixture();
+    writeFileSync(
+      fixture.envFile,
+      [
+        'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        `SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`,
+        '',
+      ].join('\n')
+    );
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/SUPABASE_SERVICE_KEY/u);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('never invokes emit for a non-Q12 forward run', () => {
+    const fixture = wrapperFixture();
+    const emitLog = join(fixture.directory, 'emit.log');
+    const emitBin = join(fixture.directory, 'bin/emit-acceptance');
+    writeFileSync(emitBin, `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$EMIT_LOG"\n`, {
+      mode: 0o700,
+    });
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_EMIT_BIN: emitBin, EMIT_LOG: emitLog },
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(emitLog)).toBe(false);
+  });
+
+  it('keeps the emit override test-only and the production emit on the package tsx shim', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).toContain('SOURCE_RECOVERY_EMIT_BIN');
+    expect(wrapper).toMatch(
+      /\[\[ -z \$\{SOURCE_RECOVERY_WRITER_BACKEND:-\}[^\n]*\$\{SOURCE_RECOVERY_EMIT_BIN:-\}/u
+    );
+    expect(wrapper).toContain('packages/course-gen-platform/node_modules/.bin/tsx');
+    expect(wrapper).toContain(
+      'packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts'
+    );
+    const verifyDispositions = wrapper.lastIndexOf('source-recovery verify-dispositions');
+    const emitBlock = wrapper.indexOf('source-forward-acceptance.json');
+    expect(verifyDispositions).toBeGreaterThan(0);
+    expect(emitBlock).toBeGreaterThan(verifyDispositions);
+  });
+});

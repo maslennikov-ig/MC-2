@@ -106,10 +106,11 @@ if [[ $local_test == 1 ]]; then
   expected_gid="${SOURCE_RECOVERY_EXPECTED_GID:?local test GID is required}"
   controller_uid="${SOURCE_RECOVERY_CONTROLLER_UID:?local test controller UID is required}"
   controller_gid="${SOURCE_RECOVERY_CONTROLLER_GID:?local test controller GID is required}"
+  emit_bin_override="${SOURCE_RECOVERY_EMIT_BIN:-}"
   restore_verification_attempts=2
   restore_verification_delay=0
 else
-  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-} ]] ||
+  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-}${SOURCE_RECOVERY_EMIT_BIN:-} ]] ||
     fail 'test-only command, lock, and UID overrides require SOURCE_RECOVERY_LOCAL_TEST=1'
   [[ $EUID -eq 0 ]] || fail 'production source recovery must run as root'
   SYSTEMCTL_BIN='/usr/bin/systemctl'
@@ -125,11 +126,12 @@ else
   expected_gid="$NODE_GID"
   controller_uid="$CONTROLLER_UID"
   controller_gid="$CONTROLLER_GID"
+  emit_bin_override=''
   restore_verification_attempts=30
   restore_verification_delay=1
   writer_backend='compose'
 fi
-readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point quiesce_fault_point expected_uid expected_gid controller_uid controller_gid writer_backend restore_verification_attempts restore_verification_delay
+readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point quiesce_fault_point expected_uid expected_gid controller_uid controller_gid emit_bin_override writer_backend restore_verification_attempts restore_verification_delay
 
 case "$writer_backend" in
   compose) ;;
@@ -1317,3 +1319,78 @@ if [[ $resume_from != verify-dispositions ]]; then
   compose_run qdrant-source-recovery-disposition source-recovery apply-dispositions --confirm-run-id "$run_id"
 fi
 compose_run qdrant-source-recovery-disposition source-recovery verify-dispositions --confirm-run-id "$run_id"
+
+# W7a real leg: after the fully verified Q12 forward recovery, compute and publish the
+# source.forward acceptance authority (<q12-run-root>/source-forward-acceptance.json) the
+# cutover controller's read_source_forward_acceptance consumes. The frozen source.forward
+# argv carries no acceptance flags, so every input derives from existing arguments plus the
+# operator-staged run-root coverage-run authority. A non-Q12 forward has no consumer and
+# publishes nothing.
+if [[ -n $q12_run_id ]]; then
+  accepted_coverage_run_file="$q12_run_root/accepted-coverage-run"
+  require_controller_file "$accepted_coverage_run_file" 'accepted coverage-run authority'
+  uuid_v4_pattern='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+  [[ $(wc -l < "$accepted_coverage_run_file") -eq 1 ]] ||
+    fail 'accepted coverage-run authority must be a single newline-terminated organization:course:run line'
+  accepted_coverage_run="$(head -n 1 -- "$accepted_coverage_run_file")"
+  [[ $accepted_coverage_run =~ ^${uuid_v4_pattern}:${uuid_v4_pattern}:${uuid_v4_pattern}$ ]] ||
+    fail 'accepted coverage-run authority must be organization:course:run lower-case UUIDv4'
+
+  read_production_env_value() {
+    local key="$1"
+    local lines
+    lines="$(grep -E "^${key}=" -- "$env_file" || true)"
+    [[ -n $lines && $(printf '%s\n' "$lines" | wc -l) -eq 1 ]] ||
+      fail "production env file must define exactly one ${key}"
+    local value="${lines#*=}"
+    [[ -n $value ]] || fail "production env file ${key} must not be empty"
+    printf '%s' "$value"
+  }
+  supabase_url="$(read_production_env_value SUPABASE_URL)"
+  supabase_service_key="$(read_production_env_value SUPABASE_SERVICE_KEY)"
+
+  if [[ $local_test == 1 && -n $emit_bin_override ]]; then
+    emit_command=("$emit_bin_override")
+  else
+    emit_tsx="$project_directory/packages/course-gen-platform/node_modules/.bin/tsx"
+    emit_entrypoint="$project_directory/packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts"
+    [[ -x $emit_tsx && ! -L $emit_tsx ]] ||
+      fail 'source.forward acceptance emit requires the package tsx shim'
+    [[ -f $emit_entrypoint && ! -L $emit_entrypoint ]] ||
+      fail 'source.forward acceptance emit entrypoint is unavailable'
+    emit_command=("$emit_tsx" "$emit_entrypoint")
+  fi
+
+  acceptance_output="$q12_run_root/source-forward-acceptance.json"
+  rm -f -- "$acceptance_output"
+  emit_source_forward_acceptance() {
+    if [[ -n $lease_fd ]]; then
+      (
+        unset Q12_EXTERNAL_QUIESCE_LEASE_FD
+        eval "exec ${lease_fd}>&-"
+        SUPABASE_URL="$supabase_url" SUPABASE_SERVICE_KEY="$supabase_service_key" \
+          exec "${emit_command[@]}" \
+          --manifest "$manifest" --journal "$journal" \
+          --recovery-run-id "$run_id" \
+          --accepted-coverage-run "$accepted_coverage_run" \
+          --output "$acceptance_output"
+      )
+    else
+      SUPABASE_URL="$supabase_url" SUPABASE_SERVICE_KEY="$supabase_service_key" \
+        "${emit_command[@]}" \
+        --manifest "$manifest" --journal "$journal" \
+        --recovery-run-id "$run_id" \
+        --accepted-coverage-run "$accepted_coverage_run" \
+        --output "$acceptance_output"
+    fi
+  }
+  if ! emit_source_forward_acceptance; then
+    rm -f -- "$acceptance_output"
+    fail 'source.forward acceptance emit failed'
+  fi
+  chown "$controller_uid:$controller_gid" -- "$acceptance_output" 2>/dev/null ||
+    fail 'source.forward acceptance authority ownership could not be set'
+  [[ -f $acceptance_output && ! -L $acceptance_output &&
+    $(owner_group_mode "$acceptance_output") == "$controller_uid:$controller_gid:400" ]] ||
+    fail 'source.forward acceptance authority was not published owner-only 0400'
+fi
