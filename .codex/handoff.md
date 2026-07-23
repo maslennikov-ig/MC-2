@@ -448,6 +448,20 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   preconditions verified on-server 2026-07-23: `fs.protected_hardlinks=1`, `.env.production`
   exactly-one non-empty `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`, secrets present path-only,
   tsx smoke from `/opt/megacampus` reaches the CLI usage gate.
+  FRESH PRE-WINDOW `plan` IS GREEN (2026-07-23, run `fd39fc26-e516-4aef-908e-90475cc5f474`,
+  release `2832222cb…`, new controller build): status `planned`, structural catalog sha
+  `68041d94…` byte-identical to the 07-17 and 07-21 runs (determinism holds), two known
+  delta-neutral extras (test-schema default ACLs), prod containers untouched. Live-invocation
+  value: `--expected-catalog-sha256 6f3cd00fd3f017634840e3c909a6f4adce927edb8d5a5823f0547b5e5cb0b8d0`;
+  `--operator-digest sha256:0fe4265ca80eb100912f6ce8155b061712db90ace4e0b1641e63e9a1a247e199`
+  (Phase B image). HARD GAP before C1 (verified on-server 2026-07-23): the `.13.4.1`
+  source-recovery runtime state was never staged — `/var/lib/megacampus-source-recovery/`
+  (reviewed `state/manifest.json` + `plan-input.json` + `state/progress`) and
+  `/opt/megacampus/data/source-recovery-capability` do not exist, the writer-quiesce manifest
+  is not published, and `--recovery-run-id`, `--resource-manifest-sha256`, and the accepted
+  coverage `org:course:run` triple are not yet derivable from any staged artifact. Staging the
+  `.13.4.1` state is the next window-prep leg; the window itself (C1..C8 quiesces production
+  writers, C9 owner-pressed) needs a scheduled owner-present session.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
