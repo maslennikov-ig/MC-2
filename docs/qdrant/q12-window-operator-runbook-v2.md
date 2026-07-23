@@ -47,6 +47,8 @@
     `q12-lifecycle-core.py` (real-read `read_source_forward_acceptance`) and
     `source-recovery-run.sh` (acceptance emit tail), and the frozen manifest sha is re-verified
     after the re-deploy.
+11. `sysctl fs.protected_hardlinks` reports `1` on the host (kernel default; the acceptance-emit
+    publish hardening assumes hardlink protection for full root/controller isolation).
 
 ## 2. Invocation
 

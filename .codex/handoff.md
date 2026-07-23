@@ -422,8 +422,14 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   `<run_root>/accepted-coverage-run` (0400, single `org:course:run` line — window precondition,
   runbook v2 §1.8-1.10). Fail-closed: missing/malformed authority, missing Supabase env values, or
   emit failure fails the forward run and leaves no acceptance file; non-Q12 forwards and
-  rollback/resume paths are untouched; `SOURCE_RECOVERY_EMIT_BIN` is local-test-only. Runtime suite
-  162/162 (7 new), wrapper-adjacent suites green, package type-check 0.
+  rollback/resume paths are untouched; `SOURCE_RECOVERY_EMIT_BIN` is local-test-only. Independent
+  correctness review found one P1 (root TOCTOU/symlink-follow on the publish) — closed in the
+  correction wave `d640f84d2`: the emit CLI publishes with `O_CREAT|O_EXCL` + descriptor-scoped
+  `fchmod` (never truncates through or chmods a swapped path), the wrapper chowns
+  `--no-dereference`, every post-emit failure removes the leftover, and the coverage-run authority
+  is validated byte-exactly. Delta-review PASS (residual: hardlink swap requires
+  `fs.protected_hardlinks=0`; runbook §1.11 now asserts the `=1` kernel default). Runtime suite
+  164/164 (9 new), CLI writer 7/7, wrapper-adjacent suites green, package type-check 0.
   REMAINING (bounded defers, `mc2-1sns3`): (b) the real VALUES + full forward-window
   rehearsal are window-grade (need a real reviewed recovery manifest + Supabase accepted-coverage
   ledgers) → the W7 owner-gated leg; the wrapper-emit real leg (real tsx/Supabase/env on the server)
