@@ -454,14 +454,32 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   delta-neutral extras (test-schema default ACLs), prod containers untouched. Live-invocation
   value: `--expected-catalog-sha256 6f3cd00fd3f017634840e3c909a6f4adce927edb8d5a5823f0547b5e5cb0b8d0`;
   `--operator-digest sha256:0fe4265ca80eb100912f6ce8155b061712db90ace4e0b1641e63e9a1a247e199`
-  (Phase B image). HARD GAP before C1 (verified on-server 2026-07-23): the `.13.4.1`
-  source-recovery runtime state was never staged — `/var/lib/megacampus-source-recovery/`
-  (reviewed `state/manifest.json` + `plan-input.json` + `state/progress`) and
-  `/opt/megacampus/data/source-recovery-capability` do not exist, the writer-quiesce manifest
-  is not published, and `--recovery-run-id`, `--resource-manifest-sha256`, and the accepted
-  coverage `org:course:run` triple are not yet derivable from any staged artifact. Staging the
-  `.13.4.1` state is the next window-prep leg; the window itself (C1..C8 quiesces production
-  writers, C9 owner-pressed) needs a scheduled owner-present session.
+  (Phase B image). `.13.4.1` STAGING LEG (2026-07-23, second owner "go"): the reviewed
+  plan-input REGENERATOR is delivered on `develop` (`d7d9725f5`,
+  `packages/course-gen-platform/tools/qdrant/generate-source-recovery-plan-input.ts` + 11/11
+  unit tests; classification comes from the SAME `buildReindexPlan` the operator plan mode
+  re-derives, audited totals pinned fail-closed, identities redacted from every error/report
+  surface) and deployed 0444 to `/opt/megacampus` (sha `6f27f996…`, tsx smoke reaches the
+  usage gate). Directory layout IS staged on the server: `/var/lib/megacampus-source-recovery/`
+  (root 0755) + `state` + `state/progress` + `/opt/megacampus/data/source-recovery-capability`
+  (all 1001:1001 0700, empty). The live regeneration run CONFIRMED the audit truth end-to-end
+  on today's host+DB — file/copy layer classification passed the exact gate
+  (261/240/109/129/2/21, 42 copies / 125 rows, 6 eligible + 18 playbook disposition
+  candidates; 261 catalog rows and 138 root files re-verified) — and then FAILED CLOSED at the
+  disposition-predicate layer: **HARD-GATE FINDING — `career_playbook_sources` is EMPTY on the
+  live DB (0 rows; `career_playbooks` has 11)**, while the frozen `.13.4.1` operator contract
+  (`verifyReviewedPriorPredicates`) requires exactly 18 live playbook-source rows matching the
+  manifest predicates. No plan-input was written (fail-closed before write). Consequence: the
+  in-window C5 `source.forward` would abort at plan time against today's DB; the 18
+  `retained-derived-only` dispositions have no live CAS target (rows either never existed —
+  the `.13.4.1` workflow stream bound to migrations/types, not live rows — or were removed by
+  the Career Playbook constructor-track cleanup). OWNER DECISION REQUIRED before staging can
+  complete: amend the disposition contract for the 18 non-eligible rows (file_catalog-only
+  bookkeeping; needs TDD + re-review of `source-recovery.ts`/manifest semantics) vs re-verify
+  intent of the deleted rows first. The writer-quiesce manifest publication and the accepted
+  coverage `org:course:run` triple remain the other pre-window staging items; the window
+  itself (C1..C8 quiesces production writers, C9 owner-pressed) still needs a scheduled
+  owner-present session.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
