@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, rmSync, statSync, symlinkSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -10,7 +11,10 @@ import {
   writePlanInputOwnerOnly,
   type RecoverySourceInventoryEntry,
 } from '../../../../tools/qdrant/generate-source-recovery-plan-input';
-import { calculateRecoveryManifestSha256 } from '../../../../tools/qdrant/source-recovery-manifest';
+import {
+  calculateRecoveryManifestSha256,
+  normalizeRecoveryManifest,
+} from '../../../../tools/qdrant/source-recovery-manifest';
 import type { ReindexSourceRow } from '../../../../tools/qdrant/reindex-plan';
 import type { RecoveryPlaybookRow } from '../../../../tools/qdrant/source-recovery-database';
 
@@ -436,6 +440,26 @@ describe('.13.4.1 plan-input generator: CLI surface', () => {
         expect(statSync(output).mode & 0o777).toBe(0o600);
         const bytes = readFileSync(output, 'utf8');
         expect(bytes).toBe(`${JSON.stringify(manifest, null, 2)}\n`);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it('round-trips through the operator acceptance contract: raw bytes hash to the canonical sha', () => {
+      // Mirrors source-recovery.ts loadReviewedRecoveryState/createPlan: the operator re-parses
+      // the raw file and refuses it unless sha256(raw bytes) equals the canonical manifest sha
+      // recomputed from the parsed object. This pins the generator→operator byte contract.
+      const directory = mkdtempSync('/tmp/mc2-plan-input-writer-');
+      try {
+        const output = join(directory, 'plan-input.json');
+        const manifest = build();
+        writePlanInputOwnerOnly(output, manifest);
+        const raw = readFileSync(output, 'utf8');
+        const reparsed = JSON.parse(raw);
+        expect(createHash('sha256').update(raw).digest('hex')).toBe(
+          calculateRecoveryManifestSha256(reparsed)
+        );
+        expect(normalizeRecoveryManifest(reparsed)).toEqual(manifest);
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
