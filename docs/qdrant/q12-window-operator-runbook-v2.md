@@ -46,7 +46,15 @@
 10. The deployed `/opt/megacampus/deploy/qdrant/` tree carries the current `develop` build of BOTH
     `q12-lifecycle-core.py` (real-read `read_source_forward_acceptance`) and
     `source-recovery-run.sh` (acceptance emit tail), and the frozen manifest sha is re-verified
-    after the re-deploy.
+    after the re-deploy. The emit runtime closure must also be current under `/opt/megacampus`:
+    `packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts` plus its
+    relative-import closure, the built `dist/` of `@megacampus/shared-types`, `shared-logger`,
+    and `shared-utils`, and the tsconfig chain (`packages/course-gen-platform/tsconfig.json` +
+    root `tsconfig.json` — the wrapper passes `--tsconfig` explicitly and fails closed if the
+    chain is missing, because tsx path-alias resolution must not depend on the caller's cwd).
+    Smoke check from `/opt/megacampus`:
+    `packages/course-gen-platform/node_modules/.bin/tsx --tsconfig packages/course-gen-platform/tsconfig.json packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts`
+    must fail with the usage message (not a module-resolution error).
 11. `sysctl fs.protected_hardlinks` reports `1` on the host (kernel default; the acceptance-emit
     publish hardening assumes hardlink protection for full root/controller isolation).
 

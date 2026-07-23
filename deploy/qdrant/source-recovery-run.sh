@@ -1354,11 +1354,15 @@ if [[ -n $q12_run_id ]]; then
   else
     emit_tsx="$project_directory/packages/course-gen-platform/node_modules/.bin/tsx"
     emit_entrypoint="$project_directory/packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts"
+    emit_tsconfig="$project_directory/packages/course-gen-platform/tsconfig.json"
+    emit_root_tsconfig="$project_directory/tsconfig.json"
     [[ -x $emit_tsx && ! -L $emit_tsx ]] ||
       fail 'source.forward acceptance emit requires the package tsx shim'
     [[ -f $emit_entrypoint && ! -L $emit_entrypoint ]] ||
       fail 'source.forward acceptance emit entrypoint is unavailable'
-    emit_command=("$emit_tsx" "$emit_entrypoint")
+    [[ -f $emit_tsconfig && ! -L $emit_tsconfig && -f $emit_root_tsconfig && ! -L $emit_root_tsconfig ]] ||
+      fail 'source.forward acceptance emit requires the package tsconfig chain'
+    emit_command=("$emit_tsx" --tsconfig "$emit_tsconfig" "$emit_entrypoint")
   fi
 
   acceptance_output="$q12_run_root/source-forward-acceptance.json"

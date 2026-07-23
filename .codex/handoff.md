@@ -434,9 +434,20 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   rehearsal are window-grade (need a real reviewed recovery manifest + Supabase accepted-coverage
   ledgers) → the W7 owner-gated leg; the wrapper-emit real leg (real tsx/Supabase/env on the server)
   is validated at that same in-window rehearsal. The pg.backup generation seam IS fully real
-  (latest.json read). Server re-deploy to `megacampus-prod` at window time now covers BOTH
-  `q12-lifecycle-core.py` (real-read build; the 2026-07-23 deploy put inc1-4 `aafbb9a1` there;
-  `.bak-0c9d23cc-20260723` retained) AND `source-recovery-run.sh` (acceptance emit tail).
+  (latest.json read). Server re-deploy is DONE (2026-07-23, owner "go"): `megacampus-prod`
+  `/opt/megacampus/deploy/qdrant/` now carries develop-HEAD `q12-lifecycle-core.py`
+  (`8d62ca02…`, `py_compile` OK; `.bak-aafbb9a1-20260723` retained alongside the earlier
+  `.bak-0c9d23cc-20260723`) and `source-recovery-run.sh` (emit tail + `--tsconfig` fix,
+  `bash -n` OK; `.bak-9b0b5d53-20260723` retained); frozen manifest `aaec6fc2` re-verified.
+  The emit runtime closure was also deployed: missing `emit-source-forward-acceptance.ts` +
+  2 stale closure files, built `dist/` for shared-types/logger/utils, and the root
+  `/opt/megacampus/tsconfig.json` (its absence silently broke tsx `@/*` alias resolution from
+  the controller's cwd — found by on-server smoke, fixed in-repo by pinning
+  `--tsconfig` in the wrapper emit argv with a fail-closed tsconfig-chain check; runtime suite
+  165/165, CLI 7/7, runbook §1.10 now documents the closure + smoke command). Window
+  preconditions verified on-server 2026-07-23: `fs.protected_hardlinks=1`, `.env.production`
+  exactly-one non-empty `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`, secrets present path-only,
+  tsx smoke from `/opt/megacampus` reaches the CLI usage gate.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review

@@ -6394,4 +6394,18 @@ fi
     expect(verifyDispositions).toBeGreaterThan(0);
     expect(emitBlock).toBeGreaterThan(verifyDispositions);
   });
+
+  it('pins the production emit tsconfig chain so module resolution is cwd-independent', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).toContain(
+      'emit_tsconfig="$project_directory/packages/course-gen-platform/tsconfig.json"'
+    );
+    expect(wrapper).toContain('emit_root_tsconfig="$project_directory/tsconfig.json"');
+    expect(wrapper).toMatch(
+      /\[\[ -f \$emit_tsconfig && ! -L \$emit_tsconfig && -f \$emit_root_tsconfig && ! -L \$emit_root_tsconfig \]\] \|\|\n\s*fail 'source\.forward acceptance emit requires the package tsconfig chain'/u
+    );
+    expect(wrapper).toContain(
+      'emit_command=("$emit_tsx" --tsconfig "$emit_tsconfig" "$emit_entrypoint")'
+    );
+  });
 });
