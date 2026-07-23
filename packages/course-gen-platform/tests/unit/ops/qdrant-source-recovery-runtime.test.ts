@@ -6223,7 +6223,11 @@ for ((i = 0; i < \${#args[@]}; i++)); do
   [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
 done
 printf '{"schema":"megacampus.q12.source-forward-acceptance/v1"}\n' > "$output"
-chmod 0400 "$output"
+if [[ -n "\${SOURCE_RECOVERY_TEST_EMIT_WRONG_MODE:-}" ]]; then
+  chmod 0600 "$output"
+else
+  chmod 0400 "$output"
+fi
 `,
       { mode: 0o700 }
     );
@@ -6286,6 +6290,18 @@ chmod 0400 "$output"
     expect(stat.mode & 0o777).toBe(0o400);
     const composeLog = readFileSync(fixture.composeLog, 'utf8');
     expect(composeLog).toContain('source-recovery verify-dispositions');
+    // The service key must never leak outside the emit child's scoped environment.
+    expect(result.stdout).not.toContain(SYNTHETIC_SERVICE_KEY);
+    expect(result.stderr).not.toContain(SYNTHETIC_SERVICE_KEY);
+    expect(composeLog).not.toContain(SYNTHETIC_SERVICE_KEY);
+  });
+
+  it('fails the forward run and removes the leftover when the published authority mode is wrong', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_EMIT_WRONG_MODE: '1' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/not published owner-only 0400/iu);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
   });
 
   it('fails closed without invoking emit when the coverage-run authority is missing', () => {
@@ -6307,6 +6323,18 @@ chmod 0400 "$output"
     const result = fixture.run();
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/organization:course:run/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed on a multi-line coverage-run authority even without a trailing newline', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, `${COVERAGE_TRIPLE}\ntrailing-garbage`);
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/single newline-terminated/iu);
     expect(existsSync(fixture.emitLog)).toBe(false);
     expect(existsSync(fixture.acceptanceOutput)).toBe(false);
   });

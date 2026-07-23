@@ -1,4 +1,4 @@
-import { chmodSync, writeFileSync } from 'node:fs';
+import { closeSync, fchmodSync, openSync, writeSync } from 'node:fs';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 
 import {
@@ -65,8 +65,17 @@ export function writeSourceForwardAcceptanceAuthority(
   outputPath: string,
   authority: SourceForwardAcceptanceAuthority
 ): void {
-  writeFileSync(outputPath, `${JSON.stringify(authority)}\n`, { encoding: 'utf-8', mode: 0o400 });
-  chmodSync(outputPath, 0o400);
+  // The wrapper may run this as root inside a controller-writable run root, so never
+  // truncate through or chmod a swapped path: create-new only ('wx' = O_CREAT|O_EXCL,
+  // which refuses an existing entry INCLUDING a planted symlink), then finalize the
+  // mode on the descriptor we own.
+  const fd = openSync(outputPath, 'wx', 0o400);
+  try {
+    writeSync(fd, `${JSON.stringify(authority)}\n`, null, 'utf-8');
+    fchmodSync(fd, 0o400);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export async function runEmitSourceForwardAcceptance(

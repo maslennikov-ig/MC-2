@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   parseEmitSourceForwardAcceptanceArgv,
   runEmitSourceForwardAcceptance,
+  writeSourceForwardAcceptanceAuthority,
 } from '../../../../tools/qdrant/emit-source-forward-acceptance';
 import {
   calculateRecoveryManifestSha256,
@@ -156,5 +160,52 @@ describe('W7a real leg: emit-source-forward-acceptance CLI', () => {
       )
     ).rejects.toThrow(/organization:course:run/iu);
     expect(write).not.toHaveBeenCalled();
+  });
+
+  describe('writeSourceForwardAcceptanceAuthority (root-safe publish)', () => {
+    const AUTHORITY = {
+      schema: 'megacampus.q12.source-forward-acceptance/v1',
+      recovery_manifest_sha256: 'a'.repeat(64),
+      coverage_fingerprint: 'b'.repeat(64),
+      coverage_run: `${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`,
+    } as const;
+
+    it('creates the authority owner-only 0400 with exact single-line content', () => {
+      const directory = mkdtempSync('/tmp/mc2-emit-writer-');
+      try {
+        const output = join(directory, 'source-forward-acceptance.json');
+        writeSourceForwardAcceptanceAuthority(output, AUTHORITY);
+        expect(statSync(output).mode & 0o777).toBe(0o400);
+        expect(readFileSync(output, 'utf8')).toBe(`${JSON.stringify(AUTHORITY)}\n`);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it('refuses an existing entry instead of truncating it', () => {
+      const directory = mkdtempSync('/tmp/mc2-emit-writer-');
+      try {
+        const output = join(directory, 'source-forward-acceptance.json');
+        writeFileSync(output, 'pre-existing\n', { mode: 0o600 });
+        expect(() => writeSourceForwardAcceptanceAuthority(output, AUTHORITY)).toThrow(/EEXIST/u);
+        expect(readFileSync(output, 'utf8')).toBe('pre-existing\n');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it('refuses a planted symlink and never writes through it', () => {
+      const directory = mkdtempSync('/tmp/mc2-emit-writer-');
+      try {
+        const target = join(directory, 'symlink-target');
+        writeFileSync(target, 'victim\n', { mode: 0o600 });
+        const output = join(directory, 'source-forward-acceptance.json');
+        symlinkSync(target, output);
+        expect(() => writeSourceForwardAcceptanceAuthority(output, AUTHORITY)).toThrow(/EEXIST/u);
+        expect(readFileSync(target, 'utf8')).toBe('victim\n');
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
   });
 });

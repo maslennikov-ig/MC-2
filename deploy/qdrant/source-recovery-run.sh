@@ -1330,9 +1330,9 @@ if [[ -n $q12_run_id ]]; then
   accepted_coverage_run_file="$q12_run_root/accepted-coverage-run"
   require_controller_file "$accepted_coverage_run_file" 'accepted coverage-run authority'
   uuid_v4_pattern='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-  [[ $(wc -l < "$accepted_coverage_run_file") -eq 1 ]] ||
-    fail 'accepted coverage-run authority must be a single newline-terminated organization:course:run line'
   accepted_coverage_run="$(head -n 1 -- "$accepted_coverage_run_file")"
+  [[ $(wc -c < "$accepted_coverage_run_file") -eq $((${#accepted_coverage_run} + 1)) ]] ||
+    fail 'accepted coverage-run authority must be a single newline-terminated organization:course:run line'
   [[ $accepted_coverage_run =~ ^${uuid_v4_pattern}:${uuid_v4_pattern}:${uuid_v4_pattern}$ ]] ||
     fail 'accepted coverage-run authority must be organization:course:run lower-case UUIDv4'
 
@@ -1388,9 +1388,16 @@ if [[ -n $q12_run_id ]]; then
     rm -f -- "$acceptance_output"
     fail 'source.forward acceptance emit failed'
   fi
-  chown "$controller_uid:$controller_gid" -- "$acceptance_output" 2>/dev/null ||
+  # --no-dereference: the run root is controller-writable, so a root wrapper must never
+  # chown through a concurrently planted symlink; a swapped entry then fails the
+  # no-follow publish check below and the leftover is removed.
+  if ! chown --no-dereference "$controller_uid:$controller_gid" -- "$acceptance_output" 2>/dev/null; then
+    rm -f -- "$acceptance_output"
     fail 'source.forward acceptance authority ownership could not be set'
-  [[ -f $acceptance_output && ! -L $acceptance_output &&
-    $(owner_group_mode "$acceptance_output") == "$controller_uid:$controller_gid:400" ]] ||
+  fi
+  if [[ ! -f $acceptance_output || -L $acceptance_output ||
+    $(owner_group_mode "$acceptance_output") != "$controller_uid:$controller_gid:400" ]]; then
+    rm -f -- "$acceptance_output"
     fail 'source.forward acceptance authority was not published owner-only 0400'
+  fi
 fi
