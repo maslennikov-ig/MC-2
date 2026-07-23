@@ -196,15 +196,16 @@ function exactFailedEntry(
   };
 }
 
-async function loadAcceptedCoverage(
-  config: SourceRecoveryReindexAdapterConfig,
+async function buildAcceptedCoverageBinding(
+  acceptedCoverageRuns: readonly AcceptedCoverageRunConfig[],
   manifest: SourceRecoveryManifest,
-  repository: SourceRecoveryReindexEvidenceRepository
+  repository: SourceRecoveryReindexEvidenceRepository,
+  recoveryManifestSha256: string
 ): Promise<AcceptedFailedCoverageBinding> {
   const expectedByScope = eligibleScopes(manifest);
-  assertExactScopes(expectedByScope, config.acceptedCoverageRuns);
+  assertExactScopes(expectedByScope, acceptedCoverageRuns);
   const ledgers: AcceptedFailedCoverageLedgerBinding[] = [];
-  for (const run of config.acceptedCoverageRuns) {
+  for (const run of acceptedCoverageRuns) {
     let accepted: { id: string; status: 'accepted' };
     let cards: ReturnType<typeof DocumentEvidenceCardsSchema.parse>;
     try {
@@ -242,11 +243,25 @@ async function loadAcceptedCoverage(
   const binding: AcceptedFailedCoverageBinding = {
     status: 'accepted',
     recoveryRunId: manifest.run_id,
-    recoveryManifestSha256: config.expectedRecoveryManifestSha256,
+    recoveryManifestSha256,
     fingerprint: '',
     ledgers,
   };
   binding.fingerprint = calculateAcceptedFailedCoverageFingerprint(binding);
+  return binding;
+}
+
+async function loadAcceptedCoverage(
+  config: SourceRecoveryReindexAdapterConfig,
+  manifest: SourceRecoveryManifest,
+  repository: SourceRecoveryReindexEvidenceRepository
+): Promise<AcceptedFailedCoverageBinding> {
+  const binding = await buildAcceptedCoverageBinding(
+    config.acceptedCoverageRuns,
+    manifest,
+    repository,
+    config.expectedRecoveryManifestSha256
+  );
   if (binding.fingerprint !== config.expectedCoverageFingerprint) {
     throw new Error('Accepted coverage fingerprint does not match exact configured state');
   }
@@ -314,4 +329,81 @@ export function createDefaultSourceRecoveryReindexAdapters(
     persistRecoveryJournalTransition: persistAcceptedRecoveryJournalTransition,
     evidenceRepository,
   });
+}
+
+// W7a real leg (emit half): the source.forward acceptance emit-entrypoint. The Q12 controller's
+// StagedValueResolver.on_source_forward_accepted needs three window-staged values —
+// <accepted-recovery-manifest-sha256>, <accepted-coverage-fingerprint>, <accepted-coverage-run>. This
+// COMPUTES them from a real reviewed recovery manifest + the accepted-coverage ledgers (the same
+// canonical functions the reindex adapter validates against — never a Python re-derivation) and the
+// controller reads the written authority via read_source_forward_acceptance. The frozen manifest binds
+// exactly one <accepted-coverage-run> slot, so the single-course-scoped window recovery yields exactly
+// one accepted coverage run.
+
+export interface SourceForwardAcceptanceEmitConfig {
+  manifestPath: string;
+  journalPath: string;
+  expectedRecoveryRunId: string;
+  acceptedCoverageRuns: readonly AcceptedCoverageRunConfig[];
+}
+
+export interface SourceForwardAcceptanceAuthority {
+  schema: 'megacampus.q12.source-forward-acceptance/v1';
+  recovery_manifest_sha256: string;
+  coverage_fingerprint: string;
+  coverage_run: string;
+}
+
+export interface SourceForwardAcceptanceEmitDependencies {
+  loadReviewedRecoveryState(input: {
+    manifestPath: string;
+    journalPath: string;
+  }): Promise<ReviewedRecoveryState>;
+  evidenceRepository: SourceRecoveryReindexEvidenceRepository;
+}
+
+export async function computeSourceForwardAcceptance(
+  config: SourceForwardAcceptanceEmitConfig,
+  dependencies: SourceForwardAcceptanceEmitDependencies
+): Promise<SourceForwardAcceptanceAuthority> {
+  assertAbsoluteNormalizedPath(config.manifestPath, 'Recovery manifest path');
+  assertAbsoluteNormalizedPath(config.journalPath, 'Recovery journal path');
+  if (!UUID_V4_PATTERN.test(config.expectedRecoveryRunId)) {
+    throw new Error('Recovery adapter identities must use lower-case UUIDv4 and SHA-256');
+  }
+  if (config.acceptedCoverageRuns.length !== 1) {
+    throw new Error('source.forward acceptance binds exactly one accepted coverage run');
+  }
+  const [run] = config.acceptedCoverageRuns;
+  if (
+    !UUID_V4_PATTERN.test(run.organizationId) ||
+    !UUID_V4_PATTERN.test(run.courseId) ||
+    !UUID_V4_PATTERN.test(run.runId)
+  ) {
+    throw new Error('Accepted coverage runs must be unique lower-case UUIDv4 course scopes');
+  }
+  const state = await dependencies.loadReviewedRecoveryState({
+    manifestPath: config.manifestPath,
+    journalPath: config.journalPath,
+  });
+  const canonicalSha256 = calculateRecoveryManifestSha256(state.manifest);
+  if (
+    state.manifest.run_id !== config.expectedRecoveryRunId ||
+    state.manifestSha256 !== canonicalSha256
+  ) {
+    throw new Error('Loaded recovery state does not match exact configured identity');
+  }
+  validateRecoveryProgressJournalBinding(state.manifest, canonicalSha256, state.journal);
+  const binding = await buildAcceptedCoverageBinding(
+    config.acceptedCoverageRuns,
+    state.manifest,
+    dependencies.evidenceRepository,
+    canonicalSha256
+  );
+  return {
+    schema: 'megacampus.q12.source-forward-acceptance/v1',
+    recovery_manifest_sha256: canonicalSha256,
+    coverage_fingerprint: binding.fingerprint,
+    coverage_run: `${run.organizationId}:${run.courseId}:${run.runId}`,
+  };
 }
