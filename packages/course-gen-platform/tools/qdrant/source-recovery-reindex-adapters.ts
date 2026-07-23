@@ -407,3 +407,11 @@ export async function computeSourceForwardAcceptance(
     coverage_run: `${run.organizationId}:${run.courseId}:${run.runId}`,
   };
 }
+
+export function createDefaultSourceForwardAcceptanceDependencies(): SourceForwardAcceptanceEmitDependencies {
+  requireQ12CapabilityFetchInstalled();
+  const evidenceRepository = new DocumentEvidenceRepository(
+    getSupabaseAdmin() as unknown as DocumentEvidenceDatabaseClient
+  );
+  return { loadReviewedRecoveryState, evidenceRepository };
+}
