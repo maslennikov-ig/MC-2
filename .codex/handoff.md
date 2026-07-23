@@ -404,7 +404,23 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
 - The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
-- W7a real `read_source_forward_acceptance` emit is a bounded defer (tracked `mc2-1sns3`): the source.forward acceptance binding (`<accepted-recovery-manifest-sha256>` + coverage fingerprint/run) is a COMPUTED value owned by the TS acceptance authority (`tools/qdrant/source-recovery-reindex-adapters.ts`), which validates rather than emits it. The controller's base seam fail-closes with an explicit W5/W7 refusal (never a silent stub); the structural staged threading is proven here with a capture-subclass fake. Producing the value (a source-recovery acceptance emit-entrypoint) + the `MC2_Q12_REAL_PG17` disposable-stack / DEV rehearsal of the real pg.backup/source.forward legs are the W5 rehearsal / W7 owner-gated leg. The pg.backup generation seam IS fully real (latest.json read).
+- W7a real-leg CODE SEAM is DELIVERED (2026-07-23, `mc2-1sns3`, three TDD commits on `develop`
+  `55d999b15`/`75e2663f6`/`d7c840048`): (1) controller `read_source_forward_acceptance` now READS the
+  on-disk `<run_root>/source-forward-acceptance.json` authority (parse+validate `COVERAGE_RUN_RE`
+  org:course:run + hex64 x2, fail-closed on missing/malformed) — mirrors `read_pg_backup_generation`,
+  no Python fingerprint re-derivation; (2) TS `computeSourceForwardAcceptance` emit-entrypoint
+  (`source-recovery-reindex-adapters.ts`) COMPUTES the canonical manifest sha256 +
+  `calculateAcceptedFailedCoverageFingerprint` + single org:course:run via the exact existing canonical
+  fns (extracted `buildAcceptedCoverageBinding`; the validate path is an unchanged thin wrapper, 20/20
+  adapter tests green); (3) `emit-source-forward-acceptance.ts` CLI (`createDefaultSourceForwardAcceptanceDependencies`).
+  All infra-free TDD (32/32 affected unit tests green), frozen manifest `aaec6fc2` untouched, type-check clean.
+  REMAINING (bounded defers, `mc2-1sns3`): (a) wire the emit CLI into the deployed hardened
+  `source-recovery-run.sh --operation forward` — window-integration only validated at the real W7
+  window, not landed untested into the recovery script; (b) the real VALUES + full forward-window
+  rehearsal are window-grade (need a real reviewed recovery manifest + Supabase accepted-coverage
+  ledgers) → the W7 owner-gated leg. The pg.backup generation seam IS fully real (latest.json read).
+  Server controller re-deploy to `megacampus-prod` is needed at window time (the 2026-07-23 deploy put
+  the inc1-4 `aafbb9a1` build there; the real-read build is newer — `.bak-0c9d23cc-20260723` retained).
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
