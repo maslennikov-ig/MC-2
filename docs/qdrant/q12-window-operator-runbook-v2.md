@@ -34,6 +34,19 @@
 5. The accepted `.13.4.1` source-recovery run id is known (this is `--recovery-run-id`).
 6. The writer-quiesce manifest is published `0400` at its absolute path and its sha256 is known.
 7. The canonical `cutover.lock` is held exclusively on FD 9 (the controller acquires it in `main()`).
+8. The accepted coverage-run authority is staged at
+   `/opt/megacampus/backups/q12/<run-id>/accepted-coverage-run` — controller-owned `0400`, one
+   newline-terminated `organization:course:run` line (lower-case UUIDv4 triple) naming the accepted
+   document-evidence coverage run for the recovered course. The `source.forward` wrapper tail reads
+   it to emit `<run-root>/source-forward-acceptance.json` (the authority
+   `read_source_forward_acceptance` consumes); a Q12 forward without it fails closed.
+9. `/opt/megacampus/.env.production` defines exactly one non-empty `SUPABASE_URL` and one
+   `SUPABASE_SERVICE_KEY` (the emit CLI validates the acceptance against the Supabase
+   accepted-coverage ledgers; the wrapper passes these two values only to the emit child).
+10. The deployed `/opt/megacampus/deploy/qdrant/` tree carries the current `develop` build of BOTH
+    `q12-lifecycle-core.py` (real-read `read_source_forward_acceptance`) and
+    `source-recovery-run.sh` (acceptance emit tail), and the frozen manifest sha is re-verified
+    after the re-deploy.
 
 ## 2. Invocation
 
@@ -62,18 +75,18 @@ receipts.
 
 ## 3. Window sequence (C1..C10)
 
-| Step   | What the controller drives                                                                                                                           | Reversible?                               |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| C1     | `barrier.install`, operator self-check, `barrier.verify-after-base` prep                                                                             | yes                                       |
-| C2     | `writers.quiesce` (W-stream writer pause)                                                                                                            | yes                                       |
-| C3     | **snapshot opened** (real `<exported-id>`) + `baseline.json`, then `pg.backup` (fresh four-file generation bound to the snapshot) + isolated restore | yes                                       |
-| C4     | `migration.base.apply` + observability, `barrier.verify-after-base`, catalog capture                                                                 | yes                                       |
-| C5     | `source.forward` — execute the `.13.4.1` recovery (42 crash-durable copies, dispositions)                                                            | yes                                       |
-| C6     | `reindex.plan` → `reindex.worker.create` → `reindex.execute` → `reindex.verify` (behind alias)                                                       | yes                                       |
-| C7     | production RE-FREEZE + ratification; **`deploy.prepare`/completed** — the planned-exit checkpoint                                                    | yes (last reversible)                     |
-| C8     | `deploy.commit` — blue/green app color prepared/committed                                                                                            | yes                                       |
-| **C9** | **nginx switch + `barrier.activate` + resume forward**                                                                                               | **NO — point of no return (owner-gated)** |
-| C10    | monitoring live (Prometheus/Grafana/Alertmanager) + secure loopback Web UI                                                                           | —                                         |
+| Step   | What the controller drives                                                                                                                                                                           | Reversible?                               |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| C1     | `barrier.install`, operator self-check, `barrier.verify-after-base` prep                                                                                                                             | yes                                       |
+| C2     | `writers.quiesce` (W-stream writer pause)                                                                                                                                                            | yes                                       |
+| C3     | **snapshot opened** (real `<exported-id>`) + `baseline.json`, then `pg.backup` (fresh four-file generation bound to the snapshot) + isolated restore                                                 | yes                                       |
+| C4     | `migration.base.apply` + observability, `barrier.verify-after-base`, catalog capture                                                                                                                 | yes                                       |
+| C5     | `source.forward` — execute the `.13.4.1` recovery (42 crash-durable copies, dispositions); the wrapper tail emits `<run-root>/source-forward-acceptance.json` from the staged coverage-run authority | yes                                       |
+| C6     | `reindex.plan` → `reindex.worker.create` → `reindex.execute` → `reindex.verify` (behind alias)                                                                                                       | yes                                       |
+| C7     | production RE-FREEZE + ratification; **`deploy.prepare`/completed** — the planned-exit checkpoint                                                                                                    | yes (last reversible)                     |
+| C8     | `deploy.commit` — blue/green app color prepared/committed                                                                                                                                            | yes                                       |
+| **C9** | **nginx switch + `barrier.activate` + resume forward**                                                                                                                                               | **NO — point of no return (owner-gated)** |
+| C10    | monitoring live (Prometheus/Grafana/Alertmanager) + secure loopback Web UI                                                                                                                           | —                                         |
 
 The C9 boundary begins Phase D closeout (W7).
 

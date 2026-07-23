@@ -414,13 +414,23 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   fns (extracted `buildAcceptedCoverageBinding`; the validate path is an unchanged thin wrapper, 20/20
   adapter tests green); (3) `emit-source-forward-acceptance.ts` CLI (`createDefaultSourceForwardAcceptanceDependencies`).
   All infra-free TDD (32/32 affected unit tests green), frozen manifest `aaec6fc2` untouched, type-check clean.
-  REMAINING (bounded defers, `mc2-1sns3`): (a) wire the emit CLI into the deployed hardened
-  `source-recovery-run.sh --operation forward` — window-integration only validated at the real W7
-  window, not landed untested into the recovery script; (b) the real VALUES + full forward-window
+  Defer (a) is CLOSED (2026-07-23, `edac2284e` on `develop`): the wrapper's Q12 forward tail now
+  invokes the emit CLI after `verify-dispositions` (tsx shim; `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`
+  extracted fail-closed from the frozen-argv `--env-file` and passed only to the emit child) and
+  publishes `<run_root>/source-forward-acceptance.json` 0400 controller-owned. Frozen argv unchanged:
+  the coverage triple comes from the NEW operator-staged run-root authority
+  `<run_root>/accepted-coverage-run` (0400, single `org:course:run` line — window precondition,
+  runbook v2 §1.8-1.10). Fail-closed: missing/malformed authority, missing Supabase env values, or
+  emit failure fails the forward run and leaves no acceptance file; non-Q12 forwards and
+  rollback/resume paths are untouched; `SOURCE_RECOVERY_EMIT_BIN` is local-test-only. Runtime suite
+  162/162 (7 new), wrapper-adjacent suites green, package type-check 0.
+  REMAINING (bounded defers, `mc2-1sns3`): (b) the real VALUES + full forward-window
   rehearsal are window-grade (need a real reviewed recovery manifest + Supabase accepted-coverage
-  ledgers) → the W7 owner-gated leg. The pg.backup generation seam IS fully real (latest.json read).
-  Server controller re-deploy to `megacampus-prod` is needed at window time (the 2026-07-23 deploy put
-  the inc1-4 `aafbb9a1` build there; the real-read build is newer — `.bak-0c9d23cc-20260723` retained).
+  ledgers) → the W7 owner-gated leg; the wrapper-emit real leg (real tsx/Supabase/env on the server)
+  is validated at that same in-window rehearsal. The pg.backup generation seam IS fully real
+  (latest.json read). Server re-deploy to `megacampus-prod` at window time now covers BOTH
+  `q12-lifecycle-core.py` (real-read build; the 2026-07-23 deploy put inc1-4 `aafbb9a1` there;
+  `.bak-0c9d23cc-20260723` retained) AND `source-recovery-run.sh` (acceptance emit tail).
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review

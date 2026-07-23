@@ -74,14 +74,16 @@ runbook and beads below.
 
 ## Remaining W7 window work (bounded, owner-gated)
 
-1. **Re-deploy** the real-read controller build (`develop` HEAD) to `megacampus-prod` before
-   the window (mechanics above).
-2. **Shell wiring**: invoke the emit CLI from the deployed hardened
-   `source-recovery-run.sh --operation forward` so it writes
-   `<run_root>/source-forward-acceptance.json` (the authority `read_source_forward_acceptance`
-   consumes). Deferred deliberately — this deployed-script change is only validated in-window;
-   do not land it untested. Emit CLI + args: `emit-source-forward-acceptance.ts`
-   (`--manifest --journal --recovery-run-id --accepted-coverage-run --output`).
+1. **Re-deploy** the `develop`-HEAD builds of BOTH `q12-lifecycle-core.py` (real-read) AND
+   `source-recovery-run.sh` (acceptance emit tail, landed 2026-07-23) to `megacampus-prod`
+   before the window (mechanics above; re-verify manifest sha after).
+2. ~~Shell wiring~~ **DONE (2026-07-23, TDD, landed on `develop`)**: the wrapper's Q12 forward
+   tail now invokes the emit CLI (tsx shim + explicit `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`
+   from `--env-file`) and publishes `<run_root>/source-forward-acceptance.json` 0400
+   controller-owned, fail-closed. NEW WINDOW PRECONDITION: stage the coverage triple at
+   `<run_root>/accepted-coverage-run` (0400, single `org:course:run` line) — runbook v2 §1.8-1.10.
+   Real-leg residual (real tsx/Supabase/env on the server) is validated at the in-window
+   rehearsal, same honest verifiability boundary as the rest of W7a.
 3. **Full forward-window rehearsal** with real values — window-grade: needs a real reviewed
    recovery manifest.json + journal (produced by the real source.forward recovery) + the real
    Supabase accepted-coverage ledgers. Target: shared source READ-ONLY + dev Qdrant `:6333`
