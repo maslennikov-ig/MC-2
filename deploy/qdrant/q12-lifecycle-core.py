@@ -27,6 +27,13 @@ EPOCH_RE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*)$")
 # W7a: the fresh pg.backup's published generation-dir basename (backup-supabase.sh generation-<ts>-<uuid>;
 # restore-supabase-drill.sh's --generation guard). The <immutable-generation> authority must match it.
 GENERATION_DIR_NAME_RE = re.compile(r"generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}")
+# W7a real leg: the accepted source.forward coverage run — an organization:course:run lower-case
+# UUIDv4 triple (reindex-course-embeddings.ts:375 splits <accepted-coverage-run> on ':'). The
+# on-disk acceptance authority the TS emit-entrypoint writes must match this exact shape.
+COVERAGE_RUN_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    r"(?::[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}){2}$"
+)
 OPERATIONS = (
     "install",
     "verify-after-base",
@@ -1421,16 +1428,35 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         binding owned by the TS source-recovery acceptance authority
         (``tools/qdrant/source-recovery-reindex-adapters.ts``: canonical manifest sha256 +
         ``calculateAcceptedFailedCoverageFingerprint`` + the unique ``org:course:run`` scopes). That
-        authority currently VALIDATES expected values rather than EMITTING them, so producing them for
-        the controller is real in-window/PG17 work (a source-recovery acceptance emit-entrypoint). To
-        avoid duplicating the TS fingerprint logic in Python (silent drift), this base seam fails closed
-        with a named W5/W7 refusal; the structural threading is proven here via a capture-subclass fake
-        (``resolve_source_forward_acceptance`` + the on_staged wiring), and the real read lands with the
-        W5 rehearsal / W7 owner-gated window. Tracked on mc2-1sns3."""
-        del request, run_root
-        raise LifecycleError(
-            "source.forward acceptance authority not wired here (real leg gated to W5 rehearsal / W7)"
-        )
+        authority is owned by the TS source-recovery acceptance emit-entrypoint
+        (``source-recovery-reindex-adapters.ts`` ``emitSourceForwardAcceptance``): it COMPUTES the
+        canonical manifest sha256 + ``calculateAcceptedFailedCoverageFingerprint`` + the single
+        ``org:course:run`` scope and writes them to ``<run_root>/source-forward-acceptance.json``
+        (``source-recovery-run.sh --operation forward`` wiring). This seam READS that on-disk authority
+        — it never recomputes the TS fingerprint in Python (no silent drift) — mirroring the
+        ``read_pg_backup_generation`` pattern (parse + validate + fail-closed). The real VALUES are
+        window-grade (a real reviewed recovery manifest + Supabase accepted-coverage ledgers), so the
+        end-to-end leg is exercised at the W7 owner-gated window; the read + its fail-closed validation
+        are unit-tested here with a synthetic authority. Tracked on mc2-1sns3."""
+        del request
+        authority = pathlib.Path(run_root) / "source-forward-acceptance.json"
+        try:
+            payload = json.loads(authority.read_bytes())
+        except (OSError, ValueError) as exc:
+            raise LifecycleError(
+                "source.forward acceptance authority is missing or unreadable"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise LifecycleError("source.forward acceptance authority is malformed")
+        manifest_sha256 = payload.get("recovery_manifest_sha256")
+        coverage_fingerprint = payload.get("coverage_fingerprint")
+        coverage_run = payload.get("coverage_run")
+        hex64 = lambda value: isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+        if not hex64(manifest_sha256) or not hex64(coverage_fingerprint):
+            raise LifecycleError("source.forward acceptance sha256 fields are malformed")
+        if not isinstance(coverage_run, str) or not COVERAGE_RUN_RE.fullmatch(coverage_run):
+            raise LifecycleError("source.forward acceptance coverage_run is malformed")
+        return (manifest_sha256, coverage_fingerprint, coverage_run)
 
     def open_window_snapshot(
         self, request: dict[str, Any], run_root: pathlib.Path

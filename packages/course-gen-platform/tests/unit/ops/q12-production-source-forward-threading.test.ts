@@ -34,10 +34,12 @@ describe('W7a inc3: production drive-loop threads on_source_forward_accepted (so
     expect(out.hasSeam, 'OwnerCustodyExecutor.read_source_forward_acceptance must exist').toBe(
       true
     );
-    // The real acceptance read is gated: the base seam must fail closed with a named W5/W7 refusal.
-    expect(out.baseSeamGated, 'base read_source_forward_acceptance must fail-closed W5/W7').toBe(
-      true
-    );
+    // W7a real leg landed: the base seam now READS the on-disk acceptance authority and must fail
+    // closed when it is absent (never a silent success).
+    expect(
+      out.baseSeamFailsClosedOnMissing,
+      'base read_source_forward_acceptance must fail-closed on a missing authority'
+    ).toBe(true);
 
     // The real gap this closes: reindex.plan cannot resolve until the staged step runs.
     expect(out.reindexBlockedBefore).toBe(true);

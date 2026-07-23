@@ -56,14 +56,18 @@ def main() -> int:
     out["hasSeam"] = callable(
         getattr(core.OwnerCustodyExecutor, "read_source_forward_acceptance", None)
     )
-    # The real base seam must fail closed with an explicit W5/W7 refusal (never a silent stub).
-    out["baseSeamGated"] = False
-    try:
-        core.OwnerCustodyExecutor().read_source_forward_acceptance(request, pathlib.Path("/tmp"))
-    except core.LifecycleError as error:
-        out["baseSeamGated"] = "W5" in str(error) or "W7" in str(error) or "gated" in str(error)
-    except Exception:  # noqa: BLE001
-        out["baseSeamGated"] = False
+    # W7a real leg: the base seam now READS the on-disk source.forward acceptance authority and must
+    # fail closed when it is absent (never a silent success). Use a guaranteed-empty run root.
+    out["baseSeamFailsClosedOnMissing"] = False
+    with tempfile.TemporaryDirectory(prefix="mc2-q12-inc3-empty-") as empty:
+        try:
+            core.OwnerCustodyExecutor().read_source_forward_acceptance(request, pathlib.Path(empty))
+        except core.LifecycleError as error:
+            out["baseSeamFailsClosedOnMissing"] = (
+                "missing" in str(error) or "acceptance" in str(error)
+            )
+        except Exception:  # noqa: BLE001
+            out["baseSeamFailsClosedOnMissing"] = False
 
     with tempfile.TemporaryDirectory(prefix="mc2-q12-w7a-inc3-") as tmp:
         run_root = pathlib.Path(tmp)
