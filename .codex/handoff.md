@@ -383,7 +383,10 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   kind↔reason↔course_id superRefine that lives in `source-recovery-manifest.ts` — currently
   rescued because `assertExactRecoveryContract` runs `normalizeRecoveryManifest` (strict
   schema). DEFERRED until after the live window: consolidate the duplicate disposition
-  schema (no operator churn before C1..C10). Tracked on `mc2-af1ay`.
+  schema, deduplicate the `CATALOG_HASH_PATTERN` constant across both copies, and consider
+  tightening its character class (exclude quote/backslash) — no operator churn before
+  C1..C10. Delta-review of `d3cb0ee43` also PASS 0 P0/P1 (both review passes and both
+  root-owned passes agree). Tracked on `mc2-af1ay`.
 - Q12 staging mutation is owner-authorized, but remains NO-GO until the
   approved local correction streams, truthful fresh validated database backup,
   Supabase-compatible restore and every documented hard gate pass. GHCR
