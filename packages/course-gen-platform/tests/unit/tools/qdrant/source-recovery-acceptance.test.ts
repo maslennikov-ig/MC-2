@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- synchronous in-memory fixtures implement Promise-returning gateway interfaces */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
@@ -56,7 +57,6 @@ import {
   type RecoveryCatalogRow,
   type RecoveryDatabaseGateway,
   type RecoveryDispositionDatabase,
-  type RecoveryPlaybookRow,
 } from '../../../../tools/qdrant/source-recovery-database.js';
 import {
   runDocumentEvidencePreflight,
@@ -102,7 +102,6 @@ interface AcceptanceFixture {
   rows: ReindexSourceRow[];
   invalidIds: Set<string>;
   catalogRows: Map<string, RecoveryCatalogRow>;
-  playbookRows: Map<string, RecoveryPlaybookRow>;
   database: RecoveryDispositionDatabase;
   adapterQueries: string[];
   publishCalls: number;
@@ -334,19 +333,12 @@ async function createAcceptanceFixture(label: string): Promise<AcceptanceFixture
     entry_id: `disposition-playbook-${index.toString().padStart(2, '0')}`,
     kind: 'career_playbook_retained_derived' as const,
     file_catalog_id: uuid(241 + index),
-    career_playbook_source_id: uuid(501 + index),
     organization_id: ORG_A,
     course_id: null,
     expected_hash: sha256(`playbook-${index}`),
     expected_storage_path: `playbook/retained-${index}.pdf`,
     expected_vector_status: 'indexed' as const,
     expected_file_error_message: null,
-    expected_career_playbook: {
-      playbook_id: uuid(601 + index),
-      user_id: USER_ID,
-      status: 'ready' as const,
-      error_message: null,
-    },
     reason: 'retained-derived-only' as const,
   }));
   const manifest: SourceRecoveryManifest = {
@@ -416,21 +408,6 @@ async function createAcceptanceFixture(label: string): Promise<AcceptanceFixture
       },
     ])
   );
-  const playbookRows = new Map<string, RecoveryPlaybookRow>(
-    playbookDispositions.map(entry => [
-      entry.career_playbook_source_id,
-      {
-        id: entry.career_playbook_source_id,
-        playbook_id: entry.expected_career_playbook.playbook_id,
-        organization_id: entry.organization_id,
-        user_id: entry.expected_career_playbook.user_id,
-        file_catalog_id: entry.file_catalog_id,
-        status: entry.expected_career_playbook.status,
-        error_message: entry.expected_career_playbook.error_message,
-      },
-    ])
-  );
-
   return {
     root,
     developmentRoot,
@@ -443,8 +420,7 @@ async function createAcceptanceFixture(label: string): Promise<AcceptanceFixture
     rows,
     invalidIds: new Set([eligibleRows[4].id, eligibleRows[5].id]),
     catalogRows,
-    playbookRows,
-    database: createMemoryDispositionDatabase(catalogRows, playbookRows),
+    database: createMemoryDispositionDatabase(catalogRows),
     adapterQueries: [],
     publishCalls: 0,
   };
@@ -627,22 +603,13 @@ async function assertRecoveryWorkspace(
 }
 
 function createMemoryDispositionDatabase(
-  catalogRows: Map<string, RecoveryCatalogRow>,
-  playbookRows: Map<string, RecoveryPlaybookRow>
+  catalogRows: Map<string, RecoveryCatalogRow>
 ): RecoveryDispositionDatabase {
   const exact = <T>(left: T, right: T): boolean => JSON.stringify(left) === JSON.stringify(right);
   const gateway: RecoveryDatabaseGateway = {
     selectFileCatalog: async input =>
       [...catalogRows.values()]
         .filter(row => input.ids.includes(row.id))
-        .filter(row => input.afterId === undefined || row.id > input.afterId)
-        .filter(row => input.applied === undefined || exact(row, input.applied))
-        .sort((left, right) => left.id.localeCompare(right.id))
-        .slice(0, input.limit)
-        .map(row => structuredClone(row)),
-    selectCareerPlaybookSources: async input =>
-      [...playbookRows.values()]
-        .filter(row => input.fileCatalogIds.includes(row.file_catalog_id))
         .filter(row => input.afterId === undefined || row.id > input.afterId)
         .filter(row => input.applied === undefined || exact(row, input.applied))
         .sort((left, right) => left.id.localeCompare(right.id))
@@ -655,24 +622,13 @@ function createMemoryDispositionDatabase(
       catalogRows.set(updated.id, updated);
       return [structuredClone(updated)];
     },
-    updateCareerPlaybookSource: async input => {
-      const current = playbookRows.get(input.expected.id);
-      if (!current || !exact(current, input.expected)) return [];
-      const updated = { ...current, ...input.patch };
-      playbookRows.set(updated.id, updated);
-      return [structuredClone(updated)];
-    },
   };
   return createRecoveryDispositionDatabase(gateway, { readBatchSize: 7 });
 }
 
-function dispositionSnapshot(
-  catalogRows: Map<string, RecoveryCatalogRow>,
-  playbookRows: Map<string, RecoveryPlaybookRow>
-): string {
+function dispositionSnapshot(catalogRows: Map<string, RecoveryCatalogRow>): string {
   return JSON.stringify({
     catalog: [...catalogRows.values()].sort((left, right) => left.id.localeCompare(right.id)),
-    playbooks: [...playbookRows.values()].sort((left, right) => left.id.localeCompare(right.id)),
   });
 }
 
@@ -682,18 +638,15 @@ async function proveCrossTenantCasRejectsWithoutPartialState(
   const catalog = new Map(
     [...fixture.catalogRows].map(([id, row]) => [id, structuredClone(row)] as const)
   );
-  const playbooks = new Map(
-    [...fixture.playbookRows].map(([id, row]) => [id, structuredClone(row)] as const)
-  );
   const entry = fixture.manifest.dispositions.find(
     disposition => disposition.kind === 'eligible_unrecoverable'
   )!;
   catalog.get(entry.file_catalog_id)!.organization_id = ORG_B;
-  const before = dispositionSnapshot(catalog, playbooks);
+  const before = dispositionSnapshot(catalog);
   const checkpoints: string[] = [];
   await expect(
     applyDispositionEntry({
-      database: createMemoryDispositionDatabase(catalog, playbooks),
+      database: createMemoryDispositionDatabase(catalog),
       entry,
       runId: fixture.manifest.run_id,
       state: 'disposition_planned',
@@ -702,7 +655,7 @@ async function proveCrossTenantCasRejectsWithoutPartialState(
       },
     })
   ).rejects.toThrow(/CAS mismatch/iu);
-  expect(dispositionSnapshot(catalog, playbooks)).toBe(before);
+  expect(dispositionSnapshot(catalog)).toBe(before);
   expect(checkpoints).toEqual([]);
 }
 
@@ -713,13 +666,7 @@ async function verifyExactDispositionTruth(
   const fileRows = await fixture.database.listFileCatalogExpectedRows(
     manifest.dispositions.map(entry => entry.file_catalog_id)
   );
-  const playbookRows = await fixture.database.listCareerPlaybookExpectedRows(
-    manifest.dispositions
-      .filter(entry => entry.kind === 'career_playbook_retained_derived')
-      .map(entry => entry.file_catalog_id)
-  );
   expect(fileRows).toHaveLength(24);
-  expect(playbookRows).toHaveLength(18);
   for (const entry of manifest.dispositions) {
     const expectedReason = `${entry.reason}; recovery_run=${manifest.run_id}`;
     expect(fileRows.find(row => row.id === entry.file_catalog_id)).toMatchObject({
@@ -730,18 +677,6 @@ async function verifyExactDispositionTruth(
       vector_status: 'failed',
       error_message: expectedReason,
     });
-    if (entry.kind === 'career_playbook_retained_derived') {
-      expect(playbookRows.find(row => row.file_catalog_id === entry.file_catalog_id)).toMatchObject(
-        {
-          id: entry.career_playbook_source_id,
-          organization_id: entry.organization_id,
-          playbook_id: entry.expected_career_playbook.playbook_id,
-          user_id: entry.expected_career_playbook.user_id,
-          status: 'failed',
-          error_message: expectedReason,
-        }
-      );
-    }
   }
 }
 

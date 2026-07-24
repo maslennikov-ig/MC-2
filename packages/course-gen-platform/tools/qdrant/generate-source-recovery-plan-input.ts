@@ -8,17 +8,10 @@ import type { ReindexSourceRow } from './reindex-plan';
 import { buildReindexPlan, loadReindexSources } from './reindex-plan';
 import { createSourceDatabase } from './reindex-course-embeddings';
 import {
-  createRecoveryDispositionDatabase,
-  createSupabaseRecoveryGateway,
-  type RecoveryPlaybookRow,
-  type RecoverySupabaseClient,
-} from './source-recovery-database';
-import {
   calculateRecoveryManifestSha256,
   normalizeRecoveryManifest,
   type SourceRecoveryManifest,
 } from './source-recovery-manifest';
-import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 
 /**
  * `.13.4.1` reviewed plan-input regeneration. The accepted `.13.4` source audit deliberately kept
@@ -222,7 +215,6 @@ function requireVectorStatus(row: ReindexSourceRow): 'pending' | 'indexing' | 'i
 
 export function buildSourceRecoveryPlanInput(input: {
   rows: readonly ReindexSourceRow[];
-  playbookRows: readonly RecoveryPlaybookRow[];
   inventory: readonly RecoverySourceInventoryEntry[];
   options: SourceRecoveryPlanInputOptions;
 }): SourceRecoveryManifest {
@@ -308,7 +300,9 @@ export function buildSourceRecoveryPlanInput(input: {
     affected_file_catalog_rows: plan.rows.length,
   }));
 
-  const playbookByFileId = new Map(input.playbookRows.map(row => [row.file_catalog_id, row]));
+  // Career Playbook dispositions are file_catalog-only bookkeeping: the reviewed
+  // career_playbook_sources rows were legally cascade-deleted with their parent playbooks
+  // (owner-approved amendment, 2026-07-24), so no live playbook predicates are bound here.
   const dispositionRows = [
     ...classification.missing.map(row => ({ row, kind: 'eligible_unrecoverable' as const })),
     ...classification.invalid.map(row => ({ row, kind: 'eligible_unrecoverable' as const })),
@@ -332,23 +326,7 @@ export function buildSourceRecoveryPlanInput(input: {
     if (entry.kind === 'eligible_unrecoverable') {
       return { ...base, reason: 'source_file_unrecoverable' as const };
     }
-    const playbook = playbookByFileId.get(entry.row.id);
-    if (!playbook) {
-      throw new Error(
-        `Absent Career Playbook row ${redact(entry.row.id)} has no playbook source row`
-      );
-    }
-    return {
-      ...base,
-      career_playbook_source_id: playbook.id,
-      expected_career_playbook: {
-        playbook_id: playbook.playbook_id,
-        user_id: playbook.user_id,
-        status: playbook.status,
-        error_message: playbook.error_message,
-      },
-      reason: 'retained-derived-only' as const,
-    };
+    return { ...base, reason: 'retained-derived-only' as const };
   });
 
   return normalizeRecoveryManifest({
@@ -465,7 +443,6 @@ export function writePlanInputOwnerOnly(
 
 export interface GeneratePlanInputDependencies {
   loadRows(): Promise<ReindexSourceRow[]>;
-  loadPlaybookRows(fileCatalogIds: readonly string[]): Promise<RecoveryPlaybookRow[]>;
   loadInventory(
     developmentRoot: string,
     productionRoot: string
@@ -491,19 +468,8 @@ export async function runGeneratePlanInput(
 ): Promise<GeneratePlanInputReport> {
   const rows = await dependencies.loadRows();
   const inventory = await dependencies.loadInventory(args.developmentRoot, args.productionRoot);
-  const { productionByPath, developmentByPath, developmentByHash } = indexInventory(inventory);
-  const classification = classifyRows(
-    [...rows].sort((left, right) => left.id.localeCompare(right.id)),
-    productionByPath,
-    developmentByPath,
-    developmentByHash
-  );
-  const playbookRows = await dependencies.loadPlaybookRows(
-    classification.unsupportedAbsent.map(row => row.id).sort()
-  );
   const manifest = buildSourceRecoveryPlanInput({
     rows,
-    playbookRows,
     inventory,
     options: {
       runId: args.runId,
@@ -580,10 +546,6 @@ async function walkRoot(
 export function createDefaultGeneratePlanInputDependencies(): GeneratePlanInputDependencies {
   return {
     loadRows: () => loadReindexSources(createSourceDatabase()),
-    loadPlaybookRows: fileCatalogIds =>
-      createRecoveryDispositionDatabase(
-        createSupabaseRecoveryGateway(getSupabaseAdmin() as unknown as RecoverySupabaseClient)
-      ).listCareerPlaybookExpectedRows(fileCatalogIds),
     loadInventory: async (developmentRoot, productionRoot) => [
       ...(await walkRoot('development', developmentRoot)),
       ...(await walkRoot('production', productionRoot)),

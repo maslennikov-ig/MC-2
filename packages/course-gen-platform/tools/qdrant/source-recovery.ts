@@ -139,28 +139,17 @@ const CopySchema = z
   })
   .strict();
 
-const ExpectedPlaybookSchema = z
-  .object({
-    playbook_id: z.string().uuid(),
-    user_id: z.string().uuid(),
-    status: z.enum(['uploaded', 'processing', 'ready', 'failed', 'removed']),
-    error_message: z.string().max(1024).nullable(),
-  })
-  .strict();
-
 const DispositionSchema = z
   .object({
     entry_id: z.string().regex(ENTRY_ID_PATTERN),
     kind: z.enum(['eligible_unrecoverable', 'career_playbook_retained_derived']),
     file_catalog_id: z.string().uuid(),
-    career_playbook_source_id: z.string().uuid().optional(),
     organization_id: z.string().uuid(),
     course_id: z.string().uuid().nullable(),
     expected_hash: z.string().regex(SHA256_PATTERN),
     expected_storage_path: z.string().regex(RELATIVE_PATH_PATTERN),
     expected_vector_status: z.enum(['pending', 'indexing', 'indexed', 'failed']),
     expected_file_error_message: z.string().max(1024).nullable(),
-    expected_career_playbook: ExpectedPlaybookSchema.optional(),
     reason: z.enum(['source_file_unrecoverable', 'retained-derived-only']),
   })
   .strict();
@@ -199,12 +188,7 @@ const JournalSchema = z
     ),
     disposition_states: z.record(
       z.string(),
-      z.enum([
-        'disposition_planned',
-        'career_playbook_source_applied',
-        'disposition_applied',
-        'disposition_verified',
-      ])
+      z.enum(['disposition_planned', 'disposition_applied', 'disposition_verified'])
     ),
   })
   .strict();
@@ -648,13 +632,6 @@ async function verifyExactDispositions(
     manifest.dispositions.map(entry => entry.file_catalog_id)
   );
   const filesById = new Map(files.map(row => [row.id, row]));
-  const playbookEntries = manifest.dispositions.filter(
-    entry => entry.kind === 'career_playbook_retained_derived'
-  );
-  const playbooks = await database.listCareerPlaybookExpectedRows(
-    playbookEntries.map(entry => entry.file_catalog_id)
-  );
-  const playbooksByFileId = new Map(playbooks.map(row => [row.file_catalog_id, row]));
   for (const entry of manifest.dispositions) {
     const expected = expectedFileFromDisposition(entry);
     const file = filesById.get(entry.file_catalog_id);
@@ -669,23 +646,9 @@ async function verifyExactDispositions(
     ) {
       throw new Error('Verified file_catalog disposition does not match the reviewed outcome');
     }
-    if (entry.kind === 'career_playbook_retained_derived') {
-      const source = playbooksByFileId.get(entry.file_catalog_id);
-      if (
-        !source ||
-        source.id !== entry.career_playbook_source_id ||
-        source.organization_id !== entry.organization_id ||
-        source.playbook_id !== entry.expected_career_playbook?.playbook_id ||
-        source.user_id !== entry.expected_career_playbook.user_id ||
-        source.status !== 'failed' ||
-        source.error_message !== `${entry.reason}; recovery_run=${manifest.run_id}`
-      ) {
-        throw new Error('Verified Career Playbook disposition does not match the reviewed outcome');
-      }
-    }
   }
-  if (files.length !== 24 || playbooks.length !== 18) {
-    throw new Error('Disposition verification did not return exact 24/18 row totals');
+  if (files.length !== 24) {
+    throw new Error('Disposition verification did not return the exact 24-row file total');
   }
 }
 
@@ -697,13 +660,6 @@ async function verifyReviewedPriorPredicates(
     manifest.dispositions.map(entry => entry.file_catalog_id)
   );
   const filesById = new Map(files.map(row => [row.id, row]));
-  const playbookEntries = manifest.dispositions.filter(
-    entry => entry.kind === 'career_playbook_retained_derived'
-  );
-  const playbooks = await database.listCareerPlaybookExpectedRows(
-    playbookEntries.map(entry => entry.file_catalog_id)
-  );
-  const playbooksByFileId = new Map(playbooks.map(row => [row.file_catalog_id, row]));
   for (const entry of manifest.dispositions) {
     const file = filesById.get(entry.file_catalog_id);
     if (
@@ -717,23 +673,9 @@ async function verifyReviewedPriorPredicates(
     ) {
       throw new Error('Planner file_catalog predicates drifted from the protected audit input');
     }
-    if (entry.kind === 'career_playbook_retained_derived') {
-      const source = playbooksByFileId.get(entry.file_catalog_id);
-      if (
-        !source ||
-        source.id !== entry.career_playbook_source_id ||
-        source.organization_id !== entry.organization_id ||
-        source.playbook_id !== entry.expected_career_playbook?.playbook_id ||
-        source.user_id !== entry.expected_career_playbook.user_id ||
-        source.status !== entry.expected_career_playbook.status ||
-        source.error_message !== entry.expected_career_playbook.error_message
-      ) {
-        throw new Error('Planner Career Playbook predicates drifted from protected audit input');
-      }
-    }
   }
-  if (files.length !== 24 || playbooks.length !== 18) {
-    throw new Error('Planner disposition inventory does not match exact 24/18 row totals');
+  if (files.length !== 24) {
+    throw new Error('Planner disposition inventory does not match the exact 24-row file total');
   }
 }
 

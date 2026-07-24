@@ -16,7 +16,6 @@ import {
   normalizeRecoveryManifest,
 } from '../../../../tools/qdrant/source-recovery-manifest';
 import type { ReindexSourceRow } from '../../../../tools/qdrant/reindex-plan';
-import type { RecoveryPlaybookRow } from '../../../../tools/qdrant/source-recovery-database';
 
 // `.13.4.1` reviewed plan-input regeneration: rebuild the owner-only recovery manifest from a
 // fresh read-only catalog projection plus a size+sha256 inventory of both upload roots. The
@@ -33,7 +32,6 @@ const PRODUCTION_ROOT = '/srv/megacampus/uploads';
 const ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001';
 const COURSE_ID = '20000000-0000-4000-8000-000000000002';
 const USER_ID = '30000000-0000-4000-8000-000000000003';
-const PLAYBOOK_ID = '40000000-0000-4000-8000-000000000004';
 
 function hex(value: number, width: number): string {
   return value.toString(16).padStart(width, '0');
@@ -45,10 +43,6 @@ function syntheticHash(space: number, index: number): string {
 
 function rowId(space: number, index: number): string {
   return `e${hex(space, 7)}-0000-4000-8000-${hex(index, 12)}`;
-}
-
-function playbookSourceId(index: number): string {
-  return `f0000000-0000-4000-8000-${hex(index, 12)}`;
 }
 
 function eligibleRow(input: {
@@ -94,14 +88,12 @@ function playbookRowFor(input: {
 
 interface Corpus {
   rows: ReindexSourceRow[];
-  playbookRows: RecoveryPlaybookRow[];
   inventory: RecoverySourceInventoryEntry[];
 }
 
 function corpus(): Corpus {
   const rows: ReindexSourceRow[] = [];
   const inventory: RecoverySourceInventoryEntry[] = [];
-  const playbookRows: RecoveryPlaybookRow[] = [];
 
   // 109 canonical production sources.
   for (let index = 0; index < 109; index += 1) {
@@ -187,6 +179,8 @@ function corpus(): Corpus {
   }
 
   // 21 non-eligible Career Playbook rows: 3 with exact development content, 18 absent.
+  // The absent 18 are file_catalog-only bookkeeping: career_playbook_sources rows were
+  // legally cascade-deleted with their parent playbooks and carry no live predicates.
   for (let index = 0; index < 21; index += 1) {
     const relative = `${ORGANIZATION_ID}/career-playbooks/${USER_ID}/playbook-${hex(index, 3)}.pdf`;
     const hash = syntheticHash(6, index);
@@ -198,20 +192,10 @@ function corpus(): Corpus {
         size: 4000 + index,
         sha256: hash,
       });
-    } else {
-      playbookRows.push({
-        id: playbookSourceId(index),
-        playbook_id: PLAYBOOK_ID,
-        organization_id: ORGANIZATION_ID,
-        user_id: USER_ID,
-        file_catalog_id: rowId(6, index),
-        status: 'failed',
-        error_message: 'source unavailable',
-      });
     }
   }
 
-  return { rows, playbookRows, inventory };
+  return { rows, inventory };
 }
 
 const OPTIONS = {
@@ -266,7 +250,6 @@ describe('.13.4.1 plan-input generator: buildSourceRecoveryPlanInput', () => {
     const scrambled = corpus();
     scrambled.rows.reverse();
     scrambled.inventory.reverse();
-    scrambled.playbookRows.reverse();
     const second = build(scrambled);
     expect(calculateRecoveryManifestSha256(second)).toBe(calculateRecoveryManifestSha256(first));
   });
@@ -293,7 +276,7 @@ describe('.13.4.1 plan-input generator: buildSourceRecoveryPlanInput', () => {
     });
   });
 
-  it('binds disposition predicates to the exact catalog and playbook rows', () => {
+  it('binds disposition predicates to the exact catalog rows only', () => {
     const manifest = build();
     const invalid = manifest.dispositions.find(entry =>
       entry.expected_storage_path.endsWith('invalid-0.txt')
@@ -311,14 +294,11 @@ describe('.13.4.1 plan-input generator: buildSourceRecoveryPlanInput', () => {
       kind: 'career_playbook_retained_derived',
       reason: 'retained-derived-only',
       course_id: null,
-      career_playbook_source_id: playbookSourceId(20),
-      expected_career_playbook: {
-        playbook_id: PLAYBOOK_ID,
-        user_id: USER_ID,
-        status: 'failed',
-        error_message: 'source unavailable',
-      },
+      expected_vector_status: 'failed',
+      expected_file_error_message: 'source unavailable',
     });
+    expect(playbook).not.toHaveProperty('career_playbook_source_id');
+    expect(playbook).not.toHaveProperty('expected_career_playbook');
   });
 
   it('fails closed when the corpus drifts from the audited totals', () => {
@@ -334,9 +314,10 @@ describe('.13.4.1 plan-input generator: buildSourceRecoveryPlanInput', () => {
     }
     expect(() => build(mismatchedAlternate)).toThrow(/audited/iu);
 
-    const absentPlaybookRow = corpus();
-    absentPlaybookRow.playbookRows = absentPlaybookRow.playbookRows.slice(1);
-    expect(() => build(absentPlaybookRow)).toThrow(/career playbook/iu);
+    const extraPlaybookRow = corpus();
+    const template = extraPlaybookRow.rows.find(row => row.id === rowId(6, 20))!;
+    extraPlaybookRow.rows.push({ ...template, id: rowId(6, 21) });
+    expect(() => build(extraPlaybookRow)).toThrow(/audited|career playbook/iu);
   });
 
   it('fails closed when rows sharing a storage path disagree on content hash', () => {
@@ -407,7 +388,6 @@ describe('.13.4.1 plan-input generator: CLI surface', () => {
       parseGeneratePlanInputArgv(VALID_ARGV),
       {
         loadRows: vi.fn().mockResolvedValue(input.rows),
-        loadPlaybookRows: vi.fn().mockResolvedValue(input.playbookRows),
         loadInventory: vi.fn().mockResolvedValue(input.inventory),
       },
       write

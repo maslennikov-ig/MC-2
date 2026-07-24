@@ -46,19 +46,12 @@ function manifest(overrides: Partial<SourceRecoveryManifest> = {}): SourceRecove
     entry_id: `disposition-playbook-${index.toString().padStart(2, '0')}`,
     kind: 'career_playbook_retained_derived' as const,
     file_catalog_id: uuid(index + 101),
-    career_playbook_source_id: uuid(index + 201),
     organization_id: ORGANIZATION_ID,
     course_id: null,
     expected_hash: 'b'.repeat(64),
     expected_storage_path: `uploads/career/missing-${index}.pdf`,
     expected_vector_status: 'indexed' as const,
     expected_file_error_message: null,
-    expected_career_playbook: {
-      playbook_id: uuid(index + 301),
-      user_id: uuid(index + 401),
-      status: 'ready' as const,
-      error_message: null,
-    },
     reason: 'retained-derived-only' as const,
   }));
   return {
@@ -509,22 +502,17 @@ describe('source recovery workflow', () => {
         current = next;
         return Promise.resolve();
       },
-      applyDisposition: (entry, state, checkpoint) => {
-        if (entry.kind === 'career_playbook_retained_derived' && state === 'disposition_planned') {
-          return checkpoint('career_playbook_source_applied').then(() =>
-            checkpoint('disposition_applied')
-          );
-        }
-        return checkpoint('disposition_applied');
-      },
+      applyDisposition: (_entry, _state, checkpoint) => checkpoint('disposition_applied'),
       readSourceCounts: () => Promise.resolve(value.expected_post_counts),
     });
 
     await runSourceRecoveryCommand({ mode: 'apply-dispositions', confirmRunId: RUN_ID }, deps);
     expect(current.phase).toBe('dispositions_applied');
     expect(
-      persisted.some(item =>
-        Object.values(item.disposition_states).includes('career_playbook_source_applied')
+      persisted.every(item =>
+        Object.values(item.disposition_states).every(state =>
+          ['disposition_planned', 'disposition_applied', 'disposition_verified'].includes(state)
+        )
       )
     ).toBe(true);
 

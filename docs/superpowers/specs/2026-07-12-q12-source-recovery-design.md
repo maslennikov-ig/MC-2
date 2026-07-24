@@ -337,3 +337,24 @@ review, and is integrated only with P0/P1 zero. All accepted commits and the
 integration result are pushed. Graphify is refreshed locally after durable code
 and operations documentation changes, without external model/API modes or Git
 hooks.
+
+## Amendment 2026-07-24: file_catalog-only Career Playbook dispositions
+
+Owner-approved amendment. Live investigation (pg_stat_user_tables:
+`career_playbook_sources` n_tup_ins=21, n_tup_del=21, n_live_tup=0;
+`career_playbooks` 79 created / 68 deleted) established that every reviewed
+`career_playbook_sources` row was legally cascade-deleted with its parent
+playbook (`playbook_id ... ON DELETE CASCADE`) during normal product use after
+the 2026-06-09 uploads. The 18-row live-predicate requirement in the original
+disposition contract is therefore permanently unsatisfiable and was removed:
+
+- `career_playbook_retained_derived` dispositions are file_catalog-only
+  bookkeeping; the manifest schema **rejects** `career_playbook_source_id` and
+  `expected_career_playbook` fields;
+- the `career_playbook_source_applied` journal checkpoint no longer exists;
+  both disposition kinds go `disposition_planned -> disposition_applied` via
+  the single `file_catalog` CAS;
+- planner/verify read exactly 24 `file_catalog` rows (6+18 by kind); the
+  recovery database layer no longer reads or writes `career_playbook_sources`;
+- all exact totals (42 copies / 125 rows / 6+18 dispositions, 261-row counts)
+  are unchanged.

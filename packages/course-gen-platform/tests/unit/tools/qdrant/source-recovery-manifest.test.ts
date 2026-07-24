@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- synchronous in-memory fixtures implement Promise-returning filesystem interfaces */
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -66,19 +67,12 @@ const manifest = (overrides: Partial<SourceRecoveryManifest> = {}): SourceRecove
       entry_id: 'disposition-b',
       kind: 'career_playbook_retained_derived',
       file_catalog_id: 'b88a28b8-3638-49d9-829a-4ab18ad3c613',
-      career_playbook_source_id: '96b5a9fb-fb09-4bd7-b3de-fd70319d5dc8',
       organization_id: 'caacdf41-6267-471b-9331-02a45611a8a7',
       course_id: null,
       expected_hash: 'b'.repeat(64),
       expected_storage_path: 'career/b.pdf',
       expected_vector_status: 'indexed',
       expected_file_error_message: null,
-      expected_career_playbook: {
-        playbook_id: 'e49be5a4-519f-4ef7-9315-f9596ff911cf',
-        user_id: 'f303c89a-1567-4797-bd28-66bcd4b76425',
-        status: 'ready',
-        error_message: null,
-      },
       reason: 'retained-derived-only',
     },
     {
@@ -394,7 +388,7 @@ describe('source recovery manifest', () => {
     ).toThrow(/reindex_started|copy states.*frozen/iu);
   });
 
-  it('supports a durable Career Playbook source-CAS checkpoint', () => {
+  it('treats Career Playbook dispositions as file_catalog-only bookkeeping', () => {
     const initial = createInitialProgressJournal(
       normalizeRecoveryManifest(manifest()),
       canonicalManifestSha256()
@@ -417,32 +411,41 @@ describe('source recovery manifest', () => {
         revision: 3,
         disposition_states: {
           ...copied.disposition_states,
-          'disposition-b': 'career_playbook_source_applied',
-        },
-      }).disposition_states['disposition-b']
-    ).toBe('career_playbook_source_applied');
-
-    expect(() =>
-      validateRecoveryJournalTransition(copied, {
-        ...copied,
-        revision: 3,
-        disposition_states: {
-          ...copied.disposition_states,
-          'disposition-a': 'career_playbook_source_applied',
-        },
-      })
-    ).toThrow(/eligible disposition/iu);
-
-    expect(() =>
-      validateRecoveryJournalTransition(copied, {
-        ...copied,
-        revision: 3,
-        disposition_states: {
-          ...copied.disposition_states,
           'disposition-b': 'disposition_applied',
         },
-      })
-    ).toThrow(/source CAS checkpoint/iu);
+      }).disposition_states['disposition-b']
+    ).toBe('disposition_applied');
+
+    expect(() =>
+      validateRecoveryJournalTransition(copied, {
+        ...copied,
+        revision: 3,
+        disposition_states: {
+          ...copied.disposition_states,
+          'disposition-b': 'career_playbook_source_applied',
+        },
+      } as never)
+    ).toThrow();
+  });
+
+  it('rejects disposition entries that still carry live career_playbook_sources predicates', () => {
+    const withLegacyPlaybookFields = manifest();
+    withLegacyPlaybookFields.dispositions = withLegacyPlaybookFields.dispositions.map(entry =>
+      entry.kind === 'career_playbook_retained_derived'
+        ? ({
+            ...entry,
+            career_playbook_source_id: '96b5a9fb-fb09-4bd7-b3de-fd70319d5dc8',
+            expected_career_playbook: {
+              playbook_id: 'e49be5a4-519f-4ef7-9315-f9596ff911cf',
+              user_id: 'f303c89a-1567-4797-bd28-66bcd4b76425',
+              status: 'ready',
+              error_message: null,
+            },
+          } as never)
+        : entry
+    );
+
+    expect(() => normalizeRecoveryManifest(withLegacyPlaybookFields)).toThrow();
   });
 
   it('accepts the complete write-ahead phase and paired-disposition sequence', () => {
@@ -466,7 +469,7 @@ describe('source recovery manifest', () => {
       revision: 3,
       disposition_states: {
         'disposition-a': 'disposition_applied',
-        'disposition-b': 'career_playbook_source_applied',
+        'disposition-b': 'disposition_planned',
       },
     });
     journal = validateRecoveryJournalTransition(journal, {
