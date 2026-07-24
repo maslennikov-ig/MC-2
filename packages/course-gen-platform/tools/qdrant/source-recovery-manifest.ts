@@ -5,6 +5,11 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+// Disposition expected_hash is a byte-exact CAS predicate against file_catalog.hash, not a
+// physical file digest: the two audited invalid-path rows carry a 23-character legacy value,
+// so any bounded printable non-space token is representable. Physical copy verification
+// (expected_sha256) stays strict sha256.
+const CATALOG_HASH_PATTERN = /^[\x21-\x7e]{1,128}$/u;
 const RELEASE_SHA_PATTERN = /^[a-f0-9]{40,64}$/u;
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const ENTRY_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
@@ -65,7 +70,7 @@ const RecoveryDispositionEntrySchema = z
     file_catalog_id: z.string().uuid(),
     organization_id: z.string().uuid(),
     course_id: z.string().uuid().nullable(),
-    expected_hash: z.string().regex(SHA256_PATTERN),
+    expected_hash: z.string().regex(CATALOG_HASH_PATTERN),
     expected_storage_path: RelativePathSchema,
     expected_vector_status: z.enum(['pending', 'indexing', 'indexed', 'failed']),
     expected_file_error_message: z.string().max(1024).nullable(),

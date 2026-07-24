@@ -165,14 +165,15 @@ function corpus(): Corpus {
   }
 
   // 2 eligible text rows with an invalid relative path (missing the uploads/ prefix) and absent
-  // bytes — the audited invalid pair refers to plain-text sources.
+  // bytes — the audited invalid pair refers to plain-text sources whose catalog hash is a
+  // 23-character legacy value, NOT a sha256 (matches the live rows byte-for-byte in shape).
   for (let index = 0; index < 2; index += 1) {
     rows.push(
       eligibleRow({
         space: 5,
         index,
         storagePath: `${ORGANIZATION_ID}/${COURSE_ID}/invalid-${index}.txt`,
-        hash: syntheticHash(5, index),
+        hash: `legacy:txt-${hex(index, 12)}`,
         mimeType: 'text/plain',
       })
     );

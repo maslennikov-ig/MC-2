@@ -428,6 +428,29 @@ describe('source recovery manifest', () => {
     ).toThrow();
   });
 
+  it('accepts legacy non-sha256 catalog hashes as byte-exact disposition predicates', () => {
+    // The two audited invalid-path rows carry a 23-character legacy catalog hash. The
+    // disposition predicate is byte-exact equality against file_catalog, not a physical
+    // file digest, so the schema accepts any bounded printable token — but never whitespace.
+    const legacy = manifest();
+    legacy.dispositions = legacy.dispositions.map(entry =>
+      entry.entry_id === 'disposition-a'
+        ? { ...entry, expected_hash: 'legacy:txt-0123456789ab' }
+        : entry
+    );
+    expect(
+      normalizeRecoveryManifest(legacy).dispositions.find(
+        entry => entry.entry_id === 'disposition-a'
+      )?.expected_hash
+    ).toBe('legacy:txt-0123456789ab');
+
+    const withWhitespace = manifest();
+    withWhitespace.dispositions = withWhitespace.dispositions.map(entry =>
+      entry.entry_id === 'disposition-a' ? { ...entry, expected_hash: 'legacy hash' } : entry
+    );
+    expect(() => normalizeRecoveryManifest(withWhitespace)).toThrow();
+  });
+
   it('rejects disposition entries that still carry live career_playbook_sources predicates', () => {
     const withLegacyPlaybookFields = manifest();
     withLegacyPlaybookFields.dispositions = withLegacyPlaybookFields.dispositions.map(entry =>
