@@ -508,6 +508,39 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   writers, C9 owner-pressed). The writer-quiesce manifest is published in-window by
   `writers.quiesce` itself (stepping hash ZERO→QSHA per the C0 operator procedure), not
   pre-staged.
+  2026-07-24 (session 2): `mc2-4sz9t` is CLOSED. The server already carried develop-HEAD
+  byte-identical (controller `8d62ca02…`, wrapper `94f923d5…`, 4-file generator closure +
+  emit CLI byte-exact; manifest `aaec6fc2…` intact; fresh `py_compile`/`bash -n` OK). Fresh
+  pre-window `plan` is GREEN under the WINDOW run-id `0fa297e4-3eb7-475f-aee6-56455f02ed6c`
+  (plan and window must share the run-id — the claim path re-reads the catalog from the run
+  root): release `e840c128034f47bb55d578f7e3aeb16fb4b35714`, status `planned`, catalog FILE
+  sha `fa69efb37423990a20ce661a13f8c6ab185dc38e7f6063d5808c24667ab221e1` (this is
+  `--expected-catalog-sha256`), inner structural sha `68041d94…` byte-identical to the
+  07-17/21/23 runs, same two delta-neutral test-schema ACL extras, prod untouched.
+  OPERATOR IMAGE REFRESH: the Phase B digest `sha256:0fe4265c…` NO LONGER EXISTS in GHCR
+  (CI republishes per develop push). The current `develop-d3cb0ee` digest
+  `sha256:8aedef32717441a1d5b4093cfad094d09bddafffbcf7a3bfa04d0da3a2d957b0` (contains the
+  mc2-af1ay amendment) was pulled on the server, its registry-attached SLSA provenance
+  verified (revision `d3cb0ee43…`, source MC-2, target qdrant-operator), and
+  `.env.production` `QDRANT_OPERATOR_IMAGE_SHA256` re-pinned (backup
+  `.env.production.bak-operator-digest-20260724`). This is the refreshed
+  `--operator-digest`. `<run-root>/secrets/db-capability` is minted and staged 0400
+  uid 1000; emit-CLI smoke (runbook §1.10) passes the usage gate.
+  **HARD GATE — WINDOW NOT OPENABLE (`mc2-gyde8` BLOCKED, owner decision required):** the
+  C5 acceptance emit + C6 reindex coverage validation cannot pass against live truth.
+  (a) The live DB has NO `document_evidence_runs`/`document_evidence_items` tables — they
+  are created EMPTY by the C4 migration `20260711120000_document_evidence.sql`, and Stage-4
+  failed-coverage cards are minted only by future post-window generation runs, so
+  `getAcceptedRun()` can never return an accepted ledger during the window. (b) The staged
+  plan-input's six `eligible_unrecoverable` dispositions span SIX org:course scopes across
+  THREE organizations, while `computeSourceForwardAcceptance` + the frozen manifest bind
+  exactly ONE `<accepted-coverage-run>` slot and `assertExactScopes` demands the full scope
+  set — the "single-course-scoped window recovery" design assumption is contradicted by the
+  accepted 07-12 audit truth. Consequence: the wrapper forward tail fails closed at C5
+  (after C2 quiesce) and C6 fails on the same validation. Candidate resolutions (owner
+  call): file_catalog-only acceptance amendment (analogous to mc2-af1ay), narrow the
+  recovery to a single course, or (not recommended) in-window ledger seeding. Evidence and
+  code cites on `mc2-gyde8`.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
