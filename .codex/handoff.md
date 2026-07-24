@@ -466,20 +466,39 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   on today's host+DB — file/copy layer classification passed the exact gate
   (261/240/109/129/2/21, 42 copies / 125 rows, 6 eligible + 18 playbook disposition
   candidates; 261 catalog rows and 138 root files re-verified) — and then FAILED CLOSED at the
-  disposition-predicate layer: **HARD-GATE FINDING — `career_playbook_sources` is EMPTY on the
-  live DB (0 rows; `career_playbooks` has 11)**, while the frozen `.13.4.1` operator contract
-  (`verifyReviewedPriorPredicates`) requires exactly 18 live playbook-source rows matching the
-  manifest predicates. No plan-input was written (fail-closed before write). Consequence: the
-  in-window C5 `source.forward` would abort at plan time against today's DB; the 18
-  `retained-derived-only` dispositions have no live CAS target (rows either never existed —
-  the `.13.4.1` workflow stream bound to migrations/types, not live rows — or were removed by
-  the Career Playbook constructor-track cleanup). OWNER DECISION REQUIRED before staging can
-  complete: amend the disposition contract for the 18 non-eligible rows (file_catalog-only
-  bookkeeping; needs TDD + re-review of `source-recovery.ts`/manifest semantics) vs re-verify
-  intent of the deleted rows first. The writer-quiesce manifest publication and the accepted
-  coverage `org:course:run` triple remain the other pre-window staging items; the window
-  itself (C1..C8 quiesces production writers, C9 owner-pressed) still needs a scheduled
-  owner-present session.
+  disposition-predicate layer: `career_playbook_sources` is EMPTY on the live DB. HARD GATE
+  RESOLVED (2026-07-24, owner-approved amendment `mc2-af1ay`): read-only investigation proved
+  the emptiness is LEGITIMATE product behavior, not data loss — pg_stat_user_tables shows
+  `career_playbook_sources` n_tup_ins=21 / n_tup_del=21 / n_live_tup=0 (all 21 rows uploaded
+  2026-06-09, all cascade-deleted via `playbook_id … ON DELETE CASCADE` when their parent
+  playbooks were deleted; `career_playbooks` shows 79 created / 68 deleted, 11 live), while
+  all 21 `file_catalog` course-NULL rows survive. The 07-12 audit read `file_catalog` only and
+  never verified live playbook-source rows. AMENDMENT DELIVERED (`e29dc188b`, TDD RED→GREEN):
+  `.13.4.1` dispositions are now file_catalog-only bookkeeping — manifest schema REJECTS
+  `career_playbook_source_id`/`expected_career_playbook`, the `career_playbook_source_applied`
+  checkpoint is removed (both kinds go planned→applied via the single file_catalog CAS),
+  planner/verify read exactly 24 file rows, the generator no longer loads playbook rows;
+  exact totals (42/125/6+18, 261 counts) and frozen manifest `aaec6fc2` unchanged; 515/515
+  qdrant unit tests + type-check green; design doc amended
+  (`docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md` §Amendment 2026-07-24).
+  A SECOND latent contract defect surfaced on live regeneration and was fixed (`d3cb0ee43`):
+  the two audited invalid-path rows carry a 23-character legacy non-sha256 `file_catalog.hash`,
+  which the frozen `expected_hash` sha256 regex could never represent — the disposition
+  predicate is now a byte-exact bounded printable token (`CATALOG_HASH_PATTERN`), while
+  physical copy `expected_sha256` stays strict. `.13.4.1` STAGING IS COMPLETE (2026-07-24):
+  the amended 4-file closure is deployed 0444 byte-identical to `/opt/megacampus` and the
+  plan-input is REGENERATED AND STAGED at `/var/lib/megacampus-source-recovery/plan-input.json`
+  (1001:1001 0600; run_id `a417a99c-db3a-45c8-9d32-561d8d068a3e` = the window
+  `--recovery-run-id`; canonical sha
+  `e9d41b175e09c7a07606e087967a1de93bd8cf6532de1f8a414f5ec878529950` verified equal to the raw
+  file bytes; release_sha `d3cb0ee432184dcb8ba939b14c4bda8d22b89209`; exact 42/125/6+18).
+  Remaining pre-window queue (Beads, in dependency order): `mc2-4sz9t` redeploy develop-HEAD
+  `q12-lifecycle-core.py` + `source-recovery-run.sh` and rerun ONE fresh green plan →
+  `mc2-gyde8` derive accepted coverage `org:course:run` + stage `accepted-coverage-run` 0400 +
+  `secrets/db-capability` → `mc2-i9h3y` the owner-present window (C1..C8 quiesces production
+  writers, C9 owner-pressed). The writer-quiesce manifest is published in-window by
+  `writers.quiesce` itself (stepping hash ZERO→QSHA per the C0 operator procedure), not
+  pre-staged.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
