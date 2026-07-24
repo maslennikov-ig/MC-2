@@ -378,6 +378,12 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
 
 ## Explicit defers
 
+- Review P2 on the `.13.4.1` amendment (`mc2-af1ay`, independent review PASS 0 P0/P1):
+  `source-recovery.ts` keeps a second operator-side `DispositionSchema` without the
+  kind↔reason↔course_id superRefine that lives in `source-recovery-manifest.ts` — currently
+  rescued because `assertExactRecoveryContract` runs `normalizeRecoveryManifest` (strict
+  schema). DEFERRED until after the live window: consolidate the duplicate disposition
+  schema (no operator churn before C1..C10). Tracked on `mc2-af1ay`.
 - Q12 staging mutation is owner-authorized, but remains NO-GO until the
   approved local correction streams, truthful fresh validated database backup,
   Supabase-compatible restore and every documented hard gate pass. GHCR
