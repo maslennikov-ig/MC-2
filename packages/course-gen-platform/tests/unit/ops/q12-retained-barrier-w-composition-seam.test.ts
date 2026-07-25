@@ -833,11 +833,7 @@ describe.runIf(RUN_REAL_CONTROLLER)('Joined forward composition', () => {
       '<recovery-run-id>': uuid5(runId, 'q12-source-recovery'),
       '<accepted-recovery-manifest-sha256>': digest('recovery-manifest'),
       '<accepted-coverage-fingerprint>': digest('coverage-fingerprint'),
-      '<accepted-coverage-run>': [
-        uuid5(runId, 'q12-coverage-org'),
-        uuid5(runId, 'q12-coverage-course'),
-        uuid5(runId, 'q12-coverage-run'),
-      ].join(':'),
+      '<accepted-coverage-run>': `catalog:${uuid5(runId, 'q12-source-recovery')}`,
     };
   }
 

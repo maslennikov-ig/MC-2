@@ -142,27 +142,22 @@ function recoveryFixture(
     journal,
     acceptedFailedCoverage: {
       status: 'accepted',
+      source: 'file_catalog',
       recoveryRunId: manifest.run_id,
       recoveryManifestSha256: manifestSha256,
       fingerprint: '',
-      ledgers: [
+      scopes: [
         {
-          ledgerId: '52000000-0000-4000-8000-000000000005',
-          status: 'accepted',
           organizationId: auditedRows[0].organizationId,
           courseId: auditedRows[0].courseId!,
           entries: auditedRows.map(row => ({
-            documentId: row.id,
+            fileCatalogId: row.id,
             organizationId: row.organizationId,
             courseId: row.courseId!,
-            coverageStatus: 'failed',
-            coverageReason: 'source_file_unrecoverable',
-            processingMode: 'metadata_only',
-            summary: null,
-            claims: [],
-            terminology: [],
-            constraints: [],
-            allocatedTokens: 0,
+            storagePath: row.storagePath,
+            hash: row.hash,
+            vectorStatus: 'failed',
+            errorMessage: `source_file_unrecoverable; recovery_run=${manifest.run_id}`,
           })),
         },
       ],
@@ -182,8 +177,8 @@ function recoveryFixture(
 }
 
 function verifiedCoverageIds(binding: RecoveryReindexBinding): string[] {
-  return binding.acceptedFailedCoverage.ledgers.flatMap(ledger =>
-    ledger.entries.map(entry => entry.documentId)
+  return binding.acceptedFailedCoverage.scopes.flatMap(scope =>
+    scope.entries.map(entry => entry.fileCatalogId)
   );
 }
 
@@ -251,9 +246,9 @@ function executionLedger(
     targetCollection: TARGET,
     recoveryRunId: recovery.binding.manifest.run_id,
     recoveryManifestSha256: recovery.binding.manifestSha256,
-    acceptedCoverageLedgerIds: recovery.binding.acceptedFailedCoverage.ledgers.map(
-      ledger => ledger.ledgerId
-    ),
+    acceptedCoverageScopes: recovery.binding.acceptedFailedCoverage.scopes
+      .map(scope => `${scope.organizationId}:${scope.courseId}`)
+      .sort(),
     acceptedCoverageStatus: 'accepted',
     acceptedCoverageFingerprint: recovery.binding.acceptedFailedCoverage.fingerprint,
     verificationFingerprint: calculateReindexVerificationFingerprint(recovery.plan),
@@ -1789,7 +1784,7 @@ describe('reindex CLI parsing', () => {
     ).toThrow('Unknown option');
   });
 
-  it('parses exact recovery paths, identity, fingerprint, and sorted course-run bindings', () => {
+  it('parses exact recovery paths, identity, fingerprint, and the catalog coverage authority', () => {
     expect(
       parseReindexCliArgs([
         'plan',
@@ -1804,9 +1799,7 @@ describe('reindex CLI parsing', () => {
         '--accepted-coverage-fingerprint',
         'b'.repeat(64),
         '--accepted-coverage-run',
-        '10000000-0000-4000-8000-000000000001:22000000-0000-4000-8000-000000000002:53000000-0000-4000-8000-000000000005',
-        '--accepted-coverage-run',
-        '10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000002:52000000-0000-4000-8000-000000000005',
+        'catalog:51000000-0000-4000-8000-000000000005',
       ])
     ).toMatchObject({
       recoveryAdapterConfig: {
@@ -1815,20 +1808,16 @@ describe('reindex CLI parsing', () => {
         expectedRecoveryRunId: '51000000-0000-4000-8000-000000000005',
         expectedRecoveryManifestSha256: 'a'.repeat(64),
         expectedCoverageFingerprint: 'b'.repeat(64),
-        acceptedCoverageRuns: [
-          {
-            organizationId: '10000000-0000-4000-8000-000000000001',
-            courseId: '20000000-0000-4000-8000-000000000002',
-            runId: '52000000-0000-4000-8000-000000000005',
-          },
-          {
-            organizationId: '10000000-0000-4000-8000-000000000001',
-            courseId: '22000000-0000-4000-8000-000000000002',
-            runId: '53000000-0000-4000-8000-000000000005',
-          },
-        ],
+        acceptedCoverageAuthority: 'catalog:51000000-0000-4000-8000-000000000005',
       },
     });
+    expect(() =>
+      parseReindexCliArgs([
+        'plan',
+        '--accepted-coverage-run',
+        '10000000-0000-4000-8000-000000000001:20000000-0000-4000-8000-000000000002:52000000-0000-4000-8000-000000000005',
+      ])
+    ).toThrow(/must be catalog:<recovery-run-id>/iu);
   });
 
   it('fails closed when default live dependencies lack exact recovery configuration', () => {
@@ -1870,15 +1859,19 @@ describe('reindex CLI parsing', () => {
     }
   });
 
-  it('rejects an unrelated empty dry-fixture ledger before artifact publication', async () => {
+  it('rejects an unrelated empty dry-fixture coverage scope before artifact publication', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'mc2-qdrant-reindex-scope-'));
     const fixturePath = join(directory, 'fixture.json');
     const artifactPath = join(directory, 'artifact.json');
     const row = source('60000000-0000-4000-8000-000000000006');
     const recovery = recoveryFixture([row]);
-    recovery.binding.acceptedFailedCoverage.ledgers.push({
-      ledgerId: '54000000-0000-4000-8000-000000000005',
-      status: 'accepted',
+    (
+      recovery.binding.acceptedFailedCoverage.scopes as {
+        organizationId: string;
+        courseId: string;
+        entries: unknown[];
+      }[]
+    ).push({
       organizationId: row.organizationId,
       courseId: '22000000-0000-4000-8000-000000000002',
       entries: [],
@@ -1917,7 +1910,7 @@ describe('reindex CLI parsing', () => {
           },
           deps
         )
-      ).rejects.toThrow(/ledger.*scope|scope.*ledger/iu);
+      ).rejects.toThrow(/coverage scopes must exactly match/iu);
       await expect(stat(artifactPath)).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(directory, { recursive: true, force: true });

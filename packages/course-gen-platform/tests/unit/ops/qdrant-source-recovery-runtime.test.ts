@@ -5521,7 +5521,7 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer re
     // operator-held inputs so this lease-focused test still reaches a clean forward exit.
     writeFileSync(
       join(fixture.q12RunRoot, 'accepted-coverage-run'),
-      '123e4567-e89b-42d3-a456-426614174101:123e4567-e89b-42d3-a456-426614174102:123e4567-e89b-42d3-a456-426614174103\n',
+      'catalog:123e4567-e89b-42d3-a456-426614174000\n',
       { mode: 0o400 }
     );
     const leaseEnvFile = fixture.args[fixture.args.indexOf('--env-file') + 1];
@@ -6102,11 +6102,9 @@ describe.runIf(RUN_REAL_CONTROLLER)(
 );
 
 describe.runIf(RUN_REAL_CONTROLLER)('Q12 source.forward acceptance emit wiring (W7a)', () => {
-  const COVERAGE_TRIPLE = [
-    '123e4567-e89b-42d3-a456-426614174101',
-    '123e4567-e89b-42d3-a456-426614174102',
-    '123e4567-e89b-42d3-a456-426614174103',
-  ].join(':');
+  // Amendment 2026-07-25: the staged authority is the file_catalog token, which must name this run's
+  // recovery run id (the wrapper's --recovery-run-id) — no org:course:run ledger triple exists.
+  const COVERAGE_AUTHORITY = 'catalog:123e4567-e89b-42d3-a456-426614174000';
   const SYNTHETIC_SUPABASE_URL = 'https://synthetic-project.supabase.invalid';
   const SYNTHETIC_SERVICE_KEY = 'synthetic-service-role-key-value';
 
@@ -6191,7 +6189,7 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source.forward acceptance emit wiring (
       ].join('\n')
     );
     const coverageRunFile = join(fixture.q12RunRoot, 'accepted-coverage-run');
-    writeFileSync(coverageRunFile, `${COVERAGE_TRIPLE}\n`, { mode: 0o400 });
+    writeFileSync(coverageRunFile, `${COVERAGE_AUTHORITY}\n`, { mode: 0o400 });
     const emitLog = join(fixture.directory, 'emit.log');
     const emitBin = join(fixture.directory, 'bin/emit-acceptance');
     writeFileSync(
@@ -6279,7 +6277,7 @@ fi
         '--recovery-run-id',
         '123e4567-e89b-42d3-a456-426614174000',
         '--accepted-coverage-run',
-        COVERAGE_TRIPLE,
+        COVERAGE_AUTHORITY,
         '--output',
         fixture.acceptanceOutput,
       ].join(' ')
@@ -6318,11 +6316,38 @@ fi
   it('fails closed without invoking emit on a malformed coverage-run triple', () => {
     const fixture = acceptanceEmitFixture();
     chmodSync(fixture.coverageRunFile, 0o600);
-    writeFileSync(fixture.coverageRunFile, 'not-a-triple\n');
+    writeFileSync(fixture.coverageRunFile, 'not-a-catalog-token\n');
     chmodSync(fixture.coverageRunFile, 0o400);
     const result = fixture.run();
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/organization:course:run/iu);
+    expect(result.stderr).toMatch(/catalog:/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed on the retired organization:course:run coverage triple', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(
+      fixture.coverageRunFile,
+      '123e4567-e89b-42d3-a456-426614174101:123e4567-e89b-42d3-a456-426614174102:123e4567-e89b-42d3-a456-426614174103\n'
+    );
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/catalog:/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed when the staged authority names another recovery run', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, 'catalog:123e4567-e89b-42d3-a456-426614174999\n');
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/recovery run/iu);
     expect(existsSync(fixture.emitLog)).toBe(false);
     expect(existsSync(fixture.acceptanceOutput)).toBe(false);
   });
@@ -6330,7 +6355,7 @@ fi
   it('fails closed on a multi-line coverage-run authority even without a trailing newline', () => {
     const fixture = acceptanceEmitFixture();
     chmodSync(fixture.coverageRunFile, 0o600);
-    writeFileSync(fixture.coverageRunFile, `${COVERAGE_TRIPLE}\ntrailing-garbage`);
+    writeFileSync(fixture.coverageRunFile, `${COVERAGE_AUTHORITY}\ntrailing-garbage`);
     chmodSync(fixture.coverageRunFile, 0o400);
     const result = fixture.run();
     expect(result.status).not.toBe(0);

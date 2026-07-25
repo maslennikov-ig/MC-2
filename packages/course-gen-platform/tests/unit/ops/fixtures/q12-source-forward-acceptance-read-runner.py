@@ -2,7 +2,8 @@
 """W7a real leg: prove the DEPLOYED OwnerCustodyExecutor.read_source_forward_acceptance BASE seam
 reads the on-disk source.forward acceptance authority (written by the TS emit-entrypoint into the
 run_root) and returns the exact ``(recovery_manifest_sha256, coverage_fingerprint, coverage_run)``
-triple — mirroring the proven read_pg_backup_generation pattern (parse + validate + fail-closed).
+triple, whose coverage_run is the `catalog:<recovery-run-id>` authority token (amendment
+2026-07-25) — mirroring the proven read_pg_backup_generation pattern (parse + validate + fail-closed).
 
 Infra-free: no docker/source/Qdrant — a plain on-disk authority JSON in a /tmp run_root. Prints ONE
 JSON object; the TS test asserts on it. This is the read half of the real leg; the write half is the
@@ -37,7 +38,7 @@ def main() -> int:
     request = {"run_id": str(uuid.uuid4()), "production": True}
     manifest_sha = "a" * 64
     fingerprint = "b" * 64
-    coverage_run = f"{uuid.uuid4()}:{uuid.uuid4()}:{uuid.uuid4()}"
+    coverage_run = f"catalog:{uuid.uuid4()}"
     executor = core.OwnerCustodyExecutor()
 
     # The seam exists on the DEPLOYED executor.
@@ -86,7 +87,7 @@ def main() -> int:
             bad_sha_failed = True
         out["malformedShaFailsClosed"] = bad_sha_failed
 
-    # (4) malformed coverage_run (not an org:course:run UUID triple) fails closed.
+    # (4) malformed coverage_run (not a catalog:<recovery-run-id> token) fails closed.
     with tempfile.TemporaryDirectory(prefix="mc2-q12-sfa-badrun-") as tmp:
         run_root = pathlib.Path(tmp)
         _write(run_root, {
@@ -100,6 +101,21 @@ def main() -> int:
         except core.LifecycleError:
             bad_run_failed = True
         out["malformedRunFailsClosed"] = bad_run_failed
+
+    # (5) the legacy org:course:run ledger triple is no longer an authority and fails closed.
+    with tempfile.TemporaryDirectory(prefix="mc2-q12-sfa-legacy-") as tmp:
+        run_root = pathlib.Path(tmp)
+        _write(run_root, {
+            "recovery_manifest_sha256": manifest_sha,
+            "coverage_fingerprint": fingerprint,
+            "coverage_run": f"{uuid.uuid4()}:{uuid.uuid4()}:{uuid.uuid4()}",
+        })
+        legacy_failed = False
+        try:
+            executor.read_source_forward_acceptance(request, run_root)
+        except core.LifecycleError:
+            legacy_failed = True
+        out["legacyTripleFailsClosed"] = legacy_failed
 
     sys.stdout.write(json.dumps(out))
     return 0

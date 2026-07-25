@@ -60,7 +60,7 @@ import {
 import {
   createDefaultSourceRecoveryReindexAdapters,
   normalizeSourceRecoveryReindexAdapterConfig,
-  type AcceptedCoverageRunConfig,
+  parseAcceptedCoverageAuthority,
   type SourceRecoveryReindexAdapterConfig,
 } from './source-recovery-reindex-adapters';
 import { requireQ12CapabilityFetchInstalled } from './source-recovery-database';
@@ -98,7 +98,7 @@ export interface ReindexExecutionArtifact {
   targetCollection: string;
   recoveryRunId: string;
   recoveryManifestSha256: string;
-  acceptedCoverageLedgerIds: string[];
+  acceptedCoverageScopes: string[];
   acceptedCoverageStatus: 'accepted';
   acceptedCoverageFingerprint: string;
   verificationFingerprint: string;
@@ -300,6 +300,13 @@ const MIN_JOB_TIMEOUT_MS = 1_000;
 const MAX_JOB_TIMEOUT_MS = 86_400_000;
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const UUID_V4_SCHEMA = z.string().regex(UUID_V4_PATTERN, 'must be a lowercase UUIDv4');
+// Accepted coverage scopes are the recovered `organization:course` pairs (amendment 2026-07-25); the
+// document-evidence ledger IDs they replace no longer exist as an in-window authority.
+const COVERAGE_SCOPE_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const COVERAGE_SCOPE_SCHEMA = z
+  .string()
+  .regex(COVERAGE_SCOPE_PATTERN, 'must be a lowercase organization:course UUIDv4 pair');
 
 function readCliValue(args: string[], index: number, option: string): [string, number] {
   const value = args[index + 1];
@@ -312,7 +319,6 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
     mode: 'plan',
     help: false,
   };
-  const acceptedCoverageRuns: AcceptedCoverageRunConfig[] = [];
   const recoveryConfig: Partial<SourceRecoveryReindexAdapterConfig> = {};
   let modeSeen = false;
 
@@ -373,15 +379,9 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       recoveryConfig.expectedCoverageFingerprint = value;
     }
     if (option === '--accepted-coverage-run') {
-      const parts = value.split(':');
-      if (parts.length !== 3) {
-        throw new Error('--accepted-coverage-run must be organization:course:run UUIDs');
-      }
-      acceptedCoverageRuns.push({
-        organizationId: parts[0],
-        courseId: parts[1],
-        runId: parts[2],
-      });
+      // Fails closed here so a legacy org:course:run triple can never reach the adapter.
+      parseAcceptedCoverageAuthority(value);
+      recoveryConfig.acceptedCoverageAuthority = value;
     }
   }
 
@@ -390,8 +390,7 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
   }
   if (options.concurrency !== undefined) resolveConcurrency(options.concurrency);
   if (options.jobTimeoutMs !== undefined) resolveJobTimeout(options.jobTimeoutMs);
-  const recoveryConfigured =
-    Object.keys(recoveryConfig).length > 0 || acceptedCoverageRuns.length > 0;
+  const recoveryConfigured = Object.keys(recoveryConfig).length > 0;
   if (recoveryConfigured) {
     if (
       !recoveryConfig.manifestPath ||
@@ -399,7 +398,7 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       !recoveryConfig.expectedRecoveryRunId ||
       !recoveryConfig.expectedRecoveryManifestSha256 ||
       !recoveryConfig.expectedCoverageFingerprint ||
-      acceptedCoverageRuns.length === 0
+      !recoveryConfig.acceptedCoverageAuthority
     ) {
       throw new Error('Exact source recovery adapter configuration is incomplete');
     }
@@ -409,7 +408,7 @@ export function parseReindexCliArgs(args: string[]): ReindexCliOptions {
       expectedRecoveryRunId: recoveryConfig.expectedRecoveryRunId,
       expectedRecoveryManifestSha256: recoveryConfig.expectedRecoveryManifestSha256,
       expectedCoverageFingerprint: recoveryConfig.expectedCoverageFingerprint,
-      acceptedCoverageRuns,
+      acceptedCoverageAuthority: recoveryConfig.acceptedCoverageAuthority,
     });
   }
   return options;
@@ -530,8 +529,8 @@ function assertArtifactRecoveryBinding(
   if (
     artifact.recoveryRunId !== plan.recoveryRunId ||
     artifact.recoveryManifestSha256 !== plan.recoveryManifestSha256 ||
-    JSON.stringify(artifact.acceptedCoverageLedgerIds) !==
-      JSON.stringify(plan.acceptedCoverageLedgerIds) ||
+    JSON.stringify(artifact.acceptedCoverageScopes) !==
+      JSON.stringify(plan.acceptedCoverageScopes) ||
     artifact.acceptedCoverageStatus !== plan.acceptedCoverageStatus ||
     artifact.acceptedCoverageFingerprint !== plan.acceptedCoverageFingerprint ||
     artifact.verificationFingerprint !== plan.verificationFingerprint
@@ -785,7 +784,7 @@ async function executeReindex(
     targetCollection,
     recoveryRunId: basePrepared.plan.recoveryRunId!,
     recoveryManifestSha256: basePrepared.plan.recoveryManifestSha256!,
-    acceptedCoverageLedgerIds: basePrepared.plan.acceptedCoverageLedgerIds!,
+    acceptedCoverageScopes: basePrepared.plan.acceptedCoverageScopes!,
     acceptedCoverageStatus: basePrepared.plan.acceptedCoverageStatus!,
     acceptedCoverageFingerprint: basePrepared.plan.acceptedCoverageFingerprint!,
     verificationFingerprint: calculateReindexVerificationFingerprint(basePrepared.plan),
@@ -1119,7 +1118,7 @@ const ReindexExecutionArtifactSchema = z
     targetCollection: z.string().min(1).max(255),
     recoveryRunId: UUID_V4_SCHEMA,
     recoveryManifestSha256: z.string().regex(/^[a-f0-9]{64}$/u),
-    acceptedCoverageLedgerIds: z.array(UUID_V4_SCHEMA).min(1),
+    acceptedCoverageScopes: z.array(COVERAGE_SCOPE_SCHEMA).min(1),
     acceptedCoverageStatus: z.literal('accepted'),
     acceptedCoverageFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
     verificationFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
@@ -1181,8 +1180,8 @@ const ReindexExecutionArtifactSchema = z
     const issue = (message: string): void => {
       context.addIssue({ code: 'custom', message });
     };
-    if (!isUniqueSorted(artifact.acceptedCoverageLedgerIds)) {
-      issue('accepted coverage ledger IDs must be unique and sorted');
+    if (!isUniqueSorted(artifact.acceptedCoverageScopes)) {
+      issue('accepted coverage scopes must be unique and sorted');
     }
     if (!isUniqueSorted(artifact.plannedJobIds))
       issue('planned ledger IDs must be unique and sorted');

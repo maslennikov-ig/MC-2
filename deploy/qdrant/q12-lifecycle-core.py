@@ -27,12 +27,14 @@ EPOCH_RE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*)$")
 # W7a: the fresh pg.backup's published generation-dir basename (backup-supabase.sh generation-<ts>-<uuid>;
 # restore-supabase-drill.sh's --generation guard). The <immutable-generation> authority must match it.
 GENERATION_DIR_NAME_RE = re.compile(r"generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}")
-# W7a real leg: the accepted source.forward coverage run — an organization:course:run lower-case
-# UUIDv4 triple (reindex-course-embeddings.ts:375 splits <accepted-coverage-run> on ':'). The
-# on-disk acceptance authority the TS emit-entrypoint writes must match this exact shape.
+# W7a real leg: the accepted source.forward coverage authority token. Owner-approved amendment
+# 2026-07-25 — acceptance is file_catalog truth, so this is `catalog:<recovery-run-id>` (parsed by
+# source-recovery-reindex-adapters.ts parseAcceptedCoverageAuthority) and NOT the retired
+# organization:course:run document-evidence ledger triple: those ledgers are created empty by the C4
+# migration and their zero-evidence cards are minted only by post-window Stage-4 runs (mc2-8m90f).
+# The six recovered course scopes live in the sha-bound reviewed recovery manifest, not in argv.
 COVERAGE_RUN_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
-    r"(?::[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}){2}$"
+    r"^catalog:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
 OPERATIONS = (
     "install",
@@ -732,10 +734,7 @@ def derive_joined_fixture_values(run_id: str, quiesce_manifest_path: str) -> dic
         "<recovery-run-id>": derived_uuid("q12-source-recovery"),
         "<accepted-recovery-manifest-sha256>": digest("recovery-manifest"),
         "<accepted-coverage-fingerprint>": digest("coverage-fingerprint"),
-        "<accepted-coverage-run>": ":".join(
-            derived_uuid(name)
-            for name in ("q12-coverage-org", "q12-coverage-course", "q12-coverage-run")
-        ),
+        "<accepted-coverage-run>": f"catalog:{derived_uuid('q12-source-recovery')}",
         "<quiesce-manifest>": quiesce_manifest_path,
     }
 
@@ -1427,15 +1426,17 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         Unlike the pg.backup generation (a simple ``latest.json`` pointer), these three are a COMPUTED
         binding owned by the TS source-recovery acceptance authority
         (``tools/qdrant/source-recovery-reindex-adapters.ts``: canonical manifest sha256 +
-        ``calculateAcceptedFailedCoverageFingerprint`` + the unique ``org:course:run`` scopes). That
-        authority is owned by the TS source-recovery acceptance emit-entrypoint
-        (``source-recovery-reindex-adapters.ts`` ``emitSourceForwardAcceptance``): it COMPUTES the
-        canonical manifest sha256 + ``calculateAcceptedFailedCoverageFingerprint`` + the single
-        ``org:course:run`` scope and writes them to ``<run_root>/source-forward-acceptance.json``
+        ``calculateAcceptedFailedCoverageFingerprint`` over the recovered file_catalog rows + the
+        ``catalog:<recovery-run-id>`` authority token). That authority is owned by the TS
+        source-recovery acceptance emit-entrypoint (``source-recovery-reindex-adapters.ts``
+        ``computeSourceForwardAcceptance``, driven by ``emit-source-forward-acceptance.ts``): it
+        COMPUTES the canonical manifest sha256 + the coverage fingerprint over the recovered
+        file_catalog rows of all six reviewed course scopes and writes them, with the authority token,
+        to ``<run_root>/source-forward-acceptance.json``
         (``source-recovery-run.sh --operation forward`` wiring). This seam READS that on-disk authority
         — it never recomputes the TS fingerprint in Python (no silent drift) — mirroring the
         ``read_pg_backup_generation`` pattern (parse + validate + fail-closed). The real VALUES are
-        window-grade (a real reviewed recovery manifest + Supabase accepted-coverage ledgers), so the
+        window-grade (a real reviewed recovery manifest + the recovered Supabase file_catalog rows), so the
         end-to-end leg is exercised at the W7 owner-gated window; the read + its fail-closed validation
         are unit-tested here with a synthetic authority. Tracked on mc2-1sns3."""
         del request

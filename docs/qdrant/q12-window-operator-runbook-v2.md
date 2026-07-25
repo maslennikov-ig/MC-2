@@ -19,8 +19,14 @@
 - **New required flag:** `--recovery-run-id` (the accepted `.13.4.1` source-recovery run id).
 - **Real-run acceptance oracle (D4).** Acceptance no longer keys off fixture byte-parity (that stays
   a separate mechanics check); a real run is accepted iff every child exited 0 **and** the barrier
-  receipt reached `guard_cleanup_complete` **and** coverage `org:course:run` is in the recovery
+  receipt reached `guard_cleanup_complete` **and** the coverage authority is bound in the recovery
   journal.
+- **file_catalog-only accepted coverage (amendment 2026-07-25).** The acceptance authority is derived
+  from the recovered `file_catalog` rows, not from the `document_evidence_*` ledgers (which the C4
+  migration creates empty; their zero-evidence cards are minted only by post-window Stage-4 runs —
+  re-verified post-window under `mc2-8m90f`). `<accepted-coverage-run>` carries the token
+  `catalog:<recovery-run-id>`; the six recovered course scopes come from the sha-bound reviewed
+  recovery manifest. The frozen manifest identity `aaec6fc2…` is unchanged.
 
 ## 1. Preconditions (before C1)
 
@@ -34,15 +40,20 @@
 5. The accepted `.13.4.1` source-recovery run id is known (this is `--recovery-run-id`).
 6. The writer-quiesce manifest is published `0400` at its absolute path and its sha256 is known.
 7. The canonical `cutover.lock` is held exclusively on FD 9 (the controller acquires it in `main()`).
-8. The accepted coverage-run authority is staged at
+8. The accepted coverage authority is staged at
    `/opt/megacampus/backups/q12/<run-id>/accepted-coverage-run` — controller-owned `0400`, one
-   newline-terminated `organization:course:run` line (lower-case UUIDv4 triple) naming the accepted
-   document-evidence coverage run for the recovered course. The `source.forward` wrapper tail reads
-   it to emit `<run-root>/source-forward-acceptance.json` (the authority
-   `read_source_forward_acceptance` consumes); a Q12 forward without it fails closed.
+   newline-terminated line holding the **file_catalog authority token**
+   `catalog:<accepted-.13.4.1-source-recovery-run-id>` (owner-approved amendment 2026-07-25; see
+   `docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md` §"Amendment 2026-07-25"). It
+   must name the same run id passed as `--recovery-run-id`; the wrapper fails closed on a mismatch,
+   on the retired `organization:course:run` ledger triple, and on any extra line. The
+   `source.forward` wrapper tail reads it to emit `<run-root>/source-forward-acceptance.json` (the
+   authority `read_source_forward_acceptance` consumes); a Q12 forward without it fails closed.
 9. `/opt/megacampus/.env.production` defines exactly one non-empty `SUPABASE_URL` and one
-   `SUPABASE_SERVICE_KEY` (the emit CLI validates the acceptance against the Supabase
-   accepted-coverage ledgers; the wrapper passes these two values only to the emit child).
+   `SUPABASE_SERVICE_KEY` (the emit CLI validates the acceptance against the live `file_catalog`
+   rows the recovery just wrote — `vector_status='failed'` plus
+   `error_message='source_file_unrecoverable; recovery_run=<run>'` for the exact six eligible
+   identities; the wrapper passes these two values only to the emit child).
 10. The deployed `/opt/megacampus/deploy/qdrant/` tree carries the current `develop` build of BOTH
     `q12-lifecycle-core.py` (real-read `read_source_forward_acceptance`) and
     `source-recovery-run.sh` (acceptance emit tail), and the frozen manifest sha is re-verified

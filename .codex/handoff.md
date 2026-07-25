@@ -541,6 +541,33 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   call): file_catalog-only acceptance amendment (analogous to mc2-af1ay), narrow the
   recovery to a single course, or (not recommended) in-window ledger seeding. Evidence and
   code cites on `mc2-gyde8`.
+  2026-07-25 (session 3): **HARD GATE RESOLVED — owner approved variant A** (file_catalog-only
+  accepted coverage) and it is DELIVERED under `mc2-tpdog`. Acceptance is now derived from the
+  recovered `file_catalog` rows (`applyDispositionEntry`'s post-state: `vector_status='failed'` +
+  `error_message='source_file_unrecoverable; recovery_run=<run>'`) cross-checked against the
+  sha-bound reviewed manifest; the six recovered `organization:course` scopes come from the
+  manifest, so the frozen manifest `aaec6fc2…` is UNCHANGED and its single `<accepted-coverage-run>`
+  slot now carries the self-describing authority token `catalog:<recovery-run-id>` (validated by the
+  controller `COVERAGE_RUN_RE`, the wrapper forward tail — which also requires it to equal the run's
+  own `--recovery-run-id` — the emit CLI and the reindex CLI). `AcceptedFailedCoverageBinding` carries
+  `source: 'file_catalog'` + `scopes` (was `ledgers`); the reindex plan/artifact field
+  `acceptedCoverageLedgerIds` became `acceptedCoverageScopes` (sorted `org:course`). Spec:
+  `docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md` §"Amendment 2026-07-25"; plan:
+  `docs/superpowers/plans/2026-07-25-q12-file-catalog-accepted-coverage.md`; runbook §0 + §1.8/§1.9
+  and the C0 operator-procedure placeholder table updated. The dropped downstream guarantee (Stage-4
+  zero-evidence cards for the six sources) is tracked as an explicit post-window defer on
+  `mc2-8m90f`, and the Stage-4 half stays covered by
+  `source-recovery-acceptance.test.ts::proveStage4AcceptsAuditedFailedSources`.
+  REDEPLOY REQUIRED before the window: controller + wrapper + emit runtime closure changed, so
+  re-deploy develop-HEAD and run ONE fresh pre-window `plan`. The plan's inner structural sha will
+  legitimately CHANGE (was `68041d94…`; the fixture `<accepted-coverage-run>` derivation is now the
+  catalog token) — the frozen manifest sha must not. `--run-id`
+  `0fa297e4-3eb7-475f-aee6-56455f02ed6c`, `--operator-digest sha256:8aedef32…` and
+  `--recovery-run-id a417a99c-db3a-45c8-9d32-561d8d068a3e` stay; re-record
+  `--expected-catalog-sha256` and `--release-sha` from the fresh plan run. `mc2-gyde8` reduces to:
+  stage `<run-root>/accepted-coverage-run` 0400 containing
+  `catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e` (db-capability is already staged) and re-run the
+  §1.10 emit smoke.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review

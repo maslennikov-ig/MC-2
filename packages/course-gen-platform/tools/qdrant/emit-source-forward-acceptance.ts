@@ -12,7 +12,8 @@ import {
  * W7a real leg CLI: the source.forward acceptance emit-entrypoint invoked by
  * `source-recovery-run.sh --operation forward` (via tsx). After the recovery forward writes its
  * reviewed manifest + journal, this COMPUTES the acceptance authority
- * (recovery_manifest_sha256 + coverage_fingerprint + org:course:run) and writes it owner-only 0400 to
+ * (recovery_manifest_sha256 + coverage_fingerprint + the `catalog:<recovery-run-id>` authority token,
+ * owner-approved amendment 2026-07-25) and writes it owner-only 0400 to
  * the run-root `source-forward-acceptance.json` the Q12 controller's `read_source_forward_acceptance`
  * consumes. Kept side-effect-free on import so the unit test can drive the parts with injected deps.
  */
@@ -86,17 +87,12 @@ export async function runEmitSourceForwardAcceptance(
     authority: SourceForwardAcceptanceAuthority
   ) => void = writeSourceForwardAcceptanceAuthority
 ): Promise<SourceForwardAcceptanceAuthority> {
-  const parts = args.coverageRun.split(':');
-  if (parts.length !== 3) {
-    throw new Error('--accepted-coverage-run must be organization:course:run UUIDs');
-  }
-  const [organizationId, courseId, runId] = parts;
   const authority = await computeSourceForwardAcceptance(
     {
       manifestPath: args.manifestPath,
       journalPath: args.journalPath,
       expectedRecoveryRunId: args.recoveryRunId,
-      acceptedCoverageRuns: [{ organizationId, courseId, runId }],
+      acceptedCoverageAuthority: args.coverageRun,
     },
     dependencies
   );

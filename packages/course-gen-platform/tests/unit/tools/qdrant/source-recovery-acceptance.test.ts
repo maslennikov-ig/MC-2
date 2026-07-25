@@ -171,13 +171,14 @@ describe('source recovery acceptance', () => {
       const { binding: recoveryBinding, literalOracle } =
         await loadAcceptedRecoveryBinding(fixture);
       const acceptedFailedCoverage = recoveryBinding.acceptedFailedCoverage;
-      expect(fixture.adapterQueries).toEqual([
-        `accepted:${ORG_A}:${COURSE_A}:${acceptedFailedCoverage.ledgers[0].ledgerId}`,
-        `items:${acceptedFailedCoverage.ledgers[0].ledgerId}`,
-        `accepted:${ORG_B}:${COURSE_B}:${acceptedFailedCoverage.ledgers[1].ledgerId}`,
-        `items:${acceptedFailedCoverage.ledgers[1].ledgerId}`,
-      ]);
+      // The Q12 acceptance binding must not touch the document-evidence ledgers at all.
+      expect(fixture.adapterQueries).toEqual([]);
+      expect(acceptedFailedCoverage.source).toBe('file_catalog');
+      expect(
+        acceptedFailedCoverage.scopes.map(scope => `${scope.organizationId}:${scope.courseId}`)
+      ).toEqual([`${ORG_A}:${COURSE_A}`, `${ORG_B}:${COURSE_B}`].sort());
       expect(acceptedFailedCoverage).toEqual(literalOracle);
+      await proveStage4AcceptsAuditedFailedSources(fixture);
       const boundRows = rowsWithDispositionTruth(fixture);
       const reindexPlan = buildReindexPlan(
         boundRows,
@@ -792,6 +793,72 @@ async function loadAcceptedRecoveryBinding(fixture: AcceptanceFixture): Promise<
   binding: RecoveryReindexBinding;
   literalOracle: AcceptedFailedCoverageBinding;
 }> {
+  // Amendment 2026-07-25: the accepted failed coverage is the recovered file_catalog state, so the
+  // literal oracle is derived from the reviewed manifest plus the post-recovery applied row state and
+  // the adapter reads file_catalog only — the document-evidence ledgers are not consulted at all.
+  const eligible = fixture.manifest.dispositions.filter(
+    entry => entry.kind === 'eligible_unrecoverable'
+  );
+  const scopes = new Map<string, AcceptedFailedCoverageBinding['scopes'][number]>();
+  for (const entry of eligible) {
+    const key = `${entry.organization_id}:${entry.course_id}`;
+    const scope = scopes.get(key) ?? {
+      organizationId: entry.organization_id,
+      courseId: entry.course_id!,
+      entries: [],
+    };
+    (scope.entries as AcceptedFailedCoverageBinding['scopes'][number]['entries'][number][]).push({
+      fileCatalogId: entry.file_catalog_id,
+      organizationId: entry.organization_id,
+      courseId: entry.course_id!,
+      storagePath: entry.expected_storage_path,
+      hash: entry.expected_hash,
+      vectorStatus: 'failed',
+      errorMessage: `source_file_unrecoverable; recovery_run=${fixture.manifest.run_id}`,
+    });
+    scopes.set(key, scope);
+  }
+  expect(scopes.size).toBe(2);
+  expect([...scopes.values()].flatMap(scope => scope.entries)).toHaveLength(6);
+  const literalOracle: AcceptedFailedCoverageBinding = {
+    status: 'accepted',
+    source: 'file_catalog',
+    recoveryRunId: fixture.manifest.run_id,
+    recoveryManifestSha256: calculateRecoveryManifestSha256(fixture.manifest),
+    fingerprint: '',
+    scopes: [...scopes.values()].sort((left, right) =>
+      `${left.organizationId}:${left.courseId}`.localeCompare(
+        `${right.organizationId}:${right.courseId}`
+      )
+    ),
+  };
+  literalOracle.fingerprint = calculateAcceptedFailedCoverageFingerprint(literalOracle);
+  const adapters = createSourceRecoveryReindexAdapters(
+    {
+      manifestPath: fixture.manifestPath,
+      journalPath: fixture.journalPath,
+      expectedRecoveryRunId: fixture.manifest.run_id,
+      expectedRecoveryManifestSha256: literalOracle.recoveryManifestSha256,
+      expectedCoverageFingerprint: literalOracle.fingerprint,
+      acceptedCoverageAuthority: `catalog:${fixture.manifest.run_id}`,
+    },
+    {
+      loadReviewedRecoveryState,
+      persistRecoveryJournalTransition,
+      catalogRepository: fixture.database,
+    }
+  );
+  return {
+    binding: await adapters.loadRecoveryBinding(),
+    literalOracle,
+  };
+}
+
+// The Stage-4 half of the accepted-failure contract: an audited unrecoverable source is accepted as a
+// zero-evidence failed card WITHOUT invoking generation. That statement is real product behaviour, but
+// it exists only AFTER the window (the evidence tables are created empty at C4), so it is asserted
+// here and re-verified against live ledgers post-window — mc2-8m90f.
+async function proveStage4AcceptsAuditedFailedSources(fixture: AcceptanceFixture): Promise<void> {
   const repository = new AcceptanceEvidenceRepository(fixture.adapterQueries);
   const eligible = fixture.manifest.dispositions.filter(
     entry => entry.kind === 'eligible_unrecoverable'
@@ -801,14 +868,11 @@ async function loadAcceptedRecoveryBinding(fixture: AcceptanceFixture): Promise<
     const key = `${entry.organization_id}:${entry.course_id}`;
     scopes.set(key, [...(scopes.get(key) ?? []), entry]);
   }
-  const ledgers: AcceptedFailedCoverageBinding['ledgers'][number][] = [];
   for (const entries of scopes.values()) {
-    const organizationId = entries[0].organization_id;
-    const courseId = entries[0].course_id!;
     const result = await runDocumentEvidencePreflight(
       {
-        organizationId,
-        courseId,
+        organizationId: entries[0].organization_id,
+        courseId: entries[0].course_id!,
         topic: 'Reviewed source recovery',
         language: 'en',
         evidenceVersion: 'source-recovery-acceptance-v1',
@@ -859,59 +923,7 @@ async function loadAcceptedRecoveryBinding(fixture: AcceptanceFixture): Promise<
         token_counts: { allocated: 0 },
       });
     }
-    ledgers.push({
-      ledgerId: result.runId!,
-      status: 'accepted',
-      organizationId,
-      courseId,
-      entries: result.cards.map(card => ({
-        documentId: card.document_id,
-        organizationId,
-        courseId,
-        coverageStatus: 'failed',
-        coverageReason: 'source_file_unrecoverable',
-        processingMode: 'metadata_only',
-        summary: null,
-        claims: [],
-        terminology: [],
-        constraints: [],
-        allocatedTokens: 0,
-      })),
-    });
   }
-  expect(ledgers).toHaveLength(2);
-  expect(ledgers.flatMap(ledger => ledger.entries)).toHaveLength(6);
-  const literalOracle: AcceptedFailedCoverageBinding = {
-    status: 'accepted',
-    recoveryRunId: fixture.manifest.run_id,
-    recoveryManifestSha256: calculateRecoveryManifestSha256(fixture.manifest),
-    fingerprint: '',
-    ledgers,
-  };
-  literalOracle.fingerprint = calculateAcceptedFailedCoverageFingerprint(literalOracle);
-  const adapters = createSourceRecoveryReindexAdapters(
-    {
-      manifestPath: fixture.manifestPath,
-      journalPath: fixture.journalPath,
-      expectedRecoveryRunId: fixture.manifest.run_id,
-      expectedRecoveryManifestSha256: literalOracle.recoveryManifestSha256,
-      expectedCoverageFingerprint: literalOracle.fingerprint,
-      acceptedCoverageRuns: literalOracle.ledgers.map(ledger => ({
-        organizationId: ledger.organizationId,
-        courseId: ledger.courseId,
-        runId: ledger.ledgerId,
-      })),
-    },
-    {
-      loadReviewedRecoveryState,
-      persistRecoveryJournalTransition,
-      evidenceRepository: repository,
-    }
-  );
-  return {
-    binding: await adapters.loadRecoveryBinding(),
-    literalOracle,
-  };
 }
 
 function rowsWithDispositionTruth(fixture: AcceptanceFixture): ReindexSourceRow[] {

@@ -1,17 +1,19 @@
 import { isAbsolute, resolve } from 'node:path';
 
-import { DocumentEvidenceCardsSchema } from '@megacampus/shared-types';
-import {
-  DocumentEvidenceRepository,
-  type DocumentEvidenceDatabaseClient,
-} from '../../src/stages/stage4-analysis/evidence/repository';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
-import { requireQ12CapabilityFetchInstalled } from './source-recovery-database';
+import {
+  createRecoveryDispositionDatabase,
+  createSupabaseRecoveryGateway,
+  requireQ12CapabilityFetchInstalled,
+  type RecoveryCatalogRow,
+  type RecoverySupabaseClient,
+} from './source-recovery-database';
 import {
   calculateAcceptedFailedCoverageFingerprint,
+  coverageScopeKey,
+  expectedCoverageErrorMessage,
   type AcceptedFailedCoverageBinding,
   type AcceptedFailedCoverageEntry,
-  type AcceptedFailedCoverageLedgerBinding,
   type RecoveryReindexBinding,
 } from './reindex-plan';
 import {
@@ -28,11 +30,29 @@ import {
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
+// The frozen Q12 command manifest (sha aaec6fc2…) binds exactly one `<accepted-coverage-run>` argv slot.
+// Owner-approved amendment 2026-07-25: that slot carries a self-describing file_catalog authority token
+// instead of an `organization:course:run` document-evidence ledger triple, because the recovery spans six
+// course scopes (sha-bound in the reviewed manifest, so argv need not repeat them) and the evidence
+// ledgers do not exist in-window at all.
+const ACCEPTED_COVERAGE_AUTHORITY_PATTERN =
+  /^catalog:([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
 
-export interface AcceptedCoverageRunConfig {
-  organizationId: string;
-  courseId: string;
-  runId: string;
+export interface AcceptedCoverageAuthority {
+  source: 'file_catalog';
+  recoveryRunId: string;
+}
+
+export function formatAcceptedCoverageAuthority(recoveryRunId: string): string {
+  return `catalog:${recoveryRunId}`;
+}
+
+export function parseAcceptedCoverageAuthority(value: string): AcceptedCoverageAuthority {
+  const matched = ACCEPTED_COVERAGE_AUTHORITY_PATTERN.exec(value);
+  if (!matched) {
+    throw new Error('--accepted-coverage-run must be catalog:<recovery-run-id>');
+  }
+  return { source: 'file_catalog', recoveryRunId: matched[1] };
 }
 
 export interface SourceRecoveryReindexAdapterConfig {
@@ -41,16 +61,11 @@ export interface SourceRecoveryReindexAdapterConfig {
   expectedRecoveryRunId: string;
   expectedRecoveryManifestSha256: string;
   expectedCoverageFingerprint: string;
-  acceptedCoverageRuns: readonly AcceptedCoverageRunConfig[];
+  acceptedCoverageAuthority: string;
 }
 
-export interface SourceRecoveryReindexEvidenceRepository {
-  getAcceptedRun(
-    runId: string,
-    courseId: string,
-    organizationId: string
-  ): Promise<{ id: string; status: 'accepted' }>;
-  listItems(runId: string): Promise<unknown>;
+export interface SourceRecoveryCatalogCoverageRepository {
+  listFileCatalogExpectedRows(ids: readonly string[]): Promise<RecoveryCatalogRow[]>;
 }
 
 export interface SourceRecoveryReindexAdapterDependencies {
@@ -64,17 +79,13 @@ export interface SourceRecoveryReindexAdapterDependencies {
     current: RecoveryProgressJournal;
     next: RecoveryProgressJournal;
   }): Promise<void>;
-  evidenceRepository: SourceRecoveryReindexEvidenceRepository;
+  catalogRepository: SourceRecoveryCatalogCoverageRepository;
 }
 
 function assertAbsoluteNormalizedPath(value: string, label: string): void {
   if (!isAbsolute(value) || resolve(value) !== value) {
     throw new Error(`${label} must be an explicit normalized absolute path`);
   }
-}
-
-function scopeKey(value: Pick<AcceptedCoverageRunConfig, 'organizationId' | 'courseId'>): string {
-  return `${value.organizationId}:${value.courseId}`;
 }
 
 export function normalizeSourceRecoveryReindexAdapterConfig(
@@ -89,27 +100,11 @@ export function normalizeSourceRecoveryReindexAdapterConfig(
   ) {
     throw new Error('Recovery adapter identities must use lower-case UUIDv4 and SHA-256');
   }
-  const acceptedCoverageRuns = [...input.acceptedCoverageRuns]
-    .map(run => ({ ...run }))
-    .sort((left, right) =>
-      [left.organizationId, left.courseId, left.runId]
-        .join(':')
-        .localeCompare([right.organizationId, right.courseId, right.runId].join(':'))
-    );
-  if (
-    acceptedCoverageRuns.length === 0 ||
-    acceptedCoverageRuns.some(
-      run =>
-        !UUID_V4_PATTERN.test(run.organizationId) ||
-        !UUID_V4_PATTERN.test(run.courseId) ||
-        !UUID_V4_PATTERN.test(run.runId)
-    ) ||
-    new Set(acceptedCoverageRuns.map(scopeKey)).size !== acceptedCoverageRuns.length ||
-    new Set(acceptedCoverageRuns.map(run => run.runId)).size !== acceptedCoverageRuns.length
-  ) {
-    throw new Error('Accepted coverage runs must be unique lower-case UUIDv4 course scopes');
+  const authority = parseAcceptedCoverageAuthority(input.acceptedCoverageAuthority);
+  if (authority.recoveryRunId !== input.expectedRecoveryRunId) {
+    throw new Error('Accepted coverage authority must name the configured recovery run');
   }
-  return { ...input, acceptedCoverageRuns };
+  return { ...input };
 }
 
 function assertConfiguredRecoveryState(
@@ -140,112 +135,93 @@ function canonicalJournal(journal: RecoveryProgressJournal): string {
   });
 }
 
-function eligibleScopes(manifest: SourceRecoveryManifest): Map<string, string[]> {
+function eligibleDispositions(manifest: SourceRecoveryManifest) {
   const eligible = manifest.dispositions.filter(entry => entry.kind === 'eligible_unrecoverable');
   if (eligible.length !== 6) {
     throw new Error('Recovery adapter requires exactly six eligible dispositions');
   }
-  const scopes = new Map<string, string[]>();
   for (const entry of eligible) {
     if (!entry.course_id) throw new Error('Eligible recovery disposition must have a course');
-    const key = `${entry.organization_id}:${entry.course_id}`;
-    scopes.set(key, [...(scopes.get(key) ?? []), entry.file_catalog_id].sort());
   }
-  return scopes;
+  return eligible;
 }
 
-function assertExactScopes(
-  expected: ReadonlyMap<string, readonly string[]>,
-  configured: readonly AcceptedCoverageRunConfig[]
-): void {
-  const configuredScopes = configured.map(scopeKey).sort();
-  const expectedScopes = [...expected.keys()].sort();
-  if (JSON.stringify(configuredScopes) !== JSON.stringify(expectedScopes)) {
-    throw new Error('Configured accepted coverage runs do not match recovery course scopes');
-  }
-}
-
-function exactFailedEntry(
-  card: ReturnType<typeof DocumentEvidenceCardsSchema.parse>[number],
-  run: AcceptedCoverageRunConfig
-): AcceptedFailedCoverageEntry {
-  if (
-    card.coverage_status !== 'failed' ||
-    card.coverage_reason !== 'source_file_unrecoverable' ||
-    card.processing_mode !== 'metadata_only' ||
-    card.summary !== null ||
-    card.key_claims.length !== 0 ||
-    card.terminology.length !== 0 ||
-    card.constraints.length !== 0 ||
-    card.token_counts.allocated !== 0
-  ) {
-    throw new Error('Accepted failed coverage card does not match exact zero-evidence shape');
-  }
-  return {
-    documentId: card.document_id,
-    organizationId: run.organizationId,
-    courseId: run.courseId,
-    coverageStatus: 'failed',
-    coverageReason: 'source_file_unrecoverable',
-    processingMode: 'metadata_only',
-    summary: null,
-    claims: [],
-    terminology: [],
-    constraints: [],
-    allocatedTokens: 0,
-  };
-}
-
+// The accepted failed coverage is the recovered file_catalog state itself: `applyDispositionEntry`
+// moves every eligible row to vector_status='failed' with the run-scoped unrecoverable marker, so the
+// binding is a read of live truth cross-checked against the sha-bound reviewed manifest. Nothing here is
+// invented, and no document-evidence ledger is consulted (they are created empty by the C4 migration and
+// their zero-evidence cards are minted only by post-window Stage-4 runs — tracked on mc2-8m90f).
 async function buildAcceptedCoverageBinding(
-  acceptedCoverageRuns: readonly AcceptedCoverageRunConfig[],
   manifest: SourceRecoveryManifest,
-  repository: SourceRecoveryReindexEvidenceRepository,
+  repository: SourceRecoveryCatalogCoverageRepository,
   recoveryManifestSha256: string
 ): Promise<AcceptedFailedCoverageBinding> {
-  const expectedByScope = eligibleScopes(manifest);
-  assertExactScopes(expectedByScope, acceptedCoverageRuns);
-  const ledgers: AcceptedFailedCoverageLedgerBinding[] = [];
-  for (const run of acceptedCoverageRuns) {
-    let accepted: { id: string; status: 'accepted' };
-    let cards: ReturnType<typeof DocumentEvidenceCardsSchema.parse>;
-    try {
-      accepted = await repository.getAcceptedRun(run.runId, run.courseId, run.organizationId);
-      cards = DocumentEvidenceCardsSchema.parse(await repository.listItems(run.runId));
-    } catch {
-      throw new Error('Accepted coverage repository rejected the configured course ledger');
-    }
-    if (accepted.id !== run.runId || accepted.status !== 'accepted') {
-      throw new Error('Accepted coverage repository returned a stale course ledger');
-    }
-    const expectedIds = expectedByScope.get(scopeKey(run))!;
-    const relevantCards = cards.filter(
-      card =>
-        expectedIds.includes(card.document_id) ||
-        (card.coverage_status === 'failed' && card.coverage_reason === 'source_file_unrecoverable')
+  const eligible = eligibleDispositions(manifest);
+  const ids = eligible.map(entry => entry.file_catalog_id).sort();
+  let rows: RecoveryCatalogRow[];
+  try {
+    rows = await repository.listFileCatalogExpectedRows(ids);
+  } catch {
+    throw new Error(
+      'Accepted coverage file_catalog read was rejected for the recovered identities'
     );
-    const relevantIds = relevantCards.map(card => card.document_id).sort();
+  }
+  const rowsById = new Map(rows.map(row => [row.id, row]));
+  if (rowsById.size !== rows.length || rows.length !== ids.length) {
+    throw new Error('Accepted coverage file_catalog rows must be the exact recovered identities');
+  }
+  const expectedErrorMessage = expectedCoverageErrorMessage(manifest.run_id);
+  const entriesByScope = new Map<string, AcceptedFailedCoverageEntry[]>();
+  for (const entry of eligible) {
+    const row = rowsById.get(entry.file_catalog_id);
     if (
-      new Set(relevantIds).size !== relevantIds.length ||
-      JSON.stringify(relevantIds) !== JSON.stringify(expectedIds)
+      !row ||
+      row.organization_id !== entry.organization_id ||
+      row.course_id !== entry.course_id ||
+      row.storage_path !== entry.expected_storage_path ||
+      row.hash !== entry.expected_hash ||
+      row.vector_status !== 'failed' ||
+      row.error_message !== expectedErrorMessage
     ) {
-      throw new Error('Accepted coverage ledger does not contain the exact eligible identities');
+      throw new Error(
+        'Accepted coverage file_catalog row is not the exact recovered disposition state'
+      );
     }
-    ledgers.push({
-      ledgerId: run.runId,
-      status: 'accepted',
-      organizationId: run.organizationId,
-      courseId: run.courseId,
-      entries: relevantCards
-        .map(card => exactFailedEntry(card, run))
-        .sort((left, right) => left.documentId.localeCompare(right.documentId)),
+    const key = coverageScopeKey({
+      organizationId: entry.organization_id,
+      courseId: entry.course_id!,
     });
+    entriesByScope.set(key, [
+      ...(entriesByScope.get(key) ?? []),
+      {
+        fileCatalogId: row.id,
+        organizationId: row.organization_id,
+        courseId: entry.course_id!,
+        storagePath: row.storage_path,
+        hash: row.hash,
+        vectorStatus: 'failed',
+        errorMessage: row.error_message,
+      },
+    ]);
   }
   const binding: AcceptedFailedCoverageBinding = {
     status: 'accepted',
+    source: 'file_catalog',
     recoveryRunId: manifest.run_id,
     recoveryManifestSha256,
     fingerprint: '',
-    ledgers,
+    scopes: [...entriesByScope.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entries]) => {
+        const [organizationId, courseId] = key.split(':');
+        return {
+          organizationId,
+          courseId,
+          entries: [...entries].sort((left, right) =>
+            left.fileCatalogId.localeCompare(right.fileCatalogId)
+          ),
+        };
+      }),
   };
   binding.fingerprint = calculateAcceptedFailedCoverageFingerprint(binding);
   return binding;
@@ -254,10 +230,9 @@ async function buildAcceptedCoverageBinding(
 async function loadAcceptedCoverage(
   config: SourceRecoveryReindexAdapterConfig,
   manifest: SourceRecoveryManifest,
-  repository: SourceRecoveryReindexEvidenceRepository
+  repository: SourceRecoveryCatalogCoverageRepository
 ): Promise<AcceptedFailedCoverageBinding> {
   const binding = await buildAcceptedCoverageBinding(
-    config.acceptedCoverageRuns,
     manifest,
     repository,
     config.expectedRecoveryManifestSha256
@@ -266,6 +241,13 @@ async function loadAcceptedCoverage(
     throw new Error('Accepted coverage fingerprint does not match exact configured state');
   }
   return binding;
+}
+
+function createDefaultCatalogCoverageRepository(): SourceRecoveryCatalogCoverageRepository {
+  requireQ12CapabilityFetchInstalled();
+  return createRecoveryDispositionDatabase(
+    createSupabaseRecoveryGateway(getSupabaseAdmin() as unknown as RecoverySupabaseClient)
+  );
 }
 
 export function createSourceRecoveryReindexAdapters(
@@ -294,7 +276,7 @@ export function createSourceRecoveryReindexAdapters(
         acceptedFailedCoverage: await loadAcceptedCoverage(
           config,
           state.manifest,
-          dependencies.evidenceRepository
+          dependencies.catalogRepository
         ),
       };
     },
@@ -320,31 +302,27 @@ export function createSourceRecoveryReindexAdapters(
 export function createDefaultSourceRecoveryReindexAdapters(
   config: SourceRecoveryReindexAdapterConfig
 ): ReturnType<typeof createSourceRecoveryReindexAdapters> {
-  requireQ12CapabilityFetchInstalled();
-  const evidenceRepository = new DocumentEvidenceRepository(
-    getSupabaseAdmin() as unknown as DocumentEvidenceDatabaseClient
-  );
   return createSourceRecoveryReindexAdapters(config, {
     loadReviewedRecoveryState,
     persistRecoveryJournalTransition: persistAcceptedRecoveryJournalTransition,
-    evidenceRepository,
+    catalogRepository: createDefaultCatalogCoverageRepository(),
   });
 }
 
 // W7a real leg (emit half): the source.forward acceptance emit-entrypoint. The Q12 controller's
 // StagedValueResolver.on_source_forward_accepted needs three window-staged values —
 // <accepted-recovery-manifest-sha256>, <accepted-coverage-fingerprint>, <accepted-coverage-run>. This
-// COMPUTES them from a real reviewed recovery manifest + the accepted-coverage ledgers (the same
+// COMPUTES them from the real reviewed recovery manifest + the recovered file_catalog rows (the same
 // canonical functions the reindex adapter validates against — never a Python re-derivation) and the
-// controller reads the written authority via read_source_forward_acceptance. The frozen manifest binds
-// exactly one <accepted-coverage-run> slot, so the single-course-scoped window recovery yields exactly
-// one accepted coverage run.
+// controller reads the written authority via read_source_forward_acceptance. The frozen manifest's single
+// <accepted-coverage-run> slot carries the `catalog:<recovery-run-id>` authority token; the six recovered
+// course scopes come from the sha-bound manifest, not from argv.
 
 export interface SourceForwardAcceptanceEmitConfig {
   manifestPath: string;
   journalPath: string;
   expectedRecoveryRunId: string;
-  acceptedCoverageRuns: readonly AcceptedCoverageRunConfig[];
+  acceptedCoverageAuthority: string;
 }
 
 export interface SourceForwardAcceptanceAuthority {
@@ -359,7 +337,7 @@ export interface SourceForwardAcceptanceEmitDependencies {
     manifestPath: string;
     journalPath: string;
   }): Promise<ReviewedRecoveryState>;
-  evidenceRepository: SourceRecoveryReindexEvidenceRepository;
+  catalogRepository: SourceRecoveryCatalogCoverageRepository;
 }
 
 export async function computeSourceForwardAcceptance(
@@ -371,16 +349,9 @@ export async function computeSourceForwardAcceptance(
   if (!UUID_V4_PATTERN.test(config.expectedRecoveryRunId)) {
     throw new Error('Recovery adapter identities must use lower-case UUIDv4 and SHA-256');
   }
-  if (config.acceptedCoverageRuns.length !== 1) {
-    throw new Error('source.forward acceptance binds exactly one accepted coverage run');
-  }
-  const [run] = config.acceptedCoverageRuns;
-  if (
-    !UUID_V4_PATTERN.test(run.organizationId) ||
-    !UUID_V4_PATTERN.test(run.courseId) ||
-    !UUID_V4_PATTERN.test(run.runId)
-  ) {
-    throw new Error('Accepted coverage runs must be unique lower-case UUIDv4 course scopes');
+  const authority = parseAcceptedCoverageAuthority(config.acceptedCoverageAuthority);
+  if (authority.recoveryRunId !== config.expectedRecoveryRunId) {
+    throw new Error('Accepted coverage authority must name the configured recovery run');
   }
   const state = await dependencies.loadReviewedRecoveryState({
     manifestPath: config.manifestPath,
@@ -395,23 +366,21 @@ export async function computeSourceForwardAcceptance(
   }
   validateRecoveryProgressJournalBinding(state.manifest, canonicalSha256, state.journal);
   const binding = await buildAcceptedCoverageBinding(
-    config.acceptedCoverageRuns,
     state.manifest,
-    dependencies.evidenceRepository,
+    dependencies.catalogRepository,
     canonicalSha256
   );
   return {
     schema: 'megacampus.q12.source-forward-acceptance/v1',
     recovery_manifest_sha256: canonicalSha256,
     coverage_fingerprint: binding.fingerprint,
-    coverage_run: `${run.organizationId}:${run.courseId}:${run.runId}`,
+    coverage_run: formatAcceptedCoverageAuthority(authority.recoveryRunId),
   };
 }
 
 export function createDefaultSourceForwardAcceptanceDependencies(): SourceForwardAcceptanceEmitDependencies {
-  requireQ12CapabilityFetchInstalled();
-  const evidenceRepository = new DocumentEvidenceRepository(
-    getSupabaseAdmin() as unknown as DocumentEvidenceDatabaseClient
-  );
-  return { loadReviewedRecoveryState, evidenceRepository };
+  return {
+    loadReviewedRecoveryState,
+    catalogRepository: createDefaultCatalogCoverageRepository(),
+  };
 }

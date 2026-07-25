@@ -14,12 +14,12 @@ import {
 } from '../../../../tools/qdrant/source-recovery-manifest';
 
 // W7a real leg CLI: parse the source.forward acceptance emit argv and drive computeSourceForwardAcceptance,
-// writing the authority through an injectable writer. Infra-free (synthetic single-course manifest +
-// fake evidence repository + fake writer).
+// writing the authority through an injectable writer. Infra-free (synthetic manifest + fake file_catalog
+// repository + fake writer).
 const RECOVERY_RUN_ID = '51000000-0000-4000-8000-000000000005';
 const ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001';
 const COURSE_ID = '20000000-0000-4000-8000-000000000002';
-const RUN_ID = '52000000-0000-4000-8000-000000000005';
+const COVERAGE_AUTHORITY = `catalog:${RECOVERY_RUN_ID}`;
 
 function manifest(): SourceRecoveryManifest {
   return {
@@ -77,26 +77,17 @@ function deps() {
         ),
       },
     }),
-    evidenceRepository: {
-      getAcceptedRun: vi.fn((runId: string) => Promise.resolve({ id: runId, status: 'accepted' })),
-      listItems: vi.fn(() =>
+    catalogRepository: {
+      listFileCatalogExpectedRows: vi.fn(() =>
         Promise.resolve(
           value.dispositions.map(entry => ({
-            document_id: entry.file_catalog_id,
-            document_name: 'doc',
-            priority: 'CORE',
-            authority_scope: 'course_source',
-            content_quality: 0,
-            course_relevance: 0,
-            processing_mode: 'metadata_only',
-            summary: null,
-            key_claims: [],
-            terminology: [],
-            constraints: [],
-            limitations: [],
-            coverage_status: 'failed',
-            coverage_reason: 'source_file_unrecoverable',
-            token_counts: { original: 0, summary: 0, allocated: 0 },
+            id: entry.file_catalog_id,
+            organization_id: entry.organization_id,
+            course_id: entry.course_id,
+            storage_path: entry.expected_storage_path,
+            hash: entry.expected_hash,
+            vector_status: 'failed' as const,
+            error_message: `source_file_unrecoverable; recovery_run=${value.run_id}`,
           }))
         )
       ),
@@ -112,7 +103,7 @@ const VALID_ARGV = [
   '--recovery-run-id',
   RECOVERY_RUN_ID,
   '--accepted-coverage-run',
-  `${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`,
+  COVERAGE_AUTHORITY,
   '--output',
   '/opt/megacampus/backups/q12/run/source-forward-acceptance.json',
 ];
@@ -123,7 +114,7 @@ describe('W7a real leg: emit-source-forward-acceptance CLI', () => {
       manifestPath: '/secure/recovery/manifest.json',
       journalPath: '/secure/recovery/journal.json',
       recoveryRunId: RECOVERY_RUN_ID,
-      coverageRun: `${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`,
+      coverageRun: COVERAGE_AUTHORITY,
       outputPath: '/opt/megacampus/backups/q12/run/source-forward-acceptance.json',
     });
   });
@@ -146,19 +137,23 @@ describe('W7a real leg: emit-source-forward-acceptance CLI', () => {
     expect(authority.schema).toBe('megacampus.q12.source-forward-acceptance/v1');
     expect(authority.recovery_manifest_sha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(authority.coverage_fingerprint).toMatch(/^[0-9a-f]{64}$/u);
-    expect(authority.coverage_run).toBe(`${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`);
+    expect(authority.coverage_run).toBe(COVERAGE_AUTHORITY);
     expect(write).toHaveBeenCalledExactlyOnceWith(args.outputPath, authority);
   });
 
-  it('fails closed on a coverage run that is not an org:course:run triple', async () => {
+  it.each([
+    ['legacy ledger triple', `${ORGANIZATION_ID}:${COURSE_ID}:${RECOVERY_RUN_ID}`],
+    ['bare run id', RECOVERY_RUN_ID],
+    ['foreign recovery run', 'catalog:54000000-0000-4000-8000-000000000005'],
+  ])('fails closed on a %s coverage authority', async (_label, coverageRun) => {
     const write = vi.fn();
     await expect(
       runEmitSourceForwardAcceptance(
-        { ...parseEmitSourceForwardAcceptanceArgv(VALID_ARGV), coverageRun: 'a:b' },
+        { ...parseEmitSourceForwardAcceptanceArgv(VALID_ARGV), coverageRun },
         deps(),
         write
       )
-    ).rejects.toThrow(/organization:course:run/iu);
+    ).rejects.toThrow(/catalog:<recovery-run-id>|recovery run/iu);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -167,7 +162,7 @@ describe('W7a real leg: emit-source-forward-acceptance CLI', () => {
       schema: 'megacampus.q12.source-forward-acceptance/v1',
       recovery_manifest_sha256: 'a'.repeat(64),
       coverage_fingerprint: 'b'.repeat(64),
-      coverage_run: `${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`,
+      coverage_run: COVERAGE_AUTHORITY,
     } as const;
 
     it('creates the authority owner-only 0400 with exact single-line content', () => {

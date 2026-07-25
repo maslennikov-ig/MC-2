@@ -66,10 +66,10 @@ describe('Q12 W2-fork: StagedValueResolver', () => {
       'assert r.value("<exported-id>")==sys.argv[4]',
       'r.on_pg_backup_done("q12-generation-abcdef0123456789")',
       'assert r.value("<immutable-generation>")=="q12-generation-abcdef0123456789"',
-      'r.on_source_forward_accepted("a"*64, "b"*64, "o:c:run")',
+      `r.on_source_forward_accepted("a"*64, "b"*64, "catalog:${RRID}")`,
       'assert r.value("<accepted-recovery-manifest-sha256>")=="a"*64',
       'assert r.value("<accepted-coverage-fingerprint>")=="b"*64',
-      'assert r.value("<accepted-coverage-run>")=="o:c:run"',
+      `assert r.value("<accepted-coverage-run>")=="catalog:${RRID}"`,
       // now every placeholder the fixture dict carried is present
       'expected={"<quiesce-manifest>","<recovery-run-id>","<exported-id>","<immutable-generation>",' +
         '"<accepted-recovery-manifest-sha256>","<accepted-coverage-fingerprint>","<accepted-coverage-run>"}',

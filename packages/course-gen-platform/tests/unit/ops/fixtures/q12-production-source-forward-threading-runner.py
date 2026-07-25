@@ -45,7 +45,7 @@ def main() -> int:
     manifest = core.load_manifest()
     fake_sha = "d" * 64
     fake_fingerprint = "e" * 64
-    fake_run = ":".join(str(uuid.uuid4()) for _ in range(3))
+    fake_run = f"catalog:{recovery_run_id}"
 
     class FakeExecutor(core.OwnerCustodyExecutor):
         # Override ONLY the acceptance-read seam; all real execution logic inherited unchanged.

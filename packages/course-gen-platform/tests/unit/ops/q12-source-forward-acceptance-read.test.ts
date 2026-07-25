@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 // W7a real leg (read half): the DEPLOYED OwnerCustodyExecutor.read_source_forward_acceptance BASE
 // seam must READ the on-disk source.forward acceptance authority (written by the TS emit-entrypoint
 // into the run_root) and return the exact (recovery_manifest_sha256, coverage_fingerprint,
-// coverage_run) triple — mirroring the proven read_pg_backup_generation pattern (parse + validate +
+// coverage_run) triple — coverage_run being the `catalog:<recovery-run-id>` authority token
+// (amendment 2026-07-25) — mirroring the proven read_pg_backup_generation pattern (parse + validate +
 // fail-closed). Infra-free (a plain JSON file in a /tmp run_root); the real values are window-grade.
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = resolve(
@@ -35,5 +36,6 @@ describe('W7a real leg: read_source_forward_acceptance reads the on-disk authori
     expect(out.missingFailsClosed).toBe(true);
     expect(out.malformedShaFailsClosed).toBe(true);
     expect(out.malformedRunFailsClosed).toBe(true);
+    expect(out.legacyTripleFailsClosed).toBe(true);
   });
 });

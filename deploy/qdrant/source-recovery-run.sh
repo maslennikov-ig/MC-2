@@ -1332,9 +1332,14 @@ if [[ -n $q12_run_id ]]; then
   uuid_v4_pattern='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
   accepted_coverage_run="$(head -n 1 -- "$accepted_coverage_run_file")"
   [[ $(wc -c < "$accepted_coverage_run_file") -eq $((${#accepted_coverage_run} + 1)) ]] ||
-    fail 'accepted coverage-run authority must be a single newline-terminated organization:course:run line'
-  [[ $accepted_coverage_run =~ ^${uuid_v4_pattern}:${uuid_v4_pattern}:${uuid_v4_pattern}$ ]] ||
-    fail 'accepted coverage-run authority must be organization:course:run lower-case UUIDv4'
+    fail 'accepted coverage-run authority must be a single newline-terminated catalog:<recovery-run-id> line'
+  # Amendment 2026-07-25: acceptance is file_catalog truth, so the operator stages the self-describing
+  # authority token instead of an organization:course:run document-evidence ledger triple, and it must
+  # name THIS run's recovery run id (the six recovered course scopes live in the sha-bound manifest).
+  [[ $accepted_coverage_run =~ ^catalog:${uuid_v4_pattern}$ ]] ||
+    fail 'accepted coverage-run authority must be catalog:<recovery-run-id> with a lower-case UUIDv4'
+  [[ $accepted_coverage_run == "catalog:$run_id" ]] ||
+    fail 'accepted coverage-run authority must name this recovery run id'
 
   read_production_env_value() {
     local key="$1"

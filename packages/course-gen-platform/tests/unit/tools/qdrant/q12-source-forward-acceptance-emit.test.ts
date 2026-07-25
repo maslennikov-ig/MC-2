@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { calculateAcceptedFailedCoverageFingerprint } from '../../../../tools/qdrant/reindex-plan';
+import {
+  calculateAcceptedFailedCoverageFingerprint,
+  expectedCoverageErrorMessage,
+  type AcceptedFailedCoverageBinding,
+} from '../../../../tools/qdrant/reindex-plan';
 import { computeSourceForwardAcceptance } from '../../../../tools/qdrant/source-recovery-reindex-adapters';
+import type { RecoveryCatalogRow } from '../../../../tools/qdrant/source-recovery-database';
 import {
   calculateRecoveryManifestSha256,
   type RecoveryProgressJournal,
@@ -10,14 +15,22 @@ import {
 
 // W7a real leg (emit half): computeSourceForwardAcceptance is the TS acceptance emit-entrypoint the
 // controller's read_source_forward_acceptance consumes. It COMPUTES (never validates-against-expected)
-// the canonical recovery manifest sha256 + calculateAcceptedFailedCoverageFingerprint + the single
-// bound org:course:run scope the frozen manifest's one <accepted-coverage-run> slot expects. The
-// window recovery is single-course-scoped, so exactly one accepted coverage run is bound. Infra-free
-// (synthetic single-course manifest + fake evidence repository), mirroring the adapter test.
+// the canonical recovery manifest sha256 + calculateAcceptedFailedCoverageFingerprint over the recovered
+// file_catalog rows + the `catalog:<recovery-run-id>` authority token the frozen manifest's single
+// <accepted-coverage-run> slot carries. The fixture mirrors the live 2026-07-12 audit shape — six
+// eligible dispositions across three organizations and six courses — because the accepted amendment
+// derives scopes from the sha-bound manifest instead of argv. Infra-free (synthetic manifest + fake
+// file_catalog repository), mirroring the adapter test.
 const RECOVERY_RUN_ID = '51000000-0000-4000-8000-000000000005';
-const ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001';
-const COURSE_ID = '20000000-0000-4000-8000-000000000002';
-const RUN_ID = '52000000-0000-4000-8000-000000000005';
+const FOREIGN_RUN_ID = '54000000-0000-4000-8000-000000000005';
+
+function organizationId(index: number): string {
+  return `1${index}000000-0000-4000-8000-000000000001`;
+}
+
+function courseId(index: number): string {
+  return `2${index}000000-0000-4000-8000-000000000002`;
+}
 
 function fileId(index: number): string {
   return `e0000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
@@ -46,9 +59,10 @@ function manifest(): SourceRecoveryManifest {
     dispositions: Array.from({ length: 6 }, (_, index) => ({
       entry_id: `eligible-${index}`,
       kind: 'eligible_unrecoverable' as const,
+      // Three organizations, six distinct courses — the accepted live audit truth.
       file_catalog_id: fileId(index),
-      organization_id: ORGANIZATION_ID,
-      course_id: COURSE_ID,
+      organization_id: organizationId(index % 3),
+      course_id: courseId(index),
       expected_hash: 'a'.repeat(64),
       expected_storage_path: `uploads/org/course/audited-${index}.pdf`,
       expected_vector_status: 'pending' as const,
@@ -75,38 +89,31 @@ function journal(value: SourceRecoveryManifest, revision = 48): RecoveryProgress
   };
 }
 
-function failedCard(documentId: string): Record<string, unknown> {
-  return {
-    document_id: documentId,
-    document_name: `Document ${documentId.slice(-1)}`,
-    priority: 'CORE',
-    authority_scope: 'course_source',
-    content_quality: 0,
-    course_relevance: 0,
-    processing_mode: 'metadata_only',
-    summary: null,
-    key_claims: [],
-    terminology: [],
-    constraints: [],
-    limitations: [],
-    coverage_status: 'failed',
-    coverage_reason: 'source_file_unrecoverable',
-    token_counts: { original: 0, summary: 0, allocated: 0 },
-  };
+function recoveredRows(
+  value: SourceRecoveryManifest,
+  patch: Partial<RecoveryCatalogRow> = {}
+): RecoveryCatalogRow[] {
+  return value.dispositions.map((entry, index) => ({
+    id: entry.file_catalog_id,
+    organization_id: entry.organization_id,
+    course_id: entry.course_id,
+    storage_path: entry.expected_storage_path,
+    hash: entry.expected_hash,
+    vector_status: 'failed' as const,
+    error_message: expectedCoverageErrorMessage(value.run_id),
+    ...(index === 0 ? patch : {}),
+  }));
 }
 
-function deps(value = manifest()) {
+function deps(value = manifest(), rows = recoveredRows(value)) {
   return {
     loadReviewedRecoveryState: vi.fn().mockResolvedValue({
       manifest: value,
       manifestSha256: calculateRecoveryManifestSha256(value),
       journal: journal(value),
     }),
-    evidenceRepository: {
-      getAcceptedRun: vi.fn((runId: string) => Promise.resolve({ id: runId, status: 'accepted' })),
-      listItems: vi.fn(() =>
-        Promise.resolve(value.dispositions.map(entry => failedCard(entry.file_catalog_id)))
-      ),
+    catalogRepository: {
+      listFileCatalogExpectedRows: vi.fn(() => Promise.resolve(rows)),
     },
   };
 }
@@ -116,7 +123,7 @@ function emitConfig(value = manifest()) {
     manifestPath: '/secure/recovery/manifest.json',
     journalPath: '/secure/recovery/journal.json',
     expectedRecoveryRunId: value.run_id,
-    acceptedCoverageRuns: [{ organizationId: ORGANIZATION_ID, courseId: COURSE_ID, runId: RUN_ID }],
+    acceptedCoverageAuthority: `catalog:${value.run_id}`,
   };
 }
 
@@ -124,72 +131,99 @@ function emitConfig(value = manifest()) {
 // so the test proves it recomputes, not echoes.
 function expectedAuthority(value = manifest()) {
   const sha256 = calculateRecoveryManifestSha256(value);
-  const binding = {
-    status: 'accepted' as const,
+  const binding: AcceptedFailedCoverageBinding = {
+    status: 'accepted',
+    source: 'file_catalog',
     recoveryRunId: value.run_id,
     recoveryManifestSha256: sha256,
     fingerprint: '',
-    ledgers: [
-      {
-        ledgerId: RUN_ID,
-        status: 'accepted' as const,
-        organizationId: ORGANIZATION_ID,
-        courseId: COURSE_ID,
-        entries: value.dispositions.map(entry => ({
-          documentId: entry.file_catalog_id,
-          organizationId: entry.organization_id,
-          courseId: entry.course_id!,
-          coverageStatus: 'failed' as const,
-          coverageReason: 'source_file_unrecoverable' as const,
-          processingMode: 'metadata_only' as const,
-          summary: null,
-          claims: [],
-          terminology: [],
-          constraints: [],
-          allocatedTokens: 0,
-        })),
-      },
-    ],
+    scopes: value.dispositions
+      .map(entry => ({
+        organizationId: entry.organization_id,
+        courseId: entry.course_id!,
+        entries: [
+          {
+            fileCatalogId: entry.file_catalog_id,
+            organizationId: entry.organization_id,
+            courseId: entry.course_id!,
+            storagePath: entry.expected_storage_path,
+            hash: entry.expected_hash,
+            vectorStatus: 'failed' as const,
+            errorMessage: expectedCoverageErrorMessage(value.run_id),
+          },
+        ],
+      }))
+      .sort((left, right) =>
+        `${left.organizationId}:${left.courseId}`.localeCompare(
+          `${right.organizationId}:${right.courseId}`
+        )
+      ),
   };
   binding.fingerprint = calculateAcceptedFailedCoverageFingerprint(binding);
   return {
     schema: 'megacampus.q12.source-forward-acceptance/v1',
     recovery_manifest_sha256: sha256,
     coverage_fingerprint: binding.fingerprint,
-    coverage_run: `${ORGANIZATION_ID}:${COURSE_ID}:${RUN_ID}`,
+    coverage_run: `catalog:${value.run_id}`,
   };
 }
 
 describe('W7a real leg: computeSourceForwardAcceptance (source.forward acceptance emit-entrypoint)', () => {
-  it('computes the canonical manifest sha256, coverage fingerprint, and single org:course:run scope', async () => {
+  it('computes the canonical manifest sha256, six-scope coverage fingerprint, and catalog authority token', async () => {
     const value = manifest();
     const authority = await computeSourceForwardAcceptance(emitConfig(value), deps(value));
     expect(authority).toEqual(expectedAuthority(value));
   });
 
-  it('fails closed when more than one coverage run is bound (frozen manifest binds exactly one)', async () => {
+  it('reads exactly the six recovered file_catalog identities', async () => {
+    const value = manifest();
+    const dependencies = deps(value);
+    await computeSourceForwardAcceptance(emitConfig(value), dependencies);
+    expect(dependencies.catalogRepository.listFileCatalogExpectedRows.mock.calls).toEqual([
+      [value.dispositions.map(entry => entry.file_catalog_id).sort()],
+    ]);
+  });
+
+  it('fails closed on the legacy org:course:run coverage token', async () => {
     const value = manifest();
     await expect(
       computeSourceForwardAcceptance(
         {
           ...emitConfig(value),
-          acceptedCoverageRuns: [
-            { organizationId: ORGANIZATION_ID, courseId: COURSE_ID, runId: RUN_ID },
-            { organizationId: ORGANIZATION_ID, courseId: COURSE_ID, runId: RUN_ID },
-          ],
+          acceptedCoverageAuthority: `${organizationId(0)}:${courseId(0)}:${value.run_id}`,
         },
         deps(value)
       )
-    ).rejects.toThrow(/exactly one|single/iu);
+    ).rejects.toThrow(/must be catalog:<recovery-run-id>/iu);
+  });
+
+  it('fails closed when the authority token names another recovery run', async () => {
+    const value = manifest();
+    await expect(
+      computeSourceForwardAcceptance(
+        { ...emitConfig(value), acceptedCoverageAuthority: `catalog:${FOREIGN_RUN_ID}` },
+        deps(value)
+      )
+    ).rejects.toThrow(/authority.*recovery run|recovery run.*authority/iu);
   });
 
   it('fails closed on a stale recovery run id (never emits mismatched authority)', async () => {
     const value = manifest();
     await expect(
       computeSourceForwardAcceptance(
-        { ...emitConfig(value), expectedRecoveryRunId: '54000000-0000-4000-8000-000000000005' },
+        { ...emitConfig(value), expectedRecoveryRunId: FOREIGN_RUN_ID },
         deps(value)
       )
     ).rejects.toThrow();
+  });
+
+  it('fails closed when a recovered row is missing the run-scoped unrecoverable marker', async () => {
+    const value = manifest();
+    await expect(
+      computeSourceForwardAcceptance(
+        emitConfig(value),
+        deps(value, recoveredRows(value, { error_message: 'source_file_unrecoverable' }))
+      )
+    ).rejects.toThrow(/recovered disposition state/iu);
   });
 });

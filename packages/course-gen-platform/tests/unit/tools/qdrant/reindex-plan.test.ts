@@ -7,6 +7,8 @@ import {
   loadReindexSources,
   mapDatabaseReindexSources,
   verifyReindexParity,
+  type AcceptedFailedCoverageEntry,
+  type AcceptedFailedCoverageScopeBinding,
   type RecoveryReindexBinding,
   type ReindexSourceRow,
 } from '../../../../tools/qdrant/reindex-plan';
@@ -69,6 +71,46 @@ const SOURCE_BASE: ReindexSourceRow = {
   locale: 'ru',
   alreadyEnqueued: false,
 };
+
+// The 2026-07-25 owner-approved amendment: accepted failed coverage is derived from the recovered
+// file_catalog rows (applyDispositionEntry's post-state), never from document-evidence ledgers. This
+// helper builds the exact binding the emit entrypoint and the reindex adapter compute from the same
+// reviewed manifest, so a fixture drift shows up as a fingerprint mismatch instead of silent drift.
+function catalogCoverage(
+  manifest: SourceRecoveryManifest,
+  manifestSha256: string
+): RecoveryReindexBinding['acceptedFailedCoverage'] {
+  const byScope = new Map<string, AcceptedFailedCoverageScopeBinding>();
+  for (const entry of manifest.dispositions) {
+    if (entry.kind !== 'eligible_unrecoverable') continue;
+    const key = `${entry.organization_id}:${entry.course_id}`;
+    const scope = byScope.get(key) ?? {
+      organizationId: entry.organization_id,
+      courseId: entry.course_id!,
+      entries: [] as AcceptedFailedCoverageEntry[],
+    };
+    (scope.entries as AcceptedFailedCoverageEntry[]).push({
+      fileCatalogId: entry.file_catalog_id,
+      organizationId: entry.organization_id,
+      courseId: entry.course_id!,
+      storagePath: entry.expected_storage_path,
+      hash: entry.expected_hash,
+      vectorStatus: 'failed',
+      errorMessage: `source_file_unrecoverable; recovery_run=${manifest.run_id}`,
+    });
+    byScope.set(key, scope);
+  }
+  const coverage: RecoveryReindexBinding['acceptedFailedCoverage'] = {
+    status: 'accepted',
+    source: 'file_catalog',
+    recoveryRunId: manifest.run_id,
+    recoveryManifestSha256: manifestSha256,
+    fingerprint: '',
+    scopes: [...byScope.values()],
+  };
+  coverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(coverage);
+  return coverage;
+}
 
 describe('buildReindexPlan', () => {
   it('classifies recoverable and missing source rows with explicit gaps', () => {
@@ -228,56 +270,8 @@ describe('buildReindexPlan', () => {
       manifest,
       manifestSha256,
       journal,
-      acceptedFailedCoverage: {
-        status: 'accepted',
-        recoveryRunId: manifest.run_id,
-        recoveryManifestSha256: manifestSha256,
-        fingerprint: '',
-        ledgers: [
-          {
-            ledgerId: '52000000-0000-4000-8000-000000000005',
-            status: 'accepted',
-            organizationId: SOURCE_BASE.organizationId,
-            courseId: SOURCE_BASE.courseId!,
-            entries: auditedRows.slice(0, 4).map(row => ({
-              documentId: row.id,
-              organizationId: row.organizationId,
-              courseId: row.courseId!,
-              coverageStatus: 'failed',
-              coverageReason: 'source_file_unrecoverable',
-              processingMode: 'metadata_only',
-              summary: null,
-              claims: [],
-              terminology: [],
-              constraints: [],
-              allocatedTokens: 0,
-            })),
-          },
-          {
-            ledgerId: '53000000-0000-4000-8000-000000000005',
-            status: 'accepted',
-            organizationId: SOURCE_BASE.organizationId,
-            courseId: '22000000-0000-4000-8000-000000000002',
-            entries: auditedRows.slice(4).map(row => ({
-              documentId: row.id,
-              organizationId: row.organizationId,
-              courseId: row.courseId!,
-              coverageStatus: 'failed',
-              coverageReason: 'source_file_unrecoverable',
-              processingMode: 'metadata_only',
-              summary: null,
-              claims: [],
-              terminology: [],
-              constraints: [],
-              allocatedTokens: 0,
-            })),
-          },
-        ],
-      },
+      acceptedFailedCoverage: catalogCoverage(manifest, manifestSha256),
     };
-    binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
-      binding.acceptedFailedCoverage
-    );
 
     const plan = buildReindexPlan(
       rows,
@@ -298,10 +292,10 @@ describe('buildReindexPlan', () => {
       missingSource: 4,
       invalidSourcePath: 2,
       expectedDocuments: 234,
-      acceptedCoverageLedgerIds: [
-        '52000000-0000-4000-8000-000000000005',
-        '53000000-0000-4000-8000-000000000005',
-      ],
+      acceptedCoverageScopes: [
+        `${SOURCE_BASE.organizationId}:${SOURCE_BASE.courseId!}`,
+        `${SOURCE_BASE.organizationId}:22000000-0000-4000-8000-000000000002`,
+      ].sort(),
       auditedFailedFileIds: auditedRows.map(row => row.id),
       gaps: expect.arrayContaining(
         rows.slice(240).map(row => ({ fileId: row.id, reason: 'missing_course' }))
@@ -368,53 +362,44 @@ describe('buildReindexPlan', () => {
           manifest.dispositions.map(entry => [entry.entry_id, 'disposition_verified'])
         ),
       },
-      acceptedFailedCoverage: {
-        status: 'accepted',
-        recoveryRunId: manifest.run_id,
-        recoveryManifestSha256: manifestSha256,
-        fingerprint: '',
-        ledgers: [
-          {
-            ledgerId: '52000000-0000-4000-8000-000000000005',
-            status: 'accepted',
-            organizationId: SOURCE_BASE.organizationId,
-            courseId: SOURCE_BASE.courseId!,
-            entries: rows.map(row => ({
-              documentId: row.id,
-              organizationId: row.organizationId,
-              courseId: row.courseId!,
-              coverageStatus: 'failed',
-              coverageReason: 'source_file_unrecoverable',
-              processingMode: 'metadata_only',
-              summary: null,
-              claims: [],
-              terminology: [],
-              constraints: [],
-              allocatedTokens: 0,
-            })),
-          },
-        ],
-      },
+      acceptedFailedCoverage: catalogCoverage(manifest, manifestSha256),
     };
-    binding.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
-      binding.acceptedFailedCoverage
-    );
+
+    const refingerprint = (candidate: RecoveryReindexBinding): RecoveryReindexBinding => {
+      candidate.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
+        candidate.acceptedFailedCoverage
+      );
+      return candidate;
+    };
+    const mutableEntries = (candidate: RecoveryReindexBinding): AcceptedFailedCoverageEntry[] =>
+      candidate.acceptedFailedCoverage.scopes[0].entries as AcceptedFailedCoverageEntry[];
 
     const staleRun = structuredClone(binding);
     staleRun.acceptedFailedCoverage.recoveryRunId = '53000000-0000-4000-8000-000000000005';
-    staleRun.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
-      staleRun.acceptedFailedCoverage
-    );
-    expect(() => buildReindexPlan(rows, () => false, staleRun)).toThrow(
+    expect(() => buildReindexPlan(rows, () => false, refingerprint(staleRun))).toThrow(
       /coverage.*run|run.*coverage/iu
     );
 
-    const nonZero = structuredClone(binding);
-    nonZero.acceptedFailedCoverage.ledgers[0].entries[0].claims = ['not-empty'];
-    nonZero.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
-      nonZero.acceptedFailedCoverage
+    const staleHash = structuredClone(binding);
+    mutableEntries(staleHash)[0].hash = 'f'.repeat(64);
+    expect(() => buildReindexPlan(rows, () => false, refingerprint(staleHash))).toThrow(
+      /exact recovered file_catalog truth/iu
     );
-    expect(() => buildReindexPlan(rows, () => false, nonZero)).toThrow(/zero|claims|evidence/iu);
+
+    const foreignMarker = structuredClone(binding);
+    mutableEntries(foreignMarker)[0].errorMessage =
+      'source_file_unrecoverable; recovery_run=53000000-0000-4000-8000-000000000005';
+    expect(() => buildReindexPlan(rows, () => false, refingerprint(foreignMarker))).toThrow(
+      /exact recovered file_catalog truth/iu
+    );
+
+    const notFailed = structuredClone(binding) as RecoveryReindexBinding & {
+      acceptedFailedCoverage: { scopes: { entries: { vectorStatus: 'indexed' }[] }[] };
+    };
+    notFailed.acceptedFailedCoverage.scopes[0].entries[0].vectorStatus = 'indexed';
+    expect(() =>
+      buildReindexPlan(rows, () => false, refingerprint(notFailed as RecoveryReindexBinding))
+    ).toThrow(/exact recovered file_catalog truth/iu);
 
     const nonAccepted = structuredClone(binding) as RecoveryReindexBinding & {
       acceptedFailedCoverage: RecoveryReindexBinding['acceptedFailedCoverage'] & {
@@ -422,26 +407,28 @@ describe('buildReindexPlan', () => {
       };
     };
     nonAccepted.acceptedFailedCoverage.status = 'processing';
-    nonAccepted.acceptedFailedCoverage.fingerprint = calculateAcceptedFailedCoverageFingerprint(
-      nonAccepted.acceptedFailedCoverage
-    );
+    refingerprint(nonAccepted);
     expect(nonAccepted.acceptedFailedCoverage.fingerprint).not.toBe(
       binding.acceptedFailedCoverage.fingerprint
     );
     expect(() => buildReindexPlan(rows, () => false, nonAccepted)).toThrow(/accepted.*status/iu);
 
-    const unrelatedEmptyLedger = structuredClone(binding);
-    unrelatedEmptyLedger.acceptedFailedCoverage.ledgers.push({
-      ledgerId: '54000000-0000-4000-8000-000000000005',
-      status: 'accepted',
+    const foreignSource = structuredClone(binding) as RecoveryReindexBinding & {
+      acceptedFailedCoverage: { source: 'document_evidence' };
+    };
+    foreignSource.acceptedFailedCoverage.source = 'document_evidence';
+    expect(() =>
+      buildReindexPlan(rows, () => false, refingerprint(foreignSource as RecoveryReindexBinding))
+    ).toThrow(/file_catalog/iu);
+
+    const unrelatedScope = structuredClone(binding);
+    (unrelatedScope.acceptedFailedCoverage.scopes as AcceptedFailedCoverageScopeBinding[]).push({
       organizationId: SOURCE_BASE.organizationId,
       courseId: '22000000-0000-4000-8000-000000000002',
       entries: [],
     });
-    unrelatedEmptyLedger.acceptedFailedCoverage.fingerprint =
-      calculateAcceptedFailedCoverageFingerprint(unrelatedEmptyLedger.acceptedFailedCoverage);
-    expect(() => buildReindexPlan(rows, () => false, unrelatedEmptyLedger)).toThrow(
-      /ledger.*scope|scope.*ledger/iu
+    expect(() => buildReindexPlan(rows, () => false, refingerprint(unrelatedScope))).toThrow(
+      /scope.*match|match.*scope/iu
     );
   });
 
