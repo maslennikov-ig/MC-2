@@ -26,6 +26,10 @@ const ORGANIZATION_ID = '10000000-0000-4000-8000-000000000001';
 const FOREIGN_ORGANIZATION_ID = '11000000-0000-4000-8000-000000000001';
 const COURSE_A_ID = '20000000-0000-4000-8000-000000000002';
 const COURSE_B_ID = '22000000-0000-4000-8000-000000000002';
+// Golden serialization pin for calculateAcceptedFailedCoverageFingerprint over the fixture
+// manifest below (six eligible dispositions across two course scopes).
+const GOLDEN_COVERAGE_FINGERPRINT =
+  'a8229359104316e18daaf08d7bed274dc08dccdb9d4d4adaacaf375ce48e4e13';
 
 function fileId(index: number): string {
   return `e0000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
@@ -291,7 +295,9 @@ describe('source recovery reindex adapters', () => {
       catalogRepository: repository(value, rows),
     });
 
-    await expect(adapters.loadRecoveryBinding()).rejects.toThrow(/coverage|file_catalog/iu);
+    await expect(adapters.loadRecoveryBinding()).rejects.toThrow(
+      /file_catalog row is not the exact recovered disposition state/iu
+    );
   });
 
   it.each([
@@ -313,6 +319,59 @@ describe('source recovery reindex adapters', () => {
     });
 
     await expect(adapters.loadRecoveryBinding()).rejects.toThrow(/coverage/iu);
+  });
+
+  it.each([
+    ['organization', 'organization_id'],
+    ['course', 'course_id'],
+  ])('rejects a manifest %s identity that is not a lower-case UUIDv4', async (_label, field) => {
+    const value = manifest();
+    // z.string().uuid() in the manifest schema accepts upper-case hex, so the coverage binding must
+    // reject it here instead of letting C6 reindex.plan fail later inside the window.
+    const current = value.dispositions[0][field as 'organization_id' | 'course_id']!;
+    const upperCased = `B${current.slice(1)}`;
+    value.dispositions[0] = {
+      ...value.dispositions[0],
+      [field]: upperCased,
+    } as (typeof value.dispositions)[number];
+    const rows = value.dispositions.map((_entry, index) => appliedRow(value, index));
+    const sha256 = calculateRecoveryManifestSha256(value);
+    const adapters = createSourceRecoveryReindexAdapters(
+      {
+        ...config(),
+        expectedRecoveryManifestSha256: sha256,
+        acceptedCoverageAuthority: formatAcceptedCoverageAuthority(value.run_id),
+      },
+      {
+        loadReviewedRecoveryState: vi.fn().mockResolvedValue({
+          manifest: value,
+          manifestSha256: sha256,
+          journal: journal(value),
+        }),
+        persistRecoveryJournalTransition: vi.fn(),
+        catalogRepository: repository(value, rows),
+      }
+    );
+
+    await expect(adapters.loadRecoveryBinding()).rejects.toThrow(
+      /coverage scopes must be unique lower-case UUIDv4/iu
+    );
+  });
+
+  it('pins the canonical coverage fingerprint to a golden constant', async () => {
+    // Guards the SERIALIZATION contract: the fixture-derived oracles elsewhere recompute the
+    // fingerprint with the function under test, so only this literal detects a silent change to the
+    // hashed field set (which would shift the window's <accepted-coverage-fingerprint>).
+    const value = manifest();
+    const adapters = createSourceRecoveryReindexAdapters(config(value), {
+      loadReviewedRecoveryState: vi.fn().mockResolvedValue(state(value)),
+      persistRecoveryJournalTransition: vi.fn(),
+      catalogRepository: repository(value),
+    });
+
+    const binding = await adapters.loadRecoveryBinding();
+
+    expect(binding.acceptedFailedCoverage.fingerprint).toBe(GOLDEN_COVERAGE_FINGERPRINT);
   });
 
   it('uses crash-durable CAS then rejects a journal echo without an independent persisted reload', async () => {

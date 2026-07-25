@@ -316,7 +316,9 @@ Stop without partial activation on:
 - unsupported filesystem durability/no-replace semantics;
 - manifest corruption, missing `fsync`, or ambiguous crash state;
 - partial database disposition that cannot reconcile through exact CAS;
-- a failed coverage ledger invariant;
+- a failed accepted-coverage invariant (since the 2026-07-25 amendment: any recovered `file_catalog`
+  row that is not the exact post-disposition state, a coverage-fingerprint mismatch, or a coverage
+  authority token that is not `catalog:<recovery-run-id>` for this run);
 - current Session pooler credentials still unavailable;
 - any required P0/P1 review finding.
 

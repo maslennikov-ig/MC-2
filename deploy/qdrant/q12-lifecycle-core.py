@@ -790,8 +790,11 @@ class StagedValueResolver:
     def on_source_forward_accepted(
         self, recovery_manifest_sha256: str, coverage_fingerprint: str, coverage_run: str
     ) -> None:
-        """After ``source.forward`` is accepted: the recovery manifest sha + accepted coverage
-        ``org:course:run`` from the recovery journal."""
+        """After ``source.forward`` is accepted: the recovery manifest sha, the coverage fingerprint
+        over the recovered file_catalog rows, and the ``catalog:<recovery-run-id>`` coverage
+        authority token — all three read from the emitted
+        ``<run-root>/source-forward-acceptance.json`` (amendment 2026-07-25; the retired contract
+        took an ``org:course:run`` ledger triple from the recovery journal)."""
         self._set("<accepted-recovery-manifest-sha256>", recovery_manifest_sha256)
         self._set("<accepted-coverage-fingerprint>", coverage_fingerprint)
         self._set("<accepted-coverage-run>", coverage_run)
@@ -945,7 +948,8 @@ def resolve_source_forward_acceptance(
 def accept_real_run(
     children_exit_codes: list[int],
     barrier_receipt: dict[str, Any],
-    recovery_journal: dict[str, Any],
+    source_forward_acceptance: dict[str, Any],
+    expected_recovery_run_id: str,
 ) -> None:
     """Design §W2 D4 (LOCKED, owner steer 2026-07-20) — the real-run acceptance oracle.
 
@@ -953,8 +957,13 @@ def accept_real_run(
       (1) every real child exited 0;
       (2) the barrier receipt v2 reached ``state == "guard_cleanup_complete"`` (state machine
           intact — the same terminal the owner-custody resume gate validates); AND
-      (3) coverage evidence is present in the recovery journal as an ``org:course:run`` triple
-          (three non-empty ``:``-separated tokens).
+      (3) the emitted ``source.forward`` acceptance authority
+          (``<run-root>/source-forward-acceptance.json``) carries two hex64 digests and a coverage
+          token ``catalog:<recovery-run-id>`` naming THIS run's recovery run.
+    Condition (3) checked ``recovery_journal["coverage"]`` for an ``org:course:run`` triple until the
+    owner-approved amendment 2026-07-25 made acceptance file_catalog truth: the recovery progress
+    journal has no ``coverage`` key (its schema is strict) and the document-evidence ledger triple no
+    longer exists as an authority, so the oracle validates the emitted authority instead.
     Byte-parity does NOT gate a real run — the fixture parity suite stays the mechanics oracle,
     checked separately. Fail closed with a distinct named reason per condition."""
     nonzero = [code for code in children_exit_codes if code != 0]
@@ -964,11 +973,24 @@ def accept_real_run(
         raise LifecycleError(
             "real run rejected: barrier receipt did not reach guard_cleanup_complete"
         )
-    coverage = recovery_journal.get("coverage") if isinstance(recovery_journal, dict) else None
-    parts = coverage.split(":") if isinstance(coverage, str) else []
-    if len(parts) != 3 or not all(parts):
+    if not isinstance(source_forward_acceptance, dict):
+        raise LifecycleError("real run rejected: source.forward acceptance authority is malformed")
+    digests = (
+        source_forward_acceptance.get("recovery_manifest_sha256"),
+        source_forward_acceptance.get("coverage_fingerprint"),
+    )
+    if not all(
+        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in digests
+    ):
+        raise LifecycleError("real run rejected: acceptance authority digests are malformed")
+    coverage_run = source_forward_acceptance.get("coverage_run")
+    if not isinstance(coverage_run, str) or not COVERAGE_RUN_RE.fullmatch(coverage_run):
         raise LifecycleError(
-            "real run rejected: coverage evidence (org:course:run) absent or malformed"
+            "real run rejected: coverage authority (catalog:<recovery-run-id>) absent or malformed"
+        )
+    if coverage_run != f"catalog:{expected_recovery_run_id}":
+        raise LifecycleError(
+            "real run rejected: coverage authority does not name this recovery run"
         )
 
 
@@ -1439,7 +1461,7 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         window-grade (a real reviewed recovery manifest + the recovered Supabase file_catalog rows), so the
         end-to-end leg is exercised at the W7 owner-gated window; the read + its fail-closed validation
         are unit-tested here with a synthetic authority. Tracked on mc2-1sns3."""
-        del request
+        expected_recovery_run_id = request.get("recovery_run_id")
         authority = pathlib.Path(run_root) / "source-forward-acceptance.json"
         try:
             payload = json.loads(authority.read_bytes())
@@ -1457,6 +1479,13 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
             raise LifecycleError("source.forward acceptance sha256 fields are malformed")
         if not isinstance(coverage_run, str) or not COVERAGE_RUN_RE.fullmatch(coverage_run):
             raise LifecycleError("source.forward acceptance coverage_run is malformed")
+        # Defense in depth (amendment 2026-07-25): the wrapper forward tail and the TS adapter both
+        # require the authority token to name the run's own recovery run, so this read seam agrees
+        # instead of trusting whatever landed in the run root.
+        if coverage_run != f"catalog:{expected_recovery_run_id}":
+            raise LifecycleError(
+                "source.forward acceptance coverage_run does not name this recovery run"
+            )
         return (manifest_sha256, coverage_fingerprint, coverage_run)
 
     def open_window_snapshot(

@@ -6320,7 +6320,7 @@ fi
     chmodSync(fixture.coverageRunFile, 0o400);
     const result = fixture.run();
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/catalog:/iu);
+    expect(result.stderr).toMatch(/must be catalog:<recovery-run-id> with a lower-case UUIDv4/iu);
     expect(existsSync(fixture.emitLog)).toBe(false);
     expect(existsSync(fixture.acceptanceOutput)).toBe(false);
   });
@@ -6335,7 +6335,8 @@ fi
     chmodSync(fixture.coverageRunFile, 0o400);
     const result = fixture.run();
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/catalog:/iu);
+    // the format guard must be the one that fires, not the single-line or equality guard
+    expect(result.stderr).toMatch(/must be catalog:<recovery-run-id> with a lower-case UUIDv4/iu);
     expect(existsSync(fixture.emitLog)).toBe(false);
     expect(existsSync(fixture.acceptanceOutput)).toBe(false);
   });

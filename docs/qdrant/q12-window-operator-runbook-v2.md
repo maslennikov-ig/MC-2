@@ -156,7 +156,10 @@ A real run is accepted iff ALL hold:
 1. every real child exited 0;
 2. the barrier receipt v2 reached `state == guard_cleanup_complete`
    (`<run-root>/database-barrier-receipt.json`); and
-3. coverage evidence `org:course:run` is present in the recovery journal.
+3. the emitted acceptance authority `<run-root>/source-forward-acceptance.json` carries two 64-hex
+   digests and `coverage_run` equal to `catalog:<recovery-run-id>` for THIS run (amendment
+   2026-07-25 — there is no `org:course:run` ledger triple and no `coverage` key in the recovery
+   journal; the controller, the wrapper forward tail and `accept_real_run` all enforce this token).
 
 Fixture byte-parity is a **separate** mechanics check (the fixture suite), not a gate on the real run.
 

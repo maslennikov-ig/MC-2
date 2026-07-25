@@ -35,10 +35,15 @@ def _write(run_root: pathlib.Path, payload: object) -> None:
 
 def main() -> int:
     out: dict[str, object] = {}
-    request = {"run_id": str(uuid.uuid4()), "production": True}
+    recovery_run_id = str(uuid.uuid4())
+    request = {
+        "run_id": str(uuid.uuid4()),
+        "production": True,
+        "recovery_run_id": recovery_run_id,
+    }
     manifest_sha = "a" * 64
     fingerprint = "b" * 64
-    coverage_run = f"catalog:{uuid.uuid4()}"
+    coverage_run = f"catalog:{recovery_run_id}"
     executor = core.OwnerCustodyExecutor()
 
     # The seam exists on the DEPLOYED executor.
@@ -116,6 +121,22 @@ def main() -> int:
         except core.LifecycleError:
             legacy_failed = True
         out["legacyTripleFailsClosed"] = legacy_failed
+
+    # (6) a well-formed token naming ANOTHER recovery run fails closed (defense in depth: the
+    # wrapper and the TS adapter enforce the same equality, so all three layers must agree).
+    with tempfile.TemporaryDirectory(prefix="mc2-q12-sfa-foreign-") as tmp:
+        run_root = pathlib.Path(tmp)
+        _write(run_root, {
+            "recovery_manifest_sha256": manifest_sha,
+            "coverage_fingerprint": fingerprint,
+            "coverage_run": f"catalog:{uuid.uuid4()}",
+        })
+        foreign_failed = False
+        try:
+            executor.read_source_forward_acceptance(request, run_root)
+        except core.LifecycleError:
+            foreign_failed = True
+        out["foreignRunFailsClosed"] = foreign_failed
 
     sys.stdout.write(json.dumps(out))
     return 0

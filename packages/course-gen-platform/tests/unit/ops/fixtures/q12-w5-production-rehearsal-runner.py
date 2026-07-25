@@ -10,7 +10,8 @@ This drives the REAL production functions (no fakes) as an integration:
   3. load_staged_values -> reload it and prove resolved_command("pg.backup") recomputes a
      BYTE-IDENTICAL command_sha256 on the recover twin (D5J determinism, D3);
   4. close_window_snapshot -> release the held source session cleanly;
-  5. accept_real_run(D4) -> accept on a terminal receipt + real coverage, reject a non-zero child.
+  5. accept_real_run(D4) -> accept on a terminal receipt + the emitted acceptance authority,
+     reject a non-zero child.
 
 Explicit IN-WINDOW-only residual (#21, bounded to W7 / the full-window production harness): the FULL
 run_live forward window with the real database-barrier dual-bind, and the real data-movement children
@@ -143,16 +144,27 @@ def main() -> int:
         executor.close_window_snapshot(coordinator)
         released = coordinator.poll() == 0
 
-        # (5) D4 oracle: accept on a terminal receipt + real coverage; reject a non-zero child
-        good_journal = {"coverage": f"{run_id}:course-x:run-y"}
+        # (5) D4 oracle: accept on a terminal receipt + the emitted acceptance authority
+        # (amendment 2026-07-25: coverage_run is catalog:<recovery-run-id>, not a ledger triple);
+        # reject a non-zero child.
+        good_authority = {
+            "schema": "megacampus.q12.source-forward-acceptance/v1",
+            "recovery_manifest_sha256": "a" * 64,
+            "coverage_fingerprint": "b" * 64,
+            "coverage_run": f"catalog:{recovery_run_id}",
+        }
         accepted = True
         try:
-            core.accept_real_run([0, 0, 0], {"state": "guard_cleanup_complete"}, good_journal)
+            core.accept_real_run(
+                [0, 0, 0], {"state": "guard_cleanup_complete"}, good_authority, recovery_run_id
+            )
         except core.LifecycleError:
             accepted = False
         rejected_nonzero = False
         try:
-            core.accept_real_run([0, 1], {"state": "guard_cleanup_complete"}, good_journal)
+            core.accept_real_run(
+                [0, 1], {"state": "guard_cleanup_complete"}, good_authority, recovery_run_id
+            )
         except core.LifecycleError:
             rejected_nonzero = True
 

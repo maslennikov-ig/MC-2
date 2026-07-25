@@ -37,5 +37,6 @@ describe('W7a real leg: read_source_forward_acceptance reads the on-disk authori
     expect(out.malformedShaFailsClosed).toBe(true);
     expect(out.malformedRunFailsClosed).toBe(true);
     expect(out.legacyTripleFailsClosed).toBe(true);
+    expect(out.foreignRunFailsClosed).toBe(true);
   });
 });

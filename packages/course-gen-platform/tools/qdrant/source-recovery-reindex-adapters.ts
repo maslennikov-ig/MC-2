@@ -142,6 +142,12 @@ function eligibleDispositions(manifest: SourceRecoveryManifest) {
   }
   for (const entry of eligible) {
     if (!entry.course_id) throw new Error('Eligible recovery disposition must have a course');
+    // The manifest schema uses z.string().uuid(), which also accepts upper-case hex and other UUID
+    // versions. Reject those here so a malformed tenant identity fails at the C5 acceptance emit
+    // instead of at the much later (and far more expensive) C6 reindex.plan gate.
+    if (!UUID_V4_PATTERN.test(entry.organization_id) || !UUID_V4_PATTERN.test(entry.course_id)) {
+      throw new Error('Accepted coverage scopes must be unique lower-case UUIDv4 courses');
+    }
   }
   return eligible;
 }
