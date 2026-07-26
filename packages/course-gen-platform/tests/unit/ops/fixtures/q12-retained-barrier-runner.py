@@ -670,10 +670,37 @@ class LiveOrdinaryExecutor(NoIoExecutor):
     deterministically distinct from that fixture tag, without ever touching the journal.
     """
 
+    # mc2-y02tz C2-DEFERRED PUBLICATION seam: when set (a dict with "path"/"body"/"mode"), the
+    # simulated `writers.quiesce` child PUBLISHES the writer-quiesce manifest at that path at the
+    # exact moment the command executes — which is what the real in-window C2 child
+    # (source-recovery-run.sh --operation quiesce-writers-only -> q12-writer-resume.py run_quiesce)
+    # does. Nothing pre-publishes it, so the fixture reproduces the production FIRST-RUN ordering.
+    deferred_quiesce_publish: dict[str, Any] | None = None
+
+    def publish_deferred_quiesce_manifest(self) -> None:
+        publish = self.deferred_quiesce_publish
+        if publish is None:
+            return
+        path = pathlib.Path(publish["path"])
+        temporary = path.with_name(f"{path.name}.deferred-publish")
+        descriptor = os.open(
+            temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, publish["mode"]
+        )
+        try:
+            os.write(descriptor, publish["body"])
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.chmod(temporary, publish["mode"])
+        os.rename(temporary, path)
+        CORE.fsync_directory(path.parent)
+
     def execute_ordinary(self, command: dict[str, Any], capability: dict[str, Any]) -> dict[str, Any]:
         self.child_executions += 1
         run_id = capability["run_id"]
         command_id = capability["command_id"]
+        if command_id == "writers.quiesce":
+            self.publish_deferred_quiesce_manifest()
         return {
             "schema_version": "megacampus.q12.retained-command-result/v1",
             "command_id": command_id,
@@ -1162,6 +1189,7 @@ LIVE_SPEC_KEYS = {
     "stopAfter",
     "cleanupCrashAfter",
     "barrierClaimCrash",
+    "deferredQuiesce",
 }
 
 RECOVER_SPEC_KEYS = {
@@ -1171,6 +1199,7 @@ RECOVER_SPEC_KEYS = {
     "production",
     "quiesceManifestPath",
     "executeActualWrapper",
+    "deferredQuiesce",
 }
 
 SUPERVISOR_SPEC_KEYS = {
@@ -1218,6 +1247,27 @@ def quiesce_manifest_sha256_readonly(raw_path: Any) -> str:
         return digest.hexdigest()
     finally:
         os.close(file_fd)
+
+
+def deferred_quiesce_target(root: pathlib.Path, raw_path: Any) -> pathlib.Path:
+    """Validate the path the simulated C2 child will publish the quiesce manifest at.
+
+    Unlike the pre-published parity path (which is shared with the composer and may live in
+    another fixture root), the DEFERRED target is written by the fixture, so it is constrained to
+    the controller's own run root — exactly where the real C2 child publishes it
+    (``<run-root>/writer-quiesce-<run-id>.json``, source-recovery-run.sh:522) — and must not
+    already exist (the whole point of the first-run ordering).
+    """
+    if not isinstance(raw_path, str) or not raw_path.startswith("/"):
+        raise RuntimeError("deferred quiesce manifest path must be absolute")
+    if os.path.normpath(raw_path) != raw_path:
+        raise RuntimeError("deferred quiesce manifest path must be normalized")
+    path = pathlib.Path(raw_path)
+    if path.parent != root:
+        raise RuntimeError("deferred quiesce manifest must be published inside the run root")
+    if path.exists() or path.is_symlink():
+        raise RuntimeError("deferred quiesce manifest path must not exist yet")
+    return path
 
 
 def run_live_fixture(spec: dict) -> int:
@@ -1272,11 +1322,27 @@ def run_live_fixture(spec: dict) -> int:
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
         expected_catalog.chmod(0o400)
     quiesce_manifest_path = spec.get("quiesceManifestPath")
-    quiesce_manifest_sha256 = (
-        quiesce_manifest_sha256_readonly(quiesce_manifest_path)
-        if quiesce_manifest_path is not None
-        else "0" * 64
-    )
+    # mc2-y02tz C2-DEFERRED PUBLICATION: the production first-run ordering — nothing pre-publishes
+    # the manifest, the request declares the operator's "not published yet" digest (all-zero by
+    # default), and the simulated writers.quiesce child publishes the real file mid-window.
+    deferred_quiesce = spec.get("deferredQuiesce")
+    if deferred_quiesce is not None:
+        if quiesce_manifest_path is None:
+            raise RuntimeError("deferredQuiesce requires quiesceManifestPath")
+        target = deferred_quiesce_target(root, quiesce_manifest_path)
+        quiesce_manifest_sha256 = deferred_quiesce.get("requestedSha256") or "0" * 64
+        if deferred_quiesce.get("publish"):
+            executor.deferred_quiesce_publish = {
+                "path": str(target),
+                "body": str(deferred_quiesce["body"]).encode("utf-8"),
+                "mode": int(deferred_quiesce.get("publishMode") or 0o400),
+            }
+    else:
+        quiesce_manifest_sha256 = (
+            quiesce_manifest_sha256_readonly(quiesce_manifest_path)
+            if quiesce_manifest_path is not None
+            else "0" * 64
+        )
     request = {
         "run_root": str(root),
         "run_id": spec.get("runId") or derive_run_id(root),
@@ -1343,11 +1409,27 @@ def run_recover_fixture(spec: dict) -> int:
         expected_catalog.write_text('{"schema_version":"fixture/v1"}\n', encoding="utf-8")
         expected_catalog.chmod(0o400)
     quiesce_manifest_path = spec.get("quiesceManifestPath")
-    quiesce_manifest_sha256 = (
-        quiesce_manifest_sha256_readonly(quiesce_manifest_path)
-        if quiesce_manifest_path is not None
-        else "0" * 64
-    )
+    # mc2-y02tz: a recover that resumes a DEFERRED first run finds no published manifest on the
+    # root (the group-3 child never ran), so it declares the same "not published yet" digest and
+    # its own simulated writers.quiesce child publishes the artifact mid-resume.
+    deferred_quiesce = spec.get("deferredQuiesce")
+    if deferred_quiesce is not None:
+        if quiesce_manifest_path is None:
+            raise RuntimeError("deferredQuiesce requires quiesceManifestPath")
+        target = deferred_quiesce_target(root, quiesce_manifest_path)
+        quiesce_manifest_sha256 = deferred_quiesce.get("requestedSha256") or "0" * 64
+        if deferred_quiesce.get("publish"):
+            executor.deferred_quiesce_publish = {
+                "path": str(target),
+                "body": str(deferred_quiesce["body"]).encode("utf-8"),
+                "mode": int(deferred_quiesce.get("publishMode") or 0o400),
+            }
+    else:
+        quiesce_manifest_sha256 = (
+            quiesce_manifest_sha256_readonly(quiesce_manifest_path)
+            if quiesce_manifest_path is not None
+            else "0" * 64
+        )
     request = {
         "run_root": str(root),
         "run_id": spec.get("runId") or derive_run_id(root),

@@ -604,6 +604,28 @@ export interface LiveControllerFixtureSpec {
    * standalone supervisor (`q12-live-cutover.sh <op>`) then completes under cutover-recovery-1.
    */
   barrierClaimCrash?: RetainedBarrierOperation;
+  /**
+   * C2-DEFERRED QUIESCE PUBLICATION (mc2-y02tz). The production FIRST live run of a window cannot
+   * have the writer-quiesce manifest on disk yet: `<run-root>/writer-quiesce-<run-id>.json` is
+   * published by the in-window C2 ordinary command `writers.quiesce` that run_live itself drives
+   * (source-recovery-run.sh --operation quiesce-writers-only), and run_live demands a FRESH run
+   * root. With this option the fixture:
+   *   * does NOT pre-publish the manifest at `quiesceManifestPath` (the path must not exist), and
+   *   * declares `requestedSha256` (default the all-zero digest = "not published yet") in the
+   *     controller request, and
+   *   * when `publish` is set, makes the fake ordinary-execution seam publish the REAL manifest
+   *     file at `quiesceManifestPath` with mode `publishMode` (default 0400) at the exact moment
+   *     the `writers.quiesce` command executes — i.e. simulating the real C2 child.
+   * `body` is the exact manifest content the simulated child writes (the same bytes a
+   * pre-published parity twin is fed), so a deferred journal can be compared against a
+   * pre-published one row-for-row.
+   */
+  deferredQuiesce?: {
+    publish?: boolean;
+    publishMode?: number;
+    requestedSha256?: string;
+    body?: string;
+  };
 }
 
 /**
@@ -632,6 +654,18 @@ export interface RecoverControllerFixtureSpec {
   production?: boolean;
   quiesceManifestPath?: string;
   executeActualWrapper?: boolean;
+  /**
+   * mc2-y02tz: resume a DEFERRED first run whose group-3 publication never happened. The manifest
+   * is absent on the root, the request declares the all-zero digest, and this recover's own
+   * simulated `writers.quiesce` child publishes the real artifact mid-resume — the same seam
+   * `LiveControllerFixtureSpec.deferredQuiesce` drives.
+   */
+  deferredQuiesce?: {
+    publish?: boolean;
+    publishMode?: number;
+    requestedSha256?: string;
+    body?: string;
+  };
 }
 
 /**

@@ -551,6 +551,24 @@ def open_parent_directory(path: pathlib.Path) -> int:
         raise
 
 
+def regular_file_present(path: pathlib.Path) -> bool:
+    """Probe for a producer-owned file WITHOUT following any link in its path.
+
+    Returns True for anything that exists at the final component — including a symlink or a
+    non-regular entry — so a hostile placement is never mistaken for "absent" (the caller's
+    ``validate_regular_file`` then fails closed on it with O_NOFOLLOW + the identity check).
+    """
+    require_lexical_absolute(path)
+    parent_descriptor = open_parent_directory(path)
+    try:
+        os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        return True
+    except FileNotFoundError:
+        return False
+    finally:
+        os.close(parent_descriptor)
+
+
 def validate_regular_file(
     path: pathlib.Path,
     *,
@@ -2607,7 +2625,7 @@ class Engine:
         command_id: str,
         values: dict[str, str],
         *,
-        quiesce_object_sha256: str | None = None,
+        quiesce_object_sha256: str | Callable[[], str] | None = None,
         resource_step_before_completion: str | None = None,
     ) -> dict[str, Any]:
         """Amendment section 4 items 4-5: one ordinary command lifecycle.
@@ -2615,6 +2633,13 @@ class Engine:
         Root emits the capability/claim/completion evidence directly through
         the production serializer/object primitives; the delegated claim
         launcher remains a D5-group and Task 9 controller concern.
+
+        ``quiesce_object_sha256`` may be a CALLABLE (mc2-y02tz). The writer-quiesce manifest is
+        PUBLISHED BY the ``writers.quiesce`` child this very lifecycle executes, so on the first
+        live run of a window its digest does not exist until after ``hook(command, capability)``
+        returns. A callable is therefore resolved at the one point where the digest is first
+        consumed — after the child ran, before the ``capability_completed``/``accepted`` rows —
+        which is exactly where a pre-known string is consumed too, so the journal is unchanged.
         """
         command = resolved_command(manifest, command_id, self.request, values)
         if command_id == "writers.quiesce":
@@ -2684,6 +2709,11 @@ class Engine:
                 raise LifecycleError("resource step is frozen to deploy.prepare completion")
             self.current_resource_manifest_sha256 = resource_step_before_completion
         if command_id == "writers.quiesce":
+            if callable(quiesce_object_sha256):
+                # C2-deferred adoption: read the manifest the child just published, enforce the
+                # same file identity/mode/ownership the pre-published path enforces, and step
+                # self.request["quiesce_manifest_sha256"] to its real digest.
+                quiesce_object_sha256 = quiesce_object_sha256()
             if quiesce_object_sha256 is None:
                 raise LifecycleError("quiesce lifecycle requires the accepted manifest digest")
             self.append(
@@ -4388,7 +4418,7 @@ def drive_forward_sequence(
     request: dict[str, Any],
     manifest: dict[str, Any],
     values: dict[str, str],
-    quiesce_bytes: bytes,
+    quiesce_bytes: bytes | Callable[[], bytes],
     run_id: str,
     resource_manifest_paths: dict[str, str],
     marker_path: str,
@@ -4400,6 +4430,7 @@ def drive_forward_sequence(
     resume_from: str | None = None,
     stop_after: str | None = None,
     on_staged: Callable[[str], None] = lambda _step: None,
+    quiesce_object_sha256: str | Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
 
@@ -4416,6 +4447,13 @@ def drive_forward_sequence(
     ``stop_after`` names a checkpoint (``_STOP_AFTER_STEP``) after which run_live stops cleanly and
     returns its PARTIAL output WITHOUT the post-activate segment. This is the crash/restart boundary
     machinery; recover never passes it (a recover always drives to convergence).
+
+    ``quiesce_bytes`` and ``quiesce_object_sha256`` may each be a CALLABLE (mc2-y02tz): on a live
+    first run of a window the writer-quiesce manifest is published mid-sequence by the group-3
+    ``writers.quiesce`` child, so neither its bytes (consumed by the group-14 FWM) nor its digest
+    (consumed by the group-3 accepted row) can be read up front. Both callables resolve at their
+    single existing consumption point, so the driven journal is unchanged. ``quiesce_object_sha256
+    is None`` keeps the original behaviour: the request-global digest read at group-3 call time.
     """
     def finalize(post_activate: bool) -> dict[str, Any]:
         return finalize_forward_output(
@@ -4450,7 +4488,8 @@ def drive_forward_sequence(
     def step_fwm() -> None:
         # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
         # run_joined_composer's publish_final_writer_manifest("forward", ...) call.
-        inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
+        payload = quiesce_bytes() if callable(quiesce_bytes) else quiesce_bytes
+        inventory = engine.derive_root_writer_inventory(payload, include_targets=True)
         engine.publish_final_writer_manifest(
             "forward",
             inventory,
@@ -4461,7 +4500,12 @@ def drive_forward_sequence(
         "operator.self-check": lambda: ordinary("operator.self-check"),
         "install": lambda: d5("install"),
         "writers.quiesce": lambda: ordinary(
-            "writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"]
+            "writers.quiesce",
+            quiesce_object_sha256=(
+                request["quiesce_manifest_sha256"]
+                if quiesce_object_sha256 is None
+                else quiesce_object_sha256
+            ),
         ),
         "pg.backup": step_pg_backup,
         "pg.restore": lambda: ordinary("pg.restore"),
@@ -4532,6 +4576,52 @@ def require_post_activate_executor(request: dict[str, Any], executor: Executor) 
         )
 
 
+def install_deferred_quiesce_adoption(
+    engine: Engine, request: dict[str, Any], quiesce_path: pathlib.Path
+) -> tuple[Callable[[], bytes], Callable[[], str]]:
+    """C2-deferred writer-quiesce adoption (mc2-y02tz), shared by run_live and run_recover.
+
+    Returns ``(published_bytes, adopt)``: the lazy group-14 byte source and the group-3 digest
+    resolver. ``adopt`` runs INSIDE append_ordinary_lifecycle after the child returned and before
+    the writers.quiesce capability_completed/accepted rows — the same point a pre-known digest is
+    consumed — so the ZERO -> QSHA step lands on an identical row.
+
+    The publication path is PINNED to the run root: the frozen ``writers.quiesce`` argv carries no
+    path argument, so the child's target is fully determined by run root + run id
+    (``run_writer_quiesce_only`` in source-recovery-run.sh:315-346 ->
+    ``q12-writer-resume.py:695``). Without this pin an operator typo in --quiesce-manifest-path
+    would only surface AFTER the ten production writers were already stopped, and the run root it
+    stranded could not be re-driven.
+    """
+    canonical_publication = engine.run_root / f"writer-quiesce-{request['run_id']}.json"
+    if quiesce_path != canonical_publication:
+        raise LifecycleError(
+            "deferred writer quiesce manifest path must be the run-root publication path"
+        )
+    cache: dict[str, bytes] = {}
+
+    def adopt() -> str:
+        if not regular_file_present(quiesce_path):
+            raise LifecycleError("writers.quiesce published no writer quiesce manifest")
+        published = validate_regular_file(quiesce_path, mode=0o400)
+        # Content authority at group 3, not group 14: derive_root_writer_inventory is pure (it
+        # appends no row and publishes nothing), so running it here refuses a malformed or foreign
+        # manifest before pg.backup/migrations instead of eleven groups later with the writers down.
+        engine.derive_root_writer_inventory(published, include_targets=False)
+        cache["bytes"] = published
+        digest = sha256(published)
+        request["quiesce_manifest_sha256"] = digest
+        return digest
+
+    def published_bytes() -> bytes:
+        payload = cache.get("bytes")
+        if payload is None:
+            raise LifecycleError("deferred writer quiesce manifest was never adopted")
+        return payload
+
+    return published_bytes, adopt
+
+
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     """Task-9 live cutover controller — the production twin of run_joined_composer.
 
@@ -4579,9 +4669,33 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         raise LifecycleError("live composition requires a fresh run root")
     quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
     require_lexical_absolute(quiesce_path)
-    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
-    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
-        raise LifecycleError("live quiesce manifest digest mismatch")
+    # mc2-y02tz — C2-DEFERRED WRITER-QUIESCE PUBLICATION. On the FIRST live run of a window the
+    # manifest CANNOT exist yet: <run-root>/writer-quiesce-<run-id>.json is published by the
+    # in-window group-3 ordinary command `writers.quiesce` (frozen manifest -> source-recovery-run.sh
+    # --operation quiesce-writers-only, path derived at source-recovery-run.sh:522) which THIS
+    # controller drives, onto a run root run_live requires to be FRESH. Hand-authoring it would be
+    # an operator asserting "the writers are already quiesced" — an authority the operator does not
+    # hold — so an absent manifest is legal here, but ONLY when the request declares the all-zero
+    # digest (the operator saying "not published yet"). Any other declared digest with an absent
+    # file is a fail-closed refusal, and a manifest that IS present keeps today's strict behaviour
+    # byte-for-byte. run_recover shares this seam for the one head that can precede the group-3
+    # publication; a resume whose journal already carries the accepted row still demands the file.
+    quiesce_object_resolver: Callable[[], str] | None
+    quiesce_source: bytes | Callable[[], bytes]
+    if regular_file_present(quiesce_path):
+        quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+        if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+            raise LifecycleError("live quiesce manifest digest mismatch")
+        quiesce_source = quiesce_bytes
+        quiesce_object_resolver = None
+    else:
+        if request["quiesce_manifest_sha256"] != ZERO:
+            raise LifecycleError(
+                "live quiesce manifest is absent for a declared non-zero digest"
+            )
+        quiesce_source, quiesce_object_resolver = install_deferred_quiesce_adoption(
+            engine, request, quiesce_path
+        )
     # W2 fork (co-design D1/D2): fixture mode returns the verbatim parity-oracle dict; production mode
     # returns a StagedValueResolver with the W3 window snapshot already opened (real <exported-id> +
     # baseline.json) and hands back the HELD coordinator to release after pg.backup.
@@ -4666,7 +4780,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             request,
             manifest,
             values,
-            quiesce_bytes,
+            quiesce_source,
             run_id,
             resource_manifest_paths,
             marker_path,
@@ -4677,6 +4791,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             resume_from=None,
             stop_after=stop_after,
             on_staged=on_staged,
+            quiesce_object_sha256=quiesce_object_resolver,
         )
     finally:
         if snapshot_coordinator is not None:
@@ -4742,9 +4857,35 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
     require_lexical_absolute(quiesce_path)
-    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
-    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
-        raise LifecycleError("recover quiesce manifest digest mismatch")
+    # mc2-y02tz: the ONE resumable head that can precede the group-3 publication is
+    # barrier.install/completed (_RECOVER_RESUME_FROM maps it to "writers.quiesce"), which is also
+    # the --stop-after writers.quiesce.pre boundary. On a deferred first run nothing has published
+    # the manifest at that head, so demanding it here would leave the root unrecoverable by ANY
+    # path (run_live refuses a non-fresh root). Accept the absence on exactly run_live's terms —
+    # declared ZERO digest, pinned publication path — and let this resume's own group-3 child
+    # publish it. A journal that already carries the writers.quiesce accepted row has a durable
+    # publication, so a missing file there stays a fail-closed refusal.
+    quiesce_object_resolver: Callable[[], str] | None
+    quiesce_source: bytes | Callable[[], bytes]
+    if regular_file_present(quiesce_path):
+        quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+        if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+            raise LifecycleError("recover quiesce manifest digest mismatch")
+        quiesce_source = quiesce_bytes
+        quiesce_object_resolver = None
+    else:
+        if request["quiesce_manifest_sha256"] != ZERO:
+            raise LifecycleError(
+                "recover quiesce manifest is absent for a declared non-zero digest"
+            )
+        if any(
+            entry.get("command_id") == "writers.quiesce" and entry.get("outcome") == "accepted"
+            for entry in engine.journal
+        ):
+            raise LifecycleError("recover requires the durably published writer quiesce manifest")
+        quiesce_source, quiesce_object_resolver = install_deferred_quiesce_adoption(
+            engine, request, quiesce_path
+        )
     if request.get("production") is True:
         # W2/D3: recover reloads the persisted staged values — the real <exported-id> and the other
         # staged authorities cannot be re-opened — so the resumed journal recomputes byte-identical
@@ -4793,9 +4934,10 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     def resume(resume_from: str) -> dict[str, Any]:
         return drive_forward_sequence(
-            engine, request, manifest, values, quiesce_bytes, run_id,
+            engine, request, manifest, values, quiesce_source, run_id,
             resource_manifest_paths, marker_path, exported_id, target_identities,
             ordinary, d5, resume_from=resume_from,
+            quiesce_object_sha256=quiesce_object_resolver,
         )
 
     # DISPATCH on the durable head — the generalized Option A table (design §6b.2). Every clean
