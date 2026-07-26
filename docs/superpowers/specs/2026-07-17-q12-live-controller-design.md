@@ -1011,3 +1011,41 @@ depends on C2 quiesce may start until OQ1 is ratified.
 - `python3 scripts/orchestration/validate_artifact.py` is not applicable (this is a
   `docs/superpowers/specs` design doc, not a stage artifact); the companion plan carries
   the round-by-round verification contract.
+
+---
+
+## 9. Amendment 2026-07-26 — C2-deferred writer-quiesce publication (`mc2-y02tz`)
+
+**Defect.** `run_live` validated the writer-quiesce manifest before journalling any row
+(`q12-lifecycle-core.py`, the `validate_regular_file(quiesce_path, mode=0o400)` +
+digest-equality pair that opened the function). Nothing can satisfy that on the FIRST run of a
+window: `<run-root>/writer-quiesce-<run-id>.json` is published by the group-3 ordinary command
+`writers.quiesce` (frozen manifest → `source-recovery-run.sh --operation quiesce-writers-only`,
+path derived at `source-recovery-run.sh:522`) which `run_live` itself drives, onto a run root the
+same function requires to be fresh; and the C2 child (`q12-writer-resume.py run_quiesce`) will not
+publish until the controller has already journalled the `quiesced` head. Hand-authoring the file is
+excluded on principle — it is an authority asserting that writers are already stopped.
+
+**Resolution.** An absent manifest is legal in `run_live` only when the request declares the
+all-zero digest (the operator stating "not published yet"); any other declared digest with an absent
+file is the named refusal `live quiesce manifest is absent for a declared non-zero digest`. In that
+deferred mode the controller adopts the artifact at its single existing consumption points:
+
+- the digest inside `Engine.append_ordinary_lifecycle`'s `writers.quiesce` branch, after
+  `hook(command, capability)` returned and before the `capability_completed`/`accepted` rows — the
+  same point a pre-known string is consumed, so the ZERO→QSHA step lands on the identical row;
+- the bytes lazily in `drive_forward_sequence.step_fwm` (group 14), their only downstream reader.
+
+Adoption re-enforces the pre-published safety envelope verbatim (canonical absolute path, regular
+non-symlink entry, mode 0400, owning uid/gid, single link) and refuses when the child published
+nothing. A manifest that IS present keeps the previous behaviour byte-for-byte, and `run_recover` is
+deliberately untouched: it resumes a window whose group-3 publication is already durable.
+
+**Parity duty.** Proven by A/B rather than argument: a deferred run and a pre-published run pinned to
+the same run id and the same manifest bytes produce equal 81-row journals under the blessed exclusion
+set; without exclusions they differ only in the per-run-root fields any two runs on distinct roots
+differ in.
+
+**Known residual.** `_RECOVER_RESUME_FROM[("barrier.install","completed")] == "writers.quiesce"`, so a
+first run stopped at `--stop-after writers.quiesce.pre` has no published manifest and `recover` — still
+strict — refuses it. Tracked as `mc2-vfjyk`; `--stop-after deploy.prepare` is unaffected.

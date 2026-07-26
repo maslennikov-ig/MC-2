@@ -28,6 +28,14 @@
   `catalog:<recovery-run-id>`; the six recovered course scopes come from the sha-bound reviewed
   recovery manifest. The frozen manifest identity `aaec6fc2…` is unchanged.
 
+- **C2-deferred writer-quiesce publication (amendment 2026-07-26, `mc2-y02tz`).** `run_live` used to
+  demand the writer-quiesce manifest before journalling anything, while the only producer of that
+  file is the group-3 `writers.quiesce` child the same run drives onto a run root that must be
+  fresh — so a first window run could never start. An absent manifest is now legal for `live` when
+  (and only when) `--quiesce-manifest-sha256` is 64 zeroes; the controller adopts the published
+  digest and bytes under the same 0400/non-symlink/ownership envelope. A manifest that IS present
+  keeps the old strict behaviour, and `recover` is unchanged.
+
 ## 1. Preconditions (before C1)
 
 1. Fresh pre-window `plan` run is green (isolated-restore + migration + catalog capture).
@@ -38,7 +46,13 @@
    - `prod-ca-2021.crt` (TLS root for the source),
      plus the per-run-root `secrets/db-capability` the barrier child consumes.
 5. The accepted `.13.4.1` source-recovery run id is known (this is `--recovery-run-id`).
-6. The writer-quiesce manifest is published `0400` at its absolute path and its sha256 is known.
+6. The writer-quiesce manifest. On the **first** `live` run of a window it does NOT exist yet and
+   must not be pre-authored: `<run-root>/writer-quiesce-<run-id>.json` is published in-window by the
+   group-3 `writers.quiesce` child, so pass `--quiesce-manifest-sha256` as 64 zeroes and the
+   controller adopts the real digest the moment the child publishes it (amendment
+   2026-07-26 / `mc2-y02tz`; `run_live` fails closed on an absent manifest with any other declared
+   digest). Pass the REAL sha256 only when the manifest already exists at that path — that is the
+   `recover` case, and `recover` still requires it.
 7. The canonical `cutover.lock` is held exclusively on FD 9 (the controller acquires it in `main()`).
 8. The accepted coverage authority is staged at
    `/opt/megacampus/backups/q12/<run-id>/accepted-coverage-run` — controller-owned `0400`, one
@@ -123,6 +137,11 @@ output WITHOUT running the post-activate cleanup+resume segment:
 | `deploy.prepare`            | the C7 planned-exit head (`deploy.prepare/completed`) | **before — last reversible checkpoint** |
 | `final-writer-manifest`     | the group-14 FWM accepted row                         | before (reversible)                     |
 | `barrier.activate`          | group 16 (activate + nginx switch)                    | **AFTER — past the point of no return** |
+
+Caveat on `writers.quiesce.pre` for a FIRST run (`mc2-vfjyk`, follow-up to `mc2-y02tz`): stopping there
+leaves the window with no published quiesce manifest, and `recover` still requires one, so that head
+is currently NOT resumable — re-drive needs a fresh run root. `deploy.prepare` is unaffected (the
+manifest is published by then).
 
 Rule of thumb: `--stop-after deploy.prepare` is the safe rehearsal/hold boundary; `#18`
 rollback-abort is still available at or before `final-writer-manifest`. Do **not** use
