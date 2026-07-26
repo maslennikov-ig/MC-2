@@ -7,9 +7,14 @@ readonly NODE_UID='1001'
 readonly NODE_GID='1001'
 readonly CONTROLLER_UID='1000'
 readonly CONTROLLER_GID='1000'
+readonly ROOT_UID='0'
 readonly PYTHON_BIN='/usr/bin/python3'
 readonly RESUME_CONTROLLER="$(dirname "$(realpath -e -- "$0")")/q12-writer-resume.py"
-readonly DEFAULT_LOCK_FILE='/run/megacampus-qdrant-source-recovery/source-recovery.lock'
+# One host lock for all four operations, on the controller-owned Q12 backups root.
+# /run is tmpfs and was root-only, so the controller identity could never open it and
+# nothing survived a reboot; root can open a controller-owned 0600 lock, so a single
+# path keeps the writer operations and the privileged forward mutually exclusive.
+readonly DEFAULT_LOCK_FILE='/opt/megacampus/backups/q12/source-recovery.lock'
 readonly DEFAULT_Q12_CUTOVER_LOCK_FILE='/opt/megacampus/backups/q12/cutover.lock'
 readonly WRITER_QUIESCE_SCHEMA='megacampus.q12.writer-quiesce/v1'
 readonly WRITER_RECOVERY_STATE_SCHEMA='megacampus.q12.writer-recovery-state/v1'
@@ -53,6 +58,96 @@ readonly -a WRITER_SERVICES=(
 fail() {
   printf 'source-recovery host wrapper: %s\n' "$1" >&2
   exit 1
+}
+
+owner_group_mode() {
+  stat -c '%u:%g:%a' -- "$1"
+}
+
+# `forward` and `rollback` run as root over directories the controller identity owns and can
+# therefore rewrite concurrently. Every root publish below must resolve its target EXACTLY
+# once: the bytes, the ownership and the mode all land on one descriptor opened O_NOFOLLOW,
+# and the pre-write fstat rejects anything that is not still the regular file this process
+# created. A controller-uid racer that unlinks the mktemp name and plants a symlink can then
+# only make the open fail closed — never make root write, chown or chmod through it.
+# The payload arrives on descriptor 3 so the heredoc can stay on stdin.
+write_controller_temporary() {
+  local path="$1" mode="$2"
+  "$PYTHON_BIN" - "$path" "$mode" "$controller_uid" "$controller_gid" <<'PY'
+import json
+import os
+import stat
+import sys
+
+path, mode, uid, gid = sys.argv[1:]
+mode = int(mode, 8)
+uid = int(uid)
+gid = int(gid)
+descriptor = os.open(path, os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW)
+try:
+    before = os.fstat(descriptor)
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_uid != os.geteuid():
+        raise SystemExit(1)
+    payload = b""
+    while True:
+        chunk = os.read(3, 1 << 16)
+        if not chunk:
+            break
+        payload += chunk
+    json.loads(payload)
+    written = 0
+    while written < len(payload):
+        written += os.write(descriptor, payload[written:])
+    os.fchown(descriptor, uid, gid)
+    os.fchmod(descriptor, mode)
+    after = os.fstat(descriptor)
+    if (after.st_dev, after.st_ino, after.st_nlink) != (before.st_dev, before.st_ino, 1):
+        raise SystemExit(1)
+    if (after.st_uid, after.st_gid, stat.S_IMODE(after.st_mode)) != (uid, gid, mode):
+        raise SystemExit(1)
+    if after.st_size != len(payload):
+        raise SystemExit(1)
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
+# The host lock has the same exposure with an extra twist: it lives in a directory the
+# controller identity owns, and bash cannot open a path O_NOFOLLOW. Create and normalize it
+# here on an O_NOFOLLOW descriptor, and let the caller re-verify the descriptor it then opens.
+# Exit codes are the wrapper's named failures: 3 unopenable (symlink/ELOOP), 2 wrong identity
+# that this identity cannot repair, 1 not a regular file.
+ensure_controller_lock_file() {
+  "$PYTHON_BIN" - "$LOCK_FILE" "$controller_uid" "$controller_gid" "$root_uid" <<'PY'
+import os
+import stat
+import sys
+
+path, uid, gid, root_uid = sys.argv[1:]
+uid = int(uid)
+gid = int(gid)
+try:
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+except OSError:
+    raise SystemExit(3)
+try:
+    current = os.fstat(descriptor)
+    if not stat.S_ISREG(current.st_mode):
+        raise SystemExit(1)
+    if (current.st_uid, current.st_gid, stat.S_IMODE(current.st_mode)) != (uid, gid, 0o600):
+        try:
+            if os.geteuid() == int(root_uid):
+                os.fchown(descriptor, uid, gid)
+            os.fchmod(descriptor, 0o600)
+        except OSError:
+            raise SystemExit(2)
+        current = os.fstat(descriptor)
+        if (current.st_uid, current.st_gid, stat.S_IMODE(current.st_mode)) != (uid, gid, 0o600):
+            raise SystemExit(2)
+finally:
+    os.close(descriptor)
+PY
 }
 
 usage() {
@@ -106,13 +201,13 @@ if [[ $local_test == 1 ]]; then
   expected_gid="${SOURCE_RECOVERY_EXPECTED_GID:?local test GID is required}"
   controller_uid="${SOURCE_RECOVERY_CONTROLLER_UID:?local test controller UID is required}"
   controller_gid="${SOURCE_RECOVERY_CONTROLLER_GID:?local test controller GID is required}"
+  root_uid="${SOURCE_RECOVERY_ROOT_UID:-$EUID}"
   emit_bin_override="${SOURCE_RECOVERY_EMIT_BIN:-}"
   restore_verification_attempts=2
   restore_verification_delay=0
 else
-  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-}${SOURCE_RECOVERY_EMIT_BIN:-} ]] ||
+  [[ -z ${SOURCE_RECOVERY_WRITER_BACKEND:-}${SOURCE_RECOVERY_SYSTEMCTL_BIN:-}${SOURCE_RECOVERY_DOCKER_BIN:-}${SOURCE_RECOVERY_COMPOSE_BIN:-}${SOURCE_RECOVERY_CURL_BIN:-}${SOURCE_RECOVERY_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE:-}${SOURCE_RECOVERY_Q12_RUN_ROOT:-}${SOURCE_RECOVERY_RESUME_FAULT_POINT:-}${SOURCE_RECOVERY_QUIESCE_FAULT_POINT:-}${SOURCE_RECOVERY_EXPECTED_UID:-}${SOURCE_RECOVERY_EXPECTED_GID:-}${SOURCE_RECOVERY_CONTROLLER_UID:-}${SOURCE_RECOVERY_CONTROLLER_GID:-}${SOURCE_RECOVERY_ROOT_UID:-}${SOURCE_RECOVERY_EMIT_BIN:-} ]] ||
     fail 'test-only command, lock, and UID overrides require SOURCE_RECOVERY_LOCAL_TEST=1'
-  [[ $EUID -eq 0 ]] || fail 'production source recovery must run as root'
   SYSTEMCTL_BIN='/usr/bin/systemctl'
   DOCKER_BIN='/usr/bin/docker'
   COMPOSE_BIN="$(dirname "$(realpath -e -- "$0")")/operator-compose.sh"
@@ -126,12 +221,13 @@ else
   expected_gid="$NODE_GID"
   controller_uid="$CONTROLLER_UID"
   controller_gid="$CONTROLLER_GID"
+  root_uid="$ROOT_UID"
   emit_bin_override=''
   restore_verification_attempts=30
   restore_verification_delay=1
   writer_backend='compose'
 fi
-readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point quiesce_fault_point expected_uid expected_gid controller_uid controller_gid emit_bin_override writer_backend restore_verification_attempts restore_verification_delay
+readonly SYSTEMCTL_BIN DOCKER_BIN COMPOSE_BIN CURL_BIN LOCK_FILE Q12_CUTOVER_LOCK_FILE Q12_RUN_ROOT_OVERRIDE resume_fault_point quiesce_fault_point expected_uid expected_gid controller_uid controller_gid root_uid emit_bin_override writer_backend restore_verification_attempts restore_verification_delay
 
 case "$writer_backend" in
   compose) ;;
@@ -155,6 +251,7 @@ fi
 [[ $expected_gid =~ ^[0-9]+$ ]] || fail 'expected source-recovery GID must be numeric'
 [[ $controller_uid =~ ^[0-9]+$ ]] || fail 'expected controller UID must be numeric'
 [[ $controller_gid =~ ^[0-9]+$ ]] || fail 'expected controller GID must be numeric'
+[[ $root_uid =~ ^[0-9]+$ ]] || fail 'expected privileged UID must be numeric'
 [[ -z ${DOCKER_HOST:-} && -z ${DOCKER_CONTEXT:-} ]] ||
   fail 'remote or selected Docker contexts are forbidden'
 docker_context="$($DOCKER_BIN context show)"
@@ -232,6 +329,24 @@ case "$operation" in
   forward|rollback|resume-writers-only|quiesce-writers-only) ;;
   *) fail '--operation must be forward, rollback, resume-writers-only, or quiesce-writers-only' ;;
 esac
+# Per-operation identity contract, asserted before the first host mutation.
+# The writer operations MUST run as the controller identity: their child's closed-inbound
+# probe creates its scratch with mkdtemp(dir=run_root) and then requires that directory —
+# and its probe output files — to be owned by the passed uid/gid (q12-writer-resume.py
+# :632-640, :179), so a root-created scratch fails closed. The forward and rollback
+# operations MUST run as root: they read operator state owned by UID:GID 1001:1001 at
+# modes this wrapper pins itself (state/ and progress/ 0700, manifest 0400, journal 0600),
+# which is unreadable from the controller identity.
+case "$operation" in
+  quiesce-writers-only|resume-writers-only)
+    [[ $EUID -eq $controller_uid ]] ||
+      fail 'writer quiesce and resume must run as the controller identity'
+    ;;
+  forward|rollback)
+    [[ $EUID -eq $root_uid ]] ||
+      fail 'source recovery forward and rollback must run as root'
+    ;;
+esac
 if [[ $operation == resume-writers-only ]]; then
   case "$resume_mode" in forward|rollback) ;; *) fail 'resume-writers-only requires --resume-mode forward or rollback' ;; esac
   [[ $stop_writers -eq 0 && -z $resume_from && -z $project_directory && -z $env_file &&
@@ -262,6 +377,51 @@ if [[ $operation == forward && -z $resume_from ]]; then
 fi
 readonly fresh_plan
 
+ensure_host_lock() {
+  local directory lock_status=0
+  directory="$(dirname -- "$LOCK_FILE")"
+  if [[ -e $directory || -L $directory ]]; then
+    # An existing directory keeps its mode. /opt/megacampus/backups/q12 is 0755 on the host
+    # and also holds cutover.lock and every run root, so a run that merely needs a lock in it
+    # must not retighten shared state other consumers traverse; requiring the controller
+    # owner and controller access is the property that actually matters here.
+    [[ -d $directory && ! -L $directory ]] ||
+      fail 'host lock directory must be an existing non-symlink directory'
+    [[ $(stat -c '%u:%g' -- "$directory") == "$controller_uid:$controller_gid" ]] ||
+      fail 'host lock directory must be owned by the exact controller UID:GID'
+    [[ -r $directory && -w $directory && -x $directory ]] ||
+      fail 'host lock directory must be controller-readable, writable, and traversable'
+  else
+    install -d -o "$controller_uid" -g "$controller_gid" -m 0700 -- "$directory"
+  fi
+  # ONE lock path serves both identities, so the file itself must stay controller-owned
+  # 0600: root can open a controller-owned lock, but the controller cannot open a
+  # root-owned one, which would silently break mutual exclusion for the writer
+  # operations. Whichever identity reaches the lock first publishes the exact identity.
+  ensure_controller_lock_file || lock_status=$?
+  case "$lock_status" in
+    0) ;;
+    3) fail 'host lock file must not be a symlink' ;;
+    2) fail 'host lock file must be the controller-owned mode 0600 canonical file' ;;
+    *) fail 'host lock file must be a regular non-symlink file' ;;
+  esac
+}
+
+# bash cannot open a path O_NOFOLLOW, so the descriptor it did open is verified against a
+# no-follow view of the path before the lock is taken. The open itself is `<>` (no O_TRUNC),
+# which is what keeps a swapped path from becoming an arbitrary-truncate primitive at root.
+verify_open_host_lock() {
+  local descriptor="$1"
+  [[ ! -L $LOCK_FILE && -f $LOCK_FILE ]] || fail 'host lock file must not be a symlink'
+  [[ $(stat -Lc '%d:%i:%u:%g:%a:%F' -- "/proc/self/fd/$descriptor") == "$(stat -c '%d:%i:%u:%g:%a:%F' -- "$LOCK_FILE")" ]] ||
+    fail 'host lock descriptor identity is invalid'
+  [[ $(stat -Lc '%u:%g:%a' -- "/proc/self/fd/$descriptor") == "$controller_uid:$controller_gid:600" ]] ||
+    fail 'host lock descriptor identity is invalid'
+  # An unlocked lock is legitimately zero length, so stat reports 'regular empty file'.
+  [[ $(stat -Lc '%F' -- "/proc/self/fd/$descriptor") == regular* ]] ||
+    fail 'host lock descriptor identity is invalid'
+}
+
 run_writer_resume_only() {
   local resume_run_root
   if [[ $local_test == 1 ]]; then
@@ -280,15 +440,9 @@ run_writer_resume_only() {
     fail 'writer resume run root must be a canonical non-symlink directory'
   [[ $(stat -c '%u:%g:%a' -- "$resume_run_root") == "$controller_uid:$controller_gid:700" ]] ||
     fail 'writer resume run root must have the exact controller owner and mode 0700'
-  local resume_lock_directory
-  resume_lock_directory="$(dirname -- "$LOCK_FILE")"
-  if [[ $local_test == 1 ]]; then
-    mkdir -p -- "$resume_lock_directory"
-    chmod 0700 -- "$resume_lock_directory"
-  else
-    install -d -o root -g root -m 0700 -- "$resume_lock_directory"
-  fi
-  exec {resume_host_lock_fd}>"$LOCK_FILE"
+  ensure_host_lock
+  exec {resume_host_lock_fd}<>"$LOCK_FILE"
+  verify_open_host_lock "$resume_host_lock_fd"
   flock -n "$resume_host_lock_fd" || fail 'another source-recovery run holds the host lock'
 
   local resume_controller_pid resume_controller_status
@@ -328,15 +482,9 @@ run_writer_quiesce_only() {
     fail 'writer quiesce run root must be a canonical non-symlink directory'
   [[ $(stat -c '%u:%g:%a' -- "$quiesce_run_root") == "$controller_uid:$controller_gid:700" ]] ||
     fail 'writer quiesce run root must have the exact controller owner and mode 0700'
-  local quiesce_lock_directory
-  quiesce_lock_directory="$(dirname -- "$LOCK_FILE")"
-  if [[ $local_test == 1 ]]; then
-    mkdir -p -- "$quiesce_lock_directory"
-    chmod 0700 -- "$quiesce_lock_directory"
-  else
-    install -d -o root -g root -m 0700 -- "$quiesce_lock_directory"
-  fi
-  exec {quiesce_host_lock_fd}>"$LOCK_FILE"
+  ensure_host_lock
+  exec {quiesce_host_lock_fd}<>"$LOCK_FILE"
+  verify_open_host_lock "$quiesce_host_lock_fd"
   flock -n "$quiesce_host_lock_fd" || fail 'another source-recovery run holds the host lock'
   /usr/bin/env -i \
     PATH='/usr/sbin:/usr/bin:/sbin:/bin' \
@@ -381,12 +529,13 @@ require_real_path "$state_directory" 'source-recovery state directory'
 [[ $progress_directory == "$state_directory/progress" ]] ||
   fail 'progress directory must be the state/progress sibling of the manifest'
 
-owner_group_mode() {
-  stat -c '%u:%g:%a' -- "$1"
-}
-
 validate_external_quiesce_lease() {
-  lease_fd="${Q12_EXTERNAL_QUIESCE_LEASE_FD:-}"
+  # The frozen command manifest declares Q12_EXTERNAL_QUIESCE_LEASE_FD only for
+  # writers.quiesce, and its identity is an owner-level invariant, so source.forward
+  # arrives without it. Default to the canonical descriptor 9 — already the hard
+  # contract in q12-writer-resume.py:302-303 and the controller's --lease-fd choices —
+  # while an explicitly set value, valid or not, still wins.
+  lease_fd="${Q12_EXTERNAL_QUIESCE_LEASE_FD-9}"
   [[ $lease_fd =~ ^[0-9]+$ ]] && ((lease_fd >= 3)) && [[ -e /proc/self/fd/$lease_fd ]] ||
     fail 'external quiesce requires an inherited lease FD'
   [[ $Q12_CUTOVER_LOCK_FILE == /* && -f $Q12_CUTOVER_LOCK_FILE && ! -L $Q12_CUTOVER_LOCK_FILE ]] ||
@@ -505,14 +654,9 @@ if [[ $fresh_plan -eq 1 ]]; then
   done
 fi
 
-lock_directory="$(dirname -- "$LOCK_FILE")"
-if [[ $local_test == 1 ]]; then
-  mkdir -p -- "$lock_directory"
-  chmod 0700 -- "$lock_directory"
-else
-  install -d -o root -g root -m 0700 -- "$lock_directory"
-fi
-exec {lock_fd}>"$LOCK_FILE"
+ensure_host_lock
+exec {lock_fd}<>"$LOCK_FILE"
+verify_open_host_lock "$lock_fd"
 flock -n "$lock_fd" || fail 'another source-recovery run holds the host lock'
 
 declare -A prior_state=()
@@ -878,17 +1022,15 @@ current_writer_record() {
 write_quiesce_manifest() {
   local status="$1"
   local barrier_json="$2"
-  local temporary manifest_directory publish_fd=''
+  local temporary manifest_directory payload publish_fd=''
   manifest_directory="$(dirname "$quiesce_manifest")"
+  payload="$(jq -n --arg schema "$WRITER_QUIESCE_SCHEMA" --arg run "$q12_run_id" --arg status "$status" \
+    --argjson barrier "$barrier_json" --argjson writers "$writer_inventory" \
+    '{schema_version:$schema,run_id:$run,status:$status,barrier:$barrier,writers:$writers}')" || return 1
   temporary="$(mktemp -- "$manifest_directory/.writer-quiesce.XXXXXXXXXX")" || return 1
-  if ! jq -n --arg schema "$WRITER_QUIESCE_SCHEMA" --arg run "$q12_run_id" --arg status "$status" \
-      --argjson barrier "$barrier_json" --argjson writers "$writer_inventory" \
-      '{schema_version:$schema,run_id:$run,status:$status,barrier:$barrier,writers:$writers}' >"$temporary" ||
-    ! chown "$controller_uid:$controller_gid" "$temporary" ||
-    ! chmod 0400 "$temporary" ||
+  if ! write_controller_temporary "$temporary" 0400 3<<<"$payload" ||
     [[ ! -f $temporary || -L $temporary ]] ||
     [[ $(owner_group_mode "$temporary") != "$controller_uid:$controller_gid:400" ]] ||
-    ! sync -f "$temporary" ||
     ! mv -f -- "$temporary" "$quiesce_manifest" ||
     ! sync -d "$manifest_directory"; then
     rm -f -- "$temporary"
@@ -900,7 +1042,7 @@ write_quiesce_manifest() {
 }
 
 write_recovery_complete_state() {
-  local temporary quiesce_sha256 source_journal_fd='' source_journal_identity='' source_journal_sha256='' publish_fd=''
+  local temporary payload quiesce_sha256 source_journal_fd='' source_journal_identity='' source_journal_sha256='' publish_fd=''
   [[ -n $writer_recovery_state && -n $q12_run_root ]] || return 1
   verify_controller_file_unchanged "$quiesce_manifest" 'durable writer quiesce manifest' \
     "$quiesce_manifest_identity" "$quiesce_manifest_sha256"
@@ -912,19 +1054,17 @@ write_recovery_complete_state() {
   eval "exec ${source_journal_fd}<&-"
   [[ $quiesce_sha256 == "$quiesce_manifest_sha256" &&
      $source_manifest_sha256 =~ ^[a-f0-9]{64}$ && $source_journal_sha256 =~ ^[a-f0-9]{64}$ ]] || return 1
+  payload="$(jq -n --arg schema "$WRITER_RECOVERY_STATE_SCHEMA" --arg run "$q12_run_id" \
+    --arg catalog "$q12_expected_catalog_sha256" --arg quiesce "$quiesce_sha256" \
+    --arg source_manifest "$source_manifest_sha256" --arg source_journal "$source_journal_sha256" '
+    {schema_version:$schema,run_id:$run,state:"recovery_complete_writers_quiesced",
+     expected_catalog_sha256:$catalog,writer_quiesce_manifest_sha256:$quiesce,
+     source_manifest_sha256:$source_manifest,source_journal_sha256:$source_journal}
+  ')" || return 1
   temporary="$(mktemp -- "$q12_run_root/.writer-recovery-state.XXXXXXXXXX")" || return 1
-  if ! jq -n --arg schema "$WRITER_RECOVERY_STATE_SCHEMA" --arg run "$q12_run_id" \
-      --arg catalog "$q12_expected_catalog_sha256" --arg quiesce "$quiesce_sha256" \
-      --arg source_manifest "$source_manifest_sha256" --arg source_journal "$source_journal_sha256" '
-      {schema_version:$schema,run_id:$run,state:"recovery_complete_writers_quiesced",
-       expected_catalog_sha256:$catalog,writer_quiesce_manifest_sha256:$quiesce,
-       source_manifest_sha256:$source_manifest,source_journal_sha256:$source_journal}
-    ' >"$temporary" ||
-    ! chown "$controller_uid:$controller_gid" "$temporary" ||
-    ! chmod 0400 "$temporary" ||
+  if ! write_controller_temporary "$temporary" 0400 3<<<"$payload" ||
     [[ ! -f $temporary || -L $temporary ]] ||
-    [[ $(owner_group_mode "$temporary") != "$controller_uid:$controller_gid:400" ]] ||
-    ! sync -f "$temporary"; then
+    [[ $(owner_group_mode "$temporary") != "$controller_uid:$controller_gid:400" ]]; then
     rm -f -- "$temporary"
     return 1
   fi
@@ -1125,6 +1265,24 @@ finish_compose_recovery() {
     printf 'source-recovery host wrapper: recovery did not publish a quiesced completion state\n' >&2
   fi
   exit "$original_status"
+}
+
+# C9 authority for the Q12 path. `writers.resume.forward` hard-requires
+# <run-root>/writer-recovery-state-<run-id>.json (q12-writer-resume.py:1389-1392), whose
+# only producer used to run from the finish_compose_recovery EXIT trap — installed solely
+# on the --stop-writers branch, which Q12 forbids. The external-quiesce forward branch
+# installs no trap, so the artifact was never published and C9 failed closed. Publish it
+# with the same verifications the trap performs, after the fully verified forward chain.
+publish_external_quiesce_recovery_state() {
+  assert_all_stopped_with_no_restart
+  if [[ -n $database_barrier_receipt ]]; then
+    verify_controller_file_unchanged "$database_barrier_receipt" 'database barrier receipt' \
+      "$barrier_receipt_identity" "$barrier_receipt_sha256"
+  fi
+  verify_controller_file_unchanged "$q12_probe_receipt" 'database barrier probe receipt' \
+    "$probe_receipt_identity" "$probe_receipt_sha256"
+  write_recovery_complete_state ||
+    fail 'Q12 forward did not publish the writer recovery state'
 }
 
 restore_systemd_writers() {
@@ -1408,5 +1566,11 @@ if [[ -n $q12_run_id ]]; then
     $(owner_group_mode "$acceptance_output") != "$controller_uid:$controller_gid:400" ]]; then
     rm -f -- "$acceptance_output"
     fail 'source.forward acceptance authority was not published owner-only 0400'
+  fi
+
+  # The Q12 external-quiesce forward is the only Q12 path that reaches here, and it never
+  # installed the completion trap, so C9's authority is published explicitly.
+  if [[ -n $external_quiesce_manifest ]]; then
+    publish_external_quiesce_recovery_state
   fi
 fi

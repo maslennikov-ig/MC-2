@@ -36,15 +36,34 @@
   digest and bytes under the same 0400/non-symlink/ownership envelope. A manifest that IS present
   keeps the old strict behaviour, and `recover` is unchanged.
 
+- **Execution identity and the one privileged command (amendment 2026-07-26, `mc2-1by33`).** The
+  controller runs as the controller identity `claude-deploy` (uid/gid 1000) — NEVER as root: its own
+  validators require every artifact it creates to be owned by 1000. The frozen writer operations
+  (`writers.quiesce`, `writers.resume.*`) also run as that identity, because their child's
+  closed-inbound probe requires its scratch to be owned by it. Exactly one frozen command needs root
+  — `source.forward`, which reads operator state owned by uid 1001 — and the controller reaches it
+  through the root-owned argv-whitelist launcher `deploy/qdrant/q12-privileged-launch.sh` using the
+  operator account's existing sudo rights. No sudoers change, no new privilege. The launcher opens the
+  window lock as an identity handle and never locks it; the controller holds `LOCK_EX` for the whole
+  run, which is what makes the child's liveness proof pass. The wrapper's host lock now lives on the
+  controller-owned Q12 backups root (the old `/run` path was root-only and on tmpfs). See
+  `docs/superpowers/specs/2026-07-26-q12-window-execution-identity-design.md`.
+
 ## 1. Preconditions (before C1)
 
 1. Fresh pre-window `plan` run is green (isolated-restore + migration + catalog capture).
 2. Owner "go" recorded for this window.
 3. Manifest identity `aaec6fc2…` verified unchanged.
-4. Secrets present and owner-only under `/opt/megacampus/secrets/` (path-only, never printed):
-   - `supabase_db_url` (the source DSN the controller snapshot connects through over libpq),
-   - `prod-ca-2021.crt` (TLS root for the source),
-     plus the per-run-root `secrets/db-capability` the barrier child consumes.
+4. Secrets present under `/opt/megacampus/secrets/` (path-only, never printed) and owned by the
+   CONTROLLER identity — root ownership is a hard refusal here, not a hardening, because the barrier
+   and the migration scripts assert the files belong to the current uid/gid:
+   - `supabase_db_url` (the source DSN the controller snapshot connects through over libpq) —
+     `claude-deploy:claude-deploy`, mode 0400 or 0600;
+   - `prod-ca-2021.crt` (TLS root for the source) — `claude-deploy:claude-deploy`, mode EXACTLY
+     `0644` (the barrier at `q12-database-barrier.sh:229` and both migration scripts pin that value;
+     an owner-only 0400/0600 CA fails five barrier and two migration commands);
+   - plus the per-run-root `secrets/db-capability` the barrier child consumes, 0400 owned by the
+     controller identity.
 5. The accepted `.13.4.1` source-recovery run id is known (this is `--recovery-run-id`).
 6. The writer-quiesce manifest. On the **first** `live` run of a window it does NOT exist yet and
    must not be pre-authored: `<run-root>/writer-quiesce-<run-id>.json` is published in-window by the
@@ -82,6 +101,38 @@
     must fail with the usage message (not a module-resolution error).
 11. `sysctl fs.protected_hardlinks` reports `1` on the host (kernel default; the acceptance-emit
     publish hardening assumes hardlink protection for full root/controller isolation).
+12. `deploy/qdrant/q12-privileged-launch.sh` is deployed next to the controller and installed
+    **root-owned mode 0555** (`sudo install -o root -g root -m 0555 …`). The controller refuses
+    nothing on its absence up front — `source.forward` simply fails at launch — so verify it is there.
+13. `.env.blue` and `.env.green` each define `WEB_IMAGE` and `API_IMAGE` as immutable
+    `repo@sha256:…` references. `docker-compose.app.yml` marks both required, and q12 mode never
+    backfills them (that code lives in the non-q12 path), so an absent key aborts `deploy.prepare`
+    before any container exists. Pin the digests the CURRENTLY RUNNING colour uses: this window is a
+    Qdrant cutover, not an application release.
+14. `/opt/megacampus/backups/q12` is owned by the controller identity and traversable by it. The
+    wrapper's host lock now lives there (`source-recovery.lock`, beside `cutover.lock`), so a
+    root-owned parent would abort C2 with a bare `install:` error. Verified 2026-07-26:
+    `claude-deploy:claude-deploy` 0755. The wrapper creates the directory only when absent and does
+    not re-mode an existing one, so nothing else that traverses it is disturbed.
+15. The pinned `prometheus`, `node-exporter`, `alertmanager` and `grafana` images are present locally
+    (`docker image inspect <repo>@sha256:<digest>` — they do NOT show in a `repo:tag` listing when
+    pulled by digest). `deploy.prepare` brings up the shared infra and would otherwise pull them
+    mid-window.
+
+### 1a. What the local suites do NOT cover (know this before you open a window)
+
+- The identity-contract and controller suites auto-enable only at uid 1000 (`RUN_REAL_CONTROLLER`), so
+  they do not run on a generic CI runner. The launcher's sandboxed cases additionally need
+  unprivileged user namespaces (`MC2_Q12_USERNS_SANDBOX`); without them they SKIP, while the
+  production-constant and not-root refusal cases still run.
+- The real `sudo` → launcher → wrapper chain, and `validate_external_quiesce_lease`'s fresh-`flock`
+  probe executed as actual root against the controller-owned lock, are exercised for the first time by
+  the DEV rehearsal (`live --stop-after deploy.prepare` on the isolated stack), not by any unit suite.
+  Do not open a production window before that rehearsal is green.
+- Host facts verified 2026-07-26 that the design leans on: `/usr/bin/sudo` present; `/etc/sudoers` sets
+  `Defaults use_pty`, which does NOT corrupt captured child output (`sudo -n /bin/printf 'a\nb\n'`
+  through a pipe with stdin closed returns byte-identical output, stderr still separated); `sudo -n
+true </dev/null` succeeds.
 
 ## 2. Invocation
 
@@ -102,6 +153,13 @@ default `python3` is 3.12, so invoke the controller explicitly with
   --recovery-run-id <accepted-.13.4.1-source-recovery-run-id> \
   [--stop-after <checkpoint>]
 ```
+
+Invoke it **as `claude-deploy` (uid/gid 1000), never under sudo**, and **with `cwd=/opt/megacampus`**:
+the two `migration.*` frozen commands are `pnpm --filter …`, which only resolves inside the workspace,
+and the controller passes no `cwd` to its children. Argument notes for a FIRST run of a window:
+`--quiesce-manifest-sha256` is 64 zeroes (§1 precondition 6), `--resource-manifest-sha256` may be any
+64-hex value because the controller overwrites it with its own genesis resource-manifest digest, and
+`--operator-digest` is the bare 64-hex GHCR index digest without a `sha256:` prefix.
 
 The controller runs `production=True` with the owner-custody executor, pins the run root to
 `/opt/megacampus/backups/q12/<run-id>`, and writes the run-root artifacts:
