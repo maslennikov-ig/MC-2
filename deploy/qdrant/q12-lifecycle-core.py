@@ -65,6 +65,15 @@ MANIFEST_COMMAND_IDS = tuple(COMMANDS.values()) + ORDINARY_COMMAND_IDS
 LEASE_FD_ENV_COMMAND_IDS = frozenset(
     ("writers.quiesce", "writers.resume.forward", "writers.resume.rollback")
 )
+LEASE_FD_ENV_KEY = "Q12_EXTERNAL_QUIESCE_LEASE_FD"
+CANONICAL_LEASE_FD = 9
+# Design D5 (2026-07-26 window execution identity): the ONE frozen command that genuinely needs root
+# (it reads the uid-1001 operator tree's 0400/0700 state) and the root-owned argv-whitelist launcher
+# that reaches it through the operator account's EXISTING sudo rights.
+PRIVILEGED_LAUNCH_COMMAND_ID = "source.forward"
+PRIVILEGED_LAUNCH_SCRIPT_NAME = "q12-privileged-launch.sh"
+PRIVILEGED_LAUNCH_MODE = 0o555
+SUDO_BIN = "/usr/bin/sudo"
 # Amendment section 5: ordinary command -> (selector phase, target phase).
 ORDINARY_ROW_GRAMMAR = {
     "operator.self-check": ("preflight", "preflight"),
@@ -1241,6 +1250,72 @@ class SourceSnapshotSeam:
         return baseline_path
 
 
+def lease_pass_fds(env: dict[str, str]) -> tuple[int, ...]:
+    """Design D3: the descriptors a manifested child inherits, derived from its OWN frozen env.
+
+    A frozen command that declares ``Q12_EXTERNAL_QUIESCE_LEASE_FD`` (``LEASE_FD_ENV_COMMAND_IDS``)
+    is telling the launcher it will run ``validate_external_quiesce_lease``
+    (source-recovery-run.sh:388-411) / the writer controller's descriptor-surface assertion
+    (q12-writer-resume.py:296-311), both of which require the canonical cutover lock to arrive on an
+    INHERITED descriptor 9 that the CONTROLLER still holds ``LOCK_EX`` on (:8041-8046 — never
+    unlocked for the life of the run). Commands that declare nothing inherit nothing, so the
+    descriptor surface stays exactly as narrow as each frozen env says it is.
+
+    The descriptor is frozen to 9 in three independent places (q12-writer-resume.py:302-303, its
+    surface assertion :152-155, and the controller's ``--lease-fd choices=(9,)``), so any other
+    declared value is a manifest defect and fails closed here rather than deep inside the child.
+    """
+    declared = env.get(LEASE_FD_ENV_KEY)
+    if declared is None:
+        return ()
+    if declared != str(CANONICAL_LEASE_FD):
+        raise LifecycleError(
+            f"manifested child lease descriptor is frozen to {CANONICAL_LEASE_FD}: {declared}"
+        )
+    # The descriptor must actually BE the controller's held lease. Without this check a lost lease
+    # surfaces from inside subprocess as either a bare OSError EBADF traceback or — worse, and
+    # observed — a SILENT pass of whatever unrelated descriptor happens to occupy 9 (subprocess
+    # allocates its stdout/stderr pipes before forking and one can land there). By the time an
+    # ordinary command executes, its intent/capability rows are already journalled, so the operator
+    # must read a reason. Unreachable in a healthy run: main() holds LOCK_EX on 9 for the whole run.
+    try:
+        os.fstat(CANONICAL_LEASE_FD)
+    except OSError as error:
+        raise LifecycleError(
+            f"manifested child requires the controller's inherited lease descriptor "
+            f"{CANONICAL_LEASE_FD}"
+        ) from error
+    return (CANONICAL_LEASE_FD,)
+
+
+def privileged_launch_command(
+    command: dict[str, Any], capability: dict[str, Any]
+) -> dict[str, Any]:
+    """Design D5: the LAUNCH-time view of an ordinary command — the only place root is reached.
+
+    Exactly one frozen command needs root: ``source.forward``, which reads the uid-1001 operator
+    tree's 0400 files inside 0700 directories (source-recovery-run.sh:367-372, :470-497). It is
+    launched through the root-owned argv whitelist ``q12-privileged-launch.sh`` using the operator
+    account's EXISTING sudo rights — ``/etc/sudoers.d/claude-deploy`` already grants
+    ``ALL=(ALL) NOPASSWD: ALL``, so this adds no privilege and requires no sudoers change; it narrows
+    what that sudo is used for. The launcher itself asserts EUID 0, refuses every argv shape other
+    than this wrapper with ``--operation forward``, opens the canonical window lock on descriptor 9 as
+    an identity handle (never locking it — the controller holds ``LOCK_EX``), and rebuilds the frozen
+    env with ``env -i`` before exec'ing the frozen argv unchanged.
+
+    Every other command keeps today's direct launch. This is deliberately not a generic escalation
+    hook: it is keyed to the single frozen command id.
+
+    D7: this is a launch-time view ONLY. The returned dict is a copy — ``command`` is left untouched,
+    so the journal keeps recording the manifest argv/env and ``command_sha256`` (which covers argv
+    only, :1039) stays the manifest binding.
+    """
+    if capability["command_id"] != PRIVILEGED_LAUNCH_COMMAND_ID:
+        return command
+    launcher = pathlib.Path(__file__).with_name(PRIVILEGED_LAUNCH_SCRIPT_NAME)
+    return {**command, "argv": [SUDO_BIN, "-n", "--", str(launcher), *command["argv"]]}
+
+
 class ProductionExecutor:
     """Executes only a command already resolved from the fixed manifest."""
 
@@ -1249,6 +1324,7 @@ class ProductionExecutor:
             command["argv"],
             check=False,
             close_fds=True,
+            pass_fds=lease_pass_fds(command["env"]),
             env=command["env"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -1436,8 +1512,12 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         ``capability_sha256 == sha256(complete_object(capability))`` so the caller's ``!= digest``
         gate (:2497) accepts it, and it is parity-neutral: written ONLY to the per-command side file,
         never the journal / checkpoint / capability digest.
+
+        Design D5 (2026-07-26): ``source.forward`` — and ONLY it — is launched through the root-owned
+        argv-whitelist launcher (see ``privileged_launch_command``). Everything else keeps the direct
+        launch; there is deliberately no generic escalation hook.
         """
-        return self.execute(command, capability)
+        return self.execute(privileged_launch_command(command, capability), capability)
 
     def read_pg_backup_generation(self, request: dict[str, Any], run_root: pathlib.Path) -> str:
         """W7a real leg (MC2_Q12_REAL_PG17 / W7-gated): the ``<immutable-generation>`` authority — the
@@ -4543,6 +4623,73 @@ def drive_forward_sequence(
     return finalize(True)
 
 
+def validate_privileged_launcher(path: pathlib.Path) -> None:
+    """Design D5 pre-flight half 1: the launcher is installed exactly as the install contract says.
+
+    Checked in escalating order so the reason names the ONE thing that is wrong: installed at all,
+    then a regular non-symlink file, then root-owned, then mode exactly 0555. A launcher that is
+    group/other-writable, or owned by the very account it constrains, would make the whitelist
+    rewritable by that account — which is the entire point of the file being root-owned 0555.
+    """
+    try:
+        observed = os.lstat(path)
+    except OSError as error:
+        raise LifecycleError("privileged launcher is not installed") from error
+    if not stat_module.S_ISREG(observed.st_mode) or stat_module.S_ISLNK(observed.st_mode):
+        raise LifecycleError("privileged launcher must be a regular non-symlink file")
+    if observed.st_uid != 0 or observed.st_gid != 0:
+        raise LifecycleError("privileged launcher must be owned by root")
+    if stat_module.S_IMODE(observed.st_mode) != PRIVILEGED_LAUNCH_MODE:
+        raise LifecycleError("privileged launcher must be mode 0555")
+
+
+def probe_privileged_launch_authority() -> None:
+    """Design D5 pre-flight half 2: the operator account can still reach root non-interactively.
+
+    ``sudo -n true`` is a read-only no-op that mutates nothing and never prompts. If the authority
+    is gone (sudoers edited, ticket expired), the window must learn it now rather than at C5 with the
+    writers already stopped.
+    """
+    completed = subprocess.run(
+        [SUDO_BIN, "-n", "--", "/usr/bin/true"],
+        check=False,
+        close_fds=True,
+        env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if completed.returncode != 0:
+        raise LifecycleError(
+            "privileged launch authority is unavailable: sudo -n could not run as root"
+        )
+
+
+def require_privileged_launcher(request: dict[str, Any]) -> None:
+    """Design D5 PRE-FLIGHT gate (production only): refuse to START a window whose ONE privileged
+    command could not be launched.
+
+    ``source.forward`` (C5) is escalated through the root-owned argv whitelist. If that launcher is
+    missing/mis-installed, or the sudo authority is gone, the run would discover it at C5 — AFTER C2
+    has stopped all ten production writers, with the window open. Like
+    ``require_post_activate_executor``, this fires at the TOP of ``run_live``/``run_recover``, before
+    the genesis row and before Engine construction, so a mis-staged host never starts the window.
+    Non-production fixture runs are unaffected: they never reach the privileged launch.
+
+    Scope note: a HOST-staging refusal must not mask a REQUEST-shape refusal. A production request
+    whose run root is not the production run root cannot reach C5 at all, and that rule belongs to
+    ``Engine.__post_init__`` ("production run root mismatch", :1804-1805) — so such a request falls
+    through here and is refused by its own authority with its own name. Every request that COULD
+    reach the privileged launch is checked.
+    """
+    if request.get("production") is not True:
+        return
+    if request.get("run_root") != f"/opt/megacampus/backups/q12/{request.get('run_id')}":
+        return
+    validate_privileged_launcher(pathlib.Path(__file__).with_name(PRIVILEGED_LAUNCH_SCRIPT_NAME))
+    probe_privileged_launch_authority()
+
+
 def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
     """R5 Sub-round F PRE-FLIGHT gate (production only): refuse to START a forward cutover whose
     executor cannot run the post-activate cleanup + forward resume.
@@ -4663,6 +4810,10 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # journal row / run-root mutation, so it never journals through activate (the point of no
     # return) only to strand there. Defense-in-depth late gate stays in the post-activate seam.
     require_post_activate_executor(request, executor)
+    # D5 PRE-FLIGHT (same rule, host side): the ONE privileged command (C5 source.forward) is
+    # launched through the root-owned argv whitelist, so a missing/mis-installed launcher or a lost
+    # sudo authority must be refused HERE — not at C5, with all ten writers already stopped by C2.
+    require_privileged_launcher(request)
     manifest = load_manifest()
     engine = Engine(request, executor)
     if engine.journal:
@@ -4825,6 +4976,9 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # activate then post-activate, so a production recover whose executor cannot run post-activate
     # must fail closed BEFORE touching the run root, not after re-activating.
     require_post_activate_executor(request, executor)
+    # D5 PRE-FLIGHT: a recover that resumes at or before source.forward re-drives the privileged
+    # launch, so the same host staging must hold before any run-root mutation.
+    require_privileged_launcher(request)
     manifest = load_manifest()
     run_root = pathlib.Path(request["run_root"])
     require_lexical_absolute(run_root)

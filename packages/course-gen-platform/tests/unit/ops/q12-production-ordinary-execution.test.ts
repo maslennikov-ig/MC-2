@@ -46,4 +46,62 @@ describe('W7a: production owner-custody execute_ordinary really runs the command
     // We took the REAL branch, not the hardcoded "q12-joined-fixture" projection.
     expect(out.distinctFromFixtureProjection).toBe(true);
   });
+
+  // Design D3 (2026-07-26 window execution identity): writers.quiesce's FROZEN env declares
+  // Q12_EXTERNAL_QUIESCE_LEASE_FD=9, but the ordinary path passed no descriptor at all, so the C2
+  // child died at its own validate_external_quiesce_lease. The seam must mirror _invoke_resume
+  // (close_fds=True, pass_fds=(9,)) for exactly the commands whose frozen env declares the lease.
+  it('hands the canonical FD9 cutover lease to a child whose frozen env declares it, without rewriting the command', () => {
+    const out = driveRunner();
+    const lease = out.leaseCase as Record<string, unknown>;
+
+    expect(lease.executed, `lease-case execute_ordinary raised: ${String(lease.error)}`).toBe(true);
+
+    // The child's descriptor surface is the assertion: exactly 0/1/2 plus the lease, and the lease
+    // resolves to the canonical cutover lock the controller holds LOCK_EX on.
+    expect(lease.childFds).toEqual([0, 1, 2, 9]);
+    expect(lease.leaseTargetIsCanonicalLock).toBe(true);
+
+    // D7: launch-time mechanics never rewrite what is recorded.
+    expect(lease.childEnvVerbatim).toBe(true);
+    expect(lease.commandNotMutated).toBe(true);
+  });
+
+  it('keeps every other ordinary child at 0/1/2 even while the controller holds the lease', () => {
+    const out = driveRunner();
+    const noLease = out.noLeaseCase as Record<string, unknown>;
+
+    // migration.base.apply's frozen env declares no lease, so it inherits nothing extra — proven
+    // with descriptor 9 open and LOCK_EX-held in the parent, i.e. the descriptor WAS available.
+    expect(noLease.executed, `no-lease execute_ordinary raised: ${String(noLease.error)}`).toBe(
+      true
+    );
+    expect(noLease.childFds).toEqual([0, 1, 2]);
+    expect(noLease.childEnvVerbatim).toBe(true);
+    expect(noLease.commandNotMutated).toBe(true);
+  });
+
+  it('fails closed when a command declares a lease descriptor other than the frozen 9', () => {
+    const out = driveRunner();
+    const guard = out.leaseDeclarationGuard as Record<string, unknown>;
+
+    expect(guard.refused, `guard did not refuse: ${String(guard.reason)}`).toBe(true);
+    expect(guard.reason).toBe('manifested child lease descriptor is frozen to 9: 8');
+  });
+
+  // Review P2: a lost lease surfaced as a bare OSError from inside subprocess, AFTER the intent and
+  // capability rows were already journalled. Unreachable in practice (main() holds LOCK_EX on 9 for
+  // the whole run) but the operator must read a reason, not a traceback.
+  it('names the failure when the canonical lease descriptor is not held at all', () => {
+    const out = driveRunner();
+    const absent = out.leaseDescriptorAbsent as Record<string, unknown>;
+
+    expect(absent.prepared, 'descriptor 9 must be closed for this probe to mean anything').toBe(
+      true
+    );
+    expect(absent.refused, `not a named refusal: ${String(absent.reason)}`).toBe(true);
+    expect(absent.reason).toBe(
+      "manifested child requires the controller's inherited lease descriptor 9"
+    );
+  });
 });
