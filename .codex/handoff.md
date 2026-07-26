@@ -4,21 +4,14 @@ Updated: 2026-07-21 (W7a inc1-4 delivered; SINGLE SOURCE OF TRUTH consolidated o
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
-- **`develop` is the single source of truth** for all Q12 self-hosted-qdrant work. A
-  content-containment audit (2026-07-21) verified `develop` is the superset of every
-  Q12 line: it fully contains `origin/develop`, `codex/self-hosted-qdrant-platform`
-  (the former integration branch), `codex/q12-plan-builder`, and
-  `codex/q12-w-writer-barrier`, plus the W7a increments (inc1-4) and the three
-  orchestration-infra commits (`record_stage_telemetry.py`, `run_stage_closeout.py`,
-  `orchestrator.toml` baseline v2.16) cherry-picked in from the stale plan branch.
-- **`codex/self-hosted-qdrant-platform`** is the historical feature/integration branch —
-  **fully merged into `develop`**; keep for history, do not treat as authoritative.
-- **`codex/self-hosted-qdrant-platform-plan`** is **STALE** (≈850 commits behind, does NOT
-  contain `deploy/qdrant/q12-lifecycle-core.py`). Do NOT use it as a base or target. Note:
-  some environment/session metadata mislabels the working branch as this `-plan` branch —
-  ignore that; the working branch is `develop`.
-- The other `codex/q12-*` worktree branches and their two contentless merge bubbles
-  (`q12-live-controller`) carry no unique content missing from `develop`.
+- **`develop` is the single source of truth** for all Q12 work; a 2026-07-21 containment audit
+  proved it is the superset of every Q12 line (`codex/self-hosted-qdrant-platform`,
+  `codex/q12-plan-builder`, `codex/q12-w-writer-barrier`, the W7a increments and the
+  orchestration-infra commits are all in it). Keep those branches for history only.
+- **`codex/self-hosted-qdrant-platform-plan` is STALE** (~850 commits behind, has no
+  `q12-lifecycle-core.py`) — never a base or target. Session metadata sometimes mislabels the
+  working branch as that one; ignore it. Q12 window work happens on `codex/q12-window-live`,
+  delivered into `develop` via `/push-dev`.
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 
@@ -66,25 +59,22 @@ staging) → `mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`,
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: `mc2-gyde8` pre-window staging is DONE (2026-07-25) and the window
-blocker `mc2-y02tz` is fixed (`9b0fd1f02`). Remaining before `mc2-i9h3y`: (1) confirm a
-fresh window slot with the owner — C2 quiesces production writers and the 00:30
-Europe/Amsterdam backup timer mutually blocks the window; (2) redeploy the patched
-`q12-lifecycle-core.py` to `megacampus-prod` with the 0444 dance + `python3.13 -m
-py_compile` and re-verify the frozen manifest; (3) ONE fresh green pre-window `plan`
-under run-id `0fa297e4-3eb7-475f-aee6-56455f02ed6c` (the 2026-07-25 run is green but
-ages) and re-record `--expected-catalog-sha256`; (4) run the window per
-`docs/qdrant/q12-window-operator-runbook-v2.md` with `--quiesce-manifest-sha256` = 64
-zeroes on the first run (§1 precondition 6), C1..C8 reversible (`--stop-after
-deploy.prepare` is the safe hold), C9 pressed by the owner in person, then C10 + Phase D.
-Do not change the frozen manifest `aaec6fc2…`.
+Recommended action: pre-window staging and both window-controller amendments are done
+(`mc2-gyde8`, `mc2-t9bma`, `mc2-y02tz`, `mc2-vfjyk` closed; `mc2-1by33` at `a83cd4332`).
+Remaining before `mc2-i9h3y`: (1) redeploy controller + wrapper to `megacampus-prod` with
+the 0444 dance and install `q12-privileged-launch.sh` 0555 root:root, re-verifying the
+frozen manifest after; (2) the host smoke of the real sudo → launcher → wrapper hop (plan
+Task 7, revised: a full `live` rehearsal outside the window is impossible because the
+frozen commands are production by construction); (3) ONE fresh green `plan` under run-id
+`0fa297e4-3eb7-475f-aee6-56455f02ed6c`, re-recording `--expected-catalog-sha256`;
+(4) owner confirms the slot — C2 quiesces production writers and the 00:30
+Europe/Amsterdam backup timer mutually blocks the window; (5) run C1..C8 with
+`--stop-after deploy.prepare` as the reversible hold, C9 pressed by the owner in person,
+then C10 + Phase D. Do not change the frozen manifest `aaec6fc2…`.
 
-Historical progress log (2026-07-19 CURRENT STATE, the four 2026-07-20 PROGRESS
-blocks, and the Phase A/B historical context) moved on 2026-07-25 to
-`.codex/stages/mc2-jz6y0/summary.md` § "Historical progress log (moved from handoff
-2026-07-25)" so this file stays current-state only per the repo contract
-(`run_process_verification.sh` 200-line limit). Current state lives in
-§ "Explicit defers" (2026-07-24/2026-07-25 blocks) and § "Accepted and Open Work".
+Historical progress logs moved 2026-07-25 to `.codex/stages/mc2-jz6y0/summary.md`
+§ "Historical progress log" so this file stays current-state only (200-line contract).
+Current state lives in § "Explicit defers" and § "Accepted and Open Work".
 
 ## Starter prompt for next orchestrator
 
@@ -168,12 +158,22 @@ a417a99c-db3a-45c8-9d32-561d8d068a3e`, `--operator-digest cb98e579bcf2d015546eab
   - OPERATOR IMAGE (`mc2-t9bma` closed): the old pin predated the amendment and would have failed
     C6 closed on the retired triple. The `23dfe973f` image already existed in GHCR; provenance and
     in-image file digests verified, pulled, `.env.production` re-pinned to `cb98e579…`.
-  - WINDOW CONTROLLER FIX (`mc2-y02tz` + `mc2-vfjyk` closed, `9b0fd1f02`): `run_live` demanded the
-    writer-quiesce manifest only its own group-3 child can publish, so no first window run could
-    start. Absent is now legal with a declared ZERO digest; digest+bytes are adopted at
-    publication, the path is pinned to `<run-root>/writer-quiesce-<run-id>.json`, content is
-    validated at group 3, and `recover` shares the seam for the `barrier.install/completed` head.
-    THE PATCHED CONTROLLER IS NOT YET ON THE SERVER — redeploy before the window.
+  - WINDOW CONTROLLER FIXES, two amendments (`mc2-y02tz`+`mc2-vfjyk` at `9b0fd1f02`, deployed;
+    `mc2-1by33` at `a83cd4332`, NOT yet on the server). (1) `run_live` demanded the writer-quiesce
+    manifest only its own group-3 child can publish; absent is now legal with a declared ZERO digest,
+    digest+bytes are adopted at publication, the path is pinned, content is validated at group 3, and
+    `recover` shares the seam for the `barrier.install/completed` head. (2) EXECUTION IDENTITY: the
+    controller and the writer operations run as uid 1000 (root cannot complete C2 — the quiesce
+    child's probe requires controller-owned scratch); only `source.forward` needs root and goes
+    through the new root-owned argv-whitelist launcher `deploy/qdrant/q12-privileged-launch.sh`
+    (install 0555 root:root) via the account's existing sudo; the controller derives `pass_fds` from
+    each command's frozen env and preflights the launcher + `sudo -n` before any journal row; one
+    controller-owned host lock replaces the root-only `/run` path; root publishes resolve their target
+    once on an O_NOFOLLOW descriptor; and the Q12 forward now publishes `writer-recovery-state`, which
+    C9 hard-requires and no Q12 path produced. Frozen manifest untouched. Independent review PASS,
+    0 P0/P1, six P2 folded in. Residuals on `mc2-9vbzp`. REDEPLOY controller + wrapper + launcher
+    before the window; then the host smoke of the real sudo hop (plan Task 7, revised — a full `live`
+    rehearsal outside the window is impossible because the frozen commands are production).
   - `mc2-i9h3y` remains owner-gated: C2 quiesces production writers (schedule the slot with the
     owner) and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan
     plus accepted C1..C8 at that moment.
