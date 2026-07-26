@@ -114,7 +114,13 @@
     root-owned parent would abort C2 with a bare `install:` error. Verified 2026-07-26:
     `claude-deploy:claude-deploy` 0755. The wrapper creates the directory only when absent and does
     not re-mode an existing one, so nothing else that traverses it is disturbed.
-15. The pinned `prometheus`, `node-exporter`, `alertmanager` and `grafana` images are present locally
+15. `deploy/qdrant/q12-writer-resume.py` is **root-owned mode 0644** on the host. The wrapper
+    refuses to delegate to it otherwise (`source-recovery-run.sh:246-248`, "writer resume controller
+    must have exact root ownership and mode 0644") — a hardening requirement about the file, so the
+    operator account cannot rewrite the privileged child. Fixed 2026-07-26 (it had been deployed
+    `claude-deploy` 0444, which would have failed C2 and C5). Because it is now root-owned,
+    redeploying it needs `sudo install`; the 0444 dance used for the controller does not apply.
+16. The pinned `prometheus`, `node-exporter`, `alertmanager` and `grafana` images are present locally
     (`docker image inspect <repo>@sha256:<digest>` — they do NOT show in a `repo:tag` listing when
     pulled by digest). `deploy.prepare` brings up the shared infra and would otherwise pull them
     mid-window.
