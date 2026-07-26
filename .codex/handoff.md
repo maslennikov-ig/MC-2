@@ -66,17 +66,17 @@ staging) → `mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`,
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: finish the Q12 W7 pre-window staging on `mc2-gyde8` — redeploy
-develop-HEAD `q12-lifecycle-core.py` + `source-recovery-run.sh` + the emit runtime
-closure (all three changed with the 2026-07-25 acceptance amendment `e7fef75d4`),
-stage `<run-root>/accepted-coverage-run` 0400 as
-`catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e`, re-run the runbook §1.10 emit smoke,
-then ONE fresh green pre-window `plan` under run-id
-`0fa297e4-3eb7-475f-aee6-56455f02ed6c` and re-record `--expected-catalog-sha256` +
-`--release-sha`. After that, run the owner-present window `mc2-i9h3y` per
-`docs/qdrant/q12-window-operator-runbook-v2.md`: C1..C8 reversible
-(`--stop-after deploy.prepare` is the safe hold), C2 quiesces production writers so its
-slot is scheduled with the owner, C9 pressed by the owner in person, then C10 + Phase D.
+Recommended action: `mc2-gyde8` pre-window staging is DONE (2026-07-25) and the window
+blocker `mc2-y02tz` is fixed (`9b0fd1f02`). Remaining before `mc2-i9h3y`: (1) confirm a
+fresh window slot with the owner — C2 quiesces production writers and the 00:30
+Europe/Amsterdam backup timer mutually blocks the window; (2) redeploy the patched
+`q12-lifecycle-core.py` to `megacampus-prod` with the 0444 dance + `python3.13 -m
+py_compile` and re-verify the frozen manifest; (3) ONE fresh green pre-window `plan`
+under run-id `0fa297e4-3eb7-475f-aee6-56455f02ed6c` (the 2026-07-25 run is green but
+ages) and re-record `--expected-catalog-sha256`; (4) run the window per
+`docs/qdrant/q12-window-operator-runbook-v2.md` with `--quiesce-manifest-sha256` = 64
+zeroes on the first run (§1 precondition 6), C1..C8 reversible (`--stop-after
+deploy.prepare` is the safe hold), C9 pressed by the owner in person, then C10 + Phase D.
 Do not change the frozen manifest `aaec6fc2…`.
 
 Historical progress log (2026-07-19 CURRENT STATE, the four 2026-07-20 PROGRESS
@@ -150,26 +150,30 @@ Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, 
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
 - The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
-- **Q12 W7 window — CURRENT STATE (2026-07-25).** The C5/C6 accepted-coverage hard gate is
-  RESOLVED: the owner approved the file_catalog-only acceptance contract and it is delivered
-  (`mc2-tpdog`, commit `e7fef75d4`; spec §"Amendment 2026-07-25" in
-  `docs/superpowers/specs/2026-07-12-q12-source-recovery-design.md`, plan
-  `docs/superpowers/plans/2026-07-25-q12-file-catalog-accepted-coverage.md`). Acceptance is now
-  derived from the recovered `file_catalog` rows cross-checked against the sha-bound reviewed
-  manifest; the frozen manifest `aaec6fc2…` is unchanged and its single `<accepted-coverage-run>`
-  slot carries the token `catalog:<recovery-run-id>`. Live read-only verification confirms all six
-  eligible rows match their disposition CAS predicates, so the authority IS derivable in-window
-  (evidence on `mc2-tpdog`).
-  - Window argument values: `--run-id 0fa297e4-3eb7-475f-aee6-56455f02ed6c`,
-    `--recovery-run-id a417a99c-db3a-45c8-9d32-561d8d068a3e`,
-    `--operator-digest sha256:8aedef32717441a1d5b4093cfad094d09bddafffbcf7a3bfa04d0da3a2d957b0`.
-    `--expected-catalog-sha256` and `--release-sha` MUST be re-recorded from a fresh plan run after
-    the redeploy (the `fa69efb3…`/`e840c1280…` pair predates the amendment).
-  - REDEPLOY REQUIRED before the window (`mc2-gyde8`): controller, wrapper and the emit runtime
-    closure all changed. Then stage `<run-root>/accepted-coverage-run` 0400 containing exactly
-    `catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e` (db-capability is already staged 0400 uid 1000),
-    re-run the runbook §1.10 emit smoke, and run ONE fresh green pre-window `plan`. That plan's
-    inner structural sha legitimately changes (was `68041d94…`); the frozen manifest sha must not.
+- **Q12 W7 window — CURRENT STATE (2026-07-26).** The C5/C6 accepted-coverage hard gate is
+  RESOLVED (`mc2-tpdog`, `e7fef75d4`; spec §"Amendment 2026-07-25" in
+  `…specs/2026-07-12-q12-source-recovery-design.md`): acceptance is derived from the recovered
+  `file_catalog` rows against the sha-bound reviewed manifest, and the frozen manifest's single
+  `<accepted-coverage-run>` slot carries `catalog:<recovery-run-id>`.
+  - Window argv: `--run-id 0fa297e4-3eb7-475f-aee6-56455f02ed6c`, `--recovery-run-id
+a417a99c-db3a-45c8-9d32-561d8d068a3e`, `--operator-digest cb98e579bcf2d015546eaba3336cae627dc9db4bea8f4479b12ffca8ca5102d9`
+    (64-hex, no prefix), `--expected-catalog-sha256 c3715ac2…`, `--release-sha 23dfe973f18cc…`,
+    `--resource-manifest-sha256` any 64-hex (live overwrites it with its genesis digest),
+    `--quiesce-manifest-sha256` 64 zeroes on a first run.
+  - PRE-WINDOW STAGING DONE 2026-07-25 (`mc2-gyde8` closed): 6 develop-HEAD files redeployed with
+    `.bak-<sha8>-20260725` backups (`py_compile`/`bash -n` green, frozen manifest re-verified);
+    `<run-root>/accepted-coverage-run` staged 0400 as `catalog:a417a99c-…` beside
+    `secrets/db-capability`; runbook §1.10 emit smoke PASS; green `plan` (inner structural sha
+    `68041d94…` UNCHANGED; the pre-amendment catalog is parked as `…json.pre-amendment-20260725`).
+  - OPERATOR IMAGE (`mc2-t9bma` closed): the old pin predated the amendment and would have failed
+    C6 closed on the retired triple. The `23dfe973f` image already existed in GHCR; provenance and
+    in-image file digests verified, pulled, `.env.production` re-pinned to `cb98e579…`.
+  - WINDOW CONTROLLER FIX (`mc2-y02tz` + `mc2-vfjyk` closed, `9b0fd1f02`): `run_live` demanded the
+    writer-quiesce manifest only its own group-3 child can publish, so no first window run could
+    start. Absent is now legal with a declared ZERO digest; digest+bytes are adopted at
+    publication, the path is pinned to `<run-root>/writer-quiesce-<run-id>.json`, content is
+    validated at group 3, and `recover` shares the seam for the `barrier.install/completed` head.
+    THE PATCHED CONTROLLER IS NOT YET ON THE SERVER — redeploy before the window.
   - `mc2-i9h3y` remains owner-gated: C2 quiesces production writers (schedule the slot with the
     owner) and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan
     plus accepted C1..C8 at that moment.
