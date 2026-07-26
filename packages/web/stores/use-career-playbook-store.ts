@@ -162,13 +162,6 @@ export interface CareerPlaybookClient {
     blockId: CareerPlaybookBlockId
     instruction: string
   }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
-  updateNumericFact?: (input: {
-    playbookId: string
-    blockId: CareerPlaybookBlockId
-    factId: string
-    replacementText: string
-    scope: 'occurrence' | 'block'
-  }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
   requestPdf?: (input: { playbookId: string }) => Promise<CareerPlaybookPdfExportResponse>
   requestFollowups?: (input: {
     playbookId: string
@@ -268,12 +261,6 @@ interface CareerPlaybookStoreState {
     blockId: CareerPlaybookBlockId,
     instruction: string
   ) => Promise<CareerPlaybookAutosaveResult>
-  updateCareerPlaybookNumericFact: (input: {
-    blockId: CareerPlaybookBlockId
-    factId: string
-    replacementText: string
-    scope: 'occurrence' | 'block'
-  }) => Promise<CareerPlaybookAutosaveResult>
   requestCareerPlaybookPdf: () => Promise<CareerPlaybookAutosaveResult>
   toggleCareerPlaybookThinkingStream: () => void
   setCareerPlaybookDraftOwner: (ownerUserId: string) => void
@@ -656,7 +643,6 @@ function initialState(): Omit<
   | 'loadCareerPlaybookViewer'
   | 'editCareerPlaybookViewerBlock'
   | 'regenerateCareerPlaybookViewerBlock'
-  | 'updateCareerPlaybookNumericFact'
   | 'requestCareerPlaybookPdf'
   | 'toggleCareerPlaybookThinkingStream'
   | 'setCareerPlaybookDraftOwner'
@@ -1279,10 +1265,6 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.library.regenerateBlock.mutate(
         input
       )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
-    updateNumericFact: async (input) =>
-      (await client.careerPlaybook.library.updateNumericFact.mutate(
-        input
-      )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
     requestPdf: async (input) =>
       (await client.careerPlaybook.exportPdf.query(
         input
@@ -1672,7 +1654,6 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
                 generated_at: updatedBlock.generated_at,
                 llm_model: updatedBlock.llm_model,
                 attempt: updatedBlock.attempt,
-                numeric_facts: updatedBlock.numeric_facts,
               },
             }
             state.viewer = normalizeViewerSnapshot({
@@ -1761,7 +1742,6 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
                 generated_at: updatedBlock.generated_at,
                 llm_model: updatedBlock.llm_model,
                 attempt: updatedBlock.attempt,
-                numeric_facts: updatedBlock.numeric_facts,
               },
             }
             state.viewer = normalizeViewerSnapshot({
@@ -1786,76 +1766,6 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.viewerActionMessage = message
           })
           return { ok: false, error: message }
-        }
-      },
-
-      updateCareerPlaybookNumericFact: async (input) => {
-        const snapshot = get()
-        if (!snapshot.viewer?.playbookId) {
-          return { ok: false, error: 'Career Playbook viewer is not loaded' }
-        }
-
-        const applyUpdatedBlock = (
-          updatedBlock: CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }
-        ) => {
-          set((state) => {
-            if (!state.viewer) return
-            const blockId = updatedBlock.blockId ?? input.blockId
-            state.viewer = normalizeViewerSnapshot({
-              ...state.viewer,
-              blocks: {
-                ...state.viewer.blocks,
-                [blockId]: {
-                  content: updatedBlock.content,
-                  status: updatedBlock.status,
-                  judge_verdict: updatedBlock.judge_verdict,
-                  generated_at: updatedBlock.generated_at,
-                  llm_model: updatedBlock.llm_model,
-                  attempt: updatedBlock.attempt,
-                  numeric_facts: updatedBlock.numeric_facts,
-                },
-              },
-            })
-            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
-            state.isUpdatingViewerBlock = false
-            state.viewerActionMessage = null
-          })
-        }
-
-        set((state) => {
-          state.isUpdatingViewerBlock = true
-          state.viewerActionMessage = null
-        })
-
-        try {
-          const client = getClient()
-          if (!client.updateNumericFact) {
-            const message =
-              'Numeric fact editing is unavailable until the backend action is connected'
-            set((state) => {
-              state.isUpdatingViewerBlock = false
-              state.viewerActionMessage = message
-            })
-            return { ok: false, backendPending: true, error: message }
-          }
-
-          const updatedBlock = await client.updateNumericFact({
-            playbookId: snapshot.viewer.playbookId,
-            ...input,
-          })
-          applyUpdatedBlock(updatedBlock)
-          return { ok: true }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Numeric fact editing failed'
-          set((state) => {
-            state.isUpdatingViewerBlock = false
-            state.viewerActionMessage = message
-          })
-          return {
-            ok: false,
-            error: message,
-            backendPending: isCareerPlaybookBackendPending(error),
-          }
         }
       },
 

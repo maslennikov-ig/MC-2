@@ -120,12 +120,6 @@ export const regenerateBlockInputSchema = blockInputSchema.extend({
   instruction: z.string().min(1).max(1000),
 });
 
-export const updateNumericFactInputSchema = blockInputSchema.extend({
-  factId: z.string().min(1),
-  replacementText: z.string().min(1).max(120),
-  scope: z.enum(['occurrence', 'block']).default('occurrence'),
-});
-
 export const shareToggleInputSchema = playbookIdInputSchema.extend({
   isPublic: z.boolean(),
 });
