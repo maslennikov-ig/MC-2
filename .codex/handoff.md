@@ -15,11 +15,6 @@ Updated: 2026-07-27 (workspace consolidated onto `develop`; SINGLE SOURCE OF TRU
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 
-Historical integration carry (now all in `develop`): the accepted correction wave D5J
-`66e41cb5`, W FLIP `60910053`, H blue/green handoff `70bf6103`, the W activation-tuple
-addendum `3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
-credential merge `a73a3651`; `codex/q12-w-writer-barrier` at `60910053` is clean/pushed.
-
 ## Product Truth
 
 - Qdrant Cloud data was test-only and is lost. Do not recover or mutate it; rebuild the derived index from authoritative sources.
@@ -59,20 +54,27 @@ staging) → `mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`,
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: the window WAS opened 2026-07-27 12:36 CEST under owner authority and died
-in `preflight` on `operator.self-check` (exit 125) with ZERO mutation — no writer quiesced. Blocker
-`mc2-wwc9l`: every frozen env carries `HOME=/root`, but the children now run as uid 1000, so the
-docker CLI cannot read `/root/.docker/config.json` and LOSES its compose plugin. 7 of 20 commands
-are hit: `operator.self-check`, all four `reindex.*` (whole C6), `deploy.prepare` and `.commit`.
-Fix at the WRAPPER seam only (manifest frozen, env equality enforced): conditional HOME
-normalization in `operator-compose.sh` + `scripts/deploy_blue_green.sh` keeping the root path
-(`source.forward`) byte-identical, then redeploy both and re-run `live`. ARGV IS NOW SETTLED
-(`mc2-2v5cq`/`mc2-sdbua` closed on evidence): `--release-sha 060b4faea…`, `--operator-digest
-b5eb528e…` (image label revision = that commit), `--expected-catalog-sha256 744076f6…` from a
-fresh green production `plan` whose immutable guard proved the authority unchanged; the DB has
-not drifted; all 8 window images are local (`claude-deploy`'s GHCR token is dead — `mc2-2vtmk`).
-`--stop-after deploy.prepare` is the sole resumable pre-C9 head; `recover` has no `--stop-after`
-and drives C8..C10. Do not change `aaec6fc2…`.
+Recommended action: the window was opened THREE times on 2026-07-27 under owner authority and each
+attempt failed CLOSED with zero mutation (no writer quiesced, no barrier receipt, zero `%q12%` objects
+in the DB, lock free). Two blockers were found and fixed: `mc2-wwc9l` (frozen `HOME=/root` vs uid-1000
+children killed `docker compose`; conditional normalization now lives in `operator-compose.sh` +
+`scripts/deploy_blue_green.sh`, both redeployed) and `mc2-94mmf` (a failing frozen child's stderr was
+dropped, so refusals were blind; the controller now carries a scrubbed tail — redeployed, sha
+`5ed0148d`). `operator.self-check` now COMPLETES in a real window. REMAINING BLOCKER `mc2-orsez`: the
+barrier child requires `<run-root>/database-barrier-input-checkpoint-<op>-<epoch>.json` 0600 (exactly
+the 12-key shape of the controller's own `phase-checkpoint.json`), and the controller never publishes
+it — only `retained-barrier-capability-checkpoint-*`, which is its own bookkeeping. So C1 cannot pass.
+The gap survived because the TEST FIXTURE publishes that file itself
+(`fixtures/q12-live-real-full-window-runner.py:230-247`). Fix: publish the copy from the controller
+right after the `barrier.*` `capability_claimed` row, and move the test's expectation onto the
+controller. SETTLED WINDOW ARGV: `--release-sha 060b4faea…`, `--operator-digest b5eb528e…`,
+`--expected-catalog-sha256 8ca17c43…` (three independent green plans agree; the DB shifted once
+around 13:00 and has been stable since), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource
+and quiesce digests on a first run. Each attempt burns its run-id (the genesis stable binding cannot
+be recomputed over an existing checkpoint), so every retry needs a fresh run root: `mkdir -m 0700`,
+copy `accepted-coverage-run` and `secrets/db-capability` (owner-approved carry-over), then one
+production `plan`. `--stop-after deploy.prepare` is the sole resumable pre-C9 head; `recover` has no
+`--stop-after`. Do not change `aaec6fc2…`.
 
 Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
 log"; this file is current-state only (200-line contract).
@@ -85,8 +87,6 @@ Full completion program authored (prompt-check pass): copy
 `…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
 publish → C live cutover → D closeout; every remote/live and credentialed step
 owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
-
-Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
 ## Required Skills and Review
 
