@@ -668,6 +668,68 @@ describe('fail-closed Supabase backup operator', () => {
     expect(published(item.backupDir)).toEqual([]);
   });
 
+  // mc2-h5l7m: the SAME credential file is read by the frozen q12-database-barrier.sh, whose identity
+  // predicate rejects ANY query string, while this script used to REQUIRE one. Two frozen Q12 commands,
+  // one path, contradictory demands — the window could not pass C1 and C3 with a single file. This
+  // script yields, because it already receives the CA path independently and already replaces the URL's
+  // sslrootcert value with the /proc path: composing both parameters here leaves the effective TLS
+  // identical (verify-full against the explicit CA) while letting the file be the bare DSN the barrier
+  // requires. The identity log asserting `url_ca_fd=yes` is the proof the CA really was used.
+  it('accepts a bare DSN and composes verify-full against the explicit CA itself', () => {
+    const item = fixture();
+    const bare =
+      'postgresql://postgres.test:synthetic-password-never-log@db.example.test:5432/postgres';
+    writeFileSync(item.urlFile, `${bare}\n`, { mode: 0o600 });
+
+    const serviceCopy = join(item.root, 'bare-service-file-copy');
+    const result = run(item, { FAKE_SERVICE_FILE_COPY: serviceCopy });
+
+    expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+    expect(result.stdout).toMatch(/^Supabase backup published: generation-/m);
+    // TLS unchanged, asserted on the composed libpq parameters themselves — BOTH of them. Checking
+    // only the CA would let a mutation drop verify-full and still pass.
+    const serviceFile = readFileSync(serviceCopy, 'utf8').trim().split('\n');
+    expect(serviceFile).toContain('sslmode=verify-full');
+    expect(serviceFile.some(line => /^sslrootcert=.*\/\.ca\.crt$/u.test(line))).toBe(true);
+    expect(readFileSync(item.identityLog, 'utf8')).toBe(
+      'ca_fd=yes\nurl_ca_fd=yes\nca_content=synthetic CA only\n'
+    );
+    expect(`${result.stdout}${result.stderr}`).not.toContain('synthetic-password-never-log');
+    expect(published(item.backupDir)).toHaveLength(1);
+  });
+
+  it('still rejects a weakened sslmode when the URL does carry a query', () => {
+    const item = fixture();
+    const weakened =
+      'postgresql://postgres.test:synthetic-password-never-log@db.example.test:5432/postgres';
+    writeFileSync(item.urlFile, `${weakened}?sslmode=require&sslrootcert=${item.caFile}\n`, {
+      mode: 0o600,
+    });
+
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('URL must contain exact sslmode=verify-full');
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
+  it('still rejects an unknown query parameter', () => {
+    const item = fixture();
+    const extra =
+      'postgresql://postgres.test:synthetic-password-never-log@db.example.test:5432/postgres';
+    writeFileSync(
+      item.urlFile,
+      `${extra}?sslmode=verify-full&sslrootcert=${item.caFile}&application_name=x\n`,
+      { mode: 0o600 }
+    );
+
+    const result = run(item);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('URL contains an unknown query parameter');
+    expect(published(item.backupDir)).toEqual([]);
+  });
+
   it('rejects unsafe parent-directory permissions for credential inputs', () => {
     const item = fixture();
     chmodSync(join(item.root, 'secrets'), 0o770);
