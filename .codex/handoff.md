@@ -46,7 +46,7 @@ Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expans
 Accepted-and-integrated history for Q1-Q12 (including every `.13.*` sub-stream,
 its review verdicts and evidence hashes) moved on 2026-07-25 to
 `.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open
-work is `mc2-i9h3y` (owner-present window; its five 2026-07-27 blockers are all closed),
+work is `mc2-i9h3y` (owner-present window; blocked on `mc2-7ohdj`),
 with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`,
 `mc2-o0g75`, `mc2-c2p8z` and `mc2-n6szm` as tracked residuals; see § "Explicit defers".
 
@@ -54,60 +54,61 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: ANSWER `mc2-h5l7m`. The window was opened a FOURTH time on 2026-07-27 17:23 (run
-`8ad0a96b-…`), reached seq 7 and failed closed with ZERO mutation (writers never stopped, C2 not
-reached, zero `%q12%` DB objects, 8 cron jobs active, read_only off, no receipt, lock free). C1 got PAST
-the input-checkpoint gate for the first time — `mc2-orsez` works in production — and died on the DB step.
-Root cause proved by running the frozen predicate: `barrier.*` requires the DSN at
-`/opt/megacampus/secrets/supabase_db_url` to carry NO query string, while the frozen `pg.backup`
-(`backup-supabase.sh:437-458`) requires that same file to carry exactly
-`sslmode=verify-full&sslrootcert=<CA>`. Two frozen commands, one path, contradictory demands; argv and
-env are frozen, so no second file or env override is possible. Recommended resolution (owner call — it
-touches backup-path TLS): the BACKUP script yields, since it already receives `$CA_FILE` separately and
-already rewrites `sslrootcert` to a /proc path, so composing both parameters itself keeps the effective
-TLS identical; then strip the query from the DSN file. Editing the frozen barrier instead would weaken
-its own identity assertion. `mc2-vcmd7` (P1) is why this cost a cycle: the barrier's node runner
-swallows the real error behind one generic line.
+Recommended action: ANSWER `mc2-7ohdj`. The window was opened a FIFTH time on 2026-07-27 17:52 (run
+`7b195118-…`) and again failed closed with ZERO mutation (transaction rolled back whole: zero `%q12%`
+objects, all 8 cron jobs active, read_only off, writers never stopped, no receipt). `mc2-h5l7m` is
+fixed, so the barrier child PASSED the identity check and ran real SQL against production for ~3
+minutes before failing. Real cause, read from the Postgres logs because the barrier is still blind
+(`mc2-vcmd7`): `permission denied for table job` — `q12-database-barrier.sh:1524` pauses cron with
+`UPDATE cron.job SET active=false WHERE active`, and production's `postgres` role holds only SELECT on
+`cron.job` (`postgres=r*`, owner `supabase_admin`); it is not superuser and not a member of
+`supabase_admin`, so it cannot grant itself UPDATE. The plan never caught this because it proves
+equality on an ISOLATED restore in a disposable container where the role is superuser — the same
+environment-substitutes-for-production shape as `mc2-orsez`/`mc2-fjcj2`. A working alternative was
+MEASURED on production with a semantically empty call: `cron.alter_job(job_id := 1, active := true)`
+succeeded and left all 8 jobs active, so pg_cron's API works where the direct write does not (all 8
+jobs are owned by `postgres`). Resolution therefore means editing the FROZEN barrier (sha
+`bdb9d935…`) to pause/restore cron through `cron.alter_job` in both the install and rollback paths —
+a contract decision — or asking Supabase for `GRANT UPDATE ON cron.job TO postgres`, which avoids the
+edit but widens the role permanently.
 
-Five earlier blockers are fixed and deployed (controller sha `8ba9db34`, Q12 tree byte-equal to
-`develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root` killed `docker compose` for
-uid-1000 children), `mc2-94mmf` (a failing child's stderr was dropped), `mc2-orsez` (the controller
-never published the barrier's input checkpoint), `mc2-fjcj2` (no production path invoked the frozen
-`barrier.cleanup` child, so C9/C10 could not complete) and `mc2-1pwkl` (colour env files lacked two
-compose-required vars). Two operational traps: `mc2-y5tgw` — any dev deploy's `docker image prune -f`
-deletes the digest-pinned `qdrant-operator` and observability images that C1/C7 need, and no pre-flight
-checks image presence; restored via root's token through the existing sudo. And always run the
-controller DETACHED (`setsid nohup`) — a plan attempt was killed by a dropped ssh (exit 255), which
-after C2 would leave the writers stopped.
+Six earlier blockers are fixed and deployed (controller sha `8ba9db34`, backup script `6680aa4f`, Q12
+tree byte-equal to `develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root` killed
+`docker compose` for uid-1000 children), `mc2-94mmf` (a failing child's stderr was dropped),
+`mc2-orsez` (the controller never published the barrier's input checkpoint), `mc2-fjcj2` (no
+production path invoked the frozen `barrier.cleanup` child, so C9/C10 could not complete),
+`mc2-1pwkl` (colour env files lacked two compose-required vars) and `mc2-h5l7m` (two frozen commands
+demanded contradictory DSN shapes; the backup script yielded, the DSN file is now bare). Two traps:
+`mc2-y5tgw` — any dev deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and
+observability images C1/C7 need, and no pre-flight checks image presence. And always run the controller
+DETACHED (`setsid nohup`) — a plan attempt was killed by a dropped ssh (exit 255), which after C2 would
+leave the writers stopped.
 
-`mc2-orsez`/`mc2-fjcj2`/`mc2-94mmf`/`mc2-vcmd7` were all invisible locally for the SAME reason: a
-fixture published or ran the missing production step, or the real error was swallowed. Every such
-stand-in is gone from the suites, which now delegate to production and override only the sandbox spawn.
+EVERY blocker so far was invisible locally for the SAME reason: a fixture, an isolate or a swallowed
+error stood in for production. The suites no longer do so — they delegate to production and override
+only the sandbox spawn.
 
-RELEASE IDENTITY SETTLED (`mc2-v7547`, owner chose to ship develop's app code). `--release-sha` and
-`--operator-digest` are DIFFERENT artifacts and had been conflated: `060b4faea` touched only
-`deploy/qdrant` + `scripts`, so CI built only its `qdrant-operator` image — `b5eb528e`, which
-`--operator-digest` keeps because it must equal `.env.production`'s pin. `--release-sha` names the APP
-release `.env.green` pins, and `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`,
-two lines changed, 0600 kept, `.env.blue` untouched) to api@`2f713f87` (rev `23dfe973f`) +
-web@`ca9afb99` (rev `50f670b9`) — the exact per-package build of the `23dfe973f` tree, since
+RELEASE IDENTITY SETTLED (`mc2-v7547`). `--release-sha` and `--operator-digest` are DIFFERENT artifacts
+and had been conflated: `060b4faea` touched only `deploy/qdrant` + `scripts`, so CI built only its
+`qdrant-operator` image — `b5eb528e`, which `--operator-digest` keeps because it must equal
+`.env.production`'s pin. `--release-sha` names the APP release `.env.green` pins; `.env.green` is
+re-pinned (backup `.env.green.bak-4128a938-20260727`, two lines, 0600 kept, `.env.blue` untouched) to
+api@`2f713f87` + web@`ca9afb99` — the exact per-package build of the `23dfe973f` tree, since
 `packages/web`/`shared-types`/`shared-utils` did not change between `50f670b9` and `23dfe973f`. No pull
-is needed for the window; the dead GHCR token (`mc2-2vtmk`) does not block it. The 17 career-playbook
-app files newer than `23dfe973f` ride the next ordinary deploy — itself broken (`mc2-o0g75`); colour
-env files are hand-maintained (`mc2-c2p8z`).
+is needed; the dead GHCR token (`mc2-2vtmk`) does not block the window. The 17 career-playbook files
+newer than `23dfe973f` ride the next ordinary deploy — itself broken (`mc2-o0g75`); colour env files
+are hand-maintained (`mc2-c2p8z`).
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
 (= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce
 digests on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN
 `expected-post-migration-catalog.json` FILE (the barrier compares it to that file, :302) — take it from
-the fresh `plan` output, NOT from a previous run: it embeds `release_sha`, which is why the old
-`8ca17c43…` (computed under `060b4faea`) became `aa96c170…` under `23dfe973f`. Each attempt burns its
-run-id, so every retry needs a fresh run root (`mkdir -m 0700`, copy `accepted-coverage-run` and
-`secrets/db-capability`) plus one production `plan`. `--stop-after deploy.prepare` is the sole
-resumable pre-C9 head. Do not change `aaec6fc2…`.
+the fresh `plan`, NOT a previous run: it embeds `release_sha` (hence `8ca17c43…` -> `aa96c170…`, stable
+across three plans). Each attempt burns its run-id, so every retry needs a fresh run root
+(`mkdir -m 0700`, copy `accepted-coverage-run` and `secrets/db-capability`) plus one production `plan`.
+`--stop-after deploy.prepare` is the sole resumable pre-C9 head. Do not change `aaec6fc2…`.
 
-Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
-log"; this file is current-state only (200-line contract).
+Historical progress logs: `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
 
 ## Starter prompt for next orchestrator
 
