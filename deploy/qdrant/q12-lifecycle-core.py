@@ -2561,6 +2561,57 @@ class Engine:
         self.retained[f"{operation}:{epoch}"] = str(path)
         return path
 
+    def publish_database_barrier_input_checkpoint(
+        self, operation: str, epoch: str, command_id: str
+    ) -> pathlib.Path:
+        """mc2-orsez: publish the DB-barrier child's OWN input checkpoint at the claimed boundary.
+
+        The frozen ``q12-database-barrier.sh`` reads this file BEFORE it will do anything — the
+        install leg by its fixed name (:420-441), the cleanup/rollback legs by
+        ``<operation>-<execution-epoch>`` (:582-597) — and ``q12-writer-resume.py`` re-reads the
+        cleanup one at C10 (:1638-1663). All three demand the same thing: the EXACT 12-key
+        cutover-checkpoint projection of the journal head, and that head must be this command's
+        ``capability_claimed`` row. That is byte-for-byte the controller's own
+        ``phase-checkpoint.json`` at this instant, so this is a copy under a second name — but the
+        controller never published it, so in production EVERY barrier command failed closed with
+        "database barrier child input checkpoint must be a canonical non-symlink regular file" and
+        C1 was impassable (found by opening the window, 2026-07-27). It stayed invisible locally
+        because the test fixtures published the file themselves.
+
+        The claimed-boundary head and the byte-equality against the live checkpoint are asserted
+        here rather than assumed: publishing a checkpoint that points anywhere else would hand the
+        frozen child a valid-looking authority for the wrong journal position.
+        """
+        head = self.journal[-1] if self.journal else None
+        if (
+            head is None
+            or head["command_id"] != command_id
+            or head["outcome"] != "capability_claimed"
+            or head["lease_epoch"] != epoch
+        ):
+            raise LifecycleError(
+                "database barrier input checkpoint requires a claimed-boundary journal head"
+            )
+        data = self.checkpoint_bytes(head)
+        if validate_regular_file(self.checkpoint_path, mode=0o600) != data:
+            raise LifecycleError(
+                "database barrier input checkpoint source is not the current fixed checkpoint"
+            )
+        path = self.run_root / f"database-barrier-input-checkpoint-{operation}-{epoch}.json"
+        # A private trace list: this publication is not part of the retained-copy trace contract.
+        immutable_publish(
+            path,
+            data,
+            0o600,
+            [],
+            allow_temporary_completion=bool(
+                getattr(self.executor, "continuous_lease", False)
+            ),
+        )
+        if path.stat().st_ino == self.checkpoint_path.stat().st_ino or path.stat().st_nlink != 1:
+            raise LifecycleError("database barrier input checkpoint identity mismatch")
+        return path
+
     def publish_capability(
         self,
         operation: str,
@@ -3940,6 +3991,15 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
         elif len(matching_claims) != 1:
             raise LifecycleError("duplicate claim authority")
 
+    # mc2-orsez: the claimed boundary is durable, so the frozen install child's input checkpoint can
+    # be published now — after the row it must bind, before the child that reads it. Only the install
+    # leg reads one here (q12-database-barrier.sh:420; the other four barrier commands read none);
+    # the cleanup leg's copy is published by orchestrate_post_activate_cleanup at its own boundary.
+    if operation == "install":
+        engine.publish_database_barrier_input_checkpoint(
+            operation, epoch, COMMANDS[operation]
+        )
+
     after_checkpoint = getattr(executor, "after_claim_checkpoint", None)
     if after_checkpoint is not None:
         after_checkpoint()
@@ -4388,6 +4448,12 @@ def orchestrate_post_activate_cleanup(
             "cleanup_receipt_sha256": receipt_sha256,
         }
     else:
+        # mc2-orsez: the claimed head is durable and the child is about to read its input checkpoint
+        # (q12-database-barrier.sh:582-597); the C10 forward-resume gate re-reads the SAME file
+        # afterwards (q12-writer-resume.py:1638-1663), so this copy must outlive the child.
+        engine.publish_database_barrier_input_checkpoint(
+            "cleanup", "cutover", CLEANUP_COMMAND_ID
+        )
         cleanup = cleanup_hook(context, command)
         receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
         if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):

@@ -230,20 +230,24 @@ class RealClaimExecutor:
         if subcommand == "install":
             # The install child validates a per-leg input checkpoint whose journal_entry_hash is the
             # capability_claimed head run_claim just appended (q12-database-barrier.sh:420-441).
-            # Publish it by copying the controller phase-checkpoint (authored by Engine.append),
-            # rebinding ONLY journal_device/journal_inode to the trust-view journal the barrier stats.
-            checkpoint = json.loads((run_root_opt / "phase-checkpoint.json").read_bytes())
-            checkpoint["journal_device"] = str(trust_stat.st_dev)
-            checkpoint["journal_inode"] = str(trust_stat.st_ino)
+            # mc2-orsez: this fixture used to PUBLISH that file itself, standing in for a production
+            # step the controller never performed — which is exactly why the C1 blocker stayed
+            # invisible to every local suite until the window was opened for real. run_claim now
+            # publishes it (Engine.publish_database_barrier_input_checkpoint) at the /opt custody
+            # path, so this fixture only OBSERVES it through the barrier's trust view.
             input_checkpoint = (
                 run_root_trust / "database-barrier-input-checkpoint-install-cutover.json"
             )
-            input_checkpoint.write_bytes(CORE.complete_object(checkpoint))
-            input_checkpoint.chmod(0o600)
-            # #15 (iv): the published checkpoint's inode binding is view-independent.
+            checkpoint = json.loads(
+                CORE.validate_regular_file(input_checkpoint, mode=0o600)
+            )
+            # #15 (iv): the published checkpoint's inode binding is view-independent — the barrier
+            # reads it through /tmp and it names the SAME journal inode the /opt custody view sees.
             self.diagnostics["input_checkpoint_view_independent"] = (
                 checkpoint["journal_device"] == str(opt_stat.st_dev)
                 and checkpoint["journal_inode"] == str(opt_stat.st_ino)
+                and checkpoint["journal_device"] == str(trust_stat.st_dev)
+                and checkpoint["journal_inode"] == str(trust_stat.st_ino)
             )
 
         rewritten = _rewrite_opt_to_trust(argv, self.trust_root)
@@ -456,16 +460,12 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
         activate_receipt_bytes = CORE.validate_regular_file(receipt_path, mode=0o400)
         archive_path.write_bytes(activate_receipt_bytes)
         archive_path.chmod(0o400)
-        # The cleanup child input checkpoint = the controller phase-checkpoint at the cleanup claimed
-        # head, journal_device/journal_inode bound to the run-root journal the barrier stats
-        # (view-independent inode) -- q12-database-barrier.sh:582-597.
-        journal_stat = os.stat(run_root / "phase.jsonl")
-        checkpoint = json.loads((run_root / "phase-checkpoint.json").read_bytes())
-        checkpoint["journal_device"] = str(journal_stat.st_dev)
-        checkpoint["journal_inode"] = str(journal_stat.st_ino)
+        # mc2-orsez: the cleanup child's input checkpoint (q12-database-barrier.sh:582-597) is
+        # published by the CONTROLLER at the cleanup claimed head, into this same run root — this
+        # fixture no longer writes it. Assert its presence so a regression surfaces here instead of
+        # inside the frozen child, past the point of no return.
         input_checkpoint = run_root / "database-barrier-input-checkpoint-cleanup-cutover.json"
-        input_checkpoint.write_bytes(CORE.complete_object(checkpoint))
-        input_checkpoint.chmod(0o600)
+        CORE.validate_regular_file(input_checkpoint, mode=0o600)
         # Run the real frozen barrier cleanup in the SAME bwrap dual-bind sandbox as the legs,
         # through --real-cleanup (which starts the in-namespace pooler proxy, runs the barrier, and
         # tears the proxy down). The barrier argv is rewritten to the /tmp trust view.
