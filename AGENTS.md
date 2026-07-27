@@ -21,6 +21,8 @@ Use the repo-local verification commands from `.codex/orchestrator.toml`.
 Use `scripts/orchestration/run_process_verification.sh` as the process-verification entrypoint before claiming the orchestration layer is in a good state.
 Use `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` when a stage is actually closing; it is the canonical two-phase closeout entrypoint.
 
+Use `scripts/orchestration/check_stranded_commits.py` before claiming that finished work is delivered. It reports commits that exist only on a side branch and never reached `develop`, matching by commit subject because cherry-pick and squash change sha, tree and patch-id. Closing a Beads issue proves intent, not delivery; on 2026-07-27 an audit found three finished, reviewed, closed changes stranded for weeks. `/push-dev` runs it as an advisory step after delivery. Knowingly undelivered branches belong in `.codex/stranded-commit-allowlist.txt` with a recorded reason.
+
 Typical code-change gates in this repo include:
 
 - `pnpm type-check`
@@ -51,6 +53,7 @@ Typical code-change gates in this repo include:
 - `scripts/orchestration/check_stage_ready.py <stage_id>` is the minimal hard stop before stage close.
 - `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` runs stage-close verification before delivery.
 - `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id>` removes safe local worktrees and branches for completed stage deliveries.
+- `scripts/orchestration/check_stranded_commits.py` detects undelivered work; `.codex/stranded-commit-allowlist.txt` records the branches that are knowingly not in `develop` and why.
 - Beads remains the source of truth for queue, status, and dependencies.
 
 ## Knowledge Graph
