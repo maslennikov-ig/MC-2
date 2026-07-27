@@ -89,6 +89,51 @@ CREATE TABLE cron.job (
 INSERT INTO cron.job (jobid, schedule, command)
   SELECT g, '*/5 * * * *', 'select ' || g FROM generate_series(1,{CRON_COUNT}) g;
 
+-- mc2-7ohdj: model the MANAGED pg_cron privilege shape, not the convenient one. On the real
+-- Supabase source cron.job is owned by supabase_admin and the connecting postgres role holds only
+-- SELECT (ACL 'postgres=r*'); it is not superuser and not a member of supabase_admin, so a direct
+-- write raises 42501 'permission denied for table job' -- MEASURED on production, and the reason
+-- five window attempts died at barrier.install. pg_cron's own alter_job succeeds there because it
+-- reaches the catalog below the SQL ACL layer (also measured, with a semantically empty call).
+-- This container has no pg_cron at all, so cron.job used to be a plain superuser-owned table and
+-- every local suite passed on a write production forbids. The trigger below reproduces the
+-- CONSTRAINT and the function reproduces the sanctioned API, so the barrier is now exercised
+-- against the same wall it meets in production.
+CREATE FUNCTION cron.q12_test_deny_direct_write() RETURNS trigger
+LANGUAGE plpgsql AS $deny$
+BEGIN
+  IF current_setting('q12test.cron_api', true) IS DISTINCT FROM 'on' THEN
+    RAISE EXCEPTION 'permission denied for table job' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END $deny$;
+CREATE TRIGGER q12_test_cron_job_managed_acl
+  BEFORE INSERT OR UPDATE OR DELETE ON cron.job
+  FOR EACH ROW EXECUTE FUNCTION cron.q12_test_deny_direct_write();
+CREATE FUNCTION cron.alter_job(
+  job_id bigint,
+  schedule text DEFAULT NULL,
+  command text DEFAULT NULL,
+  database text DEFAULT NULL,
+  username text DEFAULT NULL,
+  active boolean DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql AS $alter$
+BEGIN
+  PERFORM set_config('q12test.cron_api', 'on', true);
+  UPDATE cron.job AS target SET
+    schedule = COALESCE(alter_job.schedule, target.schedule),
+    command  = COALESCE(alter_job.command,  target.command),
+    database = COALESCE(alter_job.database, target.database),
+    username = COALESCE(alter_job.username, target.username),
+    active   = COALESCE(alter_job.active,   target.active)
+  WHERE target.jobid = alter_job.job_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'could not find valid entry for job %', alter_job.job_id;
+  END IF;
+  PERFORM set_config('q12test.cron_api', 'off', true);
+END $alter$;
+
 CREATE SCHEMA net;
 CREATE TABLE net.http_request_queue (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, url text);
 
