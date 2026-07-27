@@ -197,9 +197,52 @@ def lease_descriptor_absent_case(executor: object, run_id: str) -> dict[str, obj
     return case
 
 
+def failing_child_diagnostics_case(executor: object) -> dict[str, object]:
+    """2026-07-27 (mc2-94mmf): a failing frozen child must SAY WHY it failed.
+
+    The window's C1 ``barrier.install`` exited 1 and the controller reported only
+    "manifested child failed with status 1" — the child's stderr was captured and dropped, so the
+    operator was blind. That is survivable before C2; after C2 the writers are already stopped and
+    a blind refusal is the worst possible place to lose the reason. The message must carry the
+    child's stderr tail, and it must be scrubbed: children print DSNs and credentials on failure.
+    """
+    secret = "b" * 64
+    argv = [
+        "/usr/bin/env",
+        "sh",
+        "-c",
+        f'printf "barrier refused: capability mode mismatch\\npassword={secret}\\n" >&2; exit 1',
+    ]
+    command = {
+        "argv": argv,
+        "env": {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"},
+        "command_sha256": core.sha256(b"failing-child-diagnostics"),
+    }
+    capability = {
+        "schema_version": "megacampus.q12.retained-capability/v1",
+        "command_id": "barrier.install",
+        "run_id": str(uuid.uuid4()),
+    }
+    try:
+        executor.execute_ordinary(command, capability)
+    except Exception as error:  # noqa: BLE001 — the message itself is the artifact under test
+        message = str(error)
+        return {
+            "raised": True,
+            "message": message,
+            "carriesStatus": "status 1" in message,
+            "carriesChildReason": "capability mode mismatch" in message,
+            "leaksSecret": secret in message,
+        }
+    return {"raised": False}
+
+
 def main() -> int:
     run_id = str(uuid.uuid4())
     result_out: dict[str, object] = {"runId": run_id}
+    result_out["failingChildDiagnostics"] = failing_child_diagnostics_case(
+        core.owner_custody_executor()
+    )
 
     executor = core.owner_custody_executor()
     result_out["hasExecuteOrdinary"] = callable(getattr(executor, "execute_ordinary", None))
