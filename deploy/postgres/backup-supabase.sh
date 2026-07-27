@@ -435,7 +435,22 @@ PY
   fi
 
   local base query parameter joined='' separator=''
-  [[ "$original_result" == *\?* ]] || fail 'URL must contain exact sslmode=verify-full'
+  if [[ "$original_result" != *\?* ]]; then
+    # mc2-h5l7m: a BARE DSN is the shape the frozen q12-database-barrier.sh demands — its identity
+    # predicate rejects ANY query string — and it reads this very file
+    # (/opt/megacampus/secrets/supabase_db_url) under the frozen barrier.* commands, exactly as
+    # pg.backup reads it here. Requiring the parameters in the shared file made the two frozen
+    # commands mutually unsatisfiable and left the cutover window unable to pass C1 and C3 at once.
+    # This side yields, and it can: of the two parameters only sslmode is load-bearing —
+    # create_service_file reads sslmode FROM THE QUERY but takes sslrootcert from its own ca_path
+    # argument, and the parameterised branch below already replaces the URL's sslrootcert with the
+    # /proc path. So the effective TLS is identical either way: verify-full against the explicit CA.
+    # sslrootcert is composed too, so both branches hand create_service_file the same URL shape.
+    base=$original_result
+    joined="sslmode=verify-full&sslrootcert=$ca_fd_path"
+    effective_result="$base?$joined"
+    return
+  fi
   base=${original_result%%\?*}
   query=${original_result#*\?}
   local sslmode_count=0 root_count=0
