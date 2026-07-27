@@ -20,6 +20,7 @@ import {
   previewCourseFromPlaybook,
 } from '@/components/career-playbook/library/client-adapter'
 import type { PreviewCourseFromPlaybookResult } from '@/components/career-playbook/library/types'
+import { MarkdownRendererFull } from '@/components/markdown/MarkdownRendererFull'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
 interface CreateCourseFromPlaybookDialogProps {
@@ -50,6 +52,8 @@ interface CourseDraftState {
   courseSize: CourseSize
   style: CourseStyle
 }
+
+type DescriptionMode = 'preview' | 'edit'
 
 function draftFromPreview(preview: PreviewCourseFromPlaybookResult): CourseDraftState {
   return {
@@ -81,6 +85,7 @@ export function CreateCourseFromPlaybookDialog({
   const [draft, setDraft] = useState<CourseDraftState | null>(null)
   const [includeWebResearch, setIncludeWebResearch] = useState(false)
   const [includeBusinessContextSources, setIncludeBusinessContextSources] = useState(false)
+  const [descriptionMode, setDescriptionMode] = useState<DescriptionMode>('preview')
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [previewRequestVersion, setPreviewRequestVersion] = useState(0)
@@ -103,6 +108,7 @@ export function CreateCourseFromPlaybookDialog({
         setDraft(draftFromPreview(result))
         setIncludeWebResearch(result.defaults.includeWebResearch)
         setIncludeBusinessContextSources(result.defaults.includeBusinessContextSources)
+        setDescriptionMode('preview')
       })
       .catch((unknownError) => {
         if (cancelled) return
@@ -222,17 +228,44 @@ export function CreateCourseFromPlaybookDialog({
               </div>
 
               <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor="career-playbook-course-description">{t('descriptionLabel')}</Label>
-                <Textarea
-                  id="career-playbook-course-description"
-                  value={draft.courseDescription}
-                  className="min-h-28"
-                  onChange={(event) =>
-                    setDraft((current) =>
-                      current ? { ...current, courseDescription: event.target.value } : current
-                    )
-                  }
-                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Label htmlFor="career-playbook-course-description">
+                    {t('descriptionLabel')}
+                  </Label>
+                  <Tabs
+                    value={descriptionMode}
+                    onValueChange={(value) => setDescriptionMode(value as DescriptionMode)}
+                    className="w-full sm:w-auto"
+                  >
+                    <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+                      <TabsTrigger value="preview">{t('descriptionPreviewTab')}</TabsTrigger>
+                      <TabsTrigger value="edit">{t('descriptionEditTab')}</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                {descriptionMode === 'preview' ? (
+                  <div
+                    data-testid="career-playbook-course-description-preview"
+                    className="border-input max-h-80 min-h-28 overflow-y-auto rounded-md border bg-slate-50/70 px-4 py-3 dark:bg-slate-950/30"
+                  >
+                    <MarkdownRendererFull
+                      content={draft.courseDescription}
+                      preset="minimal"
+                      language={draft.language}
+                    />
+                  </div>
+                ) : (
+                  <Textarea
+                    id="career-playbook-course-description"
+                    value={draft.courseDescription}
+                    className="min-h-28"
+                    onChange={(event) =>
+                      setDraft((current) =>
+                        current ? { ...current, courseDescription: event.target.value } : current
+                      )
+                    }
+                  />
+                )}
               </div>
 
               <div className="grid gap-2 md:col-span-2">

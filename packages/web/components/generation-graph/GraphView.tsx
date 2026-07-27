@@ -51,6 +51,7 @@ import { nodeTypes, edgeTypes } from './GraphView.constants'
 import { GraphInteractions } from './GraphInteractions'
 import type { GraphViewProps } from './GraphView.types'
 import { shouldPreserveWorkflowViewport } from './hooks/viewport-guards'
+import { getAwaitingStagePreviewNodeId } from './review-preview-node'
 
 // Re-export GraphViewProps for backward compatibility
 export type { GraphViewProps } from './GraphView.types'
@@ -654,10 +655,8 @@ function GraphViewInner({
                             }
                       }
                       onViewResults={() => {
-                        // For stage 3, open Stage 3 node modal
-                        if (awaitingStage === 3) {
-                          selectNode('stage_3')
-                        }
+                        const previewNodeId = getAwaitingStagePreviewNodeId(awaitingStage)
+                        if (previewNodeId) selectNode(previewNodeId)
                       }}
                       isProcessing={isProcessingBanner}
                       isDark={isDark}
