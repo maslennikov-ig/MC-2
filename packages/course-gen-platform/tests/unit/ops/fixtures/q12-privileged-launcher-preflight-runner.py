@@ -112,8 +112,22 @@ def main() -> int:
             )
         )
         report["expectedPath"] = str(CORE_PATH.with_name("q12-privileged-launch.sh"))
-    elif case == "sudo-authority":
-        report["result"] = outcome(core.probe_privileged_launch_authority)
+    elif case in ("sudo-authority-refused", "sudo-authority-granted"):
+        # mc2-f2il0: pin BOTH directions of the probe's contract without asking the host who may
+        # become root. Driving the real sudoers made this assertion true on a dev box (interactive
+        # auth) and false on a GitHub runner (passwordless sudo), which is what turned develop's CI
+        # red on 2026-07-26. The probe's own logic — shell the binary, refuse by name on a non-zero
+        # exit — is exercised verbatim; only WHICH binary it shells is redirected, in this
+        # short-lived fixture process, and the production constant is reported back so the test can
+        # prove the redirection is local.
+        stub = "/bin/false" if case == "sudo-authority-refused" else "/bin/true"
+        report["productionBinary"] = core.SUDO_BIN
+        report["probedBinary"] = stub
+        core.SUDO_BIN = stub
+        try:
+            report["result"] = outcome(core.probe_privileged_launch_authority)
+        finally:
+            core.SUDO_BIN = report["productionBinary"]
     else:
         with tempfile.TemporaryDirectory(prefix="mc2-q12-preflight-") as tmp:
             candidate = launcher_case(case, pathlib.Path(tmp))

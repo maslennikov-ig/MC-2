@@ -31,6 +31,10 @@ interface Report {
   readonly alsoMissingKey?: Outcome;
   readonly alsoProductionShapedRunRoot?: Outcome;
   readonly expectedPath?: string;
+  /** The binary the probe actually shelled in this run (a stub for the sudo-authority cases). */
+  readonly probedBinary?: string;
+  /** The binary production uses, read back from the module constant to prove the stub is local. */
+  readonly productionBinary?: string;
 }
 
 function drive(testCase: string): Report {
@@ -126,15 +130,30 @@ describe('Q12 controller preflight: the privileged launcher must be installed be
     expect(report.result.reason).toBe(reason);
   });
 
+  // mc2-f2il0: this used to drive the probe against the HOST's real sudoers and assert a refusal —
+  // true on a dev box where `sudo -n` needs interactive auth, false on a GitHub runner where sudo is
+  // passwordless. develop's CI went red on 2026-07-26 and stayed red on exactly this assertion while
+  // the same commit passed locally. The probe's contract is "non-zero exit => named refusal, zero
+  // exit => pass", so BOTH directions are now pinned deterministically by pointing the probe's
+  // binary at a stub, which holds on any host and no longer depends on who may become root here.
   it('refuses when the sudo authority is unavailable', () => {
-    // On this box `sudo -n true` needs interactive auth, so the probe fails closed here; on the
-    // window host /etc/sudoers.d/claude-deploy makes it succeed (that half is exercised by the dev
-    // rehearsal, not by a unit test).
-    const report = drive('sudo-authority');
+    const report = drive('sudo-authority-refused');
     expect(report.result.refused, `not refused: ${String(report.result.reason)}`).toBe(true);
     expect(report.result.reason).toBe(
       'privileged launch authority is unavailable: sudo -n could not run as root'
     );
+  });
+
+  it('passes when the sudo authority is available', () => {
+    const report = drive('sudo-authority-granted');
+    expect(report.result.refused, `refused: ${String(report.result.reason)}`).toBe(false);
+    expect(report.result.reason).toBeUndefined();
+  });
+
+  it('probes the real sudo binary, so a stubbed run still exercises the production path', () => {
+    const report = drive('sudo-authority-refused');
+    expect(report.probedBinary).toBe('/bin/false');
+    expect(report.productionBinary).toBe('/usr/bin/sudo');
   });
 
   describe.runIf(RUN_USER_NAMESPACE_SANDBOX)('the root-owned half', () => {
