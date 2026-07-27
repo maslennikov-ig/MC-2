@@ -54,31 +54,31 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: ANSWER `mc2-7ohdj`. The window was opened a FIFTH time on 2026-07-27 17:52 (run
-`7b195118-…`) and again failed closed with ZERO mutation (transaction rolled back whole: zero `%q12%`
-objects, all 8 cron jobs active, read_only off, writers never stopped, no receipt). `mc2-h5l7m` is
-fixed, so the barrier child PASSED the identity check and ran real SQL against production for ~3
-minutes before failing. Real cause, read from the Postgres logs because the barrier is still blind
-(`mc2-vcmd7`): `permission denied for table job` — `q12-database-barrier.sh:1524` pauses cron with
-`UPDATE cron.job SET active=false WHERE active`, and production's `postgres` role holds only SELECT on
-`cron.job` (`postgres=r*`, owner `supabase_admin`); it is not superuser and not a member of
-`supabase_admin`, so it cannot grant itself UPDATE. The plan never caught this because it proves
-equality on an ISOLATED restore in a disposable container where the role is superuser — the same
-environment-substitutes-for-production shape as `mc2-orsez`/`mc2-fjcj2`. A working alternative was
-MEASURED on production with a semantically empty call: `cron.alter_job(job_id := 1, active := true)`
-succeeded and left all 8 jobs active, so pg_cron's API works where the direct write does not (all 8
-jobs are owned by `postgres`). Resolution therefore means editing the FROZEN barrier (sha
-`bdb9d935…`) to pause/restore cron through `cron.alter_job` in both the install and rollback paths —
-a contract decision — or asking Supabase for `GRANT UPDATE ON cron.job TO postgres`, which avoids the
-edit but widens the role permanently.
+Recommended action: redeploy the barrier (0444 dance), stage a fresh run root, run one production
+`plan`, then reopen `live --stop-after deploy.prepare` and report before C9, which stays owner-held.
+The window was opened FIVE times on 2026-07-27; every attempt failed closed with ZERO mutation and
+each surfaced one real defect. All seven are now fixed. The fifth attempt reached the DB step and died
+on `mc2-7ohdj`: the barrier paused cron with a direct `UPDATE cron.job`, impossible on the managed
+source where `postgres` holds only SELECT and cannot grant itself the write. Both paths now use
+`cron.alter_job` (measured on production). Barrier sha `bdb9d935…` -> `f183aa3c…`, W-tuple fields
+4/5/6 amended per the 2026-07-18 precedent and re-measured; the frozen-byte CI guard caught the drift
+as designed.
 
-Six earlier blockers are fixed and deployed (controller sha `8ba9db34`, backup script `6680aa4f`, Q12
+THE PATTERN, now closed: every one of these was invisible locally because the checked environment
+substituted for production — a fixture published the step, an isolate had superuser rights, or the
+real error was swallowed. The disposable container had no pg_cron at all and modelled `cron.job` as a
+plain superuser-owned table, so a write production forbids passed forever. It now reproduces the
+managed ACL and the sanctioned API, so with the OLD barrier the real-PG17 install fails with exactly
+the production message. Keep that discipline: model the constraint, never the convenience.
+
+Blockers fixed and deployed (controller `8ba9db34`, backup script `6680aa4f`, barrier `f183aa3c`, Q12
 tree byte-equal to `develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root` killed
 `docker compose` for uid-1000 children), `mc2-94mmf` (a failing child's stderr was dropped),
 `mc2-orsez` (the controller never published the barrier's input checkpoint), `mc2-fjcj2` (no
 production path invoked the frozen `barrier.cleanup` child, so C9/C10 could not complete),
-`mc2-1pwkl` (colour env files lacked two compose-required vars) and `mc2-h5l7m` (two frozen commands
-demanded contradictory DSN shapes; the backup script yielded, the DSN file is now bare). Two traps:
+`mc2-1pwkl` (colour env files lacked two compose-required vars), `mc2-h5l7m` (two frozen commands
+demanded contradictory DSN shapes; the backup script yielded, the DSN file is now bare), `mc2-7ohdj`
+(managed pg_cron) and `mc2-vcmd7` (the barrier now reports its own scrubbed reason). Two traps:
 `mc2-y5tgw` — any dev deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and
 observability images C1/C7 need, and no pre-flight checks image presence. And always run the controller
 DETACHED (`setsid nohup`) — a plan attempt was killed by a dropped ssh (exit 255), which after C2 would
