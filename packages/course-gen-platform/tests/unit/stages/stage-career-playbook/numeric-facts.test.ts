@@ -33,8 +33,8 @@ describe('Career Playbook numeric facts', () => {
   it('classifies source-backed values as verified and unsupported exact values as needs_review', () => {
     const facts = extract(
       'block_6',
-      '## 6. KPI и метрики\n\nПлан продаж: 12 млн ₽. Win rate: 18%.',
-      'Из загруженного KPI-документа: план продаж 12 млн ₽.'
+      '## 6. KPI и метрики\n\nПлан продаж: 12 млн ₽. Win rate: 18%. Лидогенерация: 80 MQL/месяц.',
+      'Из загруженного KPI-документа: план продаж 12 млн ₽. Лидогенерация через контент: 80 MQL/месяц.'
     );
 
     expect(facts.find(fact => fact.raw_text === '12 млн ₽')).toMatchObject({
@@ -44,6 +44,10 @@ describe('Career Playbook numeric facts', () => {
     expect(facts.find(fact => fact.raw_text === '18%')).toMatchObject({
       status: 'needs_review',
       source: 'model_suggestion',
+    });
+    expect(facts.find(fact => fact.raw_text === '80')).toMatchObject({
+      status: 'verified',
+      source: 'source_document',
     });
   });
 
@@ -94,5 +98,72 @@ describe('Career Playbook numeric facts', () => {
       source: 'methodology',
     });
     expect(facts.map(fact => fact.raw_text)).not.toContain('30');
+  });
+
+  it('does not verify low-signal checklist and table numbering from broad source evidence', () => {
+    const facts = extract(
+      'block_6',
+      [
+        '## 2.6. Чеклист внедрения',
+        '',
+        '| № | Этап | Ожидаемый срок |',
+        '| --- | --- | --- |',
+        '| 1 | Ознакомление | День 1 |',
+        '| 2 | Обсуждение карты роли | 1-я неделя |',
+        '| 6 | Заполнить раздел 22 | 2-3 недели |',
+        '| 7 | Заполнение протокола | 3-4 недели |',
+      ].join('\n'),
+      [
+        'Пользовательский контекст содержит раздел 22.',
+        'В документе есть день 1 и шаг 2, но это не подтверждает номера строк чеклиста.',
+        'Также встречается план 3-4 квартала в другом разделе.',
+      ].join('\n')
+    );
+
+    const sourceVerified = facts.filter(
+      fact => fact.status === 'verified' && fact.source === 'source_document'
+    );
+
+    expect(sourceVerified).toEqual([]);
+    expect(facts.map(fact => fact.raw_text)).not.toEqual(
+      expect.arrayContaining(['1', '2', '6', '7'])
+    );
+  });
+
+  it('does not verify table row numbers by matching substrings inside larger metrics', () => {
+    const facts = extract(
+      'block_6',
+      [
+        '## 6. KPI и метрики',
+        '',
+        '| № | Метрика | Цель |',
+        '| --- | --- | --- |',
+        '| 1 | Win rate | 18% |',
+      ].join('\n'),
+      'Из загруженного KPI-документа: win rate target is 18%.'
+    );
+
+    expect(facts.map(fact => fact.raw_text)).not.toContain('1');
+    expect(facts.find(fact => fact.raw_text === '18%')).toMatchObject({
+      status: 'verified',
+      source: 'source_document',
+    });
+  });
+
+  it('keeps actionable single-value timelines in markdown tables', () => {
+    const facts = extract(
+      'block_26',
+      [
+        '| Инициатива | Срок |',
+        '| --- | --- |',
+        '| Запуск пилота | 2 недели |',
+      ].join('\n')
+    );
+
+    expect(facts.find(fact => fact.raw_text === '2 недели')).toMatchObject({
+      status: 'needs_review',
+      source: 'model_suggestion',
+      unit: 'duration',
+    });
   });
 });

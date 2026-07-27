@@ -37,12 +37,78 @@ const NUMERIC_PATTERNS: Array<{
   {
     kind: 'duration',
     pattern:
-      /\b\d+(?:[.,]\d+)?\s?(?:дней|дня|день|недель|недели|неделя|месяцев|месяца|месяц|hours?|days?|weeks?|months?)\b/giu,
+      /(?<![\p{L}\p{N}_])\d+(?:[.,]\d+)?\s?(?:дней|дня|день|недель|недели|неделя|месяцев|месяца|месяц|hours?|days?|weeks?|months?)(?![\p{L}\p{N}_])/giu,
   },
   { kind: 'count', pattern: /\b\d+(?:[.,]\d+)?\b/g },
 ];
 
 const METHOD_STRUCTURAL_VALUES = new Set(['30-60-90']);
+
+const NUMERIC_CONTEXT_KEYWORDS = [
+  'arr',
+  'budget',
+  'cac',
+  'conversion',
+  'coverage',
+  'cvr',
+  'kpi',
+  'lead',
+  'leads',
+  'ltv',
+  'mql',
+  'mrr',
+  'nps',
+  'okr',
+  'pipeline',
+  'revenue',
+  'roi',
+  'sales',
+  'sla',
+  'sql',
+  'win rate',
+  'выруч',
+  'бюдж',
+  'конвер',
+  'лид',
+  'метрик',
+  'продаж',
+  'руб',
+  'точност',
+];
+
+const CONTEXT_STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'from',
+  'with',
+  'this',
+  'that',
+  'есть',
+  'или',
+  'как',
+  'для',
+  'при',
+  'что',
+  'это',
+  'этот',
+  'эта',
+  'эти',
+  'раздел',
+  'шаг',
+  'день',
+  'дня',
+  'дней',
+  'неделя',
+  'недели',
+  'недель',
+  'месяц',
+  'месяца',
+  'месяцев',
+  'квартал',
+  'квартала',
+  'кварталов',
+]);
 
 function normalizeForSearch(value: string): string {
   return value.toLocaleLowerCase('ru').replace(/\s+/g, ' ').trim();
@@ -60,31 +126,106 @@ function numericSearchVariants(rawText: string): string[] {
   return [...variants].filter(Boolean);
 }
 
-function evidenceWindowsForRaw(evidence: string, rawText: string): string[] {
-  const windows: string[] = [];
+function blocksEvidenceBoundary(char: string, kind: NumericMatch['kind']): boolean {
+  if (!char) return false;
+  if (kind === 'count') return /[\p{L}\p{N}%.,+-]/u.test(char);
+  return /[\p{L}\p{N}]/u.test(char);
+}
+
+function evidenceValueMatches(
+  evidence: string,
+  rawText: string,
+  kind: NumericMatch['kind']
+): Array<{ start: number; end: number }> {
+  const matches: Array<{ start: number; end: number }> = [];
   for (const variant of numericSearchVariants(rawText)) {
     let startIndex = 0;
     while (startIndex < evidence.length) {
       const matchIndex = evidence.indexOf(variant, startIndex);
       if (matchIndex < 0) break;
-      windows.push(
-        evidence.slice(
-          Math.max(0, matchIndex - 48),
-          Math.min(evidence.length, matchIndex + variant.length + 48)
-        )
-      );
-      startIndex = matchIndex + variant.length;
+      const endIndex = matchIndex + variant.length;
+      if (
+        !blocksEvidenceBoundary(evidence[matchIndex - 1] ?? '', kind) &&
+        !blocksEvidenceBoundary(evidence[endIndex] ?? '', kind)
+      ) {
+        matches.push({ start: matchIndex, end: endIndex });
+      }
+      startIndex = endIndex;
     }
   }
-  return windows;
+  return matches;
 }
 
-function evidenceContainsRawValue(evidence: string, rawText: string): boolean {
-  return numericSearchVariants(rawText).some(variant => evidence.includes(variant));
+function evidenceWindowsForRaw(
+  evidence: string,
+  rawText: string,
+  kind: NumericMatch['kind']
+): string[] {
+  return evidenceValueMatches(evidence, rawText, kind).map(match =>
+    evidence.slice(Math.max(0, match.start - 48), Math.min(evidence.length, match.end + 48))
+  );
 }
 
-function evidenceHasBenchmarkContext(evidence: string, rawText: string): boolean {
-  return evidenceWindowsForRaw(evidence, rawText).some(
+function evidenceContainsRawValue(
+  evidence: string,
+  rawText: string,
+  kind: NumericMatch['kind']
+): boolean {
+  return evidenceValueMatches(evidence, rawText, kind).length > 0;
+}
+
+function meaningfulContextTokens(value: string): Set<string> {
+  const normalized = normalizeForSearch(value);
+  const tokens = normalized.match(/[\p{L}\p{N}]+/gu) ?? [];
+  return new Set(
+    tokens.filter(token => {
+      if (token.length < 3) return false;
+      if (/^\d+$/.test(token)) return false;
+      return !CONTEXT_STOP_WORDS.has(token);
+    })
+  );
+}
+
+function hasSharedContext(left: string, right: string): boolean {
+  const leftTokens = meaningfulContextTokens(left);
+  if (leftTokens.size === 0) return false;
+  for (const token of meaningfulContextTokens(right)) {
+    if (leftTokens.has(token)) return true;
+  }
+  return false;
+}
+
+function hasBusinessNumericContext(value: string): boolean {
+  const normalized = normalizeForSearch(value);
+  return (
+    /[%$€₽]/u.test(value) ||
+    NUMERIC_CONTEXT_KEYWORDS.some(keyword => normalized.includes(keyword))
+  );
+}
+
+function evidenceHasContextualRawValue(input: {
+  evidence: string;
+  rawText: string;
+  surroundingText: string;
+  kind: NumericMatch['kind'];
+}): boolean {
+  if (!evidenceContainsRawValue(input.evidence, input.rawText, input.kind)) return false;
+
+  return evidenceWindowsForRaw(input.evidence, input.rawText, input.kind).some(window => {
+    if (!hasSharedContext(input.surroundingText, window)) return false;
+    if (input.kind !== 'count') return true;
+    return (
+      hasBusinessNumericContext(input.surroundingText) || hasBusinessNumericContext(window)
+    );
+  });
+}
+
+function evidenceHasBenchmarkContext(
+  evidence: string,
+  rawText: string,
+  kind: NumericMatch['kind']
+): boolean {
+  return evidenceWindowsForRaw(evidence, rawText, kind).some(
     window =>
       window.includes('benchmark') ||
       window.includes('бенчмарк') ||
@@ -135,6 +276,36 @@ function lineAt(content: string, index: number): string {
   return content.slice(start, end);
 }
 
+function isMarkdownTableLine(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.split('|').length > 3;
+}
+
+function markdownTableCellAt(
+  line: string,
+  indexInLine: number
+): { column: number; text: string } | null {
+  if (!isMarkdownTableLine(line)) return null;
+
+  let cellStart = -1;
+  let column = -1;
+  for (let index = 0; index < line.length; index += 1) {
+    if (line[index] !== '|') continue;
+
+    if (cellStart >= 0) {
+      column += 1;
+      const cellEnd = index;
+      if (indexInLine >= cellStart && indexInLine < cellEnd) {
+        return { column, text: line.slice(cellStart, cellEnd).trim() };
+      }
+    }
+
+    cellStart = index + 1;
+  }
+
+  return null;
+}
+
 function isHeadingIndex(content: string, index: number): boolean {
   return /^#{1,6}\s+/.test(lineAt(content, index).trimStart());
 }
@@ -148,6 +319,68 @@ function matchSurroundingText(content: string, start: number, end: number): stri
 
 function overlaps(candidate: NumericMatch, existing: NumericMatch[]): boolean {
   return existing.some(match => candidate.start < match.end && candidate.end > match.start);
+}
+
+function isStandaloneSmallCount(rawText: string): boolean {
+  return /^[1-9]$/.test(rawText.trim());
+}
+
+function hasOrdinalSuffix(content: string, end: number): boolean {
+  return /^\s*-?(?:я|й|ю|е|ая|ой|ый|ое|го|st|nd|rd|th)\b/iu.test(content.slice(end, end + 8));
+}
+
+function isRangeTailDuration(content: string, start: number): boolean {
+  return /\d\s*[-–—]\s*$/u.test(content.slice(Math.max(0, start - 8), start));
+}
+
+function isLikelyTableRowNumber(
+  content: string,
+  line: string,
+  candidate: NumericMatch
+): boolean {
+  if (candidate.kind !== 'count') return false;
+  if (!isStandaloneSmallCount(candidate.rawText)) return false;
+
+  const lineStart = content.lastIndexOf('\n', candidate.start - 1) + 1;
+  const cell = markdownTableCellAt(line, candidate.start - lineStart);
+  return cell?.column === 0 && cell.text === candidate.rawText.trim();
+}
+
+function isActionableMarkdownTableMatch(content: string, candidate: NumericMatch): boolean {
+  if (candidate.kind === 'date') return true;
+  if (candidate.kind === 'duration') return !isRangeTailDuration(content, candidate.start);
+  return false;
+}
+
+function shouldSkipNumericMatch(content: string, candidate: NumericMatch): boolean {
+  const line = lineAt(content, candidate.start);
+  const surroundingText = matchSurroundingText(content, candidate.start, candidate.end);
+  if (isMethodologyNumber(candidate.rawText, surroundingText)) return false;
+
+  const isTableLine = isMarkdownTableLine(line);
+  if (isTableLine && isLikelyTableRowNumber(content, line, candidate)) return true;
+  if (candidate.kind === 'duration' && isRangeTailDuration(content, candidate.start)) return true;
+
+  if (
+    isTableLine &&
+    !hasBusinessNumericContext(line) &&
+    !isActionableMarkdownTableMatch(content, candidate)
+  ) {
+    return true;
+  }
+
+  if (candidate.kind === 'count') {
+    if (hasOrdinalSuffix(content, candidate.end)) return true;
+    if (isStandaloneSmallCount(candidate.rawText) && !hasBusinessNumericContext(surroundingText)) {
+      return true;
+    }
+  }
+
+  if (candidate.kind === 'range' && isMarkdownTableLine(line) && !hasBusinessNumericContext(line)) {
+    return true;
+  }
+
+  return false;
 }
 
 function collectNumericMatches(content: string): NumericMatch[] {
@@ -164,6 +397,7 @@ function collectNumericMatches(content: string): NumericMatch[] {
       const candidate = { rawText, start, end, kind };
       if (isInsideRange(start, ignoredRanges)) continue;
       if (isHeadingIndex(content, start)) continue;
+      if (shouldSkipNumericMatch(content, candidate)) continue;
       if (overlaps(candidate, matches)) continue;
       matches.push(candidate);
     }
@@ -187,6 +421,7 @@ function isMethodologyNumber(rawText: string, surroundingText: string): boolean 
 
 function classifyNumericFact(input: {
   rawText: string;
+  kind: NumericMatch['kind'];
   surroundingText: string;
   evidenceText: string;
 }): {
@@ -207,8 +442,8 @@ function classifyNumericFact(input: {
     };
   }
 
-  if (evidence && evidenceContainsRawValue(evidence, input.rawText)) {
-    if (evidenceHasBenchmarkContext(evidence, input.rawText)) {
+  if (evidence && evidenceContainsRawValue(evidence, input.rawText, input.kind)) {
+    if (evidenceHasBenchmarkContext(evidence, input.rawText, input.kind)) {
       return {
         status: 'benchmark',
         source: 'web_benchmark',
@@ -217,12 +452,21 @@ function classifyNumericFact(input: {
       };
     }
 
-    return {
-      status: 'verified',
-      source: 'source_document',
-      confidence: 0.9,
-      explanation: 'Число найдено в пользовательском контексте или загруженных материалах.',
-    };
+    if (
+      evidenceHasContextualRawValue({
+        evidence,
+        rawText: input.rawText,
+        surroundingText: surrounding,
+        kind: input.kind,
+      })
+    ) {
+      return {
+        status: 'verified',
+        source: 'source_document',
+        confidence: 0.9,
+        explanation: 'Число найдено в пользовательском контексте или загруженных материалах.',
+      };
+    }
   }
 
   if (surrounding.includes('пример') || surrounding.includes('example')) {
@@ -255,6 +499,7 @@ export function extractCareerPlaybookNumericFacts(
     const surroundingText = matchSurroundingText(input.content, match.start, match.end);
     const classification = classifyNumericFact({
       rawText: match.rawText,
+      kind: match.kind,
       surroundingText,
       evidenceText,
     });

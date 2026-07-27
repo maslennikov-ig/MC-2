@@ -58,6 +58,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { getCareerPlaybookNumericFactDomId } from '@/lib/career-playbook/numeric-facts'
 import { cn } from '@/lib/utils'
 import type {
   CareerPlaybookBlockId,
@@ -118,6 +119,7 @@ export interface PlaybookViewerCopy {
   inspectorNextStep?: string
   inspectorPrepare?: string
   numericFactsTitle?: string
+  numericFactsDescription?: string
   numericFactTotal?: (count: number) => string
   numericFactVerified?: (count: number) => string
   numericFactBenchmark?: (count: number) => string
@@ -125,6 +127,12 @@ export interface PlaybookViewerCopy {
   numericFactSuggested?: (count: number) => string
   numericFactStructural?: (count: number) => string
   numericFactConflict?: (count: number) => string
+  numericFactStatusBenchmark?: string
+  numericFactStatusNeedsReview?: string
+  numericFactStatusSuggested?: string
+  numericFactStatusConflict?: string
+  numericFactActionHint?: string
+  numericFactOpenAriaLabel?: (value: string, blockTitle: string) => string
   numericEditTitle?: string
   numericEditDescription?: (value: string) => string
   numericReplacementLabel?: string
@@ -209,7 +217,9 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   inspectorLanguage: (language) => `Язык документа: ${language}`,
   inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
   inspectorPrepare: 'Подготовить к внедрению',
-  numericFactsTitle: 'Цифры',
+  numericFactsTitle: 'Проверка чисел',
+  numericFactsDescription:
+    'Проверьте точные значения перед публикацией: KPI, сроки, бюджеты и проценты.',
   numericFactTotal: (count) => formatRussianNumericFactCount(count),
   numericFactVerified: (count) => `Подтверждено: ${count}`,
   numericFactBenchmark: (count) => `Benchmark: ${count}`,
@@ -217,6 +227,12 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   numericFactSuggested: (count) => `Рекомендации: ${count}`,
   numericFactStructural: (count) => `Структурные: ${count}`,
   numericFactConflict: (count) => `Конфликты: ${count}`,
+  numericFactStatusBenchmark: 'Бенчмарк',
+  numericFactStatusNeedsReview: 'Проверить',
+  numericFactStatusSuggested: 'Рекомендация',
+  numericFactStatusConflict: 'Конфликт',
+  numericFactActionHint: 'Нажмите на число, чтобы найти его в документе.',
+  numericFactOpenAriaLabel: (value, blockTitle) => `Открыть число ${value} в блоке ${blockTitle}`,
   numericEditTitle: 'Проверить цифру',
   numericEditDescription: (value) =>
     `Сейчас в тексте используется ${value}. Укажите корректное значение.`,
@@ -351,9 +367,23 @@ const NUMERIC_FACT_STATUSES: CareerPlaybookNumericFact['status'][] = [
   'conflict',
 ]
 
+const NUMERIC_REVIEW_STATUSES = new Set<CareerPlaybookNumericFact['status']>([
+  'benchmark',
+  'suggested',
+  'needs_review',
+  'conflict',
+])
+
+interface NumericFactSummaryItem {
+  blockId: CareerPlaybookBlockId
+  blockTitle: string
+  fact: CareerPlaybookNumericFact
+}
+
 interface NumericFactSummary {
   total: number
   counts: Record<CareerPlaybookNumericFact['status'], number>
+  items: NumericFactSummaryItem[]
 }
 
 export function PlaybookViewer({
@@ -489,6 +519,44 @@ export function PlaybookViewer({
   const closeNumericFactEditor = () => {
     if (isUpdatingNumericFact) return
     setNumericFactSelection(null)
+  }
+
+  const scrollToNumericFact = (
+    blockId: CareerPlaybookBlockId,
+    fact: CareerPlaybookNumericFact
+  ) => {
+    setCollapsedBlocks((current) => {
+      if (!current.has(blockId)) return current
+      const next = new Set(current)
+      next.delete(blockId)
+      return next
+    })
+    setActiveBlockId(blockId)
+
+    if (typeof window !== 'undefined' && window.location.hash !== `#${blockId}`) {
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}#${blockId}`
+      )
+    }
+
+    const scroll = () => {
+      const trigger = document.getElementById(getCareerPlaybookNumericFactDomId(fact.id))
+      const target = trigger ?? document.getElementById(blockId)
+      if (!target) return
+
+      target.scrollIntoView({
+        block: trigger ? 'center' : 'start',
+        behavior: 'smooth',
+      })
+      if (trigger instanceof HTMLElement) {
+        trigger.focus({ preventScroll: true })
+      }
+    }
+
+    scroll()
+    window.setTimeout(scroll, 0)
   }
 
   const saveNumericFact = async () => {
@@ -648,6 +716,7 @@ export function PlaybookViewer({
                 canRegenerateImage={viewerPermissions.canManageVisibility}
                 isRegeneratingImage={isRegeneratingImage}
                 onRegenerateImage={onRegenerateImage}
+                onNumericFactOpen={scrollToNumericFact}
               />
             ) : null}
           </section>
@@ -848,6 +917,7 @@ function InspectorRail({
   canRegenerateImage,
   isRegeneratingImage,
   onRegenerateImage,
+  onNumericFactOpen,
 }: {
   snapshot: CareerPlaybookViewerSnapshot
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
@@ -872,6 +942,7 @@ function InspectorRail({
   canRegenerateImage: boolean
   isRegeneratingImage: boolean
   onRegenerateImage?: () => void
+  onNumericFactOpen: (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => void
 }) {
   return (
     <aside
@@ -898,7 +969,11 @@ function InspectorRail({
           onDelete={onDelete}
         />
 
-        <NumericFactsSummary summary={numericSummary} labels={labels} />
+        <NumericFactsSummary
+          summary={numericSummary}
+          labels={labels}
+          onNumericFactOpen={onNumericFactOpen}
+        />
 
         <QualityWarningsSummary
           issues={snapshot.qualityIssues}
@@ -1231,20 +1306,15 @@ function groupQualityIssues(issues: CareerPlaybookQualityIssue[]): Array<{
 function NumericFactsSummary({
   summary,
   labels,
+  onNumericFactOpen,
 }: {
   summary: NumericFactSummary
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  onNumericFactOpen: (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => void
 }) {
   if (summary.total === 0) return null
 
   const items = [
-    {
-      key: 'verified',
-      label: labels.numericFactVerified(summary.counts.verified),
-      count: summary.counts.verified,
-      className:
-        'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100',
-    },
     {
       key: 'benchmark',
       label: labels.numericFactBenchmark(summary.counts.benchmark),
@@ -1258,6 +1328,13 @@ function NumericFactsSummary({
       count: summary.counts.needs_review,
       className:
         'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100',
+    },
+    {
+      key: 'suggested',
+      label: labels.numericFactSuggested(summary.counts.suggested),
+      count: summary.counts.suggested,
+      className:
+        'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-300/20 dark:bg-violet-300/10 dark:text-violet-100',
     },
     {
       key: 'conflict',
@@ -1281,6 +1358,9 @@ function NumericFactsSummary({
           </h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             {labels.numericFactTotal(summary.total)}
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+            {labels.numericFactsDescription}
           </p>
         </div>
         {summary.counts.needs_review + summary.counts.conflict > 0 ? (
@@ -1311,8 +1391,80 @@ function NumericFactsSummary({
             </Badge>
           ))}
       </div>
+      <div
+        className="mt-3 grid max-h-80 gap-2 overflow-y-auto pr-1"
+        data-testid="career-playbook-numeric-review-list"
+      >
+        {summary.items.map((item) => {
+          const blockTitle = labels.blockTitle(item.blockId, item.blockTitle)
+          return (
+            <button
+              key={item.fact.id}
+              type="button"
+              className={cn(
+                'grid gap-1 rounded-md border p-2 text-left text-xs transition-colors',
+                'hover:bg-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none dark:hover:bg-slate-950/60',
+                getNumericFactReviewClassName(item.fact.status)
+              )}
+              aria-label={labels.numericFactOpenAriaLabel(item.fact.raw_text, blockTitle)}
+              onClick={() => onNumericFactOpen(item.blockId, item.fact)}
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-slate-950 dark:text-slate-50">
+                  {item.fact.raw_text}
+                </span>
+                <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px]">
+                  {getNumericFactReviewStatusLabel(item.fact.status, labels)}
+                </Badge>
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                {blockTitle}
+              </span>
+              {item.fact.explanation ? (
+                <span className="leading-5 text-slate-600 dark:text-slate-300">
+                  {item.fact.explanation}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-3 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+        {labels.numericFactActionHint}
+      </p>
     </section>
   )
+}
+
+function getNumericFactReviewStatusLabel(
+  status: CareerPlaybookNumericFact['status'],
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+) {
+  switch (status) {
+    case 'benchmark':
+      return labels.numericFactStatusBenchmark
+    case 'suggested':
+      return labels.numericFactStatusSuggested
+    case 'conflict':
+      return labels.numericFactStatusConflict
+    case 'needs_review':
+    default:
+      return labels.numericFactStatusNeedsReview
+  }
+}
+
+function getNumericFactReviewClassName(status: CareerPlaybookNumericFact['status']) {
+  switch (status) {
+    case 'benchmark':
+      return 'border-sky-200 bg-sky-50/70 text-sky-950 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-50'
+    case 'suggested':
+      return 'border-violet-200 bg-violet-50/70 text-violet-950 dark:border-violet-300/20 dark:bg-violet-300/10 dark:text-violet-50'
+    case 'conflict':
+      return 'border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-50'
+    case 'needs_review':
+    default:
+      return 'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-50'
+  }
 }
 
 function NumericFactEditorSheet({
@@ -1559,6 +1711,7 @@ function DocumentPaper({
           const content = getDisplayContent(block, title)
           const hasContent = content.trim().length > 0
           const BlockHeadingTag = titleHeading === 'h1' ? 'h2' : 'h3'
+          const displayableNumericFacts = getDisplayableNumericFacts(block.state.numeric_facts)
 
           return (
             <article
@@ -1648,7 +1801,9 @@ function DocumentPaper({
                       features={{ mermaid: true }}
                       language={snapshot.contentLanguage}
                       numericFacts={
-                        interactive && onNumericFactClick ? block.state.numeric_facts : undefined
+                        interactive && onNumericFactClick && displayableNumericFacts.length > 0
+                          ? displayableNumericFacts
+                          : undefined
                       }
                       onNumericFactClick={
                         onNumericFactClick
@@ -1736,14 +1891,31 @@ function summarizeNumericFacts(blocks: CareerPlaybookViewerBlock[]): NumericFact
   >
 
   let total = 0
+  const items: NumericFactSummaryItem[] = []
   for (const block of blocks) {
     for (const fact of block.state.numeric_facts ?? []) {
+      if (!isDisplayableNumericFact(fact)) continue
       counts[fact.status] += 1
       total += 1
+      items.push({
+        blockId: block.blockId,
+        blockTitle: block.title,
+        fact,
+      })
     }
   }
 
-  return { total, counts }
+  return { total, counts, items }
+}
+
+function getDisplayableNumericFacts(
+  numericFacts?: CareerPlaybookNumericFact[]
+): CareerPlaybookNumericFact[] {
+  return numericFacts?.filter(isDisplayableNumericFact) ?? []
+}
+
+function isDisplayableNumericFact(fact: CareerPlaybookNumericFact): boolean {
+  return NUMERIC_REVIEW_STATUSES.has(fact.status)
 }
 
 function readInitialPanelState(key: 'toc' | 'panel'): PanelState {

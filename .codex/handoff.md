@@ -1,45 +1,66 @@
 # Orchestrator Handoff
 
-Updated: 2026-06-26
-Stage: `mc2-db696.86` Career Playbook Qdrant follow-ups locally closed; cloud endpoint blocked
-Branch: `codex/career-playbook-live-smoke-fixes`
-Beads: `mc2-db696.87` closed; `mc2-db696.86` blocked on valid cloud Qdrant endpoint/key for cloud-backed validation after tracked dev-compose fix
+Updated: 2026-06-28
+Stage: `mc2-db696.93` Career Playbook numeric review navigation implemented, review-fixed, and follow-ups applied locally
+Branch: `codex/career-playbook-numeric-review`
+Worktree: `/home/me/code/mc2/.worktrees/career-playbook-numeric-review`
+Beads: `mc2-db696.93` in progress pending delivery decision; follow-ups `mc2-db696.95`, `mc2-db696.96`, and `mc2-db696.97` closed locally
 
 ## Current State
 
-- Previous stage `mc2-db696.83` remains pushed at `ac7987de` on `origin/codex/career-playbook-live-smoke-fixes`.
-- `mc2-db696.87`: `create-collection.ts` import side effect is fixed locally and the Beads issue is closed. The direct-execution guard now compares full resolved paths instead of basename suffixes.
-- `mc2-db696.87`: added `tests/unit/shared/qdrant/create-collection.test.ts`; RED reproduced import-time Qdrant call, GREEN passed after fix.
-- `mc2-db696.86`: read-only Qdrant probe confirmed the configured cloud endpoint returns plain HTTP 404 on `/collections`; this is endpoint/config-level, not missing `course_embeddings`.
-- `mc2-db696.86`: `docker-compose.dev.yml` now forces `api-dev`, `worker-dev`, and `worker-stage6-dev` to use `QDRANT_URL=http://qdrant-dev:6333`, matching the existing dev-local Qdrant service and health check.
-- Volta debugger subagent completed Qdrant diagnosis and was closed.
+- Implemented the approved numeric-review plan in an isolated worktree because `/home/me/code/mc2` had unrelated dirty Career Playbook changes.
+- Review pass used visible Codex subagents: `correctness_reviewer` and `improvement_reviewer`. Artifacts are under `.codex/stages/mc2-db696.93/artifacts/`.
+- Accepted and fixed review findings:
+  - boundary-aware evidence matching prevents count `1` from becoming `verified/source_document` just because evidence contains `18%`;
+  - markdown table row-number cells are skipped specifically, while actionable single-value table timelines like `2 недели` are retained as `needs_review`;
+  - `viewer-page-client.test.tsx` EN/RU test fixtures include the new numeric-review copy keys, removing `MISSING_MESSAGE` warnings.
+- Backend `numeric-facts.ts` filters low-signal checklist/table/ordinal digits and requires contextual evidence before marking a value `verified/source_document`.
+- Frontend shows only actionable numeric facts (`needs_review`, `suggested`, `conflict`, plus quiet `benchmark`) and hides legacy noisy `verified/count` facts from inline highlights and the right rail.
+- Right rail copy is now `Проверка чисел` with explanatory text, counters, clickable rows, and action/aria hints.
+- Clicking a row expands the block if collapsed, updates `#blockId`, scrolls/focuses the exact inline trigger by stable DOM id, and does not open the numeric editor sheet.
+- Follow-ups implemented:
+  - `mc2-db696.95`: the numeric review list has a bounded scroll container for long actionable lists, with click navigation preserved.
+  - `mc2-db696.96`: stable numeric fact DOM ids now come from a shared Career Playbook helper used by both viewer and markdown renderer.
+  - `mc2-db696.97`: compact numeric status labels are explicit RU/EN copy keys instead of derived from count labels.
 
 ## Verification
 
-- `orch-prompts docs-resolve --package @qdrant/js-client-rest --topic ...` returned `fallback-needed`; official Qdrant docs were checked for REST endpoint behavior.
-- `orch-prompts prompt-check` passed for the Qdrant diagnostic and cleanup worker prompts.
-- Masked read-only Qdrant probe reproduced plain 404 on `/collections` for the configured cloud endpoint; no cloud mutation was performed.
-- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts`: failed before fix as expected, then passed after fix.
-- `pnpm --filter @megacampus/course-gen-platform test -- tests/unit/shared/qdrant/create-collection.test.ts tests/unit/shared/qdrant/lifecycle.test.ts tests/unit/shared/rag/document-availability.test.ts`: passed, 3 files / 11 tests.
-- `docker compose -f docker-compose.dev.yml config --no-interpolate --quiet`: passed.
-- `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.86`: passed, including `pnpm type-check`, `pnpm build`, and process verification.
+- RED observed: backend unit failed on new regressions for row number `1` next to `18%` and table timeline `2 недели` before the fix.
+- RED observed: helper unit failed before the shared numeric DOM id helper existed.
+- RED observed: numeric rail unit failed before compact status labels and bounded long-list markup existed.
+- `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform test -- tests/unit/stages/stage-career-playbook/numeric-facts.test.ts`: passed, 7 tests.
+- `pnpm --filter @megacampus/web test -- tests/unit/lib/career-playbook/numeric-facts.test.ts`: passed, 1 test.
+- `pnpm --filter @megacampus/web test -- tests/unit/components/markdown/markdown-renderer-full-numeric.test.tsx`: passed, 3 tests.
+- `pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/viewer.test.tsx -t numeric`: passed, 4 selected tests.
+- `pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/viewer-page-client.test.tsx`: passed, 9 tests.
+- `pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/viewer.test.tsx`: still fails on two quality-warning tests from this isolated branch baseline; numeric tests in the same file pass, and the full file is 14/16 green. Closed task `mc2-db696.90` contains the related quality-warning viewer fixes but is not in this worktree base.
+- `pnpm type-check`: passed.
+- `SUPABASE_SERVICE_ROLE_KEY=test-service-role-key NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key pnpm build`: passed with existing Next root inference, Browserslist, and Node `url.parse` warnings.
 - `git diff --check`: passed.
+- `SUPABASE_SERVICE_ROLE_KEY=test-service-role-key NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key python3 scripts/orchestration/run_stage_closeout.py --stage mc2-db696.93`: passed after the follow-up pass. An earlier closeout attempt without env failed on required Supabase env vars only.
 
 ## Explicit defers
 
-- `mc2-db696.86`: valid cloud Qdrant database endpoint/API key is still required for cloud-backed validation. Current configured cloud endpoint returns route-level `404 page not found` on `/collections`.
-- No merge/deploy has been performed for this follow-up stage.
+- No in-scope implementation defer.
+- Full viewer unit file remains red in this branch until `mc2-db696.90` quality-warning viewer fixes are integrated/rebased into this worktree.
+- Commit, push, PR, merge, and deploy were not performed; remote/delivery actions need explicit authorization.
+
+## Closed follow-ups
+
+- `mc2-db696.95`: Validate Career Playbook numeric review rail with long actionable lists.
+- `mc2-db696.96`: Share Career Playbook numeric fact DOM id helper.
+- `mc2-db696.97`: Add explicit compact labels for Career Playbook numeric review statuses.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.86`
-Recommended action: commit and push this follow-up stage. Keep `mc2-db696.86` blocked unless a valid active Qdrant cloud endpoint/key is provided, because cloud validation cannot be completed from repo code alone.
+Next stage id: `mc2-db696.93`
+Recommended action: review the local diff, then either commit this branch directly or rebase/merge it onto the branch that already contains `mc2-db696.90` before running the full viewer test file again.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage in `/home/me/code/mc2`. Continue stage `mc2-db696.86` on branch `codex/career-playbook-live-smoke-fixes`. Local verification and closeout passed; commit/push if not already done. Do not create/delete Qdrant cloud collections or run live smoke unless a valid endpoint/key and explicit mutation authorization are present.
+Use $orchestrator-stage in `/home/me/code/mc2`. Continue `mc2-db696.93` from worktree `/home/me/code/mc2/.worktrees/career-playbook-numeric-review` on branch `codex/career-playbook-numeric-review`. Numeric review implementation and targeted gates are green; full `viewer.test.tsx` has baseline quality-warning failures because closed `mc2-db696.90` is not in this isolated branch base. Do not push, create PR, merge, deploy, or clean the worktree without explicit authorization.
 
 ## Closeout Markers
 
-docs-reviewed: no-change-needed - current changes are internal dev compose wiring and Qdrant tooling import-safety; stable project index already lists deploy/Qdrant entrypoints.
-graph-reviewed: updated - `graphify update . --force` and `graphify cluster-only . --no-viz` completed; final report shows 52,430 nodes, 76,670 edges, and 3,272 communities.
+docs-reviewed: no-change-needed - behavior is covered by code/tests and existing project index already points to the Career Playbook viewer/extractor/message entrypoints; no durable operator/API doc changed.
+graph-reviewed: updated - `graphify update . && graphify cluster-only . --no-viz` completed during follow-up closeout.
