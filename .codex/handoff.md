@@ -59,22 +59,23 @@ staging) → `mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`,
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: pre-window staging and both window-controller amendments are done
-(`mc2-gyde8`, `mc2-t9bma`, `mc2-y02tz`, `mc2-vfjyk` closed; `mc2-1by33` at `a83cd4332`).
-Remaining before `mc2-i9h3y`: (1) redeploy controller + wrapper to `megacampus-prod` with
-the 0444 dance and install `q12-privileged-launch.sh` 0555 root:root, re-verifying the
-frozen manifest after; (2) the host smoke of the real sudo → launcher → wrapper hop (plan
-Task 7, revised: a full `live` rehearsal outside the window is impossible because the
-frozen commands are production by construction); (3) ONE fresh green `plan` under run-id
-`0fa297e4-3eb7-475f-aee6-56455f02ed6c`, re-recording `--expected-catalog-sha256`;
-(4) owner confirms the slot — C2 quiesces production writers and the 00:30
-Europe/Amsterdam backup timer mutually blocks the window; (5) run C1..C8 with
-`--stop-after deploy.prepare` as the reversible hold, C9 pressed by the owner in person,
-then C10 + Phase D. Do not change the frozen manifest `aaec6fc2…`.
+Recommended action: `mc2-i9h3y` is BLOCKED after the 2026-07-27 owner-authorized pre-flight,
+which STOPPED BEFORE C1 with nothing mutated (no writer quiesced, no journal row). Every other
+precondition is green (five deployed files byte-match develop HEAD; real `sudo` → launcher →
+wrapper refused fail-closed) — evidence on the bead. Two release-pin blockers are OWNER-held:
+`mc2-2v5cq` — `.env.production` pins operator digest `b5eb528e…` while the recorded argv
+declares `cb98e579…`, the operator image is absent from the host, and GHCR returns 403 so it
+can be neither verified nor pulled; `mc2-sdbua` — the run-root catalog authority carries
+`release_sha 060b4faea…` while the argv declares `23dfe973f…` (a 2026-07-27 plan into an
+isolated `/tmp` root reproduced the `23dfe973f` catalog `c3715ac2…` byte-identically, and the
+whole delta is that one field: `68041d94…`/`edbea709…` match, so the DATABASE HAS NOT DRIFTED).
+Both reduce to ONE owner decision — which release is under cutover — then re-emit the authority
+via a production `plan`, and only then C1..C7 with `--stop-after deploy.prepare` (the sole
+resumable pre-C9 head), C9 owner-pressed — `recover` has no `--stop-after` and drives C8..C10
+to convergence. Do not change the frozen manifest `aaec6fc2…`.
 
-Historical progress logs moved 2026-07-25 to `.codex/stages/mc2-jz6y0/summary.md`
-§ "Historical progress log" so this file stays current-state only (200-line contract).
-Current state lives in § "Explicit defers" and § "Accepted and Open Work".
+Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
+log"; this file is current-state only (200-line contract).
 
 ## Starter prompt for next orchestrator
 
@@ -83,8 +84,7 @@ Full completion program authored (prompt-check pass): copy
 (authority: spec `…specs/2026-07-16-q12-full-completion-design.md` + plan
 `…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
 publish → C live cutover → D closeout; every remote/live and credentialed step
-owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
-summary at the resolved `origin/codex/self-hosted-qdrant-platform`.
+owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
 
 Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
 
