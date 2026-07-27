@@ -1331,7 +1331,21 @@ class ProductionExecutor:
             stderr=subprocess.PIPE,
         )
         if completed.returncode != 0:
-            raise LifecycleError(f"manifested child failed with status {completed.returncode}")
+            # 2026-07-27 (mc2-94mmf): the child's stderr used to be captured and dropped, so C1's
+            # barrier.install refusal arrived as a bare "status 1". Before C2 that costs a cycle;
+            # after C2 the production writers are already stopped and a blind refusal is the worst
+            # place to lose the reason. Carry the child's own words, scrubbed with the same redactor
+            # the plan drill uses (these children print DSNs and passwords when they fail) and
+            # bounded, because a failing child can emit a very large tail.
+            # This call site captures bytes (no text=True), unlike the delegated-launcher one.
+            raw_stderr = completed.stderr or b""
+            if isinstance(raw_stderr, bytes):
+                raw_stderr = raw_stderr.decode("utf-8", "replace")
+            detail = _scrub_plan_secret_text(raw_stderr.strip())[-2000:]
+            raise LifecycleError(
+                f"manifested child failed with status {completed.returncode}"
+                + (f": {detail}" if detail else "")
+            )
         return {
             "schema_version": "megacampus.q12.retained-command-result/v1",
             "command_id": capability["command_id"],

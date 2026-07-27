@@ -105,3 +105,23 @@ describe('W7a: production owner-custody execute_ordinary really runs the command
     );
   });
 });
+
+// 2026-07-27 (mc2-94mmf): the live window's C1 barrier.install exited 1 and the controller said only
+// "manifested child failed with status 1" — it had captured the child's stderr and thrown it away, so
+// the real refusal reason was unrecoverable. Before C2 that costs a diagnosis cycle; after C2 the
+// production writers are already stopped, which is the worst possible place to be blind. The message
+// must carry the child's own words, scrubbed: these children print DSNs and passwords when they fail.
+describe('a failing frozen child must report why it failed', () => {
+  it('includes the child stderr tail in the raised error and scrubs secret shapes', () => {
+    const out = driveRunner();
+    const diagnostics = out.failingChildDiagnostics as Record<string, unknown>;
+
+    expect(diagnostics.raised, 'a non-zero child must raise').toBe(true);
+    expect(diagnostics.carriesStatus, `message was: ${String(diagnostics.message)}`).toBe(true);
+    expect(
+      diagnostics.carriesChildReason,
+      `the child said "capability mode mismatch" but the message was: ${String(diagnostics.message)}`
+    ).toBe(true);
+    expect(diagnostics.leaksSecret, 'a 64-hex secret shape must be scrubbed out').toBe(false);
+  });
+});
