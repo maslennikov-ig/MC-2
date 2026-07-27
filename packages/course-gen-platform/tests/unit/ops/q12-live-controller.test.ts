@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -780,6 +781,102 @@ describe.runIf(RUN_REAL_CONTROLLER)(
       for (const row of live.journalEntries.slice(0, FORWARD_PREFIX)) {
         expect(row.command_id).not.toBe('barrier.cleanup');
       }
+    });
+  }
+);
+
+// mc2-orsez: the cleanup leg of the same controller-owned publication the install leg needed. The
+// frozen cleanup child reads <run-root>/database-barrier-input-checkpoint-cleanup-<epoch>.json
+// (q12-database-barrier.sh:582-597) and — unlike the install leg — the C10 forward-resume gate
+// re-reads the very same file afterwards (q12-writer-resume.py:1638-1663), so without a controller
+// publication the window has no way past cleanup OR past resume. The fixtures published it
+// themselves, which is exactly why the production gap was invisible; this asserts the CONTROLLER
+// wrote it into its own run root.
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Q12 live cutover controller (Task-9) — mc2-orsez: controller-published cleanup input checkpoint',
+  () => {
+    it('publishes the cleanup-leg barrier input checkpoint bound to the barrier.cleanup capability_claimed row', async () => {
+      const quiesceRoot = root();
+      const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+      const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+      const liveRoot = root();
+
+      const live = await materializeLiveController({
+        runRoot: liveRoot,
+        runId,
+        quiesceManifestPath: quiescePath,
+      });
+
+      const published = join(liveRoot, 'database-barrier-input-checkpoint-cleanup-cutover.json');
+      expect(existsSync(published)).toBe(true);
+      expect(statSync(published).mode & 0o777).toBe(0o600);
+
+      const claim = live.journalEntries.find(
+        row => row.command_id === 'barrier.cleanup' && row.outcome === 'capability_claimed'
+      );
+      expect(claim).toBeDefined();
+      const journal = statSync(join(liveRoot, 'phase.jsonl'));
+      expect(JSON.parse(readFileSync(published, 'utf8'))).toEqual({
+        schema_version: 'megacampus.q12.cutover-checkpoint/v1',
+        run_id: runId,
+        seq: claim!.seq,
+        phase: 'guard_cleanup_complete',
+        journal_entry_hash: claim!.entry_hash,
+        previous_journal_entry_hash: claim!.previous_hash,
+        journal_device: String(journal.dev),
+        journal_inode: String(journal.ino),
+        accepted_object_kind: 'none',
+        accepted_object_sha256: null,
+        resume_authority_sha256: null,
+        lease_epoch: 'cutover',
+      });
+    });
+
+    // Only two of the seven barrier commands read an input checkpoint (install and the terminal
+    // cleanup/rollback legs). Publishing one for verify-after-base, verify-after-observability,
+    // prepare-recovery or activate would leave unread authority files in the run root claiming a
+    // journal position nothing validates, so the full window must produce EXACTLY these two.
+    it('publishes an input checkpoint only for the two legs whose frozen child reads one', async () => {
+      const quiesceRoot = root();
+      const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+      const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+      const liveRoot = root();
+
+      await materializeLiveController({
+        runRoot: liveRoot,
+        runId,
+        quiesceManifestPath: quiescePath,
+      });
+
+      expect(
+        readdirSync(liveRoot)
+          .filter(name => name.startsWith('database-barrier-input-checkpoint-'))
+          .sort()
+      ).toEqual([
+        'database-barrier-input-checkpoint-cleanup-cutover.json',
+        'database-barrier-input-checkpoint-install-cutover.json',
+      ]);
+    });
+
+    // The publication belongs to the cleanup claim boundary, not to the run: a stop before the
+    // post-activate segment must leave no cleanup input checkpoint behind.
+    it('does not publish it when the run stops before the post-activate segment', async () => {
+      const quiesceRoot = root();
+      const runId = deriveRootRetainedBarrierFixtureRunId(quiesceRoot);
+      const quiescePath = writeQuiesceManifest(quiesceRoot, runId);
+      const liveRoot = root();
+
+      const stopped = await materializeLiveController({
+        runRoot: liveRoot,
+        runId,
+        quiesceManifestPath: quiescePath,
+        stopAfter: 'barrier.activate',
+      });
+
+      expect(stopped.postActivate).toBeNull();
+      expect(
+        existsSync(join(liveRoot, 'database-barrier-input-checkpoint-cleanup-cutover.json'))
+      ).toBe(false);
     });
   }
 );
