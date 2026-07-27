@@ -295,7 +295,7 @@ describe.runIf(REAL_PG17)(
       }
 
       // ---- R8-B-2-iii: the REAL frozen barrier `cleanup` off the activated state ------------------
-      // The frozen barrier (bytes bdb9d935, no MC2_Q12_BARRIER_TEST_MODE relaxation of the DB command)
+      // The frozen barrier (bytes f183aa3c, no MC2_Q12_BARRIER_TEST_MODE relaxation of the DB command)
       // runs cleanup off the activated container: real DROP SCHEMA q12_guard CASCADE, proves zero guard
       // residue, and publishes the 18-key terminal proof. The controller supplies the journal to the
       // claimed boundary + the v1-before-cleanup archive; the barrier validates them for real.
