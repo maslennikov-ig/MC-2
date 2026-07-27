@@ -8,10 +8,10 @@ Updated: 2026-07-27 (workspace consolidated onto `develop`; SINGLE SOURCE OF TRU
   proved it is the superset of every Q12 line (`codex/self-hosted-qdrant-platform`,
   `codex/q12-plan-builder`, `codex/q12-w-writer-barrier`, the W7a increments and the
   orchestration-infra commits are all in it). Keep those branches for history only.
-- **`codex/self-hosted-qdrant-platform-plan` is RETIRED** (2026-07-27): its only undelivered
-  commit — `feat(career-playbook): remove numeric review mode` (`mc2-jc275`) — was cherry-picked
-  onto `develop` as `959ce44de`; the primary worktree now sits on `develop`. Q12 window work
-  happens on `codex/q12-window-live`, delivered into `develop` via `/push-dev`.
+- **Stale branches RETIRED (2026-07-27 branch audit).** `codex/self-hosted-qdrant-platform-plan`
+  and `codex/q12-window-live` are deleted; the primary worktree sits on `develop` and new Q12 work
+  branches from it, delivered via `/push-dev`. Three stranded fixes recovered (`mc2-jc275`
+  `959ce44de`, `mc2-v31gc` `c97dca206`, `mc2-sjpbx` `3232e83cf`); video pipeline parked `mc2-hqfc3`.
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 
