@@ -35,6 +35,8 @@ const messages = {
         roleGuideSourceDescription: 'The final Role Guide will be uploaded as the main source.',
         titleLabel: 'Course title',
         descriptionLabel: 'What the course will cover',
+        descriptionPreviewTab: 'Preview',
+        descriptionEditTab: 'Edit',
         targetAudienceLabel: 'Target audience',
         learningOutcomesLabel: 'Learning outcomes',
         learningOutcomesHelp: 'One outcome per line.',
@@ -119,6 +121,39 @@ function mockPreview() {
   })
 }
 
+function mockMarkdownPreview() {
+  previewCourseFromPlaybook.mockResolvedValue({
+    playbookId: 'pb-1',
+    brief: {
+      title: 'Product Lead',
+      courseDescription:
+        '# Learning path\n\n## Module 1\n\n- Map role outcomes\n- Practice operating rituals',
+      targetAudience: 'Lead Product Platform',
+      learningOutcomes: ['Improve activation', 'Run discovery rituals'],
+      language: 'en',
+      courseSize: 'auto',
+      style: 'professional',
+    },
+    defaults: {
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    },
+    sources: {
+      roleGuide: { included: true },
+      webResearch: {
+        available: true,
+        defaultIncluded: false,
+      },
+      businessContextSources: {
+        available: false,
+        defaultIncluded: false,
+        sourceCount: 0,
+        sources: [],
+      },
+    },
+  })
+}
+
 describe('CreateCourseFromPlaybookDialog', () => {
   beforeEach(() => {
     previewCourseFromPlaybook.mockReset()
@@ -142,6 +177,7 @@ describe('CreateCourseFromPlaybookDialog', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Review course draft' })).toBeInTheDocument()
     expect(await screen.findByLabelText('Course title')).toHaveValue('Product Lead')
+    await user.click(screen.getByRole('tab', { name: 'Edit' }))
     expect(screen.getByLabelText('What the course will cover')).toHaveValue(
       'A course about platform product leadership.'
     )
@@ -200,6 +236,19 @@ describe('CreateCourseFromPlaybookDialog', () => {
         }),
       })
     )
+  })
+
+  it('renders markdown course descriptions as a readable preview by default', async () => {
+    const user = userEvent.setup()
+    mockMarkdownPreview()
+
+    renderDialog()
+
+    await user.click(screen.getByRole('button', { name: 'Create course' }))
+
+    expect(await screen.findByRole('heading', { name: 'Learning path' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Module 1' })).toBeInTheDocument()
+    expect(screen.getByText('Map role outcomes')).toBeInTheDocument()
   })
 
   it('shows loading and error states without navigating', async () => {

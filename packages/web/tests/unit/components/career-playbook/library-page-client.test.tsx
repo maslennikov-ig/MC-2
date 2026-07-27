@@ -156,6 +156,8 @@ const messages = {
         roleGuideSourceDescription: 'The final Role Guide will be uploaded as the main source.',
         titleLabel: 'Course title',
         descriptionLabel: 'What the course will cover',
+        descriptionPreviewTab: 'Preview',
+        descriptionEditTab: 'Edit',
         targetAudienceLabel: 'Target audience',
         learningOutcomesLabel: 'Learning outcomes',
         learningOutcomesHelp: 'One outcome per line.',

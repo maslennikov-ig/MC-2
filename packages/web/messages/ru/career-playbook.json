@@ -657,6 +657,8 @@
       "roleGuideSourceDescription": "Финальная должностная инструкция будет загружена как основной источник.",
       "titleLabel": "Название курса",
       "descriptionLabel": "Что будет в курсе",
+      "descriptionPreviewTab": "Просмотр",
+      "descriptionEditTab": "Редактировать",
       "targetAudienceLabel": "Целевая аудитория",
       "learningOutcomesLabel": "Результаты обучения",
       "learningOutcomesHelp": "Один результат на строку.",
