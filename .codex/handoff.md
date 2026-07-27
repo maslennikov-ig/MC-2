@@ -70,17 +70,27 @@ Deployed controller sha `5e17c393`, whole Q12 tree byte-equal to `develop`, `aae
 All five `MC2_Q12_REAL_PG17` barrier suites are green against a disposable `postgres:17.10` with the
 frozen children reading the CONTROLLER's copies (the fixtures no longer publish them).
 
-TWO OPEN BLOCKERS. `mc2-v7547` (P0, owner): the recorded `--release-sha 060b4faea…` names a release
-with NO image on the host; `.env.blue` AND `.env.green` both pin `4128a938` (2026-07-04), which is
-also what blue runs, and the GHCR token is dead (`mc2-2vtmk`). Nothing cross-checks release_sha
-against the image, so passing it would silently record a false release identity and activate a green
-slot byte-identical to blue. Treat `--release-sha` as UNSETTLED. `mc2-fjcj2` (P0): production never
-invokes the frozen `barrier.cleanup` child at all (`ProductionExecutor.execute_barrier_cleanup` only
-consumes artifacts; the documented "downstream R8-B-2" was untracked), so C9/C10 cannot complete —
-this one is past the owner gate, not a C1..C7 blocker.
+TWO OPEN BLOCKERS. `mc2-v7547` (P0, owner authority needed): `--release-sha` and `--operator-digest`
+are DIFFERENT artifacts and were conflated. `060b4faea` touched only `deploy/qdrant` + `scripts`, so CI
+built ONLY its `qdrant-operator` image — that is `b5eb528e`, which `--operator-digest` must keep
+because it must equal `.env.production`'s pin. `--release-sha` must instead name the APP release
+`.env.green` pins; today `.env.blue` and `.env.green` both pin `4128a938` (2026-07-04) and nothing
+cross-checks it, so `060b4faea` would have recorded a false identity and activated a green slot
+identical to blue. Owner chose to ship develop's app code. Newest built app images are `23dfe973f`
+(2026-07-25; nothing newer exists because CI was red 07-26..07-27, `mc2-f2il0`, now fixed and green);
+`web:develop` on the host is still `50f670b9`, so a PULL is unavoidable and the dead GHCR credential
+`mc2-2vtmk` is a hard C7 blocker. Recommended minimal truthful path: fix the credential, pull api+web
+`23dfe973f`, re-pin `.env.green`, run with `--release-sha 23dfe973f18cc…`; the 17 career-playbook app
+files newer than that ride the next ordinary deploy. Exact-HEAD instead needs a build first, and there
+is NO build-only trigger: `workflow_dispatch force_deploy=true` also enables "Deploy to Production"
+(`master || inputs.force_deploy`) and would push develop straight to prod, bypassing the window.
+`mc2-fjcj2` (P0): production never invokes the frozen `barrier.cleanup` child at all
+(`ProductionExecutor.execute_barrier_cleanup` only consumes artifacts; the documented "downstream
+R8-B-2" was untracked), so C9/C10 cannot complete — past the owner gate, not a C1..C7 blocker.
 
-STILL-SETTLED ARGV: `--operator-digest b5eb528e…`, `--expected-catalog-sha256 8ca17c43…` (three
-independent green plans agree; the DB shifted once around 13:00 and has been stable since),
+STILL-SETTLED ARGV: `--operator-digest b5eb528e…` (= `.env.production` pin),
+`--expected-catalog-sha256 8ca17c43…` (three independent green plans agree; the DB shifted once
+around 13:00 and has been stable since),
 `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce digests on a first run. Each
 attempt burns its run-id (the genesis stable binding cannot be recomputed over an existing
 checkpoint), so every retry needs a fresh run root: `mkdir -m 0700`, copy `accepted-coverage-run` and
