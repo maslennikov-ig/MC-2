@@ -1,17 +1,15 @@
 'use client'
 
 import Image from 'next/image'
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Building2,
-  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
   Globe,
-  Hash,
   Loader2,
   Lock,
   Maximize2,
@@ -26,7 +24,6 @@ import {
 import {
   dedupeCareerPlaybookQualityIssues,
   isInternalCareerPlaybookGenerationWarning,
-  type CareerPlaybookNumericFact,
   type CareerPlaybookQualityIssue,
   type CareerPlaybookViewerSnapshot,
   type CareerPlaybookVisibility,
@@ -50,17 +47,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import { getCareerPlaybookNumericFactDomId } from '@/lib/career-playbook/numeric-facts'
 import { cn } from '@/lib/utils'
 import type {
   CareerPlaybookBlockId,
@@ -70,12 +56,6 @@ import { ActionsBar, type ActionsBarCopy } from './ActionsBar'
 
 type PanelState = 'open' | 'closed'
 type ReaderMode = 'standard' | 'reading'
-type NumericFactScope = 'occurrence' | 'block'
-
-interface NumericFactSelection {
-  blockId: CareerPlaybookBlockId
-  fact: CareerPlaybookNumericFact
-}
 
 export interface PlaybookViewerCopy {
   productLabel?: string
@@ -120,29 +100,6 @@ export interface PlaybookViewerCopy {
   inspectorLanguage?: (language: string) => string
   inspectorNextStep?: string
   inspectorPrepare?: string
-  numericFactsTitle?: string
-  numericFactsDescription?: string
-  numericFactTotal?: (count: number) => string
-  numericFactVerified?: (count: number) => string
-  numericFactBenchmark?: (count: number) => string
-  numericFactNeedsReview?: (count: number) => string
-  numericFactSuggested?: (count: number) => string
-  numericFactStructural?: (count: number) => string
-  numericFactConflict?: (count: number) => string
-  numericFactStatusBenchmark?: string
-  numericFactStatusNeedsReview?: string
-  numericFactStatusSuggested?: string
-  numericFactStatusConflict?: string
-  numericFactActionHint?: string
-  numericFactOpenAriaLabel?: (value: string, blockTitle: string) => string
-  numericEditTitle?: string
-  numericEditDescription?: (value: string) => string
-  numericReplacementLabel?: string
-  numericScopeLabel?: string
-  numericScopeOccurrence?: string
-  numericScopeBlock?: string
-  numericSave?: string
-  numericCancel?: string
   actions?: ActionsBarCopy
 }
 
@@ -166,14 +123,7 @@ interface PlaybookViewerProps {
   onRegenerateImage?: () => void
   isUpdatingVisibility?: boolean
   isRegeneratingImage?: boolean
-  isUpdatingNumericFact?: boolean
   onVisibilityChange?: (visibility: CareerPlaybookVisibility) => void
-  onUpdateNumericFact?: (input: {
-    blockId: CareerPlaybookBlockId
-    factId: string
-    replacementText: string
-    scope: NumericFactScope
-  }) => Promise<boolean | void> | boolean | void
 }
 
 const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
@@ -221,31 +171,6 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   inspectorLanguage: (language) => `Язык документа: ${language}`,
   inspectorNextStep: 'Следующий шаг: создать курс для адаптации',
   inspectorPrepare: 'Подготовить к внедрению',
-  numericFactsTitle: 'Проверка чисел',
-  numericFactsDescription:
-    'Проверьте точные значения перед публикацией: KPI, сроки, бюджеты и проценты.',
-  numericFactTotal: (count) => formatRussianNumericFactCount(count),
-  numericFactVerified: (count) => `Подтверждено: ${count}`,
-  numericFactBenchmark: (count) => `Benchmark: ${count}`,
-  numericFactNeedsReview: (count) => `Требует проверки: ${count}`,
-  numericFactSuggested: (count) => `Рекомендации: ${count}`,
-  numericFactStructural: (count) => `Структурные: ${count}`,
-  numericFactConflict: (count) => `Конфликты: ${count}`,
-  numericFactStatusBenchmark: 'Бенчмарк',
-  numericFactStatusNeedsReview: 'Проверить',
-  numericFactStatusSuggested: 'Рекомендация',
-  numericFactStatusConflict: 'Конфликт',
-  numericFactActionHint: 'Нажмите на число, чтобы найти его в документе.',
-  numericFactOpenAriaLabel: (value, blockTitle) => `Открыть число ${value} в блоке ${blockTitle}`,
-  numericEditTitle: 'Проверить цифру',
-  numericEditDescription: (value) =>
-    `Сейчас в тексте используется ${value}. Укажите корректное значение.`,
-  numericReplacementLabel: 'Новое значение',
-  numericScopeLabel: 'Область применения',
-  numericScopeOccurrence: 'Только здесь',
-  numericScopeBlock: 'Весь блок',
-  numericSave: 'Сохранить цифру',
-  numericCancel: 'Отмена',
 }
 
 const defaultActionsCopy: Required<ActionsBarCopy> = {
@@ -364,34 +289,6 @@ const VISIBILITY_CONFIG: Record<
 
 const VISIBILITY_OPTIONS = Object.keys(VISIBILITY_CONFIG) as CareerPlaybookVisibility[]
 
-const NUMERIC_FACT_STATUSES: CareerPlaybookNumericFact['status'][] = [
-  'verified',
-  'benchmark',
-  'suggested',
-  'structural',
-  'needs_review',
-  'conflict',
-]
-
-const NUMERIC_REVIEW_STATUSES = new Set<CareerPlaybookNumericFact['status']>([
-  'benchmark',
-  'suggested',
-  'needs_review',
-  'conflict',
-])
-
-interface NumericFactSummaryItem {
-  blockId: CareerPlaybookBlockId
-  blockTitle: string
-  fact: CareerPlaybookNumericFact
-}
-
-interface NumericFactSummary {
-  total: number
-  counts: Record<CareerPlaybookNumericFact['status'], number>
-  items: NumericFactSummaryItem[]
-}
-
 export function PlaybookViewer({
   snapshot,
   blocks,
@@ -412,9 +309,7 @@ export function PlaybookViewer({
   onRegenerateImage,
   isUpdatingVisibility = false,
   isRegeneratingImage = false,
-  isUpdatingNumericFact = false,
   onVisibilityChange,
-  onUpdateNumericFact,
 }: PlaybookViewerProps) {
   const labels = {
     ...defaultCopy,
@@ -428,11 +323,6 @@ export function PlaybookViewer({
   const [activeBlockId, setActiveBlockId] = useState<CareerPlaybookBlockId | null>(() =>
     readInitialActiveBlockId(blocks)
   )
-  const [numericFactSelection, setNumericFactSelection] = useState<NumericFactSelection | null>(
-    null
-  )
-  const [numericReplacement, setNumericReplacement] = useState('')
-  const [numericScope, setNumericScope] = useState<NumericFactScope>('occurrence')
   const mode = readerMode ?? internalMode
   const viewerPermissions = snapshot.viewerPermissions ?? {
     canEdit: true,
@@ -453,8 +343,6 @@ export function PlaybookViewer({
     () => blocks.filter((block) => block.state.content.trim().length > 0).length,
     [blocks]
   )
-  const numericSummary = useMemo(() => summarizeNumericFacts(blocks), [blocks])
-  const canEditNumericFacts = viewerPermissions.canEdit && Boolean(onUpdateNumericFact)
   const visibleBlocksRef = useRef(new Map<CareerPlaybookBlockId, { ratio: number; top: number }>())
 
   useEffect(() => {
@@ -513,71 +401,6 @@ export function PlaybookViewer({
     elements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
   }, [blockIds, mode])
-
-  const openNumericFactEditor = (
-    blockId: CareerPlaybookBlockId,
-    fact: CareerPlaybookNumericFact
-  ) => {
-    if (!canEditNumericFacts) return
-    setNumericFactSelection({ blockId, fact })
-    setNumericReplacement(fact.raw_text)
-    setNumericScope('occurrence')
-  }
-
-  const closeNumericFactEditor = () => {
-    if (isUpdatingNumericFact) return
-    setNumericFactSelection(null)
-  }
-
-  const scrollToNumericFact = (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => {
-    setCollapsedBlocks((current) => {
-      if (!current.has(blockId)) return current
-      const next = new Set(current)
-      next.delete(blockId)
-      return next
-    })
-    setActiveBlockId(blockId)
-
-    if (typeof window !== 'undefined' && window.location.hash !== `#${blockId}`) {
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${window.location.search}#${blockId}`
-      )
-    }
-
-    const scroll = () => {
-      const trigger = document.getElementById(getCareerPlaybookNumericFactDomId(fact.id))
-      const target = trigger ?? document.getElementById(blockId)
-      if (!target) return
-
-      target.scrollIntoView({
-        block: trigger ? 'center' : 'start',
-        behavior: 'smooth',
-      })
-      if (trigger instanceof HTMLElement) {
-        trigger.focus({ preventScroll: true })
-      }
-    }
-
-    scroll()
-    window.setTimeout(scroll, 0)
-  }
-
-  const saveNumericFact = async () => {
-    if (!numericFactSelection || !onUpdateNumericFact) return
-    const replacementText = numericReplacement.trim()
-    if (!replacementText) return
-
-    const result = await onUpdateNumericFact({
-      blockId: numericFactSelection.blockId,
-      factId: numericFactSelection.fact.id,
-      replacementText,
-      scope: numericScope,
-    })
-    if (result === false) return
-    setNumericFactSelection(null)
-  }
 
   const updateToc = (next: PanelState) => {
     setToc(next)
@@ -690,7 +513,6 @@ export function PlaybookViewer({
                   onEditBlock={onEditBlock}
                   onRegenerateBlock={onRegenerateBlock}
                   interactive={viewerPermissions.canEdit}
-                  onNumericFactClick={canEditNumericFacts ? openNumericFactEditor : undefined}
                   titleHeading="p"
                 />
               </div>
@@ -703,7 +525,6 @@ export function PlaybookViewer({
                 actionMessage={actionMessage}
                 readyBlocks={readyBlocks}
                 totalBlocks={blocks.length}
-                numericSummary={numericSummary}
                 blocks={blocks}
                 contentLanguage={snapshot.contentLanguage}
                 canManageVisibility={viewerPermissions.canManageVisibility}
@@ -723,25 +544,11 @@ export function PlaybookViewer({
                 canRegenerateImage={viewerPermissions.canManageVisibility}
                 isRegeneratingImage={isRegeneratingImage}
                 onRegenerateImage={onRegenerateImage}
-                onNumericFactOpen={scrollToNumericFact}
               />
             ) : null}
           </section>
         </>
       )}
-      {canEditNumericFacts ? (
-        <NumericFactEditorSheet
-          selection={numericFactSelection}
-          replacement={numericReplacement}
-          scope={numericScope}
-          labels={labels}
-          isUpdating={isUpdatingNumericFact}
-          onReplacementChange={setNumericReplacement}
-          onScopeChange={setNumericScope}
-          onClose={closeNumericFactEditor}
-          onSave={saveNumericFact}
-        />
-      ) : null}
     </main>
   )
 }
@@ -906,7 +713,6 @@ function InspectorRail({
   actionMessage,
   readyBlocks,
   totalBlocks,
-  numericSummary,
   blocks,
   contentLanguage,
   canManageVisibility,
@@ -926,14 +732,12 @@ function InspectorRail({
   canRegenerateImage,
   isRegeneratingImage,
   onRegenerateImage,
-  onNumericFactOpen,
 }: {
   snapshot: CareerPlaybookViewerSnapshot
   labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
   actionMessage?: string | null
   readyBlocks: number
   totalBlocks: number
-  numericSummary: NumericFactSummary
   blocks: CareerPlaybookViewerBlock[]
   contentLanguage: string
   canManageVisibility: boolean
@@ -953,7 +757,6 @@ function InspectorRail({
   canRegenerateImage: boolean
   isRegeneratingImage: boolean
   onRegenerateImage?: () => void
-  onNumericFactOpen: (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => void
 }) {
   return (
     <aside
@@ -988,12 +791,6 @@ function InspectorRail({
           canCreateCourse={canCreateCourse}
           openCourseHref={openCourseHref}
           onDelete={onDelete}
-        />
-
-        <NumericFactsSummary
-          summary={numericSummary}
-          labels={labels}
-          onNumericFactOpen={onNumericFactOpen}
         />
 
         <QualityWarningsSummary
@@ -1317,289 +1114,6 @@ function groupQualityIssues(issues: CareerPlaybookQualityIssue[]): Array<{
   return Array.from(groups.values())
 }
 
-function NumericFactsSummary({
-  summary,
-  labels,
-  onNumericFactOpen,
-}: {
-  summary: NumericFactSummary
-  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
-  onNumericFactOpen: (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => void
-}) {
-  if (summary.total === 0) return null
-
-  const items = [
-    {
-      key: 'benchmark',
-      label: labels.numericFactBenchmark(summary.counts.benchmark),
-      count: summary.counts.benchmark,
-      className:
-        'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100',
-    },
-    {
-      key: 'needs_review',
-      label: labels.numericFactNeedsReview(summary.counts.needs_review),
-      count: summary.counts.needs_review,
-      className:
-        'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100',
-    },
-    {
-      key: 'suggested',
-      label: labels.numericFactSuggested(summary.counts.suggested),
-      count: summary.counts.suggested,
-      className:
-        'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-300/20 dark:bg-violet-300/10 dark:text-violet-100',
-    },
-    {
-      key: 'conflict',
-      label: labels.numericFactConflict(summary.counts.conflict),
-      count: summary.counts.conflict,
-      className:
-        'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-100',
-    },
-  ]
-
-  return (
-    <section
-      className="career-playbook-muted-card p-3"
-      data-testid="career-playbook-numeric-summary"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <Hash className="h-4 w-4 text-slate-500" aria-hidden />
-            {labels.numericFactsTitle}
-          </h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {labels.numericFactTotal(summary.total)}
-          </p>
-          <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
-            {labels.numericFactsDescription}
-          </p>
-        </div>
-        {summary.counts.needs_review + summary.counts.conflict > 0 ? (
-          <AlertTriangle
-            className="mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-200"
-            aria-hidden
-          />
-        ) : (
-          <CheckCircle2
-            className="mt-0.5 h-4 w-4 text-emerald-600 dark:text-emerald-200"
-            aria-hidden
-          />
-        )}
-      </div>
-      <div className="mt-3 grid gap-2">
-        {items
-          .filter((item) => item.count > 0)
-          .map((item) => (
-            <Badge
-              key={item.key}
-              variant="outline"
-              className={cn(
-                'justify-start rounded-md border px-2 py-1 font-medium',
-                item.className
-              )}
-            >
-              {item.label}
-            </Badge>
-          ))}
-      </div>
-      <div
-        className="mt-3 grid max-h-80 gap-2 overflow-y-auto pr-1"
-        data-testid="career-playbook-numeric-review-list"
-      >
-        {summary.items.map((item) => {
-          const blockTitle = labels.blockTitle(item.blockId, item.blockTitle)
-          return (
-            <button
-              key={item.fact.id}
-              type="button"
-              className={cn(
-                'grid gap-1 rounded-md border p-2 text-left text-xs transition-colors',
-                'hover:bg-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none dark:hover:bg-slate-950/60',
-                getNumericFactReviewClassName(item.fact.status)
-              )}
-              aria-label={labels.numericFactOpenAriaLabel(item.fact.raw_text, blockTitle)}
-              onClick={() => onNumericFactOpen(item.blockId, item.fact)}
-            >
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-slate-950 dark:text-slate-50">
-                  {item.fact.raw_text}
-                </span>
-                <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px]">
-                  {getNumericFactReviewStatusLabel(item.fact.status, labels)}
-                </Badge>
-              </span>
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                {blockTitle}
-              </span>
-              {item.fact.explanation ? (
-                <span className="leading-5 text-slate-600 dark:text-slate-300">
-                  {item.fact.explanation}
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
-      <p className="mt-3 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
-        {labels.numericFactActionHint}
-      </p>
-    </section>
-  )
-}
-
-function getNumericFactReviewStatusLabel(
-  status: CareerPlaybookNumericFact['status'],
-  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
-) {
-  switch (status) {
-    case 'benchmark':
-      return labels.numericFactStatusBenchmark
-    case 'suggested':
-      return labels.numericFactStatusSuggested
-    case 'conflict':
-      return labels.numericFactStatusConflict
-    case 'needs_review':
-    default:
-      return labels.numericFactStatusNeedsReview
-  }
-}
-
-function getNumericFactReviewClassName(status: CareerPlaybookNumericFact['status']) {
-  switch (status) {
-    case 'benchmark':
-      return 'border-sky-200 bg-sky-50/70 text-sky-950 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-50'
-    case 'suggested':
-      return 'border-violet-200 bg-violet-50/70 text-violet-950 dark:border-violet-300/20 dark:bg-violet-300/10 dark:text-violet-50'
-    case 'conflict':
-      return 'border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-50'
-    case 'needs_review':
-    default:
-      return 'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-50'
-  }
-}
-
-function NumericFactEditorSheet({
-  selection,
-  replacement,
-  scope,
-  labels,
-  isUpdating,
-  onReplacementChange,
-  onScopeChange,
-  onClose,
-  onSave,
-}: {
-  selection: NumericFactSelection | null
-  replacement: string
-  scope: NumericFactScope
-  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
-  isUpdating: boolean
-  onReplacementChange: (value: string) => void
-  onScopeChange: (scope: NumericFactScope) => void
-  onClose: () => void
-  onSave: () => Promise<void>
-}) {
-  const fact = selection?.fact ?? null
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    void onSave()
-  }
-
-  return (
-    <Sheet
-      open={Boolean(selection)}
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-    >
-      <SheetContent
-        side="right"
-        className="w-full max-w-md border-[#e5d5bf] bg-[#fffaf4] dark:border-slate-700 dark:bg-slate-950"
-      >
-        <form className="flex h-full flex-col gap-5" onSubmit={handleSubmit}>
-          <SheetHeader className="pr-8">
-            <SheetTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-sky-600 dark:text-sky-200" aria-hidden />
-              {labels.numericEditTitle}
-            </SheetTitle>
-            <SheetDescription>
-              {fact ? labels.numericEditDescription(fact.raw_text) : ''}
-            </SheetDescription>
-          </SheetHeader>
-
-          {fact ? (
-            <div className="grid gap-4">
-              <Badge
-                variant="outline"
-                className={cn(
-                  'w-fit rounded-md border px-2 py-1',
-                  getNumericFactSoftClassName(fact.status)
-                )}
-              >
-                {fact.explanation}
-              </Badge>
-
-              <div className="grid gap-2">
-                <Label htmlFor="career-playbook-numeric-replacement">
-                  {labels.numericReplacementLabel}
-                </Label>
-                <Input
-                  id="career-playbook-numeric-replacement"
-                  value={replacement}
-                  onChange={(event) => onReplacementChange(event.target.value)}
-                  autoFocus
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>{labels.numericScopeLabel}</Label>
-                <div
-                  className="grid grid-cols-2 gap-2"
-                  role="group"
-                  aria-label={labels.numericScopeLabel}
-                >
-                  {(['occurrence', 'block'] as NumericFactScope[]).map((option) => (
-                    <Button
-                      key={option}
-                      type="button"
-                      variant={scope === option ? 'default' : 'outline'}
-                      className={cn(
-                        'rounded-md',
-                        scope === option &&
-                          'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950'
-                      )}
-                      aria-pressed={scope === option}
-                      onClick={() => onScopeChange(option)}
-                    >
-                      {option === 'occurrence'
-                        ? labels.numericScopeOccurrence
-                        : labels.numericScopeBlock}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <SheetFooter className="mt-auto gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isUpdating}>
-              {labels.numericCancel}
-            </Button>
-            <Button type="submit" disabled={!replacement.trim() || isUpdating}>
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {labels.numericSave}
-            </Button>
-          </SheetFooter>
-        </form>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
 function VisibilitySection({
   labels,
   snapshot,
@@ -1671,7 +1185,6 @@ function DocumentPaper({
   onToggleBlock,
   onEditBlock,
   onRegenerateBlock,
-  onNumericFactClick,
   interactive = true,
   titleHeading = 'p',
   spacious = false,
@@ -1685,7 +1198,6 @@ function DocumentPaper({
   ) => void
   onEditBlock: (blockId: CareerPlaybookBlockId) => void
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
-  onNumericFactClick?: (blockId: CareerPlaybookBlockId, fact: CareerPlaybookNumericFact) => void
   interactive?: boolean
   titleHeading?: 'h1' | 'p'
   spacious?: boolean
@@ -1725,8 +1237,6 @@ function DocumentPaper({
           const content = getDisplayContent(block, title)
           const hasContent = content.trim().length > 0
           const BlockHeadingTag = titleHeading === 'h1' ? 'h2' : 'h3'
-          const displayableNumericFacts = getDisplayableNumericFacts(block.state.numeric_facts)
-
           return (
             <article
               key={block.blockId}
@@ -1814,16 +1324,6 @@ function DocumentPaper({
                       preset="preview"
                       features={{ mermaid: true }}
                       language={snapshot.contentLanguage}
-                      numericFacts={
-                        interactive && onNumericFactClick && displayableNumericFacts.length > 0
-                          ? displayableNumericFacts
-                          : undefined
-                      }
-                      onNumericFactClick={
-                        onNumericFactClick
-                          ? (fact) => onNumericFactClick(block.blockId, fact)
-                          : undefined
-                      }
                     />
                   ) : (
                     <p className="text-sm leading-6">{labels.waitingBlock}</p>
@@ -1898,40 +1398,6 @@ function groupBlocks(blocks: CareerPlaybookViewerBlock[]) {
   return Array.from(groups.values())
 }
 
-function summarizeNumericFacts(blocks: CareerPlaybookViewerBlock[]): NumericFactSummary {
-  const counts = Object.fromEntries(NUMERIC_FACT_STATUSES.map((status) => [status, 0])) as Record<
-    CareerPlaybookNumericFact['status'],
-    number
-  >
-
-  let total = 0
-  const items: NumericFactSummaryItem[] = []
-  for (const block of blocks) {
-    for (const fact of block.state.numeric_facts ?? []) {
-      if (!isDisplayableNumericFact(fact)) continue
-      counts[fact.status] += 1
-      total += 1
-      items.push({
-        blockId: block.blockId,
-        blockTitle: block.title,
-        fact,
-      })
-    }
-  }
-
-  return { total, counts, items }
-}
-
-function getDisplayableNumericFacts(
-  numericFacts?: CareerPlaybookNumericFact[]
-): CareerPlaybookNumericFact[] {
-  return numericFacts?.filter(isDisplayableNumericFact) ?? []
-}
-
-function isDisplayableNumericFact(fact: CareerPlaybookNumericFact): boolean {
-  return NUMERIC_REVIEW_STATUSES.has(fact.status)
-}
-
 function readInitialPanelState(key: 'toc' | 'panel'): PanelState {
   if (typeof window === 'undefined') return 'open'
   return new URLSearchParams(window.location.search).get(key) === 'closed' ? 'closed' : 'open'
@@ -1991,32 +1457,4 @@ function getDisplayContent(block: CareerPlaybookViewerBlock, title: string) {
 
 function normalizeHeading(value: string) {
   return value.replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
-}
-
-function formatRussianNumericFactCount(count: number) {
-  const mod10 = count % 10
-  const mod100 = count % 100
-  if (mod10 === 1 && mod100 !== 11) return `${count} числовое значение`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} числовых значения`
-  }
-  return `${count} числовых значений`
-}
-
-function getNumericFactSoftClassName(status: CareerPlaybookNumericFact['status']) {
-  switch (status) {
-    case 'verified':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100'
-    case 'benchmark':
-      return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100'
-    case 'suggested':
-      return 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-300/20 dark:bg-violet-300/10 dark:text-violet-100'
-    case 'structural':
-      return 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-    case 'conflict':
-      return 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-100'
-    case 'needs_review':
-    default:
-      return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100'
-  }
 }

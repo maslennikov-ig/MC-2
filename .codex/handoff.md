@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-21 (W7a inc1-4 delivered; SINGLE SOURCE OF TRUTH consolidated onto `develop`)
+Updated: 2026-07-27 (workspace consolidated onto `develop`; SINGLE SOURCE OF TRUTH unchanged)
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -8,10 +8,10 @@ Updated: 2026-07-21 (W7a inc1-4 delivered; SINGLE SOURCE OF TRUTH consolidated o
   proved it is the superset of every Q12 line (`codex/self-hosted-qdrant-platform`,
   `codex/q12-plan-builder`, `codex/q12-w-writer-barrier`, the W7a increments and the
   orchestration-infra commits are all in it). Keep those branches for history only.
-- **`codex/self-hosted-qdrant-platform-plan` is STALE** (~850 commits behind, has no
-  `q12-lifecycle-core.py`) — never a base or target. Session metadata sometimes mislabels the
-  working branch as that one; ignore it. Q12 window work happens on `codex/q12-window-live`,
-  delivered into `develop` via `/push-dev`.
+- **`codex/self-hosted-qdrant-platform-plan` is RETIRED** (2026-07-27): its only undelivered
+  commit — `feat(career-playbook): remove numeric review mode` (`mc2-jc275`) — was cherry-picked
+  onto `develop` as `959ce44de`; the primary worktree now sits on `develop`. Q12 window work
+  happens on `codex/q12-window-live`, delivered into `develop` via `/push-dev`.
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
 

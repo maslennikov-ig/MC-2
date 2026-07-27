@@ -14,7 +14,6 @@ import type {
   CareerPlaybookGraphNode,
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
-import { annotateCareerPlaybookBlocksNumericFacts } from '../numeric-facts';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
 
 export interface CareerPlaybookBlockSpec {
@@ -451,9 +450,7 @@ function splitCareerPlaybookGroupMarkdownWithFallback(
 function toGeneratedBlocks(
   blockContent: Record<CareerPlaybookBlockId, string>,
   model: string,
-  generatedAt: string,
-  evidenceText: string,
-  language: string
+  generatedAt: string
 ): Record<CareerPlaybookBlockId, CareerPlaybookBlockState> {
   const entries = Object.entries(blockContent).map(([blockId, content]) => [
     blockId,
@@ -467,20 +464,7 @@ function toGeneratedBlocks(
     },
   ]);
 
-  return annotateCareerPlaybookBlocksNumericFacts({
-    blocks: Object.fromEntries(entries) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>,
-    evidenceText,
-    language,
-  }) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
-}
-
-function buildNumericEvidenceText(input: GenerateCareerPlaybookGroupInput): string {
-  return JSON.stringify({
-    qaData: input.qaData ?? null,
-    roleProfileSpec: input.roleProfileSpec,
-    businessContext: input.roleProfileSpec.business_context ?? null,
-    research: input.roleProfileSpec.research ?? input.webResearch ?? null,
-  });
+  return Object.fromEntries(entries) as Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
 }
 
 export async function generateCareerPlaybookGroup(
@@ -506,13 +490,7 @@ export async function generateCareerPlaybookGroup(
     groupSpec,
     input
   );
-  const blocks = toGeneratedBlocks(
-    blockContent,
-    llmResult.model,
-    generatedAt,
-    buildNumericEvidenceText(input),
-    input.language
-  );
+  const blocks = toGeneratedBlocks(blockContent, llmResult.model, generatedAt);
 
   return {
     group: {

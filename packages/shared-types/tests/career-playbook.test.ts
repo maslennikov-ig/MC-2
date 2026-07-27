@@ -407,6 +407,30 @@ describe('Career Playbook shared schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts legacy numeric metadata but removes it from normalized block state', () => {
+    const result = CareerPlaybookBlockStateSchema.parse({
+      content: '## 6. KPI\n\nWin rate: 18%.',
+      status: 'generated',
+      attempt: 1,
+      numeric_facts: [
+        {
+          id: 'block_6-18-percent-0',
+          block_id: 'block_6',
+          raw_text: '18%',
+          normalized_value: '18%',
+          status: 'needs_review',
+          source: 'model_suggestion',
+          confidence: 0.45,
+          occurrence_index: 0,
+          explanation: 'Legacy numeric review metadata.',
+        },
+      ],
+    });
+
+    expect(result).not.toHaveProperty('numeric_facts');
+    expect(result.content).toContain('18%');
+  });
+
   it('stores generation progress metadata inside QA data', () => {
     const progress = CareerPlaybookGenerationProgressSchema.parse({
       stage: 'generating_foundation',
