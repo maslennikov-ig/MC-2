@@ -156,3 +156,79 @@ describe.runIf(RUN_REAL_CONTROLLER)(
     });
   }
 );
+
+// mc2-fjcj2 — R8-B-2, the half R8-B-1 deliberately deferred and nobody tracked: the frozen
+// `q12-database-barrier.sh cleanup` child was never invoked by ANY production code path.
+// orchestrate_post_activate_cleanup calls executor.execute_barrier_cleanup, production resolves
+// that to ProductionExecutor's FILE-ARTIFACT seam, and that seam opens by READING the 18-key
+// terminal proof only the child produces — so a real window failed closed on a missing proof AFTER
+// activate, i.e. past the point of no return with the writers still stopped. The fixtures ran the
+// child themselves (q12-retained-barrier-runner.py RealBarrierCleanupChild and the real-PG17
+// full-window runner), which is why every suite stayed green: the same fixture-stands-in-for-
+// production shape as mc2-orsez.
+//
+// The owner-custody executor now owns the child, and the ORDER is part of the contract: the frozen
+// child refuses unless database-barrier-receipt-v1-before-cleanup.json already exists byte-exact
+// (q12-database-barrier.sh:640-645), which the inherited file-artifact seam only published AFTER the
+// child. So the archive must be published BEFORE the launch.
+describe.runIf(RUN_REAL_CONTROLLER)(
+  'Q12 R8-B-2: the owner-custody executor runs the frozen barrier cleanup child',
+  () => {
+    it('is owned by production code, not by a fixture', () => {
+      const out = drive('--owner-custody-ownership', root());
+      expect(out.owner_custody_defines_execute_barrier_cleanup).toBe(true);
+      expect(out.owner_custody_defines_child_invoker).toBe(true);
+      // The inherited file-artifact seam stays where it is; R8-B-2 wraps it, never replaces it.
+      expect(out.production_defines_execute_barrier_cleanup).toBe(true);
+    });
+
+    it('publishes the v1 archive BEFORE launching the child, then promotes the exact v2', () => {
+      const out = drive('--owner-custody-cleanup', root());
+
+      // (a) the frozen child's predecessor-archive gate is satisfied at launch time, byte-exact.
+      expect(out.archive_existed_at_child_launch).toBe(true);
+      expect(out.archive_matched_v1_at_child_launch).toBe(true);
+      expect(out.archive_mode_at_child_launch).toBe(0o400);
+      // (b) the child was launched with the frozen argv prepare_barrier_cleanup resolved, verbatim.
+      expect(out.child_argv).toEqual((out.command as Record<string, unknown>).argv);
+      // (c) and only after it returned did the inherited seam promote the exact 10-key v2 and
+      //     delete the db-capability.
+      expect(out.terminal_proof_existed_at_child_launch).toBe(false);
+      expect(out.v2_matches_expected).toBe(true);
+      expect(out.capability_exists).toBe(false);
+    });
+
+    // This drives the REAL invoke_barrier_cleanup_child: a real subprocess, the real returncode
+    // handling, the real scrub and the real env. Faking the raise here would make the scrub
+    // assertion vacuous — a mutation dropping the redactor passed until this was tightened.
+    it('fails closed with the child own scrubbed words and mutates nothing', () => {
+      const out = drive('--owner-custody-child-fails', root());
+
+      expect(out.child_ran).toBe(true);
+      expect(out.error_type).toBe('LifecycleError');
+      expect(out.error).toMatch(/barrier cleanup child failed with status 3/u);
+      // The child's own reason must survive — a blind refusal after activate is the worst case.
+      expect(out.error).toMatch(/refused for a named reason/u);
+      // ...but its secrets must not: a 64-hex run of secret shape and a DSN password are redacted.
+      expect(out.error).toContain('***');
+      expect(out.error).not.toContain('b'.repeat(64));
+      expect(out.error).not.toContain('hunter2');
+      // Nothing was promoted: the receipt is still the activate v1 and the capability still exists.
+      expect(out.receipt_still_v1).toBe(true);
+      expect(out.capability_exists).toBe(true);
+    });
+
+    // barrier.cleanup is not a manifest command, so this executor chooses the child's env. The
+    // manifest's frozen HOME=/root is unusable for a uid-1000 child (mc2-wwc9l), and the barrier
+    // refuses outright if any MC2_Q12_* test override leaks in (q12-database-barrier.sh:115-117).
+    it('gives the child a usable HOME and no test overrides', () => {
+      const out = drive('--owner-custody-child-fails', root());
+
+      expect(out.child_ran).toBe(true);
+      expect(out.child_home).toBe(out.expected_home);
+      expect(out.child_home).not.toBe('/root');
+      expect(out.child_env_has_test_overrides).toBe(false);
+      expect(out.child_env_keys).toEqual(['HOME', 'LANG', 'LC_ALL', 'PATH']);
+    });
+  }
+);
