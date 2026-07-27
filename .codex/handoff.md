@@ -54,35 +54,36 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: redeploy the barrier (0444 dance), stage a fresh run root, run one production
-`plan`, then reopen `live --stop-after deploy.prepare` and report before C9, which stays owner-held.
-The window was opened FIVE times on 2026-07-27; every attempt failed closed with ZERO mutation and
-each surfaced one real defect. All seven are now fixed. The fifth attempt reached the DB step and died
-on `mc2-7ohdj`: the barrier paused cron with a direct `UPDATE cron.job`, impossible on the managed
-source where `postgres` holds only SELECT and cannot grant itself the write. Both paths now use
-`cron.alter_job` (measured on production). Barrier sha `bdb9d935…` -> `f183aa3c…`, W-tuple fields
-4/5/6 amended per the 2026-07-18 precedent and re-measured; the frozen-byte CI guard caught the drift
-as designed.
+Recommended action: ANSWER `mc2-8zxlc` — it needs an action outside this repo. The window was opened
+SIX times on 2026-07-27; every attempt failed closed with ZERO mutation and each surfaced a real
+defect. The sixth named the true first wall through the barrier's new diagnostics: the guard takes
+ACCESS EXCLUSIVE on every guarded relation (`:892`/`:1550`/`:1567`/`:1587`/`:1664`/`:1702`, targets
+from `.guarded_relations` at `:812-822`) and `cron.job` is in that frozen set. MEASURED both ways on
+production: ACCESS EXCLUSIVE raises 42501, ACCESS SHARE succeeds — PostgreSQL needs
+UPDATE/DELETE/TRUNCATE for any stronger mode and `postgres` holds only SELECT (owner
+`supabase_admin`, ACL `postgres=r*`, not superuser, not a member of `supabase_admin`). Unlike the
+cron pause there is NO API alternative: locking is a table-privilege operation. (A) ask Supabase for
+`GRANT UPDATE ON cron.job TO postgres` — one grant, no code change; or (B) drop `cron.job` from
+`guarded_relations`, changing the FROZEN catalog and weakening the very guarantee the window exists
+for. (A) recommended.
 
-THE PATTERN, now closed: every one of these was invisible locally because the checked environment
-substituted for production — a fixture published the step, an isolate had superuser rights, or the
-real error was swallowed. The disposable container had no pg_cron at all and modelled `cron.job` as a
-plain superuser-owned table, so a write production forbids passed forever. It now reproduces the
-managed ACL and the sanctioned API, so with the OLD barrier the real-PG17 install fails with exactly
-the production message. Keep that discipline: model the constraint, never the convenience.
+CORRECTION: `mc2-7ohdj` was closed on an incomplete root cause — the `cron.alter_job` move is correct
+and necessary, but did not unblock C1 and was closed before the window proved it.
 
-Blockers fixed and deployed (controller `8ba9db34`, backup script `6680aa4f`, barrier `f183aa3c`, Q12
-tree byte-equal to `develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root` killed
-`docker compose` for uid-1000 children), `mc2-94mmf` (a failing child's stderr was dropped),
-`mc2-orsez` (the controller never published the barrier's input checkpoint), `mc2-fjcj2` (no
-production path invoked the frozen `barrier.cleanup` child, so C9/C10 could not complete),
-`mc2-1pwkl` (colour env files lacked two compose-required vars), `mc2-h5l7m` (two frozen commands
-demanded contradictory DSN shapes; the backup script yielded, the DSN file is now bare), `mc2-7ohdj`
-(managed pg_cron) and `mc2-vcmd7` (the barrier now reports its own scrubbed reason). Two traps:
-`mc2-y5tgw` — any dev deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and
-observability images C1/C7 need, and no pre-flight checks image presence. And always run the controller
-DETACHED (`setsid nohup`) — a plan attempt was killed by a dropped ssh (exit 255), which after C2 would
-leave the writers stopped.
+THE PATTERN behind all of them: the checked environment substituted for production — a fixture
+published the step, an isolate had superuser rights, or the real error was swallowed. The container
+had no pg_cron and modelled `cron.job` as a superuser-owned table, so writes production forbids passed
+forever; it now reproduces the managed ACL and the sanctioned API. Extend that model to the LOCK
+privilege next so `mc2-8zxlc`'s class fails in CI. Model the constraint, never the convenience.
+
+Fixed and deployed (controller `8ba9db34`, backup `6680aa4f`, barrier `f183aa3c`, Q12 tree byte-equal
+to `develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root`), `mc2-94mmf` + `mc2-vcmd7`
+(swallowed child errors, both layers), `mc2-orsez` (unpublished barrier input checkpoint),
+`mc2-fjcj2` (no production path ran the frozen cleanup child), `mc2-1pwkl` (colour env vars),
+`mc2-h5l7m` (contradictory DSN shapes) and `mc2-7ohdj` (managed pg_cron pause). Two traps: `mc2-y5tgw` (a dev deploy's `docker image prune -f` deletes the digest-pinned
+`qdrant-operator` and observability images C1/C7 need; no pre-flight checks presence), and always run
+the controller DETACHED (`setsid nohup`) — a dropped ssh killed one plan (exit 255), which after C2
+would strand stopped writers.
 
 EVERY blocker so far was invisible locally for the SAME reason: a fixture, an isolate or a swallowed
 error stood in for production. The suites no longer do so — they delegate to production and override
@@ -100,15 +101,14 @@ newer than `23dfe973f` ride the next ordinary deploy — itself broken (`mc2-o0g
 are hand-maintained (`mc2-c2p8z`).
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
-(= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce
-digests on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN
-`expected-post-migration-catalog.json` FILE (the barrier compares it to that file, :302) — take it from
-the fresh `plan`, NOT a previous run: it embeds `release_sha` (hence `8ca17c43…` -> `aa96c170…`, stable
-across three plans). Each attempt burns its run-id, so every retry needs a fresh run root
-(`mkdir -m 0700`, copy `accepted-coverage-run` and `secrets/db-capability`) plus one production `plan`.
-`--stop-after deploy.prepare` is the sole resumable pre-C9 head. Do not change `aaec6fc2…`.
-
-Historical progress logs: `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
+(= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests
+on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN catalog FILE (barrier
+`:302`) — take it from the fresh `plan`, not a previous run: it embeds `release_sha` (hence
+`8ca17c43…` -> `aa96c170…`, stable across four plans). Each attempt burns its run-id, so every retry
+needs a fresh run root (`mkdir -m 0700`, copy `accepted-coverage-run` + `secrets/db-capability`) plus
+one `plan`. `--stop-after deploy.prepare` is the sole resumable pre-C9 head. Do not change
+`aaec6fc2…`. The barrier is invoked as argv[0]: keep it mode 0555, not 0444. Historical progress
+logs: `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
 
 ## Starter prompt for next orchestrator
 
@@ -179,14 +179,14 @@ owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
     `<accepted-coverage-run>` slot carries `catalog:<recovery-run-id>`.
   - EXECUTION IDENTITY (`mc2-1by33`): controller and writer operations run as uid 1000 (root cannot
     complete C2); only `source.forward` needs root, through the root-owned argv-whitelist launcher
-    `deploy/qdrant/q12-privileged-launch.sh` (0555 root:root) via the account's existing sudo. The
-    controller preflights the launcher + `sudo -n` before any journal row and publishes
-    `writer-recovery-state`, which C9 hard-requires. Residual `mc2-9vbzp`. A full `live` rehearsal
-    outside the window is impossible — the frozen commands are production.
+    `deploy/qdrant/q12-privileged-launch.sh` (0555 root:root) via the account's existing sudo. It
+    preflights the launcher + `sudo -n` before any journal row and publishes `writer-recovery-
+state`, which C9 requires. Residual `mc2-9vbzp`; no full `live` rehearsal is possible outside
+    the window.
   - `mc2-i9h3y` stays owner-gated: C2 quiesces production writers (schedule the slot with the owner)
     and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan plus
     accepted C1..C8 at that moment.
-  - Post-window defers: `mc2-8m90f` (re-verify the accepted coverage ledgers read-only), `mc2-n6szm`.
+  - Post-window defers: `mc2-8m90f`, `mc2-n6szm`.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
