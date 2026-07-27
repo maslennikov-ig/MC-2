@@ -59,20 +59,20 @@ staging) → `mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`,
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: `mc2-i9h3y` is BLOCKED after the 2026-07-27 owner-authorized pre-flight,
-which STOPPED BEFORE C1 with nothing mutated (no writer quiesced, no journal row). Every other
-precondition is green (five deployed files byte-match develop HEAD; real `sudo` → launcher →
-wrapper refused fail-closed) — evidence on the bead. Two release-pin blockers are OWNER-held:
-`mc2-2v5cq` — `.env.production` pins operator digest `b5eb528e…` while the recorded argv
-declares `cb98e579…`, the operator image is absent from the host, and GHCR returns 403 so it
-can be neither verified nor pulled; `mc2-sdbua` — the run-root catalog authority carries
-`release_sha 060b4faea…` while the argv declares `23dfe973f…` (a 2026-07-27 plan into an
-isolated `/tmp` root reproduced the `23dfe973f` catalog `c3715ac2…` byte-identically, and the
-whole delta is that one field: `68041d94…`/`edbea709…` match, so the DATABASE HAS NOT DRIFTED).
-Both reduce to ONE owner decision — which release is under cutover — then re-emit the authority
-via a production `plan`, and only then C1..C7 with `--stop-after deploy.prepare` (the sole
-resumable pre-C9 head), C9 owner-pressed — `recover` has no `--stop-after` and drives C8..C10
-to convergence. Do not change the frozen manifest `aaec6fc2…`.
+Recommended action: the window WAS opened 2026-07-27 12:36 CEST under owner authority and died
+in `preflight` on `operator.self-check` (exit 125) with ZERO mutation — no writer quiesced. Blocker
+`mc2-wwc9l`: every frozen env carries `HOME=/root`, but the children now run as uid 1000, so the
+docker CLI cannot read `/root/.docker/config.json` and LOSES its compose plugin. 7 of 20 commands
+are hit: `operator.self-check`, all four `reindex.*` (whole C6), `deploy.prepare` and `.commit`.
+Fix at the WRAPPER seam only (manifest frozen, env equality enforced): conditional HOME
+normalization in `operator-compose.sh` + `scripts/deploy_blue_green.sh` keeping the root path
+(`source.forward`) byte-identical, then redeploy both and re-run `live`. ARGV IS NOW SETTLED
+(`mc2-2v5cq`/`mc2-sdbua` closed on evidence): `--release-sha 060b4faea…`, `--operator-digest
+b5eb528e…` (image label revision = that commit), `--expected-catalog-sha256 744076f6…` from a
+fresh green production `plan` whose immutable guard proved the authority unchanged; the DB has
+not drifted; all 8 window images are local (`claude-deploy`'s GHCR token is dead — `mc2-2vtmk`).
+`--stop-after deploy.prepare` is the sole resumable pre-C9 head; `recover` has no `--stop-after`
+and drives C8..C10. Do not change `aaec6fc2…`.
 
 Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
 log"; this file is current-state only (200-line contract).
