@@ -217,6 +217,191 @@ def run_resume_failclosed(run_root_raw: str, controller: str) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------------------------- #
+# mc2-fjcj2 (R8-B-2): the owner-custody executor must RUN the frozen cleanup child, and must publish
+# the v1 archive BEFORE it (q12-database-barrier.sh:640-645 refuses without a byte-exact archive).
+# The literal process spawn is the one thing a unit driver cannot do against production PostgreSQL,
+# so these modes override ONLY that seam — the same narrow, test-harness-only substitution the
+# forward legs already use for the barrier's own argv. Everything else is the real production code:
+# the argv resolution, the archive ordering, the failure diagnostics, and the artifact consumption.
+# The real spawn against a live PG17 is proved by the MC2_Q12_REAL_PG17 full-window suite, which
+# delegates to this same production implementation.
+# ---------------------------------------------------------------------------------------------- #
+def _seed_cleanup_predecessors(run_root: pathlib.Path) -> dict[str, Any]:
+    run_id = FIXTURE.derive_run_id(run_root)
+    expected_catalog_sha256 = CORE.sha256(
+        f"q12:r8b2:expected-catalog:{run_id}".encode("utf-8")
+    )
+    v1_receipt = {
+        "schema_version": "megacampus.q12.database-barrier-receipt/v1",
+        "run_id": run_id,
+        "state": "activated",
+        "zero_guard_residue": False,
+        "expected_catalog_sha256": expected_catalog_sha256,
+        "last_command": "activate",
+        "rollback_probes_verified": True,
+        "probe_receipt_sha256": "a" * 64,
+    }
+    v1_body = CORE.complete_object(v1_receipt)
+    _seed(run_root / "database-barrier-receipt.json", v1_body)
+    probe_body = CORE.complete_object(
+        FIXTURE._barrier_probe_object(run_id, expected_catalog_sha256)
+    )
+    probe_sha256 = _seed(run_root / "database-barrier-probe-receipt.json", probe_body)
+    _seed(run_root / "secrets" / "db-capability", b"q12-capability-synthetic-sentinel\n")
+    return {
+        "run_id": run_id,
+        "expected_catalog_sha256": expected_catalog_sha256,
+        "v1_body": v1_body,
+        "probe_sha256": probe_sha256,
+        "context": {
+            "run_root": str(run_root),
+            "run_id": run_id,
+            "expected_catalog_sha256": expected_catalog_sha256,
+        },
+    }
+
+
+class _CapturingOwnerCustody(CORE.OwnerCustodyExecutor):
+    """Records what production had already done when the child was launched, then stands in for the
+    child by publishing exactly the artifact the frozen child publishes (the 18-key terminal proof).
+    Never reimplements a production step: the archive, argv and promotion all come from the real
+    class under test."""
+
+    def __init__(self, seeded: dict[str, Any], child_exit: int = 0) -> None:
+        super().__init__()
+        self._seeded = seeded
+        self._child_exit = child_exit
+        self.observed: dict[str, Any] = {}
+
+    def invoke_barrier_cleanup_child(self, argv: list[str]) -> None:
+        run_root = pathlib.Path(self._seeded["context"]["run_root"])
+        archive = run_root / "database-barrier-receipt-v1-before-cleanup.json"
+        proof = run_root / "database-barrier-cleanup-terminal-proof.json"
+        self.observed = {
+            "child_argv": list(argv),
+            "archive_existed_at_child_launch": archive.exists(),
+            "archive_matched_v1_at_child_launch": archive.exists()
+            and archive.read_bytes() == self._seeded["v1_body"],
+            "archive_mode_at_child_launch": (
+                archive.stat().st_mode & 0o777 if archive.exists() else None
+            ),
+            "terminal_proof_existed_at_child_launch": proof.exists(),
+        }
+        if self._child_exit != 0:
+            raise CORE.LifecycleError(
+                CORE._scrub_plan_secret_text(
+                    f"barrier cleanup child failed with status {self._child_exit}: "
+                    "q12 database barrier: refused for a named reason "
+                    f"(dsn postgresql://q12:hunter2@pooler:5432/postgres, token {'b' * 64})"
+                )
+            )
+        _seed(
+            proof,
+            _terminal_proof(self._seeded["run_id"], self._seeded["expected_catalog_sha256"]),
+        )
+
+
+def run_owner_custody_ownership(run_root_raw: str) -> int:
+    report = {
+        "owner_custody_defines_execute_barrier_cleanup": "execute_barrier_cleanup"
+        in vars(CORE.OwnerCustodyExecutor),
+        "owner_custody_defines_child_invoker": "invoke_barrier_cleanup_child"
+        in vars(CORE.OwnerCustodyExecutor),
+        "production_defines_execute_barrier_cleanup": "execute_barrier_cleanup"
+        in vars(CORE.ProductionExecutor),
+    }
+    sys.stdout.write(json.dumps(report, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
+def run_owner_custody_cleanup(run_root_raw: str) -> int:
+    run_root = pathlib.Path(run_root_raw)
+    seeded = _seed_cleanup_predecessors(run_root)
+    executor = _CapturingOwnerCustody(seeded)
+    command = executor.prepare_barrier_cleanup(seeded["context"])
+    outcome = executor.execute_barrier_cleanup(seeded["context"], command)
+
+    expected_v2 = {
+        "schema_version": "megacampus.q12.database-barrier-receipt/v2",
+        "run_id": seeded["run_id"],
+        "state": "guard_cleanup_complete",
+        "expected_catalog_sha256": seeded["expected_catalog_sha256"],
+        "zero_guard_residue": True,
+        "last_command": "cleanup",
+        "rollback_probes_verified": True,
+        "probe_receipt_sha256": seeded["probe_sha256"],
+        "terminal_proof_sha256": outcome["terminal_proof_sha256"],
+        "database_capability_deleted": True,
+    }
+    receipt_path = run_root / "database-barrier-receipt.json"
+    capability_path = run_root / "secrets" / "db-capability"
+    report = {
+        **executor.observed,
+        "command": command,
+        "outcome": outcome,
+        "v2_matches_expected": receipt_path.read_bytes() == CORE.complete_object(expected_v2),
+        "capability_exists": capability_path.exists() or capability_path.is_symlink(),
+    }
+    sys.stdout.write(json.dumps(report, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
+def run_owner_custody_child_fails(run_root_raw: str) -> int:
+    """Drive the REAL ``invoke_barrier_cleanup_child`` — a real subprocess, the real returncode
+    handling, the real secret scrub and the real env — by pointing the frozen argv at a stub that
+    fails the way the frozen child fails. Nothing about the failure path is faked, which is what
+    makes the scrub assertion meaningful."""
+    run_root = pathlib.Path(run_root_raw)
+    seeded = _seed_cleanup_predecessors(run_root)
+    stub = run_root / "failing-cleanup-child.py"
+    environment_dump = run_root / "child-environment.json"
+    stub.write_text(
+        "#!/usr/bin/python3\n"
+        "import json, os, sys\n"
+        f"json.dump(dict(os.environ), open({str(environment_dump)!r}, 'w'))\n"
+        "sys.stderr.write(\n"
+        "    'q12 database barrier: refused for a named reason '\n"
+        "    '(dsn postgresql://q12:hunter2@pooler:5432/postgres, token ' + 'b' * 64 + ')\\n'\n"
+        ")\n"
+        "raise SystemExit(3)\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+
+    executor = CORE.OwnerCustodyExecutor()
+    command = {"argv": [str(stub)], "command_sha256": CORE.sha256(CORE.canonical([str(stub)]))}
+    error = ""
+    error_type = ""
+    try:
+        executor.execute_barrier_cleanup(seeded["context"], command)
+    except CORE.LifecycleError as raised:
+        error, error_type = str(raised), "LifecycleError"
+    except Exception as raised:  # noqa: BLE001 — an unnamed failure is itself the defect
+        error, error_type = str(raised), type(raised).__name__
+
+    child_environment: dict[str, str] = {}
+    if environment_dump.exists():
+        child_environment = json.loads(environment_dump.read_text(encoding="utf-8"))
+    receipt_path = run_root / "database-barrier-receipt.json"
+    capability_path = run_root / "secrets" / "db-capability"
+    report = {
+        "error": error,
+        "error_type": error_type,
+        "receipt_still_v1": receipt_path.read_bytes() == seeded["v1_body"],
+        "capability_exists": capability_path.exists() or capability_path.is_symlink(),
+        "child_ran": bool(child_environment),
+        "child_env_keys": sorted(child_environment),
+        "child_home": child_environment.get("HOME"),
+        "expected_home": os.path.expanduser("~"),
+        "child_env_has_test_overrides": any(
+            key.startswith("MC2_Q12_") for key in child_environment
+        ),
+    }
+    sys.stdout.write(json.dumps(report, separators=(",", ":"), sort_keys=True) + "\n")
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) < 3:
         raise SystemExit("usage: runner <mode> <run-root> [controller]")
@@ -227,6 +412,12 @@ def main() -> int:
     if mode == "--resume-failclosed":
         controller = sys.argv[3] if len(sys.argv) > 3 else "run_live"
         return run_resume_failclosed(run_root, controller)
+    if mode == "--owner-custody-ownership":
+        return run_owner_custody_ownership(run_root)
+    if mode == "--owner-custody-cleanup":
+        return run_owner_custody_cleanup(run_root)
+    if mode == "--owner-custody-child-fails":
+        return run_owner_custody_child_fails(run_root)
     raise SystemExit(f"unknown mode: {mode}")
 
 

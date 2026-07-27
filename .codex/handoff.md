@@ -45,58 +45,63 @@ Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expans
 
 Accepted-and-integrated history for Q1-Q12 (including every `.13.*` sub-stream,
 its review verdicts and evidence hashes) moved on 2026-07-25 to
-`.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history (moved from
-handoff 2026-07-25)". Current open work: `mc2-v7547` (owner decision on the release
-identity) and `mc2-fjcj2` (production never runs the cleanup child) both block
-`mc2-i9h3y` (owner-present window), with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`,
-`mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz` and `mc2-n6szm` as tracked residuals; see
-§ "Explicit defers".
+`.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open
+work is `mc2-i9h3y` (owner-present window; its five 2026-07-27 blockers are all closed),
+with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`,
+`mc2-o0g75`, `mc2-c2p8z` and `mc2-n6szm` as tracked residuals; see § "Explicit defers".
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: ANSWER `mc2-v7547` (owner decision) before any further window attempt. The window
-was opened THREE times on 2026-07-27 under owner authority; each attempt failed CLOSED with zero
-mutation (no writer quiesced, no barrier receipt, zero `%q12%` objects in the DB, lock free), and each
-surfaced one real defect. Fixed and redeployed: `mc2-wwc9l` (frozen `HOME=/root` vs uid-1000 children
-killed `docker compose`; conditional normalization in `operator-compose.sh` +
-`scripts/deploy_blue_green.sh`), `mc2-94mmf` (a failing frozen child's stderr was dropped, so refusals
-were blind; the controller carries a scrubbed tail) and `mc2-orsez` (the controller never published
-`<run-root>/database-barrier-input-checkpoint-<op>-<epoch>.json` 0600, which the frozen barrier reads
-before it will do anything, so C1 was impassable; now published from `run_claim` for install and from
-`orchestrate_post_activate_cleanup` for cleanup — the C10 resume gate re-reads the cleanup copy).
-Deployed controller sha `5e17c393`, whole Q12 tree byte-equal to `develop`, `aaec6fc2…` unchanged.
-All five `MC2_Q12_REAL_PG17` barrier suites are green against a disposable `postgres:17.10` with the
-frozen children reading the CONTROLLER's copies (the fixtures no longer publish them).
+Recommended action: the window is UNBLOCKED — reopen it to `--stop-after deploy.prepare` and report
+before C9, which stays owner-held. It was opened three times on 2026-07-27 under owner authority; each
+attempt failed CLOSED with zero mutation (no writer quiesced, no barrier receipt, zero `%q12%` objects
+in the DB, lock free) and each surfaced one real defect. All five now fixed:
 
-TWO OPEN BLOCKERS. `mc2-v7547` (P0, owner authority needed): `--release-sha` and `--operator-digest`
-are DIFFERENT artifacts and were conflated. `060b4faea` touched only `deploy/qdrant` + `scripts`, so CI
-built ONLY its `qdrant-operator` image — that is `b5eb528e`, which `--operator-digest` must keep
-because it must equal `.env.production`'s pin. `--release-sha` must instead name the APP release
-`.env.green` pins; today `.env.blue` and `.env.green` both pin `4128a938` (2026-07-04) and nothing
-cross-checks it, so `060b4faea` would have recorded a false identity and activated a green slot
-identical to blue. Owner chose to ship develop's app code. Newest built app images are `23dfe973f`
-(2026-07-25; nothing newer exists because CI was red 07-26..07-27, `mc2-f2il0`, now fixed and green);
-`web:develop` on the host is still `50f670b9`, so a PULL is unavoidable and the dead GHCR credential
-`mc2-2vtmk` is a hard C7 blocker. Recommended minimal truthful path: fix the credential, pull api+web
-`23dfe973f`, re-pin `.env.green`, run with `--release-sha 23dfe973f18cc…`; the 17 career-playbook app
-files newer than that ride the next ordinary deploy. Exact-HEAD instead needs a build first, and there
-is NO build-only trigger: `workflow_dispatch force_deploy=true` also enables "Deploy to Production"
-(`master || inputs.force_deploy`) and would push develop straight to prod, bypassing the window.
-`mc2-fjcj2` (P0): production never invokes the frozen `barrier.cleanup` child at all
-(`ProductionExecutor.execute_barrier_cleanup` only consumes artifacts; the documented "downstream
-R8-B-2" was untracked), so C9/C10 cannot complete — past the owner gate, not a C1..C7 blocker.
+- `mc2-wwc9l` — frozen `HOME=/root` vs uid-1000 children killed `docker compose`; conditional
+  normalization in `operator-compose.sh` + `scripts/deploy_blue_green.sh`.
+- `mc2-94mmf` — a failing frozen child's stderr was dropped, so refusals were blind; the controller
+  carries a scrubbed, bounded tail.
+- `mc2-orsez` — the controller never published `database-barrier-input-checkpoint-<op>-<epoch>.json`
+  0600, which the frozen barrier reads before it will do anything, so C1 was impassable. Now published
+  from `run_claim` for install and from `orchestrate_post_activate_cleanup` for cleanup (the C10
+  resume gate re-reads that copy).
+- `mc2-fjcj2` — NO production path invoked the frozen `barrier.cleanup` child, so C9/C10 could not
+  complete. `OwnerCustodyExecutor` now publishes the v1-before-cleanup archive its predecessor gate
+  demands BEFORE launching it, runs it, then delegates to the R8-B-1 seam.
+- `mc2-1pwkl` — `.env.blue`/`.env.green` lacked `QDRANT_METRICS_GID`/`QDRANT_METRICS_TEXTFILE_HOST_DIR`,
+  required by `docker-compose.app.yml` since 2026-07-11, so C7's compose call (and any ordinary
+  deploy) failed on interpolation. Both files now carry them.
 
-STILL-SETTLED ARGV: `--operator-digest b5eb528e…` (= `.env.production` pin),
-`--expected-catalog-sha256 8ca17c43…` (three independent green plans agree; the DB shifted once
-around 13:00 and has been stable since),
-`--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce digests on a first run. Each
-attempt burns its run-id (the genesis stable binding cannot be recomputed over an existing
+`mc2-orsez`/`mc2-fjcj2`/`mc2-94mmf` were invisible locally for the SAME reason: a fixture published or
+ran the missing production step. Every such stand-in is gone — the real-PG17 suites now delegate to
+production and override only the bwrap/trust-view spawn.
+
+RELEASE IDENTITY SETTLED (`mc2-v7547`, owner chose to ship develop's app code). `--release-sha` and
+`--operator-digest` are DIFFERENT artifacts and had been conflated: `060b4faea` touched only
+`deploy/qdrant` + `scripts`, so CI built only its `qdrant-operator` image — that is `b5eb528e`, which
+`--operator-digest` keeps because it must equal `.env.production`'s pin. `--release-sha` names the APP
+release `.env.green` pins, and `.env.green` is now re-pinned (backup
+`.env.green.bak-4128a938-20260727`, two lines changed, 0600 kept, `.env.blue` untouched) to
+api@`2f713f87` (rev `23dfe973f`) + web@`ca9afb99` (rev `50f670b9`). That pair is the exact per-package
+build of the `23dfe973f` tree — `packages/web`, `shared-types` and `shared-utils` did not change
+between `50f670b9` and `23dfe973f`. Both images are already in the host daemon store and resolve by
+digest as `claude-deploy`, as do all ten images C7 touches, so no pull is needed and the dead GHCR
+token (`mc2-2vtmk`, still open, root's token works via the existing sudo) does not block the window.
+The 17 career-playbook app files newer than `23dfe973f` ride the next ordinary deploy — which is
+itself broken (`mc2-o0g75`: CI's scp cannot overwrite the 0444 Q12 files); colour env files are
+hand-maintained (`mc2-c2p8z`).
+
+WINDOW ARGV (all settled): `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`,
+`--operator-digest b5eb528e…` (= `.env.production` pin), `--expected-catalog-sha256 8ca17c43…` (three
+independent green plans agreed; re-verify with a fresh `plan` — the DB shifted once around 13:00 on
+2026-07-27), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce digests on a first
+run. Each attempt burns its run-id (the genesis stable binding cannot be recomputed over an existing
 checkpoint), so every retry needs a fresh run root: `mkdir -m 0700`, copy `accepted-coverage-run` and
-`secrets/db-capability` (owner-approved carry-over), then one production `plan` — which also takes
-`--release-sha`, so it waits on `mc2-v7547` too. `--stop-after deploy.prepare` is the sole resumable
-pre-C9 head; `recover` has no `--stop-after`. Do not change `aaec6fc2…`.
+`secrets/db-capability` (owner-approved carry-over), then one production `plan`. `--stop-after
+deploy.prepare` is the sole resumable pre-C9 head; `recover` has no `--stop-after`. Redeploy the
+controller (0444 dance) and confirm the Q12 tree is byte-equal to `develop`. Do not change `aaec6fc2…`.
 
 Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
 log"; this file is current-state only (200-line contract).
@@ -162,28 +167,26 @@ owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
 - The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
-- **Q12 W7 window — DURABLE PRECONDITIONS (superseded argv removed 2026-07-27; the live argv now
-  lives in § "Next recommended" only, so there is one source of truth).**
+- **Q12 W7 window — DURABLE PRECONDITIONS** (superseded argv removed 2026-07-27; the live argv lives
+  in § "Next recommended" only, so there is one source of truth).
   - The C5/C6 accepted-coverage hard gate is RESOLVED (`mc2-tpdog`, `e7fef75d4`; spec §"Amendment
-    2026-07-25" in `…specs/2026-07-12-q12-source-recovery-design.md`): acceptance is derived from the
+    2026-07-25" in `…specs/2026-07-12-q12-source-recovery-design.md`): acceptance derives from the
     recovered `file_catalog` rows against the sha-bound reviewed manifest, and the frozen manifest's
-    single `<accepted-coverage-run>` slot carries `catalog:<recovery-run-id>`.
+    `<accepted-coverage-run>` slot carries `catalog:<recovery-run-id>`.
   - EXECUTION IDENTITY (`mc2-1by33`): controller and writer operations run as uid 1000 (root cannot
     complete C2); only `source.forward` needs root, through the root-owned argv-whitelist launcher
     `deploy/qdrant/q12-privileged-launch.sh` (0555 root:root) via the account's existing sudo. The
-    controller derives `pass_fds` from each command's frozen env and preflights the launcher +
-    `sudo -n` before any journal row, and the Q12 forward publishes `writer-recovery-state`, which C9
-    hard-requires. Residuals on `mc2-9vbzp`. A full `live` rehearsal outside the window is
-    impossible — the frozen commands are production.
+    controller preflights the launcher + `sudo -n` before any journal row and publishes
+    `writer-recovery-state`, which C9 hard-requires. Residual `mc2-9vbzp`. A full `live` rehearsal
+    outside the window is impossible — the frozen commands are production.
   - `mc2-i9h3y` stays owner-gated: C2 quiesces production writers (schedule the slot with the owner)
     and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan plus
     accepted C1..C8 at that moment.
   - Post-window defer `mc2-8m90f`: re-verify read-only that the accepted document-evidence coverage
-    ledgers carry zero-evidence failed cards for the six recovered `file_catalog` ids once the first
-    post-window Stage-4 generation has minted them. Pre-existing lint debt: `mc2-n6szm`.
-  - Verbatim 2026-07-23/24/25 session logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Q12 W7
-    session log (moved from handoff 2026-07-25)"; `mc2-1sns3`, `mc2-uha77`, `mc2-4sz9t`, `mc2-gyde8`,
-    `mc2-i9h3y` and `mc2-tpdog` carry the per-task evidence.
+    ledgers carry zero-evidence failed cards for the six recovered `file_catalog` ids. Lint debt
+    `mc2-n6szm`.
+  - Verbatim 2026-07-23/24/25 session logs: `.codex/stages/mc2-jz6y0/summary.md` § "Q12 W7 session
+    log"; `mc2-1sns3`/`mc2-uha77`/`mc2-4sz9t`/`mc2-gyde8`/`mc2-i9h3y`/`mc2-tpdog` carry the evidence.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review

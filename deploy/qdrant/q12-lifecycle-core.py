@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import pathlib
+import pwd
 import re
 import stat as stat_module
 import subprocess
@@ -1756,6 +1757,74 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
             "validated_receipt_sha256": sha256(barrier_bytes),
         }
 
+    def execute_barrier_cleanup(
+        self, context: dict[str, Any], command: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Design §6b R8-B-2 (mc2-fjcj2): RUN the frozen ``q12-database-barrier.sh cleanup`` child,
+        then let the inherited R8-B-1 file-artifact seam consume what it produced.
+
+        Until this existed no production path invoked the child at all: ``ProductionExecutor``'s
+        seam opens by READING the 18-key terminal proof only the child publishes, so a real window
+        failed closed on a missing proof AFTER activate — past the point of no return, with the ten
+        production writers still stopped. The fixtures ran the child themselves, which is why every
+        local suite stayed green.
+
+        ORDER IS PART OF THE CONTRACT. The frozen child refuses unless
+        ``database-barrier-receipt-v1-before-cleanup.json`` already exists as a byte-exact 0400 copy
+        of the activate receipt (q12-database-barrier.sh:640-645), and the inherited seam publishes
+        that archive only AFTER the child. So it is published here first; the inherited publication
+        is then an idempotent no-op on identical bytes (``immutable_publish``).
+        """
+        run_root = pathlib.Path(context["run_root"])
+        receipt_path = run_root / "database-barrier-receipt.json"
+        immutable_publish(
+            run_root / "database-barrier-receipt-v1-before-cleanup.json",
+            validate_regular_file(receipt_path, mode=0o400),
+            0o400,
+            [],
+        )
+        self.invoke_barrier_cleanup_child(command["argv"])
+        return super().execute_barrier_cleanup(context, command)
+
+    def invoke_barrier_cleanup_child(self, argv: list[str]) -> None:
+        """Shell the frozen cleanup child on its own resolved argv.
+
+        ``barrier.cleanup`` is deliberately NOT a manifest command (§6b.4), so there is no frozen
+        env to reproduce; this supplies the same base env the manifest gives every other child, with
+        one correction. The manifest's frozen ``HOME=/root`` is unusable for the uid-1000 children
+        (`mc2-wwc9l`), and unlike a manifested argv nothing here is byte-bound, so the account's own
+        home is resolved instead of declaring one this process cannot read. No descriptors are
+        passed: the cleanup child reads the journal by path and, unlike the writer commands, declares
+        no external quiesce lease.
+
+        A nonzero exit carries the child's own words, scrubbed with the same redactor the plan drill
+        uses and bounded — these children print DSNs and 64-hex secrets when they fail, and a blind
+        refusal at this point is the single worst place for an operator to lose the reason
+        (`mc2-94mmf`).
+        """
+        environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+        home = _usable_home()
+        if home is not None:
+            environment["HOME"] = home
+        completed = subprocess.run(
+            argv,
+            check=False,
+            close_fds=True,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if completed.returncode != 0:
+            raw_stderr = completed.stderr or b""
+            if isinstance(raw_stderr, bytes):
+                raw_stderr = raw_stderr.decode("utf-8", "replace")
+            detail = _scrub_plan_secret_text(raw_stderr.strip())[-2000:]
+            raise LifecycleError(
+                f"barrier cleanup child failed with status {completed.returncode}"
+                + (f": {detail}" if detail else "")
+            )
+
     def _invoke_resume(self, argv: list[str], env: dict[str, str]) -> None:
         """Shell the writer-fleet resume child under the inherited FD9 cutover lease (mirrors
         execute()/launch_claim() delegation discipline: fixed argv/env, closed fds except the lease,
@@ -1776,6 +1845,28 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
                 "writers.resume.forward child failed with status "
                 f"{completed.returncode}: {completed.stderr.strip()}"
             )
+
+
+def _usable_home() -> str | None:
+    """The account's own home, or None when it cannot be used.
+
+    The Python twin of the wrapper-seam normalization (`mc2-wwc9l`, `operator-compose.sh`): a
+    non-manifested child must not be handed a HOME this uid cannot read. Returns None rather than
+    guessing, so the caller simply omits HOME and the child's tools fall back to getpwuid.
+    """
+    try:
+        candidate = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (KeyError, OSError):
+        return None
+    try:
+        stat_result = candidate.stat()
+    except OSError:
+        return None
+    if not stat_module.S_ISDIR(stat_result.st_mode) or stat_result.st_uid != os.getuid():
+        return None
+    if not os.access(candidate, os.R_OK | os.X_OK):
+        return None
+    return str(candidate)
 
 
 def owner_custody_executor() -> OwnerCustodyExecutor:
