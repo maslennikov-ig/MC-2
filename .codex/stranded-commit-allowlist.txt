@@ -1,0 +1,25 @@
+# Branches whose commits are knowingly absent from `develop`.
+#
+# Used by `scripts/orchestration/check_stranded_commits.py`. Anything NOT listed here that
+# carries commits absent from `develop` is treated as work that was finished and then lost —
+# which is exactly what happened to mc2-jc275, mc2-v31gc and mc2-sjpbx before the
+# 2026-07-27 branch audit found them.
+#
+# Format: `<branch-glob><TAB><reason>` or `subject:<regex><TAB><reason>`.
+# A glob is matched against the ref name with and without the `origin/` prefix, so one entry
+# covers both the local branch and its remote copy. Record WHY, not just THAT.
+
+subject:^chore: trigger deploy after Docker cleanup$	Empty CI trigger commit from 2026-01-18 that sits on every pre-sync snapshot; carries no content.
+
+archive/*	Deliberate archive snapshots. The 2026-05-10 audit re-confirmed their only non-`bd sync` content is the archive marker itself.
+backup/*	Pre-sync safety snapshots of `develop`. Verified 2026-07-27: nothing of substance is missing from `develop`.
+codex/checkpoint-2026-04-12	April checkpoint snapshot kept beside the `backup/` copies for the same 2026-05-10 sync.
+
+feature/video-presentation-pipeline	DEFERRED, owner-gated: mc2-hqfc3. The February rendering pipeline (Azure TTS, satori slides, FFmpeg composition, two players) is absent from `develop` by decision; video runs through NotebookLM instead. The owner will say when to return, and the code needs a full refresh first.
+
+codex/career-playbook-numeric-provenance	Numeric provenance was deliberately removed from the product on 2026-07-27 (mc2-jc275); this branch is the feature it removed.
+codex/career-playbook-numeric-review	Preservation commit for the abandoned numeric-review worktree, kept only so the 2026-06 exploration is not lost.
+codex/update-career-playbook-landing-e2e	Superseded: `develop`'s landing e2e spec is newer (it asserts `?fresh=1` and the decision-matrix interaction).
+codex/docs-l1-l2-routing-20260609-mc2-140614	Superseded: `develop` carries Docs L1/L2 routing in the agent docs in a cleaner header form.
+codex/vmy-7082-dev-qdrant-repair	One-off temporary April workflow for a Qdrant repair run; never meant for `develop`.
+feature/nlm-enrichments	Landed in evolved form: `develop` carries the NLM audio/video handlers and runbooks (epic mc2-6ye5z).
