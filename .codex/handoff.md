@@ -54,54 +54,57 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: the window is UNBLOCKED — reopen it to `--stop-after deploy.prepare` and report
-before C9, which stays owner-held. It was opened three times on 2026-07-27 under owner authority; each
-attempt failed CLOSED with zero mutation (no writer quiesced, no barrier receipt, zero `%q12%` objects
-in the DB, lock free) and each surfaced one real defect. All five now fixed:
+Recommended action: ANSWER `mc2-h5l7m`. The window was opened a FOURTH time on 2026-07-27 17:23 (run
+`8ad0a96b-…`), reached seq 7 and failed closed with ZERO mutation (writers never stopped, C2 not
+reached, zero `%q12%` DB objects, 8 cron jobs active, read_only off, no receipt, lock free). C1 got PAST
+the input-checkpoint gate for the first time — `mc2-orsez` works in production — and died on the DB step.
+Root cause proved by running the frozen predicate: `barrier.*` requires the DSN at
+`/opt/megacampus/secrets/supabase_db_url` to carry NO query string, while the frozen `pg.backup`
+(`backup-supabase.sh:437-458`) requires that same file to carry exactly
+`sslmode=verify-full&sslrootcert=<CA>`. Two frozen commands, one path, contradictory demands; argv and
+env are frozen, so no second file or env override is possible. Recommended resolution (owner call — it
+touches backup-path TLS): the BACKUP script yields, since it already receives `$CA_FILE` separately and
+already rewrites `sslrootcert` to a /proc path, so composing both parameters itself keeps the effective
+TLS identical; then strip the query from the DSN file. Editing the frozen barrier instead would weaken
+its own identity assertion. `mc2-vcmd7` (P1) is why this cost a cycle: the barrier's node runner
+swallows the real error behind one generic line.
 
-- `mc2-wwc9l` — frozen `HOME=/root` vs uid-1000 children killed `docker compose`; conditional
-  normalization in `operator-compose.sh` + `scripts/deploy_blue_green.sh`.
-- `mc2-94mmf` — a failing frozen child's stderr was dropped, so refusals were blind; the controller
-  carries a scrubbed, bounded tail.
-- `mc2-orsez` — the controller never published `database-barrier-input-checkpoint-<op>-<epoch>.json`
-  0600, which the frozen barrier reads before it will do anything, so C1 was impassable. Now published
-  from `run_claim` for install and from `orchestrate_post_activate_cleanup` for cleanup (the C10
-  resume gate re-reads that copy).
-- `mc2-fjcj2` — NO production path invoked the frozen `barrier.cleanup` child, so C9/C10 could not
-  complete. `OwnerCustodyExecutor` now publishes the v1-before-cleanup archive its predecessor gate
-  demands BEFORE launching it, runs it, then delegates to the R8-B-1 seam.
-- `mc2-1pwkl` — `.env.blue`/`.env.green` lacked `QDRANT_METRICS_GID`/`QDRANT_METRICS_TEXTFILE_HOST_DIR`,
-  required by `docker-compose.app.yml` since 2026-07-11, so C7's compose call (and any ordinary
-  deploy) failed on interpolation. Both files now carry them.
+Five earlier blockers are fixed and deployed (controller sha `8ba9db34`, Q12 tree byte-equal to
+`develop`, `aaec6fc2…` unchanged): `mc2-wwc9l` (frozen `HOME=/root` killed `docker compose` for
+uid-1000 children), `mc2-94mmf` (a failing child's stderr was dropped), `mc2-orsez` (the controller
+never published the barrier's input checkpoint), `mc2-fjcj2` (no production path invoked the frozen
+`barrier.cleanup` child, so C9/C10 could not complete) and `mc2-1pwkl` (colour env files lacked two
+compose-required vars). Two operational traps: `mc2-y5tgw` — any dev deploy's `docker image prune -f`
+deletes the digest-pinned `qdrant-operator` and observability images that C1/C7 need, and no pre-flight
+checks image presence; restored via root's token through the existing sudo. And always run the
+controller DETACHED (`setsid nohup`) — a plan attempt was killed by a dropped ssh (exit 255), which
+after C2 would leave the writers stopped.
 
-`mc2-orsez`/`mc2-fjcj2`/`mc2-94mmf` were invisible locally for the SAME reason: a fixture published or
-ran the missing production step. Every such stand-in is gone — the real-PG17 suites now delegate to
-production and override only the bwrap/trust-view spawn.
+`mc2-orsez`/`mc2-fjcj2`/`mc2-94mmf`/`mc2-vcmd7` were all invisible locally for the SAME reason: a
+fixture published or ran the missing production step, or the real error was swallowed. Every such
+stand-in is gone from the suites, which now delegate to production and override only the sandbox spawn.
 
 RELEASE IDENTITY SETTLED (`mc2-v7547`, owner chose to ship develop's app code). `--release-sha` and
 `--operator-digest` are DIFFERENT artifacts and had been conflated: `060b4faea` touched only
-`deploy/qdrant` + `scripts`, so CI built only its `qdrant-operator` image — that is `b5eb528e`, which
+`deploy/qdrant` + `scripts`, so CI built only its `qdrant-operator` image — `b5eb528e`, which
 `--operator-digest` keeps because it must equal `.env.production`'s pin. `--release-sha` names the APP
-release `.env.green` pins, and `.env.green` is now re-pinned (backup
-`.env.green.bak-4128a938-20260727`, two lines changed, 0600 kept, `.env.blue` untouched) to
-api@`2f713f87` (rev `23dfe973f`) + web@`ca9afb99` (rev `50f670b9`). That pair is the exact per-package
-build of the `23dfe973f` tree — `packages/web`, `shared-types` and `shared-utils` did not change
-between `50f670b9` and `23dfe973f`. Both images are already in the host daemon store and resolve by
-digest as `claude-deploy`, as do all ten images C7 touches, so no pull is needed and the dead GHCR
-token (`mc2-2vtmk`, still open, root's token works via the existing sudo) does not block the window.
-The 17 career-playbook app files newer than `23dfe973f` ride the next ordinary deploy — which is
-itself broken (`mc2-o0g75`: CI's scp cannot overwrite the 0444 Q12 files); colour env files are
-hand-maintained (`mc2-c2p8z`).
+release `.env.green` pins, and `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`,
+two lines changed, 0600 kept, `.env.blue` untouched) to api@`2f713f87` (rev `23dfe973f`) +
+web@`ca9afb99` (rev `50f670b9`) — the exact per-package build of the `23dfe973f` tree, since
+`packages/web`/`shared-types`/`shared-utils` did not change between `50f670b9` and `23dfe973f`. No pull
+is needed for the window; the dead GHCR token (`mc2-2vtmk`) does not block it. The 17 career-playbook
+app files newer than `23dfe973f` ride the next ordinary deploy — itself broken (`mc2-o0g75`); colour
+env files are hand-maintained (`mc2-c2p8z`).
 
-WINDOW ARGV (all settled): `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`,
-`--operator-digest b5eb528e…` (= `.env.production` pin), `--expected-catalog-sha256 8ca17c43…` (three
-independent green plans agreed; re-verify with a fresh `plan` — the DB shifted once around 13:00 on
-2026-07-27), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce digests on a first
-run. Each attempt burns its run-id (the genesis stable binding cannot be recomputed over an existing
-checkpoint), so every retry needs a fresh run root: `mkdir -m 0700`, copy `accepted-coverage-run` and
-`secrets/db-capability` (owner-approved carry-over), then one production `plan`. `--stop-after
-deploy.prepare` is the sole resumable pre-C9 head; `recover` has no `--stop-after`. Redeploy the
-controller (0444 dance) and confirm the Q12 tree is byte-equal to `develop`. Do not change `aaec6fc2…`.
+WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
+(= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource and quiesce
+digests on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN
+`expected-post-migration-catalog.json` FILE (the barrier compares it to that file, :302) — take it from
+the fresh `plan` output, NOT from a previous run: it embeds `release_sha`, which is why the old
+`8ca17c43…` (computed under `060b4faea`) became `aa96c170…` under `23dfe973f`. Each attempt burns its
+run-id, so every retry needs a fresh run root (`mkdir -m 0700`, copy `accepted-coverage-run` and
+`secrets/db-capability`) plus one production `plan`. `--stop-after deploy.prepare` is the sole
+resumable pre-C9 head. Do not change `aaec6fc2…`.
 
 Historical progress logs live in `.codex/stages/mc2-jz6y0/summary.md` § "Historical progress
 log"; this file is current-state only (200-line contract).
@@ -182,11 +185,7 @@ owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
   - `mc2-i9h3y` stays owner-gated: C2 quiesces production writers (schedule the slot with the owner)
     and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan plus
     accepted C1..C8 at that moment.
-  - Post-window defer `mc2-8m90f`: re-verify read-only that the accepted document-evidence coverage
-    ledgers carry zero-evidence failed cards for the six recovered `file_catalog` ids. Lint debt
-    `mc2-n6szm`.
-  - Verbatim 2026-07-23/24/25 session logs: `.codex/stages/mc2-jz6y0/summary.md` § "Q12 W7 session
-    log"; `mc2-1sns3`/`mc2-uha77`/`mc2-4sz9t`/`mc2-gyde8`/`mc2-i9h3y`/`mc2-tpdog` carry the evidence.
+  - Post-window defers: `mc2-8m90f` (re-verify the accepted coverage ledgers read-only), `mc2-n6szm`.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review
