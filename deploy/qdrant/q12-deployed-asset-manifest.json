@@ -174,12 +174,12 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-window-preflight.py",
-      "sha256": "c91c33665ce7cc5a57fcaeec92e23c2bf98b8870d2d76222cc2022d16e7f38e1"
+      "sha256": "2bc4c30305d39ef216dbc0ace4c88a1dc4be9235020a60b693cc0d9206e59e60"
     },
     {
       "group": "root",
       "identity_owner": "q12",
-      "mode": "0444",
+      "mode": "0644",
       "owner": "root",
       "path": "deploy/qdrant/q12-writer-resume.py",
       "sha256": "49ef1a07544430255cdd695f905c1337ac243a565da4c4fd13db0ab380b44cc9"
@@ -210,7 +210,7 @@
     }
   ],
   "deploy_root": "/opt/megacampus",
-  "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "1725a2df3245200fa6e12f362b7e4564897301ec",
+  "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
+  "generated_from_tree_sha": "d7471efe956fe2dab01379545a9db005c40e1e38",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

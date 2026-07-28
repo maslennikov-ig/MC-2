@@ -304,6 +304,41 @@ ROOT_OWNED = ("deploy/qdrant/q12-privileged-launch.sh", "deploy/qdrant/q12-write
 DEPLOY_OWNER = "claude-deploy"
 DEPLOY_GROUP = "claude-deploy"
 
+# mc2-lzft4: where a CONSUMER asserts an exact identity of its own, that assertion — not the
+# git-executable heuristic below — is what the host must satisfy, so it is what this manifest must
+# declare. `source-recovery-run.sh` refuses to run unless `q12-writer-resume.py` is exactly
+# root:root 0644 (the mc2-jhqpw hardening: root-owned so the operator account cannot rewrite the
+# privileged child, but still readable by the operator that reads it). The heuristic said 0444;
+# probe H2 asserted THAT and therefore certified green a host whose mode the wrapper rejects. It
+# burned window attempt #10 at C2 — after the barrier had already put production into
+# `maintenance_guarded` — and it is the eleventh instance of the environment-substitution class,
+# the first carried by a probe. `assertion` is re-checked against the consumer's own bytes at emit
+# time so the pair cannot drift apart silently again.
+CONSUMER_REQUIRED_IDENTITY: "dict[str, dict[str, str]]" = {
+    "deploy/qdrant/q12-writer-resume.py": {
+        "owner": "root",
+        "group": "root",
+        "mode": "0644",
+        "asserted_by": "deploy/qdrant/source-recovery-run.sh",
+        "assertion": "\"$RESUME_CONTROLLER\") == '0:0:644'",
+    },
+}
+
+
+def assert_consumer_identity_assertions(repo_root: pathlib.Path) -> None:
+    """Fail closed if a consumer no longer carries the assertion this manifest is pinned to."""
+    for relative, required in CONSUMER_REQUIRED_IDENTITY.items():
+        consumer = repo_root / required["asserted_by"]
+        if not consumer.is_file():
+            raise PreflightError(f"identity consumer is missing from the tree: {consumer}")
+        if required["assertion"] not in consumer.read_text(encoding="utf-8"):
+            raise PreflightError(
+                f"{required['asserted_by']} no longer carries the identity assertion "
+                f"{required['assertion']!r} that pins {relative} to "
+                f"{required['owner']}:{required['group']} {required['mode']}; re-derive "
+                "CONSUMER_REQUIRED_IDENTITY from the consumer before emitting a manifest"
+            )
+
 
 def command_manifest_assets(repo_root: pathlib.Path) -> "list[str]":
     manifest = json.loads(
@@ -340,7 +375,14 @@ def build_asset_manifest(repo_root: pathlib.Path) -> dict:
         ).stdout.splitlines()
         if line.startswith("100755 ")
     }
+    assert_consumer_identity_assertions(repo_root)
     paths = sorted(set(command_manifest_assets(repo_root)) | set(CONTROLLER_CHAIN))
+    unpinned = sorted(set(CONSUMER_REQUIRED_IDENTITY) - set(paths))
+    if unpinned:
+        raise PreflightError(
+            "a consumer-pinned asset is not in the manifest asset set and would therefore go "
+            f"unasserted on the host: {', '.join(unpinned)}"
+        )
     assets = []
     for relative in paths:
         source = repo_root / relative
@@ -352,15 +394,25 @@ def build_asset_manifest(repo_root: pathlib.Path) -> dict:
         # scp fail with EACCES — a hardening that breaks the thing it guards. For those, byte
         # equality is asserted and the file identity is left to CI, stated rather than skipped.
         q12_owned = relative.startswith("deploy/")
+        required = CONSUMER_REQUIRED_IDENTITY.get(relative)
+        if not q12_owned:
+            mode = owner = group = None
+        elif required is not None:
+            # mc2-lzft4: a consumer's own refusal outranks the heuristic.
+            mode, owner, group = required["mode"], required["owner"], required["group"]
+        else:
+            # Deployed read-only in every case the window owns and nothing else asserts: it never
+            # rewrites its own assets. 0555 for anything git marks executable (the barrier is
+            # invoked as argv[0] and must stay 0555, not 0444), 0444 otherwise.
+            mode = "0555" if relative in executable else "0444"
+            owner = "root" if relative in ROOT_OWNED else DEPLOY_OWNER
+            group = "root" if relative in ROOT_OWNED else DEPLOY_GROUP
         assets.append(
             {
                 "path": relative,
-                # Deployed read-only in every case the window owns: it never rewrites its own
-                # assets. 0555 for anything git marks executable (the barrier is invoked as
-                # argv[0] and must stay 0555, not 0444), 0444 otherwise.
-                "mode": ("0555" if relative in executable else "0444") if q12_owned else None,
-                "owner": ("root" if relative in ROOT_OWNED else DEPLOY_OWNER) if q12_owned else None,
-                "group": ("root" if relative in ROOT_OWNED else DEPLOY_GROUP) if q12_owned else None,
+                "mode": mode,
+                "owner": owner,
+                "group": group,
                 "identity_owner": "q12" if q12_owned else "ci-delivered",
                 "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
             }
@@ -372,7 +424,8 @@ def build_asset_manifest(repo_root: pathlib.Path) -> dict:
         "derivation": (
             "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that "
             "exists in the tree, plus the controller chain those commands execute, plus the "
-            "pre-flight's own two files; mode 0555 where git marks the file executable, else 0444"
+            "pre-flight's own two files; identity from the consuming script's own refusal where "
+            "one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444"
         ),
         "assets": assets,
     }
