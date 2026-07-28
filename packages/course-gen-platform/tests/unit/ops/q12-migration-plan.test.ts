@@ -97,11 +97,15 @@ function guardedRelations(): Array<Record<string, unknown>> {
     parent_oid: null,
     owner: 'postgres',
   }));
+  // mc2-34eua: cron.job is deliberately NOT guarded. In managed Supabase it is owned by
+  // supabase_admin and `postgres` holds neither UPDATE nor TRIGGER on it, so the barrier can
+  // neither LOCK it in ACCESS EXCLUSIVE MODE nor CREATE TRIGGER on it. Its quiesce guarantee is
+  // carried instead by cron.alter_job pausing, the read-only database default, the guard trigger
+  // on net.http_request_queue, and the zero-active-jobs assertion (all privilege-free).
   return [
     ...publicRelations,
     ...authRelations,
     ...storageRelations,
-    { schema: 'cron', name: 'job', oid: 400, relkind: 'r', parent_oid: null, owner: 'postgres' },
     {
       schema: 'net',
       name: 'http_request_queue',
@@ -274,6 +278,22 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 expected-post-migration-catalog plan bu
       },
     ],
     [
+      'guards cron.job',
+      (evidence: any) => {
+        // mc2-34eua: guarding cron.job is unreachable in production — `postgres` cannot lock or
+        // add a trigger to a supabase_admin-owned relation. Accepting it here would send the
+        // window into a C1 failure that only shows up against the live database.
+        evidence.guarded_relations.push({
+          schema: 'cron',
+          name: 'job',
+          oid: 400,
+          relkind: 'r',
+          parent_oid: null,
+          owner: 'supabase_admin',
+        });
+      },
+    ],
+    [
       'uses an unexpected migration key',
       (evidence: any) => {
         evidence.migrations['20260711150000'] = evidence.migrations['20260711140000'];
@@ -402,9 +422,11 @@ describe.runIf(REAL_PG17)('Q12 plan capture against disposable PostgreSQL 17.10'
       expect(ready, docker(['logs', container]).stderr).toBe(true);
 
       // Synthetic Supabase-shaped source: 47 public + 22 auth + 5 named
-      // storage + cron.job + net.http_request_queue (76 guarded), plus decoys
-      // the schema/name filter must drop regardless of the caller's superuser
-      // status (realtime.messages, cron.job_run_details, net.http_response).
+      // storage + net.http_request_queue (75 guarded), plus decoys the
+      // schema/name filter must drop regardless of the caller's superuser
+      // status (realtime.messages, cron.job, cron.job_run_details,
+      // net.http_response). cron.job is created here precisely so the capture
+      // has the chance to pick it up and must not (mc2-34eua).
       // In real Supabase `postgres` is not a superuser, so auth/storage
       // internal tables are dropped by the TRIGGER-privilege test; that leg is
       // Supabase-config-specific and is covered by the synthetic unit cases.
@@ -457,7 +479,14 @@ CREATE TABLE net.http_response(id bigint PRIMARY KEY);
       expect(structuralSql.includes(';')).toBe(false);
 
       const baseline = capture();
-      expect(baseline.guarded_relations).toHaveLength(76);
+      // mc2-34eua: cron.job exists and is still baselined as a cron job, but the live capture
+      // must NOT put it in the guarded (lock + trigger) set.
+      expect(baseline.guarded_relations).toHaveLength(75);
+      expect(
+        (baseline.guarded_relations as Array<{ schema: string; name: string }>).some(
+          relation => relation.schema === 'cron' && relation.name === 'job'
+        )
+      ).toBe(false);
       expect(baseline.cron_jobs).toHaveLength(8);
       expect(baseline.migration_frontier).toBe('20260704150249');
       const baselinePublic = new Set(
@@ -805,7 +834,12 @@ esac
     const plan = JSON.parse(result.stdout) as Record<string, string>;
     expect(plan.expected_catalog_sha256).toBe(sha256(emitted));
     const catalog = JSON.parse(emitted.toString('utf8')) as Record<string, any>;
-    expect(catalog.guarded_relations).toHaveLength(76);
+    expect(catalog.guarded_relations).toHaveLength(75);
+    expect(
+      (catalog.guarded_relations as Array<{ schema: string; name: string }>).some(
+        relation => relation.schema === 'cron' && relation.name === 'job'
+      )
+    ).toBe(false);
     expect(catalog.baseline_structural_sha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(catalog.expected_post_migration_catalog_sha256).toBe(
       catalog.migrations['20260711151000'].catalog_sha256
@@ -1358,7 +1392,12 @@ esac
       const emitted = readFileSync(fixture.catalogPath);
       assertPassesFrozenBarrier(emitted.toString('utf8'));
       const catalog = JSON.parse(emitted.toString('utf8')) as Record<string, any>;
-      expect(catalog.guarded_relations).toHaveLength(76);
+      expect(catalog.guarded_relations).toHaveLength(75);
+      expect(
+        (catalog.guarded_relations as Array<{ schema: string; name: string }>).some(
+          relation => relation.schema === 'cron' && relation.name === 'job'
+        )
+      ).toBe(false);
       expect(catalog.migrations['20260711151000'].relations.map((r: any) => r.name)).toEqual([
         'document_evidence_observability_totals',
       ]);

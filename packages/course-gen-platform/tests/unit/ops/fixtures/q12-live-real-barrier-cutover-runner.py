@@ -280,7 +280,7 @@ def main() -> int:
             raise RuntimeError(f"structural catalog query failed: {structural_result.stderr.strip()}")
         baseline_structural_sha256 = structural_result.stdout.strip()
 
-        # 2. Real oids/owners for the 76 guarded relations, queried live from the
+        # 2. Real oids/owners for the 75 guarded relations, queried live from the
         #    seeded source (not fabricated) so the barrier's OID/owner identity
         #    checks match exactly.
         public_rows = dexec_json(
@@ -301,12 +301,7 @@ def main() -> int:
             "JOIN pg_roles r ON r.oid=c.relowner "
             "WHERE n.nspname='storage' AND c.relkind IN ('r','p') ORDER BY c.relname"
         )
-        cron_row = dexec_json(
-            "SELECT c.oid::bigint AS oid, r.rolname AS owner "
-            "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
-            "JOIN pg_roles r ON r.oid=c.relowner "
-            "WHERE n.nspname='cron' AND c.relname='job'"
-        )[0]
+        # mc2-34eua: cron.job is NOT in the guarded set.
         net_row = dexec_json(
             "SELECT c.oid::bigint AS oid, r.rolname AS owner "
             "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
@@ -356,14 +351,6 @@ def main() -> int:
             ]
             + [
                 {
-                    "schema": "cron",
-                    "name": "job",
-                    "oid": cron_row["oid"],
-                    "relkind": "r",
-                    "parent_oid": None,
-                    "owner": cron_row["owner"],
-                },
-                {
                     "schema": "net",
                     "name": "http_request_queue",
                     "oid": net_row["oid"],
@@ -373,7 +360,7 @@ def main() -> int:
                 },
             ]
         )
-        if len(guarded_relations) != 76:
+        if len(guarded_relations) != 75:
             raise RuntimeError(f"guarded_relations count drifted: {len(guarded_relations)}")
 
         cron_jobs_catalog = [

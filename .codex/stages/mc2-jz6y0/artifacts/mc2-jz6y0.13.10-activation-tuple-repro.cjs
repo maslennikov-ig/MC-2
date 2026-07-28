@@ -35,7 +35,8 @@ function expectedCatalog() {
     schema_version: 'megacampus.q12.expected-post-migration-catalog/v1', database: 'postgres', database_owner: 'postgres', release_sha: '1'.repeat(40),
     migration_frontier: '20260704150249', baseline_structural_sha256: 'a'.repeat(64), expected_post_migration_catalog_sha256: 'b'.repeat(64),
     inventory_counts: { public: 47, auth: 22, storage: 5, cron_jobs: 8, pg_net_queue: 0 },
-    guarded_relations: [...publicRelations, ...authRelations, ...storageRelations, { schema: 'cron', name: 'job', oid: 400, relkind: 'r', parent_oid: null, owner: 'postgres' }, { schema: 'net', name: 'http_request_queue', oid: 401, relkind: 'r', parent_oid: null, owner: 'postgres' }],
+    // mc2-34eua (2026-07-28 amendment): cron.job removed from the guarded set.
+    guarded_relations: [...publicRelations, ...authRelations, ...storageRelations, { schema: 'net', name: 'http_request_queue', oid: 401, relkind: 'r', parent_oid: null, owner: 'postgres' }],
     cron_jobs: Array.from({ length: 8 }, (_, i) => ({ jobid: i + 1, username: 'postgres', command_sha256: String(i).repeat(64) })),
     migrations: {
       '20260711140000': { catalog_sha256: 'c'.repeat(64), migration_file_sha256: 'e'.repeat(64), relations: [{ schema: 'public', name: 'document_evidence_runs', relkind: 'r', parent_schema: null, parent_name: null, owner: 'postgres' }] },

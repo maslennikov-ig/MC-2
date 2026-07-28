@@ -366,7 +366,7 @@ jq -e --arg schema "$EXPECTED_SCHEMA" '
   (.baseline_structural_sha256 | test("^[a-f0-9]{64}$")) and
   (.expected_post_migration_catalog_sha256 | test("^[a-f0-9]{64}$")) and
   .inventory_counts == {public:47,auth:22,storage:5,cron_jobs:8,pg_net_queue:0} and
-  (.guarded_relations | type == "array" and length == 76) and
+  (.guarded_relations | type == "array" and length == 75) and
   ([.guarded_relations[].oid] | unique | length) == (.guarded_relations | length) and
   ([.guarded_relations[] | [.schema,.name] | join(".")] | unique | length) == (.guarded_relations | length) and
   ([.guarded_relations[] | select(
@@ -383,7 +383,7 @@ jq -e --arg schema "$EXPECTED_SCHEMA" '
   ([.guarded_relations[] | select(.schema == "auth")] | length) == 22 and
   ([.guarded_relations[] | select(.schema == "public")] | length) == 47 and
   ([.guarded_relations[] | select(.schema == "auth" and .name == "schema_migrations")] | length) == 0 and
-  ([.guarded_relations[] | select(.schema == "cron" and .name == "job")] | length) == 1 and
+  ([.guarded_relations[] | select(.schema == "cron")] | length) == 0 and
   ([.guarded_relations[] | select(.schema == "net" and .name == "http_request_queue")] | length) == 1 and
   (.cron_jobs | type == "array" and length == 8) and
   ([.cron_jobs[].jobid] | unique | length) == 8 and

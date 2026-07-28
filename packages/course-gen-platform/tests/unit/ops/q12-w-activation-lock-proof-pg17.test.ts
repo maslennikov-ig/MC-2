@@ -74,7 +74,8 @@ function expectedCatalog(): Record<string, unknown> {
       ...publicRelations,
       ...authRelations,
       ...storageRelations,
-      { schema: 'cron', name: 'job', oid: 400, relkind: 'r', parent_oid: null, owner: 'postgres' },
+      // mc2-34eua: cron.job is NOT guarded — production `postgres` can neither LOCK nor
+      // CREATE TRIGGER on a supabase_admin-owned relation.
       {
         schema: 'net',
         name: 'http_request_queue',

@@ -209,7 +209,7 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
         after_base_structural_sha256 = structural_after(BASE_DDL)
         after_obs_structural_sha256 = structural_after(BASE_DDL, OBS_DDL)
 
-        # 2. Real oids/owners for the 76 guarded relations (queried live).
+        # 2. Real oids/owners for the 75 guarded relations (queried live).
         def rows(schema: str):
             return dexec_json(
                 "SELECT c.relname AS name, c.oid::bigint AS oid, r.rolname AS owner "
@@ -221,11 +221,7 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
         public_rows = rows("public")
         auth_rows = rows("auth")
         storage_rows = rows("storage")
-        cron_row = dexec_json(
-            "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
-            "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
-            "WHERE n.nspname='cron' AND c.relname='job'"
-        )[0]
+        # mc2-34eua: cron.job is NOT in the guarded set.
         net_row = dexec_json(
             "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
             "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
@@ -246,10 +242,9 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
             [guarded("public", r["name"], r["oid"], r["owner"]) for r in public_rows]
             + [guarded("auth", r["name"], r["oid"], r["owner"]) for r in auth_rows]
             + [guarded("storage", r["name"], r["oid"], r["owner"]) for r in storage_rows]
-            + [guarded("cron", "job", cron_row["oid"], cron_row["owner"]),
-               guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
+            + [guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
         )
-        if len(guarded_relations) != 76:
+        if len(guarded_relations) != 75:
             raise RuntimeError(f"guarded_relations count drifted: {len(guarded_relations)}")
 
         cron_jobs_catalog = [
