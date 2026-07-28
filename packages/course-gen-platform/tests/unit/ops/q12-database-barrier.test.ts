@@ -1761,14 +1761,36 @@ describe('Q12 durable database maintenance barrier', () => {
 describe.runIf(REAL_PG17)(
   'Q12 terminal proof reconnect against disposable PostgreSQL 17.10',
   () => {
+    const docker = (args: string[], input?: string) =>
+      spawnSync('docker', args, {
+        encoding: 'utf8',
+        input,
+        timeout: 60_000,
+      });
+
+    // mc2-38ivn: production reaches PostgreSQL through Supavisor, which REWRITES the startup-packet
+    // application_name to 'Supavisor' (measured against the live pooler on 2026-07-28 by window
+    // pre-flight probe B3). A PG17 `ON login` event trigger reproduces that shape faithfully in a
+    // plain container: it re-sets application_name at session start from the SESSION source, which
+    // outranks the startup packet's PGC_S_CLIENT, and is in turn overridden by a later in-session
+    // SET -- which is exactly the repair. Without it this leg proves nothing, because a direct
+    // connection delivers application_name and the barrier would look correct for the wrong reason.
+    const POOLER_REWRITE = `
+CREATE FUNCTION public.q12_pooler_rewrite() RETURNS event_trigger LANGUAGE plpgsql AS $rewrite$
+BEGIN
+  PERFORM set_config('application_name','Supavisor',false);
+END;
+$rewrite$;
+CREATE EVENT TRIGGER q12_pooler_rewrite ON login EXECUTE FUNCTION public.q12_pooler_rewrite();
+`;
+    const INTRUDER_NAME = 'megacampus-q12-intruder';
+
+    // `%a` puts the application_name the SERVER sees in front of every log line: the same value
+    // pg_stat_activity reports, observable after the short-lived proof session is gone.
+    const LOG_PREFIX = '%a|';
+
     it('drives the protected cleanup seam through the actual terminal reconnect runner', async () => {
       const container = `mc2-q12-terminal-${process.pid}-${Date.now()}`;
-      const docker = (args: string[], input?: string) =>
-        spawnSync('docker', args, {
-          encoding: 'utf8',
-          input,
-          timeout: 60_000,
-        });
       const started = docker([
         'run',
         '-d',
@@ -1780,6 +1802,10 @@ describe.runIf(REAL_PG17)(
         '-p',
         '127.0.0.1::5432',
         POSTGRES_IMAGE,
+        '-c',
+        'log_statement=all',
+        '-c',
+        `log_line_prefix=${LOG_PREFIX}`,
       ]);
       expect(started.status, started.stderr).toBe(0);
 
@@ -1834,9 +1860,39 @@ INSERT INTO cron.job(jobid,schedule,command,nodename,nodeport,database,username,
 SELECT value,'0 * * * *','SELECT ' || value,'localhost',5432,'postgres','postgres',true,
        'q12_job_' || value
 FROM generate_series(1,8) AS value;
+${POOLER_REWRITE}
 `
         );
         expect(setup.status, setup.stderr).toBe(0);
+
+        // The emulation is real before anything depends on it: a fresh session that ASKS for a Q12
+        // name still reports 'Supavisor', and only an in-session SET moves it.
+        const rewriteProof = docker(
+          [
+            'exec',
+            '-e',
+            'PGAPPNAME=megacampus-q12-asked-at-connect',
+            '-i',
+            container,
+            'psql',
+            '-X',
+            '-q',
+            '-At',
+            '-v',
+            'ON_ERROR_STOP=1',
+            '-U',
+            'postgres',
+          ],
+          `SELECT current_setting('application_name');
+SET application_name='megacampus-q12-rewrite-probe';
+SELECT current_setting('application_name');
+`
+        );
+        expect(rewriteProof.status, rewriteProof.stderr).toBe(0);
+        expect(rewriteProof.stdout.trim().split('\n')).toEqual([
+          'Supavisor',
+          'megacampus-q12-rewrite-probe',
+        ]);
 
         const structuralSql = readFileSync(STRUCTURAL_CATALOG, 'utf8').trim();
         const structural = docker(
@@ -1920,17 +1976,92 @@ exec node "$@"
         );
         chmodSync(terminalNode, 0o700);
 
-        const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
-          env: {
-            ...fixture.env,
-            MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY: REPO_ROOT,
-            MC2_Q12_BARRIER_TEST_REAL_RECONNECT: 'mc2-local-pg17-terminal-reconnect-only',
-            MC2_Q12_BARRIER_TEST_TERMINAL_NODE: terminalNode,
-            MC2_Q12_REAL_TERMINAL_NODE_LOG: terminalInvocationLog,
-          },
-          encoding: 'utf8',
-          timeout: 60_000,
-        });
+        const runCleanup = () =>
+          spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
+            env: {
+              ...fixture.env,
+              MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY: REPO_ROOT,
+              MC2_Q12_BARRIER_TEST_REAL_RECONNECT: 'mc2-local-pg17-terminal-reconnect-only',
+              MC2_Q12_BARRIER_TEST_TERMINAL_NODE: terminalNode,
+              MC2_Q12_REAL_TERMINAL_NODE_LOG: terminalInvocationLog,
+            },
+            encoding: 'utf8',
+            timeout: 60_000,
+          });
+
+        const countSessions = (name: string) =>
+          docker([
+            'exec',
+            container,
+            'psql',
+            '-X',
+            '-q',
+            '-At',
+            '-U',
+            'postgres',
+            '-c',
+            `SELECT count(*) FROM pg_stat_activity WHERE application_name='${name}'`,
+          ]).stdout.trim();
+
+        // A barrier-era session that outlives the window must be VISIBLE to the terminal proof.
+        // Through the pooler `barrier_era_session_count` could only ever read 0 -- it passed for
+        // the wrong reason (mc2-38ivn). This leg holds one badged session open and requires the
+        // terminal proof to refuse, so the count is a live assertion and not decoration.
+        const intruder = docker([
+          'exec',
+          '-d',
+          container,
+          'psql',
+          '-X',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-U',
+          'postgres',
+          '-c',
+          `SET application_name='${INTRUDER_NAME}'`,
+          '-c',
+          'SELECT pg_sleep(120)',
+        ]);
+        expect(intruder.status, intruder.stderr).toBe(0);
+        let intruderVisible = false;
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          if (countSessions(INTRUDER_NAME) === '1') {
+            intruderVisible = true;
+            break;
+          }
+          await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+        }
+        expect(intruderVisible).toBe(true);
+
+        const withIntruder = runCleanup();
+        expect(withIntruder.status, withIntruder.stdout).not.toBe(0);
+        expect(withIntruder.stderr).toContain('database terminal reconnect result is invalid');
+        expect(existsSync(fixture.cleanupProof)).toBe(false);
+
+        const terminated = docker([
+          'exec',
+          container,
+          'psql',
+          '-X',
+          '-q',
+          '-At',
+          '-U',
+          'postgres',
+          '-c',
+          `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='${INTRUDER_NAME}'`,
+        ]);
+        expect(terminated.status, terminated.stderr).toBe(0);
+        let intruderGone = false;
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          if (countSessions(INTRUDER_NAME) === '0') {
+            intruderGone = true;
+            break;
+          }
+          await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+        }
+        expect(intruderGone).toBe(true);
+
+        const result = runCleanup();
 
         expect(
           result.status,
@@ -1951,9 +2082,19 @@ exec node "$@"
             barrier_era_session_count: 0,
           },
         });
+
+        // The decisive assertion for mc2-38ivn. `log_line_prefix=%a` records the application_name
+        // the SERVER resolved -- the same value pg_stat_activity publishes. Under the pooler-rewrite
+        // emulation this can only carry the Q12 name if the terminal proof STATED it in its own
+        // session; a runner that trusts the connection is logged as 'Supavisor' and is invisible to
+        // every consumer of the `megacampus-q12-%` prefix, including the count asserted above.
+        const serverLog = docker(['logs', container]);
+        const logText = `${serverLog.stdout}${serverLog.stderr}`;
+        expect(logText).toContain('megacampus-q12-database-terminal-proof|LOG:');
+        expect(logText).toContain(`${INTRUDER_NAME}|LOG:`);
       } finally {
         docker(['rm', '-f', container]);
       }
-    }, 120_000);
+    }, 180_000);
   }
 );

@@ -55,7 +55,7 @@ permanent production-faithful truth, proven by the mechanical PG17 test.
 | 1   | `w_integration_commit`             | `60910053455ac9af978c7951a562172e39623ca2`                                      | `git merge-base HEAD origin/codex/self-hosted-qdrant-platform` = the accepted W integration base commit (60910053), not the addendum branch HEAD.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 2   | `command_manifest_sha256`          | `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`              | `sha256(deploy/qdrant/q12-command-manifest.json)` at `60910053`. Contract-conflict RESOLVED (Risks a): historical `af9b21cb…` = sha256 at `c93d766d` (five-command manifest); superseded by the accepted D5J twenty-command expansion at `1817c5e9` → `aaec6fc2…`, i.e. the contract's `:178` "accepted integration successor".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 3   | `activation_barrier_path`          | `deploy/qdrant/q12-database-barrier.sh`                                         | Contract line 149; file present at `60910053`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 4   | `activation_barrier_sha256`        | **AMENDED** `56a7a88eac92751a4a0613aff1b10b96f5628b950a5acb4988d06616271a4647`  | `sha256(deploy/qdrant/q12-database-barrier.sh)` at the ratified **R8-B-2-ii defrost round** (found-defects #13 + #14; see the 2026-07-19 AMENDMENT note below the table). Sha succession: `134255ce…` (W base `60910053`, pre-fix) → `3673ee49…` (2026-07-18 frozen-barrier-fix) → `cb4c4f4a…` (defrost #13 interim) → `bdb9d935…` (defrost #13+#14) → `f183aa3c…` (2026-07-27 managed-cron round, mc2-7ohdj) → **`f4f90361…`** (2026-07-28 cron.job-unguarded round, mc2-34eua; current REPO field-4 truth). All prior values historical. The deployed SERVER barrier stays `3673ee49…` pending the team-lead's pre-rehearsal reinstall (explicit defer); this field pins REPO bytes.                                                                                                                                                                                                                                                                                                                                |
+| 4   | `activation_barrier_sha256`        | **AMENDED** `f98a2ce42e6b8992d386aab4e97321d439fa31e7ad0dd268f8d61123ead7be1f`  | `sha256(deploy/qdrant/q12-database-barrier.sh)` at the ratified **R8-B-2-ii defrost round** (found-defects #13 + #14; see the 2026-07-19 AMENDMENT note below the table). Sha succession: `134255ce…` (W base `60910053`, pre-fix) → `3673ee49…` (2026-07-18 frozen-barrier-fix) → `cb4c4f4a…` (defrost #13 interim) → `bdb9d935…` (defrost #13+#14) → `f183aa3c…` (2026-07-27 managed-cron round, mc2-7ohdj) → `f4f90361…` (2026-07-28 cron.job-unguarded round, mc2-34eua) → `56a7a88e…` (2026-07-28 session-level read-only round, mc2-ipwyc) → **`f98a2ce4…`** (2026-07-28 session-level application_name round, mc2-38ivn; current REPO field-4 truth). All prior values historical. The deployed SERVER barrier stays `3673ee49…` pending the team-lead's pre-rehearsal reinstall (explicit defer); this field pins REPO bytes.                                                                                                                                                                                 |
 | 5   | `activation_sql_projection_sha256` | **AMENDED** `409eb9ca06f20d395f8f2d6636aa7c06220e5a6c45594b12935b6b5ccb30c3da`  | Layer-1 value: sha256 of the full generated `activate` sqlPath (8872 bytes; was `a42d6d39…` / 8839 bytes pre-defrost). MOVED by defrost #13 (+33B, the aliased cron.job restore UPDATE, which is in the activate projection); #14 adds zero motion here. CATALOG-BOUND — production re-freeze REQUIRED (checklist). Now 9213 bytes after mc2-34eua dropped `cron.job` from the lock list; see the 2026-07-19 and 2026-07-28 AMENDMENT notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 6   | `activation_normal_slice_sha256`   | **AMENDED** `eaa36af8af9faf2a778653bd2bd63aa17fe18d1310b00c6555869941016e4e61`  | Layer-1: `between(sql, NORMAL_BEGIN, NORMAL_END)` (8655 bytes; was `d413fbd7…` / 8622 bytes pre-defrost). MOVED by defrost #13 (+33B; the aliased cron.job restore UPDATE is in the NORMAL slice); #14 adds zero motion here. CATALOG-BOUND — re-freeze REQUIRED. Now 8996 bytes after mc2-34eua dropped `cron.job`; see the 2026-07-19 and 2026-07-28 AMENDMENT notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 7   | `activation_recovery_slice_sha256` | `c41cf104c423623a56a3131c6e8d8148fae2db5af44772157c1e5a57be2d0063`              | `between(sql, RECOVERY_BEGIN, RECOVERY_END)` (103 bytes). CATALOG-INDEPENDENT (`BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; SELECT q12_guard.verify_activated_state(); COMMIT;`) — production-faithful, no re-freeze.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -403,3 +403,65 @@ non-superuser barrier role and a foreign table owner — and proves the RED (`mu
 relation oauth_authorizations`), the GREEN (CASCADE + replay, immutable guard re-armed), and both
 sides of the read-only finding. It is bound to the live barrier bytes, so it goes red if either fix
 is reverted.
+
+## 2026-07-28 AMENDMENT — every barrier session states its `application_name` (mc2-38ivn)
+
+Found by window pre-flight probe B3 (`mc2-ot8se`), measured against the LIVE pooled DSN on
+2026-07-28: Supavisor does not merely drop the startup parameter the way it drops `options`
+(mc2-ipwyc) — it **substitutes its own value**. A session that asks for
+`megacampus-q12-window-preflight-b3` reads back `'Supavisor'` from both
+`current_setting('application_name')` and `pg_stat_activity`.
+
+Consequence, and why this is a window blocker rather than cosmetics: the terminal proof's
+
+```
+(SELECT count(*)::int FROM pg_stat_activity WHERE pid<>pg_backend_pid()
+   AND datname='postgres' AND application_name LIKE 'megacampus-q12-%') AS barrier_era_session_count
+```
+
+is asserted `== 0` by the cleanup/rollback jq contract. Through the pooler that count could only
+ever read 0 — not because no barrier-era session survived the window, but because no barrier-era
+session could be recognised. It passed for the wrong reason, which is the same
+environment-substitution class that cost nine window attempts. Every other consumer of the
+`megacampus-q12-%` prefix was blind the same way.
+
+NOT affected: `quiesce_client_backends()` matches on `usename`, not `application_name`, so client
+quiescence was never blind (pre-flight probe E1 is green on production).
+
+Fix, in the shape mc2-ipwyc established — state the intent in the session, never trust the
+connection. All four barrier clients now issue `SET application_name='<their identity>'` right
+beside the existing `SET default_transaction_read_only`, and each one's session proof was extended
+to assert the name twice: `current_setting('application_name')` AND the value
+`pg_stat_activity` publishes for its own backend. The proof therefore fails closed if a future
+pooler release starts discarding the session-level SET as well:
+
+| client                                    | statement of intent                                     |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `megacampus-q12-database-barrier`         | main barrier session (all operations)                   |
+| `megacampus-q12-install-baseline-proof`   | install baseline reconnect verifier                     |
+| `megacampus-q12-recovery-readiness-proof` | `prepare-recovery` inherited-read-only proof            |
+| `megacampus-q12-database-terminal-proof`  | terminal reconnect proof — the one the count belongs to |
+
+The `prepare-recovery` client keeps observing the INHERITED read-only default (that proof is
+untouched, exactly as the 2026-07-19 round required); only its name is now stated.
+
+Re-measured with `node .codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.10-activation-tuple-repro.cjs`
+against the new barrier bytes:
+
+- field 4 `activation_barrier_sha256` → `f98a2ce42e6b8992d386aab4e97321d439fa31e7ad0dd268f8d61123ead7be1f` (prior `56a7a88e…`)
+- fields 5/6/7/8/9/10 re-measured BYTE-IDENTICAL (`409eb9ca…`, `eaa36af8…`, `c41cf104…`,
+  `05ee4e73…`, `de79e836…`, `f2bb0bee…`): the change is confined to the embedded Node runners and
+  touches no SQL projection, so no production re-freeze is required by this round.
+
+The frozen 20-command manifest is UNCHANGED (`aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841`):
+`command_sha256` covers argv only, and no argv moved.
+
+Repro: `packages/course-gen-platform/tests/unit/ops/q12-database-barrier.test.ts`
+(MC2_Q12_REAL_PG17=1) reproduces the pooler locally with a PostgreSQL 17 `ON login` event trigger
+that re-sets `application_name` at session start — the session source outranks the startup packet,
+and an in-session SET still overrides it, which is exactly the production shape. With
+`log_line_prefix=%a` the server records the name it actually resolved: RED logs the terminal proof's
+own statements as `Supavisor|LOG:`, GREEN logs them as `megacampus-q12-database-terminal-proof|LOG:`.
+The same test holds one `megacampus-q12-intruder` session open across a cleanup run and requires the
+terminal proof to refuse (`database terminal reconnect result is invalid`), so
+`barrier_era_session_count` is proven live in both directions rather than vacuously zero.
