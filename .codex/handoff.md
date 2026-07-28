@@ -51,13 +51,34 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: run `mc2-ot8se` — the read-only window pre-flight — to completion, THEN re-open
-the window to the reversible `--stop-after deploy.prepare` hold. The pre-flight owns the reinstall,
-the fresh run root and the `plan`; it is the gate on `mc2-i9h3y`, and the owner has granted it full
-authority for everything except opening the window itself. Contract + plan:
-`docs/superpowers/{specs/2026-07-28-q12-window-preflight-contract.md,plans/2026-07-28-q12-window-preflight.md}`; prompt:
-`.codex/stages/mc2-jz6y0/artifacts/mc2-ot8se-orchestrator-prompt.md`. The "Before the next
-attempt" list below stays only until the probe replaces it with a green report.
+Recommended action: fix `mc2-38ivn` (P0, blocks `mc2-i9h3y`), then re-run the pre-flight and re-open
+the window to the reversible `--stop-after deploy.prepare` hold.
+
+`mc2-ot8se` is DONE: the pre-flight exists, is deployed, and has been run for real. It found a TENTH
+instance of the class in minutes — probe **B3: the Supavisor pooler REWRITES `application_name` to
+`'Supavisor'`**, so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` reads 0
+for the wrong reason and every consumer of that prefix is blind. The remedy was measured in the same
+run: a session-level `SET application_name` DOES reach `pg_stat_activity`, exactly the `mc2-ipwyc`
+shape. It is NOT fixed here: it changes `q12-database-barrier.sh` and needs a W-tuple amendment,
+both outside `mc2-ot8se`'s authority. `quiesce_client_backends()` matches on `usename` and is
+unaffected (E1 green). Contract + plan:
+`docs/superpowers/{specs/2026-07-28-q12-window-preflight-contract.md,plans/2026-07-28-q12-window-preflight.md}`.
+
+FRESH RUN ROOT for the window (plan re-run 2026-07-28, read-only, production):
+`/opt/megacampus/backups/q12/6544c7dd-e680-462d-bf8f-5db8fc01c9b6`
+
+- `--expected-catalog-sha256 6be37e858e4fbd473a298cd1dfdaf49906e2c9964982801b39e1ac6104f7aaaa`
+  (the sha256 of THAT root's OWN `expected-post-migration-catalog.json`)
+- `baseline_structural_sha256 a2b2532406ad3a6f3fa904d9c6caed633dd2d3c90fc6e7ea4ee7668e8b5bd75b`
+  (agrees with D1, measured in the barrier's `search_path`)
+- `expected_post_migration_catalog_sha256 b1fe2b9cf95d4d6e263b5aa65a7fc907ab2521ed6b6f654c1623cd0487ffff0d`
+- report: `<run-root>/q12-window-preflight-20260728T125738Z.json` — 22 `pass`, 2 `unprovable` with
+  evidence (C5/C6), 1 `fail` (B3). Still missing from the root: `accepted-coverage-run` and
+  `secrets/db-capability`, both copied in at 0400 at window time.
+
+The deployed Q12 tree was REINSTALLED from `develop` on 2026-07-28 and H2 proves it byte-equal
+(26 assets); the replaced files are under `/opt/megacampus/backups/q12-assets/20260728T124629Z/`.
+The sixth digest pin (`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
 
 WINDOW STATE. Opened NINE times (six 2026-07-27, three 2026-07-28). Attempts 1-8 failed closed with
 ZERO mutation; each surfaced a real defect. Attempt #9 INSTALLED the guard and then aborted, leaving
@@ -102,11 +123,14 @@ agreement in the barrier's own `search_path` (D1, `mc2-2rzf6`) and quiesce feasi
 
 Still the operator's, because the probe cannot do them:
 
-1. Fresh run root + `plan` (read-only, makes its own root); then copy `accepted-coverage-run` +
-   `secrets/db-capability` in at 0400. `--expected-catalog-sha256` is the sha256 of THAT root's OWN
-   catalog FILE (barrier `:302`), never a value quoted for a prior root.
+1. Copy `accepted-coverage-run` + `secrets/db-capability` into the run root at 0400.
+   `--expected-catalog-sha256` is the sha256 of THAT root's OWN catalog FILE (barrier `:302`), never
+   a value quoted for a prior root. (The run root and the `plan` themselves are already done — see
+   § "Next recommended".)
 2. Run the controller DETACHED (`setsid nohup`). A dropped ssh once killed a plan (exit 255); after
    C2 that would strand stopped writers.
+3. Note that a push to `develop` triggers Deploy to Dev, which restarts the dev containers and makes
+   H4 fail for 30 minutes. Land deliveries BEFORE the window, not during it.
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
 (= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce
