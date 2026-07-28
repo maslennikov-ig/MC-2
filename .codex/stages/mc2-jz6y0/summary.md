@@ -1384,3 +1384,142 @@ The host file is `root:root 0644` again, so H2 now reports the truth —
 `the deployed tree differs from the manifest at 1 point(s): deploy/qdrant/q12-writer-resume.py
 (mode 0444 -> 0644)` — and the gate blocks a reopen until the manifest is corrected. A true red
 instead of a false green.
+
+## `mc2-lzft4` — the probe asserted the wrong expected value (2026-07-28, `62461e172`)
+
+Window attempt #10 burned its run-id at C2 because `/opt/megacampus/deploy/qdrant/q12-writer-resume.py`
+was deployed `root:root 0444` while `deploy/qdrant/source-recovery-run.sh:247` compares
+`stat -c '%u:%g:%a'` against `'0:0:644'` and refuses anything else. The tracked
+`deploy/qdrant/q12-deployed-asset-manifest.json` DECLARED `0444` — it derived the mode from the git
+executable bit — and probe H2 asserts mode and owner AGAINST that manifest, so H2 passed on a host
+the window's own child rejects. The `mc2-jhqpw` hardening (root-owned so the operator account cannot
+rewrite the privileged child, but readable by the operator that reads it) had regressed silently
+when a reinstall re-applied the manifest's value.
+
+FIX. `q12-window-preflight.py` grew `CONSUMER_REQUIRED_IDENTITY`: where a consuming script asserts
+an exact identity of its own, that assertion — not the heuristic — is what the manifest declares.
+The emitter now fails CLOSED in both directions: `assert_consumer_identity_assertions` re-reads the
+consumer's own bytes for the exact assertion the pin was derived from and refuses to emit if it is
+gone, and `build_asset_manifest` refuses to emit a manifest that would leave a pinned asset out of
+the asset set entirely (the rename hole). The derivation string records the new rule.
+
+TESTS (`tests/unit/ops/q12-asset-manifest-consumer-identity.test.ts`, 5). The first reads the
+wrapper directly, regex-extracts `0:0:644`, and asserts the tracked manifest declares
+`root:root 0644` — so the two cannot drift again without a red, without trusting the pin table. The
+others prove the pin is live against the consumer, that a fresh emission and the tracked file agree
+on every pinned path, and that both fail-closed guards bite (drifted consumer; pinned-but-unlisted
+asset). RED proven at the parent commit (manifest `root:root:0444` vs the wrapper's `0:0:644`).
+
+GATES. `pnpm type-check` 0, `pnpm build` 0, `tests/unit/ops` 1303/1303 across 67 files run SERIALLY
+(`--maxWorkers=1`, exit 0) — which also retires the earlier parallelism-only `q12-live-cutover`
+timeout — `q12-window-preflight.test.ts` 43/43 with the gated H2 host probes, process verification
+OK. Frozen manifest `aaec6fc2…` and barrier `f98a2ce4…` unmoved.
+
+DEPLOYED. Exactly two assets differed; both backed up to
+`/opt/megacampus/backups/q12-assets/20260728T183536Z/` and installed with the manifest's declared
+identity. H2 afterwards: "all 26 deployed assets are byte-equal to the manifest generated from tree
+`d7471efe956f…`".
+
+## A CI failure that was a test defect, not a product defect (2026-07-28, `8b53e9e43`)
+
+CI run 30387943748 failed on the W7a recover-threading test's head-1 leg with `reached=false`.
+Reproduced exactly under `python:3.12-slim`: the head-1 walk publishes a run-root resource manifest,
+and `ensure_directory` (`q12-lifecycle-core.py:527-532`) refuses any run-root directory whose owner
+is not uid/gid 1000 — `unsafe directory identity`. That refusal is CORRECT production code (the
+controller identity is `claude-deploy`), and it is the bound `q12-real-controller-gate.ts` already
+documents: GitHub-hosted runners execute as uid 1001.
+
+Head 1 now runs under `RUN_REAL_CONTROLLER`, with the Python runner honouring
+`MC2_Q12_REAL_CONTROLLER` at the same precedence so the harness and the test agree on ONE signal
+rather than two that can disagree. Where the leg cannot be driven the runner emits `skipped` plus
+the concrete reason and a `skipIf` test asserts that bound is STATED — a leg that never ran must not
+read as green. Head 4 reaches its observation point without creating a run-root directory and stays
+ungated on every runner. Both paths verified green locally (uid 1000, and forced off).
+
+## Window attempt #11 and `mc2-awi6q` — the fixture carried the substitution (2026-07-28)
+
+PREPARATION, all of it green. The Q12 tree was reinstalled from `develop` and H2 re-proven. A fresh
+`plan` ran detached under `/usr/bin/python3.13` for a fresh run-id
+`8915724a-23ba-42f1-8c25-c08110ca5dc6` and returned `status: planned`, `release_sha
+23dfe973f18cc6067d386b6eb683bf6906142165`, `expected_catalog_sha256
+1465ab2335b3a43192497d98ceade816b0c769b210178b355e4e2fee1f114342` (taken from `sha256sum` of THAT
+root's own catalog file, never retyped). The run root was staged 0700 with `accepted-coverage-run`
+0400 carrying `catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e` and a FRESHLY MINTED
+`secrets/db-capability` 0400. Runbook preconditions re-verified: the emit CLI smoke fails with the
+usage message (not a module-resolution error), `q12-privileged-launch.sh` is `root:root 0555`,
+`fs.protected_hardlinks` is 1, and both `.env.blue`/`.env.green` define `WEB_IMAGE` and `API_IMAGE`.
+`.env.production` still pins operator digest `b5eb528e…` and that image is present locally. CI was
+green at `8b53e9e43`, `Deploy to Dev` was SKIPPED (test-only change), and dev containers were 4
+hours old, so H4's host legs were quiet. The 25-probe pre-flight exited 0: 22 `pass`, and C5, C6, H4
+`unprovable` each with a named evidence pointer.
+
+THE ATTEMPT. Opened detached at 19:14Z to `--stop-after deploy.prepare`. It cleared C1 — with
+`mc2-lzft4` fixed the wrapper's ownership gate passed and C2's child RAN FOR THE FIRST TIME in
+production — and the child refused at once:
+
+```
+ResumeError: writer quiesce journal graph is invalid   (q12-writer-resume.py:1053 -> :507 -> :80)
+```
+
+11 durable rows, receipt `maintenance_guarded`, head `quiesced/capability_claimed`. No writer was
+quiesced. Production was guarded for about five minutes.
+
+ROOT CAUSE, from the real journal and the real capability files:
+
+```
+quiesced intent             capability_manifest_sha256 = 9c8cb181ef89ed15…
+quiesced capability_issued  capability_manifest_sha256 = f6d52d9bd21256d8…
+quiesced capability_claimed capability_manifest_sha256 = f6d52d9bd21256d8…
+sha256(capabilities/claimed/writers.quiesce--cutover.json)   = f6d52d9bd21256d8…
+sha256(capabilities/completed/barrier.install--cutover.json) = 9c8cb181ef89ed15…
+```
+
+Issued and claimed match `opened.digest` exactly; the intent row carries the PREDECESSOR command's
+capability digest, inherited forward. `q12-writer-resume.py:509` requires the quiesce intent row to
+be 64 zeroes and fails closed on the inherited value.
+
+THE CONTROLLER IS NORMATIVE. The ratified D5J amendment freezes inheritance in as many words —
+"the next barrier intent inherits it unchanged as `H.capability_manifest_sha256`"
+(`…specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md` item 6) — and the retained-barrier
+provenance addendum describes the same `H` inheritance. The `intent.capability_manifest_sha256 ==
+0×64` rule is real but belongs ONLY to the `barrier.cleanup` lifecycle
+(`…specs/2026-07-17-q12-live-controller-design.md:636`, `:867`), which is exactly the distinction
+the controller's own grammar validator already makes: ZERO for the cleanup intent
+(`q12-lifecycle-core.py:335`), phase-only for ordinary intents (`:356-358`), with the digest set by
+`selector_intent_from_head`'s carry rule (`:2711`).
+
+WHY IT SURVIVED THE SUITE. The runtime fixture that exercises this validator defaults
+`capabilityManifestSha256` to `'0'.repeat(64)` and appends `append('quiesced','intent')` with it
+(`qdrant-source-recovery-runtime.test.ts:1418`, `:1449`). The child agrees with the FIXTURE, and the
+fixture's journal is not the one the controller writes. That is the twelfth instance of the
+environment-substitution class and the second in two days where the checking artefact — first the
+probe (`mc2-lzft4`), now the fixture — carried the substitution itself.
+
+NOT FIXED HERE, deliberately: `deploy/qdrant/q12-writer-resume.py` is outside the authorised write
+zone and is the privileged child that stops production writers; the stop rule for a new instance of
+this class is to file and report. It is NOT byte-frozen (the W-tuple guard pins only field 2
+`q12-command-manifest.json` and field 4 `q12-database-barrier.sh`), so the fix does not move a
+frozen artefact — but it does move the asset manifest, which must be re-emitted, redeployed and
+re-proven through H2. Full proposal on `mc2-awi6q`.
+
+RESTORE. The barrier's own restore block was rendered from the DEPLOYED barrier
+(`write_restore_sql true`, `drop_schema=true`) to rendered SQL sha256
+`2f11b8ed5f8677d2f8a8c657771e833777822fc66ed8aab82ce233d6a5fb0eb0` — BYTE-IDENTICAL to the block
+used for attempt #10 — and executed under this run's capability with the barrier's exact database
+identity, CA digest and session proof. Post-restore pre-flight `--scope database` exits 0: A1-A7,
+B1-B4, C1-C4 (zero `q12_guard` residue, 8 cron jobs active, queue empty), D1, E1, E2 all pass; C5/C6
+unprovable with evidence. Every production container healthy. Only the post-COMMIT
+`pg_terminate_backend` tail failed again — `mc2-e21lo`, unchanged.
+
+STRUCTURAL-CATALOG NOTE (`mc2-ivjyb`). `baseline_structural_sha256` had moved from `a2b25324…`
+(12:56Z plan, and confirmed identical in the attempt-#10 barrier baseline at 16:00Z) to `93ca595a…`
+(20:44Z plan). Two full captures of the same frozen projection 75 s apart are byte-identical in all
+41 sections, and `migration_frontier` is `20260704150249` with 317 rows at both ends, so nothing
+volatile and no migration explains it; the plan's restore-completeness gate passed against current
+production, so nothing is missing. The pre-change payload in the same projection no longer exists
+(plan reclaims its workdir; the two surviving run-root artefacts are different projections with
+different identity shapes), so the CONTENT of the delta is unprovable from disk. Attempt #11 then
+settled the important half: D1 reported `93ca595a…` both immediately before the window and after the
+restore, so a barrier install plus the restore block is structurally NEUTRAL and the earlier change
+did not come from the restore path. The remaining action is only to keep one
+`plan --keep-equality-diagnostics` source payload so the next comparison is provable.
