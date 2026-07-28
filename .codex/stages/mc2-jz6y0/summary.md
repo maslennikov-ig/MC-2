@@ -1235,3 +1235,86 @@ wins) and reads the resolved name back out of the server log through `log_line_p
 logged the terminal proof's own statements as `Supavisor|LOG:`. The same test holds one
 `megacampus-q12-intruder` session open across a cleanup run and requires the terminal proof to
 refuse, so `barrier_era_session_count` is proven live in both directions rather than vacuously zero.
+
+## `mc2-1sns3` — the recover drive path never threaded the staged callbacks (2026-07-28, delivered)
+
+The last open dependency of the window, and the same substitution class as the ten window defects —
+this time inside our own increments rather than in production.
+
+W7a increments 2-3 wired the staged resolver callbacks that carry a real value from one
+data-movement step to the command that consumes it: `on_pg_backup_done` (pg.backup publishes the
+generation dir; `pg.restore` consumes `<immutable-generation>`) and `on_source_forward_accepted`
+(source.forward publishes the acceptance authority; `reindex.plan` consumes
+`<accepted-recovery-manifest-sha256>` / `<accepted-coverage-fingerprint>` / `<accepted-coverage-run>`).
+Both were wired as an `on_staged` hook that **`run_live` passed into `drive_forward_sequence`**.
+
+`run_recover` shares that driver and passed nothing, so the default no-op ran. Two entries of the
+generalized R8-I-B head-dispatch table re-drive a staged step:
+
+- head 1 `("barrier.install", "completed") -> "writers.quiesce"` re-drives pg.backup, then
+  `pg.restore` raised `unresolved command placeholder`;
+- head 4 `("barrier.prepare-recovery", "completed") -> "source.forward"` re-drives source.forward,
+  then `reindex.plan` raised the same.
+
+Both heads are only reachable AFTER C2 has quiesced the production writers, so the failure mode was
+a fail-closed abort with the writer fleet already stopped — the exact stranded-writer exit the
+window's stop rules exist to avoid.
+
+Increment 4 was supposed to cover this and did not: it proved the threaders are re-drive-SAFE by
+calling `resolve_pg_backup_generation` DIRECTLY (resolve-once, drift fails closed, authority
+uncorrupted). It never proved the recover drive path CALLS them. The checked environment — a direct
+call — was more permissive than the consuming one, which made no call at all.
+
+Fix (`1725a2df3`): the staged threading MOVED INTO `drive_forward_sequence`, which already holds
+`engine.executor`, `values`, `request` and `engine.run_root`. The `on_staged` parameter is gone, so
+there is one implementation and no caller can forget it — the property `WindowSnapshotHold` already
+had for `<exported-id>`, whose docstring had described recover-awareness all along.
+
+TDD RED->GREEN, infra-free: `q12-production-recover-staged-threading.test.ts` + runner drive the
+REAL `drive_forward_sequence` from each recover head exactly as `run_recover` drives it (no
+caller-supplied hook), with a fake `OwnerCustodyExecutor` subclass overriding only the
+authority-read seams and an injected `ordinary` that resolves the real frozen-manifest command the
+way `Engine.append_ordinary_lifecycle` does. Both heads reported the fail-closed error before the
+fix and resolve after.
+
+Parity and freeze: fixture composer path is production-gated and byte-identical
+(`q12-live-controller` 26/26, `q12-live-real-full-window` green under `MC2_Q12_REAL_PG17=1`);
+frozen manifest `aaec6fc2…` and barrier `f98a2ce4…` unmoved.
+
+Increment 5 boundary settled in the W7a plan: its real leg needs a real reviewed recovery
+`manifest.json` plus the recovered Supabase `file_catalog` rows, which exist only once the real
+`source.forward` has run — so it IS the window's own forward leg, not a rehearsal that could
+precede it. `mc2-1sns3` therefore closes at increment 4b.
+
+## Window identity and capability rulings (2026-07-28)
+
+`--release-sha` = `23dfe973f18cc6067d386b6eb683bf6906142165`, settled from artefacts:
+
+- `.env.green` pins `api@sha256:2f713f87…`, whose `org.opencontainers.image.revision` label on the
+  host IS `23dfe973f…`; `web@sha256:ca9afb99…` labels `50f670b9`, and
+  `git diff 50f670b9..23dfe973f -- packages/web packages/shared-types packages/shared-utils` is
+  empty, so the pair is an exact per-package build of tree `23dfe973f`;
+- `.env.production` pins `QDRANT_OPERATOR_IMAGE_SHA256=b5eb528e…`, and that image's revision label
+  IS `060b4faea` — the OPERATOR artifact, a different thing;
+- `git show 060b4faea` touched only `.codex/`, `deploy/qdrant/`, `docs/` and tests: no application
+  source, so no app image was ever built from it;
+- the staged run root's own `expected-post-migration-catalog.json` already records
+  `release_sha 23dfe973f…`.
+
+`mc2-sdbua`'s closure is therefore SUPERSEDED: it ruled on the now-spent run root `0fa297e4` and
+re-made exactly the operator-image/app-release conflation `mc2-v7547` corrected later the same day
+(and which re-pinned `.env.green` to this pair). No re-plan; `--expected-catalog-sha256` stays
+`6be37e858e4fbd473a298cd1dfdaf49906e2c9964982801b39e1ac6104f7aaaa`.
+
+`secrets/db-capability`: RE-MINT per run root, answered from the barrier's code without an owner
+decision. `q12-database-barrier.sh:210` binds only the PATH to the run id, validates 0400 +
+non-symlink + O_NOFOLLOW identity stability (`:230`, `:285`) and records the digest into THAT root's
+own receipts (`:646`, `:2034`); `install` INSERTs `q12_guard.active_run(run_id, capability_sha256,
+…)` from the session GUCs (`:945-948`), and `assert_capability` (`:984`) /
+`assert_controller_binding` (`:999`) compare only against that freshly-inserted row, which an UPDATE
+may not change (`:1059`). The value is a per-run nonce with no external counterpart. Probe C4 reads
+zero `q12_guard` residue, so a byte-identical carry-over would also have worked; re-minting was
+chosen because the same 65-byte value was staged into ten run roots across the nine burned attempts,
+one of which (#9) installed the guard and published its digest. `accepted-coverage-run` is
+deterministic and not secret, so it was copied byte-identically
+(`catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e`, 45 bytes, 0400).
