@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import pathlib
 import sys
 import tempfile
@@ -149,7 +150,35 @@ def _drive(resume_from: str, observed: str, seed: dict[str, str]) -> dict[str, o
 
 def main() -> int:
     run_id = str(uuid.uuid4())
-    head1 = _drive("writers.quiesce", "pg.restore", {})
+    # Head 1's walk publishes a checkpoint-bound resource manifest through
+    # `write_live_resource_manifest`, and `ensure_directory` refuses any run-root directory whose
+    # owner is not the production controller identity uid/gid 1000 (core `:527-532`, "unsafe
+    # directory identity"). That refusal is CORRECT production code, so this leg can only be driven
+    # where the run root is genuinely owned by 1000 — the same bound `q12-real-controller-gate.ts`
+    # already documents for the real-controller suites (GitHub runners execute as uid 1001). Report
+    # the bound explicitly rather than letting the leg read as green where it never ran. Head 4
+    # reaches its observation point without creating a run-root directory, so it runs everywhere.
+    # `MC2_Q12_REAL_CONTROLLER` is honoured with the same precedence as `q12-real-controller-gate.ts`
+    # so the harness and the test agree on one signal instead of two that can disagree.
+    override = os.environ.get("MC2_Q12_REAL_CONTROLLER")
+    if override is not None:
+        drive_head1 = override == "1"
+        reason = f"MC2_Q12_REAL_CONTROLLER={override!r} forces the uid/gid 1000 leg off"
+    else:
+        drive_head1 = os.getuid() == 1000 and os.getgid() == 1000
+        reason = (
+            "the head-1 walk publishes a run-root resource manifest and the production run-root "
+            f"identity check requires uid/gid 1000, but this process is {os.getuid()}/{os.getgid()}"
+        )
+    if drive_head1:
+        head1 = _drive("writers.quiesce", "pg.restore", {})
+    else:
+        head1 = {
+            "resumeFrom": "writers.quiesce",
+            "observed": "pg.restore",
+            "skipped": True,
+            "reason": reason,
+        }
     head4 = _drive(
         "source.forward",
         "reindex.plan",
