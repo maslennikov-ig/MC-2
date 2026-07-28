@@ -10,8 +10,7 @@ Updated: 2026-07-28 (C1 wall removed: `cron.job` unguarded, `mc2-34eua`)
   orchestration-infra commits are all in it). Keep those branches for history only.
 - **Stale branches RETIRED (2026-07-27 audit).** The primary worktree sits on `develop`; new Q12
   work branches from it and is delivered via `/push-dev`. Video pipeline parked `mc2-hqfc3`.
-
-Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
+- Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
 
 ## Product Truth
 
@@ -24,19 +23,11 @@ Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expans
 
 ## Read First
 
-- `AGENTS.md`
-- `.codex/orchestrator.toml`
-- `.codex/handoff.md`
-- `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`
-- `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
-- `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
-- `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
-- `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`
-- `docs/superpowers/specs/2026-07-13-q12-live-cutover-corrections-design.md`
-- `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`
-- `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
-- `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`
-- `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`
+`AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/project-index.md`,
+`graphify-out/GRAPH_REPORT.md`. Design/plan pairs for the live line, under
+`docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
+`2026-07-11-advisory-document-evidence-rag`, `2026-07-13-q12-live-cutover-corrections`,
+`2026-07-13-q12-recoverable-lifecycle-addendum`, `2026-07-28-q12-window-preflight`.
 
 ## Accepted and Open Work
 
@@ -80,13 +71,10 @@ The deployed Q12 tree was REINSTALLED from `develop` on 2026-07-28 and H2 proves
 (26 assets); the replaced files are under `/opt/megacampus/backups/q12-assets/20260728T124629Z/`.
 The sixth digest pin (`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
 
-WINDOW STATE. Opened NINE times (six 2026-07-27, three 2026-07-28). Attempts 1-8 failed closed with
-ZERO mutation; each surfaced a real defect. Attempt #9 INSTALLED the guard and then aborted, leaving
-production guarded + read-only with `activated=false`; it was restored by hand the same day using the
-barrier's OWN `$restore$` block (extracted programmatically, `drop_schema=true`, under the run's
-capability, fail-closed pre-checks). Production re-verified afterwards: 0 q12 schemas / triggers /
-event triggers / functions, cron 8/8 ACTIVE, database default writable, no stale sessions, all
-containers healthy. Run root `5e9b7256-…` is BURNT — each attempt burns its run-id.
+WINDOW STATE. Opened NINE times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9
+installed the guard, aborted, and was restored by hand the same day with the barrier's own
+`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id. Full
+chronology: `.codex/stages/mc2-jz6y0/summary.md`.
 
 DEFECTS #7-#9 AND THE `mc2-ipwyc` PAIR: all found, fixed and delivered on `develop`; the full
 chronology moved to `.codex/stages/mc2-jz6y0/summary.md` on 2026-07-28. Each is now a PROBE in
@@ -115,11 +103,10 @@ without a green report under 30 minutes old whose `asset_manifest_sha256` matche
 so this is a gate, not a reminder. Contract:
 `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
-What it now covers that used to be a manual step: the deployed-tree byte comparison (H2, against the
-tracked `deploy/qdrant/q12-deployed-asset-manifest.json`), the digest-pinned images and their
-`q12-window-hold/*:pinned` tags (H1, `mc2-y5tgw`), the dev-deploy quiet window (H4), guarded-set
-privilege reachability (A1..A7), the pooled session (B1..B4), cron/queue/residue (C1..C4), catalog
-agreement in the barrier's own `search_path` (D1, `mc2-2rzf6`) and quiesce feasibility (E1/E2).
+Coverage: A1..A7 guarded-set privilege reachability, B1..B4 the pooled session, C1..C4
+cron/queue/residue, D1 catalog agreement in the barrier's `search_path`, E1/E2 quiesce feasibility,
+H1..H5 host (deployed-tree bytes, digest-pinned images and their hold tags, running controller,
+dev-deploy quiet window, disk).
 
 Still the operator's, because the probe cannot do them:
 
@@ -137,44 +124,33 @@ WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operat
 digests on a first run. `--stop-after deploy.prepare` is the sole resumable pre-C9 head. The barrier
 is invoked as argv[0]: keep it mode 0555, not 0444.
 
-RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green` pins,
-`--operator-digest` the `qdrant-operator` image `.env.production` pins — different artifacts, once
-conflated. `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`) to api@`2f713f87` +
-web@`ca9afb99`. The dead GHCR token (`mc2-2vtmk`) does not block the window. Historical progress logs
-live in `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
+RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green`
+pins, `--operator-digest` the `qdrant-operator` image `.env.production` pins — different
+artifacts, once conflated. Detail, including the `.env.green` re-pin and its backup, moved to
+`.codex/stages/mc2-jz6y0/summary.md` on 2026-07-28. The dead GHCR token (`mc2-2vtmk`) does not
+block the window.
 
 ## Starter prompt for next orchestrator
 
-Full completion program authored (prompt-check pass): copy
-`docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md`
-(authority: spec `…specs/2026-07-16-q12-full-completion-design.md` + plan
-`…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
-publish → C live cutover → D closeout; every remote/live and credentialed step
-owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
-
-## Required Skills and Review
-
-- Orchestration: `orchestrator-stage`, `task-router`, `subagent-driven-development`.
-- Behavior changes: `brainstorming` where decisions remain, `test-driven-development`, `verification-before-completion`.
-- Risk/closeout: `senior-architect`, `senior-devops`, `test-pass`, `orchestration-closeout`.
-- Specialists: `docs_researcher`, search/data worker, `deploy_specialist`, `correctness_reviewer`, and `docs_reviewer`.
+`docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md` (prompt-check pass;
+Phase A local D6/Root -> B GHCR publish -> C live cutover -> D closeout, every remote/live and
+credentialed step owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
 
 ## Verification and Delivery
 
 - Do not weaken RU/EN relevance, strict-mode, restore, resume, coverage, or tenant-isolation tests.
-- Completed local gates: focused Stage 2/4/5/6 backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, pinned Qdrant 15/15, applicable local snapshot/restore 5/5, Compose 8/8, `pnpm type-check`, and `pnpm build` 75/75. Process verification, final Graphify refresh, and canonical closeout are recorded at the delivered HEAD.
+- Completed local gates at the delivered HEAD (backend/shared/web/PostgreSQL/Qdrant/Compose,
+  `pnpm type-check`, `pnpm build`, process verification, Graphify refresh, canonical closeout):
+  recorded in `.codex/stages/mc2-jz6y0/summary.md`.
 - Keep durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff synchronized before any Q12 continuation.
 - All accepted branches/commits must be pushed under the repo contract.
 - Primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
 
 ## Explicit defers
 
-- Review P2 on the `.13.4.1` amendment (`mc2-af1ay`): `source-recovery.ts` keeps a second
-  operator-side `DispositionSchema` without the kind↔reason↔course_id superRefine from
-  `source-recovery-manifest.ts` — rescued today because `assertExactRecoveryContract` runs the
-  strict `normalizeRecoveryManifest`. DEFERRED past the live window (no operator churn before
-  C1..C10): consolidate the duplicate schema, deduplicate `CATALOG_HASH_PATTERN`, consider
-  excluding quote/backslash from its character class.
+- Review P2 `mc2-af1ay` on the `.13.4.1` amendment (duplicate operator-side `DispositionSchema`,
+  `CATALOG_HASH_PATTERN`): DEFERRED past the live window — no operator churn before C1..C10.
+  Detail in `.codex/stages/mc2-jz6y0/summary.md`.
 - Q12 staging mutation is owner-authorized but NO-GO until the approved correction streams, a truthful
   fresh validated database backup, a Supabase-compatible restore and every documented hard gate pass.
   GHCR publication and password rotation keep their separate secret/effects gates. Missing-source
@@ -183,16 +159,16 @@ owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
 - D6 `.13.19` is integrated; Root `.13.13` join is the next implementation stream. D6 pinned-server
   capability gates and the fields 5/6/8/9 production re-freeze (Task C7) stay live-window scope. No
   live action outside the owner-gated window.
-- Known accepted boundaries (by design, not debt): the joined composer's partial-capture fixture is
-  truthful only while W validates held checkpoints as a creation-order prefix without a journaled
-  counter (P2-3); §5 tamper-append of a fully VALID row is outside tamper protection by design (the
-  guarded property is prefix integrity); M's residual P2-4 libpq variables are proven
-  non-exploitable with the explicit `ssl` object.
+- Known accepted boundaries (by design, not debt): recorded in
+  `.codex/stages/mc2-jz6y0/summary.md` (W prefix-integrity scope, the §5 tamper-append case,
+  M's residual P2-4 libpq variables).
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
-- The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
+- `codex/self-hosted-qdrant-platform` is intentionally retained for Q12; all other Q11-owned
+  worktrees, branches, containers, ports and temporary data are cleaned
+  (`.codex/stages/mc2-jz6y0/summary.md`).
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
 - **Q12 W7 window — DURABLE PRECONDITIONS** (superseded argv removed 2026-07-27; the live argv lives
   in § "Next recommended" only, so there is one source of truth).

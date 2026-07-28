@@ -1152,3 +1152,46 @@ THE PATTERN behind all of them: the checked environment substituted for the cons
 published the step, an isolate had superuser rights, the real error was swallowed, a host-only gate
 hid a rotten fixture, or the pooler silently dropped what the test connection delivered. Model the
 constraint, never the convenience.
+
+## Release identity and `.env.green` re-pin (moved from `.codex/handoff.md`, 2026-07-28)
+
+RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green` pins,
+`--operator-digest` the `qdrant-operator` image `.env.production` pins — different artifacts, once
+conflated. `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`) to api@`2f713f87` +
+web@`ca9afb99`. The dead GHCR token (`mc2-2vtmk`) does not block the window. Historical progress logs
+live in `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
+
+## Window attempts #1-#9 and the 2026-07-28 restore (moved from `.codex/handoff.md`)
+
+WINDOW STATE. Opened NINE times (six 2026-07-27, three 2026-07-28). Attempts 1-8 failed closed with
+ZERO mutation; each surfaced a real defect. Attempt #9 INSTALLED the guard and then aborted, leaving
+production guarded + read-only with `activated=false`; it was restored by hand the same day using the
+barrier's OWN `$restore$` block (extracted programmatically, `drop_schema=true`, under the run's
+capability, fail-closed pre-checks). Production re-verified afterwards: 0 q12 schemas / triggers /
+event triggers / functions, cron 8/8 ACTIVE, database default writable, no stale sessions, all
+containers healthy. Run root `5e9b7256-…` is BURNT — each attempt burns its run-id.
+
+## Deferred review P2 on the `.13.4.1` amendment (moved from `.codex/handoff.md`, 2026-07-28)
+
+- Review P2 on the `.13.4.1` amendment (`mc2-af1ay`): `source-recovery.ts` keeps a second
+  operator-side `DispositionSchema` without the kind↔reason↔course_id superRefine from
+  `source-recovery-manifest.ts` — rescued today because `assertExactRecoveryContract` runs the
+  strict `normalizeRecoveryManifest`. DEFERRED past the live window (no operator churn before
+  C1..C10): consolidate the duplicate schema, deduplicate `CATALOG_HASH_PATTERN`, consider
+  excluding quote/backslash from its character class.
+
+## Q11 cleanup state (moved from `.codex/handoff.md`, 2026-07-28)
+
+- The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
+
+## Completed local gates at the delivered HEAD (moved from `.codex/handoff.md`, 2026-07-28)
+
+- Completed local gates: focused Stage 2/4/5/6 backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, pinned Qdrant 15/15, applicable local snapshot/restore 5/5, Compose 8/8, `pnpm type-check`, and `pnpm build` 75/75. Process verification, final Graphify refresh, and canonical closeout are recorded at the delivered HEAD.
+
+## Known accepted boundaries (moved from `.codex/handoff.md`, 2026-07-28)
+
+- Known accepted boundaries (by design, not debt): the joined composer's partial-capture fixture is
+  truthful only while W validates held checkpoints as a creation-order prefix without a journaled
+  counter (P2-3); §5 tamper-append of a fully VALID row is outside tamper protection by design (the
+  guarded property is prefix integrity); M's residual P2-4 libpq variables are proven
+  non-exploitable with the explicit `ssl` object.
