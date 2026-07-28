@@ -891,7 +891,167 @@ def host_suite() -> dict:
     return out
 
 
+# --- the cutover gate -----------------------------------------------------------------------------
+
+CUTOVER_SHELL = REPO / "deploy/qdrant/q12-live-cutover.sh"
+
+
+def write_report(directory: pathlib.Path, stamp: str, report: dict) -> pathlib.Path:
+    path = directory / f"q12-window-preflight-{stamp}.json"
+    path.write_text(json.dumps(report, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def green_report(manifest_sha: str, captured_at: str, *, scope="all", probes_override=None) -> dict:
+    return {
+        "schema_version": "megacampus.q12.window-preflight/v1",
+        "captured_at": captured_at,
+        "tree_sha": "0" * 40,
+        "tree_sha_source": "asset-manifest",
+        "scope": scope,
+        "run_root": "/opt/megacampus/backups/q12/probe",
+        "probes": probes_override
+        if probes_override is not None
+        else [
+            {"id": probe_id, "verdict": "pass", "detail": "measured", "evidence": None}
+            for probe_id in probes.FROZEN_IDS
+        ],
+        "out_of_scope": [],
+        "summary": {"pass": len(probes.FROZEN_IDS), "fail": 0, "unprovable": 0},
+        "asset_manifest_sha256": manifest_sha,
+    }
+
+
+def stamp_for(minutes_ago: int) -> "tuple[str, str]":
+    import datetime
+
+    moment = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=minutes_ago)
+    captured = moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return captured, captured.replace(":", "").replace("-", "")
+
+
+def run_gate(report_dir: pathlib.Path, deploy_root: pathlib.Path):
+    return subprocess.run(
+        [
+            "/usr/bin/python3",
+            str(PREFLIGHT),
+            "--assert-fresh-report",
+            "--report-dir",
+            str(report_dir),
+            "--deploy-root",
+            str(deploy_root),
+        ],
+        capture_output=True,
+        text=True,
+        env=BASE_ENV,
+        check=False,
+    )
+
+
+def gate_suite() -> dict:
+    out: dict = {}
+    manifest_source = REPO / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    manifest_sha = hashlib.sha256(manifest_source.read_bytes()).hexdigest()
+
+    with tempfile.TemporaryDirectory(prefix="mc2-q12-gate-") as raw:
+        base = pathlib.Path(raw)
+        deploy_root = base / "deploy-root"
+        (deploy_root / "deploy/qdrant").mkdir(parents=True)
+        (deploy_root / "deploy/qdrant/q12-deployed-asset-manifest.json").write_bytes(
+            manifest_source.read_bytes()
+        )
+
+        def case(name: str, build) -> None:
+            directory = base / name
+            directory.mkdir()
+            build(directory)
+            completed = run_gate(directory, deploy_root)
+            out[name] = completed.returncode
+            out[f"{name}_stderr"] = (
+                "ok"
+                if completed.returncode == 0
+                else " ".join(completed.stderr.split())[:300]
+            )
+
+        fresh_captured, fresh_stamp = stamp_for(1)
+        case(
+            "accepts_green",
+            lambda d: write_report(d, fresh_stamp, green_report(manifest_sha, fresh_captured)),
+        )
+        out["accepts_green_stderr"] = "ok" if out["accepts_green"] == 0 else out["accepts_green_stderr"]
+
+        case("refuses_missing", lambda d: None)
+
+        stale_captured, stale_stamp = stamp_for(90)
+        case(
+            "refuses_stale",
+            lambda d: write_report(d, stale_stamp, green_report(manifest_sha, stale_captured)),
+        )
+        case(
+            "refuses_other_tree",
+            lambda d: write_report(d, fresh_stamp, green_report("f" * 64, fresh_captured)),
+        )
+        red = [
+            {
+                "id": probe_id,
+                "verdict": "fail" if probe_id == "C3" else "pass",
+                "detail": "measured",
+                "evidence": None,
+            }
+            for probe_id in probes.FROZEN_IDS
+        ]
+        case(
+            "refuses_red",
+            lambda d: write_report(
+                d, fresh_stamp, green_report(manifest_sha, fresh_captured, probes_override=red)
+            ),
+        )
+        hollow = [
+            {
+                "id": probe_id,
+                "verdict": "unprovable" if probe_id == "C5" else "pass",
+                "detail": "measured",
+                "evidence": None,
+            }
+            for probe_id in probes.FROZEN_IDS
+        ]
+        case(
+            "refuses_unprovable_without_evidence",
+            lambda d: write_report(
+                d, fresh_stamp, green_report(manifest_sha, fresh_captured, probes_override=hollow)
+            ),
+        )
+        case(
+            "refuses_host_scope",
+            lambda d: write_report(
+                d, fresh_stamp, green_report(manifest_sha, fresh_captured, scope="host")
+            ),
+        )
+
+    # The shell wiring: which modes the gate covers, and that the exec line did not move.
+    shell = CUTOVER_SHELL.read_text(encoding="utf-8")
+    out["shell_gates_live"] = "$mode == live" in shell and "--assert-fresh-report" in shell
+    out["shell_gates_supervisor"] = "$mode == supervisor" in shell
+    out["shell_exempts_plan"] = "$mode == plan" not in shell
+    out["shell_exempts_recover"] = "$mode == recover" not in shell
+    out["shell_exec_line_unchanged"] = (
+        'exec /usr/bin/python3 "${SCRIPT_DIR}/q12-lifecycle-core.py" "$mode" "$@"\n' in shell
+    )
+    helped = subprocess.run(
+        ["/usr/bin/bash", str(CUTOVER_SHELL), "live", "--help"],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C"},
+        check=False,
+    )
+    out["shell_live_help_status"] = helped.returncode
+    return out
+
+
 def main(argv: "list[str]") -> int:
+    if "--gate" in argv:
+        sys.stdout.write(json.dumps(gate_suite(), sort_keys=True) + "\n")
+        return 0
     if "--probes" in argv:
         sys.stdout.write(json.dumps(probe_suite(), sort_keys=True) + "\n")
         return 0

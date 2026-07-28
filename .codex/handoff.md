@@ -96,18 +96,36 @@ published the step, an isolate had superuser rights, the real error was swallowe
 hid a rotten fixture, or the pooler silently dropped what the test connection delivered. Model the
 constraint, never the convenience.
 
-BEFORE THE NEXT ATTEMPT: items 1-3 are now `mc2-ot8se`'s job, not the operator's.
+BEFORE THE NEXT ATTEMPT — one command, not a checklist. Run this on the server, immediately before
+the window, and read its report:
 
-1. The server Q12 tree is STALE again (`q12-database-barrier.sh` and `q12-lifecycle-core.py` both
-   moved after the 2026-07-28 reinstall) — the pre-flight reinstalls it and proves byte-equality.
-2. Fresh run root + `plan` (read-only, makes its own root); then copy `accepted-coverage-run` +
+```
+/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py \
+  --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>
+```
+
+It is read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
+`transaction_read_only='on'` first), goes through the pooled DSN, takes no lock and burns no run-id,
+so it can be re-run as often as wanted. It exits 0 only when all 25 frozen probes are `pass` or
+`unprovable` with a named evidence pointer, and it publishes a 0400
+`q12-window-preflight-<utc>.json` in the run root. `q12-live-cutover.sh` REFUSES `live`/`supervisor`
+without a green report under 30 minutes old whose `asset_manifest_sha256` matches the deployed tree,
+so this is a gate, not a reminder. Contract:
+`docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
+
+What it now covers that used to be a manual step: the deployed-tree byte comparison (H2, against the
+tracked `deploy/qdrant/q12-deployed-asset-manifest.json`), the digest-pinned images and their
+`q12-window-hold/*:pinned` tags (H1, `mc2-y5tgw`), the dev-deploy quiet window (H4), guarded-set
+privilege reachability (A1..A7), the pooled session (B1..B4), cron/queue/residue (C1..C4), catalog
+agreement in the barrier's own `search_path` (D1, `mc2-2rzf6`) and quiesce feasibility (E1/E2).
+
+Still the operator's, because the probe cannot do them:
+
+1. Fresh run root + `plan` (read-only, makes its own root); then copy `accepted-coverage-run` +
    `secrets/db-capability` in at 0400. `--expected-catalog-sha256` is the sha256 of THAT root's OWN
    catalog FILE (barrier `:302`), never a value quoted for a prior root.
-3. Pause dev deploys for the window: same shared database every 15-25 minutes, and their
-   `docker image prune -f` deletes the digest-pinned images C1/C7 need (`mc2-y5tgw`; hold tags
-   `q12-window-hold/*:pinned` are applied on the host and proven against the exact prune command).
-4. OPERATOR, always: run the controller DETACHED (`setsid nohup`). A dropped ssh once killed a plan
-   (exit 255); after C2 that would strand stopped writers.
+2. Run the controller DETACHED (`setsid nohup`). A dropped ssh once killed a plan (exit 255); after
+   C2 that would strand stopped writers.
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
 (= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce

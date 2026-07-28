@@ -71,6 +71,72 @@ function driveHost(): HostShape {
   return JSON.parse(result.stdout) as HostShape;
 }
 
+interface GateShape {
+  [key: string]: string | number | boolean;
+}
+
+function driveGate(): GateShape {
+  const result = spawnSync('/usr/bin/python3', [RUNNER, '--gate'], {
+    encoding: 'utf8',
+    timeout: 240_000,
+    env: { PATH: process.env.PATH, LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout) as GateShape;
+}
+
+describe('Q12 window pre-flight: the cutover gate', () => {
+  // This is what makes the pre-flight load-bearing instead of advisory: the window cannot be
+  // opened without a green, fresh report describing the tree that is actually deployed.
+  let out: GateShape;
+  beforeAll(() => {
+    out = driveGate();
+  }, 260_000);
+
+  it('accepts a green, fresh report taken against this deployed tree', () => {
+    expect(`${out.accepts_green}: ${out.accepts_green_stderr}`).toBe('0: ok');
+  });
+
+  it('refuses a missing report', () => {
+    expect(out.refuses_missing).not.toBe(0);
+    expect(String(out.refuses_missing_stderr)).toContain('no window pre-flight report');
+  });
+
+  it('refuses a stale report', () => {
+    // Hard invariant 6: E1 is a snapshot, so a report older than the attempt is not evidence for
+    // it. The probe is re-run immediately before the window, every time.
+    expect(out.refuses_stale).not.toBe(0);
+    expect(String(out.refuses_stale_stderr)).toMatch(/minutes old/u);
+  });
+
+  it('refuses a report taken against a different deployed tree', () => {
+    expect(out.refuses_other_tree).not.toBe(0);
+    expect(String(out.refuses_other_tree_stderr)).toContain('different deployed tree');
+  });
+
+  it('refuses a report that is not green, naming the first offender', () => {
+    expect(out.refuses_red).not.toBe(0);
+    expect(String(out.refuses_red_stderr)).toContain('first offender: C3');
+    expect(out.refuses_unprovable_without_evidence).not.toBe(0);
+  });
+
+  it('refuses a host-scope report where the window needs full scope', () => {
+    expect(out.refuses_host_scope).not.toBe(0);
+    expect(String(out.refuses_host_scope_stderr)).toContain('--scope all');
+  });
+
+  it('is wired into q12-live-cutover.sh for live and supervisor, and not for plan', () => {
+    expect(out.shell_gates_live).toBe(true);
+    expect(out.shell_gates_supervisor).toBe(true);
+    expect(out.shell_exempts_plan).toBe(true);
+    expect(out.shell_exempts_recover).toBe(true);
+    // The exec line stays byte-identical, and --help stays reachable.
+    expect(out.shell_exec_line_unchanged).toBe(true);
+    expect(out.shell_live_help_status).toBe(0);
+  });
+});
+
 describe('Q12 window pre-flight: the tracked deployed-asset manifest', () => {
   // The ratchet. H2 can only be a byte comparison if the manifest tracks the tree; if a Q12 asset
   // changes and the manifest is not regenerated, this test goes red HERE rather than the pre-flight

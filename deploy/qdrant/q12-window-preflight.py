@@ -390,6 +390,70 @@ def asset_manifest_sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# --- the gate q12-live-cutover.sh calls -----------------------------------------------------------
+
+DEFAULT_MAX_AGE_MINUTES = 30
+
+
+def assert_fresh_report(
+    report_dir: pathlib.Path, deploy_root: pathlib.Path, max_age_minutes: int
+) -> pathlib.Path:
+    """Refuse the window unless a GREEN, FRESH report describes the DEPLOYED tree.
+
+    This is what makes the pre-flight load-bearing instead of advisory. Three independent
+    conditions, each of which has actually gone wrong:
+
+    * green — every probe `pass`, or `unprovable` with a named evidence pointer;
+    * fresh — `captured_at` within the last `max_age_minutes`, because E1 is a snapshot and a
+      backend can arrive between the probe and C2 (hard invariant 6);
+    * matching — the report's `asset_manifest_sha256` equals the digest of the manifest on this
+      host, so a report taken against a different deployed tree cannot certify this one.
+    """
+    reports = sorted(report_dir.glob("q12-window-preflight-*.json"))
+    if not reports:
+        raise PreflightError(
+            f"no window pre-flight report in {report_dir}; run "
+            f"q12-window-preflight.py --scope all --run-root {report_dir} first"
+        )
+    path = reports[-1]
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if report.get("schema_version") != REPORT_SCHEMA_VERSION:
+        raise PreflightError(f"pre-flight report has the wrong schema: {path}")
+    if report.get("scope") != "all":
+        raise PreflightError(
+            f"pre-flight report {path} covers scope {report.get('scope')!r}; the window needs "
+            "--scope all"
+        )
+    offender = first_offender(list(report.get("probes") or []))
+    if offender is not None:
+        raise PreflightError(f"pre-flight report {path} is not green; first offender: {offender}")
+
+    captured = str(report.get("captured_at") or "")
+    try:
+        stamp = datetime.datetime.strptime(captured, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc
+        )
+    except ValueError:
+        raise PreflightError(f"pre-flight report {path} carries no usable captured_at") from None
+    age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds() / 60.0
+    if age > max_age_minutes or age < -1:
+        raise PreflightError(
+            f"pre-flight report {path} is {age:.0f} minutes old (limit {max_age_minutes}); re-run "
+            "it immediately before the window"
+        )
+
+    manifest_file = deploy_root / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    if not manifest_file.is_file():
+        raise PreflightError(f"no deployed-asset manifest at {manifest_file}")
+    expected = asset_manifest_sha256(manifest_file)
+    if str(report.get("asset_manifest_sha256")) != expected:
+        raise PreflightError(
+            f"pre-flight report {path} was taken against a different deployed tree "
+            f"(manifest {str(report.get('asset_manifest_sha256'))[:12]}… vs {expected[:12]}…)"
+        )
+    return path
+
+
 # --- self-test ------------------------------------------------------------------------------------
 
 SELF_TEST_CASES = ("all-pass", "one-fail", "unprovable-no-evidence", "unprovable-with-evidence")
@@ -454,6 +518,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="regenerate deploy/qdrant/q12-deployed-asset-manifest.json from the repository tree",
     )
     parser.add_argument("--repo-root", default=None)
+    parser.add_argument(
+        "--assert-fresh-report",
+        action="store_true",
+        help="the gate q12-live-cutover.sh calls: refuse unless a green, fresh report describes "
+        "the deployed tree",
+    )
+    parser.add_argument("--max-age-minutes", type=int, default=DEFAULT_MAX_AGE_MINUTES)
     return parser
 
 
@@ -513,6 +584,15 @@ def main(argv: "list[str]") -> int:
         target = asset_manifest_path(repo_root)
         target.write_bytes(canonical(manifest))
         sys.stdout.write(f"{target}\n")
+        return 0
+
+    if arguments.assert_fresh_report:
+        path = assert_fresh_report(
+            pathlib.Path(arguments.report_dir or "/tmp"),
+            pathlib.Path(arguments.deploy_root),
+            arguments.max_age_minutes,
+        )
+        sys.stderr.write(f"q12 window pre-flight gate: green report {path}\n")
         return 0
 
     if arguments.self_test is not None:
