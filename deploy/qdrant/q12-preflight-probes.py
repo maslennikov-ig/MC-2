@@ -459,6 +459,184 @@ def probe_a7(context: Context) -> "dict[str, object]":
     )
 
 
+# --- Group B: the pooled session ----------------------------------------------------------------
+#
+# The mc2-ipwyc wall. These are the only probes that must open more than one connection, and every
+# one of them goes through the SAME pooled DSN — reaching around the pooler is exactly what hid the
+# `options` defect for nine attempts.
+
+# `new Client({... options:"-c default_transaction_read_only=on|off" ...})` — a startup parameter
+# the Supavisor pooler never delivers.
+OPTION_DEPENDENCE_RE = re.compile(r'options\s*:\s*"-c default_transaction_read_only=(on|off)"')
+# `await client.query("SET default_transaction_read_only=on|off")` — the session-level statement of
+# intent that replaced the dependence. Deliberately anchored on the query() form so the barrier's
+# own `ALTER DATABASE postgres SET default_transaction_read_only=on` DDL does not count as one.
+SESSION_SET_RE = re.compile(r'query\("SET default_transaction_read_only=(on|off)"\)')
+
+B2_SESSION_GUC = "megacampus.q12_preflight_session_probe"
+B2_TOKEN = "session-mode-probe"
+
+
+def probe_b1(context: Context) -> "dict[str, object]":
+    """Measure startup-`options` delivery, and fail only on a runner that still depends on it.
+
+    Production truth, measured on 2026-07-28: with `-c default_transaction_read_only=on` the
+    setting still read `off` — Supavisor drops the startup parameter entirely. PostgreSQL's own
+    precedence is intact; the option simply never arrives. Benign before install, FATAL after it:
+    the barrier's own reconnect would inherit the read-only default it just set, and its
+    `transaction_read_only='off'` proof could not pass.
+    """
+    if context.script is None:
+        raise ProbeError("no database seam is bound in this scope")
+    baseline = query(context, "SELECT pg_catalog.current_setting('default_transaction_read_only')")
+    # Ask for the OPPOSITE of the observed database default, so "arrived" is unambiguous.
+    requested = "off" if baseline == "on" else "on"
+    result = context.script(
+        read_only("SELECT pg_catalog.current_setting('default_transaction_read_only')"),
+        options=f"-c default_transaction_read_only={requested}",
+    )
+    if result.returncode != 0:
+        raise ProbeError(f"options-delivery probe failed: {' '.join(result.stderr.split())[:200]}")
+    observed = result.stdout.strip()
+    delivered = observed == requested
+
+    unmatched: list[str] = []
+    for name, text in sorted(context.option_dependence_sources.items()):
+        wants: dict[str, int] = {}
+        for value in OPTION_DEPENDENCE_RE.findall(text):
+            wants[value] = wants.get(value, 0) + 1
+        has: dict[str, int] = {}
+        for value in SESSION_SET_RE.findall(text):
+            has[value] = has.get(value, 0) + 1
+        for value, count in sorted(wants.items()):
+            if has.get(value, 0) < count:
+                unmatched.append(f"{name} (options=…={value} x{count}, session SET x{has.get(value, 0)})")
+
+    state = "delivered" if delivered else "not delivered"
+    if unmatched and not delivered:
+        return verdict(
+            "B1",
+            FAIL,
+            f"startup options {state} (asked {requested!r}, session reads {observed!r}) and a "
+            f"runner still depends on delivery: {name_list(unmatched)}",
+        )
+    if unmatched:
+        return verdict(
+            "B1",
+            FAIL,
+            f"startup options {state}, but a runner states no session-level intent and would break "
+            f"the moment delivery stops: {name_list(unmatched)}",
+        )
+    return verdict(
+        "B1",
+        PASS,
+        f"startup options {state} (asked {requested!r}, session reads {observed!r}); "
+        f"{len(context.option_dependence_sources)} scanned source(s) state their intent with a "
+        "session-level SET and depend on nothing the pooler can drop",
+    )
+
+
+def probe_b2(context: Context) -> "dict[str, object]":
+    """A session-level SET must survive to the next statement: the DSN is session-mode pooling.
+
+    If this ever flips to transaction-mode, every explicit `SET` in the barrier — including the one
+    that replaced the dropped startup option — stops working, silently.
+    """
+    if context.script is None:
+        raise ProbeError("no database seam is bound in this scope")
+    sql = (
+        "BEGIN READ ONLY;\n"
+        f"{READ_ONLY_ASSERT} \\g /dev/null\n"
+        f"SET {B2_SESSION_GUC} = '{B2_TOKEN}';\n"
+        "COMMIT;\n"
+        "BEGIN READ ONLY;\n"
+        f"{READ_ONLY_ASSERT} \\g /dev/null\n"
+        f"COPY (SELECT COALESCE(pg_catalog.current_setting('{B2_SESSION_GUC}', true), '')) "
+        "TO STDOUT;\n"
+        "COMMIT;\n"
+    )
+    result = context.script(sql)
+    if result.returncode != 0:
+        raise ProbeError(f"session-mode probe failed: {' '.join(result.stderr.split())[:200]}")
+    observed = result.stdout.strip()
+    if observed != B2_TOKEN:
+        return verdict(
+            "B2",
+            FAIL,
+            f"a session-level SET did not survive to the next transaction (read back {observed!r}): "
+            "the DSN is transaction-mode pooling, and every explicit SET in the barrier is a no-op",
+        )
+    return verdict("B2", PASS, "a session-level SET survives across transactions (session-mode DSN)")
+
+
+def probe_b3(context: Context) -> "dict[str, object]":
+    """application_name must reach pg_stat_activity unmodified.
+
+    The barrier's quiesce allowlist and the terminal proof's `barrier_era_session_count` both match
+    on `megacampus-q12-%`. A pooler that rewrote the name would empty both silently — the proof
+    would read "no Q12 sessions are alive" because it could not see its own.
+    """
+    if context.script is None:
+        raise ProbeError("no database seam is bound in this scope")
+    name = f"{PREFLIGHT_APPLICATION_NAME}-b3"
+    result = context.script(
+        read_only(
+            "SELECT pg_catalog.current_setting('application_name') || '|' || COALESCE("
+            "(SELECT activity.application_name FROM pg_catalog.pg_stat_activity activity"
+            " WHERE activity.pid = pg_catalog.pg_backend_pid()), '')"
+        ),
+        application_name=name,
+    )
+    if result.returncode != 0:
+        raise ProbeError(f"application_name probe failed: {' '.join(result.stderr.split())[:200]}")
+    parts = result.stdout.strip().split("|")
+    setting = parts[0] if parts else ""
+    activity = parts[1] if len(parts) > 1 else ""
+    if setting != name or activity != name:
+        return verdict(
+            "B3",
+            FAIL,
+            f"application_name was rewritten in flight: asked {name!r}, the session reports "
+            f"{setting!r} and pg_stat_activity reports {activity!r}",
+        )
+    if not name.startswith(Q12_APPLICATION_PREFIX):
+        return verdict(
+            "B3", FAIL, f"application_name {name!r} does not carry the {Q12_APPLICATION_PREFIX!r} prefix"
+        )
+    return verdict(
+        "B3", PASS, f"application_name reaches pg_stat_activity unmodified as {name!r}"
+    )
+
+
+def probe_b4(context: Context) -> "dict[str, object]":
+    """`pg_database.datdba == current_user` — the read-only proxy for "ALTER DATABASE … SET/RESET
+    default_transaction_read_only will be permitted", which C1 install and the restore both need."""
+    row = query_json(
+        context,
+        "SELECT jsonb_build_object("
+        " 'owner', pg_catalog.pg_get_userbyid(d.datdba),"
+        " 'current_user', current_user,"
+        " 'database', d.datname)"
+        " FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database()",
+    )
+    if not isinstance(row, dict):
+        raise ProbeError("database ownership projection is malformed")
+    if str(row.get("owner")) != str(row.get("current_user")):
+        return verdict(
+            "B4",
+            FAIL,
+            f"database {row.get('database')!r} is owned by {row.get('owner')!r}, not by "
+            f"{row.get('current_user')!r}: ALTER DATABASE … SET default_transaction_read_only "
+            "will be refused",
+        )
+    return verdict(
+        "B4",
+        PASS,
+        f"database {row.get('database')!r} is owned by {row.get('current_user')!r}; the read-only "
+        "default can be set and reset",
+    )
+
+
 # --- the frozen probe list --------------------------------------------------------------------
 
 PROBES: "tuple[dict[str, object], ...]" = (
@@ -469,10 +647,10 @@ PROBES: "tuple[dict[str, object], ...]" = (
     {"id": "A5", "group": "A", "scope": DATABASE_SCOPE, "run": probe_a5},
     {"id": "A6", "group": "A", "scope": DATABASE_SCOPE, "run": probe_a6},
     {"id": "A7", "group": "A", "scope": DATABASE_SCOPE, "run": probe_a7},
-    {"id": "B1", "group": "B", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "B2", "group": "B", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "B3", "group": "B", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "B4", "group": "B", "scope": DATABASE_SCOPE, "run": _not_implemented},
+    {"id": "B1", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b1},
+    {"id": "B2", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b2},
+    {"id": "B3", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b3},
+    {"id": "B4", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b4},
     {"id": "C1", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
     {"id": "C2", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
     {"id": "C3", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},

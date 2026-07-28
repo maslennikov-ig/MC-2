@@ -191,4 +191,42 @@ describe.runIf(REAL_PG17)('Q12 window pre-flight: probes against the managed fix
     expect(out.a7_barrier_expectation).toBe(9);
     expect(out.a7_barrier_drift).toBe('fail');
   });
+
+  it('passes group B against a healthy session-mode connection', () => {
+    for (const id of ['b1', 'b2', 'b3', 'b4']) {
+      expect(`${id}=${out[`${id}_healthy`]}`, String(out[`${id}_healthy_detail`])).toBe(
+        `${id}=pass`
+      );
+    }
+  });
+
+  it('records whether the startup option arrived, and fails if a runner still depends on it', () => {
+    // mc2-ipwyc: Supavisor never delivers the connection's startup `options`, so every
+    // `-c default_transaction_read_only=…` proof was silently reading the DATABASE default. The
+    // contract is that the code does not DEPEND on delivery — the probe records the observed truth
+    // and only fails when a runner is found that still relies on it.
+    expect(out.b1_healthy).toBe('pass');
+    expect(String(out.b1_healthy_detail)).toMatch(/options (delivered|not delivered)/u);
+    expect(out.b1_dependent_runner).toBe('fail');
+    expect(String(out.b1_dependent_runner_detail)).toContain('fake-runner.js');
+    // The LIVE barrier bytes must not carry an unmatched dependence.
+    expect(out.b1_live_barrier_unmatched).toBe(0);
+  });
+
+  it('fails B2 when SET does not survive to the next statement (transaction-mode pooling)', () => {
+    expect(out.b2_transaction_mode).toBe('fail');
+    expect(String(out.b2_transaction_mode_detail)).toContain('did not survive');
+  });
+
+  it('fails B3 when the pooler rewrites application_name', () => {
+    // The barrier's quiesce allowlist and the terminal proof's barrier_era_session_count both
+    // match on `megacampus-q12-%`; a rewritten name silently empties both.
+    expect(out.b3_rewritten).toBe('fail');
+    expect(String(out.b3_rewritten_detail)).toContain('application_name');
+  });
+
+  it('fails B4 when the database is owned by another role', () => {
+    expect(out.b4_foreign_owner).toBe('fail');
+    expect(String(out.b4_foreign_owner_detail)).toContain('mc2_auth_admin');
+  });
 });

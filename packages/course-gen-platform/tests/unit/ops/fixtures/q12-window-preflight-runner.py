@@ -299,6 +299,77 @@ def probe_suite() -> dict:
         fixture.superuser(f"CREATE SCHEMA q12_guard AUTHORIZATION {fixture_module.AUTH_OWNER};")
         record(out, "a5_foreign_guard", run_one(make_context(fixture, healthy_catalog), "A5"))
         fixture.superuser("DROP SCHEMA q12_guard;")
+
+        # --- Group B: the pooled session ---------------------------------------------------------
+        healthy_b = make_context(fixture, healthy_catalog)
+        # B1 scans real source bytes: the LIVE barrier (which must carry no unmatched dependence)
+        # plus a synthetic runner that does depend on startup-option delivery.
+        healthy_b.option_dependence_sources = {
+            "q12-database-barrier.sh": (REPO / "deploy/qdrant/q12-database-barrier.sh").read_text(
+                encoding="utf-8"
+            )
+        }
+        for probe_id in ("B1", "B2", "B3", "B4"):
+            record(out, f"{probe_id.lower()}_healthy", run_one(healthy_b, probe_id))
+        barrier_text = healthy_b.option_dependence_sources["q12-database-barrier.sh"]
+        wants = probes.OPTION_DEPENDENCE_RE.findall(barrier_text)
+        states = probes.SESSION_SET_RE.findall(barrier_text)
+        out["b1_live_barrier_option_sites"] = len(wants)
+        out["b1_live_barrier_unmatched"] = sum(
+            max(0, wants.count(value) - states.count(value)) for value in sorted(set(wants))
+        )
+
+        dependent = make_context(fixture, healthy_catalog)
+        dependent.option_dependence_sources = {
+            # A runner that asks the CONNECTION for read-only and never states it in the session:
+            # exactly the shape that was fatal after install set the database default.
+            "fake-runner.js": 'const c = new Client({...conn, options:"-c '
+            'default_transaction_read_only=on"}); await c.query("SELECT 1");'
+        }
+        record(out, "b1_dependent_runner", run_one(dependent, "B1"))
+
+        # B2: a faithful transaction-mode-pooling fake — each transaction lands on a DIFFERENT
+        # backend, which is exactly what Supavisor's port 6543 does. Not a stubbed verdict: the
+        # same probe body runs, against a seam that reassigns the connection per transaction.
+        def transaction_mode_script(sql: str, *, options=None, application_name=None, role=None):
+            pieces = [piece for piece in sql.split("COMMIT;") if piece.strip()]
+            stdout: list[str] = []
+            for piece in pieces:
+                completed = fixture.psql(
+                    piece + "COMMIT;\n",
+                    role or fixture_module.BARRIER_ROLE,
+                    options=options,
+                    application_name=application_name,
+                )
+                if completed.returncode != 0:
+                    return probes.ScriptResult(
+                        completed.returncode, "".join(stdout), completed.stderr
+                    )
+                stdout.append(completed.stdout)
+            return probes.ScriptResult(0, "".join(stdout), "")
+
+        pooled = make_context(fixture, healthy_catalog)
+        pooled.script = transaction_mode_script
+        record(out, "b2_transaction_mode", run_one(pooled, "B2"))
+
+        # B3: a pooler that rewrites application_name in flight.
+        def rewriting_script(sql: str, *, options=None, application_name=None, role=None):
+            completed = fixture.psql(
+                sql,
+                role or fixture_module.BARRIER_ROLE,
+                options=options,
+                application_name="supavisor-rewrote-this",
+            )
+            return probes.ScriptResult(completed.returncode, completed.stdout, completed.stderr)
+
+        rewritten = make_context(fixture, healthy_catalog)
+        rewritten.script = rewriting_script
+        record(out, "b3_rewritten", run_one(rewritten, "B3"))
+
+        # B4: the database owned by another role.
+        fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.AUTH_OWNER};")
+        record(out, "b4_foreign_owner", run_one(make_context(fixture, healthy_catalog), "B4"))
+        fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.BARRIER_ROLE};")
     finally:
         fixture.stop()
     return out
