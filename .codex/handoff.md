@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-28 (window identity + capability settled; `mc2-1sns3` closed — see § "Next recommended")
+Updated: 2026-07-28 (attempt #10 opened, failed closed at C2, production restored; blocker `mc2-lzft4`)
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -31,75 +31,79 @@ Updated: 2026-07-28 (window identity + capability settled; `mc2-1sns3` closed �
 
 ## Accepted and Open Work
 
-Accepted-and-integrated history for Q1-Q12 (including every `.13.*` sub-stream,
-its review verdicts and evidence hashes) moved on 2026-07-25 to
-`.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open
-work is `mc2-i9h3y` (owner-present window; UNBLOCKED — `mc2-8zxlc` closed 2026-07-28),
-with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`,
-`mc2-o0g75`, `mc2-c2p8z`, `mc2-n6szm` and `mc2-qd12b` as tracked residuals; see § "Explicit defers".
+Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
+`.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open work is
+`mc2-i9h3y` (owner-present window), BLOCKED by `mc2-lzft4`; tracked residuals `mc2-uha77`,
+`mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`, `mc2-o0g75`, `mc2-c2p8z`, `mc2-n6szm`,
+`mc2-qd12b`, plus this round's `mc2-e21lo`, `mc2-zls0f` and `mc2-dizgy`; see § "Explicit defers".
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: the window is READY TO OPEN and everything before C9 is settled — `mc2-1sns3` is
-CLOSED, the `--release-sha` identity is ruled, the capability question is answered, and the run root
-is staged. What remains is the owner-held C9. Full brief:
+Recommended action: fix `mc2-lzft4` (P0) — it is the ONLY thing between here and a reopen. Attempt
+#10 opened on 2026-07-28, reached C2 and failed closed there; production was guarded for ~9 minutes
+and is fully restored (evidence below). Everything else before C9 is settled: `mc2-1sns3` CLOSED,
+the `--release-sha` identity ruled, the capability question answered, the argv fixed. Full brief:
 `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
-`mc2-1sns3` CLOSED 2026-07-28 (`1725a2df3`). Its last real gap: W7a increments 2-3 wired the staged
-callbacks as a hook `run_live` passed into `drive_forward_sequence`, and `run_recover` shares that
-driver but passed none — so the two recover heads that RE-DRIVE a staged step (head 1
-`barrier.install/completed`, head 4 `barrier.prepare-recovery/completed`) failed closed at the next
-command with "unresolved command placeholder", AFTER C2 has quiesced the writers. Increment 4 had
-proved the threaders re-drive-SAFE by calling them directly, never that the recover path CALLS them
-— the same substitution class. Fixed by moving the threading INTO the driver, so no caller can
-forget it. Increment 5's real leg is EXECUTED BY the window itself (W7a plan): its inputs exist only
-once the real `source.forward` has run. `mc2-ot8se` (the pre-flight) and `mc2-38ivn` (probe B3: the
-Supavisor pooler REWRITES `application_name`) are DONE; W-tuple field 4 → `f98a2ce4…`, fields 5-10
-byte-identical, no re-freeze. Full round in the stage summary.
+`mc2-lzft4` — the tracked asset manifest declares `deploy/qdrant/q12-writer-resume.py` mode `0444`;
+`source-recovery-run.sh:246-248` demands EXACTLY `root:root 0644` (the `mc2-jhqpw` hardening, which
+had regressed silently). Probe H2 asserts mode against that manifest, so it PASSED on a host the
+wrapper rejects — the probe built to catch this carried the substitution itself. C2's child refused
+at its first check, so NO writer was quiesced. The host file is `0644` again, so H2 now reports the
+truth (`mode 0444 -> 0644`) and the gate blocks a reopen. FIX, outside the last stage's write zone:
+declare `0644` in `deploy/qdrant/q12-deployed-asset-manifest.json`; stop `q12-window-preflight.py
+--emit-asset-manifest` deriving that mode from the git executable bit for root-owned assets, pinning
+manifest expectations against the wrapper's own required modes instead; re-emit, redeploy, prove H2
+green; then stage a FRESH run root with a FRESH run-id.
 
-RUN ROOT for the window (plan re-run 2026-07-28, read-only, production):
-`/opt/megacampus/backups/q12/6544c7dd-e680-462d-bf8f-5db8fc01c9b6`
+`mc2-1sns3` CLOSED 2026-07-28 (`1725a2df3`): `run_recover` never passed the staged-callback hook
+into the driver it shares with `run_live`, so the two recover heads that re-drive a staged step
+failed closed at the next command — fixed by moving the threading INTO the driver. Increment 5's
+real leg is EXECUTED BY the window itself (W7a plan). `mc2-ot8se` and `mc2-38ivn` are DONE. Detail
+for all of these in the stage summary.
 
-- `--expected-catalog-sha256 6be37e858e4fbd473a298cd1dfdaf49906e2c9964982801b39e1ac6104f7aaaa`
-  — the sha256 of THAT root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a
-  value quoted for a prior root; its `baseline_structural_sha256 a2b25324…` agrees with probe D1.
-- Pre-flight reports land in the run root and EXPIRE 30 min after `captured_at`; the last green one
-  read 22 `pass`, 3 `unprovable` with evidence (C5/C6/H4), 0 `fail`.
+RUN ROOT `6544c7dd-…` is BURNT (attempt #10: 11 durable rows, head
+`writers.quiesce/capability_claimed`, not one of the seven recover heads). A reopen needs a fresh
+`plan` run and a fresh run-id; `--expected-catalog-sha256` is always the sha256 of THAT root's OWN
+`expected-post-migration-catalog.json` (barrier `:302`), never a value quoted for a prior root.
+Everything else in the argv is settled below.
+
+PRODUCTION IS CLEAN after attempt #10, restored with the barrier's OWN `$restore$`
+(`drop_schema=true`, rendered from the DEPLOYED barrier, run under that run's capability). Verified
+read-only afterwards: C4 zero `q12_guard` residue, C2 8 cron jobs active, C3 queue empty,
+A5/B4/D1/E1/E2 pass, `pg_db_role_setting` back to exactly `['app.settings.jwt_exp=3600']`, every
+production container up and healthy, `cutover.lock` free. Full account, including why the barrier's
+own `rollback` command refuses here and the `mc2-e21lo` terminate-sweep finding, in the stage
+summary.
 
 The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept
-under `/opt/megacampus/backups/q12-assets/<utc>/`); H2 proves all 26 assets byte-equal to the
-tracked manifest. The sixth digest pin (`qdrant/qdrant`) now has a hold tag (`mc2-y5tgw`).
+under `/opt/megacampus/backups/q12-assets/<utc>/`). Do NOT invoke `q12-live-cutover.sh` for `live`:
+it execs `/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`). Use
+`/usr/bin/python3.13 deploy/qdrant/q12-lifecycle-core.py live …` per runbook §2 and run the gate by
+hand immediately before.
 
-WINDOW STATE. Opened NINE times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9
-installed the guard, aborted, and was restored by hand the same day with the barrier's own
-`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id. All ten
-defects are fixed on `develop` and each is now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1,
-`mc2-6fnrt`→E2, `mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3); chronology in the stage summary. THE
-PATTERN behind all of them, and behind the `mc2-1sns3` recover gap closed above: the checked
-environment substituted for the consuming one. Model the constraint, never the convenience.
+WINDOW STATE. Opened TEN times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9 and #10
+installed the guard, aborted, and were restored by hand with the barrier's own `$restore$`.
+Production re-verified clean after each. Every attempt BURNS its run-id. Ten of the eleven defects
+are fixed and each is a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2,
+`mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3); the eleventh is `mc2-lzft4`, OPEN. THE PATTERN behind all
+of them: the checked environment substituted for the consuming one — and in `mc2-lzft4` the PROBE
+itself carried the substitution. Model the constraint, never the convenience.
 
-BEFORE THE NEXT ATTEMPT — one command, not a checklist. Run this on the server, immediately before
-the window, and read its report:
-
-```
-/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py \
-  --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>
-```
-
-Read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
-`transaction_read_only='on'` first), through the pooled DSN, no lock, no run-id burned — re-run it
-as often as wanted. Exits 0 only when all 25 frozen probes are `pass` or `unprovable` with a named
-evidence pointer, and publishes a 0400 report in the run root. `q12-live-cutover.sh` REFUSES
-`live`/`supervisor` without a green report under 30 min old whose `asset_manifest_sha256` matches
-the deployed tree: a gate, not a reminder. Contract:
+BEFORE THE NEXT ATTEMPT — one command, not a checklist, on the server immediately before the window:
+`/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>`.
+Read-only by construction, through the pooled DSN, no lock, no run-id burned. Exits 0 only when all
+25 frozen probes are `pass` or `unprovable` with named evidence; `--assert-fresh-report` is the gate
+that refuses `live` without a green report under 30 min old matching the deployed tree. `mc2-lzft4`
+is the standing warning: a probe is only as good as the value it asserts against. Contract:
 `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
 Outside what the probe can do: run the controller DETACHED (`setsid nohup` — a dropped ssh once
 killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push
-touching `deploy/**` triggers Deploy to Dev, which fails H4 for 30 minutes — docs-only and
-`.codex/**` pushes do not (`scripts/ci/detect_deploy_changes.sh`), so land code BEFORE the window.
+touching `deploy/**` triggers Deploy to Dev, failing H4 for 30 minutes; docs-only and `.codex/**`
+pushes do not (`scripts/ci/detect_deploy_changes.sh`).
 
 WINDOW ARGV — SETTLED 2026-07-28 from artefacts, no re-plan. `--release-sha
 23dfe973f18cc6067d386b6eb683bf6906142165`: `.env.green`'s `API_IMAGE` (`…@sha256:2f713f87…`) carries
@@ -121,20 +125,14 @@ reports zero `q12_guard` residue, so carry-over would also have worked; re-minti
 because the same 65-byte value sits in ten run roots from the burned attempts, one of which (#9)
 installed the guard. `accepted-coverage-run` is deterministic and not secret — copied verbatim.
 
-RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green`
-pins, `--operator-digest` the `qdrant-operator` image `.env.production` pins — different
-artifacts, once conflated. Detail, including the `.env.green` re-pin and its backup, moved to
-`.codex/stages/mc2-jz6y0/summary.md` on 2026-07-28. The dead GHCR token (`mc2-2vtmk`) does not
-block the window.
+The dead GHCR token (`mc2-2vtmk`) does not block the window.
 
 ## Starter prompt for next orchestrator
 
 `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md` (prompt-check pass,
-oversize warning; finish `mc2-1sns3`, settle the release-sha ruling, stage, open to
-`deploy.prepare`, stop at the owner-held C9). Historical:
-`docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md` (prompt-check pass;
-Phase A local D6/Root -> B GHCR publish -> C live cutover -> D closeout, every remote/live and
-credentialed step owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
+oversize warning). Its §1-§3 are now DONE (`mc2-1sns3`, the release-sha ruling, the capability
+question); the live task is `mc2-lzft4`, then re-stage and reopen. Fallback: Use $orchestrator-stage
+from this handoff plus the stage summary.
 
 ## Verification and Delivery
 
@@ -142,9 +140,9 @@ credentialed step owner-gated). Fallback: Use $orchestrator-stage from this hand
 - Completed local gates at the delivered HEAD (backend/shared/web/PostgreSQL/Qdrant/Compose,
   `pnpm type-check`, `pnpm build`, process verification, Graphify refresh, canonical closeout):
   recorded in `.codex/stages/mc2-jz6y0/summary.md`.
-- Keep durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff synchronized before any Q12 continuation.
-- All accepted branches/commits must be pushed under the repo contract.
-- Primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
+- Keep durable docs, project index, Graphify, Beads, artifacts, stage summary and this handoff
+  synchronized before any Q12 continuation; push all accepted commits under the repo contract. The
+  primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
 
 ## Explicit defers
 

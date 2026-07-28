@@ -1318,3 +1318,69 @@ chosen because the same 65-byte value was staged into ten run roots across the n
 one of which (#9) installed the guard and published its digest. `accepted-coverage-run` is
 deterministic and not secret, so it was copied byte-identically
 (`catalog:a417a99c-db3a-45c8-9d32-561d8d068a3e`, 45 bytes, 0400).
+
+## Window attempt #10 and `mc2-lzft4` — the probe carried the substitution (2026-07-28)
+
+The eleventh instance of the environment-substitution class, and the first one where the PROBE built
+to catch the class was itself the thing that substituted.
+
+The attempt was set up cleanly: `mc2-1sns3` closed, the `--release-sha` identity ruled from
+artefacts, a freshly minted capability and the coverage authority staged into run root
+`6544c7dd-e680-462d-bf8f-5db8fc01c9b6` (0700; `accepted-coverage-run` 0400, `secrets/db-capability`
+0400 and distinct from all ten priors), the deployed tree reinstalled from `develop` at tree
+`1725a2df3`, and a pre-flight at `2026-07-28T15:57:11Z` reading 22 `pass` / 3 `unprovable` with
+evidence (C5, C6, H4) / 0 `fail`, which `--assert-fresh-report` accepted.
+
+It ran detached under `/usr/bin/python3.13` (runbook §2) with the settled argv and
+`--stop-after deploy.prepare`, wrote 11 durable journal rows — `operator.self-check` accepted,
+`barrier.install` completed (production entered `maintenance_guarded`), `writers.quiesce` at
+`capability_claimed` — and then its child refused at its FIRST check:
+
+    source-recovery host wrapper: writer resume controller must have exact root ownership and mode 0644
+
+`/opt/megacampus/deploy/qdrant/q12-writer-resume.py` was deployed `root:root 0444`.
+`source-recovery-run.sh:246-248` demands EXACTLY `root:root 0644` — the `mc2-jhqpw` hardening, so the
+operator account cannot rewrite the privileged child. The tracked
+`deploy/qdrant/q12-deployed-asset-manifest.json` DECLARES `0444` for that path, because the manifest
+derivation is "mode 0555 where git marks the file executable, else 0444" — a repo-side heuristic that
+is simply wrong for this one root-owned asset. Probe H2 asserts mode and owner AGAINST THAT MANIFEST,
+so it passed on a host the consumer rejects, and `mc2-jhqpw` (fixed 2026-07-26) had regressed
+silently when a 2026-07-28 reinstall re-applied the manifest's `0444`.
+
+No writer was quiesced: the wrapper refuses before acting, and the production worker containers
+stayed up 3 weeks / 26 hours untouched. The cost was the run-id and ~9 minutes of guarded production.
+
+RESTORE. The barrier's own `rollback` command was tried FIRST and refused fail-closed —
+`missing database lifecycle`, because the journal carries no `barrier.rollback` lifecycle rows and
+the controller's supervisor `OPERATIONS` tuple (`install`, `verify-after-base`,
+`verify-after-observability`, `prepare-recovery`, `activate`) does not expose rollback. That is why
+attempt #9 was restored by hand, and this one was restored the same way: `write_restore_sql true`
+(`drop_schema=true`) was extracted programmatically from the DEPLOYED `q12-database-barrier.sh`
+(rendered SQL sha256 `2f11b8ed5f8677d2f8a8c657771e833777822fc66ed8aab82ce233d6a5fb0eb0`, verified
+byte-identical when rendered from the repo copy) and executed under THIS run's capability by a
+one-off runner mirroring the barrier's own database-identity check, CA sha256 check, session proof
+and `set_config` GUC binding. The secret was referenced by path and never printed.
+
+Verified read-only afterwards: C4 zero `q12_guard` residue (was schemas=1, relations=8, functions=10,
+triggers=158, event_triggers=1), C2 8 cron jobs active, C3 queue empty, A5/B4/D1/E1/E2 `pass`;
+`pg_db_role_setting` for the database back to exactly `['app.settings.jwt_exp=3600']` with no
+`default_transaction_read_only`; a fresh session reads `default_transaction_read_only=off`; every
+production container up and healthy (`api-blue`, `web-blue`, workers); `cutover.lock` free.
+
+Second finding (`mc2-e21lo`): the restore's trailing
+`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='postgres' AND pid<>pg_backend_pid()`
+failed with `permission denied to terminate process` — the production `postgres` role cannot
+terminate `supabase_admin` backends. It runs AFTER `COMMIT`, so nothing was lost, and Supavisor had
+already recycled every app backend; but the same statement is on the activate rendering too, so both
+paths end on a statement the production role cannot execute.
+
+Third finding (`mc2-zls0f`): `q12-live-cutover.sh` execs `/usr/bin/python3`, which is 3.12.3 on the
+host while the runbook requires 3.13+. It did not bite (the only consumer of
+`POSIX_SPAWN_CLOSEFROM` is `d6_spawn_probe`, which has no caller in the controller) and the window
+was invoked directly under `/usr/bin/python3.13` with the gate run by hand, but no probe asserts
+which interpreter the wrapper resolves.
+
+The host file is `root:root 0644` again, so H2 now reports the truth —
+`the deployed tree differs from the manifest at 1 point(s): deploy/qdrant/q12-writer-resume.py
+(mode 0444 -> 0644)` — and the gate blocks a reopen until the manifest is corrected. A true red
+instead of a false green.
