@@ -481,6 +481,11 @@ APPLICATION_NAME_DEPENDENCE_RE = re.compile(r'application_name\s*:\s*"(megacampu
 APPLICATION_NAME_SESSION_SET_RE = re.compile(
     r'query\("SET application_name=(?:\\u0027|\')(megacampus-q12-[^\'\\"]*)(?:\\u0027|\')"\)'
 )
+# A client that never names itself AT ALL is the same defect arriving from the other side: it is
+# reported as 'Supavisor', invisible to every `megacampus-q12-%` consumer, and a scan that only
+# looks at DECLARED names would not see it. Counting constructions against statements of intent is
+# what makes that case visible.
+CLIENT_CONSTRUCTION_RE = re.compile(r"new Client\(")
 
 
 def probe_b1(context: Context) -> "dict[str, object]":
@@ -505,6 +510,14 @@ def probe_b1(context: Context) -> "dict[str, object]":
         raise ProbeError(f"options-delivery probe failed: {' '.join(result.stderr.split())[:200]}")
     observed = result.stdout.strip()
     delivered = observed == requested
+
+    if not context.pooler_dependence_sources:
+        return verdict(
+            "B1",
+            FAIL,
+            "no source was scanned for a surviving dependence on startup `options` delivery; an "
+            "empty source set is not evidence that every runner states its intent in the session",
+        )
 
     unmatched: list[str] = []
     for name, text in sorted(context.pooler_dependence_sources.items()):
@@ -624,14 +637,29 @@ def probe_b3(context: Context) -> "dict[str, object]":
     after_activity = after[1] if len(after) > 1 else ""
     session_set_works = after_setting == name and after_activity == name
 
-    # Which runners still name themselves on the connection alone.
+    # Which runners still name themselves on the connection alone. Counted, never de-duplicated:
+    # two clients sharing ONE name, only one of which restates it, is an empty set difference and
+    # would read green while half the barrier stayed invisible.
     unmatched: list[str] = []
     for source_name, text in sorted(context.pooler_dependence_sources.items()):
-        wants = set(APPLICATION_NAME_DEPENDENCE_RE.findall(text))
-        states = set(APPLICATION_NAME_SESSION_SET_RE.findall(text))
-        missing = sorted(wants - states)
-        if missing:
-            unmatched.append(f"{source_name} ({name_list(missing)})")
+        wants: dict[str, int] = {}
+        for value in APPLICATION_NAME_DEPENDENCE_RE.findall(text):
+            wants[value] = wants.get(value, 0) + 1
+        states: dict[str, int] = {}
+        session_sets = APPLICATION_NAME_SESSION_SET_RE.findall(text)
+        for value in session_sets:
+            states[value] = states.get(value, 0) + 1
+        for value, count in sorted(wants.items()):
+            if states.get(value, 0) < count:
+                unmatched.append(
+                    f"{source_name} (connect={value} x{count}, session SET x{states.get(value, 0)})"
+                )
+        clients = len(CLIENT_CONSTRUCTION_RE.findall(text))
+        if clients > len(session_sets):
+            unmatched.append(
+                f"{source_name} ({clients} client(s) constructed, {len(session_sets)} of which "
+                "name themselves in the session; the rest are reported under the pooler's own name)"
+            )
 
     state = (
         f"delivered unmodified as {name!r}"
@@ -649,6 +677,14 @@ def probe_b3(context: Context) -> "dict[str, object]":
             "including the terminal proof's barrier_era_session_count, which would read 0 for the "
             "wrong reason and let the window close on an unproven claim",
         )
+    if not context.pooler_dependence_sources:
+        return verdict(
+            "B3",
+            FAIL,
+            "no source was scanned for a surviving dependence on connect-time application_name; an "
+            "empty source set is not evidence that every runner states its name in the session",
+        )
+
     if unmatched:
         return verdict(
             "B3",

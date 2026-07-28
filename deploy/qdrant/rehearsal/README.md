@@ -7,7 +7,7 @@ against a disposable seeded `postgres:17.10-bookworm`. **Workers/agents never to
 disposable container and a `/tmp` scratch trust root.
 
 These are NEW driver files only. They do NOT modify the frozen server batch
-(`q12-database-barrier.sh` `f4f90361`, `q12-writer-resume.py`, `source-recovery-run.sh`,
+(`q12-database-barrier.sh` `f98a2ce4`, `q12-writer-resume.py`, `source-recovery-run.sh`,
 `q12-lifecycle-core.py`, `q12-live-cutover.sh`); they orchestrate them.
 
 ## Deliverables

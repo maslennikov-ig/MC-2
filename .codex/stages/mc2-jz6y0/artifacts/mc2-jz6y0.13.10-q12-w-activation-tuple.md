@@ -465,3 +465,28 @@ own statements as `Supavisor|LOG:`, GREEN logs them as `megacampus-q12-database-
 The same test holds one `megacampus-q12-intruder` session open across a cleanup run and requires the
 terminal proof to refuse (`database terminal reconnect result is invalid`), so
 `barrier_era_session_count` is proven live in both directions rather than vacuously zero.
+
+### 2026-07-28 follow-up measurement — the pooler resets session state on check-in
+
+Independent review of the mc2-38ivn round raised the one claim the round had NOT measured: the
+barrier's own sessions are now visible under `megacampus-q12-%`, so if Supavisor returned a server
+connection to its pool WITHOUT resetting session state, a badged backend could survive into the
+terminal proof and fail `barrier_era_session_count == 0` at C10 — a failure mode that could not
+exist before this fix. The reviewer also correctly refuted the evidence first offered for it: probe
+E2 excludes its own pid, and the pre-flight opens one connection at a time, so a single reused
+backend makes "E2 is green" equally consistent with reset and with same-connection retention.
+
+Measured directly against the live pooled DSN on 2026-07-28, read-only, through the pre-flight's own
+`build_pooled_session` seam, three rounds:
+
+- connection A set `application_name` to a deliberately NON-`megacampus-q12-` badge (so the
+  measurement could not poison E2 or the C10 counter either way) and disconnected;
+- two connections B and C were then opened CONCURRENTLY, forcing the pool to hand out two backends.
+
+In every round one of them landed on the exact backend pid A had badged, and read its own
+`application_name` back as `'Supavisor'` — not the badge. A session GUC set on the same connection
+(`megacampus.q12_capability`) also read back empty (length 0). Supavisor resets session state when a
+connection is checked in, so the badge cannot outlive its session, and the C10 counter stays
+reachable. The same measurement disposes of an adjacent worry the review raised: the capability GUC
+the barrier sets with `set_config(..., false)` does not survive check-in either, so it cannot be
+read by the next client of that connection.

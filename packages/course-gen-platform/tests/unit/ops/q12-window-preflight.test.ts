@@ -398,6 +398,24 @@ describe.runIf(REAL_PG17)('Q12 window pre-flight: probes against the managed fix
     expect(out.b3_live_barrier_unmatched).toBe(0);
   });
 
+  it('counts B3 dependence instead of de-duplicating it, and catches a client that never names itself', () => {
+    // Two clients sharing one name, only one restating it: a set difference is empty here, so the
+    // probe would report green while half the barrier stayed invisible.
+    expect(out.b3_shared_name).toBe('fail');
+    expect(String(out.b3_shared_name_detail)).toContain('megacampus-q12-twin');
+    // A client with no application_name at all is the same defect arriving from the other side.
+    expect(out.b3_unnamed_client).toBe('fail');
+    expect(String(out.b3_unnamed_client_detail)).toMatch(/name(s)? itself|unnamed/u);
+  });
+
+  it('refuses to read an empty source set as "every source is clean" (B1 and B3)', () => {
+    expect(out.b1_no_sources).toBe('fail');
+    expect(out.b3_no_sources).toBe('fail');
+    for (const id of ['b1_no_sources', 'b3_no_sources']) {
+      expect(String(out[`${id}_detail`])).toContain('no source');
+    }
+  });
+
   it('fails B4 when the database is owned by another role', () => {
     expect(out.b4_foreign_owner).toBe('fail');
     expect(String(out.b4_foreign_owner_detail)).toContain('mc2_auth_admin');

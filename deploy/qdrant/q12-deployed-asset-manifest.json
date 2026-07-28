@@ -150,7 +150,7 @@
       "mode": "0444",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-preflight-probes.py",
-      "sha256": "720aa4f0f7eb71c02225d30040262f4b3d8e4140b402cb1250f75ee0ac27b8d2"
+      "sha256": "bace7dfa19b203d58342ced58b808625850a5bd38cb119cb889ddf5b53a721ba"
     },
     {
       "group": "root",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "0eb366c331dbec9d8353514c89aba870d37642f5",
+  "generated_from_tree_sha": "7ff70d5790e7c0647b1126f668e7275707047e7d",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

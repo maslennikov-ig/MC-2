@@ -499,6 +499,37 @@ def probe_suite() -> dict:
         no_remedy.script = no_remedy_script
         record(out, "b3_no_remedy", run_one(no_remedy, "B3"))
 
+        # Two clients sharing ONE name, only one of which restates it: a set difference is empty
+        # here and would report green while half the barrier stayed invisible.
+        shared_name = make_context(fixture, healthy_catalog)
+        shared_name.script = rewriting_script
+        shared_name.pooler_dependence_sources = {
+            "fake-runner.js": 'const a = new Client({...conn, '
+            'application_name:"megacampus-q12-twin"}); '
+            'await a.query("SET application_name=\'megacampus-q12-twin\'"); '
+            'const b = new Client({...conn, application_name:"megacampus-q12-twin"}); '
+            'await b.query("SELECT 1");'
+        }
+        record(out, "b3_shared_name", run_one(shared_name, "B3"))
+
+        # A client that never names itself at all: the original defect arriving from the other side,
+        # invisible to a scan that only looks at declared names.
+        unnamed = make_context(fixture, healthy_catalog)
+        unnamed.script = rewriting_script
+        unnamed.pooler_dependence_sources = {
+            "fake-runner.js": 'const a = new Client({...conn, '
+            'application_name:"megacampus-q12-named"}); '
+            'await a.query("SET application_name=\'megacampus-q12-named\'"); '
+            'const b = new Client({...conn}); await b.query("SELECT 1");'
+        }
+        record(out, "b3_unnamed_client", run_one(unnamed, "B3"))
+
+        # An empty source set must never read as "all sources are clean".
+        for probe_id in ("B1", "B3"):
+            empty = make_context(fixture, healthy_catalog)
+            empty.pooler_dependence_sources = {}
+            record(out, f"{probe_id.lower()}_no_sources", run_one(empty, probe_id))
+
         # B4: the database owned by another role.
         fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.AUTH_OWNER};")
         record(out, "b4_foreign_owner", run_one(make_context(fixture, healthy_catalog), "B4"))
