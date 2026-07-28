@@ -579,7 +579,7 @@ def main(argv: "list[str]") -> int:
     captured_at = utc_now()
 
     if arguments.emit_asset_manifest:
-        repo_root = pathlib.Path(arguments.repo_root or HERE.parents[1])
+        repo_root = pathlib.Path(arguments.repo_root) if arguments.repo_root else HERE.parents[1]
         manifest = build_asset_manifest(repo_root)
         target = asset_manifest_path(repo_root)
         target.write_bytes(canonical(manifest))
@@ -610,9 +610,14 @@ def main(argv: "list[str]") -> int:
             sys.stderr.write(f"q12 window pre-flight NOT GREEN; first offender: {offender}\n")
         return exit_code(verdicts)
 
-    manifest_file = pathlib.Path(arguments.deploy_root) / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    # The deployed manifest is the authority when one is installed; a repository checkout falls
+    # back to the tracked file next to this script. Both are named in the report, so the operator
+    # can see WHICH manifest H2 compared against.
+    manifest_file = (
+        pathlib.Path(arguments.deploy_root) / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    )
     if not manifest_file.is_file():
-        manifest_file = asset_manifest_path(pathlib.Path(arguments.repo_root or HERE.parents[1]))
+        manifest_file = HERE / "q12-deployed-asset-manifest.json"
     manifest = load_asset_manifest(manifest_file) if manifest_file.is_file() else None
 
     workdir = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-preflight-", dir="/tmp"))
