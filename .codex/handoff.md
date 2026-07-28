@@ -51,74 +51,71 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: RE-OPEN the window to the reversible `--stop-after deploy.prepare` hold. The C1
-wall is REMOVED (`mc2-8zxlc` closed by `mc2-34eua`, owner-approved variant B, 2026-07-28) and BOTH
-pre-window steps are DONE (2026-07-28): the server's Q12 deploy tree is byte-identical to `develop`
-for all 40 tracked files (backups in `/opt/megacampus/backups/q12-assets/`), and a fresh `plan` has
-emitted a 75-relation catalog. USE RUN ROOT `5e9b7256-4ae3-449c-95e0-d6aa4d225fc8` with
-`--expected-catalog-sha256 c669b8dd90e42ab60896d342ccec2fbfa4df3ee2da2359d5746920510abbda33`; it is
-complete (catalog 0400, `accepted-coverage-run` 0400, `secrets/db-capability` 0400, root 0700) and
-its catalog holds auth 22 + public 47 + storage 5 + net 1 = 75, zero cron entries, cron_jobs still
-baselined at 8. Production verified pristine after the plan: 0 q12 schemas, 0 q12 triggers, 8 cron
-jobs ACTIVE, empty pg_net queue, no read-only default. The window was opened SIX times on 2026-07-27; every attempt failed closed with ZERO mutation and
-each surfaced a real defect. The sixth named the true first wall: the guard needs ACCESS EXCLUSIVE
-AND `CREATE TRIGGER` on every guarded relation, and `cron.job` is owned by `supabase_admin` with only
-SELECT granted to `postgres` — 42501 both ways (ACCESS SHARE succeeds; measured). A privilege audit
-of all 76 showed `cron.job` was the ONLY one out of reach — `auth`/`storage` are already selected by
-`has_table_privilege(..., 'TRIGGER')` — so the set was curated against privileges and `cron.job` was
-hardcoded past that filter. Guarding it was never a stronger guarantee, only an unreachable one.
+Recommended action: REINSTALL the server Q12 assets, take a FRESH run root + `plan`, then re-open
+the window to the reversible `--stop-after deploy.prepare` hold.
 
-VARIANT B AS BUILT (`mc2-34eua`): `cron.job` out of `guarded_relations` (75; the barrier now asserts
-NO cron relation is guarded, proven load-bearing by two-way mutation). Retained, privilege-free:
-`cron.alter_job` pause, the zero-active-jobs assertion (a read), the read-only database default, and
-the guard trigger on `net.http_request_queue` — the only write path out for the two HOURLY jobs
-(`cleanup-old-drafts-hourly` :00, `detect-stuck-generations` :30, both via `net.http_post`; the other
-six are nightly). Lost: the trigger blocking mid-window re-activation and the lock's atomicity over
-the pause — both need a superuser or Supabase automation. In `q12-source-manifest.ts` `authoritative`
-(rows hashed, a read) is now SPLIT from trigger-guarded, so `cron.job` rows are still compared minus
-`active`. Barrier `f183aa3c` -> `f4f90361`; W-tuple fields
-4/5/6/8/9 amended; `aaec6fc2…` UNCHANGED (the catalog sha reaches argv as a runtime placeholder).
-SECOND INSTANCE found by the
-amendment: the D6 activation-truth probe took `LOCK TABLE ... IN SHARE MODE` over the same catalog,
-and SHARE also needs UPDATE/DELETE/TRUNCATE/MAINTAIN — it would have raised 42501 on `cron.job` too,
-as a pre-flight separate from `barrier.install`. `cron.job` is out of both its templates (the
-`cron_jobs` READ stays); any D6 request must carry `projection_sql_sha256 = d5046e31…` (prior
-`36d28034…`). The probe is not one of the 20 frozen commands.
+WINDOW STATE. Opened NINE times (six 2026-07-27, three 2026-07-28). Attempts 1-8 failed closed with
+ZERO mutation; each surfaced a real defect. Attempt #9 INSTALLED the guard and then aborted, leaving
+production guarded + read-only with `activated=false`; it was restored by hand the same day using the
+barrier's OWN `$restore$` block (extracted programmatically, `drop_schema=true`, under the run's
+capability, fail-closed pre-checks). Production re-verified afterwards: 0 q12 schemas / triggers /
+event triggers / functions, cron 8/8 ACTIVE, database default writable, no stale sessions, all
+containers healthy. Run root `5e9b7256-…` is BURNT — each attempt burns its run-id.
 
-CORRECTIONS: `mc2-7ohdj` was closed on an incomplete root cause — `cron.alter_job` is correct and
-necessary but did not unblock C1, and was closed before the window proved it. The 2026-07-27 claim
-that all real-PG17 suites were green did not cover `q12-cron-restore-loop-ambiguity`, which that same
-change had left red (it pinned the superseded aliased UPDATE); retargeted and green, as is
-`supabase-restore-drill`'s exact-guard case (`mc2-qd12b` tracks its class).
+DEFECTS FOUND AND FIXED SINCE (all on `develop`):
 
-THE PATTERN behind all of them: the checked environment substituted for production — a fixture
-published the step, an isolate had superuser rights, the real error was swallowed, or a host-only gate
-hid a rotten fixture. Model the constraint, never the convenience.
+- `mc2-8zxlc`/`mc2-34eua` (#7, owner-approved variant B): `cron.job` out of `guarded_relations` (75).
+  The guard needs ACCESS EXCLUSIVE AND CREATE TRIGGER on every guarded relation; `cron.job` is owned
+  by `supabase_admin` with only SELECT to `postgres` — 42501 both ways, and it was the ONLY one of 76
+  out of reach. Retained, privilege-free: the `cron.alter_job` pause, the zero-active-jobs read, the
+  read-only default, and the guard trigger on `net.http_request_queue`. Second instance found by the
+  amendment: the D6 activation-truth probe locked the same catalog IN SHARE MODE — any D6 request now
+  carries `projection_sql_sha256 = d5046e31…`.
+- `mc2-2rzf6` (#8): plan and barrier measured the structural catalog in DIFFERENT `search_path`
+  contexts (`cfe6b92b` vs `a2b25324`) — deterministic, not drift. Plan capture now pins
+  `SET LOCAL search_path=pg_catalog` in the same session the barrier re-measures in.
+- `mc2-6fnrt` (#9): the controller opened and HELD the W3 snapshot coordinator before
+  `barrier.install`, and the barrier's own `quiesce_client_backends()` terminated it. The codesign
+  always resolved `<exported-id>` "at pg.backup open"; `WindowSnapshotHold` now does exactly that.
+  Barrier, W-tuple and the client quiesce untouched.
+- `mc2-ipwyc` (found during the restore, both latent PAST C9): the barrier armed guard triggers it
+  could not disarm (DROP TRIGGER needs OWNERSHIP; auth/storage tables belong to the managed admins) —
+  `$restore$` now disarms with one `DROP FUNCTION ... CASCADE` and replays the catalog-captured
+  function + six immutable triggers + REVOKE. And the Supavisor pooler NEVER delivers the connection
+  `options`, so every `-c default_transaction_read_only=…` proof was asserting the database default;
+  each runner now states its intent with a session-level SET. Barrier `f4f90361` -> `56a7a88e`,
+  W-tuple fields 4/5/6 amended. `aaec6fc2…` UNCHANGED — `command_sha256` covers argv only.
 
-Fixed and deployed (controller `cdfef48c`, plan capture `f55dc0b7`, barrier `f4f90361`, backup
-`6680aa4f`; the whole Q12 tree is byte-equal to `develop` `4a9626fca` ON THE SERVER): `mc2-wwc9l`, `mc2-94mmf`, `mc2-vcmd7`, `mc2-orsez`, `mc2-fjcj2`, `mc2-1pwkl`, `mc2-h5l7m`,
-`mc2-7ohdj`, `mc2-34eua` (see `.codex/stages/mc2-jz6y0/summary.md`). Two traps: `mc2-y5tgw` (a dev
-deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and observability images
-C1/C7 need; no pre-flight checks presence), and always run the controller DETACHED (`setsid nohup`) —
-a dropped ssh once killed a plan (exit 255); after C2 that would strand stopped writers.
+THE PATTERN behind all of them: the checked environment substituted for the consuming one — a fixture
+published the step, an isolate had superuser rights, the real error was swallowed, a host-only gate
+hid a rotten fixture, or the pooler silently dropped what the test connection delivered. Model the
+constraint, never the convenience.
 
-RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green` pins,
-`--operator-digest` the `qdrant-operator` image `.env.production` pins — they are DIFFERENT artifacts
-and had been conflated. `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`, 0600
-kept, `.env.blue` untouched) to api@`2f713f87` + web@`ca9afb99`, the per-package build of the
-`23dfe973f` tree. No pull is needed; the dead GHCR token (`mc2-2vtmk`) does not block the window. The
-17 career-playbook files newer than `23dfe973f` ride the next ordinary deploy — itself broken
-(`mc2-o0g75`); colour env files are hand-maintained (`mc2-c2p8z`).
+BEFORE THE NEXT ATTEMPT (in order):
+
+1. The server Q12 tree is STALE again: `q12-database-barrier.sh` and `q12-lifecycle-core.py` both
+   moved after the 2026-07-28 reinstall. Reinstall from `develop` and re-verify byte-equality for all
+   40 tracked files (backups land in `/opt/megacampus/backups/q12-assets/`).
+2. Fresh run root + fresh `plan` (`plan` creates the root itself and only READS production); then copy
+   `accepted-coverage-run` + `secrets/db-capability` in at 0400. `--expected-catalog-sha256` is the
+   sha256 of that root's OWN catalog FILE (barrier `:302`), NOT the value quoted for any prior root.
+3. Pause dev deploys for the window: they run every 15-25 minutes against the SAME shared database,
+   and their `docker image prune -f` also deletes the digest-pinned `qdrant-operator` and
+   observability images C1/C7 need (`mc2-y5tgw`; local hold tags `q12-window-hold/*:pinned` are
+   applied on the host and were proven against the exact prune command).
+4. Always run the controller DETACHED (`setsid nohup`): a dropped ssh once killed a plan (exit 255);
+   after C2 that would strand stopped writers.
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
-(= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests
-on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN catalog FILE (barrier
-`:302`) — for run root `5e9b7256-…` it is `c669b8dd…`. Each attempt burns its run-id, so any FURTHER
-retry needs another fresh run root plus its own `plan` (`plan` creates the root itself and only
-reads production; then copy `accepted-coverage-run` + `secrets/db-capability` in at 0400). `--stop-after deploy.prepare` is
-the sole resumable pre-C9 head. Do not change `aaec6fc2…`. The barrier is invoked as argv[0]: keep it
-mode 0555, not 0444. Historical progress logs: `.codex/stages/mc2-jz6y0/summary.md`; this file is
-current-state only.
+(= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce
+digests on a first run. `--stop-after deploy.prepare` is the sole resumable pre-C9 head. The barrier
+is invoked as argv[0]: keep it mode 0555, not 0444.
+
+RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green` pins,
+`--operator-digest` the `qdrant-operator` image `.env.production` pins — different artifacts, once
+conflated. `.env.green` is re-pinned (backup `.env.green.bak-4128a938-20260727`) to api@`2f713f87` +
+web@`ca9afb99`. The dead GHCR token (`mc2-2vtmk`) does not block the window. Historical progress logs
+live in `.codex/stages/mc2-jz6y0/summary.md`; this file is current-state only.
 
 ## Starter prompt for next orchestrator
 
