@@ -42,19 +42,19 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: open the window to the reversible `--stop-after deploy.prepare` hold. The
-pre-flight is GREEN; nothing in this repo blocks it any more.
+Recommended action: finish `mc2-1sns3` — the LAST open dependency of `mc2-i9h3y`, and the reason
+the window bead still reads BLOCKED — then settle the `--release-sha` contradiction below, stage the
+run root and open to the reversible `--stop-after deploy.prepare` hold. Full brief:
+`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
-`mc2-ot8se` (the pre-flight) and `mc2-38ivn` (its first catch) are both DONE. Probe **B3 found a
-TENTH instance of the class in minutes: the Supavisor pooler REWRITES `application_name` to
-`'Supavisor'`**, so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` could
-only ever read 0 — it passed because no barrier-era session could be RECOGNISED. Fixed in the
-`mc2-ipwyc` shape: all four barrier clients `SET application_name` in their own session and assert
-it twice (`current_setting` AND what `pg_stat_activity` publishes for their own backend), so the
-proof fails closed if a pooler release discards the session SET too. W-tuple field 4 ->
-`f98a2ce4…`, fields 5-10 BYTE-IDENTICAL (no production re-freeze). `quiesce_client_backends()`
-matches on `usename` and was never blind (E1 green). Contract + plan:
-`docs/superpowers/{specs/2026-07-28-q12-window-preflight-contract.md,plans/2026-07-28-q12-window-preflight.md}`.
+`mc2-ot8se` (the pre-flight) and `mc2-38ivn` (its first catch) are DONE. Probe B3 found a TENTH
+instance of the class in minutes: the Supavisor pooler REWRITES `application_name` to `'Supavisor'`,
+so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` could only ever read 0 —
+it passed because no barrier-era session could be RECOGNISED. Fixed in the `mc2-ipwyc` shape (all
+four barrier clients state the name in-session and assert it twice); W-tuple field 4 -> `f98a2ce4…`,
+fields 5-10 BYTE-IDENTICAL, no re-freeze. Measured afterwards, read-only on the live pooler:
+Supavisor RESETS session state on check-in, so a badge cannot outlive its session and the C10 count
+stays reachable. Full round, including the review findings it closed, in the stage summary.
 
 RUN ROOT for the window (plan re-run 2026-07-28, read-only, production; UNCHANGED by the B3 fix,
 which moved no catalog-bound digest):
@@ -66,8 +66,8 @@ which moved no catalog-bound digest):
   (agrees with D1, measured in the barrier's `search_path`)
 - `expected_post_migration_catalog_sha256 b1fe2b9cf95d4d6e263b5aa65a7fc907ab2521ed6b6f654c1623cd0487ffff0d`
 - report `<run-root>/q12-window-preflight-20260728T144848Z.json`: 22 `pass`, 3 `unprovable` with
-  evidence (C5/C6/H4), 0 `fail`; `--assert-fresh-report` accepts it. Reports EXPIRE 30 min after
-  `captured_at`. Still missing from the root: `accepted-coverage-run` + `secrets/db-capability`.
+  evidence (C5/C6/H4), 0 `fail`; the gate accepts it. Reports EXPIRE 30 min after `captured_at`.
+  Still missing from the root: `accepted-coverage-run` + `secrets/db-capability`.
 
 The deployed Q12 tree was REINSTALLED from `develop` twice on 2026-07-28 (latest: the B3 fix at
 tree `fc495354`; replaced files under `/opt/megacampus/backups/q12-assets/20260728T135316Z/`, the
@@ -85,7 +85,7 @@ DEFECTS #7-#9, the `mc2-ipwyc` PAIR and `mc2-38ivn`: all found, fixed and delive
 
 THE PATTERN behind all of them: the checked environment substituted for the consuming one — a
 fixture published the step, an isolate had superuser rights, the real error was swallowed, a
-host-only gate hid a rotten fixture, or the pooler silently dropped what the test connection
+host-only gate hid a rotten fixture, or the pooler dropped (or rewrote) what the test connection
 delivered. Model the constraint, never the convenience.
 
 BEFORE THE NEXT ATTEMPT — one command, not a checklist. Run this on the server, immediately before
@@ -96,31 +96,28 @@ the window, and read its report:
   --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>
 ```
 
-It is read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
-`transaction_read_only='on'` first), goes through the pooled DSN, takes no lock and burns no run-id,
-so re-run it as often as wanted. It exits 0 only when all 25 frozen probes are `pass` or
-`unprovable` with a named evidence pointer, and publishes a 0400 report in the run root. `q12-live-cutover.sh` REFUSES `live`/`supervisor`
-without a green report under 30 minutes old whose `asset_manifest_sha256` matches the deployed tree,
-so this is a gate, not a reminder. Contract:
+Read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
+`transaction_read_only='on'` first), through the pooled DSN, no lock, no run-id burned — re-run it
+as often as wanted. Exits 0 only when all 25 frozen probes are `pass` or `unprovable` with a named
+evidence pointer, and publishes a 0400 report in the run root. `q12-live-cutover.sh` REFUSES
+`live`/`supervisor` without a green report under 30 min old whose `asset_manifest_sha256` matches
+the deployed tree: a gate, not a reminder. Coverage: A1-A7 guarded-set privilege reachability,
+B1-B4 the pooled session, C1-C4 cron/queue/residue, D1 catalog agreement in the barrier's
+`search_path`, E1/E2 quiesce feasibility, H1-H5 host. Contract:
 `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
-Coverage: A1..A7 guarded-set privilege reachability, B1..B4 the pooled session, C1..C4
-cron/queue/residue, D1 catalog agreement in the barrier's `search_path`, E1/E2 quiesce feasibility,
-H1..H5 host (deployed-tree bytes, digest-pinned images and their hold tags, running controller,
-dev-deploy quiet window, disk).
+Outside what the probe can do: copy `accepted-coverage-run` + `secrets/db-capability` into the run
+root at 0400 (`--expected-catalog-sha256` is the sha256 of THAT root's OWN catalog FILE, barrier
+`:302`, never a value quoted for a prior root); run the controller DETACHED (`setsid nohup` — a
+dropped ssh once killed a plan at exit 255, and after C2 that would strand stopped writers); and
+note that a push to `develop` triggers Deploy to Dev, which fails H4 for 30 minutes, so land
+deliveries BEFORE the window.
 
-Still the operator's, because the probe cannot do them:
-
-1. Copy `accepted-coverage-run` + `secrets/db-capability` into the run root at 0400.
-   `--expected-catalog-sha256` is the sha256 of THAT root's OWN catalog FILE (barrier `:302`), never
-   a value quoted for a prior root. (The run root and the `plan` themselves are already done — see
-   § "Next recommended".)
-2. Run the controller DETACHED (`setsid nohup`). A dropped ssh once killed a plan (exit 255); after
-   C2 that would strand stopped writers.
-3. Note that a push to `develop` triggers Deploy to Dev, which restarts the dev containers and makes
-   H4 fail for 30 minutes. Land deliveries BEFORE the window, not during it.
-
-WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
+WINDOW ARGV — `--release-sha` IS CONTRADICTORY, settle before the window: this line and the staged
+root's authority both say `23dfe973f18cc6067d386b6eb683bf6906142165`, but `mc2-sdbua`'s closure rules
+the authority is `060b4faeac2e5ef6116aa26cda8e07e43e1343a6` (the operator image `.env.production`
+pins was built from it). A ruling that moves it moves `--expected-catalog-sha256` via a re-plan.
+`--operator-digest b5eb528e…`
 (= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce
 digests on a first run. `--stop-after deploy.prepare` is the sole resumable pre-C9 head. The barrier
 is invoked as argv[0]: keep it mode 0555, not 0444.
@@ -133,6 +130,9 @@ block the window.
 
 ## Starter prompt for next orchestrator
 
+`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md` (prompt-check pass,
+oversize warning; finish `mc2-1sns3`, settle the release-sha ruling, stage, open to
+`deploy.prepare`, stop at the owner-held C9). Historical:
 `docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md` (prompt-check pass;
 Phase A local D6/Root -> B GHCR publish -> C live cutover -> D closeout, every remote/live and
 credentialed step owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
