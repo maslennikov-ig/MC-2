@@ -259,7 +259,18 @@ def read_only_wrap(body: str, snapshot: str | None = None) -> str:
     """One read-only transaction; COPY the body's single query to STDOUT as text.
 
     When a snapshot id is supplied it is pinned with SET TRANSACTION SNAPSHOT so
-    every projection reads the exact instant the backup coordinator exported."""
+    every projection reads the exact instant the backup coordinator exported.
+
+    `search_path` is pinned to `pg_catalog` because the consumer pins it too: every
+    q12-database-barrier.sh block that RE-MEASURES one of these projections runs under
+    `SET LOCAL search_path=pg_catalog`. That is not cosmetic — pg_get_indexdef,
+    pg_get_constraintdef, pg_get_expr, format_type and pg_get_function_identity_arguments all
+    SUPPRESS the schema qualifier for objects visible in the current search_path, so the same
+    database hashes differently under the two contexts. Capturing under the caller's ambient
+    search_path made `baseline_structural_sha256` unreachable for the barrier and killed
+    barrier.install with 'pre-guard canonical structural catalog drift' (measured on production
+    2026-07-28: ambient cfe6b92b…, pg_catalog a2b25324…). Producer and consumer must measure in
+    ONE context; pinned here rather than by relaxing the barrier's hardening."""
     binding = ""
     if snapshot is not None:
         if not SNAPSHOT_RE.fullmatch(snapshot):
@@ -268,6 +279,7 @@ def read_only_wrap(body: str, snapshot: str | None = None) -> str:
     return (
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\n"
         f"{binding}"
+        "SET LOCAL search_path=pg_catalog;\n"
         f"COPY ({body}) TO STDOUT;\n"
         "COMMIT;\n"
     )
