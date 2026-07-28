@@ -27,8 +27,7 @@ Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expans
 - `AGENTS.md`
 - `.codex/orchestrator.toml`
 - `.codex/handoff.md`
-- `.codex/project-index.md`
-- `graphify-out/GRAPH_REPORT.md`
+- `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`
 - `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
 - `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
 - `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
@@ -53,53 +52,55 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 Next stage id: `mc2-jz6y0`
 
 Recommended action: RE-OPEN the window to the reversible `--stop-after deploy.prepare` hold. The C1
-wall is REMOVED (`mc2-8zxlc` closed by `mc2-34eua`, owner-approved variant B, 2026-07-28). The window
-was opened SIX times on 2026-07-27; every attempt failed closed with ZERO mutation and each surfaced a
-real defect. The sixth named the true first wall: the guard takes ACCESS EXCLUSIVE on every guarded
-relation AND `CREATE TRIGGER` on it, and `cron.job` is owned by `supabase_admin` with only SELECT
-granted to `postgres` — 42501 both ways. MEASURED on production: ACCESS EXCLUSIVE raises 42501,
-ACCESS SHARE succeeds. A privilege audit of all 76 showed `cron.job` was the ONLY one out of reach:
-`auth`/`storage` are already selected by `has_table_privilege(..., 'TRIGGER')` (22 of 23, 5 of 8), so
-the set was curated against privileges and `cron.job` was hardcoded past that filter. Guarding it was
-never a stronger guarantee, only an unreachable one.
+wall is REMOVED (`mc2-8zxlc` closed by `mc2-34eua`, owner-approved variant B, 2026-07-28) and BOTH
+pre-window steps are DONE (2026-07-28): the server's Q12 deploy tree is byte-identical to `develop`
+for all 40 tracked files (backups in `/opt/megacampus/backups/q12-assets/`), and a fresh `plan` has
+emitted a 75-relation catalog. USE RUN ROOT `5e9b7256-4ae3-449c-95e0-d6aa4d225fc8` with
+`--expected-catalog-sha256 c669b8dd90e42ab60896d342ccec2fbfa4df3ee2da2359d5746920510abbda33`; it is
+complete (catalog 0400, `accepted-coverage-run` 0400, `secrets/db-capability` 0400, root 0700) and
+its catalog holds auth 22 + public 47 + storage 5 + net 1 = 75, zero cron entries, cron_jobs still
+baselined at 8. Production verified pristine after the plan: 0 q12 schemas, 0 q12 triggers, 8 cron
+jobs ACTIVE, empty pg_net queue, no read-only default. The window was opened SIX times on 2026-07-27; every attempt failed closed with ZERO mutation and
+each surfaced a real defect. The sixth named the true first wall: the guard needs ACCESS EXCLUSIVE
+AND `CREATE TRIGGER` on every guarded relation, and `cron.job` is owned by `supabase_admin` with only
+SELECT granted to `postgres` — 42501 both ways (ACCESS SHARE succeeds; measured). A privilege audit
+of all 76 showed `cron.job` was the ONLY one out of reach — `auth`/`storage` are already selected by
+`has_table_privilege(..., 'TRIGGER')` — so the set was curated against privileges and `cron.job` was
+hardcoded past that filter. Guarding it was never a stronger guarantee, only an unreachable one.
 
-VARIANT B AS BUILT (`mc2-34eua`): `cron.job` removed from `guarded_relations` (75, not 76; the barrier
-now asserts NO cron relation is guarded, proven load-bearing by two-way mutation). Retained,
-privilege-free: `cron.alter_job` pause, the zero-active-jobs assertion (a read), the read-only
-database default, and the guard trigger on `net.http_request_queue` — the only write path out for the
-two HOURLY jobs (`cleanup-old-drafts-hourly` :00, `detect-stuck-generations` :30, both via
-`net.http_post`; the other six are nightly). Lost: the trigger blocking mid-window re-activation and
-the lock's atomicity over the pause — both need a superuser or Supabase automation. In
-`q12-source-manifest.ts` `authoritative` (rows hashed, a read) is now SPLIT from trigger-guarded, so
-`cron.job` rows are still compared minus `active`. Barrier `f183aa3c` -> `f4f90361`; W-tuple fields
+VARIANT B AS BUILT (`mc2-34eua`): `cron.job` out of `guarded_relations` (75; the barrier now asserts
+NO cron relation is guarded, proven load-bearing by two-way mutation). Retained, privilege-free:
+`cron.alter_job` pause, the zero-active-jobs assertion (a read), the read-only database default, and
+the guard trigger on `net.http_request_queue` — the only write path out for the two HOURLY jobs
+(`cleanup-old-drafts-hourly` :00, `detect-stuck-generations` :30, both via `net.http_post`; the other
+six are nightly). Lost: the trigger blocking mid-window re-activation and the lock's atomicity over
+the pause — both need a superuser or Supabase automation. In `q12-source-manifest.ts` `authoritative`
+(rows hashed, a read) is now SPLIT from trigger-guarded, so `cron.job` rows are still compared minus
+`active`. Barrier `f183aa3c` -> `f4f90361`; W-tuple fields
 4/5/6/8/9 amended; `aaec6fc2…` UNCHANGED (the catalog sha reaches argv as a runtime placeholder).
-RE-PLAN the production run root so its catalog carries 75 relations. SECOND INSTANCE found by the
+SECOND INSTANCE found by the
 amendment: the D6 activation-truth probe took `LOCK TABLE ... IN SHARE MODE` over the same catalog,
 and SHARE also needs UPDATE/DELETE/TRUNCATE/MAINTAIN — it would have raised 42501 on `cron.job` too,
 as a pre-flight separate from `barrier.install`. `cron.job` is out of both its templates (the
 `cron_jobs` READ stays); any D6 request must carry `projection_sql_sha256 = d5046e31…` (prior
 `36d28034…`). The probe is not one of the 20 frozen commands.
 
-CORRECTION: `mc2-7ohdj` was closed on an incomplete root cause — the `cron.alter_job` move is correct
-and necessary, but did not unblock C1 and was closed before the window proved it. SECOND CORRECTION:
-the 2026-07-27 claim that all real-PG17 suites were green did not cover
-`q12-cron-restore-loop-ambiguity`, which that same change had left red (it pinned the superseded
-aliased UPDATE); it is retargeted and green. `supabase-restore-drill`'s exact-guard case was red for
-longer and is now green (`mc2-qd12b` tracks the class).
+CORRECTIONS: `mc2-7ohdj` was closed on an incomplete root cause — `cron.alter_job` is correct and
+necessary but did not unblock C1, and was closed before the window proved it. The 2026-07-27 claim
+that all real-PG17 suites were green did not cover `q12-cron-restore-loop-ambiguity`, which that same
+change had left red (it pinned the superseded aliased UPDATE); retargeted and green, as is
+`supabase-restore-drill`'s exact-guard case (`mc2-qd12b` tracks its class).
 
 THE PATTERN behind all of them: the checked environment substituted for production — a fixture
-published the step, an isolate had superuser rights, the real error was swallowed, or a host-only
-gate hid a rotten fixture. The container had no pg_cron and modelled `cron.job` as a superuser-owned
-table, so writes production forbids passed forever; it now reproduces the managed ACL and the
-sanctioned API. Model the constraint, never the convenience.
+published the step, an isolate had superuser rights, the real error was swallowed, or a host-only gate
+hid a rotten fixture. Model the constraint, never the convenience.
 
-Fixed and deployed (controller `8ba9db34`, backup `6680aa4f`, barrier now `f4f90361` IN REPO — the
-server still carries `f183aa3c` and needs the reinstall before the window; Q12 tree byte-equal to
-`develop`): `mc2-wwc9l`, `mc2-94mmf`, `mc2-vcmd7`, `mc2-orsez`, `mc2-fjcj2`, `mc2-1pwkl`, `mc2-h5l7m`,
-`mc2-7ohdj`, `mc2-34eua` (see `.codex/stages/mc2-jz6y0/summary.md` for each). Two traps: `mc2-y5tgw`
-(a dev deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and observability
-images C1/C7 need; no pre-flight checks presence), and always run the controller DETACHED
-(`setsid nohup`) — a dropped ssh killed one plan (exit 255), which after C2 would strand writers.
+Fixed and deployed (controller `cdfef48c`, plan capture `f55dc0b7`, barrier `f4f90361`, backup
+`6680aa4f`; the whole Q12 tree is byte-equal to `develop` `4a9626fca` ON THE SERVER): `mc2-wwc9l`, `mc2-94mmf`, `mc2-vcmd7`, `mc2-orsez`, `mc2-fjcj2`, `mc2-1pwkl`, `mc2-h5l7m`,
+`mc2-7ohdj`, `mc2-34eua` (see `.codex/stages/mc2-jz6y0/summary.md`). Two traps: `mc2-y5tgw` (a dev
+deploy's `docker image prune -f` deletes the digest-pinned `qdrant-operator` and observability images
+C1/C7 need; no pre-flight checks presence), and always run the controller DETACHED (`setsid nohup`) —
+a dropped ssh once killed a plan (exit 255); after C2 that would strand stopped writers.
 
 RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green` pins,
 `--operator-digest` the `qdrant-operator` image `.env.production` pins — they are DIFFERENT artifacts
@@ -112,9 +113,9 @@ kept, `.env.blue` untouched) to api@`2f713f87` + web@`ca9afb99`, the per-package
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
 (= `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests
 on a first run. `--expected-catalog-sha256` is the sha256 of the run root's OWN catalog FILE (barrier
-`:302`) — take it from a FRESH `plan` (it must now hold 75 guarded relations), never a previous run.
-Each attempt burns its run-id, so every retry needs a fresh run root (`mkdir -m 0700`, copy
-`accepted-coverage-run` + `secrets/db-capability`) plus one `plan`. `--stop-after deploy.prepare` is
+`:302`) — for run root `5e9b7256-…` it is `c669b8dd…`. Each attempt burns its run-id, so any FURTHER
+retry needs another fresh run root plus its own `plan` (`plan` creates the root itself and only
+reads production; then copy `accepted-coverage-run` + `secrets/db-capability` in at 0400). `--stop-after deploy.prepare` is
 the sole resumable pre-C9 head. Do not change `aaec6fc2…`. The barrier is invoked as argv[0]: keep it
 mode 0555, not 0444. Historical progress logs: `.codex/stages/mc2-jz6y0/summary.md`; this file is
 current-state only.
@@ -151,11 +152,11 @@ owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
   strict `normalizeRecoveryManifest`. DEFERRED past the live window (no operator churn before
   C1..C10): consolidate the duplicate schema, deduplicate `CATALOG_HASH_PATTERN`, consider
   excluding quote/backslash from its character class.
-- Q12 staging mutation is owner-authorized but NO-GO until the approved correction streams, a
-  truthful fresh validated database backup, a Supabase-compatible restore and every documented hard
-  gate pass. GHCR publication and password rotation keep their separate secret/effects gates.
-  Missing-source product truth is settled by the approved six failed plus eighteen
-  retained-derived-only dispositions. Do not partially activate.
+- Q12 staging mutation is owner-authorized but NO-GO until the approved correction streams, a truthful
+  fresh validated database backup, a Supabase-compatible restore and every documented hard gate pass.
+  GHCR publication and password rotation keep their separate secret/effects gates. Missing-source
+  product truth is settled by the approved six failed plus eighteen retained-derived-only
+  dispositions. Do not partially activate.
 - D6 `.13.19` is integrated; Root `.13.13` join is the next implementation stream. D6 pinned-server
   capability gates and the fields 5/6/8/9 production re-freeze (Task C7) stay live-window scope. No
   live action outside the owner-gated window.
