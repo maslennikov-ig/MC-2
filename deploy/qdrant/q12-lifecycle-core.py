@@ -4783,7 +4783,6 @@ def drive_forward_sequence(
     *,
     resume_from: str | None = None,
     stop_after: str | None = None,
-    on_staged: Callable[[str], None] = lambda _step: None,
     quiesce_object_sha256: str | Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
@@ -4814,6 +4813,29 @@ def drive_forward_sequence(
             engine, request, resource_manifest_paths, marker_path,
             run_id=(run_id if post_activate else None), post_activate=post_activate,
         )
+
+    def on_staged(step_id: str) -> None:
+        """W7a (codesign §D2/§D3): production-only staged threading between the real data-movement
+        steps and the commands whose argv consumes what they produce.
+
+        This belongs to the DRIVER, not to a caller, because run_live and run_recover share the
+        driver and two recover heads RE-DRIVE a staged step: head 1
+        (``barrier.install/completed`` -> ``writers.quiesce``) re-drives pg.backup, whose
+        ``<immutable-generation>`` pg.restore consumes, and head 4
+        (``barrier.prepare-recovery/completed`` -> ``source.forward``) re-drives source.forward,
+        whose accepted binding reindex.plan consumes. A hook passed in by one caller only would let
+        a resumed production window fail closed at the NEXT command — after C2 has already quiesced
+        the production writers. ``WindowSnapshotHold`` already owns the same property for
+        ``<exported-id>``; this is its counterpart for the two later staged authorities.
+
+        Fixture mode is a no-op: its upfront ``derive_joined_fixture_values`` dict already carries
+        every placeholder, so the composer parity twin is byte-unaffected."""
+        if request.get("production") is not True:
+            return
+        if step_id == "pg.backup":
+            resolve_pg_backup_generation(engine.executor, values, request, engine.run_root)
+        elif step_id == "source.forward":
+            resolve_source_forward_acceptance(engine.executor, values, request, engine.run_root)
 
     if resume_from == _POST_ACTIVATE_SENTINEL:
         # Groups 1-16 already durable (barrier.activate/completed or a barrier.cleanup head): drive
@@ -5161,16 +5183,6 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         def ordinary(command_id: str, **keywords: Any) -> dict[str, Any]:
             return engine.append_ordinary_lifecycle(manifest, command_id, values, **keywords)
 
-        def on_staged(step_id: str) -> None:
-            # W7a (codesign §D2/§D3): production-only staged threading between real data-movement steps.
-            # The fixture path keeps its verbatim upfront dict (no callbacks) — parity-neutral no-op here.
-            if request.get("production") is not True:
-                return
-            if step_id == "pg.backup":
-                resolve_pg_backup_generation(executor, values, request, engine.run_root)
-            elif step_id == "source.forward":
-                resolve_source_forward_acceptance(executor, values, request, engine.run_root)
-
         # R5 Sub-round D stop_after SEAM: an optional named checkpoint at which the forward run stops
         # cleanly and returns its partial output (a stopped run does NOT run post-activate). Absent =>
         # the full 81-row window (76 forward + 5 cleanup) exactly as before. The checkpoints are the
@@ -5227,7 +5239,6 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             d5,
             resume_from=None,
             stop_after=stop_after,
-            on_staged=on_staged,
             quiesce_object_sha256=quiesce_object_resolver,
         )
     finally:
