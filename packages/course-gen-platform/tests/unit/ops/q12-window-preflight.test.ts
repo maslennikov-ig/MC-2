@@ -378,11 +378,24 @@ describe.runIf(REAL_PG17)('Q12 window pre-flight: probes against the managed fix
     expect(String(out.b2_transaction_mode_detail)).toContain('did not survive');
   });
 
-  it('fails B3 when the pooler rewrites application_name', () => {
-    // The barrier's quiesce allowlist and the terminal proof's barrier_era_session_count both
-    // match on `megacampus-q12-%`; a rewritten name silently empties both.
-    expect(out.b3_rewritten).toBe('fail');
-    expect(String(out.b3_rewritten_detail)).toContain('application_name');
+  it('records the application_name rewrite, and fails only if a runner still trusts the connection', () => {
+    // mc2-38ivn: Supavisor does not merely drop the startup application_name the way it drops
+    // `options` — it SUBSTITUTES 'Supavisor'. The terminal proof's barrier_era_session_count and
+    // every other consumer of the `megacampus-q12-%` prefix then read 0 for the wrong reason. As
+    // with B1 the contract is that the code must not DEPEND on delivery: the probe records the
+    // observed truth, and passes a rewriting pooler as long as every runner states its name in the
+    // session instead.
+    expect(out.b3_rewritten).toBe('pass');
+    expect(String(out.b3_rewritten_detail)).toMatch(/rewrit/u);
+    expect(String(out.b3_rewritten_detail)).toContain('session');
+    expect(out.b3_rewritten_dependent).toBe('fail');
+    expect(String(out.b3_rewritten_dependent_detail)).toContain('fake-runner.js');
+    // A pooler that also swallowed the session-level SET would leave no repair at all.
+    expect(out.b3_no_remedy).toBe('fail');
+    expect(String(out.b3_no_remedy_detail)).toContain('session-level');
+    // The LIVE barrier bytes: every connect-time Q12 name is restated in the session.
+    expect(Number(out.b3_live_barrier_connect_sites)).toBeGreaterThanOrEqual(4);
+    expect(out.b3_live_barrier_unmatched).toBe(0);
   });
 
   it('fails B4 when the database is owned by another role', () => {

@@ -395,14 +395,14 @@ def probe_suite() -> dict:
         healthy_b = make_context(fixture, healthy_catalog)
         # B1 scans real source bytes: the LIVE barrier (which must carry no unmatched dependence)
         # plus a synthetic runner that does depend on startup-option delivery.
-        healthy_b.option_dependence_sources = {
+        healthy_b.pooler_dependence_sources = {
             "q12-database-barrier.sh": (REPO / "deploy/qdrant/q12-database-barrier.sh").read_text(
                 encoding="utf-8"
             )
         }
         for probe_id in ("B1", "B2", "B3", "B4"):
             record(out, f"{probe_id.lower()}_healthy", run_one(healthy_b, probe_id))
-        barrier_text = healthy_b.option_dependence_sources["q12-database-barrier.sh"]
+        barrier_text = healthy_b.pooler_dependence_sources["q12-database-barrier.sh"]
         wants = probes.OPTION_DEPENDENCE_RE.findall(barrier_text)
         states = probes.SESSION_SET_RE.findall(barrier_text)
         out["b1_live_barrier_option_sites"] = len(wants)
@@ -411,7 +411,7 @@ def probe_suite() -> dict:
         )
 
         dependent = make_context(fixture, healthy_catalog)
-        dependent.option_dependence_sources = {
+        dependent.pooler_dependence_sources = {
             # A runner that asks the CONNECTION for read-only and never states it in the session:
             # exactly the shape that was fatal after install set the database default.
             "fake-runner.js": 'const c = new Client({...conn, options:"-c '
@@ -443,19 +443,61 @@ def probe_suite() -> dict:
         pooled.script = transaction_mode_script
         record(out, "b2_transaction_mode", run_one(pooled, "B2"))
 
-        # B3: a pooler that rewrites application_name in flight.
+        # B3: a pooler that rewrites application_name in flight — the production shape (mc2-38ivn).
+        # The rewrite is applied at CONNECT only, so a session-level `SET application_name` inside
+        # the probe body still takes effect, exactly as it does through Supavisor.
         def rewriting_script(sql: str, *, options=None, application_name=None, role=None):
             completed = fixture.psql(
                 sql,
                 role or fixture_module.BARRIER_ROLE,
                 options=options,
-                application_name="supavisor-rewrote-this",
+                application_name="Supavisor",
             )
             return probes.ScriptResult(completed.returncode, completed.stdout, completed.stderr)
 
         rewritten = make_context(fixture, healthy_catalog)
         rewritten.script = rewriting_script
+        rewritten.pooler_dependence_sources = {
+            "q12-database-barrier.sh": (REPO / "deploy/qdrant/q12-database-barrier.sh").read_text(
+                encoding="utf-8"
+            )
+        }
         record(out, "b3_rewritten", run_one(rewritten, "B3"))
+        barrier_text = rewritten.pooler_dependence_sources["q12-database-barrier.sh"]
+        connect_names = probes.APPLICATION_NAME_DEPENDENCE_RE.findall(barrier_text)
+        session_names = probes.APPLICATION_NAME_SESSION_SET_RE.findall(barrier_text)
+        out["b3_live_barrier_connect_sites"] = len(connect_names)
+        out["b3_live_barrier_unmatched"] = len(set(connect_names) - set(session_names))
+
+        # A runner that names itself only on the connection and never restates it in the session:
+        # invisible to every `megacampus-q12-%` consumer the moment the pooler substitutes its own.
+        dependent_name = make_context(fixture, healthy_catalog)
+        dependent_name.script = rewriting_script
+        dependent_name.pooler_dependence_sources = {
+            "fake-runner.js": 'const c = new Client({...conn, '
+            'application_name:"megacampus-q12-fake-runner"}); await c.query("SELECT 1");'
+        }
+        record(out, "b3_rewritten_dependent", run_one(dependent_name, "B3"))
+
+        # A pooler that ALSO swallows the session-level SET: the mc2-ipwyc-shaped repair does not
+        # exist there, so the probe must refuse instead of naming a remedy that does not work.
+        def no_remedy_script(sql: str, *, options=None, application_name=None, role=None):
+            stripped = "\n".join(
+                line
+                for line in sql.split("\n")
+                if not line.strip().lower().startswith("set application_name")
+            )
+            completed = fixture.psql(
+                stripped,
+                role or fixture_module.BARRIER_ROLE,
+                options=options,
+                application_name="Supavisor",
+            )
+            return probes.ScriptResult(completed.returncode, completed.stdout, completed.stderr)
+
+        no_remedy = make_context(fixture, healthy_catalog)
+        no_remedy.script = no_remedy_script
+        record(out, "b3_no_remedy", run_one(no_remedy, "B3"))
 
         # B4: the database owned by another role.
         fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.AUTH_OWNER};")

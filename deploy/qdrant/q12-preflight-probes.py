@@ -106,7 +106,7 @@ class Context:
     structural_catalog_sql: Optional[str] = None
     host: Optional[HostAdapter] = None
     # Files whose bytes probe B1 scans for a surviving dependence on startup `options` delivery.
-    option_dependence_sources: "dict[str, str]" = field(default_factory=dict)
+    pooler_dependence_sources: "dict[str, str]" = field(default_factory=dict)
     # Per-run memo so the seven group-A probes share one round trip. Cleared per Context; a probe
     # must never depend on another probe having populated it.
     cache: dict = field(default_factory=dict)
@@ -472,6 +472,16 @@ SESSION_SET_RE = re.compile(r'query\("SET default_transaction_read_only=(on|off)
 B2_SESSION_GUC = "megacampus.q12_preflight_session_probe"
 B2_TOKEN = "session-mode-probe"
 
+# `new Client({... application_name:"megacampus-q12-…"})` — a startup parameter the pooler does not
+# merely drop the way it drops `options`: it SUBSTITUTES its own value (mc2-38ivn).
+APPLICATION_NAME_DEPENDENCE_RE = re.compile(r'application_name\s*:\s*"(megacampus-q12-[^"]*)"')
+# `await client.query("SET application_name='megacampus-q12-…'")` — the session-level statement of
+# intent that replaces the dependence. The barrier spells its single quotes `'` so the embedded
+# Node runners survive the shell quoting, so both spellings are accepted here.
+APPLICATION_NAME_SESSION_SET_RE = re.compile(
+    r'query\("SET application_name=(?:\\u0027|\')(megacampus-q12-[^\'\\"]*)(?:\\u0027|\')"\)'
+)
+
 
 def probe_b1(context: Context) -> "dict[str, object]":
     """Measure startup-`options` delivery, and fail only on a runner that still depends on it.
@@ -497,7 +507,7 @@ def probe_b1(context: Context) -> "dict[str, object]":
     delivered = observed == requested
 
     unmatched: list[str] = []
-    for name, text in sorted(context.option_dependence_sources.items()):
+    for name, text in sorted(context.pooler_dependence_sources.items()):
         wants: dict[str, int] = {}
         for value in OPTION_DEPENDENCE_RE.findall(text):
             wants[value] = wants.get(value, 0) + 1
@@ -527,7 +537,7 @@ def probe_b1(context: Context) -> "dict[str, object]":
         "B1",
         PASS,
         f"startup options {state} (asked {requested!r}, session reads {observed!r}); "
-        f"{len(context.option_dependence_sources)} scanned source(s) state their intent with a "
+        f"{len(context.pooler_dependence_sources)} scanned source(s) state their intent with a "
         "session-level SET and depend on nothing the pooler can drop",
     )
 
@@ -566,65 +576,93 @@ def probe_b2(context: Context) -> "dict[str, object]":
 
 
 def probe_b3(context: Context) -> "dict[str, object]":
-    """application_name must reach pg_stat_activity unmodified.
+    """Every Q12 session must be able to name itself in `pg_stat_activity`, and no runner may
+    depend on the CONNECTION to do it.
 
-    The barrier's quiesce allowlist and the terminal proof's `barrier_era_session_count` both match
-    on `megacampus-q12-%`. A pooler that rewrote the name would empty both silently — the proof
-    would read "no Q12 sessions are alive" because it could not see its own.
+    Production truth, measured on 2026-07-28 (mc2-38ivn): Supavisor does not merely drop the
+    startup `application_name` the way it drops `options` — it substitutes `'Supavisor'`. The
+    barrier's terminal proof asserts
+
+        count(*) FROM pg_stat_activity WHERE pid<>pg_backend_pid()
+          AND datname='postgres' AND application_name LIKE 'megacampus-q12-%'  == 0
+
+    so through the pooler that count could only ever read 0 — not because no barrier-era session
+    survived the window, but because none could be recognised. It passed for the wrong reason.
+
+    The verdict therefore follows B1's shape rather than demanding delivery: measure what the
+    connection does, measure whether the session-level repair works, and fail only when a runner
+    still trusts the connection — or when no repair exists at all.
     """
     if context.script is None:
         raise ProbeError("no database seam is bound in this scope")
     name = f"{PREFLIGHT_APPLICATION_NAME}-b3"
-    result = context.script(
-        read_only(
-            "SELECT pg_catalog.current_setting('application_name') || '|' || COALESCE("
-            "(SELECT activity.application_name FROM pg_catalog.pg_stat_activity activity"
-            " WHERE activity.pid = pg_catalog.pg_backend_pid()), '')"
-        ),
-        application_name=name,
+    both = (
+        "SELECT pg_catalog.current_setting('application_name') || '|' || COALESCE("
+        "(SELECT activity.application_name FROM pg_catalog.pg_stat_activity activity"
+        " WHERE activity.pid = pg_catalog.pg_backend_pid()), '')"
     )
+    result = context.script(read_only(both), application_name=name)
     if result.returncode != 0:
         raise ProbeError(f"application_name probe failed: {' '.join(result.stderr.split())[:200]}")
     parts = result.stdout.strip().split("|")
     setting = parts[0] if parts else ""
     activity = parts[1] if len(parts) > 1 else ""
-    if setting != name or activity != name:
-        # Measure the remedy in the same breath: if a session-level `SET application_name` DOES
-        # reach pg_stat_activity, the repair has the same shape as the mc2-ipwyc fix for the
-        # dropped startup `options` — state the intent in the session instead of trusting the
-        # connection. Naming that here turns the failure into an actionable finding instead of a
-        # dead end.
-        repaired = context.script(
-            "BEGIN READ ONLY;\n"
-            f"{READ_ONLY_ASSERT} \\g /dev/null\n"
-            f"SET application_name = '{name}';\n"
-            "COPY (SELECT COALESCE((SELECT activity.application_name"
-            " FROM pg_catalog.pg_stat_activity activity"
-            " WHERE activity.pid = pg_catalog.pg_backend_pid()), '')) TO STDOUT;\n"
-            "COMMIT;\n",
-            application_name=name,
-        )
-        after_set = repaired.stdout.strip() if repaired.returncode == 0 else "<error>"
-        remedy = (
-            "a session-level `SET application_name` DOES reach pg_stat_activity, so the repair has "
-            "the mc2-ipwyc shape: state the name in the session, never trust the connection"
-            if after_set == name
-            else f"a session-level SET does not repair it either (reads {after_set!r})"
-        )
+    delivered = setting == name and activity == name
+
+    # The repair leg runs unconditionally: the barrier depends on a session-level SET reaching
+    # pg_stat_activity whether or not the connection would also have delivered the name.
+    repaired = context.script(
+        "BEGIN READ ONLY;\n"
+        f"{READ_ONLY_ASSERT} \\g /dev/null\n"
+        f"SET application_name = '{name}';\n"
+        f"COPY ({both}) TO STDOUT;\n"
+        "COMMIT;\n",
+        application_name=name,
+    )
+    after = repaired.stdout.strip().split("|") if repaired.returncode == 0 else ["<error>"]
+    after_setting = after[0] if after else ""
+    after_activity = after[1] if len(after) > 1 else ""
+    session_set_works = after_setting == name and after_activity == name
+
+    # Which runners still name themselves on the connection alone.
+    unmatched: list[str] = []
+    for source_name, text in sorted(context.pooler_dependence_sources.items()):
+        wants = set(APPLICATION_NAME_DEPENDENCE_RE.findall(text))
+        states = set(APPLICATION_NAME_SESSION_SET_RE.findall(text))
+        missing = sorted(wants - states)
+        if missing:
+            unmatched.append(f"{source_name} ({name_list(missing)})")
+
+    state = (
+        f"delivered unmodified as {name!r}"
+        if delivered
+        else f"rewritten in flight (asked {name!r}, the session reports {setting!r} and "
+        f"pg_stat_activity reports {activity!r})"
+    )
+    if not session_set_works:
         return verdict(
             "B3",
             FAIL,
-            f"application_name was rewritten in flight: asked {name!r}, the session reports "
-            f"{setting!r} and pg_stat_activity reports {activity!r}. Every consumer that matches on "
-            f"{Q12_APPLICATION_PREFIX!r} is therefore blind — including the terminal proof's "
-            f"barrier_era_session_count, which would read 0 for the wrong reason. {remedy}",
+            f"application_name is {state}, and a session-level `SET application_name` does not "
+            f"reach pg_stat_activity either (reads {after_activity or after_setting!r}). No Q12 "
+            f"session can name itself, so every consumer of {Q12_APPLICATION_PREFIX!r} is blind — "
+            "including the terminal proof's barrier_era_session_count, which would read 0 for the "
+            "wrong reason and let the window close on an unproven claim",
         )
-    if not name.startswith(Q12_APPLICATION_PREFIX):
+    if unmatched:
         return verdict(
-            "B3", FAIL, f"application_name {name!r} does not carry the {Q12_APPLICATION_PREFIX!r} prefix"
+            "B3",
+            FAIL,
+            f"application_name is {state}; a session-level SET DOES reach pg_stat_activity, but a "
+            f"runner still names itself on the connection alone and is invisible to every "
+            f"{Q12_APPLICATION_PREFIX!r} consumer: {name_list(unmatched)}",
         )
     return verdict(
-        "B3", PASS, f"application_name reaches pg_stat_activity unmodified as {name!r}"
+        "B3",
+        PASS,
+        f"application_name is {state}; a session-level SET reaches pg_stat_activity as "
+        f"{after_activity!r}, and all {len(context.pooler_dependence_sources)} scanned source(s) "
+        "restate every Q12 name in the session, so nothing depends on what the pooler delivers",
     )
 
 

@@ -86,7 +86,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-database-barrier.sh",
-      "sha256": "56a7a88eac92751a4a0613aff1b10b96f5628b950a5acb4988d06616271a4647"
+      "sha256": "f98a2ce42e6b8992d386aab4e97321d439fa31e7ad0dd268f8d61123ead7be1f"
     },
     {
       "group": "claude-deploy",
@@ -150,7 +150,7 @@
       "mode": "0444",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-preflight-probes.py",
-      "sha256": "e95001d81c176be68373b07673119b666feb136b78b91f8950c5f604027ec1fa"
+      "sha256": "720aa4f0f7eb71c02225d30040262f4b3d8e4140b402cb1250f75ee0ac27b8d2"
     },
     {
       "group": "root",
@@ -174,7 +174,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-window-preflight.py",
-      "sha256": "5f79753b56b6d09170126da5493581d43a839fbe892c89d8f4ec85417ce6717e"
+      "sha256": "c91c33665ce7cc5a57fcaeec92e23c2bf98b8870d2d76222cc2022d16e7f38e1"
     },
     {
       "group": "root",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "6432867a697f321dc7e2172c31caf2b7105eff08",
+  "generated_from_tree_sha": "c0c8d03b30b3e70700831742576a7eb3a08e92a7",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

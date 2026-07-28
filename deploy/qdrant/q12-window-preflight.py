@@ -566,7 +566,7 @@ def build_context(arguments, workdir: pathlib.Path, manifest: "dict | None"):
         structural = deploy_root / "deploy/qdrant/q12-structural-catalog.sql"
         if barrier.is_file():
             context.barrier_text = barrier.read_text(encoding="utf-8", errors="replace")
-            context.option_dependence_sources["q12-database-barrier.sh"] = context.barrier_text
+            context.pooler_dependence_sources["q12-database-barrier.sh"] = context.barrier_text
         if structural.is_file():
             context.structural_catalog_sql = structural.read_text(encoding="utf-8").strip()
         return context, f"{host_name}:{port}"
