@@ -589,11 +589,35 @@ def probe_b3(context: Context) -> "dict[str, object]":
     setting = parts[0] if parts else ""
     activity = parts[1] if len(parts) > 1 else ""
     if setting != name or activity != name:
+        # Measure the remedy in the same breath: if a session-level `SET application_name` DOES
+        # reach pg_stat_activity, the repair has the same shape as the mc2-ipwyc fix for the
+        # dropped startup `options` — state the intent in the session instead of trusting the
+        # connection. Naming that here turns the failure into an actionable finding instead of a
+        # dead end.
+        repaired = context.script(
+            "BEGIN READ ONLY;\n"
+            f"{READ_ONLY_ASSERT} \\g /dev/null\n"
+            f"SET application_name = '{name}';\n"
+            "COPY (SELECT COALESCE((SELECT activity.application_name"
+            " FROM pg_catalog.pg_stat_activity activity"
+            " WHERE activity.pid = pg_catalog.pg_backend_pid()), '')) TO STDOUT;\n"
+            "COMMIT;\n",
+            application_name=name,
+        )
+        after_set = repaired.stdout.strip() if repaired.returncode == 0 else "<error>"
+        remedy = (
+            "a session-level `SET application_name` DOES reach pg_stat_activity, so the repair has "
+            "the mc2-ipwyc shape: state the name in the session, never trust the connection"
+            if after_set == name
+            else f"a session-level SET does not repair it either (reads {after_set!r})"
+        )
         return verdict(
             "B3",
             FAIL,
             f"application_name was rewritten in flight: asked {name!r}, the session reports "
-            f"{setting!r} and pg_stat_activity reports {activity!r}",
+            f"{setting!r} and pg_stat_activity reports {activity!r}. Every consumer that matches on "
+            f"{Q12_APPLICATION_PREFIX!r} is therefore blind — including the terminal proof's "
+            f"barrier_era_session_count, which would read 0 for the wrong reason. {remedy}",
         )
     if not name.startswith(Q12_APPLICATION_PREFIX):
         return verdict(
