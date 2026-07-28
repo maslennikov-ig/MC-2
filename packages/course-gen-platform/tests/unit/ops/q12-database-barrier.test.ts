@@ -29,6 +29,16 @@ const POSTGRES_IMAGE = 'postgres:17.10-bookworm';
 const POSTGRES_PASSWORD = 'q12-local-terminal-proof-password';
 const temporaryDirectories: string[] = [];
 
+// The emitted SQL carries load-bearing rationale in `--` comments (mc2-ipwyc explains there why a
+// per-relation DROP TRIGGER is impossible). An assertion that a STATEMENT is absent must therefore
+// look at the executable lines only, or it matches the very comment that documents the absence.
+function executableSql(sql: string): string {
+  return sql
+    .split('\n')
+    .filter(line => !line.trimStart().startsWith('--'))
+    .join('\n');
+}
+
 function source(): string {
   return readFileSync(BARRIER, 'utf8');
 }
@@ -1148,9 +1158,17 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(lock).toBeGreaterThan(capability);
     expect(verify).toBeGreaterThan(lock);
     expect(restore).toBeGreaterThan(verify);
-    expect(sql).toContain("t.tgname='q12_guard_truncate'");
-    expect(sql).toContain("t.tgname='q12_guard_row'");
-    expect(sql).not.toContain("t.tgname='q12_guard_immutable'");
+    // mc2-ipwyc: the guards are disarmed by dropping the guard FUNCTION with CASCADE, never by
+    // per-relation DROP TRIGGER — that needs OWNERSHIP of the table, which postgres does not have
+    // on the auth/storage relations it is nonetheless allowed to arm.
+    expect(sql).toContain('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;');
+    expect(executableSql(sql)).not.toContain('DROP TRIGGER');
+    // The six immutable guards survive activation: their definitions are captured BEFORE the drop
+    // and replayed after it, and the count is asserted inside the block.
+    expect(sql).toContain('pg_get_triggerdef');
+    expect(sql).toContain("t.tgname IN ('q12_guard_immutable','q12_guard_immutable_truncate')");
+    expect(sql).toContain('Q12 immutable guard trigger set is not exactly six before restore');
+    expect(sql).toContain('FOREACH definition IN ARRAY immutable_definitions');
     expect(sql).toContain('q12_guard_ddl_command_start');
   });
 
@@ -1248,8 +1266,18 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(dropSchema).toBeGreaterThan(restoreDefault);
     expect(sql).not.toContain('prior := NULL');
     expect(sql).toContain('t.tgparentid=0');
-    expect(sql.indexOf("t.tgname='q12_guard_truncate'")).toBeLessThan(
-      sql.indexOf("t.tgname='q12_guard_row'")
+    // mc2-ipwyc: rollback disarms through the same CASCADE and re-creates NOTHING — the schema is
+    // dropped a few statements later. The capture must still precede the drop.
+    expect(sql).toContain('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;');
+    expect(executableSql(sql)).not.toContain('DROP TRIGGER');
+    expect(sql.indexOf('pg_get_functiondef')).toBeLessThan(
+      sql.indexOf('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;')
+    );
+    // The replay branch is emitted but provably DEAD on rollback: $drop_schema is substituted into
+    // the guard, so the rollback SQL literally reads IF 'true'='false'.
+    expect(sql).toContain("IF 'true'='false' THEN");
+    expect(sql.indexOf("IF 'true'='false' THEN")).toBeLessThan(
+      sql.indexOf('FOREACH definition IN ARRAY immutable_definitions')
     );
   });
 
