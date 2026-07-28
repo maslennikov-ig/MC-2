@@ -65,12 +65,12 @@ which moved no catalog-bound digest):
 - `baseline_structural_sha256 a2b2532406ad3a6f3fa904d9c6caed633dd2d3c90fc6e7ea4ee7668e8b5bd75b`
   (agrees with D1, measured in the barrier's `search_path`)
 - `expected_post_migration_catalog_sha256 b1fe2b9cf95d4d6e263b5aa65a7fc907ab2521ed6b6f654c1623cd0487ffff0d`
-- report `<run-root>/q12-window-preflight-20260728T135444Z.json`: 22 `pass`, 3 `unprovable` with
+- report `<run-root>/q12-window-preflight-20260728T144848Z.json`: 22 `pass`, 3 `unprovable` with
   evidence (C5/C6/H4), 0 `fail`; `--assert-fresh-report` accepts it. Reports EXPIRE 30 min after
   `captured_at`. Still missing from the root: `accepted-coverage-run` + `secrets/db-capability`.
 
 The deployed Q12 tree was REINSTALLED from `develop` twice on 2026-07-28 (latest: the B3 fix at
-tree `0eb366c3`; replaced files under `/opt/megacampus/backups/q12-assets/20260728T135316Z/`, the
+tree `fc495354`; replaced files under `/opt/megacampus/backups/q12-assets/20260728T135316Z/`, the
 earlier set under `…/20260728T124629Z/`); H2 proves all 26 assets byte-equal. The sixth digest pin
 (`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
 
