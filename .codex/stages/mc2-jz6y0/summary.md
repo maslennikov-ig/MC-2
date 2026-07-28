@@ -1195,3 +1195,43 @@ containers healthy. Run root `5e9b7256-…` is BURNT — each attempt burns its 
   counter (P2-3); §5 tamper-append of a fully VALID row is outside tamper protection by design (the
   guarded property is prefix integrity); M's residual P2-4 libpq variables are proven
   non-exploitable with the explicit `ssl` object.
+
+## `mc2-38ivn` — the pooler rewrites `application_name` (2026-07-28, delivered)
+
+The tenth instance of the environment-substitution class, and the first one found by the pre-flight
+rather than by a window attempt. Probe B3 measured it against the live pooled DSN in seconds: a
+session that asks for `megacampus-q12-window-preflight-b3` reads back `'Supavisor'` from both
+`current_setting('application_name')` and `pg_stat_activity`. Supavisor does not merely fail to
+deliver the startup parameter the way it drops `options` (`mc2-ipwyc`) — it substitutes its own.
+
+Why it blocked the window: the barrier's terminal proof asserts
+`barrier_era_session_count == 0`, counting other backends whose `application_name LIKE
+'megacampus-q12-%'`. Through the pooler that count could only ever be 0 — not because no
+barrier-era session survived, but because none could be recognised. It passed for the wrong reason,
+and the same blindness covered every other consumer of the prefix. `quiesce_client_backends()` was
+never affected: it matches on `usename` (E1 green throughout).
+
+Fix (delivered as `c0c8d03b3`, `0eb366c33`, `1435aab94`):
+
+- all four barrier clients (`megacampus-q12-database-barrier`, `-install-baseline-proof`,
+  `-recovery-readiness-proof`, `-database-terminal-proof`) issue `SET application_name` beside the
+  existing `SET default_transaction_read_only`, and each session proof asserts the name twice —
+  `current_setting` AND what `pg_stat_activity` publishes for its own backend — so the barrier fails
+  closed if a pooler release ever discards the session-level SET as well;
+- probe B3 was restructured into B1's shape: it records what the connection delivers, measures the
+  session-level repair, and fails only when no repair exists or when a scanned runner still names
+  itself on the connection alone. It is therefore red-when-broken and green-when-fixed, instead of
+  permanently red against a pooler that always rewrites;
+- the contract's B3 row was amended in lockstep, and its E2 row now records that E2 also proves the
+  pooler leaves no badged backend behind after one closes — the precondition
+  `barrier_era_session_count == 0` needs at C10;
+- W-tuple field 4 → `f98a2ce42e6b8992d386aab4e97321d439fa31e7ad0dd268f8d61123ead7be1f`; fields 5-10
+  re-measured byte-identical with `mc2-jz6y0.13.10-activation-tuple-repro.cjs`, so no production
+  re-freeze, and the frozen 20-command manifest `aaec6fc2…` did not move (argv unchanged).
+
+Evidence beyond the suites: the gated real-PG17 leg reproduces the pooler locally with a PostgreSQL
+17 `ON login` event trigger (the session source outranks the startup packet; an in-session SET still
+wins) and reads the resolved name back out of the server log through `log_line_prefix=%a`. RED
+logged the terminal proof's own statements as `Supavisor|LOG:`. The same test holds one
+`megacampus-q12-intruder` session open across a cleanup run and requires the terminal proof to
+refuse, so `barrier_era_session_count` is proven live in both directions rather than vacuously zero.

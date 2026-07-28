@@ -42,20 +42,22 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: fix `mc2-38ivn` (P0, blocks `mc2-i9h3y`), then re-run the pre-flight and re-open
-the window to the reversible `--stop-after deploy.prepare` hold.
+Recommended action: open the window to the reversible `--stop-after deploy.prepare` hold. The
+pre-flight is GREEN; nothing in this repo blocks it any more.
 
-`mc2-ot8se` is DONE: the pre-flight exists, is deployed, and has been run for real. It found a TENTH
-instance of the class in minutes — probe **B3: the Supavisor pooler REWRITES `application_name` to
-`'Supavisor'`**, so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` reads 0
-for the wrong reason and every consumer of that prefix is blind. The remedy was measured in the same
-run: a session-level `SET application_name` DOES reach `pg_stat_activity`, exactly the `mc2-ipwyc`
-shape. It is NOT fixed here: it changes `q12-database-barrier.sh` and needs a W-tuple amendment,
-both outside `mc2-ot8se`'s authority. `quiesce_client_backends()` matches on `usename` and is
-unaffected (E1 green). Contract + plan:
+`mc2-ot8se` (the pre-flight) and `mc2-38ivn` (its first catch) are both DONE. Probe **B3 found a
+TENTH instance of the class in minutes: the Supavisor pooler REWRITES `application_name` to
+`'Supavisor'`**, so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` could
+only ever read 0 — it passed because no barrier-era session could be RECOGNISED. Fixed in the
+`mc2-ipwyc` shape: all four barrier clients `SET application_name` in their own session and assert
+it twice (`current_setting` AND what `pg_stat_activity` publishes for their own backend), so the
+proof fails closed if a pooler release discards the session SET too. W-tuple field 4 ->
+`f98a2ce4…`, fields 5-10 BYTE-IDENTICAL (no production re-freeze). `quiesce_client_backends()`
+matches on `usename` and was never blind (E1 green). Contract + plan:
 `docs/superpowers/{specs/2026-07-28-q12-window-preflight-contract.md,plans/2026-07-28-q12-window-preflight.md}`.
 
-FRESH RUN ROOT for the window (plan re-run 2026-07-28, read-only, production):
+RUN ROOT for the window (plan re-run 2026-07-28, read-only, production; UNCHANGED by the B3 fix,
+which moved no catalog-bound digest):
 `/opt/megacampus/backups/q12/6544c7dd-e680-462d-bf8f-5db8fc01c9b6`
 
 - `--expected-catalog-sha256 6be37e858e4fbd473a298cd1dfdaf49906e2c9964982801b39e1ac6104f7aaaa`
@@ -63,23 +65,23 @@ FRESH RUN ROOT for the window (plan re-run 2026-07-28, read-only, production):
 - `baseline_structural_sha256 a2b2532406ad3a6f3fa904d9c6caed633dd2d3c90fc6e7ea4ee7668e8b5bd75b`
   (agrees with D1, measured in the barrier's `search_path`)
 - `expected_post_migration_catalog_sha256 b1fe2b9cf95d4d6e263b5aa65a7fc907ab2521ed6b6f654c1623cd0487ffff0d`
-- report: `<run-root>/q12-window-preflight-20260728T125738Z.json` — 22 `pass`, 2 `unprovable` with
-  evidence (C5/C6), 1 `fail` (B3). Still missing from the root: `accepted-coverage-run` and
-  `secrets/db-capability`, both copied in at 0400 at window time.
+- report `<run-root>/q12-window-preflight-20260728T135444Z.json`: 22 `pass`, 3 `unprovable` with
+  evidence (C5/C6/H4), 0 `fail`; `--assert-fresh-report` accepts it. Reports EXPIRE 30 min after
+  `captured_at`. Still missing from the root: `accepted-coverage-run` + `secrets/db-capability`.
 
-The deployed Q12 tree was REINSTALLED from `develop` on 2026-07-28 and H2 proves it byte-equal
-(26 assets); the replaced files are under `/opt/megacampus/backups/q12-assets/20260728T124629Z/`.
-The sixth digest pin (`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
+The deployed Q12 tree was REINSTALLED from `develop` twice on 2026-07-28 (latest: the B3 fix at
+tree `0eb366c3`; replaced files under `/opt/megacampus/backups/q12-assets/20260728T135316Z/`, the
+earlier set under `…/20260728T124629Z/`); H2 proves all 26 assets byte-equal. The sixth digest pin
+(`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
 
 WINDOW STATE. Opened NINE times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9
 installed the guard, aborted, and was restored by hand the same day with the barrier's own
-`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id. Full
-chronology: `.codex/stages/mc2-jz6y0/summary.md`.
+`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id.
 
-DEFECTS #7-#9 AND THE `mc2-ipwyc` PAIR: all found, fixed and delivered on `develop`; the full
-chronology moved to `.codex/stages/mc2-jz6y0/summary.md` on 2026-07-28. Each is now a PROBE in
+DEFECTS #7-#9, the `mc2-ipwyc` PAIR and `mc2-38ivn`: all found, fixed and delivered on `develop`
+(chronology in `.codex/stages/mc2-jz6y0/summary.md`). Each is now a PROBE in
 `q12-window-preflight.py` (`mc2-34eua` -> A2/A4, `mc2-2rzf6` -> D1, `mc2-6fnrt` -> E2,
-`mc2-ipwyc` -> A3/A5/B1/B2), so the class cannot return silently.
+`mc2-ipwyc` -> A3/A5/B1/B2, `mc2-38ivn` -> B3), so the class cannot return silently.
 
 THE PATTERN behind all of them: the checked environment substituted for the consuming one — a
 fixture published the step, an isolate had superuser rights, the real error was swallowed, a
@@ -96,9 +98,8 @@ the window, and read its report:
 
 It is read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
 `transaction_read_only='on'` first), goes through the pooled DSN, takes no lock and burns no run-id,
-so it can be re-run as often as wanted. It exits 0 only when all 25 frozen probes are `pass` or
-`unprovable` with a named evidence pointer, and it publishes a 0400
-`q12-window-preflight-<utc>.json` in the run root. `q12-live-cutover.sh` REFUSES `live`/`supervisor`
+so re-run it as often as wanted. It exits 0 only when all 25 frozen probes are `pass` or
+`unprovable` with a named evidence pointer, and publishes a 0400 report in the run root. `q12-live-cutover.sh` REFUSES `live`/`supervisor`
 without a green report under 30 minutes old whose `asset_manifest_sha256` matches the deployed tree,
 so this is a gate, not a reminder. Contract:
 `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
