@@ -51,8 +51,13 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: REINSTALL the server Q12 assets, take a FRESH run root + `plan`, then re-open
-the window to the reversible `--stop-after deploy.prepare` hold.
+Recommended action: run `mc2-ot8se` — the read-only window pre-flight — to completion, THEN re-open
+the window to the reversible `--stop-after deploy.prepare` hold. The pre-flight owns the reinstall,
+the fresh run root and the `plan`; it is the gate on `mc2-i9h3y`, and the owner has granted it full
+authority for everything except opening the window itself. Contract + plan:
+`docs/superpowers/{specs/2026-07-28-q12-window-preflight-contract.md,plans/2026-07-28-q12-window-preflight.md}`; prompt:
+`.codex/stages/mc2-jz6y0/artifacts/mc2-ot8se-orchestrator-prompt.md`. The "Before the next
+attempt" list below stays only until the probe replaces it with a green report.
 
 WINDOW STATE. Opened NINE times (six 2026-07-27, three 2026-07-28). Attempts 1-8 failed closed with
 ZERO mutation; each surfaced a real defect. Attempt #9 INSTALLED the guard and then aborted, leaving
@@ -91,20 +96,18 @@ published the step, an isolate had superuser rights, the real error was swallowe
 hid a rotten fixture, or the pooler silently dropped what the test connection delivered. Model the
 constraint, never the convenience.
 
-BEFORE THE NEXT ATTEMPT (in order):
+BEFORE THE NEXT ATTEMPT: items 1-3 are now `mc2-ot8se`'s job, not the operator's.
 
-1. The server Q12 tree is STALE again: `q12-database-barrier.sh` and `q12-lifecycle-core.py` both
-   moved after the 2026-07-28 reinstall. Reinstall from `develop` and re-verify byte-equality for all
-   40 tracked files (backups land in `/opt/megacampus/backups/q12-assets/`).
-2. Fresh run root + fresh `plan` (`plan` creates the root itself and only READS production); then copy
-   `accepted-coverage-run` + `secrets/db-capability` in at 0400. `--expected-catalog-sha256` is the
-   sha256 of that root's OWN catalog FILE (barrier `:302`), NOT the value quoted for any prior root.
-3. Pause dev deploys for the window: they run every 15-25 minutes against the SAME shared database,
-   and their `docker image prune -f` also deletes the digest-pinned `qdrant-operator` and
-   observability images C1/C7 need (`mc2-y5tgw`; local hold tags `q12-window-hold/*:pinned` are
-   applied on the host and were proven against the exact prune command).
-4. Always run the controller DETACHED (`setsid nohup`): a dropped ssh once killed a plan (exit 255);
-   after C2 that would strand stopped writers.
+1. The server Q12 tree is STALE again (`q12-database-barrier.sh` and `q12-lifecycle-core.py` both
+   moved after the 2026-07-28 reinstall) — the pre-flight reinstalls it and proves byte-equality.
+2. Fresh run root + `plan` (read-only, makes its own root); then copy `accepted-coverage-run` +
+   `secrets/db-capability` in at 0400. `--expected-catalog-sha256` is the sha256 of THAT root's OWN
+   catalog FILE (barrier `:302`), never a value quoted for a prior root.
+3. Pause dev deploys for the window: same shared database every 15-25 minutes, and their
+   `docker image prune -f` deletes the digest-pinned images C1/C7 need (`mc2-y5tgw`; hold tags
+   `q12-window-hold/*:pinned` are applied on the host and proven against the exact prune command).
+4. OPERATOR, always: run the controller DETACHED (`setsid nohup`). A dropped ssh once killed a plan
+   (exit 255); after C2 that would strand stopped writers.
 
 WINDOW ARGV: `--release-sha 23dfe973f18cc6067d386b6eb683bf6906142165`, `--operator-digest b5eb528e…`
 (= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce
