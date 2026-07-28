@@ -119,8 +119,20 @@ def main() -> int:
         executor.source_container = None
         executor._source_service = service_env
 
-        # (1) production fork: real snapshot + baseline + seeded resolver + HELD coordinator
-        values, exported_id, coordinator = core.resolve_window_values(request, executor, run_root, qm)
+        # (1) production fork: real baseline + seeded resolver, and NO coordinator (mc2-6fnrt).
+        # The real <exported-id> is resolved by the staged WindowSnapshotHold at the pg.backup step,
+        # which is what a live window drive does — a session held across barrier.install would be
+        # terminated by the barrier's own client quiesce.
+        values = core.resolve_window_values(request, executor, run_root, qm)
+        # mc2-6fnrt: each leg derives its OWN ephemeral libpq service file and clears the cache
+        # afterwards (no cleartext password at rest, and the two connects are now separated by
+        # the whole barrier install + writer quiesce). Production re-derives from
+        # request["db_url_file"]; this harness has no DSN file, so it re-injects the loopback
+        # service env the disposable container needs.
+        executor._source_service = service_env
+        hold = core.WindowSnapshotHold(request, executor, values, run_root)
+        exported_id = hold.exported_id()
+        coordinator = hold.coordinator
         snapshot_shaped = bool(core.PLAN_SNAPSHOT_RE.fullmatch(exported_id))
         baseline_ok = (run_root / "baseline.json").exists()
         is_resolver = isinstance(values, core.StagedValueResolver)
@@ -141,7 +153,7 @@ def main() -> int:
         )
 
         # (4) release the held source session cleanly
-        executor.close_window_snapshot(coordinator)
+        hold.release()
         released = coordinator.poll() == 0
 
         # (5) D4 oracle: accept on a terminal receipt + the emitted acceptance authority

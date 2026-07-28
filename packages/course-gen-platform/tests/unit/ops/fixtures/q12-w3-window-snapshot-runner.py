@@ -100,7 +100,16 @@ def main() -> int:
         executor.source_container = None
         executor._source_service = service_env
 
-        exported_id, baseline_path, coordinator = executor.open_window_snapshot(request, run_root)
+        # mc2-6fnrt: the two legs are now separate — the pre-maintenance baseline is published
+        # before barrier.install, the HELD coordinator is opened later, at the pg.backup step.
+        baseline_path = executor.publish_window_baseline(request, run_root)
+        # mc2-6fnrt: each leg derives its OWN ephemeral libpq service file and clears the cache
+        # afterwards (no cleartext password at rest, and the two connects are now separated by
+        # the whole barrier install + writer quiesce). Production re-derives from
+        # request["db_url_file"]; this harness has no DSN file, so it re-injects the loopback
+        # service env the disposable container needs.
+        executor._source_service = service_env
+        exported_id, coordinator = executor.open_window_snapshot(request, run_root)
         # The exported snapshot must still be HELD (the exporting session open) so pg.backup can
         # bind it; assert the coordinator is alive before we release it.
         held_alive = coordinator.poll() is None

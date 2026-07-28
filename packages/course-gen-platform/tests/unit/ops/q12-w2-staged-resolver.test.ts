@@ -133,24 +133,29 @@ describe('Q12 W2-fork: StagedValueResolver', () => {
 });
 
 // resolve_window_values is the production/fixture FORK POINT run_live/run_recover call in place of
-// the bare `values = derive_joined_fixture_values(...)` + `exported_id = values["<exported-id>"]`.
-// Fixture mode returns the upfront dict unchanged (D1). Production mode returns a StagedValueResolver
-// seeded with the UPFRONT authorities and the W3 window snapshot already opened (<exported-id> +
-// baseline), plus the held coordinator the caller must release after pg.backup. Proven here with a
-// FAKE executor; the deep per-step callback firing against real data-movement commands is W5.
+// the bare `values = derive_joined_fixture_values(...)`. Fixture mode returns the upfront dict
+// unchanged (D1). Production mode returns a StagedValueResolver seeded with the UPFRONT authorities
+// and publishes the OQ6 pre-maintenance baseline.json — and, since mc2-6fnrt, opens NO snapshot
+// coordinator: <exported-id> is a STAGED authority resolved by WindowSnapshotHold at the pg.backup
+// step (a session held across barrier.install is terminated by the barrier's client quiesce).
+// Proven here with a FAKE executor; the deep per-step callback firing against real data-movement
+// commands is W5.
 describe('Q12 W2-fork: resolve_window_values fork point', () => {
-  it('returns the fixture dict + upfront exported_id in fixture mode (no coordinator)', () => {
+  it('returns the fixture dict in fixture mode, and its hold opens nothing', () => {
     const probe = [
       ...HEADER,
       'import pathlib, tempfile',
       'root=pathlib.Path(tempfile.mkdtemp())',
       'request={"run_id":"11111111-1111-4111-8111-111111111111"}', // no "production"
-      'values, exported_id, coordinator = m.resolve_window_values(request, object(), root, sys.argv[2])',
+      'values = m.resolve_window_values(request, object(), root, sys.argv[2])',
       // fixture dict is the verbatim parity-oracle derivation
       'fx=m.derive_joined_fixture_values("11111111-1111-4111-8111-111111111111", sys.argv[2])',
       'assert dict(values)==fx, (dict(values), fx)',
-      'assert exported_id==fx["<exported-id>"], exported_id',
-      'assert coordinator is None',
+      // the staged hold yields the upfront value with NO executor call and NO session
+      'hold=m.WindowSnapshotHold(request, object(), values, root)',
+      'assert hold.exported_id()==fx["<exported-id>"], hold.exported_id()',
+      'assert hold.coordinator is None',
+      'hold.release()',
       'print("W2_FORK_FIXTURE_OK")',
     ];
     const child = spawnSync('/usr/bin/python3', ['-c', probe.join('\n'), CORE, QM], {
@@ -162,26 +167,43 @@ describe('Q12 W2-fork: resolve_window_values fork point', () => {
     expect(child.stdout).toContain('W2_FORK_FIXTURE_OK');
   });
 
-  it('returns a snapshot-seeded resolver + held coordinator in production mode (fake executor)', () => {
+  it('returns a baseline-publishing resolver and opens NO coordinator in production (fake executor)', () => {
     const probe = [
       ...HEADER,
       'import pathlib, tempfile',
       'root=pathlib.Path(tempfile.mkdtemp())',
       'held=object()',
+      'calls={"baseline":0,"open":0,"close":0}',
       'class FakeExecutor:',
-      ' def open_window_snapshot(self, request, run_root):',
+      ' def publish_window_baseline(self, request, run_root):',
       '  assert pathlib.Path(run_root)==root',
-      '  return sys.argv[4], pathlib.Path(run_root)/"baseline.json", held',
+      '  calls["baseline"]+=1',
+      '  return pathlib.Path(run_root)/"baseline.json"',
+      ' def open_window_snapshot(self, request, run_root):',
+      '  calls["open"]+=1',
+      '  return sys.argv[4], held',
+      ' def close_window_snapshot(self, coordinator):',
+      '  assert coordinator is held',
+      '  calls["close"]+=1',
       'request={"run_id":"11111111-1111-4111-8111-111111111111","production":True,"recovery_run_id":sys.argv[3]}',
-      'values, exported_id, coordinator = m.resolve_window_values(request, FakeExecutor(), root, sys.argv[2])',
+      'ex=FakeExecutor()',
+      'values = m.resolve_window_values(request, ex, root, sys.argv[2])',
       'assert isinstance(values, m.StagedValueResolver)',
-      // the snapshot id from the window executor is seeded into the resolver
-      'assert exported_id==sys.argv[4], exported_id',
-      'assert values.value("<exported-id>")==sys.argv[4]',
+      // mc2-6fnrt: the fork publishes the OQ6 baseline and opens NOTHING
+      'assert calls=={"baseline":1,"open":0,"close":0}, calls',
+      'refused=False',
+      'try:\n values.value("<exported-id>")\nexcept m.LifecycleError:\n refused=True',
+      'assert refused, "<exported-id> must stay unresolved before pg.backup"',
       'assert values.value("<recovery-run-id>")==sys.argv[3]',
       'assert values.value("<quiesce-manifest>")==sys.argv[2]',
-      // the coordinator is HELD (handed back for the caller to release after pg.backup)
-      'assert coordinator is held',
+      // the staged hold opens it later (at the pg.backup step) and HOLDS it until released
+      'hold=m.WindowSnapshotHold(request, ex, values, root)',
+      'assert hold.exported_id()==sys.argv[4], hold.exported_id()',
+      'assert calls=={"baseline":1,"open":1,"close":0}, calls',
+      'assert hold.coordinator is held',
+      'assert values.value("<exported-id>")==sys.argv[4]',
+      'hold.release()',
+      'assert calls=={"baseline":1,"open":1,"close":1}, calls',
       'print("W2_FORK_PROD_OK")',
     ];
     const child = spawnSync('/usr/bin/python3', ['-c', probe.join('\n'), CORE, QM, RRID, EID], {

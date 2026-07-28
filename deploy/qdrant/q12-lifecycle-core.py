@@ -846,30 +846,87 @@ def resolve_window_values(
     executor: Any,
     run_root: pathlib.Path,
     quiesce_manifest_path: str,
-) -> tuple[Any, str, "subprocess.Popen[str] | None"]:
+) -> Any:
     """Select the forward-window value source (design §W2 co-design D1/D2).
 
     Fixture mode (default): the verbatim ``derive_joined_fixture_values`` upfront dict — the
-    closed-composer parity oracle — with no snapshot coordinator. Production mode
-    (``request["production"] is True``): a ``StagedValueResolver`` seeded with the UPFRONT
-    authorities (quiesce manifest path + accepted ``recovery_run_id``) and the W3 window snapshot
-    already opened — ``open_window_snapshot`` publishes ``baseline.json`` and yields the live
-    ``<exported-id>``, fed into the resolver via ``on_snapshot_open``. Returns
-    ``(values, exported_id, snapshot_coordinator)``; in production the caller MUST release the held
-    coordinator (``executor.close_window_snapshot``) after pg.backup consumes the snapshot. The
-    remaining staged authorities (``<immutable-generation>`` after pg.backup, the recovery-manifest
-    sha + coverage after ``source.forward``) are resolved by their lifecycle callbacks as the real
-    data-movement steps run (W5)."""
+    closed-composer parity oracle. Production mode (``request["production"] is True``): a
+    ``StagedValueResolver`` seeded with the UPFRONT authorities (quiesce manifest path + accepted
+    ``recovery_run_id``), plus the OQ6 pre-maintenance ``baseline.json`` published here because it
+    MUST be captured before ``barrier.install`` deactivates cron and sets the database read-only.
+
+    This fork opens NO snapshot coordinator (mc2-6fnrt). ``<exported-id>`` is a STAGED authority like
+    ``<immutable-generation>``: it is resolved by ``WindowSnapshotHold`` at the pg.backup step, the
+    only command whose argv consumes it, because a session held across ``barrier.install`` is
+    terminated by the barrier's own client quiesce. The remaining staged authorities
+    (``<immutable-generation>`` after pg.backup, the recovery-manifest sha + coverage after
+    ``source.forward``) are resolved by their lifecycle callbacks as the real data-movement steps
+    run (W5)."""
     if request.get("production") is True:
         recovery_run_id = request.get("recovery_run_id")
         if not recovery_run_id:
             raise LifecycleError("production live run requires an accepted request['recovery_run_id']")
         resolver = StagedValueResolver(quiesce_manifest_path, recovery_run_id)
-        exported_id, _baseline_path, coordinator = executor.open_window_snapshot(request, run_root)
-        resolver.on_snapshot_open(exported_id)
-        return resolver, exported_id, coordinator
-    values = derive_joined_fixture_values(request["run_id"], quiesce_manifest_path)
-    return values, values["<exported-id>"], None
+        executor.publish_window_baseline(request, run_root)
+        return resolver
+    return derive_joined_fixture_values(request["run_id"], quiesce_manifest_path)
+
+
+class WindowSnapshotHold:
+    """W3/OQ5 staged holder: resolve ``<exported-id>`` AT the pg.backup step and hold the exporting
+    session only for as long as pg.backup needs it (codesign §D5 "resolved at pg.backup open").
+
+    ``pg_export_snapshot()`` is valid only while the exporting session stays open, and pg.backup is
+    the ONLY manifest command whose argv consumes ``<exported-id>``, so the coordinator's whole
+    useful life is that one step. Opening it earlier is what broke production attempt #9: the frozen
+    barrier's ``quiesce_client_backends()`` terminates every client backend, including a coordinator
+    held across ``barrier.install`` (mc2-6fnrt).
+
+    Resolve-once, shared by ``run_live`` and ``run_recover`` through ``drive_forward_sequence``:
+
+      * fixture mode -> the upfront parity-oracle value, no session at all;
+      * production, ``<exported-id>`` not yet resolved (a fresh run, or a recover from the
+        ``barrier.install/completed`` head that RE-DRIVES pg.backup) -> open one coordinator, feed
+        ``on_snapshot_open``, and re-persist the run-root staged authority so the resumed journal
+        recomputes byte-identical ordinary ``command_sha256`` (§D3);
+      * production, already resolved (a recover past pg.backup, or the later ``deploy.prepare``
+        targets manifest in the same run) -> REUSE the resolved id; never open a second session.
+
+    ``release()`` is idempotent and fail-closed: the driver calls it right after pg.backup consumes
+    the snapshot, and the controller's ``finally`` calls it again on every failure path."""
+
+    def __init__(
+        self,
+        request: dict[str, Any],
+        executor: Any,
+        values: Any,
+        run_root: pathlib.Path,
+    ) -> None:
+        self._request = request
+        self._executor = executor
+        self._values = values
+        self._run_root = pathlib.Path(run_root)
+        self.coordinator: "subprocess.Popen[str] | None" = None
+
+    def exported_id(self) -> str:
+        if self._request.get("production") is not True:
+            return self._values["<exported-id>"]
+        try:
+            return self._values.value("<exported-id>")
+        except LifecycleError:
+            pass
+        exported_id, coordinator = self._executor.open_window_snapshot(
+            self._request, self._run_root
+        )
+        self.coordinator = coordinator
+        self._values.on_snapshot_open(exported_id)
+        persist_staged_values(self._run_root, self._request["run_id"], self._values)
+        return exported_id
+
+    def release(self) -> None:
+        coordinator, self.coordinator = self.coordinator, None
+        if coordinator is not None:
+            self._executor.close_window_snapshot(coordinator)
 
 
 def staged_values_authority_path(run_root: pathlib.Path, run_id: str) -> pathlib.Path:
@@ -1194,7 +1251,20 @@ class SourceSnapshotSeam:
             proc.wait()
             raise LifecycleError("snapshot coordinator did not release the snapshot")
         if returncode != 0:
-            raise LifecycleError("snapshot coordinator session failed")
+            # mc2-6fnrt: the child's own diagnosis is the ONLY evidence of WHY the session died
+            # (production attempt #9 died as "terminating connection due to administrator command"
+            # — the barrier's client quiesce — and the bare message hid it). psql writes the server
+            # message to stderr; it carries no secret (the password lives in the service file, and
+            # the DSN never reaches argv), but keep it to one scrubbed line regardless.
+            detail = ""
+            if proc.stderr is not None:
+                try:
+                    detail = " ".join(proc.stderr.read().split())[:400]
+                except (OSError, ValueError):
+                    detail = ""
+            raise LifecycleError(
+                "snapshot coordinator session failed" + (f": {detail}" if detail else "")
+            )
 
     def produce_baseline(
         self, request: dict[str, Any], workdir: pathlib.Path, run_root: pathlib.Path
@@ -1601,38 +1671,71 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
             )
         return (manifest_sha256, coverage_fingerprint, coverage_run)
 
-    def open_window_snapshot(
+    def publish_window_baseline(
         self, request: dict[str, Any], run_root: pathlib.Path
-    ) -> tuple[str, pathlib.Path, subprocess.Popen[str]]:
-        """OQ5+OQ6 on the live cutover window path.
+    ) -> pathlib.Path:
+        """OQ6 on the live cutover window path: publish the pre-maintenance ``baseline.json`` that
+        pg.backup q12 mode consumes (backup-supabase.sh:918-926).
 
-        Publish the pre-maintenance ``baseline.json`` (OQ6) that pg.backup q12 mode consumes, then
-        open+HOLD one snapshot coordinator whose exported ``<exported-id>`` (OQ5) stays live for the
-        caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
-        session is open; backup-supabase.sh expects a LIVE id). Returns
-        ``(exported_id, baseline_path, coordinator)``. The caller MUST release the held coordinator
-        via ``close_window_snapshot`` once pg.backup has consumed the snapshot. ``open_snapshot``
-        itself fails closed on a malformed/dead exported id (reaping the session first), so a refused
-        open never leaks a source transaction. The live psql/tsx legs are MC2_Q12_REAL_PG17-gated;
-        the structural wiring is unit-testable with the seam faked.
+        This runs BEFORE ``barrier.install`` — the maintenance edge that deactivates cron and sets
+        the database read-only — so the capture records cron active + writable. ``produce_baseline``
+        opens and closes its OWN short-lived snapshot for the capture, so nothing is held afterwards:
+        the coordinator whose ``<exported-id>`` pg.backup binds against is a SEPARATE, later session
+        (``open_window_snapshot``, opened at the pg.backup step — mc2-6fnrt).
 
         The source-password libpq service file is written into an EPHEMERAL workdir (not the durable
-        run_root): it only needs to exist while produce_baseline's tsx child and the coordinator psql
-        connect, so it never persists at rest next to baseline.json / staged-values."""
+        run_root): it only needs to exist while produce_baseline's tsx child connects, so it never
+        persists at rest next to baseline.json / staged-values."""
         import shutil
         import tempfile
 
         run_root = pathlib.Path(run_root)
-        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-src-"))
+        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-baseline-"))
         try:
-            baseline_path = self._snapshot_seam.produce_baseline(request, workdir, run_root)
-            coordinator, exported_id = self._snapshot_seam.open_snapshot(request, workdir)
+            return self._snapshot_seam.produce_baseline(request, workdir, run_root)
         finally:
-            # Both children have connected (libpq read the service file at connect); drop the
+            # The child has connected (libpq read the service file at connect); drop the
             # cleartext-password file and clear the cache so it never lives at rest in run_root.
             shutil.rmtree(workdir, ignore_errors=True)
             self._source_service = None
-        return exported_id, baseline_path, coordinator
+
+    def open_window_snapshot(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> tuple[str, subprocess.Popen[str]]:
+        """OQ5 on the live cutover window path, opened AT the pg.backup step (mc2-6fnrt).
+
+        Open+HOLD one snapshot coordinator whose exported ``<exported-id>`` stays live for the
+        caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
+        session is open; backup-supabase.sh expects a LIVE id). Returns
+        ``(exported_id, coordinator)``; the caller MUST release the held coordinator via
+        ``close_window_snapshot`` once pg.backup has consumed the snapshot. ``open_snapshot`` itself
+        fails closed on a malformed/dead exported id (reaping the session first), so a refused open
+        never leaks a source transaction. The live psql leg is MC2_Q12_REAL_PG17-gated; the
+        structural wiring is unit-testable with the seam faked.
+
+        FOUND ON PRODUCTION 2026-07-28 (window attempt #9): this open used to happen next to
+        ``publish_window_baseline``, BEFORE ``barrier.install``, and the session was held across it.
+        The frozen barrier's ``quiesce_client_backends()`` terminates every client backend except its
+        own pid and exactly-idle ``supabase_admin``, so the barrier killed the controller's own
+        coordinator and the window aborted with the guard already installed. The W2/W3 codesign
+        (2026-07-20-q12-w2-w3-staged-execution-codesign.md:62,94) always resolved ``<exported-id>``
+        "at pg.backup open"; the ordering here is what makes that true. The barrier is untouched.
+
+        The source-password libpq service file is written into an EPHEMERAL workdir for the same
+        reason as the baseline leg, and this leg gets a FRESH one: the two connects are now separated
+        by the whole barrier install + writer quiesce, so no service file spans them."""
+        import shutil
+        import tempfile
+
+        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-src-"))
+        try:
+            coordinator, exported_id = self._snapshot_seam.open_snapshot(request, workdir)
+        finally:
+            # The coordinator has connected (libpq read the service file at connect); drop the
+            # cleartext-password file and clear the cache so it never lives at rest.
+            shutil.rmtree(workdir, ignore_errors=True)
+            self._source_service = None
+        return exported_id, coordinator
 
     def close_window_snapshot(self, coordinator: subprocess.Popen[str] | None) -> None:
         """Release the held window snapshot coordinator (COMMIT + close) after pg.backup consumes
@@ -4673,7 +4776,7 @@ def drive_forward_sequence(
     run_id: str,
     resource_manifest_paths: dict[str, str],
     marker_path: str,
-    exported_id: str,
+    snapshot: "WindowSnapshotHold",
     target_identities: tuple[str, ...],
     ordinary: Callable[..., dict[str, Any]],
     d5: Callable[[str], None],
@@ -4718,21 +4821,32 @@ def drive_forward_sequence(
         return finalize(True)
 
     def step_pg_backup() -> None:
+        # W3/OQ5 (mc2-6fnrt): the window snapshot coordinator opens HERE — after barrier.install has
+        # completed its client quiesce, immediately before the only command that consumes the live
+        # <exported-id> — and is released as soon as pg.backup has consumed it. Fixture mode resolves
+        # the upfront parity-oracle value with no session at all.
+        exported_id = snapshot.exported_id()
         # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
         # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
         snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
         engine.current_resource_manifest_sha256 = snapshot_digest
-        ordinary("pg.backup")
-        # W7a: staged threading — on the production path this reads the fresh generation authority and
-        # advances the resolver's on_pg_backup_done so the next step (pg.restore) can resolve
-        # <immutable-generation>. Fixture mode is a no-op (its upfront dict already carries it).
-        on_staged("pg.backup")
+        try:
+            ordinary("pg.backup")
+            # W7a: staged threading — on the production path this reads the fresh generation authority
+            # and advances the resolver's on_pg_backup_done so the next step (pg.restore) can resolve
+            # <immutable-generation>. Fixture mode is a no-op (its upfront dict already carries it).
+            on_staged("pg.backup")
+        finally:
+            # The snapshot has been consumed (or the step failed): never hold the exporting source
+            # session into the rest of the window. The controller's own finally releases again.
+            snapshot.release()
 
     def step_deploy_prepare() -> None:
         # OQ4 step 2: record the five captured target identities and step the hash AT
         # deploy.prepare/completed via resource_step_before_completion (composer parity: targets_step).
+        # The id is already resolved by then (the hold reuses it; no session is re-opened).
         targets_digest = write_live_resource_manifest(
-            engine, "targets", snapshot=exported_id, targets=target_identities
+            engine, "targets", snapshot=snapshot.exported_id(), targets=target_identities
         )
         ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
 
@@ -5019,15 +5133,16 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             engine, request, quiesce_path
         )
     # W2 fork (co-design D1/D2): fixture mode returns the verbatim parity-oracle dict; production mode
-    # returns a StagedValueResolver with the W3 window snapshot already opened (real <exported-id> +
-    # baseline.json) and hands back the HELD coordinator to release after pg.backup.
-    values, exported_id, snapshot_coordinator = resolve_window_values(
-        request, executor, engine.run_root, str(quiesce_path)
-    )
-    # W2: in production the held W3 snapshot coordinator is released once the window drive returns
-    # (pg.backup has consumed the snapshot by then); the finally guards EVERY path from acquisition
-    # onward (persist, setup, drive, exceptions, stop_after early-return) so the exporting source
-    # session never leaks. Fixture mode has no coordinator to release.
+    # returns a StagedValueResolver and publishes the OQ6 pre-maintenance baseline.json. NO snapshot
+    # coordinator is opened here (mc2-6fnrt) — one held across barrier.install is terminated by the
+    # barrier's own client quiesce.
+    values = resolve_window_values(request, executor, engine.run_root, str(quiesce_path))
+    # W3/OQ5: the staged holder opens the coordinator AT the pg.backup step and releases it as soon
+    # as pg.backup has consumed the snapshot. The finally below is the belt-and-braces release: it
+    # guards EVERY path from here onward (persist, setup, drive, exceptions, stop_after early-return)
+    # so a failure between the open and the driver's own release never leaks the source session.
+    # Fixture mode never opens anything, so its release is a no-op.
+    snapshot = WindowSnapshotHold(request, executor, values, engine.run_root)
     try:
         if request.get("production") is True:
             # D3: persist the snapshot-stage staged values so a recover re-drive recomputes
@@ -5106,7 +5221,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             run_id,
             resource_manifest_paths,
             marker_path,
-            exported_id,
+            snapshot,
             target_identities,
             ordinary,
             d5,
@@ -5116,8 +5231,7 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             quiesce_object_sha256=quiesce_object_resolver,
         )
     finally:
-        if snapshot_coordinator is not None:
-            executor.close_window_snapshot(snapshot_coordinator)
+        snapshot.release()
 
 
 def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
@@ -5252,18 +5366,26 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         for stage in ("genesis", "snapshot", "targets")
     }
     marker_path = str(engine.run_root / "quiesce-window-mode.json")
-    exported_id = values["<exported-id>"]
+    # W3/OQ5 (mc2-6fnrt): the same staged holder run_live uses. A recover past pg.backup REUSES the
+    # <exported-id> the persisted staged authority already carries (no session is opened); a recover
+    # from the barrier.install/completed head RE-DRIVES pg.backup, and that re-drive needs a LIVE
+    # exported snapshot — the one the interrupted run held is long gone — so the holder opens a fresh
+    # coordinator at the pg.backup step, exactly where an uninterrupted run opens it.
+    snapshot = WindowSnapshotHold(request, executor, values, engine.run_root)
     target_identities = tuple(
         sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
     )
 
     def resume(resume_from: str) -> dict[str, Any]:
-        return drive_forward_sequence(
-            engine, request, manifest, values, quiesce_source, run_id,
-            resource_manifest_paths, marker_path, exported_id, target_identities,
-            ordinary, d5, resume_from=resume_from,
-            quiesce_object_sha256=quiesce_object_resolver,
-        )
+        try:
+            return drive_forward_sequence(
+                engine, request, manifest, values, quiesce_source, run_id,
+                resource_manifest_paths, marker_path, snapshot, target_identities,
+                ordinary, d5, resume_from=resume_from,
+                quiesce_object_sha256=quiesce_object_resolver,
+            )
+        finally:
+            snapshot.release()
 
     # DISPATCH on the durable head — the generalized Option A table (design §6b.2). Every clean
     # completed-group boundary head resumes the shared forward driver from the group AFTER it, and
