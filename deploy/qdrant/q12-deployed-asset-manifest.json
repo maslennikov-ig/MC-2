@@ -94,7 +94,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/q12-lifecycle-core.py",
-      "sha256": "d8404112de92fd1624baf8272d655f0b98bfabfc623624e910f0c16bd4ae1178"
+      "sha256": "1cd7e39afe8428842597ed6f34a7a6951fb548f9aa18b455ba6961096c2d14c6"
     },
     {
       "group": "claude-deploy",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "fc4953541ad32bb1c5a2b6a9eacb09e37e0fb618",
+  "generated_from_tree_sha": "1725a2df3245200fa6e12f362b7e4564897301ec",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

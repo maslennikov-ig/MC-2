@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-28 (C1 wall removed: `cron.job` unguarded, `mc2-34eua`)
+Updated: 2026-07-28 (window identity + capability settled; `mc2-1sns3` closed — see § "Next recommended")
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -42,51 +42,43 @@ with `mc2-1sns3`, `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: finish `mc2-1sns3` — the LAST open dependency of `mc2-i9h3y`, and the reason
-the window bead still reads BLOCKED — then settle the `--release-sha` contradiction below, stage the
-run root and open to the reversible `--stop-after deploy.prepare` hold. Full brief:
+Recommended action: the window is READY TO OPEN and everything before C9 is settled — `mc2-1sns3` is
+CLOSED, the `--release-sha` identity is ruled, the capability question is answered, and the run root
+is staged. What remains is the owner-held C9. Full brief:
 `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
-`mc2-ot8se` (the pre-flight) and `mc2-38ivn` (its first catch) are DONE. Probe B3 found a TENTH
-instance of the class in minutes: the Supavisor pooler REWRITES `application_name` to `'Supavisor'`,
-so the terminal proof's `barrier_era_session_count LIKE 'megacampus-q12-%'` could only ever read 0 —
-it passed because no barrier-era session could be RECOGNISED. Fixed in the `mc2-ipwyc` shape (all
-four barrier clients state the name in-session and assert it twice); W-tuple field 4 -> `f98a2ce4…`,
-fields 5-10 BYTE-IDENTICAL, no re-freeze. Measured afterwards, read-only on the live pooler:
-Supavisor RESETS session state on check-in, so a badge cannot outlive its session and the C10 count
-stays reachable. Full round, including the review findings it closed, in the stage summary.
+`mc2-1sns3` CLOSED 2026-07-28 (`1725a2df3`). Its last real gap: W7a increments 2-3 wired the staged
+callbacks as a hook `run_live` passed into `drive_forward_sequence`, and `run_recover` shares that
+driver but passed none — so the two recover heads that RE-DRIVE a staged step (head 1
+`barrier.install/completed`, head 4 `barrier.prepare-recovery/completed`) failed closed at the next
+command with "unresolved command placeholder", AFTER C2 has quiesced the writers. Increment 4 had
+proved the threaders re-drive-SAFE by calling them directly, never that the recover path CALLS them
+— the same substitution class. Fixed by moving the threading INTO the driver, so no caller can
+forget it. Increment 5's real leg is EXECUTED BY the window itself (W7a plan): its inputs exist only
+once the real `source.forward` has run. `mc2-ot8se` (the pre-flight) and `mc2-38ivn` (probe B3: the
+Supavisor pooler REWRITES `application_name`) are DONE; W-tuple field 4 → `f98a2ce4…`, fields 5-10
+byte-identical, no re-freeze. Full round in the stage summary.
 
-RUN ROOT for the window (plan re-run 2026-07-28, read-only, production; UNCHANGED by the B3 fix,
-which moved no catalog-bound digest):
+RUN ROOT for the window (plan re-run 2026-07-28, read-only, production):
 `/opt/megacampus/backups/q12/6544c7dd-e680-462d-bf8f-5db8fc01c9b6`
 
 - `--expected-catalog-sha256 6be37e858e4fbd473a298cd1dfdaf49906e2c9964982801b39e1ac6104f7aaaa`
-  (the sha256 of THAT root's OWN `expected-post-migration-catalog.json`)
-- `baseline_structural_sha256 a2b2532406ad3a6f3fa904d9c6caed633dd2d3c90fc6e7ea4ee7668e8b5bd75b`
-  (agrees with D1, measured in the barrier's `search_path`)
-- `expected_post_migration_catalog_sha256 b1fe2b9cf95d4d6e263b5aa65a7fc907ab2521ed6b6f654c1623cd0487ffff0d`
-- report `<run-root>/q12-window-preflight-20260728T144848Z.json`: 22 `pass`, 3 `unprovable` with
-  evidence (C5/C6/H4), 0 `fail`; the gate accepts it. Reports EXPIRE 30 min after `captured_at`.
-  Still missing from the root: `accepted-coverage-run` + `secrets/db-capability`.
+  — the sha256 of THAT root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a
+  value quoted for a prior root; its `baseline_structural_sha256 a2b25324…` agrees with probe D1.
+- Pre-flight reports land in the run root and EXPIRE 30 min after `captured_at`; the last green one
+  read 22 `pass`, 3 `unprovable` with evidence (C5/C6/H4), 0 `fail`.
 
-The deployed Q12 tree was REINSTALLED from `develop` twice on 2026-07-28 (latest: the B3 fix at
-tree `fc495354`; replaced files under `/opt/megacampus/backups/q12-assets/20260728T135316Z/`, the
-earlier set under `…/20260728T124629Z/`); H2 proves all 26 assets byte-equal. The sixth digest pin
-(`qdrant/qdrant`) had no hold tag and now has one (`mc2-y5tgw`).
+The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept
+under `/opt/megacampus/backups/q12-assets/<utc>/`); H2 proves all 26 assets byte-equal to the
+tracked manifest. The sixth digest pin (`qdrant/qdrant`) now has a hold tag (`mc2-y5tgw`).
 
 WINDOW STATE. Opened NINE times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9
 installed the guard, aborted, and was restored by hand the same day with the barrier's own
-`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id.
-
-DEFECTS #7-#9, the `mc2-ipwyc` PAIR and `mc2-38ivn`: all found, fixed and delivered on `develop`
-(chronology in `.codex/stages/mc2-jz6y0/summary.md`). Each is now a PROBE in
-`q12-window-preflight.py` (`mc2-34eua` -> A2/A4, `mc2-2rzf6` -> D1, `mc2-6fnrt` -> E2,
-`mc2-ipwyc` -> A3/A5/B1/B2, `mc2-38ivn` -> B3), so the class cannot return silently.
-
-THE PATTERN behind all of them: the checked environment substituted for the consuming one — a
-fixture published the step, an isolate had superuser rights, the real error was swallowed, a
-host-only gate hid a rotten fixture, or the pooler dropped (or rewrote) what the test connection
-delivered. Model the constraint, never the convenience.
+`$restore$`. Production re-verified clean afterwards. Every attempt BURNS its run-id. All ten
+defects are fixed on `develop` and each is now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1,
+`mc2-6fnrt`→E2, `mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3); chronology in the stage summary. THE
+PATTERN behind all of them, and behind the `mc2-1sns3` recover gap closed above: the checked
+environment substituted for the consuming one. Model the constraint, never the convenience.
 
 BEFORE THE NEXT ATTEMPT — one command, not a checklist. Run this on the server, immediately before
 the window, and read its report:
@@ -101,26 +93,33 @@ Read-only by construction (every statement inside `BEGIN READ ONLY`, asserting
 as often as wanted. Exits 0 only when all 25 frozen probes are `pass` or `unprovable` with a named
 evidence pointer, and publishes a 0400 report in the run root. `q12-live-cutover.sh` REFUSES
 `live`/`supervisor` without a green report under 30 min old whose `asset_manifest_sha256` matches
-the deployed tree: a gate, not a reminder. Coverage: A1-A7 guarded-set privilege reachability,
-B1-B4 the pooled session, C1-C4 cron/queue/residue, D1 catalog agreement in the barrier's
-`search_path`, E1/E2 quiesce feasibility, H1-H5 host. Contract:
+the deployed tree: a gate, not a reminder. Contract:
 `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
-Outside what the probe can do: copy `accepted-coverage-run` + `secrets/db-capability` into the run
-root at 0400 (`--expected-catalog-sha256` is the sha256 of THAT root's OWN catalog FILE, barrier
-`:302`, never a value quoted for a prior root); run the controller DETACHED (`setsid nohup` — a
-dropped ssh once killed a plan at exit 255, and after C2 that would strand stopped writers); and
-note that a push to `develop` triggers Deploy to Dev, which fails H4 for 30 minutes, so land
-deliveries BEFORE the window.
+Outside what the probe can do: run the controller DETACHED (`setsid nohup` — a dropped ssh once
+killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push
+touching `deploy/**` triggers Deploy to Dev, which fails H4 for 30 minutes — docs-only and
+`.codex/**` pushes do not (`scripts/ci/detect_deploy_changes.sh`), so land code BEFORE the window.
 
-WINDOW ARGV — `--release-sha` IS CONTRADICTORY, settle before the window: this line and the staged
-root's authority both say `23dfe973f18cc6067d386b6eb683bf6906142165`, but `mc2-sdbua`'s closure rules
-the authority is `060b4faeac2e5ef6116aa26cda8e07e43e1343a6` (the operator image `.env.production`
-pins was built from it). A ruling that moves it moves `--expected-catalog-sha256` via a re-plan.
-`--operator-digest b5eb528e…`
-(= the `.env.production` pin), `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce
-digests on a first run. `--stop-after deploy.prepare` is the sole resumable pre-C9 head. The barrier
-is invoked as argv[0]: keep it mode 0555, not 0444.
+WINDOW ARGV — SETTLED 2026-07-28 from artefacts, no re-plan. `--release-sha
+23dfe973f18cc6067d386b6eb683bf6906142165`: `.env.green`'s `API_IMAGE` (`…@sha256:2f713f87…`) carries
+`org.opencontainers.image.revision = 23dfe973f…` on the host, its `WEB_IMAGE` (`…@sha256:ca9afb99…`)
+labels `50f670b9` but `git diff 50f670b9..23dfe973f -- packages/web packages/shared-types
+packages/shared-utils` is EMPTY, and the staged root's catalog authority already records it.
+`mc2-sdbua`'s closure is SUPERSEDED: it ruled on the now-spent root `0fa297e4` and re-made the
+operator/app conflation `mc2-v7547` corrected — `b5eb528e…` labels `060b4faea`, which touched no
+application source. `--operator-digest b5eb528e…`,
+`--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests on a first run.
+`--stop-after deploy.prepare` is the sole resumable pre-C9 head; the barrier is invoked as argv[0],
+so keep it mode 0555, not 0444.
+
+CAPABILITY — SETTLED 2026-07-28 from the barrier's code, no owner decision needed: RE-MINT per run
+root. `q12-database-barrier.sh:210` binds only the PATH to the run id; `install` registers whatever
+digest the session supplies (`:945-948`) and `assert_capability`/`assert_controller_binding` compare
+only against that row (`:984`, `:999`) — a per-run nonce with no external counterpart. Probe C4
+reports zero `q12_guard` residue, so carry-over would also have worked; re-minting was chosen
+because the same 65-byte value sits in ten run roots from the burned attempts, one of which (#9)
+installed the guard. `accepted-coverage-run` is deterministic and not secret — copied verbatim.
 
 RELEASE IDENTITY SETTLED (`mc2-v7547`): `--release-sha` names the APP release `.env.green`
 pins, `--operator-digest` the `qdrant-operator` image `.env.production` pins — different

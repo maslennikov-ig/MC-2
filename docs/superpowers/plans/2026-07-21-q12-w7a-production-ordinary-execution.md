@@ -44,9 +44,9 @@
 
 Add `OwnerCustodyExecutor.execute_ordinary(command, capability)` that delegates to the inherited `ProductionExecutor.execute` (real shell of `command["argv"]`). First proof: the 2 `migration.*` commands really apply on a disposable restore and the result binds `capability_sha256 == digest`; journal byte-parity vs composer preserved. Fail-closed on non-zero exit.
 
-- [ ] Failing test: production executor drives `migration.base.apply` against a disposable `postgres:17.10`; assert the migration row exists in the restored catalog and journal parity holds. Run — watch it fail (no `execute_ordinary` on prod executor).
-- [ ] Implement minimal `execute_ordinary` = `return self.execute(command, capability)`.
-- [ ] Green; then assert the fixture composer path is still byte-identical (parity neutrality).
+- [x] Failing test: production executor drives `migration.base.apply` against a disposable `postgres:17.10`; assert the migration row exists in the restored catalog and journal parity holds. Run — watch it fail (no `execute_ordinary` on prod executor).
+- [x] Implement minimal `execute_ordinary` = `return self.execute(command, capability)`.
+- [x] Green; then assert the fixture composer path is still byte-identical (parity neutrality).
 
 > **Scope correction (2026-07-21, after deep investigation).** Increment 1 wired the command-agnostic
 > `execute_ordinary` seam (proven). The remaining verifiable-here gap is NOT re-running the real
@@ -74,13 +74,13 @@ mode stays a no-op (plain-dict `values` has all placeholders upfront — byte-pa
 production-aware staged hook from `run_live`/`run_recover` (alongside `ordinary`/`d5`) so
 `drive_forward_sequence` never reaches into the resolver directly and fixture runs are unaffected.
 
-- [ ] Failing test (`q12-production-staged-threading.test.ts` + runner): drive the production forward
+- [x] Failing test (`q12-production-staged-threading.test.ts` + runner): drive the production forward
       sequence with a **fake** `OwnerCustodyExecutor` subclass whose `execute_ordinary` writes a fake
       generation pointer; assert (a) before the hook `resolved_command(pg.restore)` raises
       "unresolved command placeholder", (b) after the hook the resolver holds the fake
       `<immutable-generation>` and `pg.restore` argv resolves, (c) the run-root staged-values authority
       now contains it. Run — watch it fail (drive loop never calls the callback).
-- [ ] Implement: a `on_pg_backup_done`-invoking step in `drive_forward_sequence` (production-gated via
+- [x] Implement: a `on_pg_backup_done`-invoking step in `drive_forward_sequence` (production-gated via
       the injected hook), reading the generation authority; re-persist. Green; assert fixture parity
       byte-identical.
 
@@ -91,10 +91,10 @@ Same pattern after `ordinary("source.forward")`: read the recovery `manifest.jso
 re-persist. The downstream commands that consume `<accepted-recovery-manifest-sha256>` /
 `<accepted-coverage-fingerprint>` / `<accepted-coverage-run>` then resolve.
 
-- [ ] Failing test: production drive with a fake recovery authority; assert the three placeholders are
+- [x] Failing test: production drive with a fake recovery authority; assert the three placeholders are
       unresolved before the hook and resolved after, the first downstream consumer's argv resolves, and
       the authority round-trips. Watch it fail.
-- [ ] Implement the source.forward staged step (production-gated); green; fixture parity byte-identical.
+- [x] Implement the source.forward staged step (production-gated); green; fixture parity byte-identical.
 
 ### Increment 4 — recover determinism through the staged threading (verifiable here)
 
@@ -103,11 +103,35 @@ A production `recover` reconstructs the resolver from the persisted authority (`
 resolve-once means a recover that re-runs a staged step must byte-match the persisted value or fail
 closed as drift.
 
-- [ ] Failing test: persist a staged-values authority from a stopped production forward run
+- [x] Failing test: persist a staged-values authority from a stopped production forward run
       (`--stop-after deploy.prepare` shape), then `recover`; assert the reconstructed resolver yields the
       SAME `command_sha256` for `pg.restore` (compose↔claim equality) and a drifted authority value
       fails closed. Watch it fail (if any re-drive path re-invokes a callback without resolve-once).
-- [ ] Implement/confirm resolve-once on the re-drive path; green.
+- [x] Implement/confirm resolve-once on the re-drive path; green.
+
+### Increment 4b — the recover DRIVE PATH threads the staged callbacks (2026-07-28, `1725a2df3`)
+
+Increment 4 proved the threaders are re-drive-SAFE by calling them directly; it did not prove the
+recover drive path CALLS them. It did not: increments 2-3 wired `on_staged` as a hook `run_live`
+passed into `drive_forward_sequence`, and `run_recover` shares that driver but passed nothing. The
+two recover heads that RE-DRIVE a staged step therefore failed closed at the next consumer with
+"unresolved command placeholder" — head 1 (`barrier.install/completed` → `writers.quiesce`, which
+re-drives pg.backup, and `pg.restore` consumes `<immutable-generation>`) and head 4
+(`barrier.prepare-recovery/completed` → `source.forward`, and `reindex.plan` consumes the accepted
+coverage binding). Both are heads a production window can only reach AFTER C2 has quiesced writers.
+
+Same shape as the class the window kept hitting: the checked environment (a direct call to the
+threader) was more permissive than the consuming one (the resumed driver, which never called it).
+
+- [x] Failing test (`q12-production-recover-staged-threading.test.ts` + runner): drive the REAL
+      `drive_forward_sequence` from each recover head exactly as `run_recover` drives it — no
+      caller-supplied hook — with fake authority-read seams; assert the next consumer resolves.
+      Watched both heads fail with "unresolved command placeholder".
+- [x] Implement: the staged threading MOVED into `drive_forward_sequence` (it already holds
+      `engine.executor`, `values`, `request`, `engine.run_root`), so no caller can forget it and
+      there is one implementation instead of two call sites — the property `WindowSnapshotHold`
+      already had for `<exported-id>`. Green; fixture parity byte-identical
+      (`q12-live-controller` 26/26, W7a suites 23/23, manifest `aaec6fc2…` unmoved).
 
 ### Increment 5 — real leg on disposable PG17 / Qdrant (GATED — `MC2_Q12_REAL_PG17=1`) + W7 owner-gated prod
 
@@ -117,9 +141,19 @@ oracle. This needs the disposable Supabase-shaped stack (or the shared source **
 rehearsal) and is `MC2_Q12_REAL_PG17`-gated; the prod window itself stays **owner-gated (W7, `mc2-i9h3y`)**
 holding C9. NOT closed by local unit work.
 
-- [ ] `MC2_Q12_REAL_PG17=1` rehearsal (disposable stack or DEV: shared source read-only, dev Qdrant
-      isolated write, dev app color) drives `live --stop-after deploy.prepare` with the real
-      `OwnerCustodyExecutor`; real generation + recovery authorities feed the staged callbacks end-to-end.
+**Boundary settled (2026-07-28).** The "rehearsal" below is NOT a lighter dress run that could
+precede the window: the real values it would feed the callbacks are a real reviewed recovery
+`manifest.json` plus the recovered Supabase `file_catalog` rows, and those exist only once the real
+`source.forward` 42-copy recovery run has happened (traced on `mc2-1sns3`, 2026-07-23). So
+increment 5 IS the W7 window's own forward leg — running it separately would either mutate
+production outside the window or substitute a fixture for the very authority under test, which is
+the exact class that produced the first ten window defects. `mc2-1sns3` therefore closes at
+increment 4b, and increment 5 is EXECUTED BY `mc2-i9h3y` (the window), not before it.
+
+- [x] `MC2_Q12_REAL_PG17=1` local gate over the whole ops suite at the delivered tree — every
+      infra-free and disposable-stack leg of the staged threading, including the recover heads.
+- [ ] REAL end-to-end leg — real generation + recovery authorities feed the staged callbacks —
+      executed inside the owner-gated window `mc2-i9h3y` at C5/C6, not as a separate rehearsal.
 - [ ] Residual (if any) recorded in `mc2-uha77`; prod C9 remains held for explicit owner "go".
 
 ## Risks / open decisions (resolve in-increment, record on the bead)
