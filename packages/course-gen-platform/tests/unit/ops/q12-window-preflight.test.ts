@@ -56,6 +56,100 @@ function drive(args: string[] = []): SelfTestShape {
   return JSON.parse(result.stdout) as SelfTestShape;
 }
 
+interface HostShape {
+  [key: string]: string | number | boolean | string[];
+}
+
+function driveHost(): HostShape {
+  const result = spawnSync('/usr/bin/python3', [RUNNER, '--host'], {
+    encoding: 'utf8',
+    timeout: 240_000,
+    env: { PATH: process.env.PATH, LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout) as HostShape;
+}
+
+describe('Q12 window pre-flight: the tracked deployed-asset manifest', () => {
+  // The ratchet. H2 can only be a byte comparison if the manifest tracks the tree; if a Q12 asset
+  // changes and the manifest is not regenerated, this test goes red HERE rather than the pre-flight
+  // going green against stale expectations on the server.
+  it('is in lockstep with the repository tree', () => {
+    const out = driveHost();
+    expect(out.manifest_stale_entries).toEqual([]);
+    expect(out.manifest_missing_from_tree).toEqual([]);
+    expect(out.manifest_schema_version).toBe('megacampus.q12.deployed-asset-manifest/v1');
+    // The frozen command manifest must not have moved: the pre-flight is deliberately NOT one of
+    // its 20 commands.
+    expect(out.command_manifest_sha256).toBe(
+      'aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841'
+    );
+  });
+});
+
+describe('Q12 window pre-flight: host probes', () => {
+  let out: HostShape;
+  beforeAll(() => {
+    out = driveHost();
+  }, 260_000);
+
+  it('passes H1..H5 against a healthy synthetic host', () => {
+    for (const id of ['h1', 'h2', 'h3', 'h5']) {
+      expect(`${id}=${out[`${id}_healthy`]}`, String(out[`${id}_healthy_detail`])).toBe(
+        `${id}=pass`
+      );
+    }
+    // H4 is `pass` where `gh` exists and `unprovable`+evidence where it does not; both are green.
+    expect(['pass', 'unprovable']).toContain(out.h4_healthy);
+    if (out.h4_healthy === 'unprovable') {
+      expect(String(out.h4_healthy_evidence)).toContain('no deploy process');
+    }
+  });
+
+  it('fails H2 on a single changed byte, a wrong mode, and a wrong owner', () => {
+    expect(out.h2_changed_byte).toBe('fail');
+    expect(String(out.h2_changed_byte_detail)).toContain('sha256');
+    expect(out.h2_wrong_mode).toBe('fail');
+    expect(String(out.h2_wrong_mode_detail)).toContain('mode');
+    expect(out.h2_wrong_owner).toBe('fail');
+    expect(String(out.h2_wrong_owner_detail)).toContain('owner');
+    expect(out.h2_missing_file).toBe('fail');
+    expect(String(out.h2_missing_file_detail)).toContain('missing');
+    // CI-delivered assets are byte-checked but identity-exempt, and the exemption is stated.
+    expect(out.h2_ci_mode_change).toBe('pass');
+    expect(String(out.h2_healthy_detail)).toContain('CI-delivered');
+  });
+
+  it('fails H1 when a digest-pinned image is absent or prune-exposed', () => {
+    expect(out.h1_image_absent).toBe('fail');
+    expect(String(out.h1_image_absent_detail)).toContain('absent locally');
+    expect(out.h1_hold_tag_missing).toBe('fail');
+    expect(String(out.h1_hold_tag_missing_detail)).toContain('prune-exposed');
+  });
+
+  it('fails H3 on a real controller, and never matches its own command line', () => {
+    expect(out.h3_controller_running).toBe('fail');
+    expect(String(out.h3_controller_running_detail)).toContain('q12-lifecycle-core.py');
+    // The 2026-07-28 pgrep trap: a pattern match on "q12" also matched the pre-flight itself.
+    expect(out.h3_only_preflight_running).toBe('pass');
+  });
+
+  it('fails H4 on an in-flight deploy and on a recently restarted dev container', () => {
+    expect(out.h4_deploy_in_flight).toBe('fail');
+    expect(String(out.h4_deploy_in_flight_detail)).toContain('deploy_dev.sh');
+    expect(out.h4_recent_dev_restart).toBe('fail');
+    expect(String(out.h4_recent_dev_restart_detail)).toContain('NOT paused');
+  });
+
+  it('fails H5 when free space does not exceed the backup high-water mark', () => {
+    expect(out.h5_disk_full).toBe('fail');
+    expect(String(out.h5_disk_full_detail)).toContain('high-water');
+    // Any bound the probe introduces is stated in the report, not hidden.
+    expect(String(out.h5_healthy_detail)).toContain('BOUND:');
+  });
+});
+
 describe('Q12 window pre-flight: fail-closed aggregation', () => {
   it('exits non-zero on any fail, and on any unprovable without evidence', () => {
     const out = drive(['--self-test']);

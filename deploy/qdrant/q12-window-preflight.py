@@ -24,14 +24,17 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import importlib.util
 import json
 import os
 import pathlib
 import re
 import stat as stat_module
+import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -262,6 +265,131 @@ def resolve_tree_sha(explicit: "str | None", manifest: "dict | None") -> "tuple[
     )
 
 
+# --- the tracked deployed-asset manifest ---------------------------------------------------------
+#
+# Probe H2 compares the DEPLOYED bytes against this manifest. The manifest is tracked in git, so the
+# repository is the authority for what should be on the server, and H2 is a byte comparison instead
+# of the hand-eyeballing that let the server tree go stale twice.
+#
+# The asset set is DERIVED, not hand-listed: every /opt/megacampus path named in the frozen command
+# manifest's argv, plus the controller chain those commands execute, plus the pre-flight's own two
+# files (so a stale probe on the server cannot certify a fresh tree).
+
+CONTROLLER_CHAIN = (
+    "deploy/qdrant/q12-live-cutover.sh",
+    "deploy/qdrant/q12-lifecycle-core.py",
+    "deploy/qdrant/q12-command-manifest.json",
+    "deploy/qdrant/q12-structural-catalog.sql",
+    "deploy/qdrant/q12-migration-plan-capture.py",
+    "deploy/qdrant/q12-migration-plan-roles.py",
+    "deploy/qdrant/q12-writer-resume.py",
+    "deploy/qdrant/q12-privileged-launch.sh",
+    "deploy/qdrant/q12-capability-run.sh",
+    "deploy/qdrant/q12-live-smoke.sh",
+    "deploy/qdrant/q12-activation-truth-projection.sql",
+    "deploy/qdrant/q12-managed-session-inventory.json",
+    "deploy/qdrant/q12-managed-session-inventory-schema.json",
+    "deploy/qdrant/q12-activation-lock-catalog.test-reference.json",
+    "deploy/qdrant/q12-activation-lock-order.test-reference.json",
+    "deploy/qdrant/image-lock.json",
+    "deploy/postgres/q12-source-manifest.ts",
+    "deploy/qdrant/q12-window-preflight.py",
+    "deploy/qdrant/q12-preflight-probes.py",
+)
+
+# mc2-1by33: only `source.forward` needs root, through the root-owned argv-whitelist launcher, and
+# q12-writer-resume.py is what that launcher executes. Both are root-owned on the server; nothing
+# else in the tree is.
+ROOT_OWNED = ("deploy/qdrant/q12-privileged-launch.sh", "deploy/qdrant/q12-writer-resume.py")
+DEPLOY_OWNER = "claude-deploy"
+DEPLOY_GROUP = "claude-deploy"
+
+
+def command_manifest_assets(repo_root: pathlib.Path) -> "list[str]":
+    manifest = json.loads(
+        (repo_root / "deploy/qdrant/q12-command-manifest.json").read_text(encoding="utf-8")
+    )
+    found: set[str] = set()
+    for command in manifest["commands"].values():
+        for argument in command["argv"]:
+            for token in argument.split(":"):
+                if not token.startswith("/opt/megacampus/"):
+                    continue
+                relative = token[len("/opt/megacampus/") :]
+                if (repo_root / relative).is_file():
+                    found.add(relative)
+    return sorted(found)
+
+
+def build_asset_manifest(repo_root: pathlib.Path) -> dict:
+    tree_sha = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    if not HEX40_RE.fullmatch(tree_sha):
+        raise PreflightError("cannot resolve the repository HEAD")
+    executable = {
+        line.split("\t", 1)[1]
+        for line in subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "-s"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        if line.startswith("100755 ")
+    }
+    paths = sorted(set(command_manifest_assets(repo_root)) | set(CONTROLLER_CHAIN))
+    assets = []
+    for relative in paths:
+        source = repo_root / relative
+        if not source.is_file():
+            raise PreflightError(f"asset is missing from the tree: {relative}")
+        # Mode and owner are asserted only for the Q12-owned `deploy/` tree, which this task
+        # installs and nothing else rewrites. `scripts/**` and the compose file are delivered by
+        # CI over scp on every dev/staging deploy, and pinning them read-only would make the next
+        # scp fail with EACCES — a hardening that breaks the thing it guards. For those, byte
+        # equality is asserted and the file identity is left to CI, stated rather than skipped.
+        q12_owned = relative.startswith("deploy/")
+        assets.append(
+            {
+                "path": relative,
+                # Deployed read-only in every case the window owns: it never rewrites its own
+                # assets. 0555 for anything git marks executable (the barrier is invoked as
+                # argv[0] and must stay 0555, not 0444), 0444 otherwise.
+                "mode": ("0555" if relative in executable else "0444") if q12_owned else None,
+                "owner": ("root" if relative in ROOT_OWNED else DEPLOY_OWNER) if q12_owned else None,
+                "group": ("root" if relative in ROOT_OWNED else DEPLOY_GROUP) if q12_owned else None,
+                "identity_owner": "q12" if q12_owned else "ci-delivered",
+                "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            }
+        )
+    return {
+        "schema_version": probes.ASSET_MANIFEST_SCHEMA,
+        "generated_from_tree_sha": tree_sha,
+        "deploy_root": DEFAULT_DEPLOY_ROOT,
+        "derivation": (
+            "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that "
+            "exists in the tree, plus the controller chain those commands execute, plus the "
+            "pre-flight's own two files; mode 0555 where git marks the file executable, else 0444"
+        ),
+        "assets": assets,
+    }
+
+
+def asset_manifest_path(repo_root: pathlib.Path) -> pathlib.Path:
+    return repo_root / "deploy/qdrant/q12-deployed-asset-manifest.json"
+
+
+def load_asset_manifest(path: pathlib.Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def asset_manifest_sha256(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 # --- self-test ------------------------------------------------------------------------------------
 
 SELF_TEST_CASES = ("all-pass", "one-fail", "unprovable-no-evidence", "unprovable-with-evidence")
@@ -320,13 +448,72 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ca-file", default=DEFAULT_CA_FILE)
     parser.add_argument("--psql", default=os.environ.get("MC2_Q12_PLAN_PSQL", DEFAULT_PSQL))
     parser.add_argument("--self-test", choices=SELF_TEST_CASES, default=None)
+    parser.add_argument(
+        "--emit-asset-manifest",
+        action="store_true",
+        help="regenerate deploy/qdrant/q12-deployed-asset-manifest.json from the repository tree",
+    )
+    parser.add_argument("--repo-root", default=None)
     return parser
+
+
+def build_context(arguments, workdir: pathlib.Path, manifest: "dict | None"):
+    """Assemble the one Context every probe sees.
+
+    The database seam is bound to the pooled DSN and nothing else; there is no direct-connection
+    code path to fall back to, because the contract forbids one.
+    """
+    deploy_root = pathlib.Path(arguments.deploy_root)
+    context = probes.Context(scope=arguments.scope, manifest=manifest)
+
+    if arguments.scope in ("host", "all"):
+        host = probes.default_host_adapter(deploy_root)
+        host.gh = shutil.which("gh")
+        context.host = host
+
+    if arguments.scope in ("database", "all"):
+        if not arguments.run_root:
+            raise PreflightError("--run-root is required for scope database/all")
+        run_root = pathlib.Path(arguments.run_root)
+        if not run_root.is_absolute():
+            raise PreflightError("--run-root must be absolute")
+        catalog_path = run_root / "expected-post-migration-catalog.json"
+        if not catalog_path.is_file():
+            raise PreflightError(f"the run root carries no expected catalog: {catalog_path}")
+        context.catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        script, host_name, port = build_pooled_session(
+            pathlib.Path(arguments.db_url_file),
+            pathlib.Path(arguments.ca_file),
+            workdir,
+            arguments.psql,
+        )
+        context.script = script
+        # The barrier and the structural catalog are read from the DEPLOYED tree, not the repo:
+        # A7's frozen expectation and D1's projection must come from the bytes that will actually
+        # run in the window.
+        barrier = deploy_root / "deploy/qdrant/q12-database-barrier.sh"
+        structural = deploy_root / "deploy/qdrant/q12-structural-catalog.sql"
+        if barrier.is_file():
+            context.barrier_text = barrier.read_text(encoding="utf-8", errors="replace")
+            context.option_dependence_sources["q12-database-barrier.sh"] = context.barrier_text
+        if structural.is_file():
+            context.structural_catalog_sql = structural.read_text(encoding="utf-8").strip()
+        return context, f"{host_name}:{port}"
+    return context, None
 
 
 def main(argv: "list[str]") -> int:
     arguments = build_parser().parse_args(argv)
     scope = arguments.scope
     captured_at = utc_now()
+
+    if arguments.emit_asset_manifest:
+        repo_root = pathlib.Path(arguments.repo_root or HERE.parents[1])
+        manifest = build_asset_manifest(repo_root)
+        target = asset_manifest_path(repo_root)
+        target.write_bytes(canonical(manifest))
+        sys.stdout.write(f"{target}\n")
+        return 0
 
     if arguments.self_test is not None:
         verdicts = synthetic_verdicts(arguments.self_test, scope)
@@ -335,8 +522,46 @@ def main(argv: "list[str]") -> int:
         path = emit_report(
             verdicts, scope, None, report_dir, tree_sha, tree_sha_source, captured_at
         )
-    else:
-        raise PreflightError("only --self-test is wired up in this build")
+        for item in verdicts:
+            sys.stdout.write(f"{item['id']}  {item['verdict']}  {item['detail']}\n")
+        sys.stderr.write(f"q12 window pre-flight report: {path}\n")
+        offender = first_offender(verdicts)
+        if offender is not None:
+            sys.stderr.write(f"q12 window pre-flight NOT GREEN; first offender: {offender}\n")
+        return exit_code(verdicts)
+
+    manifest_file = pathlib.Path(arguments.deploy_root) / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    if not manifest_file.is_file():
+        manifest_file = asset_manifest_path(pathlib.Path(arguments.repo_root or HERE.parents[1]))
+    manifest = load_asset_manifest(manifest_file) if manifest_file.is_file() else None
+
+    workdir = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-preflight-", dir="/tmp"))
+    os.chmod(workdir, 0o700)
+    try:
+        context, endpoint = build_context(arguments, workdir, manifest)
+        verdicts = run_probes(context)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    tree_sha, tree_sha_source = resolve_tree_sha(arguments.expected_tree_sha, manifest)
+    run_root = pathlib.Path(arguments.run_root) if arguments.run_root else None
+    report_dir = pathlib.Path(arguments.report_dir) if arguments.report_dir else (
+        run_root if run_root is not None else pathlib.Path("/tmp")
+    )
+    extra = {
+        # What the cutover binds to: H2 proved the deployed bytes match THIS manifest, and the
+        # cutover recomputes the same digest from the manifest it is about to run against.
+        "asset_manifest_sha256": asset_manifest_sha256(manifest_file)
+        if manifest_file.is_file()
+        else None,
+        "asset_manifest_path": str(manifest_file) if manifest_file.is_file() else None,
+        # Named so the report shows WHICH endpoint was measured; it is the pooled host, never the
+        # database host, and it carries no credential.
+        "database_endpoint": endpoint,
+    }
+    path = emit_report(
+        verdicts, scope, run_root, report_dir, tree_sha, tree_sha_source, captured_at, extra
+    )
 
     for item in verdicts:
         sys.stdout.write(f"{item['id']}  {item['verdict']}  {item['detail']}\n")

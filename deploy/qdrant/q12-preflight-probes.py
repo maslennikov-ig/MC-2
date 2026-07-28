@@ -208,10 +208,6 @@ def sha256_file(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def _not_implemented(context: Context) -> "dict[str, object]":
-    raise NotImplementedError("probe not implemented yet")
-
-
 # --- Group A: privilege reachability on the guarded set ----------------------------------------
 #
 # The C1 wall. `cron.job` (attempts #6/#7, mc2-34eua) and the auth/storage ownership split
@@ -976,6 +972,392 @@ def probe_e2(context: Context) -> "dict[str, object]":
     )
 
 
+# --- Group H: host --------------------------------------------------------------------------------
+#
+# No database access. Runnable at any time, including from CI.
+
+ASSET_MANIFEST_SCHEMA = "megacampus.q12.deployed-asset-manifest/v1"
+DIGEST_PIN_RE = re.compile(r"image:\s*(\S+?)@sha256:([0-9a-f]{64}|\$\{([A-Z0-9_]+)[^}]*\})")
+HOLD_TAG_NAMESPACE = "q12-window-hold"
+
+# Process argv fragments that mean a Q12 controller is already running. Matched on the RESOLVED
+# argv of another process, never with a `pgrep -f` pattern that would also match this probe's own
+# command line — that trap cost a false positive on 2026-07-28.
+CONTROLLER_MARKERS = (
+    "q12-lifecycle-core.py",
+    "q12-live-cutover.sh",
+    "q12-database-barrier.sh",
+    "source-recovery-run.sh",
+)
+PREFLIGHT_MARKERS = ("q12-window-preflight.py", "q12-preflight-probes.py")
+DEPLOY_MARKERS = ("deploy_dev.sh", "deploy_blue_green.sh", "deploy.sh")
+# How long the host must have been free of dev-deploy activity for the cadence to read as paused.
+DEPLOY_QUIET_MINUTES = 30
+# H5 measures at most this many backup generations; the bound is stated in the verdict.
+BACKUP_GENERATION_SAMPLE = 5
+
+
+def _host(context: Context) -> HostAdapter:
+    if context.host is None:
+        raise ProbeError("no host seam is bound in this scope")
+    return context.host
+
+
+def _image_pins(host: HostAdapter) -> "dict[str, str]":
+    """Every digest-pinned image reference in the infra compose file, with ${VAR} pins resolved
+    from the environment file. Derived rather than hardcoded, so a newly pinned image is covered
+    the moment it is added."""
+    if not host.compose_file.is_file():
+        raise ProbeError(f"compose file is unavailable: {host.compose_file}")
+    variables: dict[str, str] = {}
+    if host.env_file.is_file():
+        for line in host.env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            # Only the image-digest pins are ever read out of this file, and only their VALUES for
+            # the image reference; nothing else here reaches the report.
+            if "=" in line and "IMAGE_SHA256" in line.split("=", 1)[0]:
+                key, value = line.split("=", 1)
+                variables[key.strip()] = value.strip().strip('"').strip("'")
+    pins: dict[str, str] = {}
+    for match in DIGEST_PIN_RE.finditer(
+        host.compose_file.read_text(encoding="utf-8", errors="replace")
+    ):
+        repository = match.group(1)
+        digest = match.group(2)
+        if digest.startswith("${"):
+            digest = variables.get(match.group(3) or "", "")
+        if not HEX64_RE.fullmatch(digest):
+            continue
+        # `repository:tag@sha256:…` and `repository@sha256:…` both appear; the pull stores the
+        # image by digest either way, which is why prune sees them as dangling.
+        pins[f"{repository.split(':')[0]}@sha256:{digest}"] = repository.split(":")[0]
+    return pins
+
+
+def hold_tag_for(repository: str) -> str:
+    return f"{HOLD_TAG_NAMESPACE}/{repository.rsplit('/', 1)[-1]}:pinned"
+
+
+def probe_h1(context: Context) -> "dict[str, object]":
+    """Every digest-pinned image is present locally AND carries a hold tag.
+
+    mc2-y5tgw: an image pulled by digest carries no tag, so docker calls it dangling, and
+    `docker image prune -f` — which every dev deploy runs (scripts/deploy_dev.sh:320,
+    deploy_blue_green.sh:851, deploy.sh:183) — deletes it. The window's first command executes the
+    operator image, so the window would die on step one. A local tag in the
+    `q12-window-hold/` namespace makes the image non-dangling and survives the exact prune command.
+    """
+    host = _host(context)
+    pins = _image_pins(host)
+    if not pins:
+        return verdict("H1", FAIL, f"no digest-pinned image found in {host.compose_file}")
+    missing: list[str] = []
+    untagged: list[str] = []
+    for reference, repository in sorted(pins.items()):
+        image = host.run(["docker", "image", "inspect", "--format", "{{.Id}}", reference])
+        if image.returncode != 0:
+            missing.append(reference)
+            continue
+        tag = hold_tag_for(repository)
+        held = host.run(["docker", "image", "inspect", "--format", "{{.Id}}", tag])
+        if held.returncode != 0 or held.stdout.strip() != image.stdout.strip():
+            untagged.append(f"{tag} -> {reference}")
+    if missing or untagged:
+        parts = []
+        if missing:
+            parts.append("absent locally: " + name_list(missing))
+        if untagged:
+            parts.append(
+                "present but prune-exposed (no matching hold tag): " + name_list(untagged)
+            )
+        return verdict("H1", FAIL, "; ".join(parts))
+    return verdict(
+        "H1",
+        PASS,
+        f"all {len(pins)} digest-pinned images are present and hold-tagged under "
+        f"{HOLD_TAG_NAMESPACE}/, so a dev deploy's `docker image prune -f` cannot remove them",
+    )
+
+
+def _owner_names(info: os.stat_result) -> "tuple[str, str]":
+    try:
+        import grp
+        import pwd
+
+        return pwd.getpwuid(info.st_uid).pw_name, grp.getgrgid(info.st_gid).gr_name
+    except (ImportError, KeyError):
+        return str(info.st_uid), str(info.st_gid)
+
+
+def probe_h2(context: Context) -> "dict[str, object]":
+    """The deployed Q12 tree is byte-equal to the tracked asset manifest, file by file.
+
+    Until now this comparison was done by hand — which is itself a defect surface, and the reason
+    the server tree was stale on 2026-07-28 while the operator believed it current. The manifest is
+    a tracked artifact, so `git` is the authority for what SHOULD be deployed and this probe is a
+    byte comparison rather than an eyeball.
+    """
+    host = _host(context)
+    manifest = context.manifest
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != ASSET_MANIFEST_SCHEMA:
+        raise ProbeError("the deployed-asset manifest is missing or has the wrong schema")
+    assets = manifest.get("assets")
+    if not isinstance(assets, list) or not assets:
+        raise ProbeError("the deployed-asset manifest carries no assets")
+
+    problems: list[str] = []
+    for asset in assets:
+        relative = str(asset["path"])
+        target = host.deploy_root / str(asset.get("deployed_path") or relative)
+        if not target.is_file():
+            problems.append(f"{relative} (missing)")
+            continue
+        info = target.stat()
+        # `mode`/`owner` are null for CI-delivered assets: scp rewrites them on every deploy, so
+        # pinning their identity would break the deploy it guards. Byte equality still applies —
+        # the exemption is narrow, declared per asset, and reported below.
+        if asset.get("mode") is not None:
+            actual_mode = f"{info.st_mode & 0o777:04o}"
+            if actual_mode != str(asset["mode"]):
+                problems.append(f"{relative} (mode {asset['mode']} -> {actual_mode})")
+            owner, group = _owner_names(info)
+            if owner != str(asset["owner"]) or group != str(asset["group"]):
+                problems.append(
+                    f"{relative} (owner {asset['owner']}:{asset['group']} -> {owner}:{group})"
+                )
+        digest = sha256_file(target)
+        if digest != str(asset["sha256"]):
+            problems.append(f"{relative} (sha256 {str(asset['sha256'])[:8]}… -> {digest[:8]}…)")
+
+    if problems:
+        return verdict(
+            "H2",
+            FAIL,
+            f"the deployed tree differs from the manifest at {len(problems)} point(s): "
+            + name_list(problems),
+        )
+    ci_delivered = [
+        str(asset["path"]) for asset in assets if asset.get("mode") is None
+    ]
+    return verdict(
+        "H2",
+        PASS,
+        f"all {len(assets)} deployed assets are byte-equal to the manifest generated from tree "
+        f"{str(manifest.get('generated_from_tree_sha'))[:12]}…. BOUND: mode and owner are asserted "
+        f"for the {len(assets) - len(ci_delivered)} Q12-owned assets; the {len(ci_delivered)} "
+        "CI-delivered ones are byte-checked only, because scp rewrites their identity on every "
+        "deploy (" + name_list(ci_delivered) + ")",
+    )
+
+
+def probe_h3(context: Context) -> "dict[str, object]":
+    """No controller process is already running.
+
+    Matched on the RESOLVED argv of other processes, with this probe's own pid and any
+    pre-flight argv excluded. A `pgrep -f q12` pattern would match the pre-flight's own command
+    line and report a controller that is only itself — the trap hit on 2026-07-28.
+    """
+    host = _host(context)
+    running: list[str] = []
+    for pid, argv in host.processes():
+        if pid == host.self_pid:
+            continue
+        joined = " ".join(argv)
+        if any(marker in joined for marker in PREFLIGHT_MARKERS):
+            continue
+        for marker in CONTROLLER_MARKERS:
+            if any(part.endswith(marker) for part in argv):
+                running.append(f"pid {pid} {marker}")
+                break
+    if running:
+        return verdict(
+            "H3", FAIL, "a Q12 controller is already running: " + name_list(running)
+        )
+    return verdict(
+        "H3",
+        PASS,
+        "no Q12 controller process is running (matched on resolved argv, with the pre-flight's own "
+        "command line excluded by pid and by marker)",
+    )
+
+
+def _container_start_times(host: HostAdapter) -> "list[tuple[str, str]]":
+    listed = host.run(["docker", "ps", "--quiet", "--no-trunc"])
+    if listed.returncode != 0:
+        raise ProbeError("cannot enumerate running containers")
+    ids = [line.strip() for line in listed.stdout.splitlines() if line.strip()]
+    if not ids:
+        return []
+    inspected = host.run(
+        ["docker", "inspect", "--format", "{{.Name}}\t{{.State.StartedAt}}", *ids]
+    )
+    if inspected.returncode != 0:
+        raise ProbeError("cannot inspect running containers")
+    rows: list[tuple[str, str]] = []
+    for line in inspected.stdout.splitlines():
+        if "\t" in line:
+            name, started = line.split("\t", 1)
+            rows.append((name.strip().lstrip("/"), started.strip()))
+    return rows
+
+
+def _minutes_since(timestamp: str, now: "datetime.datetime") -> "float | None":
+    import datetime as datetime_module
+
+    text = timestamp.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    # Docker emits nanosecond precision; datetime.fromisoformat accepts at most microseconds.
+    if "." in text:
+        head, _, tail = text.partition(".")
+        fraction, sign, offset = (
+            tail.partition("+") if "+" in tail else tail.partition("-")
+        )
+        text = f"{head}.{fraction[:6]}{sign}{offset}"
+    try:
+        parsed = datetime_module.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime_module.timezone.utc)
+    return (now - parsed).total_seconds() / 60.0
+
+
+def probe_h4(context: Context) -> "dict[str, object]":
+    """No deploy is in flight, and the dev-deploy cadence is paused for the window.
+
+    A dev deploy touches the SAME host and the SAME database every 15-25 minutes, and its
+    `docker image prune -f` removes the digest-pinned images H1 guards. Two legs are measured on
+    the host — no running deploy process, and no dev container restarted recently — and the GitHub
+    leg is measured only where `gh` exists. The production host has no `gh`, so there the verdict is
+    `unprovable` with the host-side measurements as its evidence, rather than a green that was
+    never established.
+    """
+    import datetime as datetime_module
+
+    host = _host(context)
+    now = datetime_module.datetime.now(datetime_module.timezone.utc)
+
+    in_flight: list[str] = []
+    for pid, argv in host.processes():
+        if pid == host.self_pid:
+            continue
+        for marker in DEPLOY_MARKERS:
+            if any(part.endswith(marker) for part in argv):
+                in_flight.append(f"pid {pid} {marker}")
+                break
+    if in_flight:
+        return verdict("H4", FAIL, "a deploy is in flight on the host: " + name_list(in_flight))
+
+    recent: list[str] = []
+    oldest_quiet = None
+    for name, started in _container_start_times(host):
+        if not name.endswith("-dev"):
+            continue
+        minutes = _minutes_since(started, now)
+        if minutes is None:
+            recent.append(f"{name} (unparseable start time {started!r})")
+            continue
+        if minutes < DEPLOY_QUIET_MINUTES:
+            recent.append(f"{name} (started {minutes:.0f}m ago)")
+        oldest_quiet = minutes if oldest_quiet is None else min(oldest_quiet, minutes)
+    if recent:
+        return verdict(
+            "H4",
+            FAIL,
+            f"dev containers restarted inside the {DEPLOY_QUIET_MINUTES}-minute quiet window, so "
+            "the dev-deploy cadence is NOT paused: " + name_list(recent),
+        )
+
+    host_evidence = (
+        f"no deploy process on the host and no dev container restarted in the last "
+        f"{DEPLOY_QUIET_MINUTES} minutes"
+        + (f" (quietest dev container: {oldest_quiet:.0f}m)" if oldest_quiet is not None else "")
+    )
+    if not host.gh:
+        return verdict(
+            "H4",
+            UNPROVABLE,
+            "the GitHub workflow queue cannot be read from this host (`gh` is not installed there)",
+            host_evidence,
+        )
+    listed = host.run(
+        [host.gh, "run", "list", "--limit", "20", "--json", "status,name,headBranch"]
+    )
+    if listed.returncode != 0:
+        return verdict(
+            "H4",
+            UNPROVABLE,
+            "`gh run list` failed, so the GitHub workflow queue was not read",
+            host_evidence,
+        )
+    try:
+        runs = json.loads(listed.stdout or "[]")
+    except json.JSONDecodeError:
+        return verdict(
+            "H4", UNPROVABLE, "`gh run list` returned unparseable JSON", host_evidence
+        )
+    active = [
+        f"{run.get('name')} on {run.get('headBranch')} ({run.get('status')})"
+        for run in runs
+        if str(run.get("status")) in ("in_progress", "queued", "waiting", "pending", "requested")
+    ]
+    if active:
+        return verdict(
+            "H4", FAIL, "a workflow run is in flight: " + name_list(active)
+        )
+    return verdict("H4", PASS, f"{host_evidence}, and no GitHub workflow run is in flight")
+
+
+def probe_h5(context: Context) -> "dict[str, object]":
+    """Free disk exceeds the backup generation's measured high-water mark."""
+    host = _host(context)
+    if not host.backup_root.is_dir():
+        raise ProbeError(f"backup root is unavailable: {host.backup_root}")
+    generations = sorted(
+        (path for path in (host.backup_root / "supabase").glob("generation-*") if path.is_dir()),
+        key=lambda path: path.name,
+        reverse=True,
+    )
+    sampled = generations[:BACKUP_GENERATION_SAMPLE]
+    high_water = 0
+    measured: list[str] = []
+    for generation in sampled:
+        result = host.run(["du", "-sb", str(generation)])
+        if result.returncode != 0:
+            continue
+        try:
+            size = int(result.stdout.split()[0])
+        except (IndexError, ValueError):
+            continue
+        measured.append(f"{generation.name}={size}")
+        high_water = max(high_water, size)
+    free = host.disk_free_bytes(host.backup_root)
+    bound = (
+        f"BOUND: the high-water mark is the largest of the {len(sampled)} most recent of "
+        f"{len(generations)} backup generation(s), and no headroom multiplier is applied"
+    )
+    if not measured:
+        return verdict(
+            "H5",
+            FAIL,
+            f"no backup generation could be measured under {host.backup_root / 'supabase'}, so the "
+            "high-water mark is unknown",
+        )
+    if free <= high_water:
+        return verdict(
+            "H5",
+            FAIL,
+            f"free space {free} bytes does not exceed the backup high-water mark {high_water} "
+            f"bytes. {bound}",
+        )
+    return verdict(
+        "H5",
+        PASS,
+        f"free space {free} bytes exceeds the backup high-water mark {high_water} bytes "
+        f"({free / max(high_water, 1):.1f}x). {bound}",
+    )
+
+
 # --- the frozen probe list --------------------------------------------------------------------
 
 PROBES: "tuple[dict[str, object], ...]" = (
@@ -999,11 +1381,11 @@ PROBES: "tuple[dict[str, object], ...]" = (
     {"id": "D1", "group": "D", "scope": DATABASE_SCOPE, "run": probe_d1},
     {"id": "E1", "group": "E", "scope": DATABASE_SCOPE, "run": probe_e1},
     {"id": "E2", "group": "E", "scope": DATABASE_SCOPE, "run": probe_e2},
-    {"id": "H1", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
-    {"id": "H2", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
-    {"id": "H3", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
-    {"id": "H4", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
-    {"id": "H5", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
+    {"id": "H1", "group": "H", "scope": HOST_SCOPE, "run": probe_h1},
+    {"id": "H2", "group": "H", "scope": HOST_SCOPE, "run": probe_h2},
+    {"id": "H3", "group": "H", "scope": HOST_SCOPE, "run": probe_h3},
+    {"id": "H4", "group": "H", "scope": HOST_SCOPE, "run": probe_h4},
+    {"id": "H5", "group": "H", "scope": HOST_SCOPE, "run": probe_h5},
 )
 
 FROZEN_IDS: "tuple[str, ...]" = tuple(str(probe["id"]) for probe in PROBES)

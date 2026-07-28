@@ -1,0 +1,216 @@
+{
+  "assets": [
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/postgres/backup-supabase.sh",
+      "sha256": "6680aa4f99f5cdb8df0b7029048a8efb306bd4d93b3dcbb87a15f891cb0e690c"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/postgres/q12-source-manifest.ts",
+      "sha256": "7bafc373fcf8e41c128e69187347a8a9c06cdf4ea208840bbedf0cbaf2bd8e92"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/postgres/restore-supabase-drill.sh",
+      "sha256": "d9ca71d75a14b359b57d937f650dbf5a21fb0fc78c6f6d404a6f8d651ab6f1a6"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/image-lock.json",
+      "sha256": "40858d0e7090972d52ac9eb65109e3a3e4ffc326b8aa4ae9fab3f5a8c7a674ef"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/operator-compose.sh",
+      "sha256": "34ffacfbf60c55c31df60eaa345be0b838870dcc4c364c32de9310e261bd638f"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-activation-lock-catalog.test-reference.json",
+      "sha256": "05ee4e733ed59733d1effd20835089a2fa2996ba1a773b748ae515ba295dbf8f"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-activation-lock-order.test-reference.json",
+      "sha256": "de79e836a943bf9d4003a963bf3515b9401d5322b59067c8a6688e6c95de62ae"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-activation-truth-projection.sql",
+      "sha256": "d5046e313e99a36938ddd9820fb3bf5cc78b8c1a92265b72242b689af3aa3e40"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-capability-run.sh",
+      "sha256": "1d6b102510e990135b1a79c0aea82a52e9e6cf1e956cb207465ea00fc1fb5982"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-command-manifest.json",
+      "sha256": "aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-database-barrier.sh",
+      "sha256": "56a7a88eac92751a4a0613aff1b10b96f5628b950a5acb4988d06616271a4647"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-lifecycle-core.py",
+      "sha256": "d8404112de92fd1624baf8272d655f0b98bfabfc623624e910f0c16bd4ae1178"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-live-cutover.sh",
+      "sha256": "e93e2f636c7908eb101f96a64b257d2ef7bb9db981ed917894b4b50424e1ed80"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-live-smoke.sh",
+      "sha256": "f76e170a7b47f4dfaf2ec471fb27bd1c5edb9432488fc340f3f4b84201dfa4e0"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-managed-session-inventory-schema.json",
+      "sha256": "f2bb0bee394111073a86e421bc11470531880c6ce0c0933a436080eaab6dd56d"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-managed-session-inventory.json",
+      "sha256": "923c24c9823fbc9f8116532f1aa95896e71ee8331098d52d39c5acc5ac48c3c1"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-migration-plan-capture.py",
+      "sha256": "3e2fa53d02d3af0140d0f45d8aaba4e3a461caaec7809d6df46a1a7768703465"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-migration-plan-roles.py",
+      "sha256": "167342472ff9ee150af850f1bc62c5d2c8f4622e62b5fcf3311005c653b65fec"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-preflight-probes.py",
+      "sha256": "ae7f296722d0847900563f548efad90686ff81db454d3415ec8c073f53ecd28c"
+    },
+    {
+      "group": "root",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "root",
+      "path": "deploy/qdrant/q12-privileged-launch.sh",
+      "sha256": "197457de588c2e123b02196f1e77f79e784456b192f966622615cfc9c7931204"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-structural-catalog.sql",
+      "sha256": "0b8a943f38b43bf99813343d365a7884e43d8237691532dc953554138f268b1e"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/q12-window-preflight.py",
+      "sha256": "75dafe59160fbd5c992e6952586d6ee1d9ad146796c1dc79364fbc4fcc450114"
+    },
+    {
+      "group": "root",
+      "identity_owner": "q12",
+      "mode": "0444",
+      "owner": "root",
+      "path": "deploy/qdrant/q12-writer-resume.py",
+      "sha256": "49ef1a07544430255cdd695f905c1337ac243a565da4c4fd13db0ab380b44cc9"
+    },
+    {
+      "group": "claude-deploy",
+      "identity_owner": "q12",
+      "mode": "0555",
+      "owner": "claude-deploy",
+      "path": "deploy/qdrant/source-recovery-run.sh",
+      "sha256": "100193d78209d9b9a7af553281ae73f2b17aadd5a543fb04ea353f107993baf0"
+    },
+    {
+      "group": null,
+      "identity_owner": "ci-delivered",
+      "mode": null,
+      "owner": null,
+      "path": "docker-compose.infra.yml",
+      "sha256": "ba065500b03c3f708b5fcfdaf3d4d18532b33dd1876ce8e31364955dc4ea7aa3"
+    },
+    {
+      "group": null,
+      "identity_owner": "ci-delivered",
+      "mode": null,
+      "owner": null,
+      "path": "scripts/deploy_blue_green.sh",
+      "sha256": "b4d45e0e016b154b10c512b20a6bd5d1e810d99a2b4e94a84506e9245c37318a"
+    }
+  ],
+  "deploy_root": "/opt/megacampus",
+  "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; mode 0555 where git marks the file executable, else 0444",
+  "generated_from_tree_sha": "50a6985ae61945a9dc1ae60bc8ad3f372ecd4655",
+  "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
+}

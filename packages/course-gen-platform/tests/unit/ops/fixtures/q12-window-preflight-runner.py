@@ -15,6 +15,7 @@ Prints one JSON object to stdout.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -552,9 +553,350 @@ def probe_suite() -> dict:
     return out
 
 
+# --- host probes against a synthetic deploy tree --------------------------------------------------
+
+preflight_module = load("q12_window_preflight", PREFLIGHT)
+
+COMPOSE_FIXTURE = """services:
+  qdrant:
+    image: qdrant/qdrant:v1.18.2@sha256:{qdrant}
+  operator:
+    image: ghcr.io/example/qdrant-operator@sha256:${{QDRANT_OPERATOR_IMAGE_SHA256}}
+"""
+ENV_FIXTURE = "SOME_OTHER=value\nQDRANT_OPERATOR_IMAGE_SHA256={operator}\nPASSWORD=not-read\n"
+
+QDRANT_DIGEST = "a" * 64
+OPERATOR_DIGEST = "b" * 64
+QDRANT_REF = f"qdrant/qdrant@sha256:{QDRANT_DIGEST}"
+OPERATOR_REF = f"ghcr.io/example/qdrant-operator@sha256:{OPERATOR_DIGEST}"
+
+
+def fake_host(root: pathlib.Path, *, images, processes, containers, free, gh=None):
+    """A HostAdapter over a real temp tree with scripted docker/du answers.
+
+    Real files (so mode/owner/sha256 are measured, not mocked) and scripted subprocesses (so the
+    probe's docker and du parsing is exercised without a live daemon).
+    """
+
+    def run(argv):
+        if argv[:3] == ["docker", "image", "inspect"]:
+            reference = argv[-1]
+            identity = images.get(reference)
+            if identity is None:
+                return probes.ScriptResult(1, "", f"Error: No such image: {reference}")
+            return probes.ScriptResult(0, identity + "\n", "")
+        if argv[:2] == ["docker", "ps"]:
+            return probes.ScriptResult(0, "".join(f"{cid}\n" for cid, _, _ in containers), "")
+        if argv[:2] == ["docker", "inspect"]:
+            return probes.ScriptResult(
+                0, "".join(f"/{name}\t{started}\n" for _, name, started in containers), ""
+            )
+        if argv[0] == "du":
+            path = pathlib.Path(argv[-1])
+            total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+            return probes.ScriptResult(0, f"{total}\t{path}\n", "")
+        if gh is not None and argv[0] == gh:
+            return probes.ScriptResult(0, "[]", "")
+        return probes.ScriptResult(127, "", f"unexpected argv: {argv}")
+
+    return probes.HostAdapter(
+        deploy_root=root,
+        run=run,
+        processes=lambda: list(processes),
+        disk_free_bytes=lambda _path: free,
+        backup_root=root / "backups",
+        compose_file=root / "h1-compose.yml",
+        env_file=root / "h1-env",
+        gh=gh,
+        self_pid=os.getpid(),
+    )
+
+
+def localise_manifest(manifest: dict) -> dict:
+    """The synthetic deploy tree belongs to whoever runs the suite, not to `claude-deploy`.
+
+    Only the OWNER NAMES are rebound; mode, path and sha256 stay exactly as tracked, so H2's
+    identity and byte checks are all still exercised for real against a real filesystem.
+    """
+    import grp
+    import pwd
+
+    user = pwd.getpwuid(os.getuid()).pw_name
+    group = grp.getgrgid(os.getgid()).gr_name
+    local = json.loads(json.dumps(manifest))
+    for asset in local["assets"]:
+        if asset.get("owner") is not None:
+            asset["owner"] = user
+            asset["group"] = group
+    return local
+
+
+def build_deploy_tree(root: pathlib.Path, manifest: dict) -> None:
+    """Materialise the manifest's assets under a synthetic deploy root, byte-for-byte from the
+    repository, with the modes the manifest declares."""
+    for asset in manifest["assets"]:
+        source = REPO / asset["path"]
+        target = root / asset["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        if asset.get("mode") is not None:
+            os.chmod(target, int(asset["mode"], 8))
+    # H1's compose/env fixtures live BESIDE the tree, not in it: overwriting the real
+    # docker-compose.infra.yml would make H2 report a byte difference the operator never made.
+    (root / "h1-compose.yml").write_text(
+        COMPOSE_FIXTURE.format(qdrant=QDRANT_DIGEST), encoding="utf-8"
+    )
+    (root / "h1-env").write_text(ENV_FIXTURE.format(operator=OPERATOR_DIGEST), encoding="utf-8")
+    generation = root / "backups/supabase/generation-20260728T000000Z-probe"
+    generation.mkdir(parents=True)
+    (generation / "dump.sql").write_bytes(b"x" * 4096)
+
+
+def host_context(root: pathlib.Path, manifest: dict, host) -> "probes.Context":
+    return probes.Context(scope="host", manifest=manifest, host=host)
+
+
+def old_start() -> str:
+    return "2020-01-01T00:00:00.123456789Z"
+
+
+def recent_start() -> str:
+    import datetime
+
+    now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=3)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.000000000Z")
+
+
+def host_suite() -> dict:
+    out: dict = {}
+    manifest_path = REPO / "deploy/qdrant/q12-deployed-asset-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    out["manifest_schema_version"] = manifest["schema_version"]
+    out["command_manifest_sha256"] = hashlib.sha256(
+        (REPO / "deploy/qdrant/q12-command-manifest.json").read_bytes()
+    ).hexdigest()
+
+    # The ratchet: every manifest entry must still describe the tree.
+    stale, missing = [], []
+    for asset in manifest["assets"]:
+        source = REPO / asset["path"]
+        if not source.is_file():
+            missing.append(asset["path"])
+            continue
+        if hashlib.sha256(source.read_bytes()).hexdigest() != asset["sha256"]:
+            stale.append(asset["path"])
+    out["manifest_stale_entries"] = sorted(stale)
+    out["manifest_missing_from_tree"] = sorted(missing)
+
+    healthy_images = {
+        QDRANT_REF: "sha256:qdrant-id",
+        OPERATOR_REF: "sha256:operator-id",
+        probes.hold_tag_for("qdrant/qdrant"): "sha256:qdrant-id",
+        probes.hold_tag_for("ghcr.io/example/qdrant-operator"): "sha256:operator-id",
+    }
+    quiet_containers = [("c1", "megacampus-api-dev", old_start())]
+
+    with tempfile.TemporaryDirectory(prefix="mc2-q12-host-") as raw:
+        root = pathlib.Path(raw)
+        build_deploy_tree(root, manifest)
+        # H2 is driven against a locally-owned copy of the tracked manifest: same paths, same modes,
+        # same hashes, owner names rebound to whoever runs the suite.
+        manifest = localise_manifest(manifest)
+        healthy = fake_host(
+            root, images=healthy_images, processes=[], containers=quiet_containers, free=1 << 40
+        )
+        context = host_context(root, manifest, healthy)
+        for probe_id in ("H1", "H2", "H3", "H4", "H5"):
+            record(out, f"{probe_id.lower()}_healthy", run_one(context, probe_id))
+
+        # --- H2: one changed byte, a wrong mode, a wrong owner, a missing file -------------------
+        target = root / "deploy/qdrant/q12-database-barrier.sh"
+        original = target.read_bytes()
+        os.chmod(target, 0o644)
+        target.write_bytes(original + b"\n")
+        os.chmod(target, 0o555)
+        record(out, "h2_changed_byte", run_one(host_context(root, manifest, healthy), "H2"))
+        os.chmod(target, 0o644)
+        target.write_bytes(original)
+        os.chmod(target, 0o555)
+
+        os.chmod(target, 0o755)
+        record(out, "h2_wrong_mode", run_one(host_context(root, manifest, healthy), "H2"))
+        os.chmod(target, 0o555)
+
+        # A CI-delivered asset's mode changing is NOT a failure: scp rewrites it every deploy.
+        ci_asset = root / "scripts/deploy_blue_green.sh"
+        os.chmod(ci_asset, 0o700)
+        record(out, "h2_ci_mode_change", run_one(host_context(root, manifest, healthy), "H2"))
+
+        removed = root / "deploy/qdrant/q12-live-smoke.sh"
+        removed_bytes = removed.read_bytes()
+        removed.unlink()
+        record(out, "h2_missing_file", run_one(host_context(root, manifest, healthy), "H2"))
+        removed.write_bytes(removed_bytes)
+        os.chmod(removed, 0o555)
+
+        wrong_owner = json.loads(json.dumps(manifest))
+        for asset in wrong_owner["assets"]:
+            if asset["path"] == "deploy/qdrant/q12-privileged-launch.sh":
+                asset["owner"] = "nobody-at-all"
+                asset["group"] = "nobody-at-all"
+        record(out, "h2_wrong_owner", run_one(host_context(root, wrong_owner, healthy), "H2"))
+
+        # --- H1: an absent image, and a present-but-untagged one ---------------------------------
+        absent = dict(healthy_images)
+        absent.pop(OPERATOR_REF)
+        record(
+            out,
+            "h1_image_absent",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root, images=absent, processes=[], containers=quiet_containers, free=1 << 40
+                    ),
+                ),
+                "H1",
+            ),
+        )
+        untagged = dict(healthy_images)
+        untagged.pop(probes.hold_tag_for("ghcr.io/example/qdrant-operator"))
+        record(
+            out,
+            "h1_hold_tag_missing",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=untagged,
+                        processes=[],
+                        containers=quiet_containers,
+                        free=1 << 40,
+                    ),
+                ),
+                "H1",
+            ),
+        )
+
+        # --- H3: a running controller, and the pre-flight's own command line ---------------------
+        controller = [
+            (4242, ["/usr/bin/python3", "/opt/megacampus/deploy/qdrant/q12-lifecycle-core.py",
+                    "controller", "--run-id", "x"])
+        ]
+        record(
+            out,
+            "h3_controller_running",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=healthy_images,
+                        processes=controller,
+                        containers=quiet_containers,
+                        free=1 << 40,
+                    ),
+                ),
+                "H3",
+            ),
+        )
+        # Only the pre-flight itself is running — including a second pre-flight process, which a
+        # `pgrep -f q12` pattern would happily report as a controller.
+        self_only = [
+            (os.getpid(), ["/usr/bin/python3", "/opt/megacampus/deploy/qdrant/q12-window-preflight.py"]),
+            (9999, ["/usr/bin/python3", "/opt/megacampus/deploy/qdrant/q12-window-preflight.py",
+                    "--scope", "host"]),
+        ]
+        record(
+            out,
+            "h3_only_preflight_running",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=healthy_images,
+                        processes=self_only,
+                        containers=quiet_containers,
+                        free=1 << 40,
+                    ),
+                ),
+                "H3",
+            ),
+        )
+
+        # --- H4: a deploy in flight, and a dev container restarted inside the quiet window -------
+        deploying = [(5151, ["/usr/bin/bash", "/opt/megacampus/scripts/deploy_dev.sh"])]
+        record(
+            out,
+            "h4_deploy_in_flight",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=healthy_images,
+                        processes=deploying,
+                        containers=quiet_containers,
+                        free=1 << 40,
+                    ),
+                ),
+                "H4",
+            ),
+        )
+        record(
+            out,
+            "h4_recent_dev_restart",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=healthy_images,
+                        processes=[],
+                        containers=[("c1", "megacampus-api-dev", recent_start())],
+                        free=1 << 40,
+                    ),
+                ),
+                "H4",
+            ),
+        )
+
+        # --- H5: free space at or below the high-water mark ---------------------------------------
+        record(
+            out,
+            "h5_disk_full",
+            run_one(
+                host_context(
+                    root,
+                    manifest,
+                    fake_host(
+                        root,
+                        images=healthy_images,
+                        processes=[],
+                        containers=quiet_containers,
+                        free=1024,
+                    ),
+                ),
+                "H5",
+            ),
+        )
+    return out
+
+
 def main(argv: "list[str]") -> int:
     if "--probes" in argv:
         sys.stdout.write(json.dumps(probe_suite(), sort_keys=True) + "\n")
+        return 0
+    if "--host" in argv:
+        sys.stdout.write(json.dumps(host_suite(), sort_keys=True) + "\n")
         return 0
     sys.stdout.write(json.dumps(self_test(), sort_keys=True) + "\n")
     return 0
