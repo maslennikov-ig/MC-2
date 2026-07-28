@@ -44,15 +44,29 @@ BARRIER = REPO / "deploy/qdrant/q12-database-barrier.sh"
 IMAGE = "postgres:17.10-bookworm"
 DOCKER = os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker")
 
-# The two mirrored restore-loop UPDATE forms, byte-for-byte as they appear (old)
-# / now appear (new) in write_restore_sql of q12-database-barrier.sh:1727-1728.
+# The restore-loop forms, byte-for-byte as they appear in write_restore_sql of
+# q12-database-barrier.sh. Two are historical and must stay ABSENT from the barrier; the third is
+# the live form and must be PRESENT.
+#
+# 1. OLD_UPDATE — the original unaliased UPDATE. Ambiguous under plpgsql's default
+#    variable_conflict=error, which is found-defect #13. Kept as the live RED demonstration.
+# 2. SUPERSEDED_ALIASED_UPDATE — the 2026-07-18 fix for #13. Correct on ambiguity, but still a
+#    direct write to cron.job, which production `postgres` is not granted (mc2-7ohdj).
+# 3. LIVE_RESTORE — the current form: an explicit existence check plus pg_cron's own alter_job.
 OLD_UPDATE = (
     "    UPDATE cron.job SET active=(job->>'active')::boolean\n"
     "      WHERE jobid=(job->>'jobid')::bigint;"
 )
-NEW_UPDATE = (
+SUPERSEDED_ALIASED_UPDATE = (
     "    UPDATE cron.job AS restore_target SET active=(job->>'active')::boolean\n"
     "      WHERE restore_target.jobid=(job->>'jobid')::bigint;"
+)
+LIVE_RESTORE = (
+    "    IF NOT EXISTS (SELECT 1 FROM cron.job AS existing_job\n"
+    "      WHERE existing_job.jobid=(job->>'jobid')::bigint)\n"
+    "      THEN RAISE EXCEPTION 'captured cron job disappeared'; END IF;\n"
+    "    PERFORM cron.alter_job(job_id := (job->>'jobid')::bigint,\n"
+    "      active := (job->>'active')::boolean);"
 )
 
 CAPTURED = '{"cron_jobs":[{"jobid":1,"active":true}]}'
@@ -73,8 +87,10 @@ def _restore_block(update_stmt: str) -> str:
 
 def main() -> int:
     barrier_text = BARRIER.read_text(encoding="utf-8")
-    fix_present = NEW_UPDATE in barrier_text
-    old_form_absent = OLD_UPDATE not in barrier_text
+    fix_present = LIVE_RESTORE in barrier_text
+    old_form_absent = (
+        OLD_UPDATE not in barrier_text and SUPERSEDED_ALIASED_UPDATE not in barrier_text
+    )
 
     cid = f"mc2-q12-cronloop-{os.getpid()}-{int(time.time())}"
     subprocess.run(
@@ -106,15 +122,22 @@ def main() -> int:
                 break
             time.sleep(0.2)
 
-        # A BARE cron.job table is enough to trigger the parse-time conflict.
+        # A BARE cron.job table is enough to trigger the parse-time conflict. The live form also
+        # needs pg_cron's alter_job to exist, so a minimal same-signature stand-in is created: this
+        # repro isolates the plpgsql name-resolution seam, not pg_cron's internals. The managed ACL
+        # itself is modelled by the barrier-cutover runner.
         setup = dexec(
             "CREATE SCHEMA cron;\n"
             "CREATE TABLE cron.job (jobid bigint PRIMARY KEY, active boolean);\n"
             "INSERT INTO cron.job VALUES (1, false);\n"
+            "CREATE FUNCTION cron.alter_job(job_id bigint, active boolean)\n"
+            "  RETURNS void LANGUAGE sql AS $fn$\n"
+            "  UPDATE cron.job AS target SET active=$2 WHERE target.jobid=$1;\n"
+            "$fn$;\n"
         )
 
         old_result = dexec(_restore_block(OLD_UPDATE))
-        new_result = dexec(_restore_block(NEW_UPDATE))
+        new_result = dexec(_restore_block(LIVE_RESTORE))
         active_after_new = dexec_scalar("SELECT active FROM cron.job WHERE jobid=1;")
 
         sys.stdout.write(

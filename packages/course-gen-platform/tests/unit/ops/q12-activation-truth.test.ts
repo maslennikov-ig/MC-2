@@ -47,9 +47,12 @@ const W_TUPLE = {
     'd413fbd79350f0bbd7e387f03cb242b2239640de1f7a8761ffa5fadd6a85b83f',
   activation_recovery_slice_sha256:
     'c41cf104c423623a56a3131c6e8d8148fae2db5af44772157c1e5a57be2d0063',
+  // Amended 2026-07-28 (mc2-34eua): cron.job left the guarded set, so the locked relation set
+  // went 79 -> 78. Prior 'cbfa2f092fe6370cd9929208029e083b3466d4fe9cf90c3b2801e8914285929a'.
   activation_lock_catalog_sha256:
-    'cbfa2f092fe6370cd9929208029e083b3466d4fe9cf90c3b2801e8914285929a',
-  activation_lock_order_sha256: '26163c334f89331a54f3e0572da8e7e6e32bf83c7c266d2c32dc1b63138d3848',
+    '05ee4e733ed59733d1effd20835089a2fa2996ba1a773b748ae515ba295dbf8f',
+  // Amended 2026-07-28 (mc2-34eua); prior '26163c334f89331a54f3e0572da8e7e6e32bf83c7c266d2c32dc1b63138d3848'.
+  activation_lock_order_sha256: 'de79e836a943bf9d4003a963bf3515b9401d5322b59067c8a6688e6c95de62ae',
   managed_inventory_schema_sha256:
     'f2bb0bee394111073a86e421bc11470531880c6ce0c0933a436080eaab6dd56d',
   managed_inventory_sha256: 'c90edb78341fb83a6d954212daca675f5bac89f17bd5611ceb6db3e56559bac6',
@@ -410,7 +413,9 @@ describe('Task 1 — canonical JSON + frame envelope + hashing', () => {
 // plan imprecision — field 5 is incompatible with a read-only allowlist. The
 // contract separates the two hashes; projection_sql_sha256 is this file's hash.
 const PROJECTION_SQL = resolve(REPO_ROOT, 'deploy/qdrant/q12-activation-truth-projection.sql');
-const PROJECTION_SQL_SHA256 = '36d280347650689de1d6c613f164c2eaa622f0eb567b134dd5b3b2cdad5332af';
+// Amended 2026-07-28 (mc2-34eua): cron.job left both the per-OID privilege list and the
+// full-catalog SHARE lock list. Prior '36d280347650689de1d6c613f164c2eaa622f0eb567b134dd5b3b2cdad5332af'.
+const PROJECTION_SQL_SHA256 = 'd5046e313e99a36938ddd9820fb3bf5cc78b8c1a92265b72242b689af3aa3e40';
 
 // Accepted W lock catalog/order (fields 8/9) — the sole authority for the
 // full-catalog SHARE lock relation set and order.
@@ -770,7 +775,11 @@ describe.runIf(REAL_PG17)('D6 probe against disposable PostgreSQL 17.10', () => 
     // Synthetic catalog fixture: the accepted-order relations as empty tables,
     // plus q12_guard.active_run singleton and cron.job / net.http_request_queue
     // stand-ins so the read-only projection templates execute.
-    const schemas = [...new Set(ORDER_RELATIONS.map(r => r.split('.')[0]))];
+    // mc2-34eua: cron.job left the lock order (it is no longer trigger-guarded), so `cron` is no
+    // longer implied by ORDER_RELATIONS — but the read-only projection templates still READ the cron
+    // inventory, which is precisely the privilege-free guarantee that was retained. Name the schema
+    // explicitly rather than deriving it from the lock set.
+    const schemas = [...new Set([...ORDER_RELATIONS.map(r => r.split('.')[0]), 'cron'])];
     const createSchemas = schemas.map(s => `CREATE SCHEMA IF NOT EXISTS ${s};`).join('\n');
     const createTables = ORDER_RELATIONS.filter(
       r => r !== 'cron.job' && r !== 'net.http_request_queue'

@@ -100,8 +100,7 @@ def _barrier_expected_catalog() -> dict[str, Any]:
             *public_relations,
             *auth_relations,
             *storage_relations,
-            {"schema": "cron", "name": "job", "oid": 400, "relkind": "r",
-             "parent_oid": None, "owner": "postgres"},
+            # mc2-34eua: cron.job is NOT guarded.
             {"schema": "net", "name": "http_request_queue", "oid": 401, "relkind": "r",
              "parent_oid": None, "owner": "postgres"},
         ],

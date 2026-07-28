@@ -6475,8 +6475,8 @@ def _plan_relation_sort_key(relation: Any) -> tuple[str, str]:
 
 
 def _validate_guarded_relations(relations: Any) -> list[str]:
-    if not isinstance(relations, list) or len(relations) != 76:
-        raise LifecycleError("guarded_relations must be a 76-element array")
+    if not isinstance(relations, list) or len(relations) != 75:
+        raise LifecycleError("guarded_relations must be a 75-element array")
     oids: set[int] = set()
     identities: list[str] = []
     counts = {"public": 0, "auth": 0, "storage": 0}
@@ -6522,8 +6522,13 @@ def _validate_guarded_relations(relations: Any) -> list[str]:
         raise LifecycleError("guarded storage relation set mismatch")
     if any(rel["schema"] == "auth" and rel["name"] == "schema_migrations" for rel in relations):
         raise LifecycleError("auth.schema_migrations must not be guarded")
-    if sum(1 for rel in relations if rel["schema"] == "cron" and rel["name"] == "job") != 1:
-        raise LifecycleError("cron.job must appear exactly once")
+    # mc2-34eua: cron.job is owned by supabase_admin and `postgres` holds neither UPDATE nor
+    # TRIGGER on it, so LOCK ... ACCESS EXCLUSIVE and CREATE TRIGGER both fail with 42501 at C1.
+    # Guarding it is therefore not a stronger guarantee, it is an unreachable one. The scheduler
+    # is quiesced by cron.alter_job pausing plus the zero-active-jobs assertion, and its only
+    # write path out (net.http_request_queue) stays guarded.
+    if any(rel["schema"] == "cron" for rel in relations):
+        raise LifecycleError("cron relations must not be guarded")
     if (
         sum(1 for rel in relations if rel["schema"] == "net" and rel["name"] == "http_request_queue")
         != 1

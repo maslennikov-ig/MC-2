@@ -11,9 +11,14 @@
 --
 -- The full-catalog LOCK TABLE ... IN SHARE MODE lists the complete accepted
 -- catalog in the accepted W byte order (W tuple field 9
--- activation_lock_order_sha256 = 26163c334f89331a54f3e0572da8e7e6e32bf83c7c266d2c32dc1b63138d3848;
+-- activation_lock_order_sha256 = de79e836a943bf9d4003a963bf3515b9401d5322b59067c8a6688e6c95de62ae;
 -- catalog set field 8 activation_lock_catalog_sha256 =
--- cbfa2f092fe6370cd9929208029e083b3466d4fe9cf90c3b2801e8914285929a).
+-- 05ee4e733ed59733d1effd20835089a2fa2996ba1a773b748ae515ba295dbf8f).
+--
+-- mc2-34eua: cron.job is NOT in either list. SHARE MODE is stronger than ACCESS SHARE, so it needs
+-- UPDATE/DELETE/TRUNCATE/MAINTAIN, and production `postgres` holds only SELECT on the
+-- supabase_admin-owned cron.job -- this probe would have raised 42501 exactly as barrier.install
+-- did. The cron_jobs template below still READS cron.job; reads need no such privilege.
 --
 -- Templates are delimited by "--@template <name>" / "--@end <name>" markers so
 -- the probe's allowlist guard can split and match them exactly (Task 5).
@@ -65,7 +70,6 @@ WITH targets(qualified_name) AS (
     ('auth.auth_table_19'),
     ('auth.auth_table_20'),
     ('auth.auth_table_21'),
-    ('cron.job'),
     ('net.http_request_queue'),
     ('public.document_evidence_observability_totals'),
     ('public.document_evidence_runs'),
@@ -169,7 +173,6 @@ LOCK TABLE
   auth.auth_table_19,
   auth.auth_table_20,
   auth.auth_table_21,
-  cron.job,
   net.http_request_queue,
   public.document_evidence_observability_totals,
   public.document_evidence_runs,

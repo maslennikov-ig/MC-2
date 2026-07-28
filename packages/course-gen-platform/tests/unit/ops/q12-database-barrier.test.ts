@@ -83,14 +83,8 @@ function expectedCatalog(): Record<string, unknown> {
       ...publicRelations,
       ...authRelations,
       ...storageRelations,
-      {
-        schema: 'cron',
-        name: 'job',
-        oid: 400,
-        relkind: 'r',
-        parent_oid: null,
-        owner: 'postgres',
-      },
+      // mc2-34eua: cron.job is NOT guarded — production `postgres` can neither LOCK nor
+      // CREATE TRIGGER on a supabase_admin-owned relation.
       {
         schema: 'net',
         name: 'http_request_queue',
@@ -1018,8 +1012,13 @@ describe('Q12 durable database maintenance barrier', () => {
     const tx1Sql = freshSql.slice(0, freshSql.indexOf('-- Q12_INSTALL_TX1_COMMITTED'));
     expect(tx1Sql.match(/^LOCK TABLE/gmu) ?? []).toHaveLength(1);
     const lockStatement = sql.match(/LOCK TABLE ([^;]+) IN ACCESS EXCLUSIVE MODE;/u)?.[1];
-    expect(lockStatement).toMatch(/"public"\."public_table_00"[\s\S]*"cron"\."job"/u);
+    expect(lockStatement).toMatch(
+      /"public"\."public_table_00"[\s\S]*"net"\."http_request_queue"[\s\S]*"supabase_migrations"\."schema_migrations"/u
+    );
     expect(lockStatement).not.toContain('document_evidence_runs');
+    // mc2-34eua: cron.job must never be a lock target. `postgres` cannot take ACCESS EXCLUSIVE on
+    // a supabase_admin-owned relation (42501), which failed C1 six times against production.
+    expect(lockStatement).not.toContain('"cron"');
     expect(sql).toContain('CREATE TRIGGER q12_guard_row');
     expect(sql).toContain('CREATE TRIGGER q12_guard_truncate');
     expect(sql).toContain('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA q12_guard FROM PUBLIC');
@@ -1269,7 +1268,7 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(existsSync(fixture.cleanupProof)).toBe(true);
   });
 
-  it('rejects unknown top-level catalog fields and a seventy-seventh public relation', () => {
+  it('rejects unknown top-level catalog fields, a seventy-sixth public relation, and a guarded cron relation', () => {
     for (const mutate of [
       (catalog: Record<string, any>) => {
         catalog.non_authoritative_relations = [];
@@ -1282,6 +1281,20 @@ describe('Q12 durable database maintenance barrier', () => {
           relkind: 'r',
           parent_oid: null,
           owner: 'postgres',
+        });
+      },
+      // mc2-34eua: a hand-assembled run-root catalog that guards a cron relation must be refused
+      // HERE, before any DB work — not discovered as a 42501 at C1 with ten writers already
+      // stopped. Both legs of the frozen assertion are exercised: the count moves off 75 and the
+      // cron-schema set is no longer empty.
+      (catalog: Record<string, any>) => {
+        catalog.guarded_relations.push({
+          schema: 'cron',
+          name: 'job',
+          oid: 999_998,
+          relkind: 'r',
+          parent_oid: null,
+          owner: 'supabase_admin',
         });
       },
     ]) {

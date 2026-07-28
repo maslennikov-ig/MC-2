@@ -35,6 +35,11 @@ CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 # The exported-snapshot id shape from pg_export_snapshot() (backup-supabase.sh).
 SNAPSHOT_RE = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+")
 
+# The guarded set is exactly the relations the barrier can both LOCK in ACCESS EXCLUSIVE MODE and
+# CREATE TRIGGER on. In managed Supabase that means `postgres` must hold TRIGGER on them, which is
+# why auth/storage are filtered by has_table_privilege. mc2-34eua: cron.job is excluded for the
+# same reason — supabase_admin owns it and grants us only SELECT, so guarding it raises 42501 at
+# C1. Do not re-add it without first proving the privilege on the live database.
 GUARDED_RELATIONS_SQL = """
 SELECT COALESCE(jsonb_agg(jsonb_build_object(
   'schema', n.nspname,
@@ -51,7 +56,6 @@ WHERE c.relkind IN ('r', 'p')
     n.nspname = 'public'
     OR (n.nspname IN ('auth', 'storage')
         AND pg_catalog.has_table_privilege('postgres', c.oid, 'TRIGGER'))
-    OR (n.nspname = 'cron' AND c.relname = 'job')
     OR (n.nspname = 'net' AND c.relname = 'http_request_queue')
   )
 """.strip()

@@ -605,12 +605,7 @@ def _build_expected_catalog(container: str) -> tuple[dict, str, str, str, str]:
     public_rows = rows("public")
     auth_rows = rows("auth")
     storage_rows = rows("storage")
-    cron_row = _dexec_json(
-        container,
-        "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
-        "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
-        "WHERE n.nspname='cron' AND c.relname='job'",
-    )[0]
+    # mc2-34eua: cron.job is NOT in the guarded set — see q12-migration-plan-capture.py.
     net_row = _dexec_json(
         container,
         "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
@@ -627,10 +622,9 @@ def _build_expected_catalog(container: str) -> tuple[dict, str, str, str, str]:
         [guarded("public", r["name"], r["oid"], r["owner"]) for r in public_rows]
         + [guarded("auth", r["name"], r["oid"], r["owner"]) for r in auth_rows]
         + [guarded("storage", r["name"], r["oid"], r["owner"]) for r in storage_rows]
-        + [guarded("cron", "job", cron_row["oid"], cron_row["owner"]),
-           guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
+        + [guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
     )
-    if len(guarded_relations) != 76:
+    if len(guarded_relations) != 75:
         raise RuntimeError(f"guarded_relations count drifted: {len(guarded_relations)}")
     cron_jobs_catalog = [
         {"jobid": r["jobid"], "username": "postgres",

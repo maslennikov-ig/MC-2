@@ -24,7 +24,6 @@
     "auth.auth_table_19",
     "auth.auth_table_20",
     "auth.auth_table_21",
-    "cron.job",
     "net.http_request_queue",
     "public.document_evidence_observability_totals",
     "public.document_evidence_runs",
