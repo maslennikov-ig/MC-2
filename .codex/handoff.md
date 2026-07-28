@@ -67,34 +67,15 @@ capability, fail-closed pre-checks). Production re-verified afterwards: 0 q12 sc
 event triggers / functions, cron 8/8 ACTIVE, database default writable, no stale sessions, all
 containers healthy. Run root `5e9b7256-…` is BURNT — each attempt burns its run-id.
 
-DEFECTS FOUND AND FIXED SINCE (all on `develop`):
+DEFECTS #7-#9 AND THE `mc2-ipwyc` PAIR: all found, fixed and delivered on `develop`; the full
+chronology moved to `.codex/stages/mc2-jz6y0/summary.md` on 2026-07-28. Each is now a PROBE in
+`q12-window-preflight.py` (`mc2-34eua` -> A2/A4, `mc2-2rzf6` -> D1, `mc2-6fnrt` -> E2,
+`mc2-ipwyc` -> A3/A5/B1/B2), so the class cannot return silently.
 
-- `mc2-8zxlc`/`mc2-34eua` (#7, owner-approved variant B): `cron.job` out of `guarded_relations` (75).
-  The guard needs ACCESS EXCLUSIVE AND CREATE TRIGGER on every guarded relation; `cron.job` is owned
-  by `supabase_admin` with only SELECT to `postgres` — 42501 both ways, and it was the ONLY one of 76
-  out of reach. Retained, privilege-free: the `cron.alter_job` pause, the zero-active-jobs read, the
-  read-only default, and the guard trigger on `net.http_request_queue`. Second instance found by the
-  amendment: the D6 activation-truth probe locked the same catalog IN SHARE MODE — any D6 request now
-  carries `projection_sql_sha256 = d5046e31…`.
-- `mc2-2rzf6` (#8): plan and barrier measured the structural catalog in DIFFERENT `search_path`
-  contexts (`cfe6b92b` vs `a2b25324`) — deterministic, not drift. Plan capture now pins
-  `SET LOCAL search_path=pg_catalog` in the same session the barrier re-measures in.
-- `mc2-6fnrt` (#9): the controller opened and HELD the W3 snapshot coordinator before
-  `barrier.install`, and the barrier's own `quiesce_client_backends()` terminated it. The codesign
-  always resolved `<exported-id>` "at pg.backup open"; `WindowSnapshotHold` now does exactly that.
-  Barrier, W-tuple and the client quiesce untouched.
-- `mc2-ipwyc` (found during the restore, both latent PAST C9): the barrier armed guard triggers it
-  could not disarm (DROP TRIGGER needs OWNERSHIP; auth/storage tables belong to the managed admins) —
-  `$restore$` now disarms with one `DROP FUNCTION ... CASCADE` and replays the catalog-captured
-  function + six immutable triggers + REVOKE. And the Supavisor pooler NEVER delivers the connection
-  `options`, so every `-c default_transaction_read_only=…` proof was asserting the database default;
-  each runner now states its intent with a session-level SET. Barrier `f4f90361` -> `56a7a88e`,
-  W-tuple fields 4/5/6 amended. `aaec6fc2…` UNCHANGED — `command_sha256` covers argv only.
-
-THE PATTERN behind all of them: the checked environment substituted for the consuming one — a fixture
-published the step, an isolate had superuser rights, the real error was swallowed, a host-only gate
-hid a rotten fixture, or the pooler silently dropped what the test connection delivered. Model the
-constraint, never the convenience.
+THE PATTERN behind all of them: the checked environment substituted for the consuming one — a
+fixture published the step, an isolate had superuser rights, the real error was swallowed, a
+host-only gate hid a rotten fixture, or the pooler silently dropped what the test connection
+delivered. Model the constraint, never the convenience.
 
 BEFORE THE NEXT ATTEMPT — one command, not a checklist. Run this on the server, immediately before
 the window, and read its report:
