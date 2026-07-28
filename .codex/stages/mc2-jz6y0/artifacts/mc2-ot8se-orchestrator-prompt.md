@@ -21,7 +21,7 @@ finding. This moves discovery off the attempt path.
 
 Write zone: deploy/qdrant/q12-window-preflight.py, q12-preflight-probes.py and
 q12-deployed-asset-manifest.json (all new); q12-live-cutover.sh (task 7 only);
-packages/course-gen-platform/tests/unit/ops/\*\*; the contract doc (amend only in lockstep with a
+`packages/course-gen-platform/tests/unit/ops/**`; the contract doc (amend only in lockstep with a
 probe change); .codex/handoff.md (keep it at or under 200 lines).
 
 Authority: the owner has granted full authority for everything this task needs — do not stop to ask
@@ -41,13 +41,13 @@ and deploying an application release. Those are a different task, not a permissi
 Constraints:
 
 - Do not touch deploy/qdrant/q12-database-barrier.sh, deploy/qdrant/q12-command-manifest.json
-  (sha aaec6fc2… must not move), or .codex/stages/\*\* other than this prompt's own directory.
+  (sha aaec6fc2… must not move), or `.codex/stages/**` other than this prompt's own directory.
 - TDD: RED before GREEN for every probe; two-way mutation checks where the plan calls for them.
 - Read-only structurally: every database statement inside BEGIN READ ONLY, each transaction
   asserting transaction_read_only='on' before anything else. No DDL, no writes.
 - Connect through the pooled DSN, never directly to the database host — bypassing the pooler is
   exactly what hid one of the nine defects.
-- No secrets in logs, reports or arguments; treat .env\*, secrets/\*\* and credential stores as
+- No secrets in logs, reports or arguments; treat `.env*`, `secrets/**` and credential stores as
   read-blocked.
 - No silent skips or caps: every frozen probe id appears in the report with a verdict, and any bound
   you introduce is stated in the report and in your summary.
