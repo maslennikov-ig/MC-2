@@ -170,13 +170,44 @@ def _setup_sql() -> str:
         # Production's `postgres` can CREATE in the database (it owns q12_guard during a window)
         # and owns the application schema; it owns nothing else.
         f"GRANT CREATE ON DATABASE postgres TO {BARRIER_ROLE};",
+        # `extensions` stays owned by another role, as it is in managed Supabase; the barrier role
+        # only gets USAGE. Without it every structural-catalog measurement dies on
+        # `permission denied for schema extensions` — a managed-privilege detail a superuser
+        # fixture cannot show you.
+        f"GRANT USAGE ON SCHEMA extensions TO {BARRIER_ROLE};",
+        # pg_subscription.subconninfo is superuser-only by default. The frozen structural catalog
+        # hashes that column, and it demonstrably reaches it on production (the plan measured
+        # a2b25324… as `postgres` on 2026-07-28), so the fixture grants the same reachability
+        # rather than pretending the projection is smaller than it is.
+        f"GRANT SELECT ON pg_catalog.pg_subscription TO {BARRIER_ROLE};",
+        f"GRANT SELECT ON pg_catalog.pg_user_mapping TO {BARRIER_ROLE};",
+        # pg_stat_activity NULLs usename/state/backend_type/xact_start for every backend the
+        # reading role neither owns nor can see through pg_read_all_stats. quiesce_client_backends()
+        # is SECURITY DEFINER owned by this role, so it reads exactly what this role reads: without
+        # this membership it would see a managed backend as an unclassifiable NULL row. Probe E1
+        # refuses on an invisible backend for that reason; this grant is what makes the HEALTHY
+        # case healthy, and the pre-flight measures whether production actually holds it.
+        f"GRANT pg_read_all_stats TO {BARRIER_ROLE};",
         f"ALTER SCHEMA public OWNER TO {BARRIER_ROLE};",
         f"ALTER DATABASE postgres OWNER TO {BARRIER_ROLE};",
     ]
 
+    # A user-defined type in `public`, used as a column type. This is what makes the structural
+    # catalog SEARCH-PATH SENSITIVE: pg_catalog.format_type renders `q12_probe_status` when public
+    # is on the search_path and `public.q12_probe_status` when it is not, so the same database
+    # hashes to two different values in the two contexts. That is mc2-2rzf6 in miniature, and
+    # without it probe D1's regression guard would prove nothing.
+    statements.append(
+        f"SET ROLE {BARRIER_ROLE};"
+        " CREATE TYPE public.q12_probe_status AS ENUM ('draft', 'ready');"
+        " RESET ROLE;"
+    )
     for table in PUBLIC_TABLES:
         statements.append(
-            f"SET ROLE {BARRIER_ROLE}; CREATE TABLE public.{table}(id bigint PRIMARY KEY); RESET ROLE;"
+            f"SET ROLE {BARRIER_ROLE};"
+            f" CREATE TABLE public.{table}(id bigint PRIMARY KEY,"
+            "   status public.q12_probe_status NOT NULL DEFAULT 'draft');"
+            " RESET ROLE;"
         )
 
     for owner, schema, tables in (
@@ -220,11 +251,16 @@ def _setup_sql() -> str:
     )
     statements.append(f"SET ROLE {CRON_OWNER}; INSERT INTO cron.job VALUES {values}; RESET ROLE;")
 
-    # The migration-frontier table the plan capture reads.
+    # The migration-frontier table the plan capture and the frozen structural catalog both read;
+    # its column set is the one q12-structural-catalog.sql projects (version/name/statements).
     statements.append(
         "CREATE SCHEMA supabase_migrations;"
-        " CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);"
-        " INSERT INTO supabase_migrations.schema_migrations VALUES ('20260711151000');"
+        " CREATE TABLE supabase_migrations.schema_migrations("
+        "   version text PRIMARY KEY, name text, statements text[]);"
+        " INSERT INTO supabase_migrations.schema_migrations"
+        "   VALUES ('20260711151000', 'document_evidence_observability_totals', ARRAY['SELECT 1']);"
+        f" GRANT USAGE ON SCHEMA supabase_migrations TO {BARRIER_ROLE};"
+        f" GRANT SELECT ON supabase_migrations.schema_migrations TO {BARRIER_ROLE};"
     )
     return "\n".join(statements) + "\n"
 

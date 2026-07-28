@@ -22,6 +22,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[5]
@@ -173,6 +174,95 @@ def synthetic_catalog(fixture, overrides=None):
     if overrides:
         catalog.update(overrides)
     return catalog
+
+
+STRUCTURAL_CATALOG_SQL = (
+    (REPO / "deploy/qdrant/q12-structural-catalog.sql").read_text(encoding="utf-8").strip()
+)
+
+
+def live_cron_projection(fixture) -> list:
+    """The plan capture's own reduced cron projection: jobid / username / command_sha256."""
+    import hashlib
+
+    raw = fixture.scalar(
+        "SELECT COALESCE(jsonb_agg(jsonb_build_object("
+        " 'jobid', job.jobid::bigint, 'username', job.username, 'command', job.command"
+        ") ORDER BY job.jobid), '[]'::jsonb) FROM cron.job job;"
+    )
+    return [
+        {
+            "jobid": row["jobid"],
+            "username": row["username"],
+            "command_sha256": hashlib.sha256(row["command"].encode("utf-8")).hexdigest(),
+        }
+        for row in json.loads(raw)
+    ]
+
+
+def structural_sha(fixture, *, pg_catalog: bool) -> str:
+    """Measure the frozen structural catalog in ONE named search_path context.
+
+    `pg_catalog=False` reproduces mc2-2rzf6's producer: the ambient search_path, under which
+    pg_get_indexdef and friends suppress the schema qualifier and the same database hashes
+    differently.
+    """
+    binding = "SET LOCAL search_path = pg_catalog;\n" if pg_catalog else ""
+    sql = (
+        "BEGIN READ ONLY;\n"
+        f"{binding}"
+        f"COPY (SELECT structural_sha256 FROM (\n{STRUCTURAL_CATALOG_SQL}\n) AS capture)"
+        " TO STDOUT;\n"
+        "COMMIT;\n"
+    )
+    completed = fixture.psql(sql)
+    if completed.returncode != 0:
+        raise RuntimeError(f"structural capture failed: {completed.stderr.strip()}")
+    return completed.stdout.strip()
+
+
+def hold_session(fixture, *, role, in_transaction, application_name=None):
+    """Open a psql session on the fixture and LEAVE IT OPEN, so E1/E2 see a real backend."""
+    argv = [fixture_module.DOCKER, "exec", "-i"]
+    if application_name is not None:
+        argv += ["-e", f"PGAPPNAME={application_name}"]
+    argv += [
+        fixture.container_id, "psql", "-X", "--no-psqlrc", "-U", role, "-d", "postgres", "-tAq",
+    ]
+    proc = subprocess.Popen(
+        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    proc.stdin.write("BEGIN;\nSELECT 1;\n" if in_transaction else "SELECT 1;\n")
+    proc.stdin.flush()
+    # Wait for the backend to actually register in pg_stat_activity before the probe reads it.
+    for _ in range(100):
+        seen = fixture.scalar(
+            "SELECT count(*)::int FROM pg_catalog.pg_stat_activity"
+            f" WHERE usename = '{role}'"
+            + (
+                f" AND application_name = '{application_name}'"
+                if application_name is not None
+                else ""
+            )
+            + (" AND xact_start IS NOT NULL" if in_transaction else "")
+            + ";"
+        )
+        if seen != "0":
+            break
+        time.sleep(0.1)
+    return proc
+
+
+def release_session(proc) -> None:
+    try:
+        proc.stdin.close()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
 
 
 def make_context(fixture, catalog, barrier_text=SYNTHETIC_BARRIER):
@@ -370,6 +460,93 @@ def probe_suite() -> dict:
         fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.AUTH_OWNER};")
         record(out, "b4_foreign_owner", run_one(make_context(fixture, healthy_catalog), "B4"))
         fixture.superuser(f"ALTER DATABASE postgres OWNER TO {fixture_module.BARRIER_ROLE};")
+
+        # --- Groups C, D, E -----------------------------------------------------------------------
+        healthy_catalog["cron_jobs"] = live_cron_projection(fixture)
+        healthy_catalog["baseline_structural_sha256"] = structural_sha(fixture, pg_catalog=True)
+        cde = make_context(fixture, healthy_catalog)
+        cde.structural_catalog_sql = STRUCTURAL_CATALOG_SQL
+        for probe_id in ("C1", "C2", "C3", "C4", "C5", "C6", "D1", "E1", "E2"):
+            record(out, f"{probe_id.lower()}_healthy", run_one(cde, probe_id))
+
+        # C5/C6 evidence must name something that actually exists, not a plausible string.
+        out["c5_evidence_names_a_real_artifact"] = "mc2-6fnrt" in probes.C5_EVIDENCE
+        out["c6_evidence_names_a_real_artifact"] = (
+            REPO / "packages/course-gen-platform/tests/unit/ops/q12-guard-trigger-ownership.test.ts"
+        ).is_file()
+
+        # C1: EXECUTE revoked.
+        fixture.psql(
+            "REVOKE EXECUTE ON FUNCTION"
+            " cron.alter_job(bigint, text, text, text, text, boolean) FROM mc2_barrier;",
+            role=fixture_module.CRON_OWNER,
+        )
+        record(out, "c1_revoked", run_one(make_context(fixture, healthy_catalog), "C1"))
+        fixture.psql(
+            "GRANT EXECUTE ON FUNCTION"
+            " cron.alter_job(bigint, text, text, text, text, boolean) TO mc2_barrier;",
+            role=fixture_module.CRON_OWNER,
+        )
+
+        # C2: a changed command, and a job left paused by a previous attempt.
+        fixture.psql("UPDATE cron.job SET command = 'select public.tampered()' WHERE jobid = 3;",
+                     role=fixture_module.CRON_OWNER)
+        record(out, "c2_command_drift", run_one(make_context(fixture, healthy_catalog), "C2"))
+        fixture.psql("UPDATE cron.job SET command = 'select public.job_3()' WHERE jobid = 3;",
+                     role=fixture_module.CRON_OWNER)
+        fixture.psql("UPDATE cron.job SET active = false WHERE jobid = 5;",
+                     role=fixture_module.CRON_OWNER)
+        record(out, "c2_paused_job", run_one(make_context(fixture, healthy_catalog), "C2"))
+        fixture.psql("UPDATE cron.job SET active = true WHERE jobid = 5;",
+                     role=fixture_module.CRON_OWNER)
+
+        # C3: a queued pg_net request.
+        fixture.psql("INSERT INTO net.http_request_queue VALUES (1);",
+                     role=fixture_module.NET_OWNER)
+        record(out, "c3_nonempty", run_one(make_context(fixture, healthy_catalog), "C3"))
+        fixture.psql("DELETE FROM net.http_request_queue;", role=fixture_module.NET_OWNER)
+
+        # C4: residue from an earlier attempt.
+        fixture.psql(
+            "CREATE SCHEMA q12_guard;"
+            " CREATE FUNCTION q12_guard.enforce_write_barrier() RETURNS trigger"
+            " LANGUAGE plpgsql AS $fn$ BEGIN RAISE EXCEPTION 'x'; END $fn$;"
+        )
+        record(out, "c4_residue", run_one(make_context(fixture, healthy_catalog), "C4"))
+        fixture.psql("DROP SCHEMA q12_guard CASCADE;")
+
+        # D1: the mc2-2rzf6 regression guard — a catalog captured under the AMBIENT search_path.
+        ambient = structural_sha(fixture, pg_catalog=False)
+        out["d1_contexts_differ"] = ambient != healthy_catalog["baseline_structural_sha256"]
+        drifted_catalog = dict(healthy_catalog)
+        drifted_catalog["baseline_structural_sha256"] = ambient
+        ambient_context = make_context(fixture, drifted_catalog)
+        ambient_context.structural_catalog_sql = STRUCTURAL_CATALOG_SQL
+        record(out, "d1_ambient_search_path", run_one(ambient_context, "D1"))
+
+        # E1/E2: sessions held open across the probe, exactly as attempt #9 held its coordinator.
+        managed = hold_session(fixture, role=fixture_module.MANAGED_ROLE, in_transaction=True)
+        try:
+            record(out, "e1_busy_managed_backend", run_one(make_context(fixture, healthy_catalog), "E1"))
+            # …and the same backend with pg_read_all_stats revoked: pg_stat_activity nulls its
+            # columns, and E1 must refuse rather than count zero. quiesce_client_backends() runs
+            # SECURITY DEFINER as this role and would be just as blind.
+            fixture.superuser(f"REVOKE pg_read_all_stats FROM {fixture_module.BARRIER_ROLE};")
+            record(out, "e1_invisible_backend", run_one(make_context(fixture, healthy_catalog), "E1"))
+            fixture.superuser(f"GRANT pg_read_all_stats TO {fixture_module.BARRIER_ROLE};")
+        finally:
+            release_session(managed)
+
+        ours = hold_session(
+            fixture,
+            role=fixture_module.BARRIER_ROLE,
+            in_transaction=False,
+            application_name="megacampus-q12-w3-snapshot-coordinator",
+        )
+        try:
+            record(out, "e2_our_session_alive", run_one(make_context(fixture, healthy_catalog), "E2"))
+        finally:
+            release_session(ours)
     finally:
         fixture.stop()
     return out

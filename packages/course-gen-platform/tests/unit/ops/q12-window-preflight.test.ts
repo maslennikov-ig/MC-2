@@ -229,4 +229,81 @@ describe.runIf(REAL_PG17)('Q12 window pre-flight: probes against the managed fix
     expect(out.b4_foreign_owner).toBe('fail');
     expect(String(out.b4_foreign_owner_detail)).toContain('mc2_auth_admin');
   });
+
+  it('passes groups C, D and E against a healthy managed environment', () => {
+    for (const id of ['c1', 'c2', 'c3', 'c4', 'd1', 'e1', 'e2']) {
+      expect(`${id}=${out[`${id}_healthy`]}`, String(out[`${id}_healthy_detail`])).toBe(
+        `${id}=pass`
+      );
+    }
+  });
+
+  it('reports C5 and C6 as unprovable with a real evidence pointer, never as a pass', () => {
+    // These two are unprovable BY CONSTRUCTION: event-trigger creation and
+    // pg_get_functiondef/pg_get_triggerdef round-trip fidelity cannot be established read-only.
+    // The contract's `unprovable` verdict exists so the report never shows a green that was not
+    // measured — but it must name what proves the fact instead, or it counts as a fail.
+    expect(out.c5_healthy).toBe('unprovable');
+    expect(out.c6_healthy).toBe('unprovable');
+    expect(String(out.c5_healthy_evidence)).toContain('attempt #9');
+    expect(String(out.c6_healthy_evidence)).toContain('q12-guard-trigger-ownership');
+    expect(out.c5_evidence_names_a_real_artifact).toBe(true);
+    expect(out.c6_evidence_names_a_real_artifact).toBe(true);
+  });
+
+  it('fails C1 when EXECUTE on cron.alter_job is revoked', () => {
+    expect(out.c1_revoked).toBe('fail');
+    expect(String(out.c1_revoked_detail)).toContain('alter_job');
+  });
+
+  it('fails C2 on cron drift and on a job left paused by a previous attempt', () => {
+    expect(out.c2_command_drift).toBe('fail');
+    expect(String(out.c2_command_drift_detail)).toContain('3');
+    expect(out.c2_paused_job).toBe('fail');
+    expect(String(out.c2_paused_job_detail)).toContain('inactive');
+  });
+
+  it('fails C3 when net.http_request_queue is not empty', () => {
+    expect(out.c3_nonempty).toBe('fail');
+  });
+
+  it('fails C4 on any q12_guard residue', () => {
+    expect(out.c4_residue).toBe('fail');
+    expect(String(out.c4_residue_detail)).toContain('q12_guard');
+  });
+
+  it('fails D1 when the catalog was captured in a different search_path (mc2-2rzf6)', () => {
+    // The mc2-2rzf6 regression guard. The plan and the barrier once measured the structural
+    // catalog in DIFFERENT search_path contexts (cfe6b92b vs a2b25324) — deterministic, not drift
+    // — and barrier.install died on "pre-guard canonical structural catalog drift".
+    expect(out.d1_ambient_search_path).toBe('fail');
+    expect(String(out.d1_ambient_search_path_detail)).toContain('search_path');
+    // The two contexts really do hash differently in this fixture; otherwise the guard proves
+    // nothing.
+    expect(out.d1_contexts_differ).toBe(true);
+  });
+
+  it('fails E1 on a supabase_admin backend that is not exactly idle', () => {
+    // quiesce_client_backends() refuses a managed supabase_admin client that holds a transaction,
+    // and cannot terminate a backend owned by a reserved role.
+    expect(out.e1_busy_managed_backend).toBe('fail');
+    expect(String(out.e1_busy_managed_backend_detail)).toContain('supabase_admin');
+  });
+
+  it('fails E1 when a backend is INVISIBLE rather than counting it as absent', () => {
+    // pg_stat_activity nulls usename/state/backend_type for any backend the reading role neither
+    // owns nor sees through pg_read_all_stats. A `backend_type = 'client backend'` filter in SQL
+    // would drop those rows and report a serene zero — while quiesce_client_backends(), which runs
+    // SECURITY DEFINER as the same role, would be just as blind and try to terminate a managed
+    // backend. Found by driving the probe as a NON-superuser; a superuser fixture cannot show it.
+    expect(out.e1_invisible_backend).toBe('fail');
+    expect(String(out.e1_invisible_backend_detail)).toContain('invisible');
+  });
+
+  it('fails E2 when one of our own sessions is alive (mc2-6fnrt)', () => {
+    // Attempt #9: the controller opened and HELD the W3 snapshot coordinator before
+    // barrier.install, and the barrier's own quiesce_client_backends() terminated it.
+    expect(out.e2_our_session_alive).toBe('fail');
+    expect(String(out.e2_our_session_alive_detail)).toContain('megacampus-q12-');
+  });
 });

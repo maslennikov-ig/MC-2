@@ -637,6 +637,345 @@ def probe_b4(context: Context) -> "dict[str, object]":
     )
 
 
+# --- Group C: the path that has never run --------------------------------------------------------
+#
+# Everything past C9 has never executed against anything production-like. This group is
+# deliberately explicit about what it can and cannot prove.
+
+CRON_ALTER_JOB_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'signature', p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')',
+  'executable', pg_catalog.has_function_privilege(current_user, p.oid, 'EXECUTE')
+) ORDER BY p.oid), '[]'::jsonb)
+FROM pg_catalog.pg_proc p
+JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'cron' AND p.proname = 'alter_job'
+""".strip()
+
+CRON_JOBS_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'jobid', job.jobid::bigint,
+  'username', job.username,
+  'active', job.active,
+  'command', job.command
+) ORDER BY job.jobid), '[]'::jsonb)
+FROM cron.job job
+""".strip()
+
+GUARD_RESIDUE_SQL = """
+SELECT jsonb_build_object(
+  'schemas', (SELECT count(*)::int FROM pg_catalog.pg_namespace WHERE nspname = 'q12_guard'),
+  'relations', (SELECT count(*)::int FROM pg_catalog.pg_class relation
+                JOIN pg_catalog.pg_namespace ns ON ns.oid = relation.relnamespace
+                WHERE ns.nspname = 'q12_guard'),
+  'functions', (SELECT count(*)::int FROM pg_catalog.pg_proc function_object
+                JOIN pg_catalog.pg_namespace ns ON ns.oid = function_object.pronamespace
+                WHERE ns.nspname = 'q12_guard'),
+  'triggers', (SELECT count(*)::int FROM pg_catalog.pg_trigger trigger_object
+               WHERE trigger_object.tgname LIKE 'q12_guard%' AND NOT trigger_object.tgisinternal),
+  'event_triggers', (SELECT count(*)::int FROM pg_catalog.pg_event_trigger event_trigger
+                     JOIN pg_catalog.pg_proc function_object ON function_object.oid = event_trigger.evtfoid
+                     JOIN pg_catalog.pg_namespace ns ON ns.oid = function_object.pronamespace
+                     WHERE ns.nspname = 'q12_guard')
+)
+""".strip()
+
+
+def probe_c1(context: Context) -> "dict[str, object]":
+    """EXECUTE on cron.alter_job — the retained, privilege-free cron pause.
+
+    After mc2-34eua removed cron.job from the guarded set, the pause is the ONLY thing standing
+    between an active cron job and a window that has just set the database read-only.
+    """
+    rows = query_json(context, CRON_ALTER_JOB_SQL)
+    if not isinstance(rows, list) or not rows:
+        return verdict("C1", FAIL, "cron.alter_job does not exist; the cron pause cannot run")
+    unreachable = [str(row["signature"]) for row in rows if not row.get("executable")]
+    if unreachable:
+        return verdict(
+            "C1", FAIL, "no EXECUTE on: " + name_list(unreachable)
+        )
+    return verdict(
+        "C1",
+        PASS,
+        f"EXECUTE is held on {len(rows)} cron.alter_job overload(s): "
+        + name_list([str(row["signature"]) for row in rows]),
+    )
+
+
+def probe_c2(context: Context) -> "dict[str, object]":
+    """The cron job set matches the plan's baseline: count, ids, usernames, command hashes — and
+    every job is ACTIVE.
+
+    An inactive job before the window is not a neutral fact: it means a previous attempt's
+    `cron.alter_job(..., active := false)` was never undone, so the restore would replay a baseline
+    that does not describe ordinary operation.
+    """
+    expected = (context.catalog or {}).get("cron_jobs")
+    if not isinstance(expected, list):
+        raise ProbeError("the run root's catalog carries no cron_jobs")
+    live = query_json(context, CRON_JOBS_SQL)
+    if not isinstance(live, list):
+        raise ProbeError("cron projection is malformed")
+
+    observed = {
+        int(row["jobid"]): {
+            "username": str(row["username"]),
+            "active": bool(row["active"]),
+            "command_sha256": hashlib.sha256(str(row["command"]).encode("utf-8")).hexdigest(),
+        }
+        for row in live
+    }
+    wanted = {int(row["jobid"]): row for row in expected}
+
+    if len(observed) != len(wanted):
+        return verdict(
+            "C2",
+            FAIL,
+            f"cron carries {len(observed)} jobs, the plan captured {len(wanted)}",
+        )
+    drift: list[str] = []
+    for jobid, want in sorted(wanted.items()):
+        have = observed.get(jobid)
+        if have is None:
+            drift.append(f"{jobid} (missing)")
+            continue
+        if have["username"] != str(want.get("username")):
+            drift.append(f"{jobid} (username {want.get('username')!r} -> {have['username']!r})")
+        if have["command_sha256"] != str(want.get("command_sha256")):
+            drift.append(f"{jobid} (command changed)")
+    if drift:
+        return verdict("C2", FAIL, "cron job drift against the plan: " + name_list(drift))
+    inactive = sorted(str(jobid) for jobid, have in observed.items() if not have["active"])
+    if inactive:
+        return verdict(
+            "C2",
+            FAIL,
+            "cron jobs are inactive before the window opens (a previous attempt's pause was never "
+            "undone): " + name_list(inactive),
+        )
+    return verdict(
+        "C2", PASS, f"{len(observed)} cron jobs match the plan and are all active"
+    )
+
+
+def probe_c3(context: Context) -> "dict[str, object]":
+    count = query(context, "SELECT count(*)::int FROM net.http_request_queue")
+    if count != "0":
+        return verdict(
+            "C3",
+            FAIL,
+            f"net.http_request_queue holds {count} row(s); the window requires an empty queue",
+        )
+    return verdict("C3", PASS, "net.http_request_queue is empty")
+
+
+def probe_c4(context: Context) -> "dict[str, object]":
+    residue = query_json(context, GUARD_RESIDUE_SQL)
+    if not isinstance(residue, dict):
+        raise ProbeError("guard residue projection is malformed")
+    present = sorted(f"{key}={value}" for key, value in residue.items() if int(value) != 0)
+    if present:
+        return verdict(
+            "C4",
+            FAIL,
+            "q12_guard residue is present from an earlier attempt: " + ", ".join(present),
+        )
+    return verdict(
+        "C4", PASS, "no q12_guard residue: zero schemas, relations, functions, triggers, event triggers"
+    )
+
+
+def probe_c5(context: Context) -> "dict[str, object]":
+    """Event-trigger creation cannot be probed read-only: CREATE EVENT TRIGGER is DDL, and there is
+    no `has_*_privilege` for it — the right is superuser-only in PostgreSQL, and production's
+    `postgres` is not a superuser, so no catalog read answers the question. Proven instead by the
+    only thing that could prove it: an attempt that actually did it."""
+    return verdict(
+        "C5",
+        UNPROVABLE,
+        "CREATE EVENT TRIGGER is DDL with no read-only privilege proxy; not established here",
+        C5_EVIDENCE,
+    )
+
+
+def probe_c6(context: Context) -> "dict[str, object]":
+    """pg_get_functiondef / pg_get_triggerdef round-trip fidelity — the barrier's $restore$ replays
+    catalog-captured definitions (mc2-ipwyc). Proving the round trip means CREATE-ing and
+    re-reading an object, which is DDL. Proven instead by the gated real-PG17 suite."""
+    return verdict(
+        "C6",
+        UNPROVABLE,
+        "definition round-trip fidelity needs DDL to establish; not established here",
+        C6_EVIDENCE,
+    )
+
+
+# --- Group D: catalog agreement --------------------------------------------------------------------
+#
+# The mc2-2rzf6 wall. The plan and the barrier once measured the structural catalog in DIFFERENT
+# `search_path` contexts (ambient cfe6b92b… vs pg_catalog a2b25324…) and barrier.install died on
+# "pre-guard canonical structural catalog drift". Deterministic, not drift — but indistinguishable
+# from drift at 04:00 with a window open.
+
+
+def probe_d1(context: Context) -> "dict[str, object]":
+    """Re-measure the structural catalog in the BARRIER's own session context and compare.
+
+    The frozen `q12-structural-catalog.sql` is reused verbatim; reimplementing the projection here
+    would recreate exactly the defect this probe exists to catch. `read_only()` pins
+    `SET LOCAL search_path = pg_catalog` for every probe, which is the barrier's context.
+    """
+    if not context.structural_catalog_sql:
+        raise ProbeError("the frozen structural catalog SQL is not available")
+    body = context.structural_catalog_sql.strip()
+    if ";" in body:
+        raise ProbeError("structural catalog SQL must be one semicolon-free query")
+    expected = str((context.catalog or {}).get("baseline_structural_sha256") or "")
+    if not HEX64_RE.fullmatch(expected):
+        raise ProbeError("the run root's catalog carries no baseline_structural_sha256")
+    observed = query(context, f"SELECT structural_sha256 FROM (\n{body}\n) AS preflight")
+    if not HEX64_RE.fullmatch(observed):
+        raise ProbeError("the live structural catalog SHA-256 is malformed")
+    if observed != expected:
+        return verdict(
+            "D1",
+            FAIL,
+            f"structural catalog disagreement measured under SET LOCAL search_path=pg_catalog: "
+            f"the run root expects {expected[:8]}…, the live database hashes to {observed[:8]}…. "
+            "If the plan was captured under a different search_path this is deterministic, not "
+            "drift (mc2-2rzf6); otherwise the database changed since the plan.",
+        )
+    return verdict(
+        "D1",
+        PASS,
+        f"structural catalog {observed[:8]}… agrees with the run root, measured in the barrier's "
+        "own search_path context",
+    )
+
+
+# --- Group E: quiesce feasibility --------------------------------------------------------------------
+
+# NOTE THE FILTER. `backend_type = 'client backend'` deliberately does NOT appear in the WHERE
+# clause. PostgreSQL nulls out usename / state / backend_type / xact_start in pg_stat_activity for
+# any backend the reading role neither owns nor can see through pg_read_all_stats — so filtering on
+# backend_type in SQL would silently DROP exactly the managed backends this probe exists to find,
+# and E1 would report "0 client backends, nothing to refuse" while supabase_admin sat in an open
+# transaction. The rows are classified in Python instead, and an invisible row is a refusal, not an
+# absence. (This is the same substitution class as the nine window defects; it was caught here by
+# driving the probe as a NON-superuser against the managed fixture.)
+CLIENT_BACKENDS_SQL = """
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'pid', activity.pid,
+  'visible', (activity.backend_type IS NOT NULL),
+  'usename', COALESCE(activity.usename, ''),
+  'application_name', COALESCE(activity.application_name, ''),
+  'state', COALESCE(activity.state, ''),
+  'backend_type', COALESCE(activity.backend_type, ''),
+  'has_xact', (activity.xact_start IS NOT NULL
+            OR activity.backend_xid IS NOT NULL
+            OR activity.backend_xmin IS NOT NULL),
+  'signalable', (
+    pg_catalog.pg_has_role(current_user, 'pg_signal_backend', 'MEMBER')
+    OR (activity.usesysid IS NOT NULL
+        AND pg_catalog.pg_has_role(current_user, activity.usesysid, 'MEMBER'))),
+  'target_is_superuser', COALESCE((
+    SELECT role.rolsuper FROM pg_catalog.pg_roles role WHERE role.oid = activity.usesysid), false)
+) ORDER BY activity.pid), '[]'::jsonb)
+FROM pg_catalog.pg_stat_activity activity
+WHERE activity.datname = pg_catalog.current_database()
+  AND activity.pid <> pg_catalog.pg_backend_pid()
+""".strip()
+
+# The barrier's own managed-boundary role: quiesce_client_backends() accepts it only when it is
+# EXACTLY idle, and terminates everything else.
+MANAGED_BOUNDARY_ROLE = "supabase_admin"
+
+
+def probe_e1(context: Context) -> "dict[str, object]":
+    """Enumerate client backends and flag anything `quiesce_client_backends()` would refuse.
+
+    A snapshot cannot exclude a race — a backend can appear between this probe and C2 — so the
+    verdict NAMES the observed set and the probe is re-run immediately before the window. That
+    bound is stated here rather than hidden.
+    """
+    rows = query_json(context, CLIENT_BACKENDS_SQL)
+    if not isinstance(rows, list):
+        raise ProbeError("client backend projection is malformed")
+    refusals: list[str] = []
+    clients = 0
+    for row in rows:
+        pid = row.get("pid")
+        if not row.get("visible"):
+            # We cannot classify it — and neither can quiesce_client_backends(), which runs
+            # SECURITY DEFINER as this same role and reads the same nulled-out columns. It would
+            # see usename IS NULL, skip the supabase_admin branch, and try to terminate a managed
+            # backend.
+            refusals.append(
+                f"pid {pid} (invisible: pg_stat_activity nulls its columns for this role, so the "
+                "quiesce cannot classify it either — grant pg_read_all_stats or expect a refusal)"
+            )
+            continue
+        if str(row.get("backend_type")) != "client backend":
+            continue
+        clients += 1
+        usename = str(row.get("usename"))
+        if usename == MANAGED_BOUNDARY_ROLE:
+            if str(row.get("state")) != "idle" or row.get("has_xact"):
+                refusals.append(
+                    f"pid {pid} {usename} state={row.get('state')!r} "
+                    f"in_transaction={bool(row.get('has_xact'))}"
+                )
+        elif row.get("target_is_superuser") or not row.get("signalable"):
+            refusals.append(f"pid {pid} {usename} (not terminable by the barrier role)")
+    if refusals:
+        return verdict(
+            "E1",
+            FAIL,
+            f"quiesce_client_backends() would refuse or mis-handle {len(refusals)} of {len(rows)} "
+            "backend(s): " + name_list(refusals),
+        )
+    return verdict(
+        "E1",
+        PASS,
+        f"{clients} client backend(s) observed among {len(rows)} visible backend(s), none of which "
+        "quiesce_client_backends() would refuse. BOUND: this is a snapshot and cannot exclude a "
+        "backend arriving between now and C2; re-run the pre-flight immediately before the window.",
+    )
+
+
+def probe_e2(context: Context) -> "dict[str, object]":
+    """mc2-6fnrt: nothing of OURS may be alive across barrier.install.
+
+    Attempt #9 opened and HELD the W3 snapshot coordinator before barrier.install, and the
+    barrier's own quiesce terminated it — the run died as "terminating connection due to
+    administrator command". The probe's own session is excluded by pid.
+    """
+    rows = query_json(
+        context,
+        "SELECT COALESCE(jsonb_agg(jsonb_build_object("
+        " 'pid', activity.pid,"
+        " 'application_name', activity.application_name) ORDER BY activity.pid), '[]'::jsonb)"
+        " FROM pg_catalog.pg_stat_activity activity"
+        " WHERE activity.datname = pg_catalog.current_database()"
+        "   AND activity.pid <> pg_catalog.pg_backend_pid()"
+        f"   AND activity.application_name LIKE '{Q12_APPLICATION_PREFIX}%'",
+    )
+    if not isinstance(rows, list):
+        raise ProbeError("Q12 session projection is malformed")
+    if rows:
+        named = [f"pid {row['pid']} {row['application_name']}" for row in rows]
+        return verdict(
+            "E2",
+            FAIL,
+            f"{len(rows)} {Q12_APPLICATION_PREFIX}% session(s) are alive besides this probe's own; "
+            "the barrier's quiesce would terminate them mid-window: " + name_list(named),
+        )
+    return verdict(
+        "E2", PASS, f"no {Q12_APPLICATION_PREFIX}% session is alive besides this probe's own"
+    )
+
+
 # --- the frozen probe list --------------------------------------------------------------------
 
 PROBES: "tuple[dict[str, object], ...]" = (
@@ -651,15 +990,15 @@ PROBES: "tuple[dict[str, object], ...]" = (
     {"id": "B2", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b2},
     {"id": "B3", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b3},
     {"id": "B4", "group": "B", "scope": DATABASE_SCOPE, "run": probe_b4},
-    {"id": "C1", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "C2", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "C3", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "C4", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "C5", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "C6", "group": "C", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "D1", "group": "D", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "E1", "group": "E", "scope": DATABASE_SCOPE, "run": _not_implemented},
-    {"id": "E2", "group": "E", "scope": DATABASE_SCOPE, "run": _not_implemented},
+    {"id": "C1", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c1},
+    {"id": "C2", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c2},
+    {"id": "C3", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c3},
+    {"id": "C4", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c4},
+    {"id": "C5", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c5},
+    {"id": "C6", "group": "C", "scope": DATABASE_SCOPE, "run": probe_c6},
+    {"id": "D1", "group": "D", "scope": DATABASE_SCOPE, "run": probe_d1},
+    {"id": "E1", "group": "E", "scope": DATABASE_SCOPE, "run": probe_e1},
+    {"id": "E2", "group": "E", "scope": DATABASE_SCOPE, "run": probe_e2},
     {"id": "H1", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
     {"id": "H2", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
     {"id": "H3", "group": "H", "scope": HOST_SCOPE, "run": _not_implemented},
