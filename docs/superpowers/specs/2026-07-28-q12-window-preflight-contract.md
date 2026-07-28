@@ -1,7 +1,7 @@
 # Q12 window pre-flight — contract
 
 **Status:** proposed, 2026-07-28
-**Owner bead:** `mc2-<preflight>` (see § Beads)
+**Owner bead:** `mc2-ot8se`
 **Blocks:** `mc2-i9h3y` (owner-gated live window C1..C10)
 
 ## Problem
