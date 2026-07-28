@@ -1,0 +1,76 @@
+Runtime: Claude Code CLI, VS Code integrated terminal on WSL
+Target: orchestrator session in /home/me/code/mc2, branch develop
+Audience: the agent implementing Beads task mc2-ot8se
+
+Goal: implement the Q12 read-only window pre-flight — one probe that asserts every environmental
+precondition the live cutover window depends on, so those defects are found in minutes instead of
+one per window attempt.
+
+Context: read in this order before acting — AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md,
+then docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md (the contract; its "Hard
+invariants" and frozen "Probe list" ARE the acceptance criteria) and
+docs/superpowers/plans/2026-07-28-q12-window-preflight.md (seven tasks, each with its own RED/GREEN
+cycle and commit). Then `bd show mc2-ot8se` and claim it with `bd update mc2-ot8se --claim`.
+
+Nine window attempts produced nine defects, all of one class: the environment the code was
+verified in was more permissive than the one it runs in. Local fixtures give the test role
+superuser rights and ownership of every object and connect straight to a container; production is
+a managed PostgreSQL where the role owns almost nothing and the connection crosses the Supavisor
+pooler. The window fails closed at the first violation — correct, but it means one finding per
+expensive attempt. This work moves discovery off the attempt path.
+
+Write zone: deploy/qdrant/q12-window-preflight.py, q12-preflight-probes.py and
+q12-deployed-asset-manifest.json (all new); q12-live-cutover.sh (task 7 only);
+packages/course-gen-platform/tests/unit/ops/\*\*; the contract doc (amend only in lockstep with a
+probe change); .codex/handoff.md (task 7 only, keep it at or under 200 lines).
+
+Constraints:
+
+- Do not touch deploy/qdrant/q12-database-barrier.sh, deploy/qdrant/q12-command-manifest.json
+  (sha aaec6fc2… must not move), or .codex/stages/\*\*.
+- TDD: RED before GREEN for every probe; two-way mutation checks where the plan calls for them.
+- Read-only structurally: every database statement inside BEGIN READ ONLY, each transaction
+  asserting transaction_read_only='on' before anything else. No DDL, no writes.
+- Connect through the pooled DSN, never directly to the database host — bypassing the pooler is
+  exactly what hid one of the nine defects.
+- No secrets in logs, reports or arguments; treat .env\*, secrets/\*\* and credential stores as
+  read-blocked.
+- No silent skips or caps: every frozen probe id appears in the report with a verdict, and any bound
+  you introduce is stated in the report and in your summary.
+- Authorized without asking: local edits in the write zone, Beads updates, local verification,
+  commits on develop and an ordinary push once the gates pass and a fresh fetch shows the remote is
+  neither ahead nor diverged.
+- NOT authorized without a fresh explicit user request: opening or advancing the Q12 window, any
+  production database access beyond the pre-flight's own read-only probes, deploys, force-push,
+  container changes, credential changes.
+- If something cannot be established read-only, do not invent a mutation to prove it. Report it as
+  `unprovable` with a real evidence pointer, exactly as the contract's C5/C6 do.
+
+Success criteria:
+
+- All seven plan tasks complete, each with its own commit.
+- Gates run and quoted with real output. From packages/course-gen-platform:
+  `npx vitest run --config vitest.config.unit.ts tests/unit/ops --maxWorkers=3` (use maxWorkers=3 —
+  at full parallelism the docker-backed suites contend and flake), then
+  `MC2_Q12_REAL_PG17=1 npx vitest run --config vitest.config.unit.ts
+tests/unit/ops/q12-managed-role-fixture.test.ts tests/unit/ops/q12-window-preflight.test.ts`.
+  From the repo root: `pnpm type-check`, `pnpm build`,
+  `bash scripts/orchestration/run_process_verification.sh`,
+  `python3 scripts/orchestration/check_stranded_commits.py`.
+- Pre-flight green in `--scope host` on the server, and `--scope all` proven against the
+  disposable-container fixture. The production run needs a fresh run root — that is the NEXT stage,
+  not this one.
+- q12-live-cutover.sh refuses to open a window without a fresh green report matching the deployed
+  tree; .codex/handoff.md names the command instead of describing a manual check.
+- `bd close mc2-ot8se` with the delivered commit shas in the reason, then `bd dolt push`.
+
+Output: report back leading with the outcome and how to verify it — what the probe list covers, what
+it deliberately cannot prove and on what evidence, anything you bounded, the exact commands and
+output behind the completion claim, and plainly anything you did not finish and why. List changed
+files and the docs impact.
+
+Stop: stop and report instead of continuing when a probe seems to require changing the frozen
+barrier or the frozen manifest; when the pre-flight reports a fail that needs a production change to
+clear; when the ops suite fails in isolation rather than only under parallelism; when the remote is
+ahead or diverged at push time; or when you find a tenth instance of the environment-substitution
+class — file it as a bead with the probe id in the title and report before continuing.
