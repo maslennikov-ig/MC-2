@@ -69,3 +69,31 @@ describe('Q12 C3: libpq children get a HOME they can stat (mc2-1cxna)', () => {
     expect(script).toContain('REDACTED:REDACTED@');
   });
 });
+
+// The restore drill has the same shape: its frozen pg.restore env also pins HOME=/root, and the
+// docker CLI aborts on an unreadable $HOME/.docker/config.json and then never discovers its CLI
+// plugins — so `docker buildx imagetools inspect --raw` degrades to "unknown flag: --raw" and C4
+// dies on "restore image index lookup failed" (window attempt #16). Proven on the host: the same
+// command returns the OCI image index under a HOME the process can stat.
+describe('Q12 C4: the restore drill gets a HOME it can stat (mc2-1cxna)', () => {
+  it('exports the adopted private temp root as HOME before any docker child', () => {
+    const drill = readFileSync(
+      resolve(REPO_ROOT, 'deploy/postgres/restore-supabase-drill.sh'),
+      'utf8'
+    );
+
+    const exportIndex = drill.indexOf('export HOME="$TEMP_ROOT"');
+    expect(exportIndex, 'the drill no longer gives its children a stat-able HOME').toBeGreaterThan(
+      0
+    );
+    // It must land inside create_temp_root — after the directory exists, and before that function
+    // returns — or it protects nothing. (verify_image_identity is DEFINED earlier in the file but
+    // CALLED later, so textual order against it proves nothing.)
+    const start = drill.indexOf('create_temp_root() {');
+    const guard = drill.indexOf("require_absolute_directory 'private temp directory'");
+    expect(start).toBeGreaterThan(0);
+    expect(guard).toBeGreaterThan(start);
+    expect(exportIndex).toBeGreaterThan(guard);
+    expect(exportIndex).toBeLessThan(drill.indexOf('validate_generation() {'));
+  });
+});

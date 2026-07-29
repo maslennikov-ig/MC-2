@@ -331,6 +331,17 @@ create_temp_root() {
   exec {temp_input}>&-
   wait "$temp_pid" || fail 'private temp directory adoption failed'
   require_absolute_directory 'private temp directory' "$TEMP_ROOT" 700
+  # mc2-1cxna: the frozen pg.restore manifest env pins HOME=/root while this drill runs as the
+  # deploy operator, and /root is 0700 root-owned. The docker CLI aborts loading
+  # $HOME/.docker/config.json with EACCES and then never discovers its CLI plugins, so
+  # `docker buildx imagetools inspect` degrades into "unknown flag: --raw" and C4 died on "restore
+  # image index lookup failed" (window attempt #16, 2026-07-29) after the writers were stopped and
+  # the backup had already committed. Proven on the host: the identical command succeeds and
+  # returns the OCI image index under a HOME this process can stat. The adopted private temp root
+  # is owned by this process, holds no .docker, and is removed with the rest of the drill state —
+  # so the CLI falls back to its system plugin directory and its anonymous registry path, which is
+  # what this public.ecr.aws lookup needs.
+  export HOME="$TEMP_ROOT"
 }
 
 validate_generation() {
