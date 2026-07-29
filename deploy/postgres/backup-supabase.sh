@@ -60,6 +60,30 @@ fail() {
   exit "$status"
 }
 
+# mc2-1cxna: fail WITH the captured diagnostics. Every step below routes stderr into a file under
+# the run-private generation directory, which `fail` never reads and cleanup then reclaims — so a
+# non-zero exit reached the caller as a bare status and nothing else. That is what happened at C3 of
+# window attempt #12 (2026-07-29): "pg_dumpall before snapshot failed with status 1", with the
+# reason already written to disk and discarded, inside a cutover window that had to be unwound by
+# hand. The same reasoning the pg_dump branch already states applies here: these diagnostics never
+# contain the credential (it lives in the libpq service file, and libpq errors name the service, the
+# host and the user, never the password). A `user:secret@host` shape is redacted anyway, and the
+# tail is bounded so a runaway stream cannot flood the controller log.
+fail_command() {
+  local message=$1
+  local status=$2
+  local stderr_file=$3
+  if [[ -s "$stderr_file" ]]; then
+    printf 'Supabase backup diagnostics (last 10 lines of %s):\n' "${stderr_file##*/}" >&2
+    /usr/bin/tail -n 10 -- "$stderr_file" \
+      | /usr/bin/cut -c1-300 \
+      | /usr/bin/sed -E 's#://[^:/@[:space:]]+:[^@[:space:]]+@#://REDACTED:REDACTED@#g' >&2 || true
+  else
+    printf 'Supabase backup diagnostics: the command wrote no stderr\n' >&2
+  fi
+  fail "$message" "$status"
+}
+
 cleanup_temp() {
   if [[ -n "$TEMP_POINTER" ]]; then
     case "$TEMP_POINTER" in
@@ -1004,7 +1028,7 @@ main() {
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_before" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_dumpall before snapshot failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_dumpall before snapshot failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_dumpall before snapshot emitted stderr'
   /usr/bin/chmod 600 -- "$roles_before"
 
@@ -1027,7 +1051,7 @@ main() {
   run_manifest_generator "$manifest" "$SNAPSHOT" "$service_file" "$ca_fd_path" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "source manifest generation failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "source manifest generation failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'source manifest generator emitted stderr'
   /usr/bin/chmod 600 -- "$manifest"
   validate_manifest "$manifest" "$SNAPSHOT" || fail 'source manifest validation failed'
@@ -1038,7 +1062,7 @@ main() {
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_after" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_dumpall after snapshot failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_dumpall after snapshot failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_dumpall after snapshot emitted stderr'
   /usr/bin/chmod 600 -- "$roles_after"
 
@@ -1051,14 +1075,14 @@ main() {
   "$PG_RESTORE" --list "$archive" >"$toc" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_restore validation failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_restore validation failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_restore validation emitted stderr'
   /usr/bin/grep -Eq '^[[:space:]]*[0-9]+;' "$toc" || fail 'pg_restore validation returned no archive entries' 65
   set +e
   "$PG_RESTORE" --file=/dev/null "$archive" >/dev/null 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_restore full traversal failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_restore full traversal failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_restore full traversal emitted stderr'
 
   normalize_roles_export "$roles_before" "$roles_before_normalized" || fail 'roles-before normalization failed'
