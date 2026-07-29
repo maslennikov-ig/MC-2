@@ -6,7 +6,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/postgres/backup-supabase.sh",
-      "sha256": "ec3fea8ad432d2e6c1370caa1a935b910764b394f82c3df33d95a60e8bf38791"
+      "sha256": "1f7ba579847f1a98f01264a7762029fdfa015e7f82654edfc8b1e935de696353"
     },
     {
       "group": "claude-deploy",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "4bcc4315bb078727a7b9a3cec764663f0be43159",
+  "generated_from_tree_sha": "847163e688b45ff6e4b45e35d046067cbb3b1d2a",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
