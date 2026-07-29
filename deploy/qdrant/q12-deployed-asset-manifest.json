@@ -182,7 +182,7 @@
       "mode": "0644",
       "owner": "root",
       "path": "deploy/qdrant/q12-writer-resume.py",
-      "sha256": "0ad5f2a7867165e4390476aea3a6ec4f346024b5be627d2d4284815e6c706e73"
+      "sha256": "bb81024b8a58a41b5d8565f5adeee598402466f808bf0f056da998975561edd5"
     },
     {
       "group": "claude-deploy",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "b138c57183481a531080d05772a766243350f41c",
+  "generated_from_tree_sha": "479686ad19ae0ff2a9304b4a116ef858ded0dac0",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
