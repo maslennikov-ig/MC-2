@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "8ed6aad269dc1d5e18a1b69201f426987fc29851",
+  "generated_from_tree_sha": "4d89af736583f25779e9452affd80b9fee4c5ba4",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
