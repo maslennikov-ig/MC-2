@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-28 (attempt #11 opened, failed closed at C2, production restored; blocker `mc2-awi6q`)
+Updated: 2026-07-29 (attempts #12 and #13; C1 and C2 now PASS, blocker moved to C3 `mc2-1cxna`)
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -33,75 +33,75 @@ Updated: 2026-07-28 (attempt #11 opened, failed closed at C2, production restore
 
 Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
 `.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open work is
-`mc2-i9h3y` (owner-present window), BLOCKED by `mc2-awi6q`; tracked residuals `mc2-uha77`,
+`mc2-i9h3y` (owner-present window), BLOCKED by `mc2-1cxna`; tracked residuals `mc2-uha77`,
 `mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`, `mc2-o0g75`, `mc2-c2p8z`, `mc2-n6szm`,
-`mc2-qd12b`, `mc2-e21lo`, `mc2-zls0f`, `mc2-dizgy`, plus `mc2-ivjyb`; see § "Explicit defers".
+`mc2-qd12b`, `mc2-e21lo`, `mc2-zls0f`, `mc2-dizgy`, `mc2-0ie27`, plus `mc2-ivjyb`; see § "Explicit defers".
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: fix `mc2-awi6q` (P0) — it is the ONLY thing between here and a reopen. Attempt
-#11 opened on 2026-07-28 with a green 25-probe pre-flight, reached C2 and failed closed there;
-production was guarded for ~5 minutes and is fully restored (evidence below). Everything else before
-C9 is settled: `mc2-1sns3` CLOSED, `mc2-lzft4` CLOSED and proven on the host, the `--release-sha`
-identity ruled, the capability question answered, the argv fixed. Full brief:
-`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`. `mc2-awi6q` — with `mc2-lzft4` fixed, C2's child ran for the FIRST TIME in production and refused:
-`writer quiesce journal graph is invalid` (`q12-writer-resume.py:507`). `:509` requires the
-`quiesced/intent` row's `capability_manifest_sha256` to be 64 zeroes; the controller carries the
-predecessor's digest forward (`9c8cb181…`, the `barrier.install` capability), which is what the
-ratified D5J amendment item 6 freezes ("the next intent inherits it unchanged as
-`H.capability_manifest_sha256`"). The `0×64` intent rule belongs to the `barrier.cleanup` lifecycle
-only. The child agrees with the runtime FIXTURE, which defaults `capabilityManifestSha256` to 64
-zeroes (`qdrant-source-recovery-runtime.test.ts:1418`/`:1449`) — the twelfth instance of the
-substitution class. FIX (outside the last stage's write zone, and the child is privileged): accept
-the inherited digest at `:509`, keep the exact-digest rule for issued/claimed, rebuild the fixture
-from the REAL captured journal, re-audit the child's other journal expectations the same way, then
-re-emit the asset manifest (the file's sha moves), redeploy, prove H2, and stage a FRESH run root.
+Recommended action: reopen the window once `mc2-1cxna` (P0) can NAME its failure. C1 and C2 both
+PASS now: attempt #13 (2026-07-29 07:58Z) ran clean through the writer quiesce for the first time —
+16 journal rows, the ten writers inventoried, stopped and manifested, the closed-inbound probe
+satisfied by the real nginx — and died at C3 with `pg_dumpall before snapshot failed with status 1`
+and nothing else, because `backup-supabase.sh` discarded the stderr it had already captured. That
+discard is FIXED (`fail_command`, five call sites); the same command run read-only afterwards exits
+0 with empty stderr on the restored database, so the cause lives in the guarded-window state — the
+barrier's `ALTER DATABASE postgres SET default_transaction_read_only=on`, the pooler after C2
+terminated backends, or a pooler connection limit. Reopen, read the new diagnostics, fix, and hold
+at `--stop-after deploy.prepare` for the owner at C9. Three C2 defects are CLOSED and covered by
+suites that drive the REAL child from the REAL controller: `mc2-awi6q` (the intent-row carry rule
+plus two checkpoint files the controller never published) and `mc2-1kcbv` (writer selection swept
+whole compose projects, so production's seven platform containers made it 17 instead of 10). Full
+brief: `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
-`mc2-lzft4` CLOSED (`62461e172`): the manifest declared mode `0444` where `source-recovery-run.sh`
-demands `root:root 0644`, so H2 certified a host the wrapper rejects; identity now comes from the
-consuming script's own refusal and the emitter fails closed if either side moves. `mc2-1sns3` CLOSED
-(`1725a2df3`): `run_recover` never passed the staged-callback hook into the driver it shares with
-`run_live`; the threading moved INTO the driver. `mc2-ot8se` and `mc2-38ivn` are DONE. Detail for
-all of these in the stage summary.
+`mc2-lzft4`, `mc2-1sns3`, `mc2-ot8se`, `mc2-38ivn`, `mc2-awi6q` and `mc2-1kcbv` are all CLOSED;
+detail for each in the stage summary.
 
-RUN ROOTS `6544c7dd-…` (attempt #10) and `8915724a-…` (attempt #11) are BURNT — each carries 11
-durable rows with head `writers.quiesce/capability_claimed`, which is NOT one of the seven recover
-heads. A reopen needs a fresh `plan` run and a fresh run-id; `--expected-catalog-sha256` is always
-the sha256 of THAT root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a value
-quoted for a prior root. Everything else in the argv is settled below.
+RUN ROOTS `6544c7dd-…` (#10), `8915724a-…` (#11), `d6dcb2b7-…` (#12) and `07810dcf-…` (#13) are
+BURNT; `74000355-…` was abandoned before any journal row (D1 caught the drift below). A reopen needs
+a fresh `plan` and a fresh run-id, and `--expected-catalog-sha256` is always the `sha256sum` of THAT
+root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a value quoted for a prior
+root. Everything else in the argv is settled below.
 
-PRODUCTION IS CLEAN after attempt #11, restored with the barrier's OWN `$restore$`
-(`drop_schema=true`, rendered from the DEPLOYED barrier, run under that run's capability). Verified
-read-only afterwards: C4 zero `q12_guard` residue, C2 8 cron jobs active, C3 queue empty,
-A5/B4/D1/E1/E2 pass, `pg_db_role_setting` back to exactly `['app.settings.jwt_exp=3600']`, every
-production container up and healthy, `cutover.lock` free. Full account, including why the barrier's
-own `rollback` command refuses here and the `mc2-e21lo` terminate-sweep finding, in the stage
-summary.
+THE PLAN IS PERISHABLE (`mc2-0ie27`, found 2026-07-29). Supabase Realtime rotates daily
+`realtime.messages_*` partitions on its own service timer — no pg_cron entry, so C2 stays green —
+and every create/drop moves the structural catalog hash the barrier re-measures at C1. A plan
+captured at 06:31Z was already stale by 07:00Z (`93ca595a…` -> `1a0ac0f0…`). D1 is the detector and
+it works: it refused before the window opened, with zero mutation. Keep plan -> open to minutes.
+
+PRODUCTION IS CLEAN after attempt #13. Attempt #13 is the first that actually STOPPED writers, so
+production was really down 07:59Z-08:03Z. Recovery order that worked: (1) the barrier's OWN rendered
+`$restore$` under that run's capability, then (2) every writer restored from THAT RUN'S OWN
+`writer-quiesce-<run-id>.json` — `docker update --restart` back to each recorded prior policy
+(`unless-stopped`), then `docker start` where `prior_running` was true. Verified: 17 containers up
+and healthy, both public hosts 200, database-scope pre-flight EXIT=0 (C4 zero `q12_guard` residue,
+C2 8 cron jobs active, C3 empty, D1 agrees, A/B/E pass). Full account in the stage summary.
 
 The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept
 under `/opt/megacampus/backups/q12-assets/<utc>/`). Do NOT invoke `q12-live-cutover.sh` for `live`:
 it execs `/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`). Use
 `/usr/bin/python3.13 … live …` per runbook §2 and run the gate by hand immediately before.
 
-WINDOW STATE. Opened ELEVEN times (2026-07-27/28); #1-#8 failed closed with ZERO mutation, #9, #10
-and #11 installed the guard, aborted, and were restored by hand with the barrier's own `$restore$`
-(the rendered block is byte-identical every time: `2f11b8ed…`). Production re-verified clean after
-each. Every attempt BURNS its run-id. Eleven of the twelve defects are fixed and most are now a
-PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2, `mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3,
-`mc2-lzft4`→H2's expected value); the twelfth is `mc2-awi6q`, OPEN. THE PATTERN behind all of them:
-the checked environment substituted for the consuming one — in `mc2-lzft4` the PROBE carried the
-substitution, and in `mc2-awi6q` the TEST FIXTURE did. Model the constraint, never the convenience.
+WINDOW STATE. Opened THIRTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
+installed the guard and were restored by hand; #13 also stopped the writers and was restored the same
+way plus the writer replay above. The rendered restore block is byte-identical every time
+(`2f11b8ed…`). Every attempt BURNS its run-id. C1 and C2 now PASS. Fifteen defects found, fourteen
+fixed and most are now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2,
+`mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3, `mc2-lzft4`→H2's expected value); `mc2-awi6q` and
+`mc2-1kcbv` are CLOSED with suites that drive the REAL child from the REAL controller; `mc2-1cxna`
+(C3) and `mc2-0ie27` (plan perishability) are OPEN. THE PATTERN behind almost all of them: the
+checked environment substituted for the consuming one — a probe carried it in `mc2-lzft4`, a test
+fixture in `mc2-awi6q` and `mc2-1kcbv`. Model the constraint, never the convenience.
 
 BEFORE THE NEXT ATTEMPT — one command on the server immediately before the window:
 `/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>`.
 Read-only by construction, through the pooled DSN, no lock, no run-id burned. Exits 0 only when all
 25 frozen probes are `pass` or `unprovable` with named evidence; `--assert-fresh-report` refuses
-`live` without a green report under 30 min old matching the deployed tree. It went fully green
-before attempt #11 (22 pass; C5, C6, H4 unprovable with evidence) and the window still failed at C2:
-a probe is only as good as the value it asserts against, and covers nothing outside its reach.
-Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
+`live` without a green report under 30 min old matching the deployed tree. It has gone fully green
+before every attempt since #11 (22 pass; C5/C6/H4 unprovable with evidence) and the window still
+failed past it three times: a probe covers nothing outside its reach. Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
 Outside what the probe can do: run the controller DETACHED (`setsid nohup` — a dropped ssh once
 killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push
@@ -114,9 +114,9 @@ WINDOW ARGV — SETTLED 2026-07-28 from artefacts, no re-plan. `--release-sha
 `org.opencontainers.image.revision = 23dfe973f…` on the host, its `WEB_IMAGE` (`…@sha256:ca9afb99…`)
 labels `50f670b9` but `git diff 50f670b9..23dfe973f -- packages/web packages/shared-types
 packages/shared-utils` is EMPTY, and the staged root's catalog authority already records it.
-`mc2-sdbua`'s closure is SUPERSEDED: it ruled on the now-spent root `0fa297e4` and re-made the
-operator/app conflation `mc2-v7547` corrected — `b5eb528e…` labels `060b4faea`, which touched no
-application source. `--operator-digest b5eb528e…`,
+`mc2-sdbua`'s closure is SUPERSEDED (it ruled on the spent root `0fa297e4` and re-made the
+operator/app conflation `mc2-v7547` corrected; `b5eb528e…` labels `060b4faea`, no application
+source). `--operator-digest b5eb528e…`,
 `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests on a first run.
 `--stop-after deploy.prepare` is the sole resumable pre-C9 head; the barrier is invoked as argv[0],
 so keep it mode 0555, not 0444.

@@ -1523,3 +1523,80 @@ settled the important half: D1 reported `93ca595a…` both immediately before th
 restore, so a barrier install plus the restore block is structurally NEUTRAL and the earlier change
 did not come from the restore path. The remaining action is only to keep one
 `plan --keep-equality-diagnostics` source payload so the next comparison is provable.
+
+## Window attempts #12 and #13 — C1 and C2 cleared, blocker moved to C3 (2026-07-29)
+
+`mc2-awi6q` TURNED OUT TO BE TWO GAPS. The filed one was the carry rule: the child demanded the
+`writers.quiesce` INTENT row carry `0×64`, while the controller carries the predecessor command's
+capability digest forward (ratified D5J item 6, and the controller's own
+`selector_intent_from_head`/`append_ordinary_lifecycle`). The child now requires that row to equal
+the PRECEDING journal row's digest exactly — a corrected expectation, not a relaxed one, and `0×64`
+only when the journal is empty. Past that check a second gap appeared: the child reads
+`writer-quiesce-capability-checkpoint-<run-id>-<epoch>.json` (the 12-key projection of the intent
+row, whose sha256 IS the capability's `capability_input_checkpoint_sha256`) and
+`writer-quiesce-input-checkpoint-<run-id>-<epoch>.json` (the claimed-boundary head, byte-identical
+to `phase-checkpoint.json`). The controller computed the first digest and wrote it into the
+capability but published NEITHER FILE — the exact mc2-orsez shape, invisible for the same reason:
+the runtime fixtures published these files themselves. `Engine.publish_writer_quiesce_child_checkpoint`
+now publishes both at the boundaries their contents are taken from and asserts the journal head
+rather than assuming it.
+
+THE PLAN IS PERISHABLE (`mc2-0ie27`). Between the two attempts, D1 refused a run root whose plan was
+19 minutes old: the plan captured `93ca595a…`, the live database hashed `1a0ac0f0…`, stable on
+re-measurement, both under the same pinned `search_path=pg_catalog` (so not the mc2-2rzf6 projection
+difference). The highest OIDs in the whole database named the cause: `realtime.messages_2026_08_01`
+and its index/pkey. Supabase Realtime keeps a rolling ~7-day window of DAILY partitions of
+`realtime.messages` and rotates them on its own service timer — no pg_cron entry, so C2 stays green
+— and each create/drop moves the structural catalog the barrier re-measures at C1. D1 is the
+detector and it worked: it refused BEFORE the window opened, with zero production mutation. The
+mitigation used since is to keep plan → open to a few minutes.
+
+`mc2-1kcbv` — THE WRITER INVENTORY SWEPT WHOLE COMPOSE PROJECTS. Attempt #12 (07:19Z) cleared C1 and
+the C2 child ran past both mc2-awi6q gaps into the Docker inventory, where it refused: "writer
+quiesce inventory is not exact" (`:961`). It swept `docker ps -aq --filter
+label=com.docker.compose.project=<p>` over `megacampus-blue`, `megacampus-green` and `megacampus`
+and demanded exactly ten. On production `megacampus` also carries redis, qdrant, qdrant-dev,
+docling-mcp, docling-mcp-internal, notebooklm-bridge and notebooklm-bridge-dev — SEVENTEEN. Worse
+than the count: had it matched, the classifier one line later ("not api/web, so a worker") would
+have labelled redis a `production-worker` and stopped it. The fixture that covered this had exactly
+ten containers in the projects, so a sweep and a selection were indistinguishable. The ten writer
+SERVICES are now frozen beside `CLASSES` and each is selected with a second label filter.
+
+BOTH FIXES ARE COVERED BY SUITES THAT DRIVE THE REAL CHILD FROM THE REAL CONTROLLER.
+`q12-quiesce-child-input-contract.test.ts` (7 tests) drives `Engine.append_ordinary_lifecycle` and
+launches the actual `q12-writer-resume.py` from `execute_ordinary` to its `before-inventory`
+boundary; it publishes neither checkpoint itself, withdraws each in turn to prove they are
+load-bearing, and re-runs the child with the pre-fix `0×64` expression restored, which reproduces
+the production message verbatim. `q12-quiesce-writer-inventory.test.ts` (4 tests) does the same to
+the `after-inventory` boundary against a fake `docker` seeded with production's REAL composition —
+captured read-only, labels and state only, never container env, with each writer's real healthcheck
+presence, restart policy `unless-stopped:0` and compose file — and covers production as it is, the
+pre-fix sweep restored, a writer removed, and a new platform service added.
+
+ATTEMPT #13 (07:58Z) CLEARED C1 AND C2. Sixteen journal rows: the writer quiesce inventoried the ten
+writers, set their restart policies to `no`, stopped api/web, satisfied `probe_closed_inbound()`
+against the REAL nginx, stopped the workers, published the final manifest and had it ACCEPTED. It
+then died at C3: `Supabase backup failed: pg_dumpall before snapshot failed with status 1`, and
+nothing else — `backup-supabase.sh` routes that step's stderr into a file under the run-private
+generation directory that `fail` never reads and cleanup reclaims. Filed `mc2-1cxna` and FIXED the
+discard in the same pass (`fail_command` prints a bounded, credential-redacted tail; five call
+sites). Ruled out read-only afterwards: the identical command with the identical flags, DSN, CA and
+libpq service shape exits 0 with 7943 bytes and EMPTY stderr on the restored database, so the cause
+lives in the guarded-window state — candidates are the barrier's `ALTER DATABASE postgres SET
+default_transaction_read_only=on`, the pooler after C2 terminated backends, or a pooler connection
+limit.
+
+RECOVERY FROM #13, the first attempt that actually stopped writers (production down 07:59Z-08:03Z):
+(1) the barrier's OWN rendered `$restore$` (sha256 `2f11b8ed…`, byte-identical to #10/#11/#12) under
+that run's capability, then (2) every writer replayed from THAT RUN'S OWN
+`writer-quiesce-<run-id>.json` — `docker update --restart` back to each recorded prior policy
+(`unless-stopped`), then `docker start` where `prior_running` was true. Verified after: 17
+containers up and healthy, `https://ai.megacampus.ru/` and `https://dev.ai.megacampus.ru/` both 200,
+database-scope pre-flight EXIT=0 with C4 zero `q12_guard` residue and D1 back at `1a0ac0f0…`. Only
+the post-COMMIT `pg_terminate_backend` tail failed again (`mc2-e21lo`).
+
+READ-ONLY CHECKS DONE MEANWHILE, so the next attempt has fewer unknowns: no `error_page` or
+`charset` override in `/etc/nginx`, so nginx serves its standard error template — which is
+byte-for-byte what the child expects; `Server: nginx/1.24.0 (Ubuntu)` matches the child's regex; TLS
+validates for both hostnames over `--resolve` to 127.0.0.1; and every one of the ten writers' real
+state matches every field `validate_quiesce_writers` checks.
