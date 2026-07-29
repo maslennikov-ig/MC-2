@@ -1638,3 +1638,25 @@ The recovery is now routine and proven: the barrier's own rendered `$restore$` u
 capability, then the ten writers replayed from THAT RUN'S OWN `writer-quiesce-<run-id>.json`. After
 each: 17 containers up, both public hosts 200, database-scope pre-flight EXIT=0, C4 zero residue,
 D1 back at `1a0ac0f0…`.
+
+## Window attempt #16 — C3 cleared, and the same HOME cause a third time at C4 (2026-07-29)
+
+`pg.backup` ran to COMPLETION against production: 20 journal rows through `backup_committed/
+completed`, the real `pg_dumpall`, `pg_dump`, source manifest and both `pg_restore` validation
+passes. C4's restore drill then died on `restore image index lookup failed`, with
+`WARNING: Error loading config file: open /root/.docker/config.json: permission denied` beside it.
+
+Third face of the same cause. `restore-supabase-drill.sh` runs under the frozen pg.restore env's
+`HOME=/root` as the deploy operator; the docker CLI aborts loading `$HOME/.docker/config.json` with
+EACCES and then never discovers its CLI plugins, so `docker buildx imagetools inspect "$RESTORE_TAG"
+--raw` degrades into `unknown flag: --raw`. Reproduced and cured on the host read-only: the same
+argv prints exactly that under `HOME=/root` and returns the OCI image index for
+`public.ecr.aws/supabase/postgres:17.6.1.064` under a stat-able HOME. The buildx plugin was never
+missing — it is in `/usr/libexec/docker/cli-plugins`. The drill now exports its adopted private temp
+root as HOME inside `create_temp_root`, after the 0700 directory exists and before any child runs.
+
+THE LESSON, now three times over in one afternoon: the frozen manifest env pins `HOME=/root` for
+every privileged command, while the commands run as the deploy operator. Any child that resolves
+something under `$HOME` — libpq's default client certificate, the docker CLI's config and plugin
+directory — fails with EACCES rather than falling back, because an unreadable parent is not the
+same as an absent file. When adding a consumer to a frozen-env command, give it a HOME it can stat.

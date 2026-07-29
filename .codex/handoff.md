@@ -1,13 +1,11 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-29 (attempts #12-#15; C1, C2 and both C3 dumps PASS; blocker `mc2-1cxna`)
+Updated: 2026-07-29 (attempts #12-#16; C1, C2 and C3 PASS; blocker is C4 `mc2-1cxna`)
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
-- **`develop` is the single source of truth** for all Q12 work; a 2026-07-21 containment audit
-  proved it is the superset of every Q12 line (`codex/self-hosted-qdrant-platform`,
-  `codex/q12-plan-builder`, `codex/q12-w-writer-barrier`, the W7a increments and the
-  orchestration-infra commits are all in it). Keep those branches for history only.
+- **`develop` is the single source of truth** for all Q12 work; the 2026-07-21 containment audit
+  proved it is the superset of every Q12 line. Keep those branches for history only.
 - **Stale branches RETIRED (2026-07-27 audit).** The primary worktree sits on `develop`; new Q12
   work branches from it and is delivered via `/push-dev`. Video pipeline parked `mc2-hqfc3`.
 - Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
@@ -48,8 +46,10 @@ defects were found and fixed on 2026-07-29, each by opening the window and each 
 containers made it 17 instead of 10) — both CLOSED — and `mc2-1cxna` (OPEN, two causes fixed): the
 frozen `HOME=/root` made libpq refuse every connection because it could not stat
 `/root/.postgresql/postgresql.crt`, and the manifest generator was handed `/proc/self/fd/N` paths
-that do not survive its spawn chain. Attempt #15 got both dumps through and died on the second;
-attempt #16 starts at the source manifest generator. Reopen with the sequence in § "Before the next
+that do not survive its spawn chain. Attempt #16 then ran `pg.backup` to COMPLETION and died at C4 on a third face of the same cause:
+the docker CLI cannot read `/root/.docker/config.json` either, so it never discovers its buildx
+plugin and `docker buildx imagetools inspect --raw` degrades to "unknown flag". Fixed the same way.
+Attempt #17 starts at C4's image-index lookup. Reopen with the sequence in § "Before the next
 attempt", read any new failure from the diagnostics (`fail_command` now prints them), and hold at
 `--stop-after deploy.prepare` for the owner at C9. Full brief:
 `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
@@ -58,7 +58,7 @@ attempt", read any new failure from the diagnostics (`fail_command` now prints t
 detail for each in the stage summary.
 
 RUN ROOTS `6544c7dd-…` (#10), `8915724a-…` (#11), `d6dcb2b7-…` (#12) and `07810dcf-…` (#13) are
-BURNT, as are `a9d88afb-…` (#14) and `2cd7e61b-…` (#15); `74000355-…` was abandoned before any
+BURNT, as are `a9d88afb-…` (#14), `2cd7e61b-…` (#15) and `96741f4b-…` (#16); `74000355-…` was abandoned before any
 journal row (D1 caught the drift below). A reopen needs
 a fresh `plan` and a fresh run-id, and `--expected-catalog-sha256` is always the `sha256sum` of THAT
 root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a value quoted for a prior
@@ -78,15 +78,15 @@ production was really down 07:59Z-08:03Z. Recovery order that worked: (1) the ba
 and healthy, both public hosts 200, database-scope pre-flight EXIT=0 (C4 zero `q12_guard` residue,
 C2 8 cron jobs active, C3 empty, D1 agrees, A/B/E pass). Full account in the stage summary.
 
-The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept
-under `/opt/megacampus/backups/q12-assets/<utc>/`). Do NOT invoke `q12-live-cutover.sh` for `live`:
-it execs `/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`). Use
-`/usr/bin/python3.13 … live …` per runbook §2 and run the gate by hand immediately before.
+The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept in
+`/opt/megacampus/backups/q12-assets/`). Do NOT invoke `q12-live-cutover.sh` for `live`: it execs
+`/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`); use
+`/usr/bin/python3.13 … live …` and run the gate by hand immediately before.
 
-WINDOW STATE. Opened FIFTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
-installed the guard and were restored by hand; #13-#15 also stopped the writers and were restored
-the same way plus the writer replay above (#15 ran both real dumps first, so its outage was ~16
-minutes rather than ~4). The rendered restore block is byte-identical every time
+WINDOW STATE. Opened SIXTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
+installed the guard and were restored by hand; #13-#16 also stopped the writers and were restored
+the same way plus the writer replay above (outages of ~4 to ~16 minutes, longer once the real dumps
+started running to completion). The rendered restore block is byte-identical every time
 (`2f11b8ed…`). Every attempt BURNS its run-id. C1 and C2 now PASS. Fifteen defects found, fourteen
 fixed and most are now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2,
 `mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3, `mc2-lzft4`→H2's expected value); `mc2-awi6q` and
@@ -98,25 +98,22 @@ fixture in `mc2-awi6q` and `mc2-1kcbv`. Model the constraint, never the convenie
 BEFORE THE NEXT ATTEMPT — one command on the server immediately before the window:
 `/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>`.
 Read-only by construction, through the pooled DSN, no lock, no run-id burned. Exits 0 only when all
-25 frozen probes are `pass` or `unprovable` with named evidence; `--assert-fresh-report` refuses
-`live` without a green report under 30 min old matching the deployed tree. It has gone fully green
-before every attempt since #11 (22 pass; C5/C6/H4 unprovable with evidence) and the window still
-failed past it three times: a probe covers nothing outside its reach. Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
+25 probes are `pass` or `unprovable` with named evidence. It has been green before every attempt
+since #11 and the window still failed past it each time: a probe covers nothing outside its reach.
+Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
-Outside what the probe can do: run the controller DETACHED (`setsid nohup` — a dropped ssh once
+Outside what the probe can do: run the controller DETACHED (`setsid nohup`; a dropped ssh once
 killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push
-touching `deploy/**` triggers Deploy to Dev, failing H4 for 30 minutes; docs-only, `.codex/**` and
-test-only pushes do not (`scripts/ci/detect_deploy_changes.sh`). Deploy to Dev never scps
-`deploy/qdrant` — only the master `Deploy to Production` job does (broken per `mc2-o0g75`).
+touching `deploy/**` triggers Deploy to Dev, failing H4 for 30 minutes (docs-only, `.codex/**` and
+test-only pushes do not). Deploy to Dev never scps `deploy/qdrant` — only the master job does,
+broken per `mc2-o0g75`, so the tree is reinstalled by hand.
 
 WINDOW ARGV — SETTLED 2026-07-28 from artefacts, no re-plan. `--release-sha
-23dfe973f18cc6067d386b6eb683bf6906142165`: `.env.green`'s `API_IMAGE` (`…@sha256:2f713f87…`) carries
-`org.opencontainers.image.revision = 23dfe973f…` on the host, its `WEB_IMAGE` (`…@sha256:ca9afb99…`)
-labels `50f670b9` but `git diff 50f670b9..23dfe973f -- packages/web packages/shared-types
-packages/shared-utils` is EMPTY, and the staged root's catalog authority already records it.
-`mc2-sdbua`'s closure is SUPERSEDED (it ruled on the spent root `0fa297e4` and re-made the
-operator/app conflation `mc2-v7547` corrected; `b5eb528e…` labels `060b4faea`, no application
-source). `--operator-digest b5eb528e…`,
+23dfe973f18cc6067d386b6eb683bf6906142165` (`.env.green`'s `API_IMAGE` carries that
+`org.opencontainers.image.revision`; its `WEB_IMAGE` labels `50f670b9`, but the diff against
+`23dfe973f` over `packages/web|shared-types|shared-utils` is EMPTY, and the staged root's catalog
+authority records it). `mc2-sdbua`'s closure is SUPERSEDED: it ruled on the spent root `0fa297e4`
+and re-made the operator/app conflation `mc2-v7547` corrected. `--operator-digest b5eb528e…`,
 `--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests on a first run.
 `--stop-after deploy.prepare` is the sole resumable pre-C9 head; the barrier is invoked as argv[0],
 so keep it mode 0555, not 0444.
@@ -126,6 +123,9 @@ root. `q12-database-barrier.sh:210` binds only the PATH to the run id; `install`
 digest the session supplies (`:945-948`) and `assert_capability`/`assert_controller_binding` compare
 only against that row (`:984`, `:999`) — a per-run nonce with no external counterpart.
 `accepted-coverage-run` is deterministic and not secret — copied verbatim.
+THE FROZEN ENV PINS `HOME=/root` FOR EVERY COMMAND while they run as the deploy operator; any child
+resolving something under `$HOME` (libpq's client certificate, the docker CLI's config and plugins)
+fails with EACCES, not "absent". Give every new consumer a HOME it can stat.
 
 The dead GHCR token (`mc2-2vtmk`) does not block the window.
 
