@@ -36,7 +36,16 @@ on vanilla PG17.10, so a locally seeded container would fail for a reason that h
 with the window.  Without a bound handle every child is reported ``skipped`` with that reason, which
 is what the TypeScript suite asserts in CI.
 
-    q12-isolate-dry-run-runner.py [--persist-handle <abs path>]
+    q12-isolate-dry-run-runner.py [--generation <abs path>] [--persist-handle <abs path>]
+
+``--generation`` is the ordinary path on the host: it drives the reviewed drill in SCHEDULED mode
+over an EXISTING backup generation, through the same persist seam the plan uses
+(``MC2_Q12_RESTORE_PERSIST_HANDLE``), and tears the isolate down afterwards.  The plan's own
+``teardown()`` reclaims its isolate unconditionally, so a completed plan leaves nothing to attach to;
+driving the drill directly reuses the machinery without touching the controller, and re-uses a dump
+that already exists instead of taking another one from production.  The drill runs under the frozen
+``pg.restore`` env — the exact condition attempt #16 died in — so this leg would have caught that
+defect for free.
 
 Prints one JSON object to stdout.  Reads no secret into an argument or a log: the isolate password
 travels through a mode-0600 libpq URI file, and every child's stderr is scrubbed before it is
@@ -56,7 +65,16 @@ import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[5]
-COMMAND_MANIFEST = REPO / "deploy/qdrant/q12-command-manifest.json"
+# The deployed tree is the authority where one exists — on the host that is also the only place the
+# `pnpm --filter …` children resolve from, which is why it is the cwd every child is given
+# (runbook §2). A repository checkout falls back to itself so the suite runs in CI.
+DEPLOY_ROOT = pathlib.Path(os.environ.get("MC2_Q12_DRY_RUN_DEPLOY_ROOT", "/opt/megacampus"))
+ROOT = (
+    DEPLOY_ROOT
+    if (DEPLOY_ROOT / "deploy/qdrant/q12-command-manifest.json").is_file()
+    else REPO
+)
+COMMAND_MANIFEST = ROOT / "deploy/qdrant/q12-command-manifest.json"
 CA_FILE = pathlib.Path(
     os.environ.get("MC2_Q12_DRY_RUN_CA_FILE", "/opt/megacampus/secrets/prod-ca-2021.crt")
 )
@@ -198,7 +216,7 @@ def drive(command_id: str, command: dict, credentials: "dict[str, str]") -> dict
     completed = subprocess.run(
         argv,
         env=dict(command["env"]),
-        cwd=str(REPO),
+        cwd=str(ROOT),
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
@@ -218,47 +236,129 @@ def drive(command_id: str, command: dict, credentials: "dict[str, str]") -> dict
     }
 
 
-def report(handle_path: "pathlib.Path | None") -> dict:
+def drill_isolate(generation: pathlib.Path, workdir: pathlib.Path) -> "tuple[dict, dict]":
+    """Restore an EXISTING backup generation into a disposable isolate, and hand back the handle.
+
+    Scheduled mode, exactly as the plan drives it: no capability, no q12_guard, no activation
+    cleanup — the pre-cutover source has no guard schema, so the Q12 mode could never succeed here.
+    The env is the frozen ``pg.restore`` env plus the three seam variables the drill's persist path
+    needs, so the drill runs in the same environment the window hands it.
+    """
+    drill = ROOT / "deploy/postgres/restore-supabase-drill.sh"
+    if not drill.is_file():
+        raise RuntimeError(f"restore drill is unavailable: {drill}")
+    manifest = json.loads(COMMAND_MANIFEST.read_text(encoding="utf-8"))
+    frozen = dict(manifest["commands"]["pg.restore"]["env"])
+    handle_path = workdir / "restore-persist-handle.json"
+    run_id = str(__import__("uuid").uuid4())
+    completed = subprocess.run(
+        [str(drill), "--scheduled-run-id", run_id, "--generation", str(generation)],
+        env={
+            **frozen,
+            "MC2_Q12_RESTORE_PERSIST_HANDLE": str(handle_path),
+            "MC2_Q12_PLAN_DOCKER": os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker"),
+            "MC2_Q12_PLAN_REPO_ROOT": str(ROOT),
+        },
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5400,
+    )
+    child = {
+        "id": "pg.restore",
+        "outcome": RAN if completed.returncode == 0 else FAILED,
+        "status": completed.returncode,
+        "env_home": frozen.get("HOME", ""),
+        "detail": (
+            f"the reviewed drill restored {generation.name} into a disposable isolate under the "
+            f"frozen pg.restore env (HOME={frozen.get('HOME', '')}), scheduled mode, no capability "
+            "and no guard"
+            if completed.returncode == 0
+            else scrub(completed.stderr or completed.stdout)
+        ),
+    }
+    if completed.returncode != 0:
+        return child, {}
+    return child, load_handle(handle_path)
+
+
+def reclaim(handle: dict) -> dict:
+    """Remove the isolate this harness created. Named in the report, never silent."""
+    docker = os.environ.get("MC2_Q12_PLAN_DOCKER", "/usr/bin/docker")
+    outcome = {}
+    for kind, argv in (
+        ("container", [docker, "rm", "-f", handle["container"]]),
+        ("volume", [docker, "volume", "rm", "--force", handle["volume"]]),
+        ("network", [docker, "network", "rm", handle["network"]]),
+    ):
+        result = subprocess.run(argv, capture_output=True, text=True, check=False)
+        outcome[kind] = "removed" if result.returncode == 0 else scrub(result.stderr)[:160]
+    return outcome
+
+
+def report(handle_path: "pathlib.Path | None", generation: "pathlib.Path | None" = None) -> dict:
     manifest = json.loads(COMMAND_MANIFEST.read_text(encoding="utf-8"))
     commands = manifest["commands"]
     children: list[dict] = []
     isolate: dict = {"bound": False}
 
-    if handle_path is None:
+    if handle_path is None and generation is None:
         reason = (
-            "no plan persist handle was bound (--persist-handle); the isolate is a Supabase "
+            "no isolate was bound (--generation or --persist-handle); the isolate is a Supabase "
             "PostgreSQL 17.6 restored from the production dump and a vanilla container is not a "
             "substitute — the document-evidence migration manifest hashes fail on vanilla PG17.10"
         )
         for command_id in ("pg.restore", *DRIVEN):
             children.append({"id": command_id, "outcome": SKIPPED, "detail": reason})
     else:
-        handle = load_handle(handle_path)
-        isolate = {
-            "bound": True,
-            "run_id": handle["run_id"],
-            "container": handle["container"],
-            "database": handle["database"],
-            "port": handle["port"],
-        }
         workdir = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-isolate-dry-run-"))
         os.chmod(workdir, 0o700)
+        owned = False
+        handle: dict = {}
         try:
-            credentials = isolate_credentials(handle, workdir)
-            children.append(
-                {
-                    "id": "pg.restore",
-                    "outcome": RAN,
-                    "detail": (
-                        "the reviewed drill produced THIS isolate: container "
-                        f"{handle['container']} carries {handle['database']} restored from the "
-                        f"production generation of plan run {handle['run_id']}"
-                    ),
+            if generation is not None:
+                restore, handle = drill_isolate(generation, workdir)
+                children.append(restore)
+                owned = bool(handle)
+            else:
+                handle = load_handle(handle_path)  # type: ignore[arg-type]
+                children.append(
+                    {
+                        "id": "pg.restore",
+                        "outcome": RAN,
+                        "detail": (
+                            "the reviewed drill produced THIS isolate: container "
+                            f"{handle['container']} carries {handle['database']} restored from the "
+                            f"production generation of plan run {handle['run_id']}"
+                        ),
+                    }
+                )
+            if handle:
+                isolate = {
+                    "bound": True,
+                    "run_id": handle["run_id"],
+                    "container": handle["container"],
+                    "database": handle["database"],
+                    "port": handle["port"],
                 }
-            )
-            for command_id in DRIVEN:
-                children.append(drive(command_id, commands[command_id], credentials))
+                credentials = isolate_credentials(handle, workdir)
+                for command_id in DRIVEN:
+                    children.append(drive(command_id, commands[command_id], credentials))
+            else:
+                for command_id in DRIVEN:
+                    children.append(
+                        {
+                            "id": command_id,
+                            "outcome": SKIPPED,
+                            "detail": "the restore drill did not produce an isolate, so there was "
+                            "nothing to migrate; see the pg.restore detail",
+                        }
+                    )
         finally:
+            if owned and handle:
+                isolate["reclaimed"] = reclaim(handle)
             for leftover in sorted(workdir.glob("*")):
                 leftover.unlink(missing_ok=True)
             workdir.rmdir()
@@ -298,13 +398,21 @@ def main(argv: "list[str]") -> int:
     parser.add_argument(
         "--persist-handle",
         default=os.environ.get("MC2_Q12_ISOLATE_HANDLE") or None,
-        help="restore-persist-handle.json from a plan run root",
+        help="restore-persist-handle.json from a live isolate",
+    )
+    parser.add_argument(
+        "--generation",
+        default=os.environ.get("MC2_Q12_ISOLATE_GENERATION") or None,
+        help="an existing backup generation to restore into a disposable isolate",
     )
     arguments = parser.parse_args(argv)
     handle_path = pathlib.Path(arguments.persist_handle) if arguments.persist_handle else None
     if handle_path is not None and not handle_path.is_file():
         raise SystemExit(f"persist handle is not a file: {handle_path}")
-    sys.stdout.write(json.dumps(report(handle_path), sort_keys=True) + "\n")
+    generation = pathlib.Path(arguments.generation) if arguments.generation else None
+    if generation is not None and not (generation / "database.dump").is_file():
+        raise SystemExit(f"generation carries no database.dump: {generation}")
+    sys.stdout.write(json.dumps(report(handle_path, generation), sort_keys=True) + "\n")
     return 0
 
 
