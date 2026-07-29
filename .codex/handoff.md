@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-29 (attempts #12 and #13; C1 and C2 now PASS, blocker moved to C3 `mc2-1cxna`)
+Updated: 2026-07-29 (attempts #12-#15; C1, C2 and both C3 dumps PASS; blocker `mc2-1cxna`)
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -41,26 +41,25 @@ Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: reopen the window once `mc2-1cxna` (P0) can NAME its failure. C1 and C2 both
-PASS now: attempt #13 (2026-07-29 07:58Z) ran clean through the writer quiesce for the first time —
-16 journal rows, the ten writers inventoried, stopped and manifested, the closed-inbound probe
-satisfied by the real nginx — and died at C3 with `pg_dumpall before snapshot failed with status 1`
-and nothing else, because `backup-supabase.sh` discarded the stderr it had already captured. That
-discard is FIXED (`fail_command`, five call sites); the same command run read-only afterwards exits
-0 with empty stderr on the restored database, so the cause lives in the guarded-window state — the
-barrier's `ALTER DATABASE postgres SET default_transaction_read_only=on`, the pooler after C2
-terminated backends, or a pooler connection limit. Reopen, read the new diagnostics, fix, and hold
-at `--stop-after deploy.prepare` for the owner at C9. Three C2 defects are CLOSED and covered by
-suites that drive the REAL child from the REAL controller: `mc2-awi6q` (the intent-row carry rule
-plus two checkpoint files the controller never published) and `mc2-1kcbv` (writer selection swept
-whole compose projects, so production's seven platform containers made it 17 instead of 10). Full
-brief: `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
+Recommended action: reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
+defects were found and fixed on 2026-07-29, each by opening the window and each covered afterwards:
+`mc2-awi6q` (the intent-row carry rule plus two checkpoint files the controller never published),
+`mc2-1kcbv` (writer selection swept whole compose projects, so production's seven platform
+containers made it 17 instead of 10) — both CLOSED — and `mc2-1cxna` (OPEN, two causes fixed): the
+frozen `HOME=/root` made libpq refuse every connection because it could not stat
+`/root/.postgresql/postgresql.crt`, and the manifest generator was handed `/proc/self/fd/N` paths
+that do not survive its spawn chain. Attempt #15 got both dumps through and died on the second;
+attempt #16 starts at the source manifest generator. Reopen with the sequence in § "Before the next
+attempt", read any new failure from the diagnostics (`fail_command` now prints them), and hold at
+`--stop-after deploy.prepare` for the owner at C9. Full brief:
+`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
 `mc2-lzft4`, `mc2-1sns3`, `mc2-ot8se`, `mc2-38ivn`, `mc2-awi6q` and `mc2-1kcbv` are all CLOSED;
 detail for each in the stage summary.
 
 RUN ROOTS `6544c7dd-…` (#10), `8915724a-…` (#11), `d6dcb2b7-…` (#12) and `07810dcf-…` (#13) are
-BURNT; `74000355-…` was abandoned before any journal row (D1 caught the drift below). A reopen needs
+BURNT, as are `a9d88afb-…` (#14) and `2cd7e61b-…` (#15); `74000355-…` was abandoned before any
+journal row (D1 caught the drift below). A reopen needs
 a fresh `plan` and a fresh run-id, and `--expected-catalog-sha256` is always the `sha256sum` of THAT
 root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a value quoted for a prior
 root. Everything else in the argv is settled below.
@@ -84,14 +83,15 @@ under `/opt/megacampus/backups/q12-assets/<utc>/`). Do NOT invoke `q12-live-cuto
 it execs `/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`). Use
 `/usr/bin/python3.13 … live …` per runbook §2 and run the gate by hand immediately before.
 
-WINDOW STATE. Opened THIRTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
-installed the guard and were restored by hand; #13 also stopped the writers and was restored the same
-way plus the writer replay above. The rendered restore block is byte-identical every time
+WINDOW STATE. Opened FIFTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
+installed the guard and were restored by hand; #13-#15 also stopped the writers and were restored
+the same way plus the writer replay above (#15 ran both real dumps first, so its outage was ~16
+minutes rather than ~4). The rendered restore block is byte-identical every time
 (`2f11b8ed…`). Every attempt BURNS its run-id. C1 and C2 now PASS. Fifteen defects found, fourteen
 fixed and most are now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2,
 `mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3, `mc2-lzft4`→H2's expected value); `mc2-awi6q` and
 `mc2-1kcbv` are CLOSED with suites that drive the REAL child from the REAL controller; `mc2-1cxna`
-(C3) and `mc2-0ie27` (plan perishability) are OPEN. THE PATTERN behind almost all of them: the
+(C3, two causes already fixed) and `mc2-0ie27` (plan perishability) are OPEN. THE PATTERN behind almost all of them: the
 checked environment substituted for the consuming one — a probe carried it in `mc2-lzft4`, a test
 fixture in `mc2-awi6q` and `mc2-1kcbv`. Model the constraint, never the convenience.
 

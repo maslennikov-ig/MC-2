@@ -1600,3 +1600,41 @@ READ-ONLY CHECKS DONE MEANWHILE, so the next attempt has fewer unknowns: no `err
 byte-for-byte what the child expects; `Server: nginx/1.24.0 (Ubuntu)` matches the child's regex; TLS
 validates for both hostnames over `--resolve` to 127.0.0.1; and every one of the ten writers' real
 state matches every field `validate_quiesce_writers` checks.
+
+## Window attempts #14 and #15 — C3's two causes, both named by the diagnostics fix (2026-07-29)
+
+`mc2-1cxna` CAUSE ONE — libpq could not stat its default client certificate. Attempt #14 printed
+what attempt #13 had discarded: `pg_dumpall: error: connection to server ... failed: could not open
+certificate file "/root/.postgresql/postgresql.crt": Permission denied`. The FROZEN pg.backup
+manifest env pins `HOME=/root` while the command runs as the deploy operator, and libpq resolves
+its default client certificate under `$HOME`. `/root` is 0700 root-owned, so the stat fails with
+EACCES rather than "absent" — and libpq treats "cannot determine" as fatal. `/root/.postgresql` does
+not even exist; the unreadable parent is the whole failure. Proven on production read-only in both
+directions: the identical command exits 1 with exactly that message under `HOME=/root` and exits 0
+with 7943 bytes and empty stderr under a run-private HOME. The manifest cannot move, so the script
+hands every libpq child `HOME="$TEMP_GENERATION"` — its own adopted 0700 directory, which exists and
+holds no `.postgresql`. The barrier was never affected because it drives SQL through node-postgres,
+not libpq.
+
+`mc2-1cxna` CAUSE TWO — `/proc/self/fd/N` does not survive the generator's spawn chain. Attempt #15
+got BOTH REAL DUMPS through against production and died at `source manifest failed: EACCES:
+permission denied, open '/proc/self/fd/14'`. The script already documents this hazard for the
+adopted CA in as many words; the two q12-only arguments (`--baseline`, `--expected-catalog`) never
+got the same treatment because nothing had ever run the q12 branch. In the generator's own process
+that descriptor number resolves to one of ITS descriptors. Both inputs are now materialized into the
+run-private generation directory at 0600, byte-verified against the descriptor they came from, and
+REMOVED before publication — the published generation must contain exactly four files, and the
+existing operator suite caught that second half immediately rather than production doing it.
+
+WHAT MADE BOTH DIAGNOSABLE. `backup-supabase.sh` routed five steps' stderr into a run-private file
+that `fail` never read and cleanup then reclaimed, so attempt #13 reported a bare status. The first
+pass of `mc2-1cxna` added `fail_command`, which prints a bounded, credential-redacted tail before
+failing. Every attempt since has named its own failure on the first try. That change paid for itself
+twice in one afternoon.
+
+COST AND RECOVERY. Attempts #13-#15 each stopped the writers, so production was really down: about
+four minutes each for #13/#14, and about sixteen for #15 because the real dumps ran to completion.
+The recovery is now routine and proven: the barrier's own rendered `$restore$` under that run's
+capability, then the ten writers replayed from THAT RUN'S OWN `writer-quiesce-<run-id>.json`. After
+each: 17 containers up, both public hosts 200, database-scope pre-flight EXIT=0, C4 zero residue,
+D1 back at `1a0ac0f0…`.
