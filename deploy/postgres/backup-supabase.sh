@@ -611,9 +611,30 @@ run_manifest_generator() {
     local expected_hash
     expected_hash=$(/usr/bin/sha256sum "/proc/self/fd/$EXPECTED_CATALOG_FD")
     expected_hash=${expected_hash%% *}
+    # mc2-1cxna: the SAME reason the adopted CA is materialized a few lines below — a
+    # /proc/self/fd path does not survive the pnpm/node spawn chain of the manifest generator, and
+    # in that child the number resolves to one of ITS descriptors, so the open fails with EACCES
+    # rather than reading the intended file. The CA already had this treatment; the two q12-only
+    # inputs never did, because nothing had ever run the q12 branch. It cost C3 of window attempt
+    # #15 (2026-07-29) with "source manifest failed: EACCES: permission denied, open
+    # '/proc/self/fd/14'", after the writers were stopped and both dumps had already succeeded.
+    # Copies are run-private 0600 and byte-verified against the descriptor they came from, so the
+    # adopted-descriptor identity checks above remain the authority.
+    local baseline_path="$TEMP_GENERATION/.q12-baseline.json"
+    local expected_catalog_path="$TEMP_GENERATION/.q12-expected-catalog.json"
+    ( umask 077; /usr/bin/cat "/proc/self/fd/$BASELINE_FD" >"$baseline_path" ) ||
+      fail 'Q12 baseline materialization failed'
+    ( umask 077; /usr/bin/cat "/proc/self/fd/$EXPECTED_CATALOG_FD" >"$expected_catalog_path" ) ||
+      fail 'Q12 expected catalog materialization failed'
+    /usr/bin/chmod 600 -- "$baseline_path" "$expected_catalog_path"
+    local materialized_hash
+    materialized_hash=$(/usr/bin/sha256sum "$expected_catalog_path")
+    materialized_hash=${materialized_hash%% *}
+    [[ "$materialized_hash" == "$expected_hash" ]] ||
+      fail 'Q12 expected catalog materialization does not match the adopted descriptor'
     args+=(
-      --baseline "/proc/self/fd/$BASELINE_FD"
-      --expected-catalog "/proc/self/fd/$EXPECTED_CATALOG_FD"
+      --baseline "$baseline_path"
+      --expected-catalog "$expected_catalog_path"
       --expected-catalog-sha256 "$expected_hash"
       --q12-run-id "$RUN_ID"
     )
@@ -1106,6 +1127,11 @@ main() {
 
   /usr/bin/rm -- "$roles_after" "$roles_before_normalized" "$roles_after_normalized" \
     "$service_file" "$ca_fd_path" "$dump_stderr" "$command_stderr" "$toc"
+  # mc2-1cxna: the q12 generator inputs are materialized into this same directory, and the
+  # published generation must contain EXACTLY four files.
+  if [[ "$BACKUP_MODE" == q12 ]]; then
+    /usr/bin/rm -f -- "$TEMP_GENERATION/.q12-baseline.json" "$TEMP_GENERATION/.q12-expected-catalog.json"
+  fi
   scan_generation_secrets "$URL_FILE" "$archive" "$roles_before" "$manifest" || \
     fail 'generation secret scan failed'
   create_checksums "$TEMP_GENERATION" "$final_name" "$SNAPSHOT"
