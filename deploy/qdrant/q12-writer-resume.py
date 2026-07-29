@@ -27,6 +27,14 @@ CLASSES = {
     "production-api", "production-web", "production-worker",
     "development-api", "development-web", "development-worker",
 }
+# mc2-1kcbv: the compose projects that may hold a Q12 writer, and the ten writer SERVICES inside
+# them. The projects also carry the platform's non-writer services, so the service names are what
+# defines the writer set — one entry per expected class count in `validate_quiesce_writers`.
+QUIESCE_PROJECTS = ("megacampus-blue", "megacampus-green", "megacampus")
+QUIESCE_SERVICES = (
+    "api", "web", "worker", "worker-stage6", "worker-stage7",
+    "api-dev", "web-dev", "worker-dev", "worker-stage6-dev", "worker-stage7-dev",
+)
 ROLLBACK_CONDITIONAL_PHASES = [
     "handoff_rollback_verified",
     "qdrant_rollback_verified",
@@ -952,12 +960,28 @@ def run_quiesce():
             )
             previous_overlay_sha256 = overlay_file.digest
     else:
+        # mc2-1kcbv: select by compose SERVICE, not by "everything in the compose project". The
+        # three scanned projects also hold the platform's non-writer services — on production
+        # `megacampus` carries redis, qdrant, qdrant-dev, docling-mcp, docling-mcp-internal,
+        # notebooklm-bridge and notebooklm-bridge-dev alongside the eight writers, so the
+        # project-wide sweep returned 17 containers and C2 failed closed with "writer quiesce
+        # inventory is not exact" (window attempt #12, 2026-07-29) — after the barrier had already
+        # guarded the database. The classifier below would also have called redis a
+        # `production-worker`. The ten writer services are frozen here and the exactness check is
+        # kept, so adding a platform service no longer moves the writer set and REMOVING a writer
+        # still fails closed.
         writer_ids = []
-        for project in ("megacampus-blue", "megacampus-green", "megacampus"):
-            writer_ids.extend(
-                value for value in docker("ps", "-aq", "--no-trunc", "--filter", f"label=com.docker.compose.project={project}").splitlines()
-                if value
-            )
+        for project in QUIESCE_PROJECTS:
+            for service in QUIESCE_SERVICES:
+                writer_ids.extend(
+                    value
+                    for value in docker(
+                        "ps", "-aq", "--no-trunc",
+                        "--filter", f"label=com.docker.compose.project={project}",
+                        "--filter", f"label=com.docker.compose.service={service}",
+                    ).splitlines()
+                    if value
+                )
         require(len(writer_ids) == 10 and len(set(writer_ids)) == 10, "writer quiesce inventory is not exact")
         writers = []
         raw_rows = {}
