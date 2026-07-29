@@ -22,7 +22,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/postgres/restore-supabase-drill.sh",
-      "sha256": "d9ca71d75a14b359b57d937f650dbf5a21fb0fc78c6f6d404a6f8d651ab6f1a6"
+      "sha256": "5343823883c1afcfdcc698c82cba78cd86ba2547d0147769576da4e71bc8a0fe"
     },
     {
       "group": "claude-deploy",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "ec5faf371390298ceeae4623db745bbd97f94de9",
+  "generated_from_tree_sha": "56c13c758360601ab23b612852d6d65afb043867",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
