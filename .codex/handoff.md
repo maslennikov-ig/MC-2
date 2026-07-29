@@ -1,6 +1,16 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-29 (attempts #12-#16; C1, C2 and C3 PASS; blocker is C4 `mc2-1cxna`)
+Updated: 2026-07-29 (attempts #12-#16; C1, C2 and C3 PASS; the window is SHUT on `mc2-wl5vn`)
+
+## THE WINDOW IS NOT RUNNABLE RIGHT NOW — `mc2-wl5vn` (P0, owner decision)
+
+Found 2026-07-29 by the `mc2-rjy9k` dry run, read-only, against attempt #16's own generation: C4
+cannot restore a GUARDED dump. C1 installs `q12_guard`; C3 dumps production with it; C4 restores as
+`supabase_admin` and supautils refuses — `Superuser owned event trigger must execute a superuser
+owned function`, because the guard is owned by the managed non-superuser by design (`mc2-ipwyc`).
+The pg_restore invocation is common to both drill modes, so the window hits it identically. Opening
+now would stop the ten writers, run both dumps and die there. Four candidate remedies are on the
+bead; each changes what "strict restore" proves, so the owner rules. `mc2-i9h3y` now depends on it.
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -39,7 +49,8 @@ Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
+Recommended action (SUPERSEDED 2026-07-29 by `mc2-wl5vn` above — do not reopen the window until it
+is settled; everything below stays true for the attempt that follows): reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
 defects were found and fixed on 2026-07-29, each by opening the window and each covered afterwards:
 `mc2-awi6q` and `mc2-1kcbv` are CLOSED (the intent-row carry rule, two checkpoint files the
 controller never published, and a writer sweep that returned 17 containers instead of 10);

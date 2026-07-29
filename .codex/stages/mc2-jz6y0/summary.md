@@ -1729,3 +1729,46 @@ exists to stop. They stay in-window residuals with the barrier's dual-bind,
 17.10 is not a substitute for the isolate either — the document-evidence migration manifest hashes
 fail there — so without a bound handle every child is reported `skipped` with that reason, which is
 what CI asserts.
+
+## What the dry run found on its first use (2026-07-29)
+
+Two defects on the C4 path, both read-only, with no writer stopped, no guard installed, no run-id
+burnt and zero production downtime. Sixteen window attempts cost ~40 minutes of waiting and 4-16
+minutes of real outage each to learn one thing; this cost neither.
+
+**One, fixed.** `restore-supabase-drill.sh` ran `ALTER DATABASE restore_test SET
+default_transaction_read_only='on'` without the read-only override the rest of the script already
+carries. `database-post.sql` replays the SOURCE's captured `ALTER DATABASE … SET` values, and a Q12
+generation is dumped at C3 — after C1's barrier has set `default_transaction_read_only = on` on
+production. The replay hands restore_test that default, every session opened afterwards inherits it,
+and the statement dies with `cannot execute ALTER DATABASE in a read-only transaction`. The value
+being set is the one already in force, so it is a no-op that still fails the window. Fixed with the
+file's own remedy (`PGOPTIONS='-c default_transaction_read_only=off'`, spelled out rather than routed
+through the helper, because in bash an assignment before a FUNCTION call stays in effect afterwards).
+
+**Two, `mc2-wl5vn`, OPEN and owner-gated.** With that cleared the drill reached the archive restore
+and supautils refused:
+
+```
+ERROR: Superuser owned event trigger must execute a superuser owned function
+DETAIL: The current user "supabase_admin" is a superuser and the function
+        "q12_guard.enforce_ddl_barrier" is owned by a non-superuser
+```
+
+The dump carries the whole guard — `SCHEMA q12_guard postgres`, `FUNCTION q12_guard
+enforce_ddl_barrier() postgres`, the event trigger — because C3 dumps a database C1 has already
+guarded. The ownership split is deliberate (`mc2-ipwyc`): the guard belongs to the managed
+non-superuser so the barrier can disarm what it armed. The restore reverses the pairing — a
+superuser-owned event trigger executing a non-superuser-owned function — and supautils rejects
+exactly that. The pg_restore invocation is common to both drill modes, so the window hits it
+identically.
+
+This is NOT the environment class. It is the design meeting supautils, and it has never been seen
+because C4 has never got this far. The remedy is a real design choice with four candidates recorded
+on the bead, so the window stays shut until the owner rules.
+
+**And a third thing, smaller.** `fail 'strict archive restore failed'` threw the reason away: every
+log this drill captures lives under a TEMP_ROOT that `on_exit` reclaims unconditionally. The
+`mc2-94mmf` remedy is now applied here too — `fail_with_log` carries the scrubbed tail of the
+captured log — which is what turned a one-line refusal into the diagnosis above. Inside a window,
+with the writers already stopped, that difference is the whole cost of an attempt.

@@ -49,6 +49,25 @@ fail() {
   exit "${2:-1}"
 }
 
+# mc2-rjy9k, the mc2-94mmf lesson applied here: every log this script captures lives under TEMP_ROOT,
+# which `on_exit` reclaims unconditionally, so a failure that names only its own step throws the
+# reason away. Inside a window that is the worst possible place to lose it — the writers are already
+# stopped. Carry the tail of the captured log, with anything credential-shaped scrubbed, exactly as
+# `backup-supabase.sh`'s `fail_command` does. Log paths only; no file content is ever echoed whole.
+fail_with_log() {
+  local message=$1 log=$2 tail_lines=${3:-40} detail=''
+  if [[ -s "$log" ]]; then
+    detail=$(/usr/bin/tail -n "$tail_lines" -- "$log" |
+      /usr/bin/sed -E "s#postgres(ql)?://[^[:space:]\"']+#<redacted>#g; s#[0-9a-f]{64}#<redacted>#g")
+  fi
+  if [[ -n "$detail" ]]; then
+    printf 'Supabase restore drill failed: %s\n--- %s (last %s lines, secrets scrubbed) ---\n%s\n' \
+      "$message" "${log##*/}" "$tail_lines" "$detail" >&2
+    exit 1
+  fi
+  fail "$message"
+}
+
 # BEGIN authoritative Docker lifecycle
 restore_docker_expected_name() {
   case "$1" in
@@ -793,7 +812,23 @@ PY
   # One multi-statement command string runs as a single implicit transaction
   # and ALTER SYSTEM refuses transaction blocks, so each override is issued
   # as its own statement.
-  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+  # mc2-rjy9k: this statement must carry the read-only override the rest of this script already
+  # carries (:822, :828, :836, :848). `database-post.sql` above replays the SOURCE's captured
+  # `ALTER DATABASE … SET` values, and a Q12 generation is dumped at C3 — AFTER C1's barrier has set
+  # `default_transaction_read_only = on` on production. The replay therefore hands restore_test that
+  # very default, every session opened afterwards inherits it, and this ALTER DATABASE dies with
+  #   ERROR: cannot execute ALTER DATABASE in a read-only transaction
+  # The value being set is the same one already in force, so the statement is a no-op in that case —
+  # but a fail-closed no-op still fails the window. Found 2026-07-29 by the isolate dry run, against
+  # attempt #16's own generation, with no writer stopped and no run-id burnt; the window had never
+  # reached this line because C4 died earlier on the buildx lookup. This connection is a direct
+  # loopback one to the isolate, not the pooled DSN, so the startup option is genuinely delivered.
+  # Spelled out rather than routed through run_service_psql: in bash an assignment preceding a
+  # FUNCTION call stays in effect after the call returns, which would leak the override into every
+  # later statement in this script — including the ones that must observe the read-only default.
+  PGSERVICEFILE="$TEMP_ROOT/cleanup-restore-test.service" PGSERVICE=mc2_restore_cleanup \
+    PGOPTIONS='-c default_transaction_read_only=off' \
+    "$PSQL" -X --no-psqlrc --no-password --set ON_ERROR_STOP=on --command \
     "ALTER DATABASE restore_test SET default_transaction_read_only='on';" >/dev/null
   # ALTER SYSTEM requires superuser rights, which only supabase_admin holds.
   write_pgpass "$TEMP_ROOT/system-overrides.pgpass" "$port" postgres supabase_admin "$restore_password"
@@ -828,7 +863,8 @@ PY
     PGOPTIONS='-c default_transaction_read_only=off' \
     "$PG_RESTORE" --dbname=restore_test --username=supabase_admin --no-password \
     --exit-on-error --single-transaction "$GENERATION/database.dump" \
-    >"$TEMP_ROOT/restore.stdout" 2>"$TEMP_ROOT/restore.stderr" || fail 'strict archive restore failed'
+    >"$TEMP_ROOT/restore.stdout" 2>"$TEMP_ROOT/restore.stderr" ||
+    fail_with_log 'strict archive restore failed' "$TEMP_ROOT/restore.stderr"
   [[ ! -s "$TEMP_ROOT/restore.stderr" ]] || fail 'strict archive restore emitted stderr'
   verify_restored_pgtle_packages "$TEMP_ROOT/restore.service" mc2_restore_actor
 
