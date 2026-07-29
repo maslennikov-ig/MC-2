@@ -41,15 +41,12 @@ Next stage id: `mc2-jz6y0`
 
 Recommended action: reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
 defects were found and fixed on 2026-07-29, each by opening the window and each covered afterwards:
-`mc2-awi6q` (the intent-row carry rule plus two checkpoint files the controller never published),
-`mc2-1kcbv` (writer selection swept whole compose projects, so production's seven platform
-containers made it 17 instead of 10) — both CLOSED — and `mc2-1cxna` (OPEN, two causes fixed): the
-frozen `HOME=/root` made libpq refuse every connection because it could not stat
-`/root/.postgresql/postgresql.crt`, and the manifest generator was handed `/proc/self/fd/N` paths
-that do not survive its spawn chain. Attempt #16 then ran `pg.backup` to COMPLETION and died at C4 on a third face of the same cause:
-the docker CLI cannot read `/root/.docker/config.json` either, so it never discovers its buildx
-plugin and `docker buildx imagetools inspect --raw` degrades to "unknown flag". Fixed the same way.
-Attempt #17 starts at C4's image-index lookup. Reopen with the sequence in § "Before the next
+`mc2-awi6q` and `mc2-1kcbv` are CLOSED (the intent-row carry rule, two checkpoint files the
+controller never published, and a writer sweep that returned 17 containers instead of 10);
+`mc2-1cxna` is OPEN with three causes fixed — the frozen `HOME=/root` is unreadable by the operator,
+so libpq could not stat its client certificate and the docker CLI could not find its buildx plugin,
+and the manifest generator was handed `/proc/self/fd/N` paths that do not survive its spawn chain. Attempt #16 ran `pg.backup` to COMPLETION and died at C4 on the third face of that cause; fixed the
+same way. Attempt #17 starts at C4's image-index lookup — but run `mc2-bh3ef` and `mc2-rjy9k` FIRST. Reopen with the sequence in § "Before the next
 attempt", read any new failure from the diagnostics (`fail_command` now prints them), and hold at
 `--stop-after deploy.prepare` for the owner at C9. Full brief:
 `docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
@@ -131,10 +128,13 @@ The dead GHCR token (`mc2-2vtmk`) does not block the window.
 
 ## Starter prompt for next orchestrator
 
-`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md` (prompt-check pass,
-oversize warning). Its §1-§5 are now DONE (`mc2-1sns3`, the release-sha ruling, the capability
-question, run-root staging and two opened windows); the live task is `mc2-awi6q`, then re-stage and
-reopen. Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
+`docs/superpowers/prompts/2026-07-29-q12-window-completion-orchestrator.md`, with the plan it
+follows: `docs/superpowers/plans/2026-07-29-q12-window-environment-preflight.md`. The 2026-07-28
+prompt is SUPERSEDED — its §1-§5 are all done. The live sequence is `mc2-bh3ef` (P0, frozen-env
+pre-flight probes), then `mc2-rjy9k` (P1, dry-run the children against the plan's isolate), then ONE
+window attempt. Do not reopen the window first: five defects on 2026-07-29 cost ~40 minutes of
+waiting each and 4-16 minutes of REAL production downtime, and every one of them was establishable
+read-only. Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
 
 ## Verification and Delivery
 
