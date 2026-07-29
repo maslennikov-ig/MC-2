@@ -11,6 +11,12 @@ fails closed at the first violation — correct behaviour — so each expensive 
 one finding.  This module moves discovery off the attempt path: one read-only probe that asserts
 every environmental precondition the window depends on, re-runnable at no risk.
 
+AMENDED 2026-07-29 (mc2-bh3ef).  Group G was added after five more defects, none of them logic and
+three of them the same cause in three different consumers: the frozen command manifest's
+``HOME=/root`` meeting children that run as uid 1000.  Groups A-E measure the database and group H
+the deployed bytes; group G measures the environment the twenty frozen commands are HANDED, for all
+twenty, including the ten that have never executed in a window.
+
 DISCIPLINE.  Every probe here is pure given a ``Context``.  All database access goes through
 ``Context.script``, which the entry point binds to the pooled production DSN and the test runner
 binds to the managed-privilege fixture — so a probe cannot reach a connection the contract forbids,
@@ -30,7 +36,9 @@ import os
 import pathlib
 import re
 import shutil
+import stat as stat_module
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -93,6 +101,11 @@ class HostAdapter:
     gh: Optional[str] = None
     # The pre-flight's own pid, so H3 can never match its own command line.
     self_pid: int = field(default_factory=os.getpid)
+    # (argv, env, stdin_text) -> ScriptResult, with NOTHING inherited from this process's
+    # environment. Group G needs it: the whole point there is to run a consumer under a command's
+    # EXACT frozen env, and `run` above deliberately inherits, which is the substitution G exists to
+    # catch.
+    run_env: Optional[Callable[..., ScriptResult]] = None
 
 
 @dataclass
@@ -100,8 +113,21 @@ class Context:
     scope: str
     # (sql, options=None, application_name=None) -> ScriptResult, on ONE fresh connection.
     script: Optional[Callable[..., ScriptResult]] = None
+    # The psql binary G3 drives directly, so it can open the pooled connection under a COMMAND's
+    # frozen env rather than this process's own. `script` cannot: its env is fixed by construction.
+    psql: Optional[str] = None
     catalog: Optional[dict] = None
     manifest: Optional[dict] = None
+    # The FROZEN command manifest (`q12-command-manifest.json`), read from the deployed tree. Not
+    # the same artefact as `manifest` above, which is the deployed-ASSET manifest probe H2 compares
+    # bytes against; group G measures the twenty frozen commands themselves.
+    command_manifest: Optional[dict] = None
+    # Where the deployed tree lives, bound in EVERY scope: group G's libpq leg is database-scope but
+    # still has to read the entry points the frozen commands execute.
+    deploy_root: Optional[pathlib.Path] = None
+    # The pooled libpq environment (PGSERVICEFILE/PGSERVICE and nothing secret), so G3 can open the
+    # same pooled connection under a command's frozen env instead of this process's own.
+    libpq_env: "dict[str, str]" = field(default_factory=dict)
     barrier_text: Optional[str] = None
     structural_catalog_sql: Optional[str] = None
     host: Optional[HostAdapter] = None
@@ -1456,6 +1482,927 @@ def probe_h5(context: Context) -> "dict[str, object]":
     )
 
 
+# --- Group G: the frozen environment every manifest command runs in ------------------------------
+#
+# The mc2-1cxna wall.  On 2026-07-29 the live window produced five defects and NOT ONE of them was
+# logic; three were the same cause in three different consumers.  The frozen command manifest pins
+# ``HOME=/root`` for every one of its twenty commands, while the controller and its children run as
+# uid 1000 (mc2-1by33) and ``/root`` is 0700 root-owned.  A child that resolves something under
+# ``$HOME`` therefore gets EACCES — which is NOT the same as "absent", so nothing falls back:
+#
+#   * libpq stops on its default client certificate ``$HOME/.postgresql/postgresql.crt`` and refuses
+#     every connection (C3, attempts #13/#14);
+#   * the docker CLI abandons ``$HOME/.docker/config.json`` and then never discovers its CLI
+#     plugins, so ``docker buildx`` and ``docker compose`` CEASE TO EXIST and degrade to
+#     "unknown command" (C4, attempt #16; the same cause killed the 2026-07-27 pre-flight).
+#
+# Groups A-E measure the database and group H the deployed bytes.  Nothing measured the environment
+# the commands are HANDED.  This group does, for EVERY command in the frozen manifest — including
+# the ten that have never executed in a window — and it is deliberately COMPLETE over the manifest:
+# a command this group cannot account for is a `fail`, never a silence.
+#
+# The frozen env cannot be edited (`aaec6fc2…` is immutable by contract and ``load_manifest``
+# enforces byte-equal env per command), so every repair lives in a consumer, and every repair is
+# pinned to that consumer's OWN bytes — the mc2-lzft4 discipline, where a probe that carried its own
+# expected value certified a host the consumer rejects.
+
+COMMAND_MANIFEST_SCHEMA = "megacampus.q12.command-manifest/v1"
+COMMAND_MANIFEST_RELATIVE = "deploy/qdrant/q12-command-manifest.json"
+DEPLOY_PREFIX = "/opt/megacampus/"
+
+# mc2-1by33: exactly one frozen command reaches root, through the root-owned argv whitelist; every
+# other command runs as the controller's own uid.
+PRIVILEGED_COMMAND_ID = "source.forward"
+ROOT_IDENTITY = "root"
+OPERATOR_IDENTITY = "operator"
+
+FROZEN_HOME_BLOCK_BEGIN = "# --- frozen-HOME normalization (mc2-wwc9l) ---"
+FROZEN_HOME_BLOCK_END = "# --- end frozen-HOME normalization ---"
+
+# Consumers that resolve something under $HOME. DERIVED from a deployed file's own bytes rather than
+# declared per command, so a chain that starts using one is covered the moment it does.
+DOCKER_INVOCATION_RE = re.compile(
+    r"(?:\$\{?DOCKER(?:_BIN)?\}?|/usr/bin/docker|\bdocker_bin\b|\bdocker\()[\"'\s,]*([a-z][a-z0-9_-]*)"
+)
+# A docker CLI PLUGIN is a separate executable discovered through the config directory under $HOME.
+# The core verbs are built into the binary and survive an unreadable HOME with a warning — the exact
+# asymmetry that let the writer fleet stop and start for sixteen attempts while `docker buildx`
+# silently ceased to exist at C4.
+DOCKER_PLUGIN_VERBS = ("buildx", "compose")
+# Bounded so a FILENAME cannot pose as a binary: `$TEMP_GENERATION/.pg_dump.stderr` is a log, not a
+# connection, and counting it made the per-invocation rule below flag thirty-eight innocent lines.
+LIBPQ_INVOCATION_RE = re.compile(r"(?<![\w.-])(psql|pg_dump|pg_dumpall|pg_restore|pg_isready)(?![\w.-])")
+# libpq resolves its default client certificate ONLY while opening a connection: an offline
+# `pg_restore --list archive` reads nothing under $HOME. A libpq call site therefore counts as a
+# consumer only where the same logical line also establishes a connection.
+LIBPQ_CONNECTION_RE = re.compile(
+    r"(?<![\w])(PGSERVICE|PGSERVICEFILE|PGHOST|PGDATABASE|PGUSER|PGPASSFILE|--dbname|--host|"
+    r"--no-password|service=|postgres(?:ql)?://)"
+)
+# A re-exec'ing spawn chain: the descriptor table the parent opened does not reach the grandchild,
+# so a `/proc/self/fd/N` ARGUMENT stops resolving. Direct coreutil children keep it and are fine.
+RESPAWNING_CONSUMER_RE = re.compile(r"(?<![\w.-])(pnpm|npm|npx|tsx|node|docker)(?![\w.-])")
+FD_PATH_RE = re.compile(r"/proc/self/fd/(?:\$\{?[A-Za-z_][A-Za-z0-9_]*\}?|\d+)")
+
+CHAIN_MEMBER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:sh|py|ts)")
+
+
+PROCESS_SCOPE = "process"
+INVOCATION_SCOPE = "invocation"
+
+
+@dataclass(frozen=True)
+class HomeRepair:
+    """How one consumer survives the frozen `HOME=/root`, pinned to a token in its own bytes.
+
+    `scope` is the difference between the two repair shapes in this tree, and it is not cosmetic. An
+    `export HOME=…` covers the process and everything it spawns; a `HOME=… some-command` prefix
+    covers exactly that one invocation and NOTHING else, so the next libpq call added beside it
+    inherits the frozen `/root` again. G1 holds the second shape to a per-invocation rule for that
+    reason.
+    """
+
+    kind: str
+    scope: str
+    token: str
+    note: str
+
+
+# Keyed by deploy-root-relative path. `token` MUST appear in the deployed file: a repair that is
+# refactored away becomes a `fail` here instead of a stale belief in this table.
+HOME_REPAIRS: "dict[str, HomeRepair]" = {
+    "deploy/qdrant/operator-compose.sh": HomeRepair(
+        "normalization-block",
+        PROCESS_SCOPE,
+        FROZEN_HOME_BLOCK_BEGIN,
+        "replaces only a HOME the current uid genuinely cannot use, with the account's own passwd "
+        "home, before any docker child runs (mc2-wwc9l)",
+    ),
+    "scripts/deploy_blue_green.sh": HomeRepair(
+        "normalization-block",
+        PROCESS_SCOPE,
+        FROZEN_HOME_BLOCK_BEGIN,
+        "the same block, byte-for-byte, asserted by q12-frozen-home-normalization.test.ts",
+    ),
+    "deploy/postgres/restore-supabase-drill.sh": HomeRepair(
+        "private-temp-home",
+        PROCESS_SCOPE,
+        'export HOME="$TEMP_ROOT"',
+        "exports the adopted private 0700 temp root as HOME inside create_temp_root, before any "
+        "child runs, so the docker CLI discovers its buildx plugin (mc2-1cxna c)",
+    ),
+    "deploy/postgres/backup-supabase.sh": HomeRepair(
+        "per-invocation-home",
+        INVOCATION_SCOPE,
+        'HOME="$TEMP_GENERATION"',
+        "hands every libpq invocation a HOME it can stat, so libpq stops looking for its default "
+        "client certificate under an unreadable /root (mc2-1cxna a)",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class HomeExemption:
+    """A consumer that meets an unusable `$HOME` and is proven to survive it anyway.
+
+    An exemption is never a belief. `allowed` is the exact set of consumer classes it covers, and it
+    is checked against the DERIVED consumers of the deployed bytes on every run, so reaching one
+    more revokes it automatically. `smoke` is a read-only invocation re-measured under the frozen
+    env, so a claim like "this one degrades instead of failing" is a measurement, not a memory.
+    """
+
+    consumer: str
+    reason: str
+    allowed: "tuple[str, ...]" = ()
+    smoke: "tuple[str, ...] | None" = None
+
+
+HOME_EXEMPTIONS: "dict[str, HomeExemption]" = {
+    # The writer controller asserts `dict(os.environ) == EXPECTED_ENVIRONMENT` with HOME=/root
+    # (q12-writer-resume.py:75-81, :149), so a repair CANNOT live there: normalising HOME would make
+    # the child refuse its own environment. It survives because it only ever reaches docker's
+    # built-in verbs, which need no plugin discovery. The moment a plugin verb appears in its bytes
+    # that stops being true, and this exemption is revoked automatically.
+    "deploy/qdrant/q12-writer-resume.py": HomeExemption(
+        consumer="docker-cli",
+        reason=(
+            "reaches only docker's built-in verbs (inspect/ps/update/start/stop), which need no "
+            "plugin discovery and survive an unreadable HOME with a warning; the child pins its own "
+            "environment to the frozen one, so the repair cannot live here"
+        ),
+        allowed=("docker-cli",),
+    ),
+    # The writer wrapper is the same shape: it inspects and starts containers itself, and rebuilds
+    # the frozen env with `env -i … HOME='/root'` for the controller it spawns (:449-451, :489-491)
+    # precisely because that child demands it. Its own docker use is built-in verbs only.
+    "deploy/qdrant/source-recovery-run.sh": HomeExemption(
+        consumer="docker-cli",
+        reason=(
+            "reaches only docker's built-in verbs, and rebuilds the frozen env verbatim for the "
+            "writer controller, which asserts that exact environment"
+        ),
+        allowed=("docker-cli",),
+    ),
+    # migration.base.apply / migration.observability.apply exec /usr/bin/pnpm directly, so there is
+    # no deployed wrapper to repair. pnpm reports an unreadable rc file as a WARNING and continues;
+    # that is measured here under the exact frozen env rather than assumed, because it is the one
+    # consumer in the manifest whose behaviour under EACCES is degrade-and-continue.
+    "/usr/bin/pnpm": HomeExemption(
+        consumer="pnpm",
+        reason=(
+            "pnpm treats an unreadable $HOME/.npmrc and $HOME/.config/pnpm/rc as a warning and "
+            "continues; neither migration command installs anything, so no registry credential is "
+            "resolved"
+        ),
+        smoke=("/usr/bin/pnpm", "--version"),
+    ),
+}
+
+
+def _deploy_root(context: Context) -> pathlib.Path:
+    if context.deploy_root is not None:
+        return context.deploy_root
+    if context.host is not None:
+        return context.host.deploy_root
+    raise ProbeError("no deployed tree is bound in this scope")
+
+
+def _command_manifest(context: Context) -> dict:
+    manifest = context.command_manifest
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != COMMAND_MANIFEST_SCHEMA:
+        raise ProbeError("the frozen command manifest is missing or has the wrong schema")
+    commands = manifest.get("commands")
+    if not isinstance(commands, dict) or not commands:
+        raise ProbeError("the frozen command manifest carries no commands")
+    return manifest
+
+
+def _run_env(
+    context: Context, argv: "list[str]", env: "dict[str, str]", stdin_text: "str | None" = None
+) -> ScriptResult:
+    """Run one child under an EXACT environment, inheriting nothing from this process."""
+    if context.host is not None and context.host.run_env is not None:
+        return context.host.run_env(argv, env, stdin_text)
+    completed = subprocess.run(
+        argv,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        **({"input": stdin_text} if stdin_text is not None else {"stdin": subprocess.DEVNULL}),
+    )
+    return ScriptResult(completed.returncode, completed.stdout, completed.stderr)
+
+
+def _deployed_path(context: Context, token: str) -> "pathlib.Path | None":
+    """Map an argv token onto the deployed tree, or None when it is not part of it."""
+    if not token.startswith(DEPLOY_PREFIX):
+        return None
+    candidate = _deploy_root(context) / token[len(DEPLOY_PREFIX) :]
+    return candidate if candidate.is_file() else None
+
+
+def _chain_for(context: Context, argv: "list[str]") -> "dict[str, str]":
+    """The deployed files one frozen command executes, one level deep, DERIVED from bytes.
+
+    argv[0] plus every script named in its own text that exists beside it or under the deployed
+    root. One level is a real bound and it is stated in the verdicts: it covers the wrapper that
+    receives the frozen env and the child it immediately execs, which is where all three 2026-07-29
+    HOME defects and the fd-path defect lived.
+    """
+    root = _deploy_root(context)
+    chain: dict[str, str] = {}
+    entry = _deployed_path(context, argv[0]) if argv else None
+    if entry is None:
+        return chain
+    chain[str(entry.relative_to(root))] = entry.read_text(encoding="utf-8", errors="replace")
+    for name in sorted(set(CHAIN_MEMBER_RE.findall(chain[str(entry.relative_to(root))]))):
+        sibling = entry.parent / name
+        if not sibling.is_file() or sibling == entry:
+            continue
+        relative = str(sibling.relative_to(root))
+        chain.setdefault(relative, sibling.read_text(encoding="utf-8", errors="replace"))
+    return chain
+
+
+def _home_state(home: str, identity: str) -> "tuple[bool, str]":
+    """Can the executing identity actually USE this HOME?
+
+    For the operator that is `stat` plus `R_OK|X_OK` measured with the probe's own uid — the same
+    uid the controller and its children run as. For root it is existence and directory-ness: root
+    bypasses the permission bits through CAP_DAC_OVERRIDE, so `/root` being 0700 root-owned is
+    exactly what makes it usable there and unusable for everyone else. Stated, not assumed.
+    """
+    path = pathlib.Path(home)
+    if not home or not path.is_absolute():
+        return False, f"HOME {home!r} is not an absolute path"
+    try:
+        info = path.stat()
+    except OSError as error:
+        return False, f"{home} cannot be stat'ed by this identity ({error.strerror})"
+    if not stat_module.S_ISDIR(info.st_mode):
+        return False, f"{home} is not a directory"
+    if identity == ROOT_IDENTITY:
+        return True, f"{home} is a directory and root bypasses its 0{info.st_mode & 0o777:o} mode"
+    if not os.access(path, os.R_OK | os.X_OK):
+        return False, (
+            f"{home} is mode 0{info.st_mode & 0o777:o} owned by uid {info.st_uid}; uid "
+            f"{os.getuid()} can neither read nor traverse it"
+        )
+    return True, f"{home} is readable and traversable by uid {os.getuid()}"
+
+
+ASSIGNMENT_RE = re.compile(
+    r"^\s*(?:readonly\s+|local\s+|export\s+|declare\s+-r\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.+)$"
+)
+HOME_ASSIGNMENT_RE = re.compile(r"(?<![A-Za-z0-9_])HOME=")
+
+
+def _logical_lines(text: str) -> "list[str]":
+    """Shell logical lines: backslash continuations joined.
+
+    A repair and the invocation it repairs routinely sit on different physical lines —
+    ``HOME="$TEMP_GENERATION" \\`` then the binary on the next — so a per-physical-line rule would
+    read every repaired call in `backup-supabase.sh` as unrepaired.
+    """
+    lines: list[str] = []
+    buffer = ""
+    for raw in text.splitlines():
+        buffer = f"{buffer} {raw.strip()}" if buffer else raw
+        stripped = buffer.rstrip()
+        if stripped.endswith("\\"):
+            buffer = stripped[:-1]
+            continue
+        lines.append(buffer)
+        buffer = ""
+    if buffer:
+        lines.append(buffer)
+    return lines
+
+
+def _variable_consumers(
+    lines: "list[str]", members: "dict[str, dict[str, list[str]]] | None" = None
+) -> "dict[str, dict[str, list[str]]]":
+    """Shell variables whose VALUE names a $HOME-resolving consumer.
+
+    ``readonly PG_DUMPALL='/usr/lib/postgresql/17/bin/pg_dumpall'`` is the only place the string
+    `pg_dumpall` ever appears in `backup-supabase.sh`; every invocation says `"$PG_DUMPALL"`. A
+    literal-token scan alone therefore sees the consumer in the file and in none of its call sites,
+    which is precisely backwards for a per-invocation rule.
+
+    `members` extends the same treatment to a spawned CHILD: ``MANIFEST_GENERATOR=…q12-source-
+    manifest.ts`` makes every `"$MANIFEST_GENERATOR"` call site reach whatever that child reaches,
+    so a per-invocation repair must cover it too.
+    """
+    variables: dict[str, dict[str, list[str]]] = {}
+    for line in lines:
+        match = ASSIGNMENT_RE.match(line)
+        if match is None:
+            continue
+        value = match.group(2)
+        found = dict(_consumers_in(value))
+        for basename, consumers in (members or {}).items():
+            if basename in value:
+                _merge_consumers(found, consumers)
+        if found:
+            variables[match.group(1)] = found
+    return variables
+
+
+def _merge_consumers(into: "dict[str, list[str]]", extra: "dict[str, list[str]]") -> None:
+    for name, tokens in extra.items():
+        into[name] = sorted(set(into.get(name, [])) | set(tokens))
+
+
+def _line_consumers(line: str, variables: "dict[str, dict[str, list[str]]]") -> "dict[str, list[str]]":
+    """The consumers ONE invocation reaches, literally or through a variable it expands."""
+    if line.lstrip().startswith("#"):
+        return {}
+    found = dict(_consumers_in(line))
+    for name, consumers in variables.items():
+        if re.search(r"\$\{?" + re.escape(name) + r"\}?(?![A-Za-z0-9_])", line):
+            _merge_consumers(found, consumers)
+    if "libpq" in found and not LIBPQ_CONNECTION_RE.search(line):
+        del found["libpq"]
+    return found
+
+
+def _consumers_in(text: str) -> "dict[str, list[str]]":
+    """Which $HOME-resolving consumers a deployed file reaches, with the evidence tokens."""
+    found: dict[str, list[str]] = {}
+    plugins = sorted(
+        {verb for verb in DOCKER_INVOCATION_RE.findall(text) if verb in DOCKER_PLUGIN_VERBS}
+    )
+    core = sorted(
+        {verb for verb in DOCKER_INVOCATION_RE.findall(text) if verb not in DOCKER_PLUGIN_VERBS}
+    )
+    if plugins:
+        found["docker-cli-plugin"] = plugins
+    if core:
+        found["docker-cli"] = core
+    clients = sorted(set(LIBPQ_INVOCATION_RE.findall(text)))
+    if clients:
+        found["libpq"] = clients
+    return found
+
+
+def frozen_command_surface(context: Context) -> "list[dict]":
+    """One record per frozen command: its env, its identity, its chain and its consumers."""
+    if "frozen_command_surface" in context.cache:
+        return context.cache["frozen_command_surface"]
+    manifest = _command_manifest(context)
+    records: list[dict] = []
+    for command_id, command in manifest["commands"].items():
+        env = dict(command.get("env") or {})
+        argv = list(command.get("argv") or [])
+        identity = ROOT_IDENTITY if command_id == PRIVILEGED_COMMAND_ID else OPERATOR_IDENTITY
+        chain = _chain_for(context, argv)
+        records.append(
+            {
+                "id": command_id,
+                "argv": argv,
+                "env": env,
+                "home": env.get("HOME", ""),
+                "identity": identity,
+                "entry_point": argv[0] if argv else "",
+                "chain": chain,
+                "consumers": {name: _consumers_in(text) for name, text in chain.items()},
+            }
+        )
+    context.cache["frozen_command_surface"] = records
+    return records
+
+
+def _repair_for(relative: str, text: str) -> "tuple[HomeRepair | None, str | None]":
+    """The declared repair for a chain member, and the reason it does not hold."""
+    repair = HOME_REPAIRS.get(relative)
+    if repair is None:
+        return None, None
+    if repair.token not in text:
+        return None, (
+            f"{relative} no longer carries its declared {repair.kind} repair "
+            f"({repair.token!r}); the frozen HOME reaches its children unrepaired"
+        )
+    return repair, None
+
+
+def _entry_relative(record: dict) -> "str | None":
+    """The chain member that argv[0] names — the one handed the frozen env directly."""
+    chain = record["chain"]
+    entry = str(record["entry_point"])
+    for relative in chain:
+        if entry.endswith(relative):
+            return relative
+    return next(iter(chain), None)
+
+
+def _repair_state(record: dict, member: str) -> "tuple[str, HomeRepair | None, str]":
+    """ONE rule, shared by G1, G2 and G3, for what covers a chain member's frozen HOME.
+
+    * ``drift``      — a declared repair is no longer in the deployed bytes;
+    * ``process``    — the member, or the entry point that spawns it, exports a usable HOME;
+    * ``inherited``  — the entry point repairs per invocation, and this member is a child it spawns,
+      so it inherits whatever that call site set. G1 is what holds those call sites to it;
+    * ``invocation`` — the member itself repairs per invocation, and only per invocation;
+    * ``none``       — nothing repairs it.
+    """
+    own, drift = _repair_for(member, str(record["chain"][member]))
+    if drift:
+        return "drift", None, drift
+    if own is not None and own.scope == PROCESS_SCOPE:
+        return "process", own, member
+    entry = _entry_relative(record)
+    if entry is not None and entry != member:
+        inherited, entry_drift = _repair_for(entry, str(record["chain"][entry]))
+        if entry_drift:
+            return "drift", None, entry_drift
+        if inherited is not None and inherited.scope == PROCESS_SCOPE:
+            return "process", inherited, entry
+        if inherited is not None:
+            return "inherited", inherited, entry
+    if own is not None:
+        return "invocation", own, member
+    return "none", None, member
+
+
+def probe_g1(context: Context) -> "dict[str, object]":
+    """Every frozen command's `$HOME` is usable by the identity that runs it, or a consumer repairs
+    it, or nothing in its chain resolves under `$HOME`.
+
+    Complete over the manifest by construction: a command whose chain cannot be read is a `fail`,
+    so a new frozen command cannot arrive here unexamined.
+    """
+    records = frozen_command_surface(context)
+    offenders: list[str] = []
+    unusable: list[str] = []
+    repaired: list[str] = []
+    exempted: list[str] = []
+    unmeasured: list[str] = []
+    inert: list[str] = []
+
+    for record in records:
+        command_id = str(record["id"])
+        home = str(record["home"])
+        if not home:
+            offenders.append(f"{command_id} (frozen env declares no HOME)")
+            continue
+        usable, why = _home_state(home, str(record["identity"]))
+        if usable:
+            continue
+        unusable.append(f"{command_id} -> {why}")
+
+        chain = record["chain"]
+        consumers = record["consumers"]
+        touching = {name: found for name, found in consumers.items() if found}
+
+        if not chain:
+            # argv[0] is not a deployed file: the only such commands are the two that exec
+            # /usr/bin/pnpm, and they are covered by an exemption measured below.
+            exemption = HOME_EXEMPTIONS.get(str(record["entry_point"]))
+            if exemption is None:
+                offenders.append(
+                    f"{command_id} (entry point {record['entry_point']} is outside the deployed "
+                    "tree and carries no measured exemption)"
+                )
+                continue
+            outcome, text = _exemption_verdict(
+                context, record, exemption, str(record["entry_point"])
+            )
+            {"fail": offenders, "unmeasured": unmeasured, "ok": exempted}[outcome].append(text)
+            continue
+
+        if not touching:
+            inert.append(f"{command_id} (nothing in its chain resolves under $HOME)")
+            continue
+
+        for name in sorted(touching):
+            text = str(chain[name])
+            state, repair, source = _repair_state(record, name)
+            if state == "drift":
+                offenders.append(f"{command_id}: {source}")
+                continue
+            if state == "process":
+                repaired.append(f"{command_id} -> {name} ({repair.kind} in {source})")
+                continue
+            if state == "inherited":
+                # The parent spawns this child on a line the per-invocation rule below already holds
+                # to `HOME=`; judging the child again on its own bytes would demand a second repair
+                # for an environment it merely inherits.
+                repaired.append(
+                    f"{command_id} -> {name} (inherits {repair.kind} from {source}'s call site)"
+                )
+                continue
+            if state == "invocation":
+                # An invocation-scope repair covers exactly the call sites that carry it. Every
+                # logical line in this member that reaches a $HOME-resolving consumer — directly, or
+                # through a variable naming one, or by spawning a chain member that does — must
+                # carry its own HOME=. This is the rule that catches the NEXT libpq call added
+                # beside a repaired one, which is how this class keeps arriving.
+                others = {
+                    pathlib.Path(other).name: found
+                    for other, found in touching.items()
+                    if other != name
+                }
+                lines = _logical_lines(text)
+                variables = _variable_consumers(lines, others)
+                naked = [
+                    " ".join(line.split())[:120]
+                    for line in lines
+                    if _line_consumers(line, variables) and not HOME_ASSIGNMENT_RE.search(line)
+                ]
+                if naked:
+                    offenders.append(
+                        f"{command_id}: {name} carries a {repair.kind} repair, but "
+                        f"{len(naked)} invocation(s) reach a $HOME-resolving consumer without it, "
+                        f"so they run under {home}: " + name_list(naked, limit=3)
+                    )
+                else:
+                    repaired.append(f"{command_id} -> {name} ({repair.kind}, every call site)")
+                continue
+            exemption = HOME_EXEMPTIONS.get(name)
+            if exemption is None:
+                offenders.append(
+                    f"{command_id}: {name} reaches "
+                    + "/".join(sorted(touching[name]))
+                    + f" under an unusable HOME {home} with no repair and no measured exemption"
+                )
+                continue
+            outcome, text = _exemption_verdict(context, record, exemption, name)
+            {"fail": offenders, "unmeasured": unmeasured, "ok": exempted}[outcome].append(text)
+
+    if offenders:
+        distinct = sorted(set(offenders))
+        return verdict("G1", FAIL, f"{len(distinct)} frozen-env offence(s): " + name_list(distinct))
+    bound = (
+        "BOUND: the chain is derived one level deep — the wrapper handed the frozen env plus the "
+        "child it execs — and consumer detection is by invocation token, so a consumer reached "
+        "through a path this cannot read is out of its reach."
+    )
+    if unmeasured:
+        return verdict(
+            "G1",
+            UNPROVABLE,
+            f"{len(unusable)} frozen command(s) declare a HOME their identity cannot use; "
+            f"{len(repaired)} are repaired by the consumer's own bytes and {len(exempted)} carry a "
+            f"re-measured exemption, but {len(unmeasured)} could not be measured here: "
+            + name_list(unmeasured)
+            + f". {bound}",
+            "the production host carries every binary these exemptions name, and the pre-flight is "
+            "re-run there immediately before the window (.codex/handoff.md § 'Before the next "
+            "attempt'); the unmeasured entries are named above rather than counted as passes",
+        )
+    return verdict(
+        "G1",
+        PASS,
+        f"all {len(records)} frozen commands account for their HOME: {len(unusable)} declare a HOME "
+        f"their identity cannot use, of which {len(repaired)} are repaired by the consumer's own "
+        f"bytes ({name_list(repaired)}), {len(exempted)} carry a re-measured exemption "
+        f"({name_list(exempted)}) and {len(inert)} reach no $HOME-resolving consumer. {bound}",
+    )
+
+
+def _exemption_verdict(
+    context: Context, record: dict, exemption: HomeExemption, name: str
+) -> "tuple[str, str]":
+    """Re-measure an exemption on every run: `ok`, `fail`, or `unmeasured` with the reason.
+
+    `unmeasured` is not a pass. An exemption whose smoke test cannot run on THIS host (a workstation
+    without the binary) leaves G1 `unprovable` with that named gap, so a green can never be reported
+    for something nothing measured.
+    """
+    reached = sorted(record["consumers"].get(name, {}))
+    beyond = [consumer for consumer in reached if consumer not in exemption.allowed]
+    if beyond:
+        return "fail", (
+            f"{record['id']}: {name}'s exemption is REVOKED — it now reaches "
+            + ", ".join(beyond)
+            + f", which is outside the {'/'.join(exemption.allowed) or 'empty'} set it was granted "
+            f"for, under an unusable HOME {record['home']}"
+        )
+    if exemption.smoke is not None:
+        binary = pathlib.Path(exemption.smoke[0])
+        if not binary.is_file():
+            return "unmeasured", (
+                f"{record['id']}: {name}'s exemption could not be re-measured — {binary} is not "
+                "installed on this host"
+            )
+        result = _run_env(context, list(exemption.smoke), dict(record["env"]))
+        if result.returncode != 0:
+            return "fail", (
+                f"{record['id']}: {name}'s exemption does not hold under its own frozen env — "
+                f"{' '.join(exemption.smoke)} exited {result.returncode}: "
+                + " ".join((result.stderr or result.stdout).split())[:200]
+            )
+    return "ok", f"{record['id']} -> {name} ({exemption.consumer})"
+
+
+def _docker_binary(context: Context) -> "str | None":
+    for candidate in ("/usr/bin/docker", "/usr/local/bin/docker"):
+        if pathlib.Path(candidate).is_file():
+            return candidate
+    return shutil.which("docker")
+
+
+def _repaired_env(
+    context: Context, record: dict, source: str, repair: "HomeRepair | None"
+) -> "tuple[dict[str, str], str]":
+    """The environment the consumer ITSELF establishes out of the frozen one.
+
+    Where the consumer carries the shared normalization block, the block is EXTRACTED FROM THE
+    DEPLOYED BYTES and executed under the frozen env, so the probe measures the repair that will
+    actually run rather than a re-implementation of it — the mc2-lzft4 rule. Where the repair is a
+    private temp home, the probe reproduces that property (a 0700 directory this uid owns) and says
+    so, because replaying the consumer's own temp-root adoption would have side effects.
+    """
+    env = dict(record["env"])
+    if repair is not None and repair.kind == "normalization-block":
+        text = str(record["chain"][source])
+        begin = text.index(FROZEN_HOME_BLOCK_BEGIN) + len(FROZEN_HOME_BLOCK_BEGIN)
+        block = text[begin : text.index(FROZEN_HOME_BLOCK_END)]
+        script = (
+            "set -euo pipefail\n"
+            "fail() { printf 'wrapper: %s\\n' \"$1\" >&2; exit 1; }\n"
+            f"{block}\nprintf '%s' \"${{HOME-}}\"\n"
+        )
+        result = _run_env(context, ["/bin/bash", "-c", script], env)
+        if result.returncode != 0 or not result.stdout.strip():
+            raise ProbeError(
+                f"{source}'s own frozen-HOME normalization refused to run under its frozen env: "
+                + " ".join(result.stderr.split())[:200]
+            )
+        env["HOME"] = result.stdout.strip()
+        return env, f"{source}'s own normalization block, executed from the deployed bytes"
+    private = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-frozen-home-"))
+    os.chmod(private, 0o700)
+    env["HOME"] = str(private)
+    return env, "a private 0700 temp home, the property the consumer's own temp root establishes"
+
+
+def probe_g2(context: Context) -> "dict[str, object]":
+    """The docker CLI discovers its plugins for every frozen command that needs one.
+
+    Attempt #16 died here: under `HOME=/root` the CLI logs `Error loading config file: … permission
+    denied` and then never scans for cli-plugins, so `docker buildx imagetools inspect --raw`
+    degrades to `unknown command`. Both legs are measured — the frozen env as it stands, and the env
+    the consumer's own repair establishes — because the first is what the defect looked like and the
+    second is what has to be true for the window to open.
+    """
+    docker = _docker_binary(context)
+    records = frozen_command_surface(context)
+    needed: list[tuple[dict, str, list[str]]] = []
+    for record in records:
+        for name, found in record["consumers"].items():
+            verbs = found.get("docker-cli-plugin")
+            if verbs:
+                needed.append((record, name, verbs))
+    if not needed:
+        return verdict(
+            "G2",
+            FAIL,
+            "no frozen command was found to reach a docker CLI plugin; an empty consumer set is "
+            "not evidence that plugin discovery is irrelevant — it means the derivation stopped "
+            "working",
+        )
+    if docker is None:
+        return verdict(
+            "G2",
+            UNPROVABLE,
+            "no docker CLI on this host, so plugin discovery under the frozen env was not measured",
+            "deploy/qdrant/q12-preflight-probes.py probe G2 requires the docker CLI; the production "
+            "host has it at /usr/bin/docker and the measurement is re-run there before the window",
+        )
+
+    frozen_failures: list[str] = []
+    repaired_failures: list[str] = []
+    unrepaired: list[str] = []
+    proven: list[str] = []
+    temporary: list[pathlib.Path] = []
+    try:
+        for record, name, verbs in needed:
+            state, repair, source = _repair_state(record, name)
+            if state == "drift":
+                unrepaired.append(f"{record['id']}: {source}")
+                continue
+            if state == "none" and name not in HOME_EXEMPTIONS:
+                unrepaired.append(
+                    f"{record['id']}: {name} invokes docker "
+                    + "/".join(verbs)
+                    + f" under HOME {record['home']} with no repair"
+                )
+                continue
+            repaired_env, how = _repaired_env(context, record, source, repair)
+            if repaired_env["HOME"] != record["env"].get("HOME"):
+                temporary.append(pathlib.Path(repaired_env["HOME"]))
+            for verb in verbs:
+                frozen = _run_env(context, [docker, verb, "version"], dict(record["env"]))
+                if frozen.returncode != 0:
+                    frozen_failures.append(f"{record['id']} docker {verb} ({name})")
+                fixed = _run_env(context, [docker, verb, "version"], repaired_env)
+                if fixed.returncode != 0:
+                    repaired_failures.append(
+                        f"{record['id']} docker {verb} under {how}: "
+                        + " ".join((fixed.stderr or fixed.stdout).split())[:160]
+                    )
+                else:
+                    proven.append(f"{record['id']} docker {verb} ({name})")
+    finally:
+        for path in temporary:
+            if path.name.startswith("mc2-q12-frozen-home-"):
+                shutil.rmtree(path, ignore_errors=True)
+
+    if unrepaired:
+        return verdict("G2", FAIL, "; ".join(sorted(set(unrepaired))))
+    if repaired_failures:
+        return verdict(
+            "G2",
+            FAIL,
+            "the docker CLI does not discover its plugin even under the repair the consumer "
+            "establishes: " + name_list(repaired_failures),
+        )
+    return verdict(
+        "G2",
+        PASS,
+        f"{len(proven)} docker plugin invocation(s) across {len({r['id'] for r, _, _ in needed})} "
+        f"frozen command(s) discover their plugin under the repair their own consumer establishes "
+        f"({name_list(sorted(set(proven)))}); under the frozen env verbatim "
+        f"{len(frozen_failures)} of them do not, which is the mc2-1cxna defect measured rather than "
+        "recalled",
+    )
+
+
+def probe_g3(context: Context) -> "dict[str, object]":
+    """A libpq client connects through the POOLED DSN under each frozen env that needs one.
+
+    Attempts #13/#14 died here: libpq resolves its default client certificate at
+    `$HOME/.postgresql/postgresql.crt`, and an EACCES on that stat refuses the connection outright.
+    The connection goes through the pooled DSN and nothing else, and every statement is the standard
+    read-only assertion, so this costs one round trip and mutates nothing.
+    """
+    if context.script is None or context.psql is None or not context.libpq_env:
+        raise ProbeError("no database seam is bound in this scope")
+    records = frozen_command_surface(context)
+    needed: list[tuple[dict, str, list[str]]] = []
+    for record in records:
+        for name, found in record["consumers"].items():
+            clients = found.get("libpq")
+            if clients:
+                needed.append((record, name, clients))
+    if not needed:
+        return verdict(
+            "G3",
+            FAIL,
+            "no frozen command was found to reach a libpq client; an empty consumer set is not "
+            "evidence, it means the derivation stopped working",
+        )
+
+    body = read_only("SELECT 1")
+    unrepaired: list[str] = []
+    repaired_failures: list[str] = []
+    frozen_failures: list[str] = []
+    proven: list[str] = []
+    temporary: list[pathlib.Path] = []
+    try:
+        for record, name, clients in needed:
+            state, repair, source = _repair_state(record, name)
+            if state == "drift":
+                unrepaired.append(f"{record['id']}: {source}")
+                continue
+            if state == "none" and name not in HOME_EXEMPTIONS:
+                unrepaired.append(
+                    f"{record['id']}: {name} invokes "
+                    + "/".join(clients)
+                    + f" under HOME {record['home']} with no repair"
+                )
+                continue
+            argv = [context.psql, "-X", "--no-psqlrc", "--no-password", "-tAq", "-v", "ON_ERROR_STOP=1"]
+            frozen_env = {**record["env"], **context.libpq_env}
+            frozen = _run_env(context, argv, frozen_env, body)
+            if frozen.returncode != 0:
+                frozen_failures.append(f"{record['id']} ({name})")
+            repaired_env, how = _repaired_env(context, record, source, repair)
+            if repaired_env["HOME"] != record["env"].get("HOME"):
+                temporary.append(pathlib.Path(repaired_env["HOME"]))
+            fixed = _run_env(context, argv, {**repaired_env, **context.libpq_env}, body)
+            if fixed.returncode != 0 or fixed.stdout.strip() != "1":
+                repaired_failures.append(
+                    f"{record['id']} under {how}: "
+                    + " ".join((fixed.stderr or fixed.stdout).split())[:160]
+                )
+            else:
+                proven.append(f"{record['id']} ({name})")
+    finally:
+        for path in temporary:
+            if path.name.startswith("mc2-q12-frozen-home-"):
+                shutil.rmtree(path, ignore_errors=True)
+
+    if unrepaired:
+        return verdict("G3", FAIL, "; ".join(sorted(set(unrepaired))))
+    if repaired_failures:
+        return verdict(
+            "G3",
+            FAIL,
+            "libpq cannot reach the pooled DSN even under the repair the consumer establishes: "
+            + name_list(repaired_failures),
+        )
+    return verdict(
+        "G3",
+        PASS,
+        f"{len(proven)} libpq-using frozen command(s) connect read-only through the pooled DSN "
+        f"under the repair their own consumer establishes ({name_list(sorted(set(proven)))}); "
+        f"under the frozen env verbatim {len(frozen_failures)} of them cannot",
+    )
+
+
+def probe_g4(context: Context) -> "dict[str, object]":
+    """No frozen command hands a `/proc/self/fd/N` path to a re-exec'ing child.
+
+    Attempt #15's second cause: `backup-supabase.sh` passed `/proc/self/fd/$CA_FD` as an ARGUMENT to
+    the manifest generator, whose pnpm -> node -> tsx chain does not carry the parent's descriptor
+    table, so the path stopped existing — after the writers were stopped and both dumps had already
+    succeeded. `/proc/self` is per-process: the same text names a different thing in every process
+    that reads it, which is why an EACCES-style failure never appears and the file is simply absent.
+
+    Both halves are measured: the property itself, against a real child, and every deployed chain
+    member for a surviving dependence on it.
+    """
+    records = frozen_command_surface(context)
+
+    # The property, measured rather than asserted: a descriptor this process holds, named as a
+    # /proc/self/fd path, does not resolve in a child that does not inherit it.
+    handle, temporary_path = tempfile.mkstemp(prefix="mc2-q12-fd-probe-")
+    try:
+        os.write(handle, b"q12")
+        fd_path = f"/proc/self/fd/{handle}"
+        if not pathlib.Path(fd_path).exists():
+            raise ProbeError("the fd path does not resolve in the probe's own process")
+        child = subprocess.run(
+            ["/usr/bin/test", "-e", fd_path], capture_output=True, text=True, check=False
+        )
+        survives = child.returncode == 0
+    finally:
+        os.close(handle)
+        pathlib.Path(temporary_path).unlink(missing_ok=True)
+    if survives:
+        return verdict(
+            "G4",
+            FAIL,
+            f"a /proc/self/fd path resolved in a child that does not hold the descriptor; the "
+            "measurement this probe depends on is not measuring what it claims",
+        )
+
+    offenders: list[str] = []
+    scanned = 0
+    for record in records:
+        others = {pathlib.Path(other).name for other in record["chain"]}
+        for name, text in record["chain"].items():
+            scanned += 1
+            lines = _logical_lines(text)
+            # `"$TSX_SHIM" "$MANIFEST_GENERATOR" …` names neither `tsx` nor the child in the line
+            # that spawns them, which is exactly how the 2026-07-29 call site read as innocent. The
+            # variables are resolved from their own assignments first.
+            respawning: set[str] = set()
+            for line in lines:
+                match = ASSIGNMENT_RE.match(line)
+                if match is None:
+                    continue
+                value = match.group(2)
+                if RESPAWNING_CONSUMER_RE.search(value) or any(
+                    child in value for child in others if child != pathlib.Path(name).name
+                ):
+                    respawning.add(match.group(1))
+            for line in lines:
+                found = FD_PATH_RE.search(line)
+                if found is None or line.lstrip().startswith("#"):
+                    continue
+                consumers = sorted(set(RESPAWNING_CONSUMER_RE.findall(line))) + sorted(
+                    f"${variable}"
+                    for variable in respawning
+                    if re.search(r"\$\{?" + re.escape(variable) + r"\}?(?![A-Za-z0-9_])", line)
+                )
+                if consumers:
+                    offenders.append(
+                        f"{record['id']}: {name} hands "
+                        + found.group(0)
+                        + " to "
+                        + "/".join(consumers)
+                    )
+    if offenders:
+        return verdict(
+            "G4",
+            FAIL,
+            f"{len(offenders)} argv path(s) that do not survive a re-exec'ing child: "
+            + name_list(sorted(set(offenders))),
+        )
+    return verdict(
+        "G4",
+        PASS,
+        "a /proc/self/fd path is measured NOT to resolve in a child that does not hold the "
+        f"descriptor, and none of the {scanned} deployed chain member(s) behind the "
+        f"{len(records)} frozen commands hands one to a re-exec'ing child (pnpm/npm/npx/tsx/node/"
+        "docker). BOUND: the scan is per line, so a path assembled across two lines is out of reach",
+    )
+
+
 # --- the frozen probe list --------------------------------------------------------------------
 
 PROBES: "tuple[dict[str, object], ...]" = (
@@ -1484,6 +2431,10 @@ PROBES: "tuple[dict[str, object], ...]" = (
     {"id": "H3", "group": "H", "scope": HOST_SCOPE, "run": probe_h3},
     {"id": "H4", "group": "H", "scope": HOST_SCOPE, "run": probe_h4},
     {"id": "H5", "group": "H", "scope": HOST_SCOPE, "run": probe_h5},
+    {"id": "G1", "group": "G", "scope": HOST_SCOPE, "run": probe_g1},
+    {"id": "G2", "group": "G", "scope": HOST_SCOPE, "run": probe_g2},
+    {"id": "G3", "group": "G", "scope": DATABASE_SCOPE, "run": probe_g3},
+    {"id": "G4", "group": "G", "scope": HOST_SCOPE, "run": probe_g4},
 )
 
 FROZEN_IDS: "tuple[str, ...]" = tuple(str(probe["id"]) for probe in PROBES)
@@ -1527,6 +2478,22 @@ def default_host_adapter(deploy_root: pathlib.Path) -> HostAdapter:
     def disk_free(path: pathlib.Path) -> int:
         return shutil.disk_usage(str(path)).free
 
+    def run_env(
+        argv: "list[str]", env: "dict[str, str]", stdin_text: "str | None" = None
+    ) -> ScriptResult:
+        """Group G's seam: EXACTLY the given environment, nothing inherited. Inheriting here would
+        reintroduce the substitution the whole group exists to catch — the probe's own usable HOME
+        standing in for the frozen one."""
+        completed = subprocess.run(
+            argv,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            **({"input": stdin_text} if stdin_text is not None else {"stdin": subprocess.DEVNULL}),
+        )
+        return ScriptResult(completed.returncode, completed.stdout, completed.stderr)
+
     return HostAdapter(
         deploy_root=deploy_root,
         run=run,
@@ -1535,4 +2502,5 @@ def default_host_adapter(deploy_root: pathlib.Path) -> HostAdapter:
         backup_root=deploy_root / "backups",
         compose_file=deploy_root / "docker-compose.infra.yml",
         env_file=deploy_root / ".env.production",
+        run_env=run_env,
     )

@@ -171,6 +171,51 @@ No database access. Runnable at any time, including from CI.
 | H4  | No deploy workflow is in flight (`gh run list`), and the dev-deploy cadence is paused for the window. **Amended 2026-07-28:** two legs are measured on the host — no running deploy process, and no dev container restarted inside a 30-minute quiet window — and the GitHub leg only where `gh` exists. The production host has no `gh`, so there H4 is `unprovable` with the host-side measurements as its evidence, never a green that was not established.                                                                                                                                                                                                                                                                                                                                |
 | H5  | Free disk space exceeds the backup generation's measured high-water mark. The mark is the largest of the five most recent `backups/supabase/generation-*` directories, with no headroom multiplier; that bound is stated in the verdict.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
+### Group G — the frozen environment every manifest command runs in
+
+**Added 2026-07-29 (`mc2-bh3ef`).** The `mc2-1cxna` wall. Groups A-E measure the database and group
+H the deployed bytes; nothing measured the environment the commands are **handed**. The frozen
+`q12-command-manifest.json` pins `HOME=/root` for all twenty commands while the controller and its
+children run as uid 1000 (`mc2-1by33`), and `/root` is `0700 root-owned`. A child that resolves
+something under `$HOME` gets `EACCES`, which is **not** "absent", so nothing falls back: libpq stops
+on its default client certificate and refuses every connection (C3, attempts #13/#14); the docker
+CLI abandons its config file and then never discovers its CLI plugins, so `docker buildx` and
+`docker compose` cease to exist (C4, attempt #16, and the 2026-07-27 pre-flight before it).
+
+The frozen env cannot be edited, so every repair lives in a consumer. Two repair shapes exist and
+the difference is load-bearing: an `export HOME=…` covers the process and everything it spawns; a
+`HOME=… <command>` prefix covers **exactly that invocation**, so the next call added beside it
+inherits `/root` again. Every repair is pinned to a token in the consumer's own deployed bytes — the
+`mc2-lzft4` rule, where a probe carrying its own expected value certified a host the consumer
+rejects — and a repair that is refactored away is a `fail`, not a stale belief.
+
+The group is **complete over the manifest**: a command group G cannot account for is a `fail`, never
+a silence, so a twenty-first frozen command cannot arrive unexamined.
+
+| id  | Assertion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | For every frozen command: `$HOME` as declared is stat-able (`R_OK\|X_OK`) by the identity that runs it — the probe's own uid for nineteen, root for `source.forward` through the argv-whitelist launcher — **or** the chain repairs it, **or** nothing in the chain resolves under `$HOME`. Where the repair is invocation-scope, **every** logical line reaching a `$HOME`-resolving consumer must carry its own `HOME=`; that is the rule that catches the next call added beside a repaired one. |
+| G2  | Docker CLI plugin discovery, measured both ways for every command whose chain reaches `docker compose`/`docker buildx`: under the frozen env verbatim (today: absent — the defect, measured rather than recalled) and under the repair the consumer itself establishes, executed from the deployed bytes where a shared normalization block exists. A plugin that stays undiscovered under the repair is a `fail`.                                                                                  |
+| G3  | libpq connects read-only through the **pooled** DSN under each frozen env whose chain reaches a libpq client, again both ways. `pg_restore --list` and friends do not count: libpq resolves its default client certificate only while opening a connection, so a call site counts only where the same logical line establishes one.                                                                                                                                                                 |
+| G4  | No frozen command hands a `/proc/self/fd/N` path to a re-exec'ing child. Both halves are measured: the property itself, against a real child that does not hold the descriptor, and every deployed chain member for a surviving dependence — including through a variable, which is how the 2026-07-29 call site read as innocent.                                                                                                                                                                  |
+
+Consumer sets are **derived** from the deployed bytes, never hand-listed per command, so a chain that
+starts using one is covered the moment it does. Where a consumer meets an unusable `$HOME` and
+survives anyway, the exemption names the exact consumer classes it covers and is re-checked against
+the derived set on every run — reaching one more revokes it — and any behavioural claim ("this one
+warns and continues") is re-measured under the frozen env rather than remembered. An exemption whose
+measurement cannot run on the current host leaves G1 `unprovable` with that gap named, never a pass.
+
+Bounds, stated rather than hidden: the chain is derived one level deep (the wrapper handed the
+frozen env plus the child it execs); consumer detection is by invocation token, so a consumer
+reached through a path the scan cannot read is out of reach; G4's scan is per logical line, so a
+path assembled across two lines is out of reach.
+
+**Acceptance:** each of G1..G4 must be shown RED against the state that produced the 2026-07-29
+defects — the repair removed from a scratch copy of the consumer, the `/proc/self/fd` argv
+reinstated, a plugin verb introduced into an exempted child. A probe that cannot be shown red is not
+evidence.
+
 ## Success criterion
 
 `q12-window-preflight.py --scope all --run-root <fresh root>` exits `0`, and its report is attached

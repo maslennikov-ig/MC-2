@@ -16,6 +16,10 @@ so ``deploy/qdrant/q12-command-manifest.json`` does not move.  It never opens, h
 window, never touches a capability, consumes no run-id, takes no lock, and writes nothing to the
 database.
 
+Group G (mc2-bh3ef) READS that frozen manifest and runs consumers under each command's own frozen
+env — ``docker <plugin> version``, a read-only ``SELECT 1`` through the pooled DSN, ``pnpm
+--version``. All of them are read-only, none is a manifest command, and none touches the window.
+
 This file owns the argument surface, the connection seam, report emission and the exit code.  It
 holds NO probe SQL — that lives in ``q12-preflight-probes.py``.
 """
@@ -234,7 +238,11 @@ def build_pooled_session(
         )
         return probes.ScriptResult(completed.returncode, completed.stdout, completed.stderr)
 
-    return script, parsed.hostname, parsed.port or 5432
+    # Group G drives psql itself, under a frozen command's OWN env rather than this one, so it needs
+    # the pooled binding as data. Only PGSERVICEFILE/PGSERVICE travel: the password stays in the
+    # mode-0600 service file and never reaches an environment VALUE or argv.
+    libpq_env = {"PGSERVICEFILE": str(service_path), "PGSERVICE": "q12preflight"}
+    return script, parsed.hostname, parsed.port or 5432, libpq_env
 
 
 # --- freshness ------------------------------------------------------------------------------------
@@ -590,6 +598,17 @@ def build_context(arguments, workdir: pathlib.Path, manifest: "dict | None"):
     deploy_root = pathlib.Path(arguments.deploy_root)
     context = probes.Context(scope=arguments.scope, manifest=manifest)
 
+    # Group G measures the FROZEN command manifest, in every scope: G3's libpq leg is database-scope
+    # but still has to read the entry points those commands execute. The deployed copy is the
+    # authority — the bytes that will actually run — with the repository copy beside this script as
+    # the fallback for a checkout that has no /opt/megacampus.
+    context.deploy_root = deploy_root
+    command_manifest_file = deploy_root / probes.COMMAND_MANIFEST_RELATIVE
+    if not command_manifest_file.is_file():
+        command_manifest_file = HERE / "q12-command-manifest.json"
+    if command_manifest_file.is_file():
+        context.command_manifest = json.loads(command_manifest_file.read_text(encoding="utf-8"))
+
     if arguments.scope in ("host", "all"):
         host = probes.default_host_adapter(deploy_root)
         host.gh = shutil.which("gh")
@@ -605,13 +624,15 @@ def build_context(arguments, workdir: pathlib.Path, manifest: "dict | None"):
         if not catalog_path.is_file():
             raise PreflightError(f"the run root carries no expected catalog: {catalog_path}")
         context.catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-        script, host_name, port = build_pooled_session(
+        script, host_name, port, libpq_env = build_pooled_session(
             pathlib.Path(arguments.db_url_file),
             pathlib.Path(arguments.ca_file),
             workdir,
             arguments.psql,
         )
         context.script = script
+        context.psql = arguments.psql
+        context.libpq_env = libpq_env
         # The barrier and the structural catalog are read from the DEPLOYED tree, not the repo:
         # A7's frozen expectation and D1's projection must come from the bytes that will actually
         # run in the window.

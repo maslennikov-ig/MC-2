@@ -1121,7 +1121,186 @@ def gate_suite() -> dict:
     return out
 
 
+# --- group G: the frozen environment every manifest command runs in -------------------------------
+#
+# mc2-bh3ef. Each probe is driven twice: against the tree as delivered, and against a SCRATCH COPY
+# reinstated to the exact state that produced a 2026-07-29 defect. A probe that cannot be shown red
+# is not evidence — that is how mc2-lzft4 slipped through, where the probe carried the substitution
+# it existed to catch.
+
+FROZEN_ENV_TREE = ("deploy/qdrant", "deploy/postgres", "scripts")
+
+
+def frozen_tree(mutate=None) -> pathlib.Path:
+    """A scratch copy of the deployed tree, optionally reinstated to a defective state."""
+    import shutil
+
+    root = pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-frozen-env-"))
+    for relative in FROZEN_ENV_TREE:
+        shutil.copytree(REPO / relative, root / relative)
+    if mutate is not None:
+        mutate(root)
+    return root
+
+
+def rewrite(root: pathlib.Path, relative: str, old: str, new: str) -> None:
+    target = root / relative
+    text = target.read_text(encoding="utf-8")
+    if old not in text:
+        raise RuntimeError(f"cannot reinstate the defective state: {old!r} is not in {relative}")
+    target.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def frozen_libpq_seam(root: pathlib.Path):
+    """psql answers the way production answered on 2026-07-29: libpq refuses under a HOME it cannot
+    stat, and connects under one it can. Everything else is a real child under the exact frozen env.
+
+    This stands in for the pooled production DSN, which no local suite can reach. The REAL leg is
+    `--scope all` on the host immediately before the window; what is proven here is the rule that
+    decides WHICH commands must be measured and what makes them pass.
+    """
+    real = probes.default_host_adapter(root).run_env
+
+    def run_env(argv, env, stdin_text=None):
+        if argv[0].endswith("psql"):
+            if os.access(env.get("HOME", ""), os.R_OK | os.X_OK):
+                return probes.ScriptResult(0, "1\n", "")
+            return probes.ScriptResult(
+                2,
+                "",
+                'psql: error: connection to server failed: could not open certificate file '
+                f'"{env.get("HOME", "")}/.postgresql/postgresql.crt": Permission denied',
+            )
+        return real(argv, env, stdin_text)
+
+    return run_env
+
+
+def frozen_context(root: pathlib.Path, *, command_manifest=None) -> "probes.Context":
+    context = probes.Context(scope="all")
+    context.deploy_root = root
+    context.command_manifest = command_manifest or json.loads(
+        (root / "deploy/qdrant/q12-command-manifest.json").read_text(encoding="utf-8")
+    )
+    host = probes.default_host_adapter(root)
+    host.run_env = frozen_libpq_seam(root)
+    context.host = host
+    context.script = lambda *args, **kwargs: probes.ScriptResult(0, "1", "")
+    context.psql = "/usr/lib/postgresql/17/bin/psql"
+    context.libpq_env = {"PGSERVICEFILE": str(root / "libpq-service"), "PGSERVICE": "q12preflight"}
+    return context
+
+
+def frozen_run(out: dict, key: str, root: pathlib.Path, ids, *, command_manifest=None) -> None:
+    import shutil
+
+    try:
+        context = frozen_context(root, command_manifest=command_manifest)
+        for probe_id in ids:
+            record(out, f"{key}_{probe_id.lower()}", run_one(context, probe_id))
+    finally:
+        if str(root).startswith("/tmp/mc2-q12-frozen-env-"):
+            shutil.rmtree(root, ignore_errors=True)
+
+
+def frozen_env_suite() -> dict:
+    out: dict = {}
+    out["docker_present"] = pathlib.Path("/usr/bin/docker").is_file()
+    out["pnpm_present"] = pathlib.Path("/usr/bin/pnpm").is_file()
+
+    # --- the tree as delivered ------------------------------------------------------------------
+    frozen_run(out, "healthy", frozen_tree(), ("G1", "G2", "G3", "G4"))
+
+    # --- a frozen HOME the identity CAN use: the probe must not be a constant `fail` -------------
+    usable = json.loads((REPO / "deploy/qdrant/q12-command-manifest.json").read_text("utf-8"))
+    for command in usable["commands"].values():
+        command["env"]["HOME"] = os.path.expanduser("~")
+    frozen_run(out, "usable_home", frozen_tree(), ("G1",), command_manifest=usable)
+
+    # --- completeness: a twenty-first command whose entry point group G cannot read --------------
+    extra = json.loads((REPO / "deploy/qdrant/q12-command-manifest.json").read_text("utf-8"))
+    extra["commands"]["unaccounted.command"] = {
+        "argv": ["/usr/bin/some-new-runner", "--whatever"],
+        "argv_sha256": "0" * 64,
+        "env": {"PATH": "/usr/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/root"},
+    }
+    frozen_run(out, "unaccounted", frozen_tree(), ("G1",), command_manifest=extra)
+
+    # --- mc2-1cxna (a): the libpq call sites lose their HOME repair (C3, attempts #13/#14) --------
+    frozen_run(
+        out,
+        "libpq_unrepaired",
+        frozen_tree(
+            lambda root: rewrite(
+                root, "deploy/postgres/backup-supabase.sh", 'HOME="$TEMP_GENERATION" ', ""
+            )
+        ),
+        ("G1", "G3"),
+    )
+
+    # --- mc2-1cxna (c): the restore drill loses its exported private HOME (C4, attempt #16) -------
+    frozen_run(
+        out,
+        "docker_unrepaired",
+        frozen_tree(
+            lambda root: rewrite(
+                root, "deploy/postgres/restore-supabase-drill.sh", 'export HOME="$TEMP_ROOT"', "true"
+            )
+        ),
+        ("G1", "G2"),
+    )
+
+    # --- the shared normalization block removed from the wrapper seam (mc2-wwc9l) -----------------
+    frozen_run(
+        out,
+        "block_removed",
+        frozen_tree(
+            lambda root: rewrite(
+                root,
+                "deploy/qdrant/operator-compose.sh",
+                probes.FROZEN_HOME_BLOCK_BEGIN,
+                "# removed",
+            )
+        ),
+        ("G1", "G2"),
+    )
+
+    # --- mc2-1cxna (b): a /proc/self/fd argv reinstated on the generator's spawn chain ------------
+    frozen_run(
+        out,
+        "fd_path",
+        frozen_tree(
+            lambda root: rewrite(
+                root,
+                "deploy/postgres/backup-supabase.sh",
+                '"$TSX_SHIM" "$MANIFEST_GENERATOR" "${args[@]}"',
+                '"$TSX_SHIM" "$MANIFEST_GENERATOR" --ca-file "/proc/self/fd/$CA_FD" "${args[@]}"',
+            )
+        ),
+        ("G4",),
+    )
+
+    # --- an exemption that stops holding: the writer child reaches a plugin verb ------------------
+    frozen_run(
+        out,
+        "exemption_revoked",
+        frozen_tree(
+            lambda root: rewrite(
+                root,
+                "deploy/qdrant/q12-writer-resume.py",
+                'docker("inspect", writer_id)',
+                'docker("buildx", "version")',
+            )
+        ),
+        ("G1",),
+    )
+    return out
+
+
 def main(argv: "list[str]") -> int:
+    if "--frozen-env" in argv:
+        sys.stdout.write(json.dumps(frozen_env_suite(), sort_keys=True) + "\n")
+        return 0
     if "--gate" in argv:
         sys.stdout.write(json.dumps(gate_suite(), sort_keys=True) + "\n")
         return 0

@@ -1660,3 +1660,72 @@ every privileged command, while the commands run as the deploy operator. Any chi
 something under `$HOME` — libpq's default client certificate, the docker CLI's config and plugin
 directory — fails with EACCES rather than falling back, because an unreadable parent is not the
 same as an absent file. When adding a consumer to a frozen-env command, give it a HOME it can stat.
+
+## `mc2-bh3ef` — group G, the frozen-env surface of every manifest command (2026-07-29)
+
+Sixteen attempts, five defects in one day, and not one of them logic. Three were the same cause in
+three different consumers. The pre-flight had twenty-five probes and none of them measured the
+environment the twenty FROZEN commands are handed — groups A-E measure the database, group H the
+deployed bytes. Group G closes that reach, for all twenty commands including the ten that have
+never run in a window.
+
+- **G1** — `$HOME` per command, per identity. Nineteen commands run as uid 1000 and declare
+  `HOME=/root`; `source.forward` runs as root through the argv-whitelist launcher, where the same
+  `/root` IS usable, and that difference is measured rather than assumed. A command passes when its
+  HOME is usable, when a consumer repairs it, or when nothing in its chain resolves under `$HOME`.
+- **G2** — docker CLI plugin discovery, measured under the frozen env verbatim (absent: the C4
+  defect, measured rather than recalled) and under the repair the consumer itself establishes,
+  executed from the deployed bytes where the shared normalization block exists.
+- **G3** — libpq through the POOLED DSN under each frozen env that needs one, both ways.
+- **G4** — `/proc/self/fd/N` argv paths, in two halves: the property measured against a real child
+  that does not hold the descriptor, and every deployed chain member scanned for a surviving
+  dependence, including through a variable — which is how the real 2026-07-29 call site read as
+  innocent, since neither `tsx` nor the child is named on the line that spawns them.
+
+TWO REPAIR SHAPES, and the difference is load-bearing. An `export HOME=…` covers the process and
+everything it spawns; a `HOME=… <command>` prefix covers exactly that invocation, so the next call
+added beside it inherits `/root` again. G1 holds the second shape to a per-invocation rule over
+logical lines — which is the rule that catches the NEXT libpq call, not the last one.
+
+NOTHING IS DECLARED THAT CAN BE DERIVED. Consumer sets come from the deployed bytes; repairs are
+pinned to a token in the consumer's own file, so one refactored away is a `fail`; exemptions name the
+exact consumer classes they cover and are revoked automatically when the consumer reaches further —
+`q12-writer-resume.py` is exempt because it reaches only docker's built-in verbs AND because it
+asserts `dict(os.environ) == EXPECTED_ENVIRONMENT` with `HOME=/root`, so a repair cannot live there
+at all. A behavioural claim ("pnpm warns and continues") is re-measured under the frozen env on every
+run, and where the binary is absent G1 is `unprovable` with that gap NAMED, never a pass.
+
+Two false-positive classes were removed by measurement, not by loosening: a filename
+(`.pg_dump.stderr`) is not a binary, and an offline `pg_restore --list` opens no connection, so a
+libpq call site counts only where the same logical line establishes one. Both had made G1 flag
+thirty-eight innocent lines — and a probe that cries wolf closes the window just as hard as one that
+sleeps through it.
+
+EVERY PROBE IS SHOWN RED against the state that produced the 2026-07-29 defects, in
+`q12-window-preflight.test.ts` § "the frozen-env surface (group G)": the repair removed from a
+scratch copy of `backup-supabase.sh` and of `restore-supabase-drill.sh`, the shared block removed
+from `operator-compose.sh`, the `/proc/self/fd` argv reinstated on the generator's spawn chain, a
+plugin verb introduced into the exempted writer child, and a twenty-first command whose entry point
+group G cannot read. Plus the inverse, which matters just as much: a frozen HOME the identity CAN
+use passes outright, so the probe is not a constant refusal.
+
+## `mc2-rjy9k` — the data-movement children against the plan's isolate (2026-07-29)
+
+Group G catches "this child cannot START in its environment". This harness is the second net.
+`packages/course-gen-platform/tests/unit/ops/fixtures/q12-isolate-dry-run-runner.py` reuses the
+isolate the plan's persist seam already hands back (`restore-persist-handle.json`) as a TARGET: no
+writer stopped, no guard installed, no run-id burnt, production never written.
+
+It drives `migration.base.apply` and `migration.observability.apply` — the real frozen argv, byte-
+identical except for the three credential PATHS, under the command's own frozen env. Those two have
+NEVER executed: sixteen attempts died at or before C4, the command immediately before them.
+
+What it cannot carry is structural, not awkward. `source.forward`, `reindex.plan`,
+`reindex.worker.create`, `reindex.execute`, `reindex.verify` and `deploy.prepare` each mount or
+verify `database-barrier-receipt.json` / `database-barrier-probe-receipt.json`, which only
+`barrier.activate` mints; fabricating one to reach them would be the exact substitution this stage
+exists to stop. They stay in-window residuals with the barrier's dual-bind,
+`quiesce_client_backends` and `probe_closed_inbound`'s real nginx 502/503. A vanilla PostgreSQL
+17.10 is not a substitute for the isolate either — the document-evidence migration manifest hashes
+fail there — so without a bound handle every child is reported `skipped` with that reason, which is
+what CI asserts.

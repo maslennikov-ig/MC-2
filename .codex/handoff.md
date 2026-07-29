@@ -95,9 +95,28 @@ fixture in `mc2-awi6q` and `mc2-1kcbv`. Model the constraint, never the convenie
 BEFORE THE NEXT ATTEMPT — one command on the server immediately before the window:
 `/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>`.
 Read-only by construction, through the pooled DSN, no lock, no run-id burned. Exits 0 only when all
-25 probes are `pass` or `unprovable` with named evidence. It has been green before every attempt
+29 probes are `pass` or `unprovable` with named evidence. It has been green before every attempt
 since #11 and the window still failed past it each time: a probe covers nothing outside its reach.
 Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
+
+GROUP G (`mc2-bh3ef`, 2026-07-29) closed the reach that let five defects through in one day. G1..G4
+measure the environment the twenty FROZEN commands are handed — `$HOME` usability per command and
+per identity, docker CLI plugin discovery, a libpq connection through the pooled DSN, and
+`/proc/self/fd` argv paths that do not survive a re-exec'ing child — for all twenty, including the
+ten that have never run. Repairs are pinned to the consumer's own deployed bytes, so one that is
+refactored away is a `fail`; exemptions name the exact consumer classes they cover and are revoked
+automatically when a consumer reaches further. Each probe is shown RED against the 2026-07-29 state
+in `q12-window-preflight.test.ts` § "the frozen-env surface (group G)". `--scope host` now selects
+`H1..H5,G1,G2,G4`; G3 is database scope.
+
+THE DRY RUN (`mc2-rjy9k`) is
+`/usr/bin/python3 packages/course-gen-platform/tests/unit/ops/fixtures/q12-isolate-dry-run-runner.py --persist-handle <run-root>/restore-persist-handle.json`,
+run on the host against the isolate the plan's persist seam hands back. It drives the two migration
+children — which have never executed, sixteen attempts having died at or before C4, the command
+right before them — under their OWN frozen env, with only the three credential PATHS re-pointed. It
+reports every other child `skipped` with a structural reason: `source.forward`, `reindex.*` and
+`deploy.prepare` all mount or verify the barrier receipt that only `barrier.activate` mints, and
+fabricating one would be the substitution this whole stage exists to stop.
 
 Outside what the probe can do: run the controller DETACHED (`setsid nohup`; a dropped ssh once
 killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push

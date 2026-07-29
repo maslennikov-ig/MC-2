@@ -216,6 +216,92 @@ describe('Q12 window pre-flight: host probes', () => {
   });
 });
 
+function driveFrozenEnv(): HostShape {
+  const result = spawnSync('/usr/bin/python3', [RUNNER, '--frozen-env'], {
+    encoding: 'utf8',
+    timeout: 300_000,
+    env: { PATH: process.env.PATH, LC_ALL: 'C', LANG: 'C' },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout) as HostShape;
+}
+
+// mc2-bh3ef — group G, the frozen environment every manifest command runs in.
+//
+// Every case below drives the REAL probe against a scratch copy of the deployed tree reinstated to
+// the exact state that produced a 2026-07-29 defect. A probe that cannot be shown red is not
+// evidence: that is precisely how mc2-lzft4 slipped through, where the probe carried the
+// substitution it existed to catch.
+describe('Q12 window pre-flight: the frozen-env surface (group G)', () => {
+  let out: HostShape;
+  beforeAll(() => {
+    out = driveFrozenEnv();
+  }, 320_000);
+
+  it('accounts for every frozen command against the tree as delivered', () => {
+    // G1 is green when every command's HOME is usable, repaired or exempt. On a host without one of
+    // the binaries an exemption names it is `unprovable` WITH evidence — never a pass.
+    expect(['pass', 'unprovable']).toContain(out.healthy_g1);
+    if (out.healthy_g1 === 'unprovable') {
+      expect(String(out.healthy_g1_evidence).trim().length).toBeGreaterThan(0);
+      expect(String(out.healthy_g1_detail)).toContain('could not be measured here');
+    }
+    expect(String(out.healthy_g1_detail)).toContain('BOUND');
+    expect(out.healthy_g4, String(out.healthy_g4_detail)).toBe('pass');
+    expect(out.healthy_g3, String(out.healthy_g3_detail)).toBe('pass');
+    if (out.docker_present) {
+      expect(out.healthy_g2, String(out.healthy_g2_detail)).toBe('pass');
+      // The frozen env's own failure is measured, not recalled: that is the mc2-1cxna defect.
+      expect(String(out.healthy_g2_detail)).toContain('under the frozen env verbatim');
+    }
+  });
+
+  it('is not a constant refusal: a frozen HOME the identity can use passes outright', () => {
+    expect(out.usable_home_g1, String(out.usable_home_g1_detail)).toBe('pass');
+  });
+
+  it('refuses a frozen command whose entry point it cannot account for', () => {
+    expect(out.unaccounted_g1).toBe('fail');
+    expect(String(out.unaccounted_g1_detail)).toContain('unaccounted.command');
+    expect(String(out.unaccounted_g1_detail)).toContain('outside the deployed tree');
+  });
+
+  it('fails G1/G3 with the libpq call sites unrepaired (mc2-1cxna a, C3 attempts #13/#14)', () => {
+    expect(out.libpq_unrepaired_g1).toBe('fail');
+    expect(String(out.libpq_unrepaired_g1_detail)).toContain('backup-supabase.sh');
+    expect(out.libpq_unrepaired_g3).toBe('fail');
+    expect(String(out.libpq_unrepaired_g3_detail)).toContain('per-invocation-home');
+  });
+
+  it('fails G1/G2 with the restore drill unrepaired (mc2-1cxna c, C4 attempt #16)', () => {
+    expect(out.docker_unrepaired_g1).toBe('fail');
+    expect(String(out.docker_unrepaired_g1_detail)).toContain('restore-supabase-drill.sh');
+    expect(out.docker_unrepaired_g2).toBe('fail');
+    expect(String(out.docker_unrepaired_g2_detail)).toContain('private-temp-home');
+  });
+
+  it('fails G1/G2 when the shared normalization block leaves a wrapper (mc2-wwc9l)', () => {
+    expect(out.block_removed_g1).toBe('fail');
+    expect(String(out.block_removed_g1_detail)).toContain('operator-compose.sh');
+    expect(out.block_removed_g2).toBe('fail');
+  });
+
+  it('fails G4 on a /proc/self/fd argv handed to a spawn chain (mc2-1cxna b, attempt #15)', () => {
+    expect(out.fd_path_g4).toBe('fail');
+    expect(String(out.fd_path_g4_detail)).toContain('/proc/self/fd/$CA_FD');
+    // Resolved through the variable that names the runner: the literal `tsx` is nowhere on the line
+    // that spawns it, which is exactly why the real call site read as innocent.
+    expect(String(out.fd_path_g4_detail)).toContain('$TSX_SHIM');
+  });
+
+  it('revokes an exemption the moment its consumer reaches further', () => {
+    expect(out.exemption_revoked_g1).toBe('fail');
+    expect(String(out.exemption_revoked_g1_detail)).toContain('REVOKED');
+    expect(String(out.exemption_revoked_g1_detail)).toContain('docker-cli-plugin');
+  });
+});
+
 describe('Q12 window pre-flight: fail-closed aggregation', () => {
   it('exits non-zero on any fail, and on any unprovable without evidence', () => {
     const out = drive(['--self-test']);
@@ -236,11 +322,12 @@ describe('Q12 window pre-flight: fail-closed aggregation', () => {
     const out = drive(['--self-test']);
 
     expect(out.report_ids).toEqual(out.frozen_ids);
-    expect(out.report_ids.length).toBe(25);
+    // 25 through mc2-ot8se, plus group G's four (mc2-bh3ef).
+    expect(out.report_ids.length).toBe(29);
     // Out-of-scope probes are NAMED rather than dropped, so a narrower scope can never read as
     // "everything passed".
-    expect(out.scope_host_ids).toEqual(['H1', 'H2', 'H3', 'H4', 'H5']);
-    expect(out.scope_host_out_of_scope.length).toBe(20);
+    expect(out.scope_host_ids).toEqual(['H1', 'H2', 'H3', 'H4', 'H5', 'G1', 'G2', 'G4']);
+    expect(out.scope_host_out_of_scope.length).toBe(21);
     expect([...out.scope_host_ids, ...out.scope_host_out_of_scope].sort()).toEqual(
       [...out.frozen_ids].sort()
     );
@@ -251,14 +338,14 @@ describe('Q12 window pre-flight: fail-closed aggregation', () => {
 
     expect(out.report_mode).toBe('0o400');
     expect(out.report_schema_version).toBe('megacampus.q12.window-preflight/v1');
-    expect(out.report_summary).toEqual({ pass: 25, fail: 0, unprovable: 0 });
+    expect(out.report_summary).toEqual({ pass: 29, fail: 0, unprovable: 0 });
     // Freshness (hard invariant 6): a report that cannot be dated is not evidence for an attempt.
     expect(out.report_captured_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u);
     expect(out.report_tree_sha).toMatch(/^[0-9a-f]{40}$/u);
     expect(out.rerun_is_a_new_report).toBe(true);
 
     // The human summary is one line per probe: `id  verdict  detail`.
-    expect(out.stdout_lines.length).toBe(25);
+    expect(out.stdout_lines.length).toBe(29);
     for (const line of out.stdout_lines) {
       expect(line).toMatch(/^[A-H]\d {2}(pass|fail|unprovable) {2}/u);
     }
