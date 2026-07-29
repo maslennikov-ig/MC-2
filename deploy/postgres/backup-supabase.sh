@@ -619,12 +619,12 @@ run_manifest_generator() {
     )
   fi
   if [[ $TEST_MODE_ACTIVE -eq 1 ]]; then
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$MANIFEST_GENERATOR" "${args[@]}"
   else
     [[ -x "$TSX_SHIM" ]] || fail "tsx runner is unavailable: $TSX_SHIM is missing or not executable (run pnpm install in the workspace)"
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$TSX_SHIM" "$MANIFEST_GENERATOR" "${args[@]}"
   fi
@@ -899,7 +899,7 @@ start_scheduled_snapshot() {
   local ca_fd_path=$2
   [[ -x "$PSQL" ]] || fail 'absolute psql command is unavailable'
   coproc MC2_SNAPSHOT {
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$PSQL" -X --no-psqlrc --quiet --tuples-only --no-align --set ON_ERROR_STOP=on
   }
@@ -1021,9 +1021,19 @@ main() {
     start_scheduled_snapshot "$service_file" "$ca_fd_path"
   fi
 
+  # mc2-1cxna: HOME must point somewhere this process can STAT. The frozen pg.backup env pins
+  # HOME=/root while the command runs as the deploy operator, and libpq resolves its default client
+  # certificate at $HOME/.postgresql/postgresql.crt. /root is 0700 root-owned, so the lookup fails
+  # with EACCES rather than "absent" and libpq refuses the connection outright:
+  #   pg_dumpall: error: connection to server ... failed: could not open certificate file
+  #   "/root/.postgresql/postgresql.crt": Permission denied
+  # That killed C3 of window attempts #13 and #14 (2026-07-29) AFTER the writers were already
+  # stopped. The run-private generation directory is owned by this process and holds no
+  # .postgresql, so the default lookup finds nothing and is ignored — which is the intended
+  # "no client certificate" behaviour. sslmode/sslrootcert stay explicit and unaffected.
   local status
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_before" 2>"$command_stderr"
   status=$?
@@ -1033,7 +1043,7 @@ main() {
   /usr/bin/chmod 600 -- "$roles_before"
 
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMP" --format=custom --no-password --snapshot="$SNAPSHOT" --file="$archive" 2>"$dump_stderr"
   status=$?
@@ -1057,7 +1067,7 @@ main() {
   validate_manifest "$manifest" "$SNAPSHOT" || fail 'source manifest validation failed'
 
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_after" 2>"$command_stderr"
   status=$?
