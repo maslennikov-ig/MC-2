@@ -475,6 +475,20 @@ def run_quiesce():
         and head["lease_epoch"] == capability["lease_epoch"],
         "writer quiesce claimed journal head is invalid",
     )
+    # mc2-awi6q: an ordinary command's INTENT row does not carry its own (not yet issued)
+    # capability — it INHERITS the predecessor row's value unchanged. That carry is the ratified
+    # rule (docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md item 6)
+    # and the controller's own behaviour (q12-lifecycle-core.py selector_intent_from_head /
+    # append_ordinary_lifecycle: `carried = self.journal[-1]["capability_manifest_sha256"]`, ZERO
+    # only when the journal is empty). The 0×64 intent rule is real but belongs to the
+    # barrier.cleanup lifecycle alone (design :636/:867, core grammar :335). Demanding 0×64 here
+    # made C2 fail closed on a correct production journal after the barrier had already guarded the
+    # database (window attempt #11, 2026-07-28). The inherited value is checked EXACTLY against the
+    # preceding journal row, so this is a corrected expectation, not a relaxed one.
+    carried_before = {
+        entry["seq"]: (journal_entries[position - 1]["capability_manifest_sha256"] if position else "0" * 64)
+        for position, entry in enumerate(journal_entries)
+    }
     quiesce_rows = [entry for entry in journal_entries if entry["phase"] == "quiesced"]
     require(all(entry["command_id"] == "writers.quiesce" for entry in quiesce_rows), "writer quiesce journal command graph is invalid")
     expected_rows = []
@@ -506,7 +520,11 @@ def run_quiesce():
         )
         require(
             observed_outcomes in allowed_outcomes
-            and all(entry["capability_manifest_sha256"] in ({"intent": "0" * 64}.get(entry["outcome"], opened.digest),) for entry in epoch_rows),
+            and all(
+                entry["capability_manifest_sha256"]
+                == (carried_before[entry["seq"]] if entry["outcome"] == "intent" else opened.digest)
+                for entry in epoch_rows
+            ),
             "writer quiesce journal graph is invalid",
         )
         if "recovery_prefix_accepted" in observed_outcomes:

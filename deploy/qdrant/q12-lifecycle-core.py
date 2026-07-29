@@ -2806,6 +2806,62 @@ class Engine:
             raise LifecycleError("database barrier input checkpoint identity mismatch")
         return path
 
+    def publish_writer_quiesce_child_checkpoint(
+        self, kind: str, expected_outcome: str, epoch: str
+    ) -> pathlib.Path:
+        """mc2-awi6q: publish the writers.quiesce child's OWN checkpoint copies.
+
+        ``q12-writer-resume.py`` (:522-576) refuses to quiesce a single writer unless BOTH copies
+        already exist as canonical 0600 regular files:
+
+          * ``writer-quiesce-capability-checkpoint-<run-id>-<epoch>.json`` — the 12-key projection
+            of the quiesce INTENT row, whose sha256 is the capability's own
+            ``capability_input_checkpoint_sha256``;
+          * ``writer-quiesce-input-checkpoint-<run-id>-<epoch>.json`` — the projection of the
+            ``capability_claimed`` head, byte-identical to the live ``phase-checkpoint.json``.
+
+        The controller computed the first digest and wrote it into the capability, but published
+        neither FILE — the same gap mc2-orsez closed for the barrier child, invisible for the same
+        reason: the runtime fixtures published these files themselves. Found by opening the window,
+        2026-07-28 (attempt #11), where C2 failed closed after the barrier had already put
+        production into ``maintenance_guarded``.
+
+        The boundary is asserted rather than assumed: publishing either copy at the wrong journal
+        position would hand the child a valid-looking authority for a row it is not claiming under.
+        """
+        head = self.journal[-1] if self.journal else None
+        if (
+            head is None
+            or head["command_id"] != "writers.quiesce"
+            or head["outcome"] != expected_outcome
+            or head["lease_epoch"] != epoch
+        ):
+            raise LifecycleError(
+                "writer quiesce child checkpoint requires its own boundary journal head"
+            )
+        data = self.checkpoint_bytes(head)
+        if validate_regular_file(self.checkpoint_path, mode=0o600) != data:
+            raise LifecycleError(
+                "writer quiesce child checkpoint source is not the current fixed checkpoint"
+            )
+        path = (
+            self.run_root
+            / f"writer-quiesce-{kind}-checkpoint-{self.request['run_id']}-{epoch}.json"
+        )
+        # A private trace list: this publication is not part of the retained-copy trace contract.
+        immutable_publish(
+            path,
+            data,
+            0o600,
+            [],
+            allow_temporary_completion=bool(
+                getattr(self.executor, "continuous_lease", False)
+            ),
+        )
+        if path.stat().st_ino == self.checkpoint_path.stat().st_ino or path.stat().st_nlink != 1:
+            raise LifecycleError("writer quiesce child checkpoint identity mismatch")
+        return path
+
     def publish_capability(
         self,
         operation: str,
@@ -2990,6 +3046,11 @@ class Engine:
             selector_phase, "intent", command_id, command["command_sha256"], "cutover", carried
         )
         checkpoint_hash = sha256(self.checkpoint_path.read_bytes())
+        if command_id == "writers.quiesce":
+            # mc2-awi6q: the C2 child reads this copy and demands its digest be the capability's
+            # capability_input_checkpoint_sha256 — publish it at the intent boundary the digest is
+            # taken from, not later, or the two stop describing the same journal position.
+            self.publish_writer_quiesce_child_checkpoint("capability", "intent", "cutover")
         _, capability, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
         self.append(
             target_phase,
@@ -3008,6 +3069,9 @@ class Engine:
             "cutover",
             digest,
         )
+        if command_id == "writers.quiesce":
+            # mc2-awi6q: the claimed-boundary copy the child re-reads as its own input checkpoint.
+            self.publish_writer_quiesce_child_checkpoint("input", "capability_claimed", "cutover")
         # R4 Sub-round A (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md
         # §3/§6.4): an injectable, parity-neutral ordinary-execution seam. When the caller's
         # executor exposes execute_ordinary, this delegates to it for a real child result;
