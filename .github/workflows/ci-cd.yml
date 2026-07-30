@@ -732,14 +732,44 @@ jobs:
             scripts/rollback_blue_green.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
 
-          scp -i ~/.ssh/deploy_key -r \
-            deploy/qdrant \
-            deploy/systemd \
-            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/deploy/
+          # mc2-o0g75: deploy/qdrant/** is deployed read-only (0444, 0555) by the Q12 asset
+          # convention, and scp overwrites a file in place rather than replacing it — so the
+          # 2026-07-20 deploy died here and production had not been deployed since 2026-07-04.
+          # tar --unlink-first replaces each file instead of writing through it, which needs only
+          # the directory to be writable, and it is. The archive carries FILES only — `--unlink-first`
+          # applied to a directory entry fails with "Cannot unlink: Directory not empty", so the
+          # member list comes from find and the target directories are left alone.
+          #
+          # Two files are deliberately NOT copied: q12-privileged-launch.sh is the root-owned argv
+          # whitelist launcher and q12-writer-resume.py is its root-owned payload. The deploy user
+          # cannot rewrite them, and it must not — root ownership is the security property. They
+          # change only through the deliberate manual install, never through an ordinary deploy.
+          find deploy/qdrant deploy/systemd -type f \
+            ! -name q12-privileged-launch.sh \
+            ! -name q12-writer-resume.py \
+            ! -path '*/__pycache__/*' \
+            -print0 \
+            | tar -cf - --null --no-recursion -T - \
+            | ssh -i ~/.ssh/deploy_key \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "tar -xf - --no-same-owner --unlink-first -C ${{ env.DEPLOY_PATH }}"
 
-          scp -i ~/.ssh/deploy_key -r \
-            ops/qdrant \
-            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/ops/
+          # Put the read-only modes back, from the same tracked manifest the window pre-flight's H2
+          # probe checks against, so an ordinary deploy does not leave the tree 0644 and turn H2
+          # into a false alarm.
+          scp -i ~/.ssh/deploy_key \
+            scripts/ci/restore_deployed_asset_modes.py \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:/tmp/restore_deployed_asset_modes.py
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "python3 /tmp/restore_deployed_asset_modes.py --deploy-root ${{ env.DEPLOY_PATH }} && rm -f /tmp/restore_deployed_asset_modes.py"
+
+          # mc2-o0g75, second face: /opt/megacampus/ops/qdrant is root-owned all the way down
+          # (Prometheus/Grafana/Alertmanager config, installed root-owned by deliberate hardening),
+          # so this scp could never have succeeded as the deploy user either. It is monitoring
+          # configuration, not application code, and the deployed tree is byte-identical to the
+          # repository as of 2026-07-30 — an ordinary app deploy has no business rewriting it.
+          # It changes through the same deliberate root install that put it there.
 
       # NOTE: Do NOT update nginx config here!
       # deploy_blue_green.sh applies the template with correct Blue/Green ports.
