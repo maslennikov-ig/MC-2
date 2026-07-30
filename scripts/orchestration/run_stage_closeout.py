@@ -360,7 +360,7 @@ def check_child_acceptance_cleanup(artifacts: list[dict[str, object]]) -> None:
         print("child acceptance cleanup OK")
         return
 
-    print("Accepted child streams require mini-closeout before stage close:", file=sys.stderr)
+    print("Final stage closeout needs child delivery and cleanup state:", file=sys.stderr)
     for failure in failures:
         print(f"- {failure}", file=sys.stderr)
     raise SystemExit(1)

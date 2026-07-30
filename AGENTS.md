@@ -82,9 +82,9 @@ bd close <id>         # Complete work
 
 ### Rules
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Task truth for engineering work lives in `bd`. `TodoWrite` is allowed for in-session skill checklists; it is not a task tracker and does not replace `bd`.
 - Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Use `bd remember` for cross-session project facts. The harness `MEMORY.md` remains the primary memory store — both are in use, neither is banned.
 
 ## Session Completion
 
