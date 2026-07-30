@@ -88,28 +88,20 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, follow the repo delivery contract and current user authorization. Remote pushes are not automatic.
 
-**MANDATORY WORKFLOW:**
+**WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
+4. **Deliver when authorized** - `bd dolt push`, then ordinary `git push` only after fresh verification passes and a fetch proves the remote is not ahead or diverged
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+6. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Use `bd` for task truth when available.
+- Run quality gates before completion claims.
+- Ordinary commits and ordinary push are allowed after fresh verification/closeout when the repo contract or current user request authorizes delivery. Before push, fetch and stop if remote is ahead/diverged, branch/protected-target is unclear, or uncommitted/staged scope is unsafe. Subagents may commit/push only their assigned branch/worktree when explicitly allowed by task/contract, never directly to protected/base branches.
 <!-- END BEADS INTEGRATION -->
