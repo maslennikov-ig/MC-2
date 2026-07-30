@@ -60,6 +60,30 @@ fail() {
   exit "$status"
 }
 
+# mc2-1cxna: fail WITH the captured diagnostics. Every step below routes stderr into a file under
+# the run-private generation directory, which `fail` never reads and cleanup then reclaims — so a
+# non-zero exit reached the caller as a bare status and nothing else. That is what happened at C3 of
+# window attempt #12 (2026-07-29): "pg_dumpall before snapshot failed with status 1", with the
+# reason already written to disk and discarded, inside a cutover window that had to be unwound by
+# hand. The same reasoning the pg_dump branch already states applies here: these diagnostics never
+# contain the credential (it lives in the libpq service file, and libpq errors name the service, the
+# host and the user, never the password). A `user:secret@host` shape is redacted anyway, and the
+# tail is bounded so a runaway stream cannot flood the controller log.
+fail_command() {
+  local message=$1
+  local status=$2
+  local stderr_file=$3
+  if [[ -s "$stderr_file" ]]; then
+    printf 'Supabase backup diagnostics (last 10 lines of %s):\n' "${stderr_file##*/}" >&2
+    /usr/bin/tail -n 10 -- "$stderr_file" \
+      | /usr/bin/cut -c1-300 \
+      | /usr/bin/sed -E 's#://[^:/@[:space:]]+:[^@[:space:]]+@#://REDACTED:REDACTED@#g' >&2 || true
+  else
+    printf 'Supabase backup diagnostics: the command wrote no stderr\n' >&2
+  fi
+  fail "$message" "$status"
+}
+
 cleanup_temp() {
   if [[ -n "$TEMP_POINTER" ]]; then
     case "$TEMP_POINTER" in
@@ -435,7 +459,22 @@ PY
   fi
 
   local base query parameter joined='' separator=''
-  [[ "$original_result" == *\?* ]] || fail 'URL must contain exact sslmode=verify-full'
+  if [[ "$original_result" != *\?* ]]; then
+    # mc2-h5l7m: a BARE DSN is the shape the frozen q12-database-barrier.sh demands — its identity
+    # predicate rejects ANY query string — and it reads this very file
+    # (/opt/megacampus/secrets/supabase_db_url) under the frozen barrier.* commands, exactly as
+    # pg.backup reads it here. Requiring the parameters in the shared file made the two frozen
+    # commands mutually unsatisfiable and left the cutover window unable to pass C1 and C3 at once.
+    # This side yields, and it can: of the two parameters only sslmode is load-bearing —
+    # create_service_file reads sslmode FROM THE QUERY but takes sslrootcert from its own ca_path
+    # argument, and the parameterised branch below already replaces the URL's sslrootcert with the
+    # /proc path. So the effective TLS is identical either way: verify-full against the explicit CA.
+    # sslrootcert is composed too, so both branches hand create_service_file the same URL shape.
+    base=$original_result
+    joined="sslmode=verify-full&sslrootcert=$ca_fd_path"
+    effective_result="$base?$joined"
+    return
+  fi
   base=${original_result%%\?*}
   query=${original_result#*\?}
   local sslmode_count=0 root_count=0
@@ -572,20 +611,41 @@ run_manifest_generator() {
     local expected_hash
     expected_hash=$(/usr/bin/sha256sum "/proc/self/fd/$EXPECTED_CATALOG_FD")
     expected_hash=${expected_hash%% *}
+    # mc2-1cxna: the SAME reason the adopted CA is materialized a few lines below — a
+    # /proc/self/fd path does not survive the pnpm/node spawn chain of the manifest generator, and
+    # in that child the number resolves to one of ITS descriptors, so the open fails with EACCES
+    # rather than reading the intended file. The CA already had this treatment; the two q12-only
+    # inputs never did, because nothing had ever run the q12 branch. It cost C3 of window attempt
+    # #15 (2026-07-29) with "source manifest failed: EACCES: permission denied, open
+    # '/proc/self/fd/14'", after the writers were stopped and both dumps had already succeeded.
+    # Copies are run-private 0600 and byte-verified against the descriptor they came from, so the
+    # adopted-descriptor identity checks above remain the authority.
+    local baseline_path="$TEMP_GENERATION/.q12-baseline.json"
+    local expected_catalog_path="$TEMP_GENERATION/.q12-expected-catalog.json"
+    ( umask 077; /usr/bin/cat "/proc/self/fd/$BASELINE_FD" >"$baseline_path" ) ||
+      fail 'Q12 baseline materialization failed'
+    ( umask 077; /usr/bin/cat "/proc/self/fd/$EXPECTED_CATALOG_FD" >"$expected_catalog_path" ) ||
+      fail 'Q12 expected catalog materialization failed'
+    /usr/bin/chmod 600 -- "$baseline_path" "$expected_catalog_path"
+    local materialized_hash
+    materialized_hash=$(/usr/bin/sha256sum "$expected_catalog_path")
+    materialized_hash=${materialized_hash%% *}
+    [[ "$materialized_hash" == "$expected_hash" ]] ||
+      fail 'Q12 expected catalog materialization does not match the adopted descriptor'
     args+=(
-      --baseline "/proc/self/fd/$BASELINE_FD"
-      --expected-catalog "/proc/self/fd/$EXPECTED_CATALOG_FD"
+      --baseline "$baseline_path"
+      --expected-catalog "$expected_catalog_path"
       --expected-catalog-sha256 "$expected_hash"
       --q12-run-id "$RUN_ID"
     )
   fi
   if [[ $TEST_MODE_ACTIVE -eq 1 ]]; then
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$MANIFEST_GENERATOR" "${args[@]}"
   else
     [[ -x "$TSX_SHIM" ]] || fail "tsx runner is unavailable: $TSX_SHIM is missing or not executable (run pnpm install in the workspace)"
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$TSX_SHIM" "$MANIFEST_GENERATOR" "${args[@]}"
   fi
@@ -860,7 +920,7 @@ start_scheduled_snapshot() {
   local ca_fd_path=$2
   [[ -x "$PSQL" ]] || fail 'absolute psql command is unavailable'
   coproc MC2_SNAPSHOT {
-    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+    PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
       PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
       "$PSQL" -X --no-psqlrc --quiet --tuples-only --no-align --set ON_ERROR_STOP=on
   }
@@ -982,19 +1042,29 @@ main() {
     start_scheduled_snapshot "$service_file" "$ca_fd_path"
   fi
 
+  # mc2-1cxna: HOME must point somewhere this process can STAT. The frozen pg.backup env pins
+  # HOME=/root while the command runs as the deploy operator, and libpq resolves its default client
+  # certificate at $HOME/.postgresql/postgresql.crt. /root is 0700 root-owned, so the lookup fails
+  # with EACCES rather than "absent" and libpq refuses the connection outright:
+  #   pg_dumpall: error: connection to server ... failed: could not open certificate file
+  #   "/root/.postgresql/postgresql.crt": Permission denied
+  # That killed C3 of window attempts #13 and #14 (2026-07-29) AFTER the writers were already
+  # stopped. The run-private generation directory is owned by this process and holds no
+  # .postgresql, so the default lookup finds nothing and is ignored — which is the intended
+  # "no client certificate" behaviour. sslmode/sslrootcert stay explicit and unaffected.
   local status
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_before" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_dumpall before snapshot failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_dumpall before snapshot failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_dumpall before snapshot emitted stderr'
   /usr/bin/chmod 600 -- "$roles_before"
 
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMP" --format=custom --no-password --snapshot="$SNAPSHOT" --file="$archive" 2>"$dump_stderr"
   status=$?
@@ -1012,18 +1082,18 @@ main() {
   run_manifest_generator "$manifest" "$SNAPSHOT" "$service_file" "$ca_fd_path" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "source manifest generation failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "source manifest generation failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'source manifest generator emitted stderr'
   /usr/bin/chmod 600 -- "$manifest"
   validate_manifest "$manifest" "$SNAPSHOT" || fail 'source manifest validation failed'
 
   set +e
-  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" \
+  PGSERVICE=mc2_supabase_backup PGSERVICEFILE="$service_file" HOME="$TEMP_GENERATION" \
     PGSSLMODE=verify-full PGSSLROOTCERT="$ca_fd_path" \
     "$PG_DUMPALL" --roles-only --no-role-passwords --no-password >"$roles_after" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_dumpall after snapshot failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_dumpall after snapshot failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_dumpall after snapshot emitted stderr'
   /usr/bin/chmod 600 -- "$roles_after"
 
@@ -1036,14 +1106,14 @@ main() {
   "$PG_RESTORE" --list "$archive" >"$toc" 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_restore validation failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_restore validation failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_restore validation emitted stderr'
   /usr/bin/grep -Eq '^[[:space:]]*[0-9]+;' "$toc" || fail 'pg_restore validation returned no archive entries' 65
   set +e
   "$PG_RESTORE" --file=/dev/null "$archive" >/dev/null 2>"$command_stderr"
   status=$?
   set -e
-  [[ $status -eq 0 ]] || fail "pg_restore full traversal failed with status $status" "$status"
+  [[ $status -eq 0 ]] || fail_command "pg_restore full traversal failed with status $status" "$status" "$command_stderr"
   [[ ! -s "$command_stderr" ]] || fail 'pg_restore full traversal emitted stderr'
 
   normalize_roles_export "$roles_before" "$roles_before_normalized" || fail 'roles-before normalization failed'
@@ -1057,6 +1127,11 @@ main() {
 
   /usr/bin/rm -- "$roles_after" "$roles_before_normalized" "$roles_after_normalized" \
     "$service_file" "$ca_fd_path" "$dump_stderr" "$command_stderr" "$toc"
+  # mc2-1cxna: the q12 generator inputs are materialized into this same directory, and the
+  # published generation must contain EXACTLY four files.
+  if [[ "$BACKUP_MODE" == q12 ]]; then
+    /usr/bin/rm -f -- "$TEMP_GENERATION/.q12-baseline.json" "$TEMP_GENERATION/.q12-expected-catalog.json"
+  fi
   scan_generation_secrets "$URL_FILE" "$archive" "$roles_before" "$manifest" || \
     fail 'generation secret scan failed'
   create_checksums "$TEMP_GENERATION" "$final_name" "$SNAPSHOT"

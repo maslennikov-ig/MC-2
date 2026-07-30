@@ -430,6 +430,25 @@ function normalizePhysicalRelationOids(view: JsonObject, label: string): void {
   if (view.relations_sha256 !== undefined) view.relations_sha256 = sha256(relations);
 }
 
+// `authoritative` means "this relation's rows are hashed and compared baseline-to-cutover". It is
+// NOT the same as "the barrier installs a q12_guard trigger on it", and mc2-34eua split the two:
+//
+//   * cron.job stays authoritative — comparing its rows (every column except `active`, which the
+//     barrier legitimately flips) is a pure read and still proves no job definition changed;
+//   * cron.job is NOT trigger-guarded — it is owned by supabase_admin and production `postgres`
+//     holds neither UPDATE nor TRIGGER, so both LOCK ... ACCESS EXCLUSIVE and CREATE TRIGGER raise
+//     42501. See deploy/qdrant/q12-migration-plan-capture.py.
+//
+// q12_guard's own tables are excluded for the pre-existing reason: their triggers are the internal
+// immutable pair enumerated by GUARD_TRIGGERS, not the external row/truncate pair.
+function isTriggerGuardedRelation(relation: JsonObject): boolean {
+  return (
+    relation.classification === 'authoritative' &&
+    relation.schema !== 'q12_guard' &&
+    relation.schema !== 'cron'
+  );
+}
+
 export function assertFrozenGuardedRelations(
   expectedRelations: JsonObject[],
   cutoverRelations: unknown[]
@@ -438,7 +457,7 @@ export function assertFrozenGuardedRelations(
   relationsWithoutPhysicalOids(cutoverRelations, 'cutover.relations');
   const actualRelations = cutoverRelations
     .map((raw, index) => object(raw, `cutover.relations[${index}]`))
-    .filter(relation => relation.classification === 'authoritative')
+    .filter(isTriggerGuardedRelation)
     .map(relation => ({
       schema: relation.schema,
       name: relation.name,
@@ -1036,7 +1055,7 @@ const GUARD_CONSTRAINTS = new Set([
 // guard-owned table meant to accept live writes), plus the append-only-guard
 // q12_guard_immutable/q12_guard_immutable_truncate pair on each of the three
 // durable, append-only guard tables. This is distinct from the EXTERNAL
-// q12_guard_row/q12_guard_truncate triggers the barrier installs on the 76
+// q12_guard_row/q12_guard_truncate triggers the barrier installs on the 75
 // guarded relations outside q12_guard (see isExternalGuardTrigger).
 const GUARD_TRIGGERS = new Set([
   'active_run.q12_guard_immutable',
@@ -1199,7 +1218,7 @@ function validateExactGuardDelta(cutover: JsonObject, guardedRelations: JsonObje
       item.schema === 'q12_guard'
   );
   for (const trigger of guardTriggers) {
-    // Triggers on the 76 EXTERNAL guarded relations must be the exact
+    // Triggers on the 75 EXTERNAL guarded relations must be the exact
     // q12_guard_row/q12_guard_truncate pair (isExternalGuardTrigger's own name
     // check); triggers living inside the q12_guard schema itself may use
     // either that same external-style pair (q12_guard.probe, the one guard
@@ -1456,11 +1475,7 @@ function validateTransition(
 
   const guardedRelations =
     expectedGuardedRelations ??
-    cutoverRelations
-      .map(value => object(value, 'relation'))
-      .filter(
-        relation => relation.classification === 'authoritative' && relation.schema !== 'q12_guard'
-      );
+    cutoverRelations.map(value => object(value, 'relation')).filter(isTriggerGuardedRelation);
   validateExactGuardDelta(cutover, guardedRelations);
 
   const cutoverCatalog = object(cutover.catalog, 'cutover.catalog');

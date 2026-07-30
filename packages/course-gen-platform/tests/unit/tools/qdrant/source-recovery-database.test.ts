@@ -10,17 +10,13 @@ import {
   requireQ12CapabilityFetchInstalled,
   type RecoveryCatalogRow,
   type RecoveryDatabaseGateway,
-  type RecoveryPlaybookRow,
   type RecoverySupabaseClient,
 } from '../../../../tools/qdrant/source-recovery-database.js';
 import type { RecoveryDispositionEntry } from '../../../../tools/qdrant/source-recovery-manifest.js';
 
 const FILE_ID = '2e31f684-67a8-48b5-9c49-cc385fc04b37';
-const SOURCE_ID = '96b5a9fb-fb09-4bd7-b3de-fd70319d5dc8';
 const ORGANIZATION_ID = 'caacdf41-6267-471b-9331-02a45611a8a7';
 const COURSE_ID = '5191a3cc-d417-4451-9bc6-240ac38e469c';
-const PLAYBOOK_ID = 'e49be5a4-519f-4ef7-9315-f9596ff911cf';
-const USER_ID = 'f303c89a-1567-4797-bd28-66bcd4b76425';
 const Q12_CAPABILITY = 'q12-capability-sentinel';
 
 const temporaryDirectories: string[] = [];
@@ -51,23 +47,10 @@ const catalogRow = (overrides: Partial<RecoveryCatalogRow> = {}): RecoveryCatalo
   ...overrides,
 });
 
-const playbookRow = (overrides: Partial<RecoveryPlaybookRow> = {}): RecoveryPlaybookRow => ({
-  id: SOURCE_ID,
-  playbook_id: PLAYBOOK_ID,
-  organization_id: ORGANIZATION_ID,
-  user_id: USER_ID,
-  file_catalog_id: FILE_ID,
-  status: 'ready',
-  error_message: null,
-  ...overrides,
-});
-
 function gateway(overrides: Partial<RecoveryDatabaseGateway> = {}): RecoveryDatabaseGateway {
   return {
     selectFileCatalog: () => Promise.resolve([]),
-    selectCareerPlaybookSources: () => Promise.resolve([]),
     updateFileCatalog: () => Promise.resolve([]),
-    updateCareerPlaybookSource: () => Promise.resolve([]),
     ...overrides,
   };
 }
@@ -110,7 +93,7 @@ describe('source recovery disposition database', () => {
       },
     };
     const client = {
-      from(table: 'file_catalog' | 'career_playbook_sources') {
+      from(table: 'file_catalog') {
         calls.push(`from:${table}`);
         return query;
       },
@@ -166,19 +149,6 @@ describe('source recovery disposition database', () => {
     await expect(duplicateDatabase.listFileCatalogExpectedRows([FILE_ID])).rejects.toThrow(
       /duplicate file_catalog/iu
     );
-
-    const duplicatePlaybookDatabase = createRecoveryDispositionDatabase(
-      gateway({
-        selectCareerPlaybookSources: () =>
-          Promise.resolve([
-            playbookRow(),
-            playbookRow({ id: 'a6b5a9fb-fb09-4bd7-b3de-fd70319d5dc8' }),
-          ]),
-      })
-    );
-    await expect(
-      duplicatePlaybookDatabase.listCareerPlaybookExpectedRows([FILE_ID])
-    ).rejects.toThrow(/duplicate career_playbook_sources file_catalog/iu);
   });
 
   it('uses every reviewed file predicate and reconciles only the exact applied state', async () => {
@@ -293,36 +263,23 @@ describe('source recovery disposition database', () => {
     ).rejects.toThrow(/returned row.*exact applied state/iu);
   });
 
-  it('requires the Career Playbook source CAS checkpoint before the catalog CAS', async () => {
+  it('applies a Career Playbook disposition through the file_catalog CAS only', async () => {
     const events: string[] = [];
     const expectedFile = catalogRow({ course_id: null });
-    const expectedSource = playbookRow();
     const disposition: RecoveryDispositionEntry = {
       entry_id: 'disposition-career',
       kind: 'career_playbook_retained_derived',
       file_catalog_id: FILE_ID,
-      career_playbook_source_id: SOURCE_ID,
       organization_id: ORGANIZATION_ID,
       course_id: null,
       expected_hash: expectedFile.hash,
       expected_storage_path: expectedFile.storage_path,
       expected_vector_status: expectedFile.vector_status,
       expected_file_error_message: null,
-      expected_career_playbook: {
-        playbook_id: PLAYBOOK_ID,
-        user_id: USER_ID,
-        status: 'ready',
-        error_message: null,
-      },
       reason: 'retained-derived-only',
     };
     const database = createRecoveryDispositionDatabase(
       gateway({
-        updateCareerPlaybookSource: input => {
-          expect(input.expected).toEqual(expectedSource);
-          events.push('source-cas');
-          return Promise.resolve([{ ...expectedSource, ...input.patch }]);
-        },
         updateFileCatalog: input => {
           expect(input.expected).toEqual(expectedFile);
           events.push('catalog-cas');
@@ -331,7 +288,7 @@ describe('source recovery disposition database', () => {
       })
     );
 
-    const afterSource = await applyDispositionEntry({
+    const applied = await applyDispositionEntry({
       database,
       entry: disposition,
       runId: 'ea25d26d-9dc3-4c2c-9e42-95ab8270cb6e',
@@ -340,28 +297,9 @@ describe('source recovery disposition database', () => {
         events.push(`checkpoint:${state}`);
         return Promise.resolve();
       },
-      stopAfterCheckpoint: 'career_playbook_source_applied',
     });
-    expect(afterSource).toBe('career_playbook_source_applied');
-    expect(events).toEqual(['source-cas', 'checkpoint:career_playbook_source_applied']);
-
-    const afterCatalog = await applyDispositionEntry({
-      database,
-      entry: disposition,
-      runId: 'ea25d26d-9dc3-4c2c-9e42-95ab8270cb6e',
-      state: afterSource,
-      persistCheckpoint: state => {
-        events.push(`checkpoint:${state}`);
-        return Promise.resolve();
-      },
-    });
-    expect(afterCatalog).toBe('disposition_applied');
-    expect(events).toEqual([
-      'source-cas',
-      'checkpoint:career_playbook_source_applied',
-      'catalog-cas',
-      'checkpoint:disposition_applied',
-    ]);
+    expect(applied).toBe('disposition_applied');
+    expect(events).toEqual(['catalog-cas', 'checkpoint:disposition_applied']);
   });
 });
 

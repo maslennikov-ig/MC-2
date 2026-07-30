@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/restrict-plus-operands -- lstat uid arithmetic on fixture metadata is number-typed at runtime */
 import { createHash } from 'node:crypto';
 import {
   chmod,
@@ -234,19 +235,12 @@ function recoveryManifest(overrides: Partial<SourceRecoveryManifest> = {}): Sour
     entry_id: `disposition-playbook-${index.toString().padStart(2, '0')}`,
     kind: 'career_playbook_retained_derived' as const,
     file_catalog_id: uuid(index + 101),
-    career_playbook_source_id: uuid(index + 201),
     organization_id: ORGANIZATION_ID,
     course_id: null,
     expected_hash: 'b'.repeat(64),
     expected_storage_path: `uploads/career/missing-${index}.pdf`,
     expected_vector_status: 'indexed' as const,
     expected_file_error_message: null,
-    expected_career_playbook: {
-      playbook_id: uuid(index + 301),
-      user_id: uuid(index + 401),
-      status: 'ready' as const,
-      error_message: null,
-    },
     reason: 'retained-derived-only' as const,
   }));
   return {

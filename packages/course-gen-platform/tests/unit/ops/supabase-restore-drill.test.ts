@@ -153,6 +153,9 @@ function sourceManifest(): Record<string, unknown> {
 
 function exactGuardTransitionManifest(): Record<string, unknown> {
   const tables = ['active_run', 'baseline', 'migration_guards', 'probe'];
+  // The durable, append-only guard tables — every one carries the immutable trigger pair. probe is
+  // the one guard table meant to accept live writes, so it carries the row/truncate pair instead.
+  const immutableGuardTables = ['active_run', 'baseline', 'migration_guards'];
   const columns = [
     'active_run.singleton',
     'active_run.run_id',
@@ -184,12 +187,21 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
     'migration_guards.migration_guards_migration_file_sha256_check',
     'probe.probe_pkey',
   ];
+  // Must mirror GUARD_FUNCTIONS in deploy/postgres/q12-source-manifest.ts exactly — this builder
+  // is the POSITIVE case, so a short list makes it fail closed rather than vacuously pass. It had
+  // drifted five functions behind the barrier; the case is RUN_REAL_CONTROLLER-gated (auto-on for
+  // uid 1000, off on CI runners), which is why the drift stayed invisible.
   const functions = [
     'assert_capability',
+    'assert_controller_binding',
+    'enforce_ddl_barrier',
     'enforce_write_barrier',
     'extend_guard',
+    'quiesce_client_backends',
+    'verify_activated_state',
     'verify_capability',
     'verify_expected_guards',
+    'verify_install_resume_state',
   ];
   const functionIdentity = (name: string): string =>
     name === 'extend_guard'
@@ -281,6 +293,23 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
       identity,
       owner: 'postgres',
     })),
+    // The append-only-guard immutable pair on each durable guard table. Same drift as `functions`:
+    // GUARD_TRIGGERS in the manifest authority requires all six, and this positive builder had
+    // none of them.
+    ...immutableGuardTables.flatMap(table => [
+      {
+        object_type: 'trigger',
+        schema: 'q12_guard',
+        identity: `${table}.q12_guard_immutable`,
+        owner: 'postgres',
+      },
+      {
+        object_type: 'trigger',
+        schema: 'q12_guard',
+        identity: `${table}.q12_guard_immutable_truncate`,
+        owner: 'postgres',
+      },
+    ]),
     {
       object_type: 'trigger',
       schema: 'q12_guard',
@@ -306,20 +335,27 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
       owner: 'postgres',
     },
   ];
+  // Mirrors the manifest authority's aclPrivileges/expectedAcls exactly. Three reconciliations
+  // this positive builder had drifted behind, all documented at their authority:
+  //   * PG17 added MAINTAIN, so a real q12_guard table ACL row set has 8 privileges, not 7;
+  //   * a self-grant materialized by REVOKE is never WITH GRANT OPTION -> grantable is false;
+  //   * PostgreSQL refuses GRANT/REVOKE on implicit array types, so each `_<table>` keeps its
+  //     un-revocable default PUBLIC USAGE grant instead of an owner self-grant.
   const aclRows = (
     object_type: string,
     identity: string,
     privileges: string[],
-    schema = 'q12_guard'
+    schema = 'q12_guard',
+    grantee = 'postgres'
   ) =>
     privileges.map(privilege => ({
       object_type,
       schema,
       identity,
       grantor: 'postgres',
-      grantee: 'postgres',
+      grantee,
       privilege,
-      grantable: true,
+      grantable: false,
     }));
   const objectAcls = [
     ...aclRows('schema', 'q12_guard', ['CREATE', 'USAGE'], null as unknown as string),
@@ -327,6 +363,7 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
       aclRows('relation', name, [
         'DELETE',
         'INSERT',
+        'MAINTAIN',
         'REFERENCES',
         'SELECT',
         'TRIGGER',
@@ -338,6 +375,8 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
     ...[...tables, ...tables.map(name => `_${name}`)].flatMap(name =>
       aclRows('type', name, ['USAGE'])
     ),
+    // The array type keeps BOTH rows: the owner self-grant above and this un-revocable default.
+    ...tables.flatMap(name => aclRows('type', `_${name}`, ['USAGE'], 'q12_guard', 'PUBLIC')),
   ];
   const guardDefinition = 'EXECUTE FUNCTION q12_guard.enforce_write_barrier()';
   const cutover = structuredClone(baseline) as Record<string, any>;
@@ -373,6 +412,20 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
     triggers: [
       { schema: 'public', table: 'items', name: 'q12_guard_row', definition: guardDefinition },
       { schema: 'public', table: 'items', name: 'q12_guard_truncate', definition: guardDefinition },
+      ...immutableGuardTables.flatMap(table => [
+        {
+          schema: 'q12_guard',
+          table,
+          name: 'q12_guard_immutable',
+          definition: guardDefinition,
+        },
+        {
+          schema: 'q12_guard',
+          table,
+          name: 'q12_guard_immutable_truncate',
+          definition: guardDefinition,
+        },
+      ]),
       { schema: 'q12_guard', table: 'probe', name: 'q12_guard_row', definition: guardDefinition },
       {
         schema: 'q12_guard',

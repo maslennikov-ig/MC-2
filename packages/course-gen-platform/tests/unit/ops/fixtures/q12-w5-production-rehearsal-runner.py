@@ -10,7 +10,8 @@ This drives the REAL production functions (no fakes) as an integration:
   3. load_staged_values -> reload it and prove resolved_command("pg.backup") recomputes a
      BYTE-IDENTICAL command_sha256 on the recover twin (D5J determinism, D3);
   4. close_window_snapshot -> release the held source session cleanly;
-  5. accept_real_run(D4) -> accept on a terminal receipt + real coverage, reject a non-zero child.
+  5. accept_real_run(D4) -> accept on a terminal receipt + the emitted acceptance authority,
+     reject a non-zero child.
 
 Explicit IN-WINDOW-only residual (#21, bounded to W7 / the full-window production harness): the FULL
 run_live forward window with the real database-barrier dual-bind, and the real data-movement children
@@ -118,8 +119,20 @@ def main() -> int:
         executor.source_container = None
         executor._source_service = service_env
 
-        # (1) production fork: real snapshot + baseline + seeded resolver + HELD coordinator
-        values, exported_id, coordinator = core.resolve_window_values(request, executor, run_root, qm)
+        # (1) production fork: real baseline + seeded resolver, and NO coordinator (mc2-6fnrt).
+        # The real <exported-id> is resolved by the staged WindowSnapshotHold at the pg.backup step,
+        # which is what a live window drive does — a session held across barrier.install would be
+        # terminated by the barrier's own client quiesce.
+        values = core.resolve_window_values(request, executor, run_root, qm)
+        # mc2-6fnrt: each leg derives its OWN ephemeral libpq service file and clears the cache
+        # afterwards (no cleartext password at rest, and the two connects are now separated by
+        # the whole barrier install + writer quiesce). Production re-derives from
+        # request["db_url_file"]; this harness has no DSN file, so it re-injects the loopback
+        # service env the disposable container needs.
+        executor._source_service = service_env
+        hold = core.WindowSnapshotHold(request, executor, values, run_root)
+        exported_id = hold.exported_id()
+        coordinator = hold.coordinator
         snapshot_shaped = bool(core.PLAN_SNAPSHOT_RE.fullmatch(exported_id))
         baseline_ok = (run_root / "baseline.json").exists()
         is_resolver = isinstance(values, core.StagedValueResolver)
@@ -140,19 +153,30 @@ def main() -> int:
         )
 
         # (4) release the held source session cleanly
-        executor.close_window_snapshot(coordinator)
+        hold.release()
         released = coordinator.poll() == 0
 
-        # (5) D4 oracle: accept on a terminal receipt + real coverage; reject a non-zero child
-        good_journal = {"coverage": f"{run_id}:course-x:run-y"}
+        # (5) D4 oracle: accept on a terminal receipt + the emitted acceptance authority
+        # (amendment 2026-07-25: coverage_run is catalog:<recovery-run-id>, not a ledger triple);
+        # reject a non-zero child.
+        good_authority = {
+            "schema": "megacampus.q12.source-forward-acceptance/v1",
+            "recovery_manifest_sha256": "a" * 64,
+            "coverage_fingerprint": "b" * 64,
+            "coverage_run": f"catalog:{recovery_run_id}",
+        }
         accepted = True
         try:
-            core.accept_real_run([0, 0, 0], {"state": "guard_cleanup_complete"}, good_journal)
+            core.accept_real_run(
+                [0, 0, 0], {"state": "guard_cleanup_complete"}, good_authority, recovery_run_id
+            )
         except core.LifecycleError:
             accepted = False
         rejected_nonzero = False
         try:
-            core.accept_real_run([0, 1], {"state": "guard_cleanup_complete"}, good_journal)
+            core.accept_real_run(
+                [0, 1], {"state": "guard_cleanup_complete"}, good_authority, recovery_run_id
+            )
         except core.LifecycleError:
             rejected_nonzero = True
 

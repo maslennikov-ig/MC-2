@@ -67,30 +67,29 @@ export interface ReindexPlan {
   auditedFailedFileIds: string[];
   recoveryRunId?: string;
   recoveryManifestSha256?: string;
-  acceptedCoverageLedgerIds?: string[];
+  acceptedCoverageScopes?: string[];
   acceptedCoverageStatus?: 'accepted';
   acceptedCoverageFingerprint?: string;
   verificationFingerprint?: string;
   gaps: ReindexGap[];
 }
 
+// Accepted failed coverage is file_catalog truth (owner-approved amendment 2026-07-25). The recovery's
+// own disposition CAS (`applyDispositionEntry`) is what makes an audited failure durable: the row moves
+// to vector_status='failed' with error_message='source_file_unrecoverable; recovery_run=<run>'. That is
+// the only coverage statement that exists in-window — the document-evidence ledgers are created empty by
+// the C4 migration and their zero-evidence cards are minted only by post-window Stage-4 runs (mc2-8m90f).
 export interface AcceptedFailedCoverageEntry {
-  documentId: string;
+  fileCatalogId: string;
   organizationId: string;
   courseId: string;
-  coverageStatus: 'failed';
-  coverageReason: 'source_file_unrecoverable';
-  processingMode: 'metadata_only';
-  summary: null;
-  claims: readonly string[];
-  terminology: readonly string[];
-  constraints: readonly string[];
-  allocatedTokens: 0;
+  storagePath: string;
+  hash: string;
+  vectorStatus: 'failed';
+  errorMessage: string;
 }
 
-export interface AcceptedFailedCoverageLedgerBinding {
-  ledgerId: string;
-  status: 'accepted';
+export interface AcceptedFailedCoverageScopeBinding {
   organizationId: string;
   courseId: string;
   entries: readonly AcceptedFailedCoverageEntry[];
@@ -98,10 +97,11 @@ export interface AcceptedFailedCoverageLedgerBinding {
 
 export interface AcceptedFailedCoverageBinding {
   status: 'accepted';
+  source: 'file_catalog';
   recoveryRunId: string;
   recoveryManifestSha256: string;
   fingerprint: string;
-  ledgers: readonly AcceptedFailedCoverageLedgerBinding[];
+  scopes: readonly AcceptedFailedCoverageScopeBinding[];
 }
 
 export interface RecoveryReindexBinding {
@@ -116,43 +116,44 @@ export type ReindexSourceProbe = (row: ReindexSourceRow) => boolean | 'invalid_s
 const VERIFIED_RECOVERY_PHASES = new Set(['verified', 'reindex_started', 'complete']);
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
+export function expectedCoverageErrorMessage(recoveryRunId: string): string {
+  return `source_file_unrecoverable; recovery_run=${recoveryRunId}`;
+}
+
+export function coverageScopeKey(
+  value: Pick<AcceptedFailedCoverageScopeBinding, 'organizationId' | 'courseId'>
+): string {
+  return `${value.organizationId}:${value.courseId}`;
+}
+
 export function calculateAcceptedFailedCoverageFingerprint(
   binding: AcceptedFailedCoverageBinding
 ): string {
-  const ledgers = [...binding.ledgers]
-    .sort((left, right) =>
-      [left.organizationId, left.courseId, left.ledgerId]
-        .join(':')
-        .localeCompare([right.organizationId, right.courseId, right.ledgerId].join(':'))
-    )
-    .map(ledger => ({
-      ledgerId: ledger.ledgerId,
-      status: ledger.status,
-      organizationId: ledger.organizationId,
-      courseId: ledger.courseId,
-      entries: [...ledger.entries]
-        .sort((left, right) => left.documentId.localeCompare(right.documentId))
+  const scopes = [...binding.scopes]
+    .sort((left, right) => coverageScopeKey(left).localeCompare(coverageScopeKey(right)))
+    .map(scope => ({
+      organizationId: scope.organizationId,
+      courseId: scope.courseId,
+      entries: [...scope.entries]
+        .sort((left, right) => left.fileCatalogId.localeCompare(right.fileCatalogId))
         .map(entry => ({
-          documentId: entry.documentId,
+          fileCatalogId: entry.fileCatalogId,
           organizationId: entry.organizationId,
           courseId: entry.courseId,
-          coverageStatus: entry.coverageStatus,
-          coverageReason: entry.coverageReason,
-          processingMode: entry.processingMode,
-          summary: entry.summary,
-          claims: [...entry.claims],
-          terminology: [...entry.terminology],
-          constraints: [...entry.constraints],
-          allocatedTokens: entry.allocatedTokens,
+          storagePath: entry.storagePath,
+          hash: entry.hash,
+          vectorStatus: entry.vectorStatus,
+          errorMessage: entry.errorMessage,
         })),
     }));
   return createHash('sha256')
     .update(
       JSON.stringify({
         status: binding.status,
+        source: binding.source,
         recoveryRunId: binding.recoveryRunId,
         recoveryManifestSha256: binding.recoveryManifestSha256,
-        ledgers,
+        scopes,
       })
     )
     .digest('hex');
@@ -230,6 +231,9 @@ function validateRecoveryBinding(
   if (!coverage || coverage.status !== 'accepted') {
     throw new Error('Accepted failed coverage status must be accepted');
   }
+  if (coverage.source !== 'file_catalog') {
+    throw new Error('Accepted failed coverage must be derived from file_catalog truth');
+  }
   if (
     coverage.recoveryRunId !== manifest.run_id ||
     coverage.recoveryManifestSha256 !== canonicalSha256
@@ -239,61 +243,51 @@ function validateRecoveryBinding(
   if (coverage.fingerprint !== calculateAcceptedFailedCoverageFingerprint(coverage)) {
     throw new Error('Accepted failed coverage fingerprint is not canonical');
   }
-  const ledgers = [...coverage.ledgers].sort((left, right) =>
-    [left.organizationId, left.courseId, left.ledgerId]
-      .join(':')
-      .localeCompare([right.organizationId, right.courseId, right.ledgerId].join(':'))
+  const scopes = [...coverage.scopes].sort((left, right) =>
+    coverageScopeKey(left).localeCompare(coverageScopeKey(right))
   );
   if (
-    ledgers.length === 0 ||
-    ledgers.some(
-      ledger =>
-        !UUID_V4_PATTERN.test(ledger.ledgerId) ||
-        !UUID_V4_PATTERN.test(ledger.organizationId) ||
-        !UUID_V4_PATTERN.test(ledger.courseId) ||
-        ledger.status !== 'accepted'
+    scopes.length === 0 ||
+    scopes.some(
+      scope => !UUID_V4_PATTERN.test(scope.organizationId) || !UUID_V4_PATTERN.test(scope.courseId)
     ) ||
-    new Set(ledgers.map(ledger => ledger.ledgerId)).size !== ledgers.length ||
-    new Set(ledgers.map(ledger => `${ledger.organizationId}:${ledger.courseId}`)).size !==
-      ledgers.length
+    new Set(scopes.map(coverageScopeKey)).size !== scopes.length
   ) {
-    throw new Error('Accepted failed coverage ledgers must be unique lower-case UUIDv4 scopes');
+    throw new Error('Accepted failed coverage scopes must be unique lower-case UUIDv4 courses');
   }
   const eligibleScopes = [
     ...new Set(eligible.map(entry => `${entry.organization_id}:${entry.course_id}`)),
   ].sort();
-  const ledgerScopes = ledgers.map(ledger => `${ledger.organizationId}:${ledger.courseId}`).sort();
-  if (JSON.stringify(ledgerScopes) !== JSON.stringify(eligibleScopes)) {
+  if (JSON.stringify(scopes.map(coverageScopeKey)) !== JSON.stringify(eligibleScopes)) {
     throw new Error(
-      'Accepted failed coverage ledger scopes must exactly match reviewed eligible dispositions'
+      'Accepted failed coverage scopes must exactly match reviewed eligible dispositions'
     );
   }
-  const coverageEntries = ledgers.flatMap(ledger => ledger.entries);
+  const coverageEntries = scopes.flatMap(scope => scope.entries);
   assertExactSet(
-    coverageEntries.map(entry => entry.documentId),
+    coverageEntries.map(entry => entry.fileCatalogId),
     eligible.map(entry => entry.file_catalog_id),
     'Accepted failed coverage IDs'
   );
   const eligibleById = new Map(eligible.map(entry => [entry.file_catalog_id, entry]));
-  for (const ledger of ledgers) {
-    for (const entry of ledger.entries) {
-      const disposition = eligibleById.get(entry.documentId);
+  const expectedErrorMessage = expectedCoverageErrorMessage(manifest.run_id);
+  for (const scope of scopes) {
+    for (const entry of scope.entries) {
+      const disposition = eligibleById.get(entry.fileCatalogId);
       if (
         !disposition ||
-        entry.organizationId !== ledger.organizationId ||
-        entry.courseId !== ledger.courseId ||
+        entry.organizationId !== scope.organizationId ||
+        entry.courseId !== scope.courseId ||
         entry.organizationId !== disposition.organization_id ||
         entry.courseId !== disposition.course_id ||
-        entry.coverageStatus !== 'failed' ||
-        entry.coverageReason !== 'source_file_unrecoverable' ||
-        entry.processingMode !== 'metadata_only' ||
-        entry.summary !== null ||
-        entry.claims.length !== 0 ||
-        entry.terminology.length !== 0 ||
-        entry.constraints.length !== 0 ||
-        entry.allocatedTokens !== 0
+        entry.hash !== disposition.expected_hash ||
+        entry.storagePath !== disposition.expected_storage_path ||
+        entry.vectorStatus !== 'failed' ||
+        entry.errorMessage !== expectedErrorMessage
       ) {
-        throw new Error('Accepted failed coverage must contain exact zero-evidence tenant truth');
+        throw new Error(
+          'Accepted failed coverage must contain the exact recovered file_catalog truth'
+        );
       }
     }
   }
@@ -301,7 +295,7 @@ function validateRecoveryBinding(
   const rowsById = new Map(sourceRows.map(row => [row.id, row]));
   for (const entry of eligible) {
     const row = rowsById.get(entry.file_catalog_id);
-    const expectedError = `source_file_unrecoverable; recovery_run=${manifest.run_id}`;
+    const expectedError = expectedCoverageErrorMessage(manifest.run_id);
     if (
       !row ||
       row.organizationId !== entry.organization_id ||
@@ -330,7 +324,7 @@ export function calculateReindexVerificationFingerprint(plan: ReindexPlan): stri
       JSON.stringify({
         recoveryRunId: plan.recoveryRunId,
         recoveryManifestSha256: plan.recoveryManifestSha256,
-        acceptedCoverageLedgerIds: plan.acceptedCoverageLedgerIds,
+        acceptedCoverageScopes: plan.acceptedCoverageScopes,
         acceptedCoverageStatus: plan.acceptedCoverageStatus,
         acceptedCoverageFingerprint: plan.acceptedCoverageFingerprint,
         auditedFailedFileIds: [...plan.auditedFailedFileIds].sort(),
@@ -478,8 +472,8 @@ export function buildReindexPlan(
       ? {
           recoveryRunId: validatedBinding.manifest.run_id,
           recoveryManifestSha256: recoveryBinding!.manifestSha256,
-          acceptedCoverageLedgerIds: recoveryBinding!.acceptedFailedCoverage.ledgers
-            .map(ledger => ledger.ledgerId)
+          acceptedCoverageScopes: recoveryBinding!.acceptedFailedCoverage.scopes
+            .map(coverageScopeKey)
             .sort(),
           acceptedCoverageStatus: recoveryBinding!.acceptedFailedCoverage.status,
           acceptedCoverageFingerprint: recoveryBinding!.acceptedFailedCoverage.fingerprint,

@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import pathlib
+import pwd
 import re
 import stat as stat_module
 import subprocess
@@ -24,6 +25,18 @@ from typing import Any, Protocol
 
 ZERO = "0" * 64
 EPOCH_RE = re.compile(r"^(?:cutover|cutover-recovery-[1-9][0-9]*)$")
+# W7a: the fresh pg.backup's published generation-dir basename (backup-supabase.sh generation-<ts>-<uuid>;
+# restore-supabase-drill.sh's --generation guard). The <immutable-generation> authority must match it.
+GENERATION_DIR_NAME_RE = re.compile(r"generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}")
+# W7a real leg: the accepted source.forward coverage authority token. Owner-approved amendment
+# 2026-07-25 — acceptance is file_catalog truth, so this is `catalog:<recovery-run-id>` (parsed by
+# source-recovery-reindex-adapters.ts parseAcceptedCoverageAuthority) and NOT the retired
+# organization:course:run document-evidence ledger triple: those ledgers are created empty by the C4
+# migration and their zero-evidence cards are minted only by post-window Stage-4 runs (mc2-8m90f).
+# The six recovered course scopes live in the sha-bound reviewed recovery manifest, not in argv.
+COVERAGE_RUN_RE = re.compile(
+    r"^catalog:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 OPERATIONS = (
     "install",
     "verify-after-base",
@@ -53,6 +66,15 @@ MANIFEST_COMMAND_IDS = tuple(COMMANDS.values()) + ORDINARY_COMMAND_IDS
 LEASE_FD_ENV_COMMAND_IDS = frozenset(
     ("writers.quiesce", "writers.resume.forward", "writers.resume.rollback")
 )
+LEASE_FD_ENV_KEY = "Q12_EXTERNAL_QUIESCE_LEASE_FD"
+CANONICAL_LEASE_FD = 9
+# Design D5 (2026-07-26 window execution identity): the ONE frozen command that genuinely needs root
+# (it reads the uid-1001 operator tree's 0400/0700 state) and the root-owned argv-whitelist launcher
+# that reaches it through the operator account's EXISTING sudo rights.
+PRIVILEGED_LAUNCH_COMMAND_ID = "source.forward"
+PRIVILEGED_LAUNCH_SCRIPT_NAME = "q12-privileged-launch.sh"
+PRIVILEGED_LAUNCH_MODE = 0o555
+SUDO_BIN = "/usr/bin/sudo"
 # Amendment section 5: ordinary command -> (selector phase, target phase).
 ORDINARY_ROW_GRAMMAR = {
     "operator.self-check": ("preflight", "preflight"),
@@ -539,6 +561,24 @@ def open_parent_directory(path: pathlib.Path) -> int:
         raise
 
 
+def regular_file_present(path: pathlib.Path) -> bool:
+    """Probe for a producer-owned file WITHOUT following any link in its path.
+
+    Returns True for anything that exists at the final component — including a symlink or a
+    non-regular entry — so a hostile placement is never mistaken for "absent" (the caller's
+    ``validate_regular_file`` then fails closed on it with O_NOFOLLOW + the identity check).
+    """
+    require_lexical_absolute(path)
+    parent_descriptor = open_parent_directory(path)
+    try:
+        os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        return True
+    except FileNotFoundError:
+        return False
+    finally:
+        os.close(parent_descriptor)
+
+
 def validate_regular_file(
     path: pathlib.Path,
     *,
@@ -722,10 +762,7 @@ def derive_joined_fixture_values(run_id: str, quiesce_manifest_path: str) -> dic
         "<recovery-run-id>": derived_uuid("q12-source-recovery"),
         "<accepted-recovery-manifest-sha256>": digest("recovery-manifest"),
         "<accepted-coverage-fingerprint>": digest("coverage-fingerprint"),
-        "<accepted-coverage-run>": ":".join(
-            derived_uuid(name)
-            for name in ("q12-coverage-org", "q12-coverage-course", "q12-coverage-run")
-        ),
+        "<accepted-coverage-run>": f"catalog:{derived_uuid('q12-source-recovery')}",
         "<quiesce-manifest>": quiesce_manifest_path,
     }
 
@@ -781,8 +818,11 @@ class StagedValueResolver:
     def on_source_forward_accepted(
         self, recovery_manifest_sha256: str, coverage_fingerprint: str, coverage_run: str
     ) -> None:
-        """After ``source.forward`` is accepted: the recovery manifest sha + accepted coverage
-        ``org:course:run`` from the recovery journal."""
+        """After ``source.forward`` is accepted: the recovery manifest sha, the coverage fingerprint
+        over the recovered file_catalog rows, and the ``catalog:<recovery-run-id>`` coverage
+        authority token — all three read from the emitted
+        ``<run-root>/source-forward-acceptance.json`` (amendment 2026-07-25; the retired contract
+        took an ``org:course:run`` ledger triple from the recovery journal)."""
         self._set("<accepted-recovery-manifest-sha256>", recovery_manifest_sha256)
         self._set("<accepted-coverage-fingerprint>", coverage_fingerprint)
         self._set("<accepted-coverage-run>", coverage_run)
@@ -806,30 +846,87 @@ def resolve_window_values(
     executor: Any,
     run_root: pathlib.Path,
     quiesce_manifest_path: str,
-) -> tuple[Any, str, "subprocess.Popen[str] | None"]:
+) -> Any:
     """Select the forward-window value source (design §W2 co-design D1/D2).
 
     Fixture mode (default): the verbatim ``derive_joined_fixture_values`` upfront dict — the
-    closed-composer parity oracle — with no snapshot coordinator. Production mode
-    (``request["production"] is True``): a ``StagedValueResolver`` seeded with the UPFRONT
-    authorities (quiesce manifest path + accepted ``recovery_run_id``) and the W3 window snapshot
-    already opened — ``open_window_snapshot`` publishes ``baseline.json`` and yields the live
-    ``<exported-id>``, fed into the resolver via ``on_snapshot_open``. Returns
-    ``(values, exported_id, snapshot_coordinator)``; in production the caller MUST release the held
-    coordinator (``executor.close_window_snapshot``) after pg.backup consumes the snapshot. The
-    remaining staged authorities (``<immutable-generation>`` after pg.backup, the recovery-manifest
-    sha + coverage after ``source.forward``) are resolved by their lifecycle callbacks as the real
-    data-movement steps run (W5)."""
+    closed-composer parity oracle. Production mode (``request["production"] is True``): a
+    ``StagedValueResolver`` seeded with the UPFRONT authorities (quiesce manifest path + accepted
+    ``recovery_run_id``), plus the OQ6 pre-maintenance ``baseline.json`` published here because it
+    MUST be captured before ``barrier.install`` deactivates cron and sets the database read-only.
+
+    This fork opens NO snapshot coordinator (mc2-6fnrt). ``<exported-id>`` is a STAGED authority like
+    ``<immutable-generation>``: it is resolved by ``WindowSnapshotHold`` at the pg.backup step, the
+    only command whose argv consumes it, because a session held across ``barrier.install`` is
+    terminated by the barrier's own client quiesce. The remaining staged authorities
+    (``<immutable-generation>`` after pg.backup, the recovery-manifest sha + coverage after
+    ``source.forward``) are resolved by their lifecycle callbacks as the real data-movement steps
+    run (W5)."""
     if request.get("production") is True:
         recovery_run_id = request.get("recovery_run_id")
         if not recovery_run_id:
             raise LifecycleError("production live run requires an accepted request['recovery_run_id']")
         resolver = StagedValueResolver(quiesce_manifest_path, recovery_run_id)
-        exported_id, _baseline_path, coordinator = executor.open_window_snapshot(request, run_root)
-        resolver.on_snapshot_open(exported_id)
-        return resolver, exported_id, coordinator
-    values = derive_joined_fixture_values(request["run_id"], quiesce_manifest_path)
-    return values, values["<exported-id>"], None
+        executor.publish_window_baseline(request, run_root)
+        return resolver
+    return derive_joined_fixture_values(request["run_id"], quiesce_manifest_path)
+
+
+class WindowSnapshotHold:
+    """W3/OQ5 staged holder: resolve ``<exported-id>`` AT the pg.backup step and hold the exporting
+    session only for as long as pg.backup needs it (codesign §D5 "resolved at pg.backup open").
+
+    ``pg_export_snapshot()`` is valid only while the exporting session stays open, and pg.backup is
+    the ONLY manifest command whose argv consumes ``<exported-id>``, so the coordinator's whole
+    useful life is that one step. Opening it earlier is what broke production attempt #9: the frozen
+    barrier's ``quiesce_client_backends()`` terminates every client backend, including a coordinator
+    held across ``barrier.install`` (mc2-6fnrt).
+
+    Resolve-once, shared by ``run_live`` and ``run_recover`` through ``drive_forward_sequence``:
+
+      * fixture mode -> the upfront parity-oracle value, no session at all;
+      * production, ``<exported-id>`` not yet resolved (a fresh run, or a recover from the
+        ``barrier.install/completed`` head that RE-DRIVES pg.backup) -> open one coordinator, feed
+        ``on_snapshot_open``, and re-persist the run-root staged authority so the resumed journal
+        recomputes byte-identical ordinary ``command_sha256`` (§D3);
+      * production, already resolved (a recover past pg.backup, or the later ``deploy.prepare``
+        targets manifest in the same run) -> REUSE the resolved id; never open a second session.
+
+    ``release()`` is idempotent and fail-closed: the driver calls it right after pg.backup consumes
+    the snapshot, and the controller's ``finally`` calls it again on every failure path."""
+
+    def __init__(
+        self,
+        request: dict[str, Any],
+        executor: Any,
+        values: Any,
+        run_root: pathlib.Path,
+    ) -> None:
+        self._request = request
+        self._executor = executor
+        self._values = values
+        self._run_root = pathlib.Path(run_root)
+        self.coordinator: "subprocess.Popen[str] | None" = None
+
+    def exported_id(self) -> str:
+        if self._request.get("production") is not True:
+            return self._values["<exported-id>"]
+        try:
+            return self._values.value("<exported-id>")
+        except LifecycleError:
+            pass
+        exported_id, coordinator = self._executor.open_window_snapshot(
+            self._request, self._run_root
+        )
+        self.coordinator = coordinator
+        self._values.on_snapshot_open(exported_id)
+        persist_staged_values(self._run_root, self._request["run_id"], self._values)
+        return exported_id
+
+    def release(self) -> None:
+        coordinator, self.coordinator = self.coordinator, None
+        if coordinator is not None:
+            self._executor.close_window_snapshot(coordinator)
 
 
 def staged_values_authority_path(run_root: pathlib.Path, run_id: str) -> pathlib.Path:
@@ -886,10 +983,58 @@ def load_staged_values(
     return resolver
 
 
+def resolve_pg_backup_generation(
+    executor: Any,
+    resolver: "StagedValueResolver",
+    request: dict[str, Any],
+    run_root: pathlib.Path,
+) -> pathlib.Path:
+    """W7a: the production drive-loop staged step AFTER pg.backup and BEFORE pg.restore (codesign §D2).
+
+    pg.restore's manifest argv consumes ``<immutable-generation>`` — the absolute generation dir the
+    fresh pg.backup published — which is only known once pg.backup has run, so with a live
+    ``StagedValueResolver`` a production forward window would otherwise fail closed at ``pg.restore``
+    ("unresolved command placeholder"). This reads that on-disk authority through the executor's
+    isolable ``read_pg_backup_generation`` seam (a fake subclass overrides it for infra-free unit
+    wiring; the real ``latest.json`` read is the MC2_Q12_REAL_PG17 / W7-gated leg), feeds
+    ``resolver.on_pg_backup_done`` (resolve-once), and re-persists the run-root staged authority so a
+    recover re-drive recomputes byte-identical ordinary ``command_sha256`` (§D3, single authority).
+    Production path only — the fixture composer's upfront ``derive_joined_fixture_values`` dict already
+    carries every placeholder, so this is never invoked there (parity-neutral)."""
+    generation = executor.read_pg_backup_generation(request, run_root)
+    resolver.on_pg_backup_done(generation)
+    return persist_staged_values(run_root, request["run_id"], resolver)
+
+
+def resolve_source_forward_acceptance(
+    executor: Any,
+    resolver: "StagedValueResolver",
+    request: dict[str, Any],
+    run_root: pathlib.Path,
+) -> pathlib.Path:
+    """W7a: the production drive-loop staged step AFTER source.forward and BEFORE reindex.plan
+    (codesign §D2/§D3). reindex.plan's manifest argv consumes ``<accepted-recovery-manifest-sha256>``,
+    ``<accepted-coverage-fingerprint>`` and ``<accepted-coverage-run>`` — the accepted source.forward
+    binding, known only once the recovery run is accepted. This reads that authority through the
+    executor's isolable ``read_source_forward_acceptance`` seam (a fake subclass overrides it for the
+    infra-free unit wiring; the real read is the W5/W7-gated leg), feeds
+    ``resolver.on_source_forward_accepted`` (resolve-once), and re-persists the run-root staged
+    authority so a recover re-drive recomputes byte-identical ordinary ``command_sha256``. Production
+    path only — parity-neutral (never called on the fixture composer path)."""
+    recovery_manifest_sha256, coverage_fingerprint, coverage_run = (
+        executor.read_source_forward_acceptance(request, run_root)
+    )
+    resolver.on_source_forward_accepted(
+        recovery_manifest_sha256, coverage_fingerprint, coverage_run
+    )
+    return persist_staged_values(run_root, request["run_id"], resolver)
+
+
 def accept_real_run(
     children_exit_codes: list[int],
     barrier_receipt: dict[str, Any],
-    recovery_journal: dict[str, Any],
+    source_forward_acceptance: dict[str, Any],
+    expected_recovery_run_id: str,
 ) -> None:
     """Design §W2 D4 (LOCKED, owner steer 2026-07-20) — the real-run acceptance oracle.
 
@@ -897,8 +1042,13 @@ def accept_real_run(
       (1) every real child exited 0;
       (2) the barrier receipt v2 reached ``state == "guard_cleanup_complete"`` (state machine
           intact — the same terminal the owner-custody resume gate validates); AND
-      (3) coverage evidence is present in the recovery journal as an ``org:course:run`` triple
-          (three non-empty ``:``-separated tokens).
+      (3) the emitted ``source.forward`` acceptance authority
+          (``<run-root>/source-forward-acceptance.json``) carries two hex64 digests and a coverage
+          token ``catalog:<recovery-run-id>`` naming THIS run's recovery run.
+    Condition (3) checked ``recovery_journal["coverage"]`` for an ``org:course:run`` triple until the
+    owner-approved amendment 2026-07-25 made acceptance file_catalog truth: the recovery progress
+    journal has no ``coverage`` key (its schema is strict) and the document-evidence ledger triple no
+    longer exists as an authority, so the oracle validates the emitted authority instead.
     Byte-parity does NOT gate a real run — the fixture parity suite stays the mechanics oracle,
     checked separately. Fail closed with a distinct named reason per condition."""
     nonzero = [code for code in children_exit_codes if code != 0]
@@ -908,11 +1058,24 @@ def accept_real_run(
         raise LifecycleError(
             "real run rejected: barrier receipt did not reach guard_cleanup_complete"
         )
-    coverage = recovery_journal.get("coverage") if isinstance(recovery_journal, dict) else None
-    parts = coverage.split(":") if isinstance(coverage, str) else []
-    if len(parts) != 3 or not all(parts):
+    if not isinstance(source_forward_acceptance, dict):
+        raise LifecycleError("real run rejected: source.forward acceptance authority is malformed")
+    digests = (
+        source_forward_acceptance.get("recovery_manifest_sha256"),
+        source_forward_acceptance.get("coverage_fingerprint"),
+    )
+    if not all(
+        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in digests
+    ):
+        raise LifecycleError("real run rejected: acceptance authority digests are malformed")
+    coverage_run = source_forward_acceptance.get("coverage_run")
+    if not isinstance(coverage_run, str) or not COVERAGE_RUN_RE.fullmatch(coverage_run):
         raise LifecycleError(
-            "real run rejected: coverage evidence (org:course:run) absent or malformed"
+            "real run rejected: coverage authority (catalog:<recovery-run-id>) absent or malformed"
+        )
+    if coverage_run != f"catalog:{expected_recovery_run_id}":
+        raise LifecycleError(
+            "real run rejected: coverage authority does not name this recovery run"
         )
 
 
@@ -1088,7 +1251,20 @@ class SourceSnapshotSeam:
             proc.wait()
             raise LifecycleError("snapshot coordinator did not release the snapshot")
         if returncode != 0:
-            raise LifecycleError("snapshot coordinator session failed")
+            # mc2-6fnrt: the child's own diagnosis is the ONLY evidence of WHY the session died
+            # (production attempt #9 died as "terminating connection due to administrator command"
+            # — the barrier's client quiesce — and the bare message hid it). psql writes the server
+            # message to stderr; it carries no secret (the password lives in the service file, and
+            # the DSN never reaches argv), but keep it to one scrubbed line regardless.
+            detail = ""
+            if proc.stderr is not None:
+                try:
+                    detail = " ".join(proc.stderr.read().split())[:400]
+                except (OSError, ValueError):
+                    detail = ""
+            raise LifecycleError(
+                "snapshot coordinator session failed" + (f": {detail}" if detail else "")
+            )
 
     def produce_baseline(
         self, request: dict[str, Any], workdir: pathlib.Path, run_root: pathlib.Path
@@ -1145,6 +1321,72 @@ class SourceSnapshotSeam:
         return baseline_path
 
 
+def lease_pass_fds(env: dict[str, str]) -> tuple[int, ...]:
+    """Design D3: the descriptors a manifested child inherits, derived from its OWN frozen env.
+
+    A frozen command that declares ``Q12_EXTERNAL_QUIESCE_LEASE_FD`` (``LEASE_FD_ENV_COMMAND_IDS``)
+    is telling the launcher it will run ``validate_external_quiesce_lease``
+    (source-recovery-run.sh:388-411) / the writer controller's descriptor-surface assertion
+    (q12-writer-resume.py:296-311), both of which require the canonical cutover lock to arrive on an
+    INHERITED descriptor 9 that the CONTROLLER still holds ``LOCK_EX`` on (:8041-8046 — never
+    unlocked for the life of the run). Commands that declare nothing inherit nothing, so the
+    descriptor surface stays exactly as narrow as each frozen env says it is.
+
+    The descriptor is frozen to 9 in three independent places (q12-writer-resume.py:302-303, its
+    surface assertion :152-155, and the controller's ``--lease-fd choices=(9,)``), so any other
+    declared value is a manifest defect and fails closed here rather than deep inside the child.
+    """
+    declared = env.get(LEASE_FD_ENV_KEY)
+    if declared is None:
+        return ()
+    if declared != str(CANONICAL_LEASE_FD):
+        raise LifecycleError(
+            f"manifested child lease descriptor is frozen to {CANONICAL_LEASE_FD}: {declared}"
+        )
+    # The descriptor must actually BE the controller's held lease. Without this check a lost lease
+    # surfaces from inside subprocess as either a bare OSError EBADF traceback or — worse, and
+    # observed — a SILENT pass of whatever unrelated descriptor happens to occupy 9 (subprocess
+    # allocates its stdout/stderr pipes before forking and one can land there). By the time an
+    # ordinary command executes, its intent/capability rows are already journalled, so the operator
+    # must read a reason. Unreachable in a healthy run: main() holds LOCK_EX on 9 for the whole run.
+    try:
+        os.fstat(CANONICAL_LEASE_FD)
+    except OSError as error:
+        raise LifecycleError(
+            f"manifested child requires the controller's inherited lease descriptor "
+            f"{CANONICAL_LEASE_FD}"
+        ) from error
+    return (CANONICAL_LEASE_FD,)
+
+
+def privileged_launch_command(
+    command: dict[str, Any], capability: dict[str, Any]
+) -> dict[str, Any]:
+    """Design D5: the LAUNCH-time view of an ordinary command — the only place root is reached.
+
+    Exactly one frozen command needs root: ``source.forward``, which reads the uid-1001 operator
+    tree's 0400 files inside 0700 directories (source-recovery-run.sh:367-372, :470-497). It is
+    launched through the root-owned argv whitelist ``q12-privileged-launch.sh`` using the operator
+    account's EXISTING sudo rights — ``/etc/sudoers.d/claude-deploy`` already grants
+    ``ALL=(ALL) NOPASSWD: ALL``, so this adds no privilege and requires no sudoers change; it narrows
+    what that sudo is used for. The launcher itself asserts EUID 0, refuses every argv shape other
+    than this wrapper with ``--operation forward``, opens the canonical window lock on descriptor 9 as
+    an identity handle (never locking it — the controller holds ``LOCK_EX``), and rebuilds the frozen
+    env with ``env -i`` before exec'ing the frozen argv unchanged.
+
+    Every other command keeps today's direct launch. This is deliberately not a generic escalation
+    hook: it is keyed to the single frozen command id.
+
+    D7: this is a launch-time view ONLY. The returned dict is a copy — ``command`` is left untouched,
+    so the journal keeps recording the manifest argv/env and ``command_sha256`` (which covers argv
+    only, :1039) stays the manifest binding.
+    """
+    if capability["command_id"] != PRIVILEGED_LAUNCH_COMMAND_ID:
+        return command
+    launcher = pathlib.Path(__file__).with_name(PRIVILEGED_LAUNCH_SCRIPT_NAME)
+    return {**command, "argv": [SUDO_BIN, "-n", "--", str(launcher), *command["argv"]]}
+
+
 class ProductionExecutor:
     """Executes only a command already resolved from the fixed manifest."""
 
@@ -1153,13 +1395,28 @@ class ProductionExecutor:
             command["argv"],
             check=False,
             close_fds=True,
+            pass_fds=lease_pass_fds(command["env"]),
             env=command["env"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         if completed.returncode != 0:
-            raise LifecycleError(f"manifested child failed with status {completed.returncode}")
+            # 2026-07-27 (mc2-94mmf): the child's stderr used to be captured and dropped, so C1's
+            # barrier.install refusal arrived as a bare "status 1". Before C2 that costs a cycle;
+            # after C2 the production writers are already stopped and a blind refusal is the worst
+            # place to lose the reason. Carry the child's own words, scrubbed with the same redactor
+            # the plan drill uses (these children print DSNs and passwords when they fail) and
+            # bounded, because a failing child can emit a very large tail.
+            # This call site captures bytes (no text=True), unlike the delegated-launcher one.
+            raw_stderr = completed.stderr or b""
+            if isinstance(raw_stderr, bytes):
+                raw_stderr = raw_stderr.decode("utf-8", "replace")
+            detail = _scrub_plan_secret_text(raw_stderr.strip())[-2000:]
+            raise LifecycleError(
+                f"manifested child failed with status {completed.returncode}"
+                + (f": {detail}" if detail else "")
+            )
         return {
             "schema_version": "megacampus.q12.retained-command-result/v1",
             "command_id": capability["command_id"],
@@ -1327,38 +1584,158 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
         self._source_service: dict[str, str] | None = None
         self._snapshot_seam = SourceSnapshotSeam(self)
 
-    def open_window_snapshot(
-        self, request: dict[str, Any], run_root: pathlib.Path
-    ) -> tuple[str, pathlib.Path, subprocess.Popen[str]]:
-        """OQ5+OQ6 on the live cutover window path.
+    def execute_ordinary(
+        self, command: dict[str, Any], capability: dict[str, Any]
+    ) -> dict[str, Any]:
+        """W7a: the deployed ordinary-execution seam (append_ordinary_lifecycle hook, :2494).
 
-        Publish the pre-maintenance ``baseline.json`` (OQ6) that pg.backup q12 mode consumes, then
-        open+HOLD one snapshot coordinator whose exported ``<exported-id>`` (OQ5) stays live for the
-        caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
-        session is open; backup-supabase.sh expects a LIVE id). Returns
-        ``(exported_id, baseline_path, coordinator)``. The caller MUST release the held coordinator
-        via ``close_window_snapshot`` once pg.backup has consumed the snapshot. ``open_snapshot``
-        itself fails closed on a malformed/dead exported id (reaping the session first), so a refused
-        open never leaks a source transaction. The live psql/tsx legs are MC2_Q12_REAL_PG17-gated;
-        the structural wiring is unit-testable with the seam faked.
+        Runs the fully-resolved REAL manifest argv (pg.backup / pg.restore / migration.* /
+        source.forward / reindex.* / deploy.*) exactly as the barrier claim path shells a command —
+        via the inherited ``ProductionExecutor.execute``: fail-closed on non-zero exit, ``env``/argv
+        taken verbatim from the resolved command (real staged values on the production path per
+        W2/W3). The returned RESULT_KEYS object binds
+        ``capability_sha256 == sha256(complete_object(capability))`` so the caller's ``!= digest``
+        gate (:2497) accepts it, and it is parity-neutral: written ONLY to the per-command side file,
+        never the journal / checkpoint / capability digest.
+
+        Design D5 (2026-07-26): ``source.forward`` — and ONLY it — is launched through the root-owned
+        argv-whitelist launcher (see ``privileged_launch_command``). Everything else keeps the direct
+        launch; there is deliberately no generic escalation hook.
+        """
+        return self.execute(privileged_launch_command(command, capability), capability)
+
+    def read_pg_backup_generation(self, request: dict[str, Any], run_root: pathlib.Path) -> str:
+        """W7a real leg (MC2_Q12_REAL_PG17 / W7-gated): the ``<immutable-generation>`` authority — the
+        absolute generation dir the fresh pg.backup published, read from the backup-dir ``latest.json``
+        pointer (backup-supabase.sh:743-762). ``run_root`` is unused here (the generation lands in the
+        backup dir, not the run root) but keeps the seam signature uniform. A fake subclass overrides
+        this method for the infra-free unit wiring test; here it reads the real on-disk pointer and
+        returns the absolute generation path restore-supabase-drill.sh's ``--generation`` guard demands.
+        Fail closed on a missing/malformed pointer."""
+        del run_root
+        backup_dir = pathlib.Path(
+            os.environ.get("MC2_Q12_SUPABASE_BACKUP_DIR") or "/opt/megacampus/backups/supabase"
+        )
+        pointer = json.loads((backup_dir / "latest.json").read_bytes())
+        generation = pointer.get("generation") if isinstance(pointer, dict) else None
+        if not isinstance(generation, str) or not GENERATION_DIR_NAME_RE.fullmatch(generation):
+            raise LifecycleError("pg.backup generation pointer is malformed")
+        return str(backup_dir / generation)
+
+    def read_source_forward_acceptance(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> tuple[str, str, str]:
+        """W7a real leg (deliberately W5/W7-gated) — the source.forward acceptance authority:
+        ``(<accepted-recovery-manifest-sha256>, <accepted-coverage-fingerprint>, <accepted-coverage-run>)``.
+
+        Unlike the pg.backup generation (a simple ``latest.json`` pointer), these three are a COMPUTED
+        binding owned by the TS source-recovery acceptance authority
+        (``tools/qdrant/source-recovery-reindex-adapters.ts``: canonical manifest sha256 +
+        ``calculateAcceptedFailedCoverageFingerprint`` over the recovered file_catalog rows + the
+        ``catalog:<recovery-run-id>`` authority token). That authority is owned by the TS
+        source-recovery acceptance emit-entrypoint (``source-recovery-reindex-adapters.ts``
+        ``computeSourceForwardAcceptance``, driven by ``emit-source-forward-acceptance.ts``): it
+        COMPUTES the canonical manifest sha256 + the coverage fingerprint over the recovered
+        file_catalog rows of all six reviewed course scopes and writes them, with the authority token,
+        to ``<run_root>/source-forward-acceptance.json``
+        (``source-recovery-run.sh --operation forward`` wiring). This seam READS that on-disk authority
+        — it never recomputes the TS fingerprint in Python (no silent drift) — mirroring the
+        ``read_pg_backup_generation`` pattern (parse + validate + fail-closed). The real VALUES are
+        window-grade (a real reviewed recovery manifest + the recovered Supabase file_catalog rows), so the
+        end-to-end leg is exercised at the W7 owner-gated window; the read + its fail-closed validation
+        are unit-tested here with a synthetic authority. Tracked on mc2-1sns3."""
+        expected_recovery_run_id = request.get("recovery_run_id")
+        authority = pathlib.Path(run_root) / "source-forward-acceptance.json"
+        try:
+            payload = json.loads(authority.read_bytes())
+        except (OSError, ValueError) as exc:
+            raise LifecycleError(
+                "source.forward acceptance authority is missing or unreadable"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise LifecycleError("source.forward acceptance authority is malformed")
+        manifest_sha256 = payload.get("recovery_manifest_sha256")
+        coverage_fingerprint = payload.get("coverage_fingerprint")
+        coverage_run = payload.get("coverage_run")
+        hex64 = lambda value: isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+        if not hex64(manifest_sha256) or not hex64(coverage_fingerprint):
+            raise LifecycleError("source.forward acceptance sha256 fields are malformed")
+        if not isinstance(coverage_run, str) or not COVERAGE_RUN_RE.fullmatch(coverage_run):
+            raise LifecycleError("source.forward acceptance coverage_run is malformed")
+        # Defense in depth (amendment 2026-07-25): the wrapper forward tail and the TS adapter both
+        # require the authority token to name the run's own recovery run, so this read seam agrees
+        # instead of trusting whatever landed in the run root.
+        if coverage_run != f"catalog:{expected_recovery_run_id}":
+            raise LifecycleError(
+                "source.forward acceptance coverage_run does not name this recovery run"
+            )
+        return (manifest_sha256, coverage_fingerprint, coverage_run)
+
+    def publish_window_baseline(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> pathlib.Path:
+        """OQ6 on the live cutover window path: publish the pre-maintenance ``baseline.json`` that
+        pg.backup q12 mode consumes (backup-supabase.sh:918-926).
+
+        This runs BEFORE ``barrier.install`` — the maintenance edge that deactivates cron and sets
+        the database read-only — so the capture records cron active + writable. ``produce_baseline``
+        opens and closes its OWN short-lived snapshot for the capture, so nothing is held afterwards:
+        the coordinator whose ``<exported-id>`` pg.backup binds against is a SEPARATE, later session
+        (``open_window_snapshot``, opened at the pg.backup step — mc2-6fnrt).
 
         The source-password libpq service file is written into an EPHEMERAL workdir (not the durable
-        run_root): it only needs to exist while produce_baseline's tsx child and the coordinator psql
-        connect, so it never persists at rest next to baseline.json / staged-values."""
+        run_root): it only needs to exist while produce_baseline's tsx child connects, so it never
+        persists at rest next to baseline.json / staged-values."""
         import shutil
         import tempfile
 
         run_root = pathlib.Path(run_root)
-        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-src-"))
+        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-baseline-"))
         try:
-            baseline_path = self._snapshot_seam.produce_baseline(request, workdir, run_root)
-            coordinator, exported_id = self._snapshot_seam.open_snapshot(request, workdir)
+            return self._snapshot_seam.produce_baseline(request, workdir, run_root)
         finally:
-            # Both children have connected (libpq read the service file at connect); drop the
+            # The child has connected (libpq read the service file at connect); drop the
             # cleartext-password file and clear the cache so it never lives at rest in run_root.
             shutil.rmtree(workdir, ignore_errors=True)
             self._source_service = None
-        return exported_id, baseline_path, coordinator
+
+    def open_window_snapshot(
+        self, request: dict[str, Any], run_root: pathlib.Path
+    ) -> tuple[str, subprocess.Popen[str]]:
+        """OQ5 on the live cutover window path, opened AT the pg.backup step (mc2-6fnrt).
+
+        Open+HOLD one snapshot coordinator whose exported ``<exported-id>`` stays live for the
+        caller to bind pg.backup against (``pg_export_snapshot()`` is only valid while the exporting
+        session is open; backup-supabase.sh expects a LIVE id). Returns
+        ``(exported_id, coordinator)``; the caller MUST release the held coordinator via
+        ``close_window_snapshot`` once pg.backup has consumed the snapshot. ``open_snapshot`` itself
+        fails closed on a malformed/dead exported id (reaping the session first), so a refused open
+        never leaks a source transaction. The live psql leg is MC2_Q12_REAL_PG17-gated; the
+        structural wiring is unit-testable with the seam faked.
+
+        FOUND ON PRODUCTION 2026-07-28 (window attempt #9): this open used to happen next to
+        ``publish_window_baseline``, BEFORE ``barrier.install``, and the session was held across it.
+        The frozen barrier's ``quiesce_client_backends()`` terminates every client backend except its
+        own pid and exactly-idle ``supabase_admin``, so the barrier killed the controller's own
+        coordinator and the window aborted with the guard already installed. The W2/W3 codesign
+        (2026-07-20-q12-w2-w3-staged-execution-codesign.md:62,94) always resolved ``<exported-id>``
+        "at pg.backup open"; the ordering here is what makes that true. The barrier is untouched.
+
+        The source-password libpq service file is written into an EPHEMERAL workdir for the same
+        reason as the baseline leg, and this leg gets a FRESH one: the two connects are now separated
+        by the whole barrier install + writer quiesce, so no service file spans them."""
+        import shutil
+        import tempfile
+
+        workdir = pathlib.Path(tempfile.mkdtemp(prefix="q12-window-src-"))
+        try:
+            coordinator, exported_id = self._snapshot_seam.open_snapshot(request, workdir)
+        finally:
+            # The coordinator has connected (libpq read the service file at connect); drop the
+            # cleartext-password file and clear the cache so it never lives at rest.
+            shutil.rmtree(workdir, ignore_errors=True)
+            self._source_service = None
+        return exported_id, coordinator
 
     def close_window_snapshot(self, coordinator: subprocess.Popen[str] | None) -> None:
         """Release the held window snapshot coordinator (COMMIT + close) after pg.backup consumes
@@ -1483,6 +1860,74 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
             "validated_receipt_sha256": sha256(barrier_bytes),
         }
 
+    def execute_barrier_cleanup(
+        self, context: dict[str, Any], command: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Design §6b R8-B-2 (mc2-fjcj2): RUN the frozen ``q12-database-barrier.sh cleanup`` child,
+        then let the inherited R8-B-1 file-artifact seam consume what it produced.
+
+        Until this existed no production path invoked the child at all: ``ProductionExecutor``'s
+        seam opens by READING the 18-key terminal proof only the child publishes, so a real window
+        failed closed on a missing proof AFTER activate — past the point of no return, with the ten
+        production writers still stopped. The fixtures ran the child themselves, which is why every
+        local suite stayed green.
+
+        ORDER IS PART OF THE CONTRACT. The frozen child refuses unless
+        ``database-barrier-receipt-v1-before-cleanup.json`` already exists as a byte-exact 0400 copy
+        of the activate receipt (q12-database-barrier.sh:640-645), and the inherited seam publishes
+        that archive only AFTER the child. So it is published here first; the inherited publication
+        is then an idempotent no-op on identical bytes (``immutable_publish``).
+        """
+        run_root = pathlib.Path(context["run_root"])
+        receipt_path = run_root / "database-barrier-receipt.json"
+        immutable_publish(
+            run_root / "database-barrier-receipt-v1-before-cleanup.json",
+            validate_regular_file(receipt_path, mode=0o400),
+            0o400,
+            [],
+        )
+        self.invoke_barrier_cleanup_child(command["argv"])
+        return super().execute_barrier_cleanup(context, command)
+
+    def invoke_barrier_cleanup_child(self, argv: list[str]) -> None:
+        """Shell the frozen cleanup child on its own resolved argv.
+
+        ``barrier.cleanup`` is deliberately NOT a manifest command (§6b.4), so there is no frozen
+        env to reproduce; this supplies the same base env the manifest gives every other child, with
+        one correction. The manifest's frozen ``HOME=/root`` is unusable for the uid-1000 children
+        (`mc2-wwc9l`), and unlike a manifested argv nothing here is byte-bound, so the account's own
+        home is resolved instead of declaring one this process cannot read. No descriptors are
+        passed: the cleanup child reads the journal by path and, unlike the writer commands, declares
+        no external quiesce lease.
+
+        A nonzero exit carries the child's own words, scrubbed with the same redactor the plan drill
+        uses and bounded — these children print DSNs and 64-hex secrets when they fail, and a blind
+        refusal at this point is the single worst place for an operator to lose the reason
+        (`mc2-94mmf`).
+        """
+        environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+        home = _usable_home()
+        if home is not None:
+            environment["HOME"] = home
+        completed = subprocess.run(
+            argv,
+            check=False,
+            close_fds=True,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if completed.returncode != 0:
+            raw_stderr = completed.stderr or b""
+            if isinstance(raw_stderr, bytes):
+                raw_stderr = raw_stderr.decode("utf-8", "replace")
+            detail = _scrub_plan_secret_text(raw_stderr.strip())[-2000:]
+            raise LifecycleError(
+                f"barrier cleanup child failed with status {completed.returncode}"
+                + (f": {detail}" if detail else "")
+            )
+
     def _invoke_resume(self, argv: list[str], env: dict[str, str]) -> None:
         """Shell the writer-fleet resume child under the inherited FD9 cutover lease (mirrors
         execute()/launch_claim() delegation discipline: fixed argv/env, closed fds except the lease,
@@ -1503,6 +1948,28 @@ class OwnerCustodyExecutor(ProductionExecutor, SourceConnectionConfig):
                 "writers.resume.forward child failed with status "
                 f"{completed.returncode}: {completed.stderr.strip()}"
             )
+
+
+def _usable_home() -> str | None:
+    """The account's own home, or None when it cannot be used.
+
+    The Python twin of the wrapper-seam normalization (`mc2-wwc9l`, `operator-compose.sh`): a
+    non-manifested child must not be handed a HOME this uid cannot read. Returns None rather than
+    guessing, so the caller simply omits HOME and the child's tools fall back to getpwuid.
+    """
+    try:
+        candidate = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (KeyError, OSError):
+        return None
+    try:
+        stat_result = candidate.stat()
+    except OSError:
+        return None
+    if not stat_module.S_ISDIR(stat_result.st_mode) or stat_result.st_uid != os.getuid():
+        return None
+    if not os.access(candidate, os.R_OK | os.X_OK):
+        return None
+    return str(candidate)
 
 
 def owner_custody_executor() -> OwnerCustodyExecutor:
@@ -2288,6 +2755,113 @@ class Engine:
         self.retained[f"{operation}:{epoch}"] = str(path)
         return path
 
+    def publish_database_barrier_input_checkpoint(
+        self, operation: str, epoch: str, command_id: str
+    ) -> pathlib.Path:
+        """mc2-orsez: publish the DB-barrier child's OWN input checkpoint at the claimed boundary.
+
+        The frozen ``q12-database-barrier.sh`` reads this file BEFORE it will do anything — the
+        install leg by its fixed name (:420-441), the cleanup/rollback legs by
+        ``<operation>-<execution-epoch>`` (:582-597) — and ``q12-writer-resume.py`` re-reads the
+        cleanup one at C10 (:1638-1663). All three demand the same thing: the EXACT 12-key
+        cutover-checkpoint projection of the journal head, and that head must be this command's
+        ``capability_claimed`` row. That is byte-for-byte the controller's own
+        ``phase-checkpoint.json`` at this instant, so this is a copy under a second name — but the
+        controller never published it, so in production EVERY barrier command failed closed with
+        "database barrier child input checkpoint must be a canonical non-symlink regular file" and
+        C1 was impassable (found by opening the window, 2026-07-27). It stayed invisible locally
+        because the test fixtures published the file themselves.
+
+        The claimed-boundary head and the byte-equality against the live checkpoint are asserted
+        here rather than assumed: publishing a checkpoint that points anywhere else would hand the
+        frozen child a valid-looking authority for the wrong journal position.
+        """
+        head = self.journal[-1] if self.journal else None
+        if (
+            head is None
+            or head["command_id"] != command_id
+            or head["outcome"] != "capability_claimed"
+            or head["lease_epoch"] != epoch
+        ):
+            raise LifecycleError(
+                "database barrier input checkpoint requires a claimed-boundary journal head"
+            )
+        data = self.checkpoint_bytes(head)
+        if validate_regular_file(self.checkpoint_path, mode=0o600) != data:
+            raise LifecycleError(
+                "database barrier input checkpoint source is not the current fixed checkpoint"
+            )
+        path = self.run_root / f"database-barrier-input-checkpoint-{operation}-{epoch}.json"
+        # A private trace list: this publication is not part of the retained-copy trace contract.
+        immutable_publish(
+            path,
+            data,
+            0o600,
+            [],
+            allow_temporary_completion=bool(
+                getattr(self.executor, "continuous_lease", False)
+            ),
+        )
+        if path.stat().st_ino == self.checkpoint_path.stat().st_ino or path.stat().st_nlink != 1:
+            raise LifecycleError("database barrier input checkpoint identity mismatch")
+        return path
+
+    def publish_writer_quiesce_child_checkpoint(
+        self, kind: str, expected_outcome: str, epoch: str
+    ) -> pathlib.Path:
+        """mc2-awi6q: publish the writers.quiesce child's OWN checkpoint copies.
+
+        ``q12-writer-resume.py`` (:522-576) refuses to quiesce a single writer unless BOTH copies
+        already exist as canonical 0600 regular files:
+
+          * ``writer-quiesce-capability-checkpoint-<run-id>-<epoch>.json`` — the 12-key projection
+            of the quiesce INTENT row, whose sha256 is the capability's own
+            ``capability_input_checkpoint_sha256``;
+          * ``writer-quiesce-input-checkpoint-<run-id>-<epoch>.json`` — the projection of the
+            ``capability_claimed`` head, byte-identical to the live ``phase-checkpoint.json``.
+
+        The controller computed the first digest and wrote it into the capability, but published
+        neither FILE — the same gap mc2-orsez closed for the barrier child, invisible for the same
+        reason: the runtime fixtures published these files themselves. Found by opening the window,
+        2026-07-28 (attempt #11), where C2 failed closed after the barrier had already put
+        production into ``maintenance_guarded``.
+
+        The boundary is asserted rather than assumed: publishing either copy at the wrong journal
+        position would hand the child a valid-looking authority for a row it is not claiming under.
+        """
+        head = self.journal[-1] if self.journal else None
+        if (
+            head is None
+            or head["command_id"] != "writers.quiesce"
+            or head["outcome"] != expected_outcome
+            or head["lease_epoch"] != epoch
+        ):
+            raise LifecycleError(
+                "writer quiesce child checkpoint requires its own boundary journal head"
+            )
+        data = self.checkpoint_bytes(head)
+        if validate_regular_file(self.checkpoint_path, mode=0o600) != data:
+            raise LifecycleError(
+                "writer quiesce child checkpoint source is not the current fixed checkpoint"
+            )
+        path = (
+            self.run_root
+            / f"writer-quiesce-{kind}-checkpoint-{self.request['run_id']}-{epoch}.json"
+        )
+        # A private trace list: this publication is not part of the retained-copy trace contract.
+        immutable_publish(
+            path,
+            data,
+            0o600,
+            [],
+            allow_temporary_completion=bool(
+                getattr(self.executor, "continuous_lease", False)
+            ),
+        )
+        if path.stat().st_ino == self.checkpoint_path.stat().st_ino or path.stat().st_nlink != 1:
+            raise LifecycleError("writer quiesce child checkpoint identity mismatch")
+        return path
+
     def publish_capability(
         self,
         operation: str,
@@ -2446,7 +3020,7 @@ class Engine:
         command_id: str,
         values: dict[str, str],
         *,
-        quiesce_object_sha256: str | None = None,
+        quiesce_object_sha256: str | Callable[[], str] | None = None,
         resource_step_before_completion: str | None = None,
     ) -> dict[str, Any]:
         """Amendment section 4 items 4-5: one ordinary command lifecycle.
@@ -2454,6 +3028,13 @@ class Engine:
         Root emits the capability/claim/completion evidence directly through
         the production serializer/object primitives; the delegated claim
         launcher remains a D5-group and Task 9 controller concern.
+
+        ``quiesce_object_sha256`` may be a CALLABLE (mc2-y02tz). The writer-quiesce manifest is
+        PUBLISHED BY the ``writers.quiesce`` child this very lifecycle executes, so on the first
+        live run of a window its digest does not exist until after ``hook(command, capability)``
+        returns. A callable is therefore resolved at the one point where the digest is first
+        consumed — after the child ran, before the ``capability_completed``/``accepted`` rows —
+        which is exactly where a pre-known string is consumed too, so the journal is unchanged.
         """
         command = resolved_command(manifest, command_id, self.request, values)
         if command_id == "writers.quiesce":
@@ -2465,6 +3046,11 @@ class Engine:
             selector_phase, "intent", command_id, command["command_sha256"], "cutover", carried
         )
         checkpoint_hash = sha256(self.checkpoint_path.read_bytes())
+        if command_id == "writers.quiesce":
+            # mc2-awi6q: the C2 child reads this copy and demands its digest be the capability's
+            # capability_input_checkpoint_sha256 — publish it at the intent boundary the digest is
+            # taken from, not later, or the two stop describing the same journal position.
+            self.publish_writer_quiesce_child_checkpoint("capability", "intent", "cutover")
         _, capability, digest = self.publish_ordinary_capability(command_id, command, checkpoint_hash)
         self.append(
             target_phase,
@@ -2483,6 +3069,9 @@ class Engine:
             "cutover",
             digest,
         )
+        if command_id == "writers.quiesce":
+            # mc2-awi6q: the claimed-boundary copy the child re-reads as its own input checkpoint.
+            self.publish_writer_quiesce_child_checkpoint("input", "capability_claimed", "cutover")
         # R4 Sub-round A (design docs/superpowers/specs/2026-07-17-q12-live-controller-design.md
         # §3/§6.4): an injectable, parity-neutral ordinary-execution seam. When the caller's
         # executor exposes execute_ordinary, this delegates to it for a real child result;
@@ -2523,6 +3112,11 @@ class Engine:
                 raise LifecycleError("resource step is frozen to deploy.prepare completion")
             self.current_resource_manifest_sha256 = resource_step_before_completion
         if command_id == "writers.quiesce":
+            if callable(quiesce_object_sha256):
+                # C2-deferred adoption: read the manifest the child just published, enforce the
+                # same file identity/mode/ownership the pre-published path enforces, and step
+                # self.request["quiesce_manifest_sha256"] to its real digest.
+                quiesce_object_sha256 = quiesce_object_sha256()
             if quiesce_object_sha256 is None:
                 raise LifecycleError("quiesce lifecycle requires the accepted manifest digest")
             self.append(
@@ -3655,6 +4249,15 @@ def run_claim(arguments: argparse.Namespace, executor: Executor) -> dict[str, An
         elif len(matching_claims) != 1:
             raise LifecycleError("duplicate claim authority")
 
+    # mc2-orsez: the claimed boundary is durable, so the frozen install child's input checkpoint can
+    # be published now — after the row it must bind, before the child that reads it. Only the install
+    # leg reads one here (q12-database-barrier.sh:420; the other four barrier commands read none);
+    # the cleanup leg's copy is published by orchestrate_post_activate_cleanup at its own boundary.
+    if operation == "install":
+        engine.publish_database_barrier_input_checkpoint(
+            operation, epoch, COMMANDS[operation]
+        )
+
     after_checkpoint = getattr(executor, "after_claim_checkpoint", None)
     if after_checkpoint is not None:
         after_checkpoint()
@@ -4103,6 +4706,12 @@ def orchestrate_post_activate_cleanup(
             "cleanup_receipt_sha256": receipt_sha256,
         }
     else:
+        # mc2-orsez: the claimed head is durable and the child is about to read its input checkpoint
+        # (q12-database-barrier.sh:582-597); the C10 forward-resume gate re-reads the SAME file
+        # afterwards (q12-writer-resume.py:1638-1663), so this copy must outlive the child.
+        engine.publish_database_barrier_input_checkpoint(
+            "cleanup", "cutover", CLEANUP_COMMAND_ID
+        )
         cleanup = cleanup_hook(context, command)
         receipt_sha256 = cleanup.get("cleanup_receipt_sha256")
         if not isinstance(receipt_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
@@ -4227,17 +4836,18 @@ def drive_forward_sequence(
     request: dict[str, Any],
     manifest: dict[str, Any],
     values: dict[str, str],
-    quiesce_bytes: bytes,
+    quiesce_bytes: bytes | Callable[[], bytes],
     run_id: str,
     resource_manifest_paths: dict[str, str],
     marker_path: str,
-    exported_id: str,
+    snapshot: "WindowSnapshotHold",
     target_identities: tuple[str, ...],
     ordinary: Callable[..., dict[str, Any]],
     d5: Callable[[str], None],
     *,
     resume_from: str | None = None,
     stop_after: str | None = None,
+    quiesce_object_sha256: str | Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     """Design §6b.2 (R8-I-B): the ONE resumable forward driver both run_live and run_recover share.
 
@@ -4254,6 +4864,13 @@ def drive_forward_sequence(
     ``stop_after`` names a checkpoint (``_STOP_AFTER_STEP``) after which run_live stops cleanly and
     returns its PARTIAL output WITHOUT the post-activate segment. This is the crash/restart boundary
     machinery; recover never passes it (a recover always drives to convergence).
+
+    ``quiesce_bytes`` and ``quiesce_object_sha256`` may each be a CALLABLE (mc2-y02tz): on a live
+    first run of a window the writer-quiesce manifest is published mid-sequence by the group-3
+    ``writers.quiesce`` child, so neither its bytes (consumed by the group-14 FWM) nor its digest
+    (consumed by the group-3 accepted row) can be read up front. Both callables resolve at their
+    single existing consumption point, so the driven journal is unchanged. ``quiesce_object_sha256
+    is None`` keeps the original behaviour: the request-global digest read at group-3 call time.
     """
     def finalize(post_activate: bool) -> dict[str, Any]:
         return finalize_forward_output(
@@ -4261,30 +4878,69 @@ def drive_forward_sequence(
             run_id=(run_id if post_activate else None), post_activate=post_activate,
         )
 
+    def on_staged(step_id: str) -> None:
+        """W7a (codesign §D2/§D3): production-only staged threading between the real data-movement
+        steps and the commands whose argv consumes what they produce.
+
+        This belongs to the DRIVER, not to a caller, because run_live and run_recover share the
+        driver and two recover heads RE-DRIVE a staged step: head 1
+        (``barrier.install/completed`` -> ``writers.quiesce``) re-drives pg.backup, whose
+        ``<immutable-generation>`` pg.restore consumes, and head 4
+        (``barrier.prepare-recovery/completed`` -> ``source.forward``) re-drives source.forward,
+        whose accepted binding reindex.plan consumes. A hook passed in by one caller only would let
+        a resumed production window fail closed at the NEXT command — after C2 has already quiesced
+        the production writers. ``WindowSnapshotHold`` already owns the same property for
+        ``<exported-id>``; this is its counterpart for the two later staged authorities.
+
+        Fixture mode is a no-op: its upfront ``derive_joined_fixture_values`` dict already carries
+        every placeholder, so the composer parity twin is byte-unaffected."""
+        if request.get("production") is not True:
+            return
+        if step_id == "pg.backup":
+            resolve_pg_backup_generation(engine.executor, values, request, engine.run_root)
+        elif step_id == "source.forward":
+            resolve_source_forward_acceptance(engine.executor, values, request, engine.run_root)
+
     if resume_from == _POST_ACTIVATE_SENTINEL:
         # Groups 1-16 already durable (barrier.activate/completed or a barrier.cleanup head): drive
         # only the post-activate cleanup segment, converging idempotently (§6b.2 rows 5 & 8).
         return finalize(True)
 
     def step_pg_backup() -> None:
+        # W3/OQ5 (mc2-6fnrt): the window snapshot coordinator opens HERE — after barrier.install has
+        # completed its client quiesce, immediately before the only command that consumes the live
+        # <exported-id> — and is released as soon as pg.backup has consumed it. Fixture mode resolves
+        # the upfront parity-oracle value with no session at all.
+        exported_id = snapshot.exported_id()
         # OQ4 step 1: record the exported snapshot identity into a checkpoint-bound resource
         # manifest and step the hash BEFORE pg.backup/intent (composer parity: snapshot_step).
         snapshot_digest = write_live_resource_manifest(engine, "snapshot", snapshot=exported_id)
         engine.current_resource_manifest_sha256 = snapshot_digest
-        ordinary("pg.backup")
+        try:
+            ordinary("pg.backup")
+            # W7a: staged threading — on the production path this reads the fresh generation authority
+            # and advances the resolver's on_pg_backup_done so the next step (pg.restore) can resolve
+            # <immutable-generation>. Fixture mode is a no-op (its upfront dict already carries it).
+            on_staged("pg.backup")
+        finally:
+            # The snapshot has been consumed (or the step failed): never hold the exporting source
+            # session into the rest of the window. The controller's own finally releases again.
+            snapshot.release()
 
     def step_deploy_prepare() -> None:
         # OQ4 step 2: record the five captured target identities and step the hash AT
         # deploy.prepare/completed via resource_step_before_completion (composer parity: targets_step).
+        # The id is already resolved by then (the hold reuses it; no session is re-opened).
         targets_digest = write_live_resource_manifest(
-            engine, "targets", snapshot=exported_id, targets=target_identities
+            engine, "targets", snapshot=snapshot.exported_id(), targets=target_identities
         )
         ordinary("deploy.prepare", resource_step_before_completion=targets_digest)
 
     def step_fwm() -> None:
         # Section 5 group 14: the forward final-writer manifest (FWM), a byte/order twin of
         # run_joined_composer's publish_final_writer_manifest("forward", ...) call.
-        inventory = engine.derive_root_writer_inventory(quiesce_bytes, include_targets=True)
+        payload = quiesce_bytes() if callable(quiesce_bytes) else quiesce_bytes
+        inventory = engine.derive_root_writer_inventory(payload, include_targets=True)
         engine.publish_final_writer_manifest(
             "forward",
             inventory,
@@ -4295,7 +4951,12 @@ def drive_forward_sequence(
         "operator.self-check": lambda: ordinary("operator.self-check"),
         "install": lambda: d5("install"),
         "writers.quiesce": lambda: ordinary(
-            "writers.quiesce", quiesce_object_sha256=request["quiesce_manifest_sha256"]
+            "writers.quiesce",
+            quiesce_object_sha256=(
+                request["quiesce_manifest_sha256"]
+                if quiesce_object_sha256 is None
+                else quiesce_object_sha256
+            ),
         ),
         "pg.backup": step_pg_backup,
         "pg.restore": lambda: ordinary("pg.restore"),
@@ -4307,7 +4968,7 @@ def drive_forward_sequence(
             manifest, "migrations_applied", "migration.observability.apply", values
         ),
         "prepare-recovery": lambda: d5("prepare-recovery"),
-        "source.forward": lambda: ordinary("source.forward"),
+        "source.forward": lambda: (ordinary("source.forward"), on_staged("source.forward")),
         "reindex.plan": lambda: ordinary("reindex.plan"),
         "reindex.worker.create": lambda: ordinary("reindex.worker.create"),
         "reindex.execute": lambda: ordinary("reindex.execute"),
@@ -4331,6 +4992,73 @@ def drive_forward_sequence(
             # A stopped run returns its partial output and does NOT run the post-activate segment.
             return finalize(False)
     return finalize(True)
+
+
+def validate_privileged_launcher(path: pathlib.Path) -> None:
+    """Design D5 pre-flight half 1: the launcher is installed exactly as the install contract says.
+
+    Checked in escalating order so the reason names the ONE thing that is wrong: installed at all,
+    then a regular non-symlink file, then root-owned, then mode exactly 0555. A launcher that is
+    group/other-writable, or owned by the very account it constrains, would make the whitelist
+    rewritable by that account — which is the entire point of the file being root-owned 0555.
+    """
+    try:
+        observed = os.lstat(path)
+    except OSError as error:
+        raise LifecycleError("privileged launcher is not installed") from error
+    if not stat_module.S_ISREG(observed.st_mode) or stat_module.S_ISLNK(observed.st_mode):
+        raise LifecycleError("privileged launcher must be a regular non-symlink file")
+    if observed.st_uid != 0 or observed.st_gid != 0:
+        raise LifecycleError("privileged launcher must be owned by root")
+    if stat_module.S_IMODE(observed.st_mode) != PRIVILEGED_LAUNCH_MODE:
+        raise LifecycleError("privileged launcher must be mode 0555")
+
+
+def probe_privileged_launch_authority() -> None:
+    """Design D5 pre-flight half 2: the operator account can still reach root non-interactively.
+
+    ``sudo -n true`` is a read-only no-op that mutates nothing and never prompts. If the authority
+    is gone (sudoers edited, ticket expired), the window must learn it now rather than at C5 with the
+    writers already stopped.
+    """
+    completed = subprocess.run(
+        [SUDO_BIN, "-n", "--", "/usr/bin/true"],
+        check=False,
+        close_fds=True,
+        env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if completed.returncode != 0:
+        raise LifecycleError(
+            "privileged launch authority is unavailable: sudo -n could not run as root"
+        )
+
+
+def require_privileged_launcher(request: dict[str, Any]) -> None:
+    """Design D5 PRE-FLIGHT gate (production only): refuse to START a window whose ONE privileged
+    command could not be launched.
+
+    ``source.forward`` (C5) is escalated through the root-owned argv whitelist. If that launcher is
+    missing/mis-installed, or the sudo authority is gone, the run would discover it at C5 — AFTER C2
+    has stopped all ten production writers, with the window open. Like
+    ``require_post_activate_executor``, this fires at the TOP of ``run_live``/``run_recover``, before
+    the genesis row and before Engine construction, so a mis-staged host never starts the window.
+    Non-production fixture runs are unaffected: they never reach the privileged launch.
+
+    Scope note: a HOST-staging refusal must not mask a REQUEST-shape refusal. A production request
+    whose run root is not the production run root cannot reach C5 at all, and that rule belongs to
+    ``Engine.__post_init__`` ("production run root mismatch", :1804-1805) — so such a request falls
+    through here and is refused by its own authority with its own name. Every request that COULD
+    reach the privileged launch is checked.
+    """
+    if request.get("production") is not True:
+        return
+    if request.get("run_root") != f"/opt/megacampus/backups/q12/{request.get('run_id')}":
+        return
+    validate_privileged_launcher(pathlib.Path(__file__).with_name(PRIVILEGED_LAUNCH_SCRIPT_NAME))
+    probe_privileged_launch_authority()
 
 
 def require_post_activate_executor(request: dict[str, Any], executor: Executor) -> None:
@@ -4364,6 +5092,52 @@ def require_post_activate_executor(request: dict[str, Any], executor: Executor) 
         raise LifecycleError(
             "writers.resume.forward requires the server-side owner-custody executor (not wired here)"
         )
+
+
+def install_deferred_quiesce_adoption(
+    engine: Engine, request: dict[str, Any], quiesce_path: pathlib.Path
+) -> tuple[Callable[[], bytes], Callable[[], str]]:
+    """C2-deferred writer-quiesce adoption (mc2-y02tz), shared by run_live and run_recover.
+
+    Returns ``(published_bytes, adopt)``: the lazy group-14 byte source and the group-3 digest
+    resolver. ``adopt`` runs INSIDE append_ordinary_lifecycle after the child returned and before
+    the writers.quiesce capability_completed/accepted rows — the same point a pre-known digest is
+    consumed — so the ZERO -> QSHA step lands on an identical row.
+
+    The publication path is PINNED to the run root: the frozen ``writers.quiesce`` argv carries no
+    path argument, so the child's target is fully determined by run root + run id
+    (``run_writer_quiesce_only`` in source-recovery-run.sh:315-346 ->
+    ``q12-writer-resume.py:695``). Without this pin an operator typo in --quiesce-manifest-path
+    would only surface AFTER the ten production writers were already stopped, and the run root it
+    stranded could not be re-driven.
+    """
+    canonical_publication = engine.run_root / f"writer-quiesce-{request['run_id']}.json"
+    if quiesce_path != canonical_publication:
+        raise LifecycleError(
+            "deferred writer quiesce manifest path must be the run-root publication path"
+        )
+    cache: dict[str, bytes] = {}
+
+    def adopt() -> str:
+        if not regular_file_present(quiesce_path):
+            raise LifecycleError("writers.quiesce published no writer quiesce manifest")
+        published = validate_regular_file(quiesce_path, mode=0o400)
+        # Content authority at group 3, not group 14: derive_root_writer_inventory is pure (it
+        # appends no row and publishes nothing), so running it here refuses a malformed or foreign
+        # manifest before pg.backup/migrations instead of eleven groups later with the writers down.
+        engine.derive_root_writer_inventory(published, include_targets=False)
+        cache["bytes"] = published
+        digest = sha256(published)
+        request["quiesce_manifest_sha256"] = digest
+        return digest
+
+    def published_bytes() -> bytes:
+        payload = cache.get("bytes")
+        if payload is None:
+            raise LifecycleError("deferred writer quiesce manifest was never adopted")
+        return payload
+
+    return published_bytes, adopt
 
 
 def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
@@ -4407,25 +5181,54 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # journal row / run-root mutation, so it never journals through activate (the point of no
     # return) only to strand there. Defense-in-depth late gate stays in the post-activate seam.
     require_post_activate_executor(request, executor)
+    # D5 PRE-FLIGHT (same rule, host side): the ONE privileged command (C5 source.forward) is
+    # launched through the root-owned argv whitelist, so a missing/mis-installed launcher or a lost
+    # sudo authority must be refused HERE — not at C5, with all ten writers already stopped by C2.
+    require_privileged_launcher(request)
     manifest = load_manifest()
     engine = Engine(request, executor)
     if engine.journal:
         raise LifecycleError("live composition requires a fresh run root")
     quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
     require_lexical_absolute(quiesce_path)
-    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
-    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
-        raise LifecycleError("live quiesce manifest digest mismatch")
+    # mc2-y02tz — C2-DEFERRED WRITER-QUIESCE PUBLICATION. On the FIRST live run of a window the
+    # manifest CANNOT exist yet: <run-root>/writer-quiesce-<run-id>.json is published by the
+    # in-window group-3 ordinary command `writers.quiesce` (frozen manifest -> source-recovery-run.sh
+    # --operation quiesce-writers-only, path derived at source-recovery-run.sh:522) which THIS
+    # controller drives, onto a run root run_live requires to be FRESH. Hand-authoring it would be
+    # an operator asserting "the writers are already quiesced" — an authority the operator does not
+    # hold — so an absent manifest is legal here, but ONLY when the request declares the all-zero
+    # digest (the operator saying "not published yet"). Any other declared digest with an absent
+    # file is a fail-closed refusal, and a manifest that IS present keeps today's strict behaviour
+    # byte-for-byte. run_recover shares this seam for the one head that can precede the group-3
+    # publication; a resume whose journal already carries the accepted row still demands the file.
+    quiesce_object_resolver: Callable[[], str] | None
+    quiesce_source: bytes | Callable[[], bytes]
+    if regular_file_present(quiesce_path):
+        quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+        if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+            raise LifecycleError("live quiesce manifest digest mismatch")
+        quiesce_source = quiesce_bytes
+        quiesce_object_resolver = None
+    else:
+        if request["quiesce_manifest_sha256"] != ZERO:
+            raise LifecycleError(
+                "live quiesce manifest is absent for a declared non-zero digest"
+            )
+        quiesce_source, quiesce_object_resolver = install_deferred_quiesce_adoption(
+            engine, request, quiesce_path
+        )
     # W2 fork (co-design D1/D2): fixture mode returns the verbatim parity-oracle dict; production mode
-    # returns a StagedValueResolver with the W3 window snapshot already opened (real <exported-id> +
-    # baseline.json) and hands back the HELD coordinator to release after pg.backup.
-    values, exported_id, snapshot_coordinator = resolve_window_values(
-        request, executor, engine.run_root, str(quiesce_path)
-    )
-    # W2: in production the held W3 snapshot coordinator is released once the window drive returns
-    # (pg.backup has consumed the snapshot by then); the finally guards EVERY path from acquisition
-    # onward (persist, setup, drive, exceptions, stop_after early-return) so the exporting source
-    # session never leaks. Fixture mode has no coordinator to release.
+    # returns a StagedValueResolver and publishes the OQ6 pre-maintenance baseline.json. NO snapshot
+    # coordinator is opened here (mc2-6fnrt) — one held across barrier.install is terminated by the
+    # barrier's own client quiesce.
+    values = resolve_window_values(request, executor, engine.run_root, str(quiesce_path))
+    # W3/OQ5: the staged holder opens the coordinator AT the pg.backup step and releases it as soon
+    # as pg.backup has consumed the snapshot. The finally below is the belt-and-braces release: it
+    # guards EVERY path from here onward (persist, setup, drive, exceptions, stop_after early-return)
+    # so a failure between the open and the driver's own release never leaks the source session.
+    # Fixture mode never opens anything, so its release is a no-op.
+    snapshot = WindowSnapshotHold(request, executor, values, engine.run_root)
     try:
         if request.get("production") is True:
             # D3: persist the snapshot-stage staged values so a recover re-drive recomputes
@@ -4490,20 +5293,20 @@ def run_live(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
             request,
             manifest,
             values,
-            quiesce_bytes,
+            quiesce_source,
             run_id,
             resource_manifest_paths,
             marker_path,
-            exported_id,
+            snapshot,
             target_identities,
             ordinary,
             d5,
             resume_from=None,
             stop_after=stop_after,
+            quiesce_object_sha256=quiesce_object_resolver,
         )
     finally:
-        if snapshot_coordinator is not None:
-            executor.close_window_snapshot(snapshot_coordinator)
+        snapshot.release()
 
 
 def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
@@ -4533,6 +5336,9 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
     # activate then post-activate, so a production recover whose executor cannot run post-activate
     # must fail closed BEFORE touching the run root, not after re-activating.
     require_post_activate_executor(request, executor)
+    # D5 PRE-FLIGHT: a recover that resumes at or before source.forward re-drives the privileged
+    # launch, so the same host staging must hold before any run-root mutation.
+    require_privileged_launcher(request)
     manifest = load_manifest()
     run_root = pathlib.Path(request["run_root"])
     require_lexical_absolute(run_root)
@@ -4565,9 +5371,35 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
 
     quiesce_path = pathlib.Path(request["quiesce_manifest_path"])
     require_lexical_absolute(quiesce_path)
-    quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
-    if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
-        raise LifecycleError("recover quiesce manifest digest mismatch")
+    # mc2-y02tz: the ONE resumable head that can precede the group-3 publication is
+    # barrier.install/completed (_RECOVER_RESUME_FROM maps it to "writers.quiesce"), which is also
+    # the --stop-after writers.quiesce.pre boundary. On a deferred first run nothing has published
+    # the manifest at that head, so demanding it here would leave the root unrecoverable by ANY
+    # path (run_live refuses a non-fresh root). Accept the absence on exactly run_live's terms —
+    # declared ZERO digest, pinned publication path — and let this resume's own group-3 child
+    # publish it. A journal that already carries the writers.quiesce accepted row has a durable
+    # publication, so a missing file there stays a fail-closed refusal.
+    quiesce_object_resolver: Callable[[], str] | None
+    quiesce_source: bytes | Callable[[], bytes]
+    if regular_file_present(quiesce_path):
+        quiesce_bytes = validate_regular_file(quiesce_path, mode=0o400)
+        if sha256(quiesce_bytes) != request["quiesce_manifest_sha256"]:
+            raise LifecycleError("recover quiesce manifest digest mismatch")
+        quiesce_source = quiesce_bytes
+        quiesce_object_resolver = None
+    else:
+        if request["quiesce_manifest_sha256"] != ZERO:
+            raise LifecycleError(
+                "recover quiesce manifest is absent for a declared non-zero digest"
+            )
+        if any(
+            entry.get("command_id") == "writers.quiesce" and entry.get("outcome") == "accepted"
+            for entry in engine.journal
+        ):
+            raise LifecycleError("recover requires the durably published writer quiesce manifest")
+        quiesce_source, quiesce_object_resolver = install_deferred_quiesce_adoption(
+            engine, request, quiesce_path
+        )
     if request.get("production") is True:
         # W2/D3: recover reloads the persisted staged values — the real <exported-id> and the other
         # staged authorities cannot be re-opened — so the resumed journal recomputes byte-identical
@@ -4609,17 +5441,26 @@ def run_recover(request: dict[str, Any], executor: Executor) -> dict[str, Any]:
         for stage in ("genesis", "snapshot", "targets")
     }
     marker_path = str(engine.run_root / "quiesce-window-mode.json")
-    exported_id = values["<exported-id>"]
+    # W3/OQ5 (mc2-6fnrt): the same staged holder run_live uses. A recover past pg.backup REUSES the
+    # <exported-id> the persisted staged authority already carries (no session is opened); a recover
+    # from the barrier.install/completed head RE-DRIVES pg.backup, and that re-drive needs a LIVE
+    # exported snapshot — the one the interrupted run held is long gone — so the holder opens a fresh
+    # coordinator at the pg.backup step, exactly where an uninterrupted run opens it.
+    snapshot = WindowSnapshotHold(request, executor, values, engine.run_root)
     target_identities = tuple(
         sha256(f"q12:resource-target:{index}:{run_id}".encode("utf-8")) for index in range(5)
     )
 
     def resume(resume_from: str) -> dict[str, Any]:
-        return drive_forward_sequence(
-            engine, request, manifest, values, quiesce_bytes, run_id,
-            resource_manifest_paths, marker_path, exported_id, target_identities,
-            ordinary, d5, resume_from=resume_from,
-        )
+        try:
+            return drive_forward_sequence(
+                engine, request, manifest, values, quiesce_source, run_id,
+                resource_manifest_paths, marker_path, snapshot, target_identities,
+                ordinary, d5, resume_from=resume_from,
+                quiesce_object_sha256=quiesce_object_resolver,
+            )
+        finally:
+            snapshot.release()
 
     # DISPATCH on the durable head — the generalized Option A table (design §6b.2). Every clean
     # completed-group boundary head resumes the shared forward driver from the group AFTER it, and
@@ -5831,8 +6672,8 @@ def _plan_relation_sort_key(relation: Any) -> tuple[str, str]:
 
 
 def _validate_guarded_relations(relations: Any) -> list[str]:
-    if not isinstance(relations, list) or len(relations) != 76:
-        raise LifecycleError("guarded_relations must be a 76-element array")
+    if not isinstance(relations, list) or len(relations) != 75:
+        raise LifecycleError("guarded_relations must be a 75-element array")
     oids: set[int] = set()
     identities: list[str] = []
     counts = {"public": 0, "auth": 0, "storage": 0}
@@ -5878,8 +6719,13 @@ def _validate_guarded_relations(relations: Any) -> list[str]:
         raise LifecycleError("guarded storage relation set mismatch")
     if any(rel["schema"] == "auth" and rel["name"] == "schema_migrations" for rel in relations):
         raise LifecycleError("auth.schema_migrations must not be guarded")
-    if sum(1 for rel in relations if rel["schema"] == "cron" and rel["name"] == "job") != 1:
-        raise LifecycleError("cron.job must appear exactly once")
+    # mc2-34eua: cron.job is owned by supabase_admin and `postgres` holds neither UPDATE nor
+    # TRIGGER on it, so LOCK ... ACCESS EXCLUSIVE and CREATE TRIGGER both fail with 42501 at C1.
+    # Guarding it is therefore not a stronger guarantee, it is an unreachable one. The scheduler
+    # is quiesced by cron.alter_job pausing plus the zero-active-jobs assertion, and its only
+    # write path out (net.http_request_queue) stays guarded.
+    if any(rel["schema"] == "cron" for rel in relations):
+        raise LifecycleError("cron relations must not be guarded")
     if (
         sum(1 for rel in relations if rel["schema"] == "net" and rel["name"] == "http_request_queue")
         != 1

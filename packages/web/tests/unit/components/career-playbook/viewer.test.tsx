@@ -2,10 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps, ReactElement } from 'react'
-import type {
-  CareerPlaybookNumericFact,
-  CareerPlaybookViewerSnapshot,
-} from '@megacampus/shared-types'
+import type { CareerPlaybookViewerSnapshot } from '@megacampus/shared-types'
 
 import { ActionsBar } from '@/components/career-playbook/viewer/ActionsBar'
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
@@ -17,30 +14,8 @@ import {
 } from '@/stores/use-career-playbook-store'
 
 vi.mock('@/components/markdown/MarkdownRendererFull', () => ({
-  MarkdownRendererFull: ({
-    content,
-    numericFacts,
-    onNumericFactClick,
-  }: {
-    content: string
-    numericFacts?: Array<{ id: string; raw_text: string; status?: string }>
-    onNumericFactClick?: (fact: { id: string; raw_text: string; status?: string }) => void
-  }) => (
-    <div data-testid="markdown-renderer">
-      {content}
-      {numericFacts?.map((fact) => (
-        <button
-          key={fact.id}
-          type="button"
-          id={`career-playbook-numeric-fact-${fact.id}`}
-          data-numeric-fact-status={fact.status}
-          data-testid={`numeric-fact-${fact.id}`}
-          onClick={() => onNumericFactClick?.(fact)}
-        >
-          {fact.raw_text}
-        </button>
-      ))}
-    </div>
+  MarkdownRendererFull: ({ content }: { content: string }) => (
+    <div data-testid="markdown-renderer">{content}</div>
   ),
 }))
 
@@ -111,10 +86,6 @@ const ruViewerCopy = {
   qualityIssueRegenerateBlock: 'Перегенерировать',
   qualityIssueSuggestionLabel: 'Что исправить',
   qualityIssueLegacyTitle: 'Системное предупреждение',
-  numericFactStatusBenchmark: 'Бенчмарк',
-  numericFactStatusNeedsReview: 'Проверить',
-  numericFactStatusSuggested: 'Рекомендация',
-  numericFactStatusConflict: 'Конфликт',
   visibilityLabel: 'Видимость',
   visibilityValueLabel: (visibility: string) =>
     visibility === 'organization'
@@ -147,24 +118,6 @@ function makeBlocks(): CareerPlaybookViewerBlock[] {
       attempt: 0,
     },
   }))
-}
-
-function makeNumericFact(
-  id: string,
-  overrides: Partial<CareerPlaybookNumericFact> = {}
-): CareerPlaybookNumericFact {
-  return {
-    id,
-    block_id: 'block_6',
-    raw_text: '18%',
-    normalized_value: '18%',
-    status: 'needs_review',
-    source: 'model_suggestion',
-    confidence: 0.45,
-    occurrence_index: 0,
-    explanation: 'Точное значение не найдено в источниках.',
-    ...overrides,
-  }
 }
 
 describe('Career Playbook viewer components', () => {
@@ -264,7 +217,7 @@ describe('Career Playbook viewer components', () => {
     expect(handleRegenerateImage).toHaveBeenCalledTimes(1)
   })
 
-  it('places image status before inspector actions and keeps the right rail scrollable', () => {
+  it('renders legacy numeric metadata as plain text without review UI', () => {
     const blocks = makeBlocks()
     const blockSix = blocks.find((block) => block.blockId === 'block_6')
     if (blockSix) {
@@ -285,7 +238,7 @@ describe('Career Playbook viewer components', () => {
             explanation: 'Точное значение не найдено в источниках.',
           },
         ],
-      }
+      } as unknown as CareerPlaybookViewerBlock['state']
     }
 
     render(
@@ -311,15 +264,16 @@ describe('Career Playbook viewer components', () => {
     const title = within(inspector).getByText('Инспектор документа')
     const imageHeading = within(inspector).getByRole('heading', { name: 'Изображение' })
     const pdfAction = within(inspector).getByRole('button', { name: 'PDF' })
-    const numericHeading = within(inspector).getByRole('heading', { name: 'Проверка чисел' })
 
     expect(inspector).toHaveClass('xl:max-h-[calc(100vh-6rem)]')
     expect(inspector).toHaveClass('xl:overflow-y-auto')
     expect(title.compareDocumentPosition(imageHeading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(imageHeading.compareDocumentPosition(pdfAction)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(imageHeading.compareDocumentPosition(numericHeading)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
+    const kpiBlock = screen.getByRole('article', { name: 'Показатели эффективности' })
+    expect(within(kpiBlock).getByTestId('markdown-renderer')).toHaveTextContent('Win rate: 18%.')
+    expect(within(inspector).queryByText('Проверка чисел')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('career-playbook-numeric-summary')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('numeric-fact-block_6-18-percent-0')).not.toBeInTheDocument()
   })
 
   it('highlights and scrolls the active contents item as document blocks enter the viewport', async () => {
@@ -738,351 +692,6 @@ describe('Career Playbook viewer components', () => {
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Показать правый блок' })).not.toBeInTheDocument()
     expect(screen.queryByText('Видимость')).not.toBeInTheDocument()
-  })
-
-  it('shows pastel numeric provenance summary and lets owners correct a numeric fact', async () => {
-    const user = userEvent.setup()
-    const handleUpdateNumericFact = vi.fn().mockResolvedValue(undefined)
-    const blocks = makeBlocks()
-    const blockSix = blocks.find((block) => block.blockId === 'block_6')
-    if (blockSix) {
-      blockSix.state = {
-        content: '## 6. KPI\n\nWin rate: 18%. Pipeline coverage: 3x.',
-        status: 'generated',
-        attempt: 1,
-        numeric_facts: [
-          {
-            id: 'block_6-18-percent-0',
-            block_id: 'block_6',
-            raw_text: '18%',
-            normalized_value: '18%',
-            status: 'needs_review',
-            source: 'model_suggestion',
-            confidence: 0.45,
-            occurrence_index: 0,
-            explanation: 'Точное значение не найдено в источниках.',
-          },
-          {
-            id: 'block_6-3x-0',
-            block_id: 'block_6',
-            raw_text: '3x',
-            normalized_value: '3x',
-            status: 'benchmark',
-            source: 'web_benchmark',
-            confidence: 0.7,
-            occurrence_index: 1,
-            explanation: 'Benchmark из внешнего исследования.',
-          },
-        ],
-      }
-    }
-
-    render(
-      <PlaybookViewer
-        snapshot={snapshot}
-        blocks={blocks}
-        copy={ruViewerCopy}
-        onEditBlock={vi.fn()}
-        onRegenerateBlock={vi.fn()}
-        onUpdateNumericFact={handleUpdateNumericFact}
-        onPdf={vi.fn()}
-        onShare={vi.fn()}
-        onCreateCourse={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-
-    const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-    expect(within(inspector).getByText('Проверка чисел')).toBeInTheDocument()
-    expect(
-      within(inspector).getByText(
-        'Проверьте точные значения перед публикацией: KPI, сроки, бюджеты и проценты.'
-      )
-    ).toBeInTheDocument()
-    expect(within(inspector).getByText('Требует проверки: 1')).toBeInTheDocument()
-    expect(within(inspector).getByText('Benchmark: 1')).toBeInTheDocument()
-    expect(within(inspector).getByText('2 числовых значения')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('numeric-fact-block_6-18-percent-0'))
-    const editorDialog = screen.getByRole('dialog', { name: 'Проверить цифру' })
-    expect(editorDialog).toBeInTheDocument()
-    expect(
-      within(editorDialog).getByText('Точное значение не найдено в источниках.')
-    ).toBeInTheDocument()
-
-    await user.clear(screen.getByLabelText('Новое значение'))
-    await user.type(screen.getByLabelText('Новое значение'), '21%')
-    await user.click(screen.getByRole('button', { name: 'Сохранить цифру' }))
-
-    expect(handleUpdateNumericFact).toHaveBeenCalledWith({
-      blockId: 'block_6',
-      factId: 'block_6-18-percent-0',
-      replacementText: '21%',
-      scope: 'occurrence',
-    })
-  })
-
-  it('shows an actionable numeric review list and scrolls to a selected number without opening the editor', async () => {
-    const user = userEvent.setup()
-    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
-      Element.prototype,
-      'scrollIntoView'
-    )
-    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
-    const scrollIntoView = vi.fn()
-    const focus = vi.fn()
-    const blocks = makeBlocks()
-    const blockSix = blocks.find((block) => block.blockId === 'block_6')
-    if (blockSix) {
-      blockSix.state = {
-        content: '## 6. KPI\n\nWin rate: 18%. Table row 1 is not a fact.',
-        status: 'generated',
-        attempt: 1,
-        numeric_facts: [
-          {
-            id: 'block_6-18-percent-0',
-            block_id: 'block_6',
-            raw_text: '18%',
-            normalized_value: '18%',
-            status: 'needs_review',
-            source: 'model_suggestion',
-            confidence: 0.45,
-            occurrence_index: 0,
-            explanation: 'Точное значение не найдено в источниках.',
-          },
-          {
-            id: 'block_6-row-1-0',
-            block_id: 'block_6',
-            raw_text: '1',
-            normalized_value: '1',
-            unit: 'count',
-            status: 'verified',
-            source: 'source_document',
-            confidence: 0.9,
-            occurrence_index: 0,
-            explanation: 'Legacy noisy verified digit.',
-          },
-        ],
-      }
-    }
-
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
-      configurable: true,
-      value: scrollIntoView,
-    })
-    Object.defineProperty(HTMLElement.prototype, 'focus', {
-      configurable: true,
-      value: focus,
-    })
-
-    try {
-      render(
-        <PlaybookViewer
-          snapshot={snapshot}
-          blocks={blocks}
-          copy={ruViewerCopy}
-          onEditBlock={vi.fn()}
-          onRegenerateBlock={vi.fn()}
-          onUpdateNumericFact={vi.fn()}
-          onPdf={vi.fn()}
-          onShare={vi.fn()}
-          onCreateCourse={vi.fn()}
-          onDelete={vi.fn()}
-        />
-      )
-
-      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-      expect(within(inspector).getByText('Проверка чисел')).toBeInTheDocument()
-      expect(
-        within(inspector).getByText(
-          'Проверьте точные значения перед публикацией: KPI, сроки, бюджеты и проценты.'
-        )
-      ).toBeInTheDocument()
-      expect(within(inspector).getByRole('button', { name: /18%/ })).toBeInTheDocument()
-      expect(within(inspector).getByText('Проверить')).toBeInTheDocument()
-      expect(within(inspector).queryByText('Требует проверки')).not.toBeInTheDocument()
-      expect(within(inspector).queryByText('Legacy noisy verified digit.')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('numeric-fact-block_6-row-1-0')).not.toBeInTheDocument()
-
-      await user.click(within(inspector).getByRole('button', { name: /18%/ }))
-
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
-      expect(focus).toHaveBeenCalled()
-      expect(screen.queryByRole('dialog', { name: 'Проверить цифру' })).not.toBeInTheDocument()
-      expect(window.location.hash).toBe('#block_6')
-    } finally {
-      if (originalScrollIntoViewDescriptor) {
-        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
-      } else {
-        delete (Element.prototype as Partial<Element>).scrollIntoView
-      }
-      if (originalFocusDescriptor) {
-        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
-      } else {
-        delete (HTMLElement.prototype as Partial<HTMLElement>).focus
-      }
-    }
-  })
-
-  it('keeps a long numeric review list bounded while preserving click navigation', async () => {
-    const user = userEvent.setup()
-    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
-      Element.prototype,
-      'scrollIntoView'
-    )
-    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
-    const scrollIntoView = vi.fn()
-    const focus = vi.fn()
-    const blocks = makeBlocks()
-    const blockSix = blocks.find((block) => block.blockId === 'block_6')
-    const numericFacts = Array.from({ length: 12 }, (_, index) =>
-      makeNumericFact(`block_6-metric-${index}-0`, {
-        raw_text: `${index + 10}%`,
-        normalized_value: `${index + 10}%`,
-        occurrence_index: index,
-        explanation: `Проверьте метрику ${index + 10}%.`,
-      })
-    )
-
-    if (blockSix) {
-      blockSix.state = {
-        content: '## 6. KPI\n\n' + numericFacts.map((fact) => fact.raw_text).join(' '),
-        status: 'generated',
-        attempt: 1,
-        numeric_facts: numericFacts,
-      }
-    }
-
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
-      configurable: true,
-      value: scrollIntoView,
-    })
-    Object.defineProperty(HTMLElement.prototype, 'focus', {
-      configurable: true,
-      value: focus,
-    })
-
-    try {
-      render(
-        <PlaybookViewer
-          snapshot={snapshot}
-          blocks={blocks}
-          copy={ruViewerCopy}
-          onEditBlock={vi.fn()}
-          onRegenerateBlock={vi.fn()}
-          onUpdateNumericFact={vi.fn()}
-          onPdf={vi.fn()}
-          onShare={vi.fn()}
-          onCreateCourse={vi.fn()}
-          onDelete={vi.fn()}
-        />
-      )
-
-      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-      const reviewList = within(inspector).getByTestId('career-playbook-numeric-review-list')
-      expect(reviewList).toHaveClass('max-h-80')
-      expect(reviewList).toHaveClass('overflow-y-auto')
-      expect(within(reviewList).getAllByRole('button')).toHaveLength(12)
-
-      await user.click(within(reviewList).getByRole('button', { name: /21%/ }))
-
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
-      expect(focus).toHaveBeenCalled()
-      expect(window.location.hash).toBe('#block_6')
-    } finally {
-      if (originalScrollIntoViewDescriptor) {
-        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
-      } else {
-        delete (Element.prototype as Partial<Element>).scrollIntoView
-      }
-      if (originalFocusDescriptor) {
-        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
-      } else {
-        delete (HTMLElement.prototype as Partial<HTMLElement>).focus
-      }
-    }
-  })
-
-  it('expands a collapsed block before scrolling to a numeric review item', async () => {
-    const user = userEvent.setup()
-    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
-      Element.prototype,
-      'scrollIntoView'
-    )
-    const originalFocusDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'focus')
-    const scrollIntoView = vi.fn()
-    const focus = vi.fn()
-    const blocks = makeBlocks()
-    const blockSix = blocks.find((block) => block.blockId === 'block_6')
-    if (blockSix) {
-      blockSix.state = {
-        content: '## 6. KPI\n\nWin rate: 18%.',
-        status: 'generated',
-        attempt: 1,
-        numeric_facts: [
-          {
-            id: 'block_6-18-percent-0',
-            block_id: 'block_6',
-            raw_text: '18%',
-            normalized_value: '18%',
-            status: 'needs_review',
-            source: 'model_suggestion',
-            confidence: 0.45,
-            occurrence_index: 0,
-            explanation: 'Точное значение не найдено в источниках.',
-          },
-        ],
-      }
-    }
-
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
-      configurable: true,
-      value: scrollIntoView,
-    })
-    Object.defineProperty(HTMLElement.prototype, 'focus', {
-      configurable: true,
-      value: focus,
-    })
-
-    try {
-      render(
-        <PlaybookViewer
-          snapshot={snapshot}
-          blocks={blocks}
-          copy={ruViewerCopy}
-          onEditBlock={vi.fn()}
-          onRegenerateBlock={vi.fn()}
-          onUpdateNumericFact={vi.fn()}
-          onPdf={vi.fn()}
-          onShare={vi.fn()}
-          onCreateCourse={vi.fn()}
-          onDelete={vi.fn()}
-        />
-      )
-
-      await user.click(screen.getByRole('button', { name: 'Свернуть Показатели эффективности' }))
-      expect(screen.queryByTestId('numeric-fact-block_6-18-percent-0')).not.toBeInTheDocument()
-
-      const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
-      await user.click(within(inspector).getByRole('button', { name: /18%/ }))
-
-      await waitFor(() => {
-        expect(screen.getByTestId('numeric-fact-block_6-18-percent-0')).toBeInTheDocument()
-        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
-        expect(focus).toHaveBeenCalled()
-      })
-    } finally {
-      if (originalScrollIntoViewDescriptor) {
-        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor)
-      } else {
-        delete (Element.prototype as Partial<Element>).scrollIntoView
-      }
-      if (originalFocusDescriptor) {
-        Object.defineProperty(HTMLElement.prototype, 'focus', originalFocusDescriptor)
-      } else {
-        delete (HTMLElement.prototype as Partial<HTMLElement>).focus
-      }
-    }
   })
 
   it('edits markdown and submits regeneration instructions from the block editor sheet', async () => {

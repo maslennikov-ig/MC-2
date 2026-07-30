@@ -5,6 +5,11 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+// Disposition expected_hash is a byte-exact CAS predicate against file_catalog.hash, not a
+// physical file digest: the two audited invalid-path rows carry a 23-character legacy value,
+// so any bounded printable non-space token is representable. Physical copy verification
+// (expected_sha256) stays strict sha256.
+const CATALOG_HASH_PATTERN = /^[\x21-\x7e]{1,128}$/u;
 const RELEASE_SHA_PATTERN = /^[a-f0-9]{40,64}$/u;
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const ENTRY_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/u;
@@ -54,56 +59,42 @@ const RecoveryCopyEntrySchema = z
   })
   .strict();
 
-const ExpectedCareerPlaybookSchema = z
-  .object({
-    playbook_id: z.string().uuid(),
-    user_id: z.string().uuid(),
-    status: z.enum(['uploaded', 'processing', 'ready', 'failed', 'removed']),
-    error_message: z.string().max(1024).nullable(),
-  })
-  .strict();
-
+// Career Playbook dispositions are file_catalog-only bookkeeping: the reviewed
+// career_playbook_sources rows were legally cascade-deleted with their parent playbooks
+// (owner-approved amendment, 2026-07-24), so disposition entries carry no live playbook
+// predicates and the strict schema rejects any manifest that still does.
 const RecoveryDispositionEntrySchema = z
   .object({
     entry_id: z.string().regex(ENTRY_ID_PATTERN),
     kind: z.enum(['eligible_unrecoverable', 'career_playbook_retained_derived']),
     file_catalog_id: z.string().uuid(),
-    career_playbook_source_id: z.string().uuid().optional(),
     organization_id: z.string().uuid(),
     course_id: z.string().uuid().nullable(),
-    expected_hash: z.string().regex(SHA256_PATTERN),
+    expected_hash: z.string().regex(CATALOG_HASH_PATTERN),
     expected_storage_path: RelativePathSchema,
     expected_vector_status: z.enum(['pending', 'indexing', 'indexed', 'failed']),
     expected_file_error_message: z.string().max(1024).nullable(),
-    expected_career_playbook: ExpectedCareerPlaybookSchema.optional(),
     reason: z.enum(['source_file_unrecoverable', 'retained-derived-only']),
   })
   .strict()
   .superRefine((entry, context) => {
     if (
       entry.kind === 'eligible_unrecoverable' &&
-      (entry.reason !== 'source_file_unrecoverable' ||
-        entry.career_playbook_source_id !== undefined ||
-        entry.expected_career_playbook !== undefined ||
-        entry.course_id === null)
+      (entry.reason !== 'source_file_unrecoverable' || entry.course_id === null)
     ) {
       context.addIssue({
         code: 'custom',
-        message:
-          'eligible unrecoverable disposition has an invalid reason, course, or playbook source',
+        message: 'eligible unrecoverable disposition has an invalid reason or course',
       });
     }
     if (
       entry.kind === 'career_playbook_retained_derived' &&
-      (entry.reason !== 'retained-derived-only' ||
-        entry.career_playbook_source_id === undefined ||
-        entry.expected_career_playbook === undefined ||
-        entry.course_id !== null)
+      (entry.reason !== 'retained-derived-only' || entry.course_id !== null)
     ) {
       context.addIssue({
         code: 'custom',
         message:
-          'career playbook disposition requires its source id and retained-derived-only reason',
+          'career playbook disposition requires a null course and retained-derived-only reason',
       });
     }
   });
@@ -138,7 +129,6 @@ export const RECOVERY_RUN_PHASES = [
 const CopyStateSchema = z.enum(['planned', 'published', 'rollback_planned', 'rolled_back']);
 const DispositionStateSchema = z.enum([
   'disposition_planned',
-  'career_playbook_source_applied',
   'disposition_applied',
   'disposition_verified',
 ]);
@@ -218,12 +208,6 @@ export function normalizeRecoveryManifest(input: SourceRecoveryManifest): Source
   assertUnique(
     dispositions.map(entry => entry.file_catalog_id),
     'file catalog id'
-  );
-  assertUnique(
-    dispositions.flatMap(entry =>
-      entry.career_playbook_source_id ? [entry.career_playbook_source_id] : []
-    ),
-    'career playbook source id'
   );
   assertUnique(
     [...copies.map(entry => entry.entry_id), ...dispositions.map(entry => entry.entry_id)],
@@ -754,12 +738,7 @@ export function validateRecoveryJournalTransition(
   }
 
   const dispositionTransitions: Record<string, readonly string[]> = {
-    disposition_planned: [
-      'disposition_planned',
-      'career_playbook_source_applied',
-      'disposition_applied',
-    ],
-    career_playbook_source_applied: ['career_playbook_source_applied', 'disposition_applied'],
+    disposition_planned: ['disposition_planned', 'disposition_applied'],
     disposition_applied: ['disposition_applied', 'disposition_verified'],
     disposition_verified: ['disposition_verified'],
   };
@@ -769,19 +748,6 @@ export function validateRecoveryJournalTransition(
       throw new Error(
         `Illegal disposition state transition for ${entryId}: ${currentState} -> ${nextState}`
       );
-    }
-    if (
-      next.disposition_kinds[entryId] === 'eligible_unrecoverable' &&
-      nextState === 'career_playbook_source_applied'
-    ) {
-      throw new Error('Eligible disposition cannot use a Career Playbook source checkpoint');
-    }
-    if (
-      next.disposition_kinds[entryId] === 'career_playbook_retained_derived' &&
-      currentState === 'disposition_planned' &&
-      nextState === 'disposition_applied'
-    ) {
-      throw new Error('Career Playbook disposition must persist its source CAS checkpoint first');
     }
     if (currentState !== nextState && phaseIndex(next.phase) < phaseIndex('copied')) {
       throw new Error('Disposition updates cannot begin before copied phase');

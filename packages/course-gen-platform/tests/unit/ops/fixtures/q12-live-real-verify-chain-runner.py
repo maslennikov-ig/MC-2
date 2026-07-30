@@ -209,7 +209,7 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
         after_base_structural_sha256 = structural_after(BASE_DDL)
         after_obs_structural_sha256 = structural_after(BASE_DDL, OBS_DDL)
 
-        # 2. Real oids/owners for the 76 guarded relations (queried live).
+        # 2. Real oids/owners for the 75 guarded relations (queried live).
         def rows(schema: str):
             return dexec_json(
                 "SELECT c.relname AS name, c.oid::bigint AS oid, r.rolname AS owner "
@@ -221,11 +221,7 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
         public_rows = rows("public")
         auth_rows = rows("auth")
         storage_rows = rows("storage")
-        cron_row = dexec_json(
-            "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
-            "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
-            "WHERE n.nspname='cron' AND c.relname='job'"
-        )[0]
+        # mc2-34eua: cron.job is NOT in the guarded set.
         net_row = dexec_json(
             "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
             "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
@@ -246,10 +242,9 @@ def main() -> int:  # noqa: C901 - the harness is intentionally linear/explicit
             [guarded("public", r["name"], r["oid"], r["owner"]) for r in public_rows]
             + [guarded("auth", r["name"], r["oid"], r["owner"]) for r in auth_rows]
             + [guarded("storage", r["name"], r["oid"], r["owner"]) for r in storage_rows]
-            + [guarded("cron", "job", cron_row["oid"], cron_row["owner"]),
-               guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
+            + [guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
         )
-        if len(guarded_relations) != 76:
+        if len(guarded_relations) != 75:
             raise RuntimeError(f"guarded_relations count drifted: {len(guarded_relations)}")
 
         cron_jobs_catalog = [
@@ -413,13 +408,27 @@ exit "$barrier_rc"
                 env=barrier_env, capture_output=True, text=True, timeout=120,
             )
 
+        def require_leg(op: str, result):
+            """mc2-vcmd7 (fixture side): every leg's exit status is load-bearing. A nonzero child
+            used to surface only as a downstream artifact being absent, several frames later, with
+            the barrier's own reason discarded — the same blindness the barrier itself had. Fail
+            here, with its words."""
+            if result.returncode != 0:
+                stderr = result.stderr or ""
+                # The barrier's own lines are what matter; the sandbox's docker/proxy chatter can
+                # bury them, so surface them preferentially and keep a tail as the fallback.
+                own = [line for line in stderr.splitlines() if line.startswith("q12 ")]
+                detail = " | ".join(own[-6:]) if own else stderr.strip()[-2000:]
+                raise SystemExit(f"real barrier {op} failed ({result.returncode}): {detail}")
+            return result
+
         receipt_path = barrier_run_root / "database-barrier-receipt.json"
 
         def read_receipt():
             return json.loads(receipt_path.read_text(encoding="utf-8")) if receipt_path.exists() else None
 
         # 5. install -> maintenance_guarded (the R4 acceptance, re-driven here).
-        install_result = run_barrier("install")
+        install_result = require_leg("install", run_barrier("install"))
         install_receipt = read_receipt()
 
         def apply_migration(migration: str, ddl: str, relations, file_sha: str, catalog_sha: str):
@@ -533,7 +542,7 @@ exit "$barrier_rc"
         #    and reaches recovery_ready_guarded (rollback_probes_verified=true, bound
         #    probe_receipt_sha256). Captured non-raising so the verify chain result stands
         #    independently.
-        prepare_recovery_result = run_barrier("prepare-recovery")
+        prepare_recovery_result = require_leg("prepare-recovery", run_barrier("prepare-recovery"))
         prepare_recovery_receipt = read_receipt()
         surface_after_prepare = guard_surface()
         prepare_db_state = db_lifecycle_state()
@@ -542,7 +551,7 @@ exit "$barrier_rc"
         #     Restores cron/read_only to the captured baseline, drops the probe table, sets
         #     activated=true under the append-only guard, verifies verify_activated_state,
         #     and reaches activated (last_command=activate, rollback_probes_verified=true).
-        activate_result = run_barrier("activate")
+        activate_result = require_leg("activate", run_barrier("activate"))
         activate_receipt = read_receipt()
         surface_after_activate = guard_surface()
         activate_db_state = db_lifecycle_state()
@@ -594,7 +603,7 @@ exit "$barrier_rc"
 
         # 12. R8-B-2-iii: drive the REAL frozen barrier `cleanup` OFF the activated state, then prove
         #     the R8-B-1 controller seam consumes the REAL terminal proof end-to-end. The barrier
-        #     cleanup (bytes bdb9d935, same real proxy/namespace/no-DB-relaxation path as every other
+        #     cleanup (bytes f183aa3c, same real proxy/namespace/no-DB-relaxation path as every other
         #     leg) has a predecessor gate (q12-database-barrier.sh:636-700) requiring: the install
         #     baseline (already published by the install leg), the activate receipt (already at
         #     database-barrier-receipt.json), AND a byte-exact predecessor-receipt ARCHIVE the
@@ -688,7 +697,7 @@ exit "$barrier_rc"
         cleanup_terminal_proof_path = (
             barrier_run_root / "database-barrier-cleanup-terminal-proof.json"
         )
-        cleanup_result = run_barrier("cleanup")
+        cleanup_result = require_leg("cleanup", run_barrier("cleanup"))
         cleanup_terminal_proof = (
             json.loads(cleanup_terminal_proof_path.read_text(encoding="utf-8"))
             if cleanup_terminal_proof_path.exists()

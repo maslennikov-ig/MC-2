@@ -21,6 +21,7 @@ node_modules/
 !.codex/subagent-spawn-template.md
 !.codex/manual-agent-prompt-template.md
 !.codex/hooks.json
+!.codex/stranded-commit-allowlist.txt
 !.codex/stages/
 !.codex/stages/**
 

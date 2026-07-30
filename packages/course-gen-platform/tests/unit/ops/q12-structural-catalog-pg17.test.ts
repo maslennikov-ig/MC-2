@@ -13,6 +13,7 @@ const POSTGRES_PASSWORD = 'q12-local-pg17-fixture-only';
 const CONTROLLER_GUC =
   '-c megacampus.q12_fixture_controller=on -c default_transaction_read_only=off';
 const CONTAINER = `mc2-q12-pg17-${process.pid}-${Date.now()}`;
+const PLAN_CAPTURE = resolve(REPO_ROOT, 'deploy/qdrant/q12-migration-plan-capture.py');
 const structuralCatalogSql = readFileSync(STRUCTURAL_CATALOG, 'utf8').trim();
 let familyBaseline: StructuralSnapshot;
 
@@ -288,6 +289,17 @@ function psql(sql: string, options: PsqlOptions = {}): string {
   const result = psqlResult(sql, options);
   expect(result.status, result.stderr || result.stdout).toBe(0);
   return result.stdout.trim();
+}
+
+// psql -At still echoes BEGIN/SET/COMMIT status lines for a multi-statement script; the catalog hash
+// is the sole 64-hex line in the output.
+function hashLine(output: string): string {
+  const lines = output
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^[0-9a-f]{64}$/u.test(line));
+  expect(lines, `no unique 64-hex hash line in: ${output}`).toHaveLength(1);
+  return lines[0];
 }
 
 function snapshot(options: PsqlOptions = {}): StructuralSnapshot {
@@ -596,6 +608,102 @@ describe.runIf(REAL_PG17)('Q12 canonical catalog against real PostgreSQL 17.10',
 
   afterAll(() => {
     docker(['rm', '-f', CONTAINER], undefined, 30_000);
+  });
+
+  // mc2-34eua follow-up: the plan CAPTURES this catalog and the barrier RE-MEASURES it, and the two
+  // must agree byte-for-byte or barrier.install dies at 'pre-guard canonical structural catalog
+  // drift'. They ran in DIFFERENT session contexts: the barrier sets `SET LOCAL
+  // search_path=pg_catalog` (a hardening it must keep) while q12-migration-plan-capture.py's
+  // read_only_wrap set no search_path at all. Every definition-rendering catalog function
+  // (pg_get_indexdef / pg_get_constraintdef / pg_get_expr / format_type /
+  // pg_get_function_identity_arguments) SUPPRESSES the schema qualifier for objects visible in the
+  // current search_path, so the same database hashes differently under the two contexts and the
+  // window could never pass C1. Measured on production 2026-07-28: default search_path
+  // cfe6b92b…, search_path=pg_catalog a2b25324….
+  //
+  // Case 1 keeps case 2 honest: it proves the sensitivity is REAL on this fixture, so an accidental
+  // future change that made the hash search_path-insensitive would show up here rather than turning
+  // the agreement assertion vacuous.
+  it('renders the catalog search_path-SENSITIVELY when a visible-schema object is involved', () => {
+    psql(`
+      CREATE TYPE public.sp_enum AS ENUM ('a', 'b');
+      CREATE TABLE public.sp_table(
+        value public.sp_enum DEFAULT 'a'::public.sp_enum,
+        CONSTRAINT sp_check CHECK (value = 'a'::public.sp_enum)
+      );
+    `);
+    try {
+      const visible = hashLine(
+        psql(`SELECT canonical.structural_sha256 FROM (\n${structuralCatalogSql}\n) canonical`)
+      );
+      const pgCatalogOnly = hashLine(
+        psql(
+          `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+         SET LOCAL search_path=pg_catalog;
+         SELECT canonical.structural_sha256 FROM (\n${structuralCatalogSql}\n) canonical;
+         COMMIT;`
+        )
+      );
+      expect(pgCatalogOnly).not.toBe(visible);
+    } finally {
+      psql(`
+        DROP TABLE IF EXISTS public.sp_table;
+        DROP TYPE IF EXISTS public.sp_enum;
+      `);
+    }
+  });
+
+  it('captures the catalog in the SAME session context the barrier re-measures it in', () => {
+    psql(`
+      CREATE TYPE public.sp_enum AS ENUM ('a', 'b');
+      CREATE TABLE public.sp_table(
+        value public.sp_enum DEFAULT 'a'::public.sp_enum,
+        CONSTRAINT sp_check CHECK (value = 'a'::public.sp_enum)
+      );
+    `);
+    try {
+      // The REAL capture wrapper, emitted by the deployed capture script itself — never a copy of
+      // its text, so a future divergence in read_only_wrap fails this test.
+      const emit = spawnSync(
+        '/usr/bin/python3',
+        [
+          '-c',
+          [
+            'import importlib.util, sys',
+            `spec = importlib.util.spec_from_file_location('cap', ${JSON.stringify(PLAN_CAPTURE)})`,
+            'module = importlib.util.module_from_spec(spec)',
+            'spec.loader.exec_module(module)',
+            'body = sys.stdin.read()',
+            'sys.stdout.write(module.read_only_wrap(body))',
+          ].join('\n'),
+        ],
+        {
+          encoding: 'utf8',
+          input: `SELECT structural_sha256 FROM (\n${structuralCatalogSql}\n) AS plan_capture`,
+          env: { PATH: process.env.PATH ?? '/usr/bin:/bin', LC_ALL: 'C', LANG: 'C' },
+          maxBuffer: 8 * 1024 * 1024,
+        }
+      );
+      expect(emit.status, emit.stderr).toBe(0);
+      // COPY ... TO STDOUT emits the single column; psql -At passes it through.
+      const captureHash = hashLine(psql(emit.stdout));
+
+      const barrierHash = hashLine(
+        psql(
+          `BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY;
+         SET LOCAL search_path=pg_catalog;
+         SELECT canonical.structural_sha256 FROM (\n${structuralCatalogSql}\n) canonical;
+         COMMIT;`
+        )
+      );
+
+      expect(captureHash).toBe(barrierHash);
+    } finally {
+      psql(`
+        DROP TABLE IF EXISTS public.sp_table;
+        DROP TYPE IF EXISTS public.sp_enum;
+      `);
+    }
   });
 
   it('proves a fresh session inherits read-only while an explicit primary READ WRITE transaction remains possible', () => {

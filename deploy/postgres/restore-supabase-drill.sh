@@ -49,6 +49,25 @@ fail() {
   exit "${2:-1}"
 }
 
+# mc2-rjy9k, the mc2-94mmf lesson applied here: every log this script captures lives under TEMP_ROOT,
+# which `on_exit` reclaims unconditionally, so a failure that names only its own step throws the
+# reason away. Inside a window that is the worst possible place to lose it — the writers are already
+# stopped. Carry the tail of the captured log, with anything credential-shaped scrubbed, exactly as
+# `backup-supabase.sh`'s `fail_command` does. Log paths only; no file content is ever echoed whole.
+fail_with_log() {
+  local message=$1 log=$2 tail_lines=${3:-40} detail=''
+  if [[ -s "$log" ]]; then
+    detail=$(/usr/bin/tail -n "$tail_lines" -- "$log" |
+      /usr/bin/sed -E "s#postgres(ql)?://[^[:space:]\"']+#<redacted>#g; s#[0-9a-f]{64}#<redacted>#g")
+  fi
+  if [[ -n "$detail" ]]; then
+    printf 'Supabase restore drill failed: %s\n--- %s (last %s lines, secrets scrubbed) ---\n%s\n' \
+      "$message" "${log##*/}" "$tail_lines" "$detail" >&2
+    exit 1
+  fi
+  fail "$message"
+}
+
 # BEGIN authoritative Docker lifecycle
 restore_docker_expected_name() {
   case "$1" in
@@ -331,6 +350,17 @@ create_temp_root() {
   exec {temp_input}>&-
   wait "$temp_pid" || fail 'private temp directory adoption failed'
   require_absolute_directory 'private temp directory' "$TEMP_ROOT" 700
+  # mc2-1cxna: the frozen pg.restore manifest env pins HOME=/root while this drill runs as the
+  # deploy operator, and /root is 0700 root-owned. The docker CLI aborts loading
+  # $HOME/.docker/config.json with EACCES and then never discovers its CLI plugins, so
+  # `docker buildx imagetools inspect` degrades into "unknown flag: --raw" and C4 died on "restore
+  # image index lookup failed" (window attempt #16, 2026-07-29) after the writers were stopped and
+  # the backup had already committed. Proven on the host: the identical command succeeds and
+  # returns the OCI image index under a HOME this process can stat. The adopted private temp root
+  # is owned by this process, holds no .docker, and is removed with the rest of the drill state —
+  # so the CLI falls back to its system plugin directory and its anonymous registry path, which is
+  # what this public.ecr.aws lookup needs.
+  export HOME="$TEMP_ROOT"
 }
 
 validate_generation() {
@@ -370,6 +400,124 @@ PY
   "$PG_RESTORE" --file=- "$GENERATION/database.dump" 2>"$TEMP_ROOT/pg-restore-traversal.stderr" | \
     /usr/bin/python3 "$PGTLE_ARCHIVE_SCANNER" || fail 'archive full offline traversal or pgtle package validation failed'
   [[ ! -s "$TEMP_ROOT/pg-restore-traversal.stderr" ]] || fail 'archive full traversal emitted stderr'
+  build_restore_toc
+}
+
+# mc2-wl5vn. C3 dumps a database C1 has already guarded, so the archive carries the q12_guard
+# schema, its function, and — fatally — the event trigger that binds them. Replaying that as the
+# image superuser reverses the ownership pairing supautils demands: mc2-ipwyc deliberately keeps
+# q12_guard owned by the managed non-superuser `postgres` so the barrier can disarm what it armed,
+# and supautils refuses a superuser-owned event trigger whose function is not:
+#   ERROR: Superuser owned event trigger must execute a superuser owned function
+# Sixteen window attempts died before C4, so this is the first time a guarded dump has ever been
+# restored. The remedy is to skip exactly that one archive entry, and to say so rather than let a
+# quieter restore pass for a complete one.
+#
+# STATE THE NARROWING. The isolate is no longer a full replay of the archive: the guard's event
+# trigger is present in the dump and is not executed against restore_test. What is NOT narrowed:
+#  * archive completeness — the offline full traversal above still reads every entry, this one
+#    included, and the pgTLE scanner still sees the entire stream;
+#  * the cutover and baseline comparisons — q12-source-manifest.ts captures pg_trigger, never
+#    pg_event_trigger, and q12-structural-catalog.sql already excludes this event trigger by name
+#    (:975), so neither view ever observed the object being skipped;
+#  * the activation cleanup — its DROP SCHEMA q12_guard CASCADE is what deletes this trigger on a
+#    full replay anyway, moments later, so the end state of the isolate is unchanged.
+#
+# DERIVE, NEVER DECLARE (the mc2-lzft4 discipline). The entry is not named in this script. Each
+# EVENT TRIGGER entry is extracted from the archive through a one-entry list and skipped only if
+# the archive's own SQL says it executes a q12_guard function. An unguarded archive (scheduled
+# mode) therefore excludes nothing, a guard renamed upstream is still caught, and a production
+# event trigger that is not the guard's is still restored. An entry whose SQL cannot be parsed
+# fails closed.
+build_restore_toc() {
+  /usr/bin/python3 - "$PG_RESTORE" "$GENERATION/database.dump" "$TEMP_ROOT/archive.toc" \
+    "$TEMP_ROOT/restore.toc" "$TEMP_ROOT/restore-exclusions.json" "$TEMP_ROOT/one-entry.toc" <<'PY'
+import json, pathlib, re, subprocess, sys
+
+pg_restore, dump, toc_path, list_path, report_path, scratch_path = sys.argv[1:7]
+toc = pathlib.Path(toc_path).read_text(encoding="utf-8").splitlines()
+scratch = pathlib.Path(scratch_path)
+
+GUARD_SCHEMA = "q12_guard"
+# `pg_restore --list`: "<dumpId>; <tableoid> <oid> <DESC> <schema> <tag...> <owner>".
+ENTRY = re.compile(r"^\s*(\d+);\s+\d+\s+\d+\s+([A-Z][A-Z ]*[A-Z])\s+(\S+)\s+(.*\S)\s*$")
+EXECUTES = re.compile(
+    r"CREATE\s+EVENT\s+TRIGGER\s+(?P<trigger>\"[^\"]+\"|[^\s(]+)\b"
+    r".*?EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?P<schema>\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_$]*)\s*\.",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def unquote(token):
+    return token[1:-1].replace('""', '"') if token.startswith('"') else token
+
+
+def entry_sql(line):
+    scratch.write_text(line + "\n", encoding="utf-8")
+    scratch.chmod(0o600)
+    done = subprocess.run(
+        [pg_restore, "--use-list", str(scratch), "--file=-", dump],
+        capture_output=True, text=True, check=False,
+    )
+    if done.returncode != 0 or done.stderr.strip():
+        raise SystemExit("single-entry archive extraction failed")
+    return done.stdout
+
+
+excluded_rows, excluded_names = [], set()
+for index, line in enumerate(toc):
+    match = ENTRY.match(line)
+    if match is None or match.group(2) != "EVENT TRIGGER":
+        continue
+    sql = EXECUTES.search(entry_sql(line))
+    if sql is None:
+        raise SystemExit("event trigger entry carries no parsable CREATE EVENT TRIGGER")
+    schema = unquote(sql.group("schema"))
+    if schema != GUARD_SCHEMA:
+        continue
+    name = unquote(sql.group("trigger"))
+    excluded_names.add(name)
+    excluded_rows.append({"line": index, "dump_id": match.group(1), "trigger": name,
+                          "function_schema": schema, "reason": "supautils ownership pairing (mc2-wl5vn)"})
+
+# A COMMENT or SECURITY LABEL on a skipped event trigger would fail on an object that is no longer
+# there, so it follows the entry it describes. Nothing else may ride along.
+for index, line in enumerate(toc):
+    match = ENTRY.match(line)
+    if match is None or match.group(2) not in ("COMMENT", "SECURITY LABEL"):
+        continue
+    tag = match.group(4)
+    dependent = next((name for name in excluded_names
+                      if re.match(r"^EVENT TRIGGER\s+(\"?)" + re.escape(name) + r"\1(\s|$)", tag)), None)
+    if dependent is None:
+        continue
+    excluded_rows.append({"line": index, "dump_id": match.group(1), "trigger": dependent,
+                          "function_schema": GUARD_SCHEMA, "reason": f"depends on skipped {dependent}"})
+
+skipped = {row["line"] for row in excluded_rows}
+restore_list = [(";" + line) if index in skipped else line for index, line in enumerate(toc)]
+# Fail closed on the rewrite itself: same length, and the only difference anywhere is a leading
+# semicolon on exactly the derived lines. A use-list that silently lost an entry would restore a
+# quietly smaller database and every comparison downstream would still be measuring the archive.
+if len(restore_list) != len(toc):
+    raise SystemExit("restore list cardinality drift")
+for index, (before, after) in enumerate(zip(toc, restore_list)):
+    if index in skipped:
+        if after != ";" + before:
+            raise SystemExit("restore list exclusion is not a pure comment-out")
+    elif after != before:
+        raise SystemExit("restore list altered an entry it must not touch")
+
+pathlib.Path(list_path).write_text("\n".join(restore_list) + "\n", encoding="utf-8")
+pathlib.Path(report_path).write_text(
+    json.dumps({"schema": "megacampus.q12.restore-exclusions/v1",
+                "total_entries": len(toc), "excluded": excluded_rows}, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8")
+scratch.unlink(missing_ok=True)
+print(f"restore list built: {len(toc)} archive entries, {len(excluded_rows)} skipped"
+      + ("" if not excluded_rows else ": " + ", ".join(sorted({row["trigger"] for row in excluded_rows}))))
+PY
+  /usr/bin/chmod 600 -- "$TEMP_ROOT/restore.toc" "$TEMP_ROOT/restore-exclusions.json"
 }
 
 verify_image_identity() {
@@ -782,7 +930,23 @@ PY
   # One multi-statement command string runs as a single implicit transaction
   # and ALTER SYSTEM refuses transaction blocks, so each override is issued
   # as its own statement.
-  run_service_psql "$TEMP_ROOT/cleanup-restore-test.service" mc2_restore_cleanup --command \
+  # mc2-rjy9k: this statement must carry the read-only override the rest of this script already
+  # carries (:822, :828, :836, :848). `database-post.sql` above replays the SOURCE's captured
+  # `ALTER DATABASE … SET` values, and a Q12 generation is dumped at C3 — AFTER C1's barrier has set
+  # `default_transaction_read_only = on` on production. The replay therefore hands restore_test that
+  # very default, every session opened afterwards inherits it, and this ALTER DATABASE dies with
+  #   ERROR: cannot execute ALTER DATABASE in a read-only transaction
+  # The value being set is the same one already in force, so the statement is a no-op in that case —
+  # but a fail-closed no-op still fails the window. Found 2026-07-29 by the isolate dry run, against
+  # attempt #16's own generation, with no writer stopped and no run-id burnt; the window had never
+  # reached this line because C4 died earlier on the buildx lookup. This connection is a direct
+  # loopback one to the isolate, not the pooled DSN, so the startup option is genuinely delivered.
+  # Spelled out rather than routed through run_service_psql: in bash an assignment preceding a
+  # FUNCTION call stays in effect after the call returns, which would leak the override into every
+  # later statement in this script — including the ones that must observe the read-only default.
+  PGSERVICEFILE="$TEMP_ROOT/cleanup-restore-test.service" PGSERVICE=mc2_restore_cleanup \
+    PGOPTIONS='-c default_transaction_read_only=off' \
+    "$PSQL" -X --no-psqlrc --no-password --set ON_ERROR_STOP=on --command \
     "ALTER DATABASE restore_test SET default_transaction_read_only='on';" >/dev/null
   # ALTER SYSTEM requires superuser rights, which only supabase_admin holds.
   write_pgpass "$TEMP_ROOT/system-overrides.pgpass" "$port" postgres supabase_admin "$restore_password"
@@ -816,8 +980,10 @@ PY
   PGSERVICEFILE="$TEMP_ROOT/restore.service" PGSERVICE=mc2_restore_actor \
     PGOPTIONS='-c default_transaction_read_only=off' \
     "$PG_RESTORE" --dbname=restore_test --username=supabase_admin --no-password \
-    --exit-on-error --single-transaction "$GENERATION/database.dump" \
-    >"$TEMP_ROOT/restore.stdout" 2>"$TEMP_ROOT/restore.stderr" || fail 'strict archive restore failed'
+    --exit-on-error --single-transaction --use-list "$TEMP_ROOT/restore.toc" \
+    "$GENERATION/database.dump" \
+    >"$TEMP_ROOT/restore.stdout" 2>"$TEMP_ROOT/restore.stderr" ||
+    fail_with_log 'strict archive restore failed' "$TEMP_ROOT/restore.stderr"
   [[ ! -s "$TEMP_ROOT/restore.stderr" ]] || fail 'strict archive restore emitted stderr'
   verify_restored_pgtle_packages "$TEMP_ROOT/restore.service" mc2_restore_actor
 
@@ -857,7 +1023,13 @@ PY
     # now, after a fully successful restore and durable handle publication.
     PERSIST_ENGAGED=1
   fi
-  printf 'Supabase isolated restore passed: %s\n' "${GENERATION##*/}"
+  # The exclusion is derived far above, before any container exists; restate it beside the verdict
+  # so a run log never reads as a full replay when it was not one (mc2-wl5vn).
+  local skipped
+  skipped=$(/usr/bin/python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["excluded"]))' \
+    "$TEMP_ROOT/restore-exclusions.json")
+  printf 'Supabase isolated restore passed: %s (archive entries skipped: %s)\n' \
+    "${GENERATION##*/}" "$skipped"
 }
 
 main "$@"

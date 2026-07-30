@@ -6,12 +6,10 @@ import {
   getUserVisibleCareerPlaybookWarnings,
 } from '@megacampus/shared-types';
 import type {
-  CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookGenerateImageJobData,
   CareerPlaybookImageStatus,
   CareerPlaybookLinkedCourse,
-  CareerPlaybookNumericFact,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookQualityIssue,
   CareerPlaybookVisibility,
@@ -26,16 +24,11 @@ import {
   mapPlaybookRow,
   normalizeGeneratedBlocks,
   normalizeStoredQAData,
-  toJson,
   type CareerPlaybookLinkedCourseRow,
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from './service-mappers';
 import { buildSlug } from './course-bridge-helpers';
-import {
-  annotateCareerPlaybookBlockNumericFacts,
-  findCareerPlaybookNumericFactOccurrences,
-} from '@/stages/stage-career-playbook/numeric-facts';
 import { addJob, removeTerminalJobById } from '@/orchestrator/queue';
 import {
   remediateCareerPlaybookFinalMarkdown,
@@ -140,19 +133,6 @@ export interface CareerPlaybookPdfExportResponse {
   contentType: 'application/pdf';
   sizeBytes: number;
 }
-
-export interface CareerPlaybookNumericFactUpdateInput {
-  playbookId: string;
-  blockId: CareerPlaybookBlockId;
-  factId: string;
-  replacementText: string;
-  scope: 'occurrence' | 'block';
-}
-
-const FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
-  'header',
-  ...Array.from({ length: 26 }, (_, index) => `block_${index + 1}`),
-];
 
 function getCareerPlaybookSupabase(): CareerPlaybookSupabase {
   return getSupabaseAdmin() as unknown as CareerPlaybookSupabase;
@@ -794,188 +774,6 @@ async function mapRowToPublicShare(
       ? markdownRemediation.content
       : (mapped.final_markdown ?? ''),
     qualityWarnings: [],
-  };
-}
-
-function replaceNumberOccurrence(input: {
-  content: string;
-  rawText: string;
-  replacementText: string;
-  occurrenceIndex: number;
-  scope: 'occurrence' | 'block';
-}): string {
-  const occurrences = findCareerPlaybookNumericFactOccurrences(input.content, input.rawText);
-
-  if (occurrences.length === 0) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact text not found' });
-  }
-
-  if (input.scope === 'block') {
-    return occurrences.reduceRight(
-      (next, occurrence) =>
-        `${next.slice(0, occurrence.start)}${input.replacementText}${next.slice(occurrence.end)}`,
-      input.content
-    );
-  }
-
-  const occurrence = occurrences[input.occurrenceIndex];
-  if (occurrence) {
-    return `${input.content.slice(0, occurrence.start)}${input.replacementText}${input.content.slice(
-      occurrence.end
-    )}`;
-  }
-
-  throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact occurrence not found' });
-}
-
-function hasCompleteGeneratedBlocks(blocks: Record<string, CareerPlaybookBlockState>): boolean {
-  return FINAL_BLOCK_ORDER.every(blockId => blocks[blockId]?.content.trim());
-}
-
-function assembleStoredBlocksMarkdown(blocks: Record<string, CareerPlaybookBlockState>): string {
-  return FINAL_BLOCK_ORDER.map(blockId => blocks[blockId]?.content.trim())
-    .filter(Boolean)
-    .join('\n\n');
-}
-
-function buildPatchedFinalMarkdown(input: {
-  row: CareerPlaybookRow;
-  blocks: Record<string, CareerPlaybookBlockState>;
-  fact: CareerPlaybookNumericFact;
-  replacementText: string;
-  oldBlockContent: string;
-  newBlockContent: string;
-  scope: 'occurrence' | 'block';
-}): string | null {
-  if (hasCompleteGeneratedBlocks(input.blocks)) {
-    return assembleStoredBlocksMarkdown(input.blocks);
-  }
-
-  if (!input.row.final_markdown) return input.blocks[input.fact.block_id]?.content ?? null;
-
-  const oldBlockContent = input.oldBlockContent.trim();
-  if (oldBlockContent && input.row.final_markdown.includes(oldBlockContent)) {
-    return input.row.final_markdown.replace(oldBlockContent, input.newBlockContent.trim());
-  }
-
-  try {
-    return replaceNumberOccurrence({
-      content: input.row.final_markdown,
-      rawText: input.fact.raw_text,
-      replacementText: input.replacementText,
-      occurrenceIndex: input.fact.occurrence_index,
-      scope: input.scope,
-    });
-  } catch {
-    return input.row.final_markdown;
-  }
-}
-
-function markReplacementAsUserVerified(input: {
-  facts: CareerPlaybookNumericFact[];
-  replacementText: string;
-  updatedAt: string;
-}): CareerPlaybookNumericFact[] {
-  let matched = false;
-  return input.facts.map(fact => {
-    if (!matched && fact.raw_text === input.replacementText) {
-      matched = true;
-      return {
-        ...fact,
-        status: 'verified',
-        source: 'user_input',
-        confidence: 1,
-        explanation: 'Исправлено пользователем.',
-        updated_at: input.updatedAt,
-      };
-    }
-    return fact;
-  });
-}
-
-function buildNumericEvidenceText(row: CareerPlaybookRow, replacementText: string): string {
-  return JSON.stringify({
-    replacementText,
-    userInput: replacementText,
-    qaData: row.q_a_data,
-    roleProfileSpec: row.role_profile_spec,
-    webResearch: row.web_research,
-  });
-}
-
-export async function updateCareerPlaybookNumericFact(
-  ctx: Context,
-  input: CareerPlaybookNumericFactUpdateInput
-): Promise<CareerPlaybookBlockState & { blockId: CareerPlaybookBlockId }> {
-  const user = requireUser(ctx);
-  const row = await loadManageablePlaybook(input.playbookId, user);
-  const generatedBlocks = normalizeGeneratedBlocks(row.generated_blocks);
-  const block = generatedBlocks[input.blockId];
-  if (!block) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Career Playbook block not found' });
-  }
-
-  const fact = block.numeric_facts?.find(candidate => candidate.id === input.factId);
-  if (!fact) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Numeric fact not found' });
-  }
-
-  const updatedAt = new Date().toISOString();
-  const content = replaceNumberOccurrence({
-    content: block.content,
-    rawText: fact.raw_text,
-    replacementText: input.replacementText,
-    occurrenceIndex: fact.occurrence_index,
-    scope: input.scope,
-  });
-  const annotatedBlock = annotateCareerPlaybookBlockNumericFacts({
-    blockId: input.blockId,
-    block: {
-      ...block,
-      content,
-      status: 'generated',
-      generated_at: updatedAt,
-    },
-    evidenceText: buildNumericEvidenceText(row, input.replacementText),
-    language: row.language,
-  });
-  annotatedBlock.numeric_facts = markReplacementAsUserVerified({
-    facts: annotatedBlock.numeric_facts ?? [],
-    replacementText: input.replacementText,
-    updatedAt,
-  });
-
-  const nextBlocks = {
-    ...generatedBlocks,
-    [input.blockId]: annotatedBlock,
-  };
-  const finalMarkdown = buildPatchedFinalMarkdown({
-    row,
-    blocks: nextBlocks,
-    fact,
-    replacementText: input.replacementText,
-    oldBlockContent: block.content,
-    newBlockContent: content,
-    scope: input.scope,
-  });
-
-  const supabase = getCareerPlaybookSupabase();
-  const { data, error } = await supabase
-    .from('career_playbooks')
-    .update({
-      generated_blocks: toJson(nextBlocks),
-      final_markdown: finalMarkdown,
-    })
-    .eq('id', input.playbookId)
-    .select('*')
-    .single();
-
-  if (error || !data) throwOnDbError(error, 'Failed to update Career Playbook numeric fact');
-
-  const updatedBlocks = normalizeGeneratedBlocks(data.generated_blocks);
-  return {
-    ...(updatedBlocks[input.blockId] ?? annotatedBlock),
-    blockId: input.blockId,
   };
 }
 

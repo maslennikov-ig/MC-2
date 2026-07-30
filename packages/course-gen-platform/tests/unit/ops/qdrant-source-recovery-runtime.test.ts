@@ -5517,10 +5517,43 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer re
     );
     const lease = join(fixture.directory, 'q12-cutover.lock');
     writeFileSync(lease, '', { mode: 0o600 });
+    // The Q12 forward tail now emits the source.forward acceptance authority; stage its
+    // operator-held inputs so this lease-focused test still reaches a clean forward exit.
+    writeFileSync(
+      join(fixture.q12RunRoot, 'accepted-coverage-run'),
+      'catalog:123e4567-e89b-42d3-a456-426614174000\n',
+      { mode: 0o400 }
+    );
+    const leaseEnvFile = fixture.args[fixture.args.indexOf('--env-file') + 1];
+    writeFileSync(
+      leaseEnvFile,
+      [
+        'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        'SUPABASE_URL=https://synthetic-project.supabase.invalid',
+        'SUPABASE_SERVICE_KEY=synthetic-service-role-key-value',
+        '',
+      ].join('\n')
+    );
+    const leaseEmitBin = join(fixture.directory, 'bin/emit-acceptance');
+    writeFileSync(
+      leaseEmitBin,
+      `#!/usr/bin/env bash
+set -euo pipefail
+output=''
+args=("$@")
+for ((i = 0; i < \${#args[@]}; i++)); do
+  [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+done
+printf '{"schema":"megacampus.q12.source-forward-acceptance/v1"}\n' > "$output"
+chmod 0400 "$output"
+`,
+      { mode: 0o700 }
+    );
     const command = `exec {fd}<>"$1"; flock "$fd"; SOURCE_RECOVERY_TEST_FORBIDDEN_FD="$fd" Q12_EXTERNAL_QUIESCE_LEASE_FD="$fd" exec bash "$2" --external-quiesce-manifest "$3" "\${@:4}"`;
     const externalEnvironment = {
       ...fixture.env,
       SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: lease,
+      SOURCE_RECOVERY_EMIT_BIN: leaseEmitBin,
     };
     const wrongPath = join(fixture.directory, 'wrong-run-external-quiesce.json');
     writeFileSync(wrongPath, `${JSON.stringify(externalPayload)}\n`, { mode: 0o400 });
@@ -5648,7 +5681,10 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer re
 
   it('uses the fixed production locks and exact ten-writer inventory', () => {
     const wrapper = source('deploy/qdrant/source-recovery-run.sh');
-    expect(wrapper).toContain('/run/megacampus-qdrant-source-recovery/source-recovery.lock');
+    // D2 (2026-07-26): the host lock moved off tmpfs /run to the controller-owned Q12
+    // backups root so uid 1000 and root can share one mutually exclusive lock path.
+    expect(wrapper).toContain('/opt/megacampus/backups/q12/source-recovery.lock');
+    expect(wrapper).not.toContain('/run/megacampus-qdrant-source-recovery');
     expect(wrapper).toContain('/opt/megacampus/backups/q12/cutover.lock');
     expect(wrapper).toContain("readonly NODE_UID='1001'");
     expect(wrapper).toContain("readonly NODE_GID='1001'");
@@ -6067,3 +6103,886 @@ describe.runIf(RUN_REAL_CONTROLLER)(
     });
   }
 );
+
+// Amendment 2026-07-25: the staged authority is the file_catalog token, which must name this run's
+// recovery run id (the wrapper's --recovery-run-id) — no org:course:run ledger triple exists.
+const COVERAGE_AUTHORITY = 'catalog:123e4567-e89b-42d3-a456-426614174000';
+const SYNTHETIC_SUPABASE_URL = 'https://synthetic-project.supabase.invalid';
+const SYNTHETIC_SERVICE_KEY = 'synthetic-service-role-key-value';
+
+interface AcceptanceEmitFixture extends ComposeWriterFixture {
+  lease: string;
+  external: string;
+  emitBin: string;
+  emitLog: string;
+  envFile: string;
+  coverageRunFile: string;
+  acceptanceOutput: string;
+  manifestPath: string;
+  journalPath: string;
+  run(extraEnv?: NodeJS.ProcessEnv): ReturnType<typeof spawnSync>;
+}
+
+// D4 (2026-07-26): source.forward carries no Q12_EXTERNAL_QUIESCE_LEASE_FD in the frozen
+// manifest env, so the lease seam must be exercised both ways — an explicitly declared
+// arbitrary descriptor (the historical shape) and the canonical descriptor 9 with no
+// variable at all, which is what the real launcher hands the wrapper.
+interface AcceptanceEmitLeaseOptions {
+  leaseDescriptor?: number;
+  declareLeaseEnv?: boolean;
+  // Opens the descriptor on a held decoy lock instead of the canonical cutover lock, so the
+  // "held but wrong file" negative can be driven against the DEFAULTED descriptor too.
+  leaseOpensDecoy?: boolean;
+}
+
+function acceptanceEmitFixture(
+  leaseOptions: AcceptanceEmitLeaseOptions = {}
+): AcceptanceEmitFixture {
+  const fixture = composeWriterFixture();
+  const stopped = fixture.records();
+  for (const record of stopped) {
+    record.State.Running = false;
+    record.State.Status = 'exited';
+    record.HostConfig.RestartPolicy = { Name: 'no', MaximumRetryCount: 0 };
+  }
+  writeFileSync(fixture.recordsPath, `${JSON.stringify(stopped)}\n`, { mode: 0o600 });
+  const external = fixture.quiesceManifest;
+  writeFileSync(
+    external,
+    `${JSON.stringify({
+      schema_version: 'megacampus.q12.writer-quiesce/v1',
+      run_id: Q12_RUN_ID,
+      status: 'quiesced',
+      barrier: {
+        state: 'recovery_ready_guarded',
+        zero_guard_residue: false,
+        expected_catalog_sha256: 'b'.repeat(64),
+        probe_receipt_sha256: createHash('sha256')
+          .update(readFileSync(fixture.probeReceipt))
+          .digest('hex'),
+      },
+      writers: stopped.map((record, index) => ({
+        class:
+          index === 0
+            ? 'production-api'
+            : index === 1
+              ? 'production-web'
+              : index < 5
+                ? 'production-worker'
+                : index === 5
+                  ? 'development-api'
+                  : index === 6
+                    ? 'development-web'
+                    : 'development-worker',
+        id: record.Id,
+        name: record.Name,
+        project: record.Config.Labels['com.docker.compose.project'],
+        service: record.Config.Labels['com.docker.compose.service'],
+        config_files: record.Config.Labels['com.docker.compose.project.config_files'],
+        working_dir: record.Config.Labels['com.docker.compose.project.working_dir'],
+        image_id: record.Image,
+        image_ref: record.Config.Image,
+        prior_running: true,
+        prior_status: 'running',
+        healthcheck_present: true,
+        prior_health_status: 'healthy',
+        prior_restart_policy: { name: 'unless-stopped', maximum_retry_count: 0 },
+        temporary_restart_policy: { name: 'no', maximum_retry_count: 0 },
+      })),
+    })}\n`,
+    { mode: 0o400 }
+  );
+  const lease = join(fixture.directory, 'q12-cutover-emit.lock');
+  writeFileSync(lease, '', { mode: 0o600 });
+  const envFile = fixture.args[fixture.args.indexOf('--env-file') + 1];
+  writeFileSync(
+    envFile,
+    [
+      'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      `SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`,
+      `SUPABASE_SERVICE_KEY=${SYNTHETIC_SERVICE_KEY}`,
+      '',
+    ].join('\n')
+  );
+  const coverageRunFile = join(fixture.q12RunRoot, 'accepted-coverage-run');
+  writeFileSync(coverageRunFile, `${COVERAGE_AUTHORITY}\n`, { mode: 0o400 });
+  const emitLog = join(fixture.directory, 'emit.log');
+  const emitBin = join(fixture.directory, 'bin/emit-acceptance');
+  writeFileSync(
+    emitBin,
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n "\${SOURCE_RECOVERY_TEST_FORBIDDEN_FD:-}" ]]; then
+  [[ -z "\${Q12_EXTERNAL_QUIESCE_LEASE_FD:-}" ]]
+  [[ ! -e "/proc/self/fd/$SOURCE_RECOVERY_TEST_FORBIDDEN_FD" ]]
+fi
+printf '%s\n' "$*" >> "$EMIT_LOG"
+printf 'env SUPABASE_URL=%s\n' "\${SUPABASE_URL:-unset}" >> "$EMIT_LOG"
+printf 'env SUPABASE_SERVICE_KEY=%s\n' "\${SUPABASE_SERVICE_KEY:-unset}" >> "$EMIT_LOG"
+if [[ -n "\${SOURCE_RECOVERY_TEST_EMIT_FAIL:-}" ]]; then
+  if [[ "\${SOURCE_RECOVERY_TEST_EMIT_FAIL}" == with-output ]]; then
+    output=''
+    args=("$@")
+    for ((i = 0; i < \${#args[@]}; i++)); do
+      [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+    done
+    printf '{"schema":"partial"}\n' > "$output"
+    chmod 0400 "$output"
+  fi
+  exit 82
+fi
+output=''
+args=("$@")
+for ((i = 0; i < \${#args[@]}; i++)); do
+  [[ "\${args[i]}" != --output ]] || output="\${args[i + 1]}"
+done
+printf '{"schema":"megacampus.q12.source-forward-acceptance/v1"}\n' > "$output"
+if [[ -n "\${SOURCE_RECOVERY_TEST_EMIT_WRONG_MODE:-}" ]]; then
+  chmod 0600 "$output"
+else
+  chmod 0400 "$output"
+fi
+`,
+    { mode: 0o700 }
+  );
+  const manifestPath = fixture.args[fixture.args.indexOf('--manifest') + 1];
+  const journalPath = join(
+    fixture.args[fixture.args.indexOf('--progress-directory') + 1],
+    'journal.json'
+  );
+  const leaseSetup =
+    leaseOptions.leaseDescriptor === undefined
+      ? 'exec {fd}<>"$1"; flock "$fd"'
+      : `exec ${leaseOptions.leaseDescriptor}<>"$1"; flock ${leaseOptions.leaseDescriptor}; fd=${leaseOptions.leaseDescriptor}`;
+  const leaseVariable =
+    leaseOptions.declareLeaseEnv === false ? '' : 'Q12_EXTERNAL_QUIESCE_LEASE_FD="$fd" ';
+  const command = `${leaseSetup}; SOURCE_RECOVERY_TEST_FORBIDDEN_FD="$fd" ${leaseVariable}exec bash "$2" --external-quiesce-manifest "$3" "\${@:4}"`;
+  const decoyLease = join(fixture.directory, 'q12-cutover-decoy.lock');
+  writeFileSync(decoyLease, '', { mode: 0o600 });
+  const openedLease = leaseOptions.leaseOpensDecoy === true ? decoyLease : lease;
+  const run = (extraEnv: NodeJS.ProcessEnv = {}): ReturnType<typeof spawnSync> =>
+    spawnSync(
+      'bash',
+      ['-c', command, 'q12-emit', openedLease, WRAPPER, external, ...fixture.args],
+      {
+        env: {
+          ...fixture.env,
+          SOURCE_RECOVERY_Q12_CUTOVER_LOCK_FILE: lease,
+          SOURCE_RECOVERY_EMIT_BIN: emitBin,
+          EMIT_LOG: emitLog,
+          ...extraEnv,
+        },
+        encoding: 'utf8',
+      }
+    );
+  return {
+    ...fixture,
+    lease,
+    external,
+    emitBin,
+    emitLog,
+    envFile,
+    coverageRunFile,
+    acceptanceOutput: join(fixture.q12RunRoot, 'source-forward-acceptance.json'),
+    manifestPath,
+    journalPath,
+    run,
+  };
+}
+
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 source.forward acceptance emit wiring (W7a)', () => {
+  it('emits the acceptance authority after the verified Q12 forward with exact argv and scoped env', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run();
+    expect(result.status, result.stderr).toBe(0);
+    const emitLog = readFileSync(fixture.emitLog, 'utf8');
+    const invocations = emitLog.split('\n').filter(line => line.startsWith('--manifest'));
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]).toBe(
+      [
+        '--manifest',
+        fixture.manifestPath,
+        '--journal',
+        fixture.journalPath,
+        '--recovery-run-id',
+        '123e4567-e89b-42d3-a456-426614174000',
+        '--accepted-coverage-run',
+        COVERAGE_AUTHORITY,
+        '--output',
+        fixture.acceptanceOutput,
+      ].join(' ')
+    );
+    expect(emitLog).toContain(`env SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`);
+    expect(emitLog).toContain(`env SUPABASE_SERVICE_KEY=${SYNTHETIC_SERVICE_KEY}`);
+    const stat = statSync(fixture.acceptanceOutput);
+    expect(stat.mode & 0o777).toBe(0o400);
+    const composeLog = readFileSync(fixture.composeLog, 'utf8');
+    expect(composeLog).toContain('source-recovery verify-dispositions');
+    // The service key must never leak outside the emit child's scoped environment.
+    expect(result.stdout).not.toContain(SYNTHETIC_SERVICE_KEY);
+    expect(result.stderr).not.toContain(SYNTHETIC_SERVICE_KEY);
+    expect(composeLog).not.toContain(SYNTHETIC_SERVICE_KEY);
+  });
+
+  it('fails the forward run and removes the leftover when the published authority mode is wrong', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_EMIT_WRONG_MODE: '1' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/not published owner-only 0400/iu);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed without invoking emit when the coverage-run authority is missing', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    rmSync(fixture.coverageRunFile);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/accepted coverage-run authority/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed without invoking emit on a malformed coverage-run triple', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, 'not-a-catalog-token\n');
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/must be catalog:<recovery-run-id> with a lower-case UUIDv4/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed on the retired organization:course:run coverage triple', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(
+      fixture.coverageRunFile,
+      '123e4567-e89b-42d3-a456-426614174101:123e4567-e89b-42d3-a456-426614174102:123e4567-e89b-42d3-a456-426614174103\n'
+    );
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    // the format guard must be the one that fires, not the single-line or equality guard
+    expect(result.stderr).toMatch(/must be catalog:<recovery-run-id> with a lower-case UUIDv4/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed when the staged authority names another recovery run', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, 'catalog:123e4567-e89b-42d3-a456-426614174999\n');
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/recovery run/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed on a multi-line coverage-run authority even without a trailing newline', () => {
+    const fixture = acceptanceEmitFixture();
+    chmodSync(fixture.coverageRunFile, 0o600);
+    writeFileSync(fixture.coverageRunFile, `${COVERAGE_AUTHORITY}\ntrailing-garbage`);
+    chmodSync(fixture.coverageRunFile, 0o400);
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/single newline-terminated/iu);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails the forward run and leaves no acceptance file when emit exits non-zero', () => {
+    const fixture = acceptanceEmitFixture();
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_EMIT_FAIL: 'with-output' });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/acceptance emit failed/iu);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('fails closed without invoking emit when the production env file lacks the Supabase values', () => {
+    const fixture = acceptanceEmitFixture();
+    writeFileSync(
+      fixture.envFile,
+      [
+        'QDRANT_OPERATOR_IMAGE_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        `SUPABASE_URL=${SYNTHETIC_SUPABASE_URL}`,
+        '',
+      ].join('\n')
+    );
+    const result = fixture.run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/SUPABASE_SERVICE_KEY/u);
+    expect(existsSync(fixture.emitLog)).toBe(false);
+    expect(existsSync(fixture.acceptanceOutput)).toBe(false);
+  });
+
+  it('never invokes emit for a non-Q12 forward run', () => {
+    const fixture = wrapperFixture();
+    const emitLog = join(fixture.directory, 'emit.log');
+    const emitBin = join(fixture.directory, 'bin/emit-acceptance');
+    writeFileSync(emitBin, `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$EMIT_LOG"\n`, {
+      mode: 0o700,
+    });
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_EMIT_BIN: emitBin, EMIT_LOG: emitLog },
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(emitLog)).toBe(false);
+  });
+
+  it('keeps the emit override test-only and the production emit on the package tsx shim', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).toContain('SOURCE_RECOVERY_EMIT_BIN');
+    expect(wrapper).toMatch(
+      /\[\[ -z \$\{SOURCE_RECOVERY_WRITER_BACKEND:-\}[^\n]*\$\{SOURCE_RECOVERY_EMIT_BIN:-\}/u
+    );
+    expect(wrapper).toContain('packages/course-gen-platform/node_modules/.bin/tsx');
+    expect(wrapper).toContain(
+      'packages/course-gen-platform/tools/qdrant/emit-source-forward-acceptance.ts'
+    );
+    const verifyDispositions = wrapper.lastIndexOf('source-recovery verify-dispositions');
+    const emitBlock = wrapper.indexOf('source-forward-acceptance.json');
+    expect(verifyDispositions).toBeGreaterThan(0);
+    expect(emitBlock).toBeGreaterThan(verifyDispositions);
+  });
+
+  it('pins the production emit tsconfig chain so module resolution is cwd-independent', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).toContain(
+      'emit_tsconfig="$project_directory/packages/course-gen-platform/tsconfig.json"'
+    );
+    expect(wrapper).toContain('emit_root_tsconfig="$project_directory/tsconfig.json"');
+    expect(wrapper).toMatch(
+      /\[\[ -f \$emit_tsconfig && ! -L \$emit_tsconfig && -f \$emit_root_tsconfig && ! -L \$emit_root_tsconfig \]\] \|\|\n\s*fail 'source\.forward acceptance emit requires the package tsconfig chain'/u
+    );
+    expect(wrapper).toContain(
+      'emit_command=("$emit_tsx" --tsconfig "$emit_tsconfig" "$emit_entrypoint")'
+    );
+  });
+});
+
+// Q12 window execution identity (2026-07-26 design D1/D2/D4/D6). The wrapper used to
+// refuse every non-root production run, which made `writers.quiesce` structurally
+// impossible: its child's closed-inbound probe requires a scratch directory owned by the
+// controller identity (q12-writer-resume.py:632-640). `source.forward` in turn genuinely
+// needs root, because it reads the 1001-owned operator state at modes it pins itself.
+// So the blanket gate becomes a per-operation identity contract, the single host lock
+// moves to the controller-owned Q12 backups root, the external-quiesce lease descriptor
+// defaults to the canonical 9 (keeping the frozen manifest untouched), and a Q12
+// external-quiesce forward publishes the C9 writer recovery state its resume child
+// hard-requires (q12-writer-resume.py:1389-1392).
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 window execution identity contract', () => {
+  const CURRENT_UID = String(process.getuid?.() ?? 1000);
+  const FOREIGN_UID = String((process.getuid?.() ?? 1000) + 7);
+
+  it('accepts the controller identity for the writer quiesce operation', () => {
+    const fixture = writerQuiesceFixture();
+
+    const result = fixture.quiesce();
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it('refuses the writer quiesce operation for a non-controller identity by its own name', () => {
+    const fixture = writerQuiesceFixture();
+
+    const result = fixture.quiesce({ SOURCE_RECOVERY_CONTROLLER_UID: FOREIGN_UID });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/must run as the controller identity/iu);
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
+  });
+
+  it('refuses the writer resume operation for a non-controller identity by its own name', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync(
+      'bash',
+      [
+        WRAPPER,
+        '--operation',
+        'resume-writers-only',
+        '--resume-mode',
+        'forward',
+        '--run-id',
+        Q12_RUN_ID,
+      ],
+      { env: { ...fixture.env, SOURCE_RECOVERY_CONTROLLER_UID: FOREIGN_UID }, encoding: 'utf8' }
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/must run as the controller identity/iu);
+  });
+
+  it('accepts the privileged identity for a forward run', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_ROOT_UID: CURRENT_UID },
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it('refuses a forward run for a non-privileged identity by its own name before any side effect', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_ROOT_UID: FOREIGN_UID },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/must run as root/iu);
+    expect(existsSync(fixture.composeLog)).toBe(false);
+  });
+
+  it('accepts the privileged identity for a rollback run', () => {
+    const fixture = wrapperFixture(['megacampus-api-blue', 'megacampus-worker']);
+    prepareReviewedState(fixture, true);
+
+    const result = spawnSync(
+      'bash',
+      [WRAPPER, '--operation', 'rollback', '--stop-writers', ...fixture.args],
+      { env: { ...fixture.env, SOURCE_RECOVERY_ROOT_UID: CURRENT_UID }, encoding: 'utf8' }
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it('refuses a rollback run for a non-privileged identity by its own name', () => {
+    const fixture = wrapperFixture(['megacampus-api-blue', 'megacampus-worker']);
+    prepareReviewedState(fixture, true);
+
+    const result = spawnSync(
+      'bash',
+      [WRAPPER, '--operation', 'rollback', '--stop-writers', ...fixture.args],
+      { env: { ...fixture.env, SOURCE_RECOVERY_ROOT_UID: FOREIGN_UID }, encoding: 'utf8' }
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/must run as root/iu);
+    expect(existsSync(fixture.composeLog)).toBe(false);
+    expect(states(fixture)['megacampus-api-blue']).toBe('active');
+  });
+
+  it('keeps the privileged identity override behind the local-test seam', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { PATH: process.env.PATH, SOURCE_RECOVERY_ROOT_UID: CURRENT_UID },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('require SOURCE_RECOVERY_LOCAL_TEST=1');
+  });
+
+  it('replaces the blanket production root gate with the per-operation identity contract', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).not.toContain("fail 'production source recovery must run as root'");
+    expect(wrapper).toContain("readonly ROOT_UID='0'");
+    expect(wrapper).toMatch(
+      /quiesce-writers-only\|resume-writers-only\)\n\s*\[\[ \$EUID -eq \$controller_uid \]\]/u
+    );
+    expect(wrapper).toMatch(/forward\|rollback\)\n\s*\[\[ \$EUID -eq \$root_uid \]\]/u);
+    // The contract must be asserted before the first host mutation the run performs.
+    const contract = wrapper.indexOf('must run as the controller identity');
+    const firstLockSite = wrapper.indexOf('ensure_host_lock\n');
+    expect(contract).toBeGreaterThan(0);
+    expect(firstLockSite).toBeGreaterThan(contract);
+  });
+
+  it('creates the single host lock as the controller-owned 0600 file at every operation site', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    expect(wrapper).not.toContain('install -d -o root -g root');
+    expect(wrapper).toContain(
+      'install -d -o "$controller_uid" -g "$controller_gid" -m 0700 -- "$directory"'
+    );
+    // One helper, one lock path, three operation sites (resume-only, quiesce-only, forward).
+    expect(wrapper.match(/^\s*ensure_host_lock$/gmu)).toHaveLength(3);
+    expect(wrapper.match(/exec \{[a-z_]*lock_fd\}<>"\$LOCK_FILE"/gu)).toHaveLength(3);
+  });
+
+  it('publishes the host lock controller-owned 0600 at the relocated path', () => {
+    const fixture = wrapperFixture();
+    const lockFile = String(fixture.env.SOURCE_RECOVERY_LOCK_FILE);
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const lock = statSync(lockFile);
+    expect(lock.mode & 0o777).toBe(0o600);
+    expect(String(lock.uid)).toBe(CURRENT_UID);
+  });
+
+  it('normalizes a loosely moded pre-existing host lock to the controller-owned 0600 identity', () => {
+    const fixture = wrapperFixture();
+    const lockFile = String(fixture.env.SOURCE_RECOVERY_LOCK_FILE);
+    mkdirSync(resolve(lockFile, '..'), { recursive: true, mode: 0o700 });
+    writeFileSync(lockFile, '', { mode: 0o644 });
+    chmodSync(lockFile, 0o644);
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(statSync(lockFile).mode & 0o777).toBe(0o600);
+  });
+
+  it('refuses a symlinked host lock by name', () => {
+    const fixture = wrapperFixture();
+    const lockFile = String(fixture.env.SOURCE_RECOVERY_LOCK_FILE);
+    const planted = join(fixture.directory, 'planted-lock');
+    writeFileSync(planted, '', { mode: 0o600 });
+    mkdirSync(resolve(lockFile, '..'), { recursive: true, mode: 0o700 });
+    symlinkSync(planted, lockFile);
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/host lock file must not be a symlink/iu);
+    expect(existsSync(fixture.composeLog)).toBe(false);
+  });
+
+  it('accepts the canonical descriptor 9 lease without the frozen manifest declaring it', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+
+    const result = fixture.run();
+
+    expect(result.status, result.stderr).toBe(0);
+    // SOURCE_RECOVERY_TEST_FORBIDDEN_FD=9 makes both children assert the descriptor was
+    // closed for them, which only happens when the default reached the close path.
+    expect(readFileSync(fixture.emitLog, 'utf8')).toContain('--recovery-run-id');
+    expect(readFileSync(fixture.composeLog, 'utf8')).toContain(
+      'source-recovery verify-dispositions'
+    );
+  });
+
+  it('honours an explicitly declared lease descriptor that is not the canonical 9', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 7, declareLeaseEnv: true });
+
+    const result = fixture.run();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(fixture.composeLog, 'utf8')).toContain(
+      'source-recovery verify-dispositions'
+    );
+  });
+
+  it('refuses a set-but-empty lease variable even when the canonical descriptor is held', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+
+    const result = fixture.run({ Q12_EXTERNAL_QUIESCE_LEASE_FD: '' });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/external quiesce requires an inherited lease FD/iu);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('refuses the defaulted lease descriptor when the canonical lock is not inherited', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 7, declareLeaseEnv: false });
+
+    const result = fixture.run();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/external quiesce requires an inherited lease FD/iu);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('publishes the C9 writer recovery state after a verified Q12 external-quiesce forward', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+
+    const result = fixture.run();
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(fixture.recoveryState)).toBe(true);
+    const stat = statSync(fixture.recoveryState);
+    expect(stat.mode & 0o777).toBe(0o400);
+    expect(String(stat.uid)).toBe(CURRENT_UID);
+    expect(String(stat.gid)).toBe(String(process.getgid?.() ?? 1000));
+    const state = JSON.parse(readFileSync(fixture.recoveryState, 'utf8')) as Record<string, any>;
+    expect(Object.keys(state).sort()).toEqual(
+      [
+        'expected_catalog_sha256',
+        'run_id',
+        'schema_version',
+        'source_journal_sha256',
+        'source_manifest_sha256',
+        'state',
+        'writer_quiesce_manifest_sha256',
+      ].sort()
+    );
+    expect(state.schema_version).toBe('megacampus.q12.writer-recovery-state/v1');
+    expect(state.run_id).toBe(Q12_RUN_ID);
+    expect(state.state).toBe('recovery_complete_writers_quiesced');
+    expect(state.expected_catalog_sha256).toBe('b'.repeat(64));
+    expect(state.writer_quiesce_manifest_sha256).toBe(fileSha256(fixture.external));
+    expect(state.source_manifest_sha256).toBe(fileSha256(fixture.manifestPath));
+    expect(state.source_journal_sha256).toBe(fileSha256(fixture.journalPath));
+  });
+
+  it('does not publish the C9 writer recovery state when the forward fails', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_EMIT_FAIL: '1' });
+
+    expect(result.status).not.toBe(0);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('does not publish the C9 writer recovery state when a disposition phase is rejected', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+
+    const result = fixture.run({ SOURCE_RECOVERY_TEST_FAIL_MODE: 'verify-dispositions' });
+
+    expect(result.status).not.toBe(0);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('fails the forward without publishing when a bound probe receipt changes after validation', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+    const replacement = join(fixture.directory, 'swapped-probe-receipt.json');
+    writeFileSync(replacement, readFileSync(fixture.probeReceipt), { mode: 0o400 });
+
+    const result = fixture.run({
+      SOURCE_RECOVERY_TEST_SWAP_AFTER_MODE: 'verify-dispositions',
+      SOURCE_RECOVERY_TEST_SWAP_REPLACEMENT: replacement,
+      SOURCE_RECOVERY_TEST_SWAP_TARGET: fixture.probeReceipt,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/changed after validation/iu);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('fails the forward without publishing when a writer stopped being quiesced', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+    const restarted = fixture.records();
+    restarted[4].State.Running = true;
+    restarted[4].State.Status = 'running';
+    const replacement = join(fixture.directory, 'restarted-docker-records.json');
+    writeFileSync(replacement, `${JSON.stringify(restarted)}\n`, { mode: 0o600 });
+
+    const result = fixture.run({
+      SOURCE_RECOVERY_TEST_SWAP_AFTER_MODE: 'verify-dispositions',
+      SOURCE_RECOVERY_TEST_SWAP_REPLACEMENT: replacement,
+      SOURCE_RECOVERY_TEST_SWAP_TARGET: fixture.recordsPath,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/did not remain stopped with restart=no/iu);
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+
+  it('publishes no writer recovery state for a non-Q12 forward run', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(
+      readdirSync(fixture.directory).some(entry => entry.startsWith('writer-recovery-state-'))
+    ).toBe(false);
+  });
+
+  it('publishes the C9 recovery state on the external-quiesce forward branch after the verified chain', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    const verifyDispositions = wrapper.lastIndexOf('source-recovery verify-dispositions');
+    const publish = wrapper.indexOf('publish_external_quiesce_recovery_state\n');
+    expect(publish).toBeGreaterThan(verifyDispositions);
+    expect(wrapper).toMatch(
+      /publish_external_quiesce_recovery_state\(\) \{\n\s*assert_all_stopped_with_no_restart/u
+    );
+    expect(wrapper).toContain('write_recovery_complete_state ||');
+  });
+});
+
+// Correction wave 2026-07-26 on the execution-identity increment. Three properties the
+// independent review asked for, all of them consequences of `source.forward` now being a
+// REAL root-executed path over controller-writable directories: every root publish must
+// resolve its target exactly once (no path-based chown/chmod after a truncating redirect),
+// the shared Q12 backups directory must never be re-moded by a run that merely needs a lock
+// in it, and the single lock plus the defaulted lease descriptor must be pinned across both
+// identities.
+describe.runIf(RUN_REAL_CONTROLLER)('Q12 root-executed publish discipline', () => {
+  const CURRENT_UID = String(process.getuid?.() ?? 1000);
+  const CURRENT_GID = String(process.getgid?.() ?? 1000);
+  const FOREIGN_UID = String((process.getuid?.() ?? 1000) + 7);
+
+  it('opens the host lock without truncating whatever the path resolves to', () => {
+    const fixture = wrapperFixture();
+    const lockFile = String(fixture.env.SOURCE_RECOVERY_LOCK_FILE);
+    writeFileSync(lockFile, 'operator-sentinel\n', { mode: 0o600 });
+    chmodSync(lockFile, 0o600);
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // A truncating `>` open is an arbitrary-truncate primitive for the controller uid the
+    // moment root runs the forward; nothing in the protocol needs the lock's bytes.
+    expect(readFileSync(lockFile, 'utf8')).toBe('operator-sentinel\n');
+  });
+
+  it('publishes root-executed artifacts through one no-follow descriptor', () => {
+    const wrapper = source('deploy/qdrant/source-recovery-run.sh');
+    // No path-based ownership or mode mutation of a temporary that a controller-uid racer
+    // could have replaced between the redirect and the check.
+    expect(wrapper).not.toContain('chown "$controller_uid:$controller_gid" "$temporary"');
+    expect(wrapper).not.toContain('chmod 0400 "$temporary"');
+    expect(wrapper).not.toContain(': >>"$LOCK_FILE"');
+    // Both publishes and the lock go through the O_NOFOLLOW descriptor helpers.
+    expect(wrapper).toContain('write_controller_temporary');
+    expect(wrapper).toContain('ensure_controller_lock_file');
+    expect(wrapper.match(/os\.O_NOFOLLOW/gu)?.length).toBeGreaterThanOrEqual(2);
+    expect(wrapper).toContain('os.fchown(descriptor');
+    expect(wrapper).toContain('os.fchmod(descriptor');
+    // The descriptor is validated BEFORE any byte, ownership or mode change, and the
+    // payload is validated as JSON so a short read cannot publish a truncated artifact.
+    expect(wrapper).toMatch(
+      /before = os\.fstat\(descriptor\)\n\s*if not stat\.S_ISREG\(before\.st_mode\) or before\.st_nlink != 1 or before\.st_uid != os\.geteuid\(\):/u
+    );
+    expect(wrapper).toContain('json.loads(payload)');
+    // The lock is opened read-write without O_TRUNC at all three operation sites.
+    expect(wrapper.match(/exec \{[a-z_]*lock_fd\}<>"\$LOCK_FILE"/gu)).toHaveLength(3);
+    expect(wrapper).not.toMatch(/exec \{[a-z_]*lock_fd\}>"\$LOCK_FILE"/u);
+    expect(wrapper.match(/^\s*verify_open_host_lock "/gmu)).toHaveLength(3);
+  });
+
+  it('refuses to publish the writer recovery state through a planted symlink', () => {
+    const fixture = acceptanceEmitFixture({ leaseDescriptor: 9, declareLeaseEnv: false });
+    const planted = join(fixture.directory, 'planted-recovery-state.json');
+    writeFileSync(planted, '{}\n', { mode: 0o600 });
+    symlinkSync(planted, fixture.recoveryState);
+
+    const result = fixture.run();
+
+    expect(result.status).not.toBe(0);
+    expect(readFileSync(planted, 'utf8')).toBe('{}\n');
+  });
+
+  it('creates an absent host lock directory as the controller-owned 0700 identity', () => {
+    const fixture = wrapperFixture();
+    const lockDirectory = join(fixture.directory, 'absent-lock-root');
+    const lockFile = join(lockDirectory, 'source-recovery.lock');
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_LOCK_FILE: lockFile },
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const directory = statSync(lockDirectory);
+    expect(directory.mode & 0o777).toBe(0o700);
+    expect(String(directory.uid)).toBe(CURRENT_UID);
+    expect(String(directory.gid)).toBe(CURRENT_GID);
+  });
+
+  it('leaves an existing shared host lock directory mode untouched', () => {
+    const fixture = wrapperFixture();
+    const lockDirectory = join(fixture.directory, 'shared-lock-root');
+    mkdirSync(lockDirectory, { mode: 0o755 });
+    chmodSync(lockDirectory, 0o755);
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: {
+        ...fixture.env,
+        SOURCE_RECOVERY_LOCK_FILE: join(lockDirectory, 'source-recovery.lock'),
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // /opt/megacampus/backups/q12 is 0755 on the host and also holds cutover.lock and every
+    // run root; retightening it mid-window is an unvalidated mutation of shared state.
+    expect(statSync(lockDirectory).mode & 0o777).toBe(0o755);
+  });
+
+  it('refuses an existing host lock directory that is not controller-owned by name', () => {
+    const fixture = wrapperFixture();
+
+    const result = spawnSync('bash', [WRAPPER, ...fixture.args], {
+      env: { ...fixture.env, SOURCE_RECOVERY_CONTROLLER_UID: FOREIGN_UID },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/host lock directory must be owned by the exact controller/iu);
+    expect(existsSync(fixture.composeLog)).toBe(false);
+  });
+
+  it('holds the one host lock against the other identity', async () => {
+    const forward = wrapperFixture();
+    const quiesce = writerQuiesceFixture();
+    const sharedLock = join(forward.directory, 'shared-identity.lock');
+
+    const holder = spawn('bash', [WRAPPER, ...forward.args], {
+      env: {
+        ...forward.env,
+        SOURCE_RECOVERY_LOCK_FILE: sharedLock,
+        SOURCE_RECOVERY_ROOT_UID: CURRENT_UID,
+        SOURCE_RECOVERY_TEST_SLEEP: '0.6',
+      },
+      stdio: 'pipe',
+    });
+    await new Promise(resolveWait => setTimeout(resolveWait, 250));
+    const contender = quiesce.quiesce({ SOURCE_RECOVERY_LOCK_FILE: sharedLock });
+
+    expect(contender.status).not.toBe(0);
+    expect(contender.stderr).toContain('another source-recovery run holds the host lock');
+    await new Promise<void>((resolveExit, reject) => {
+      holder.once('error', reject);
+      holder.once('exit', code => (code === 0 ? resolveExit() : reject(new Error(`exit ${code}`))));
+    });
+  }, 20_000);
+
+  it('normalizes the host lock mode on the non-privileged branch', () => {
+    const fixture = writerQuiesceFixture();
+    const lockFile = String(fixture.env.SOURCE_RECOVERY_LOCK_FILE);
+    writeFileSync(lockFile, '', { mode: 0o644 });
+    chmodSync(lockFile, 0o644);
+
+    // root_uid is deliberately foreign, so the privileged chown branch cannot run and the
+    // controller-identity branch has to reach the exact 0600 state on its own.
+    const result = fixture.quiesce({ SOURCE_RECOVERY_ROOT_UID: FOREIGN_UID });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(statSync(lockFile).mode & 0o777).toBe(0o600);
+  });
+
+  it('refuses the defaulted descriptor 9 when it is held on the wrong file', () => {
+    const fixture = acceptanceEmitFixture({
+      leaseDescriptor: 9,
+      declareLeaseEnv: false,
+      leaseOpensDecoy: true,
+    });
+
+    const result = fixture.run();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(
+      /lease FD must reference the exact cutover lock|lease FD identity/iu
+    );
+    expect(existsSync(fixture.recoveryState)).toBe(false);
+  });
+});

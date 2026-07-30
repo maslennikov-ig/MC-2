@@ -298,11 +298,7 @@ function expectedDerivedValues(): Record<string, string> {
     '<recovery-run-id>': uuid5(PROBE_RUN_ID, 'q12-source-recovery'),
     '<accepted-recovery-manifest-sha256>': digest('recovery-manifest'),
     '<accepted-coverage-fingerprint>': digest('coverage-fingerprint'),
-    '<accepted-coverage-run>': [
-      uuid5(PROBE_RUN_ID, 'q12-coverage-org'),
-      uuid5(PROBE_RUN_ID, 'q12-coverage-course'),
-      uuid5(PROBE_RUN_ID, 'q12-coverage-run'),
-    ].join(':'),
+    '<accepted-coverage-run>': `catalog:${uuid5(PROBE_RUN_ID, 'q12-source-recovery')}`,
     '<quiesce-manifest>': PROBE_QUIESCE,
   };
 }

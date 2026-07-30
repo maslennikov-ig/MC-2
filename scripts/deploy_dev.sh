@@ -69,10 +69,12 @@ read_secret_file() {
     if [[ "$path" != /* ]]; then
         path="$BASE_PATH/${path#./}"
     fi
-    [ -f "$path" ] && [ -r "$path" ] || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
-    mode="$(stat -c '%a' "$path")"
+    # Secret files are owned root:root 0400 (created by the production deploy); read
+    # them via sudo, matching deploy_blue_green.sh's read_secret_file.
+    sudo -n test -f "$path" && sudo -n test -r "$path" || { echo "ERROR: $label file is missing or unreadable" >&2; return 1; }
+    mode="$(sudo -n stat -c '%a' "$path")"
     (( (8#$mode & 077) == 0 )) || { echo "ERROR: $label file permissions are unsafe" >&2; return 1; }
-    value="$(cat -- "$path"; printf x)"
+    value="$(sudo -n cat -- "$path"; printf x)"
     value="${value%x}"
     if [[ "$value" == *$'\r\n' ]]; then
         value="${value%$'\r\n'}"
@@ -127,7 +129,7 @@ qdrant_dev_gate() {
     QDRANT_URL=http://qdrant-dev:6333 QDRANT_API_KEY="$admin_key" \
         $DEV_COMPOSE run --rm --no-deps -T \
         -e QDRANT_URL -e QDRANT_API_KEY \
-        --entrypoint node api-dev \
+        --entrypoint tsx api-dev \
         dist/shared/qdrant/create-collection.js --verify-only
     unset admin_key
 }

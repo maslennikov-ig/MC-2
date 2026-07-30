@@ -316,7 +316,9 @@ Stop without partial activation on:
 - unsupported filesystem durability/no-replace semantics;
 - manifest corruption, missing `fsync`, or ambiguous crash state;
 - partial database disposition that cannot reconcile through exact CAS;
-- a failed coverage ledger invariant;
+- a failed accepted-coverage invariant (since the 2026-07-25 amendment: any recovered `file_catalog`
+  row that is not the exact post-disposition state, a coverage-fingerprint mismatch, or a coverage
+  authority token that is not `catalog:<recovery-run-id>` for this run);
 - current Session pooler credentials still unavailable;
 - any required P0/P1 review finding.
 
@@ -337,3 +339,88 @@ review, and is integrated only with P0/P1 zero. All accepted commits and the
 integration result are pushed. Graphify is refreshed locally after durable code
 and operations documentation changes, without external model/API modes or Git
 hooks.
+
+## Amendment 2026-07-24: file_catalog-only Career Playbook dispositions
+
+Owner-approved amendment. Live investigation (pg_stat_user_tables:
+`career_playbook_sources` n_tup_ins=21, n_tup_del=21, n_live_tup=0;
+`career_playbooks` 79 created / 68 deleted) established that every reviewed
+`career_playbook_sources` row was legally cascade-deleted with its parent
+playbook (`playbook_id ... ON DELETE CASCADE`) during normal product use after
+the 2026-06-09 uploads. The 18-row live-predicate requirement in the original
+disposition contract is therefore permanently unsatisfiable and was removed:
+
+- `career_playbook_retained_derived` dispositions are file_catalog-only
+  bookkeeping; the manifest schema **rejects** `career_playbook_source_id` and
+  `expected_career_playbook` fields;
+- the `career_playbook_source_applied` journal checkpoint no longer exists;
+  both disposition kinds go `disposition_planned -> disposition_applied` via
+  the single `file_catalog` CAS;
+- planner/verify read exactly 24 `file_catalog` rows (6+18 by kind); the
+  recovery database layer no longer reads or writes `career_playbook_sources`;
+- all exact totals (42 copies / 125 rows / 6+18 dispositions, 261-row counts)
+  are unchanged.
+
+## Amendment 2026-07-25: file_catalog-only accepted coverage
+
+Owner-approved amendment (decision recorded 2026-07-25, variant A of the three
+options put to the owner on `mc2-gyde8`). The original acceptance contract keyed
+the `source.forward` acceptance authority to the **document-evidence coverage
+ledgers** (`document_evidence_runs.status='accepted'` plus
+`document_evidence_items` zero-evidence failed cards). Live read-only
+verification established that this is unsatisfiable inside the window, for two
+independent reasons:
+
+1. **The ledgers do not exist pre-window.** `information_schema` on the pinned
+   project (`diqooqbuchsliypgwksu`; `file_catalog`=261 rows confirms the audited
+   database) has no `document_evidence_runs`/`document_evidence_items` tables at
+   all. They are created **empty** by the C4 migration
+   `20260711120000_document_evidence.sql`, and the failed-coverage cards are
+   minted only by **post-window** Stage-4 runs (`source-failure.ts` marker
+   `source_file_unrecoverable; recovery_run=<run>`). `getAcceptedRun()` can
+   therefore never succeed at C5/C6.
+2. **Scope contradiction.** The 6 accepted `eligible_unrecoverable` dispositions
+   span **six** `organization:course` scopes across **three** organizations,
+   while the frozen command manifest binds exactly **one**
+   `<accepted-coverage-run>` argv slot (`aaec6fc2…` must not change) and the
+   emit entrypoint enforced exactly one accepted coverage run.
+
+The accepted contract is therefore:
+
+- **Acceptance is `file_catalog` truth.** The binding is built from the reviewed
+  (sha-bound) manifest's 6 eligible dispositions cross-checked against the live
+  `file_catalog` rows in exactly the post-recovery state `applyDispositionEntry`
+  writes: `vector_status='failed'` and
+  `error_message='source_file_unrecoverable; recovery_run=<recovery-run-id>'`,
+  with `organization_id`, `course_id`, `storage_path` and `hash` equal to the
+  disposition predicates. Nothing is invented and no ledger is consulted.
+- **Binding shape.** `AcceptedFailedCoverageBinding` carries
+  `source: 'file_catalog'` and `scopes` (one entry per recovered
+  `organization:course`, each listing its `file_catalog` entries) instead of
+  `ledgers`. `calculateAcceptedFailedCoverageFingerprint` covers the whole
+  binding, so any drift in row truth changes `<accepted-coverage-fingerprint>`.
+- **The frozen manifest is unchanged.** `<accepted-coverage-run>` keeps its
+  position and token; its VALUE is now the self-describing authority token
+  `catalog:<recovery-run-id>`, validated by the controller
+  (`COVERAGE_RUN_RE`), the wrapper forward tail (which additionally requires it
+  to name the run's own `--recovery-run-id`), the emit CLI and the reindex CLI.
+  The six course scopes come from the manifest, so argv need not repeat them.
+- **Reindex plan/artifact.** `acceptedCoverageLedgerIds` (ledger UUIDs) becomes
+  `acceptedCoverageScopes` (sorted unique `organization:course` pairs), bound
+  into the verification fingerprint and the durable execute artifact.
+
+**What is deliberately dropped, and where it is tracked.** The downstream
+product statement — that Stage-4 evidence for these six sources is accepted as
+zero-evidence failed — is real but only becomes verifiable **after** the window.
+It is not silently discarded: `mc2-8m90f` re-verifies it read-only against the
+live ledgers once the first post-window Stage-4 generation has minted the cards.
+The Stage-4 side of that contract stays covered by
+`tests/unit/tools/qdrant/source-recovery-acceptance.test.ts`
+(`proveStage4AcceptsAuditedFailedSources`), which asserts an audited
+unrecoverable source is accepted as a zero-evidence failed card without
+invoking generation.
+
+Redeploy consequence: the controller, the wrapper and the emit runtime closure
+change, so the window needs a redeploy plus one fresh pre-window `plan` run. The
+plan's structural sha legitimately changes (the fixture `<accepted-coverage-run>`
+derivation is now the catalog token); the frozen manifest sha must not.

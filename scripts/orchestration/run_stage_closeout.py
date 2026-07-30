@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
+import json
 import pathlib
 import re
 import subprocess
@@ -53,6 +56,7 @@ STRUCTURAL_CHANGE_FILES = {
     "src/main.py",
     "src/worker.py",
 }
+VERIFICATION_TIER_ORDER = ("inner", "delta", "integration", "release")
 
 
 def parse_frontmatter(text: str) -> tuple[str, str]:
@@ -103,7 +107,92 @@ def load_stage_artifacts(repo_root: pathlib.Path, stage_id: str) -> list[dict[st
     return [parse_artifact(path) for path in sorted(artifacts_dir.glob("*.md"))]
 
 
-def infer_groups(contract: dict[str, object], artifacts: list[dict[str, object]], include_optional: bool) -> list[str]:
+def meaningful_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [
+        item.strip().lower()
+        for item in value
+        if isinstance(item, str)
+        and item.strip()
+        and not item.strip().startswith("<")
+        and item.strip().lower() not in {"n/a", "none"}
+    ]
+
+
+def append_unique(groups: list[str], additions: object) -> None:
+    if not isinstance(additions, list):
+        return
+    for group in additions:
+        if isinstance(group, str) and group and group not in groups:
+            groups.append(group)
+
+
+def append_policy_groups(
+    groups: list[str],
+    verification: dict[str, object],
+    mapping: dict[str, object],
+    mapping_name: str,
+    selector: str,
+) -> None:
+    additions = mapping.get(selector)
+    if not isinstance(additions, list) or not additions:
+        raise SystemExit(
+            f"verification_policy.{mapping_name}.{selector!r} must be a non-empty command-group list"
+        )
+    for group in additions:
+        if not isinstance(group, str) or not group:
+            raise SystemExit(
+                f"verification_policy.{mapping_name}.{selector!r} contains an invalid command group"
+            )
+        if not isinstance(verification.get(group), list) or not verification[group]:
+            raise SystemExit(
+                f"verification group {group!r} selected by {mapping_name}.{selector!r} is missing, empty, or not a list"
+            )
+        if group not in groups:
+            groups.append(group)
+
+
+def artifact_metadata(artifacts: list[dict[str, object]]) -> tuple[str, set[str], set[str], bool]:
+    tiers: set[str] = set()
+    risk_tags: set[str] = set()
+    surfaces: set[str] = set()
+    present = False
+    for artifact in artifacts:
+        tier = artifact.get("verification_tier")
+        if isinstance(tier, str) and tier.strip().lower() in VERIFICATION_TIER_ORDER:
+            tiers.add(tier.strip().lower())
+            present = True
+        tags = meaningful_list(artifact.get("risk_tags"))
+        affected = meaningful_list(artifact.get("affected_surfaces"))
+        if tags or affected:
+            present = True
+        risk_tags.update(tags)
+        surfaces.update(affected)
+
+    selected_tier = ""
+    for tier in reversed(VERIFICATION_TIER_ORDER):
+        if tier in tiers:
+            selected_tier = tier
+            break
+    return selected_tier, risk_tags, surfaces, present
+
+
+def artifact_has_adaptive_metadata(artifact: dict[str, object]) -> bool:
+    return artifact_metadata([artifact])[3]
+
+
+def split_adaptive_artifacts(
+    artifacts: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    modern: list[dict[str, object]] = []
+    legacy: list[dict[str, object]] = []
+    for artifact in artifacts:
+        (modern if artifact_has_adaptive_metadata(artifact) else legacy).append(artifact)
+    return modern, legacy
+
+
+def infer_legacy_groups(contract: dict[str, object], artifacts: list[dict[str, object]], include_optional: bool) -> list[str]:
     verification = contract.get("verification", {})
     if not isinstance(verification, dict):
         return []
@@ -137,10 +226,99 @@ def infer_groups(contract: dict[str, object], artifacts: list[dict[str, object]]
     return groups
 
 
+def infer_adaptive_groups(
+    contract: dict[str, object], artifacts: list[dict[str, object]], include_optional: bool
+) -> list[str]:
+    verification = contract.get("verification", {})
+    policy = contract.get("verification_policy")
+    if not isinstance(verification, dict) or not isinstance(policy, dict):
+        raise SystemExit("risk-adaptive verification requires [verification] and [verification_policy]")
+    if policy.get("mode") != "risk_adaptive":
+        raise SystemExit("verification_policy.mode must be 'risk_adaptive' for artifacts with adaptive metadata")
+
+    tier, risk_tags, surfaces, metadata_present = artifact_metadata(artifacts)
+    if not metadata_present:
+        raise SystemExit("adaptive verification requires artifact metadata")
+
+    tier = tier or str(policy.get("default_tier", "integration")).strip().lower()
+    if tier not in VERIFICATION_TIER_ORDER:
+        raise SystemExit(f"unsupported verification tier: {tier!r}")
+    tier_groups = policy.get("tier_groups")
+    if not isinstance(tier_groups, dict):
+        raise SystemExit("verification_policy.tier_groups must be a table")
+
+    groups: list[str] = []
+    append_policy_groups(groups, verification, tier_groups, "tier_groups", tier)
+
+    risk_tag_groups = policy.get("risk_tag_groups", {})
+    if not isinstance(risk_tag_groups, dict):
+        raise SystemExit("verification_policy.risk_tag_groups must be a table")
+    for tag in sorted(risk_tags):
+        append_policy_groups(groups, verification, risk_tag_groups, "risk_tag_groups", tag)
+
+    surface_groups = policy.get("surface_groups", {})
+    if not isinstance(surface_groups, dict):
+        raise SystemExit("verification_policy.surface_groups must be a table")
+    for surface in sorted(surfaces):
+        append_policy_groups(groups, verification, surface_groups, "surface_groups", surface)
+
+    if include_optional and "stage_level_optional_commands" in verification:
+        append_unique(groups, ["stage_level_optional_commands"])
+
+    return groups
+
+
+def infer_groups(contract: dict[str, object], artifacts: list[dict[str, object]], include_optional: bool) -> list[str]:
+    """Choose adaptive groups per modern artifact and preserve legacy evidence for older artifacts."""
+    policy = contract.get("verification_policy")
+    modern, legacy = split_adaptive_artifacts(artifacts)
+    if isinstance(policy, dict) and policy.get("mode") == "risk_adaptive" and high_risk_artifacts_missing_metadata(artifacts):
+        raise SystemExit(
+            "high-risk changed artifacts require verification_tier, risk_tags, affected_surfaces, and invariants"
+        )
+    if not modern:
+        return infer_legacy_groups(contract, artifacts, include_optional)
+    if not isinstance(policy, dict) or policy.get("mode") != "risk_adaptive":
+        raise SystemExit("artifacts with adaptive metadata require verification_policy.mode = 'risk_adaptive'")
+
+    groups = infer_adaptive_groups(contract, modern, include_optional)
+    if legacy:
+        append_unique(groups, infer_legacy_groups(contract, legacy, include_optional))
+    return groups
+
+
+def artifact_has_changed_files(artifact: dict[str, object]) -> bool:
+    changed_files = artifact.get("changed_files")
+    return isinstance(changed_files, list) and any(
+        item and not str(item).startswith("<") for item in changed_files
+    )
+
+
+def high_risk_artifacts_missing_metadata(artifacts: list[dict[str, object]]) -> bool:
+    for artifact in artifacts:
+        risk_level = artifact.get("risk_level")
+        if not (
+            artifact_has_changed_files(artifact)
+            and isinstance(risk_level, str)
+            and risk_level.lower() == "high"
+        ):
+            continue
+        tier = artifact.get("verification_tier")
+        if not isinstance(tier, str) or tier.strip().lower() not in VERIFICATION_TIER_ORDER:
+            return True
+        if not meaningful_list(artifact.get("risk_tags")):
+            return True
+        if not meaningful_list(artifact.get("affected_surfaces")):
+            return True
+        if not meaningful_list(artifact.get("invariants")):
+            return True
+    return False
+
+
 def stage_has_high_risk_artifact(artifacts: list[dict[str, object]]) -> bool:
     for artifact in artifacts:
         risk_level = artifact.get("risk_level")
-        if isinstance(risk_level, str) and risk_level.lower() == "high":
+        if artifact_has_changed_files(artifact) and isinstance(risk_level, str) and risk_level.lower() == "high":
             return True
     return False
 
@@ -182,7 +360,104 @@ def check_child_acceptance_cleanup(artifacts: list[dict[str, object]]) -> None:
         print("child acceptance cleanup OK")
         return
 
-    print("Accepted child streams require mini-closeout before stage close:", file=sys.stderr)
+    print("Final stage closeout needs child delivery and cleanup state:", file=sys.stderr)
+    for failure in failures:
+        print(f"- {failure}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def resolve_review_state_path(repo_root: pathlib.Path, inbox: dict[str, object]) -> pathlib.Path:
+    raw_path = inbox.get("review_state_file")
+    if not isinstance(raw_path, str) or not raw_path:
+        raise SystemExit("completion_inbox.review_state_file is required for blocking-review checks")
+    path = pathlib.Path(raw_path)
+    if inbox.get("scope", "repo_root") != "git_common_dir":
+        return repo_root / path
+
+    common_dir_raw = subprocess.check_output(
+        ["git", "rev-parse", "--git-common-dir"], cwd=repo_root, text=True
+    ).strip()
+    common_dir = pathlib.Path(common_dir_raw)
+    if not common_dir.is_absolute():
+        common_dir = (repo_root / common_dir).resolve()
+    return common_dir / path
+
+
+def load_reviewed_state(path: pathlib.Path) -> dict[str, dict[str, object]]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read completion review state {path}: {exc}") from exc
+    reviewed = payload.get("reviewed") if isinstance(payload, dict) else None
+    if not isinstance(reviewed, dict):
+        raise SystemExit(f"completion review state {path} is missing a reviewed object")
+    if any(not isinstance(event_id, str) or not isinstance(entry, dict) for event_id, entry in reviewed.items()):
+        raise SystemExit(f"completion review state {path} contains an invalid reviewed entry")
+    return reviewed
+
+
+@contextmanager
+def review_state_read_lock(path: pathlib.Path):
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def unresolved_blocking_review_findings(
+    reviewed: dict[str, dict[str, object]], stage_id: str | None = None
+) -> list[str]:
+    scoped = {
+        event_id: entry
+        for event_id, entry in reviewed.items()
+        if stage_id is None or entry.get("stage_id") == stage_id
+    }
+    resolved: set[str] = set()
+    for entry in scoped.values():
+        if entry.get("decision") != "accepted":
+            continue
+        if entry.get("verify") != "passed" or not isinstance(entry.get("artifact_path"), str):
+            continue
+        links = entry.get("resolves_review")
+        if isinstance(links, list):
+            resolved.update(link for link in links if isinstance(link, str) and link)
+
+    failures: list[str] = []
+    for event_id, entry in scoped.items():
+        severity = entry.get("severity")
+        if severity not in {"P0", "P1"}:
+            continue
+        decision = entry.get("decision")
+        if decision == "accepted":
+            failures.append(f"{event_id}: P0/P1 finding cannot be accepted directly; record a linked correction")
+        elif event_id not in resolved:
+            failures.append(f"{event_id}: {severity} finding has no linked accepted correction")
+    return failures
+
+
+def check_blocking_review_findings(
+    repo_root: pathlib.Path, contract: dict[str, object], stage_id: str | None = None
+) -> None:
+    limits = contract.get("stage_limits")
+    if not isinstance(limits, dict) or limits.get("p0_p1_block_acceptance") is not True:
+        return
+    inbox = contract.get("completion_inbox")
+    if not isinstance(inbox, dict):
+        raise SystemExit("p0_p1_block_acceptance requires a [completion_inbox] section")
+    state_path = resolve_review_state_path(repo_root, inbox)
+    with review_state_read_lock(state_path):
+        reviewed = load_reviewed_state(state_path)
+    failures = unresolved_blocking_review_findings(reviewed, stage_id)
+    if not failures:
+        print("blocking review findings OK")
+        return
+    print("P0/P1 review findings must be fixed before stage acceptance:", file=sys.stderr)
     for failure in failures:
         print(f"- {failure}", file=sys.stderr)
     raise SystemExit(1)
@@ -497,15 +772,19 @@ def main(argv: list[str]) -> int:
     if not isinstance(verification, dict):
         verification = {}
 
-    groups = list(args.verify_group) if args.verify_group else infer_groups(contract, artifacts, args.include_optional)
+    explicit_groups = bool(args.verify_group)
+    _, legacy_artifacts = split_adaptive_artifacts(artifacts)
+    groups = list(args.verify_group) if explicit_groups else infer_groups(contract, artifacts, args.include_optional)
     if not groups and "stage_close_commands" in verification:
         groups = ["stage_close_commands"]
     groups = add_e2e_group_when_requested(
         groups,
         verification,
-        requested=args.include_e2e or stage_has_high_risk_artifact(artifacts),
+        requested=args.include_e2e
+        or (not explicit_groups and stage_has_high_risk_artifact(legacy_artifacts)),
     )
 
+    check_blocking_review_findings(repo_root, contract, args.stage_id)
     check_child_acceptance_cleanup(artifacts)
     check_project_index_review(repo_root, contract, args.stage_id)
     check_documentation_review(repo_root, args.stage_id)
@@ -513,8 +792,8 @@ def main(argv: list[str]) -> int:
 
     for group in groups:
         commands = verification.get(group)
-        if not isinstance(commands, list):
-            raise SystemExit(f"Verification group {group!r} is missing or not a list")
+        if not isinstance(commands, list) or not commands:
+            raise SystemExit(f"Verification group {group!r} is missing, empty, or not a list")
         print(f"== verification group: {group} ==")
         for command in commands:
             run_shell(str(command), repo_root, args.dry_run)
@@ -531,6 +810,7 @@ def main(argv: list[str]) -> int:
         if not args.dry_run:
             subprocess.run(cmd, cwd=repo_root, check=True)
 
+    check_blocking_review_findings(repo_root, contract, args.stage_id)
     print("stage closeout verification OK")
     return 0
 

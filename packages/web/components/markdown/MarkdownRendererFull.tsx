@@ -48,10 +48,7 @@ import { MermaidDiagram } from './components/MermaidDiagram'
 import { escapeCurrencyDollarSigns } from './utils/escape-currency'
 import { parseCalloutFromChildren } from './utils/callout-parser'
 import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getCareerPlaybookNumericFactDomId } from '@/lib/career-playbook/numeric-facts'
 import type { PresetName, FeatureFlags } from './types'
-import type { CareerPlaybookNumericFact } from '@megacampus/shared-types'
 import type { Components } from 'react-markdown'
 
 // KaTeX CSS for math rendering
@@ -72,10 +69,6 @@ export interface MarkdownRendererFullProps {
   features?: Partial<FeatureFlags>
   /** Content language for localized callout titles (ISO 639-1) */
   language?: string
-  /** Optional Career Playbook numeric annotations rendered over plain markdown text. */
-  numericFacts?: CareerPlaybookNumericFact[]
-  /** Called when an annotated numeric fact is clicked. */
-  onNumericFactClick?: (fact: CareerPlaybookNumericFact) => void
 }
 
 /**
@@ -242,8 +235,6 @@ export function MarkdownRendererFull({
   className,
   features,
   language,
-  numericFacts,
-  onNumericFactClick,
 }: MarkdownRendererFullProps): React.JSX.Element {
   // Get merged preset configuration with feature overrides
   const config = getPresetConfig(preset, features)
@@ -257,8 +248,6 @@ export function MarkdownRendererFull({
   }
 
   const normalizedContent = normalizeMalformedMarkdownTables(content)
-  const annotatableNumericFacts = getAnnotatableNumericFacts(numericFacts)
-  const numericAnnotationState = createNumericAnnotationState(annotatableNumericFacts)
 
   // Build remark plugins array based on config
   const remarkPlugins: React.ComponentProps<typeof Markdown>['remarkPlugins'] = [remarkGfm]
@@ -275,41 +264,17 @@ export function MarkdownRendererFull({
 
   // Build custom components based on config
   const components: Components = {
-    p: ({ children }) => (
-      <p>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </p>
-    ),
+    p: ({ children }) => <p>{children}</p>,
 
-    li: ({ children }) => (
-      <li>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </li>
-    ),
+    li: ({ children }) => <li>{children}</li>,
 
-    td: ({ children }) => (
-      <td>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </td>
-    ),
+    td: ({ children }) => <td>{children}</td>,
 
-    th: ({ children }) => (
-      <th>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </th>
-    ),
+    th: ({ children }) => <th>{children}</th>,
 
-    strong: ({ children }) => (
-      <strong>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </strong>
-    ),
+    strong: ({ children }) => <strong>{children}</strong>,
 
-    em: ({ children }) => (
-      <em>
-        {annotateMarkdownChildren(children, numericAnnotationState, onNumericFactClick, language)}
-      </em>
-    ),
+    em: ({ children }) => <em>{children}</em>,
 
     h1: ({ children }) => <h1>{children}</h1>,
 
@@ -479,289 +444,5 @@ export function MarkdownRendererFull({
     </Markdown>
   )
 
-  return (
-    <article className={wrapperClassName}>
-      {annotatableNumericFacts.length > 0 ? (
-        <TooltipProvider delayDuration={150}>{markdown}</TooltipProvider>
-      ) : (
-        markdown
-      )}
-    </article>
-  )
-}
-
-type NumericFactClickHandler = (fact: CareerPlaybookNumericFact) => void
-
-interface NumericAnnotationState {
-  factsByRawText: Map<string, CareerPlaybookNumericFact[]>
-  seenByRawText: Map<string, number>
-}
-
-function getAnnotatableNumericFacts(
-  numericFacts?: CareerPlaybookNumericFact[]
-): CareerPlaybookNumericFact[] {
-  if (!numericFacts?.length) return []
-
-  const unique = new Map<string, CareerPlaybookNumericFact>()
-  for (const fact of numericFacts) {
-    const rawText = fact.raw_text.trim()
-    if (!rawText) continue
-    unique.set(`${fact.id}:${rawText}`, fact)
-  }
-
-  return Array.from(unique.values()).sort((left, right) => {
-    const lengthDelta = right.raw_text.length - left.raw_text.length
-    return lengthDelta === 0 ? left.id.localeCompare(right.id) : lengthDelta
-  })
-}
-
-function createNumericAnnotationState(
-  numericFacts: CareerPlaybookNumericFact[]
-): NumericAnnotationState {
-  const factsByRawText = new Map<string, CareerPlaybookNumericFact[]>()
-  for (const fact of numericFacts) {
-    const existing = factsByRawText.get(fact.raw_text) ?? []
-    existing.push(fact)
-    factsByRawText.set(fact.raw_text, existing)
-  }
-
-  for (const facts of factsByRawText.values()) {
-    facts.sort((left, right) => {
-      const occurrenceDelta = left.occurrence_index - right.occurrence_index
-      return occurrenceDelta === 0 ? left.id.localeCompare(right.id) : occurrenceDelta
-    })
-  }
-
-  return {
-    factsByRawText,
-    seenByRawText: new Map(),
-  }
-}
-
-function annotateMarkdownChildren(
-  children: React.ReactNode,
-  numericState: NumericAnnotationState,
-  onNumericFactClick?: NumericFactClickHandler,
-  language?: string
-): React.ReactNode {
-  if (numericState.factsByRawText.size === 0) return children
-
-  return React.Children.map(children, (child) => {
-    if (typeof child === 'string' || typeof child === 'number') {
-      return annotateTextNode(String(child), numericState, onNumericFactClick, language)
-    }
-
-    if (React.isValidElement(child)) {
-      if (shouldSkipNumericAnnotation(child)) return child
-
-      const elementProps = child.props as { children?: React.ReactNode }
-      if (!elementProps.children) return child
-
-      return React.cloneElement(
-        child as React.ReactElement<{ children?: React.ReactNode }>,
-        undefined,
-        annotateMarkdownChildren(elementProps.children, numericState, onNumericFactClick, language)
-      )
-    }
-
-    return child
-  })
-}
-
-function shouldSkipNumericAnnotation(child: React.ReactElement) {
-  const props = child.props as { node?: { tagName?: string } }
-  const tagName = typeof child.type === 'string' ? child.type : props.node?.tagName
-  return tagName === 'code' || tagName === 'pre' || tagName === 'a'
-}
-
-function annotateTextNode(
-  text: string,
-  numericState: NumericAnnotationState,
-  onNumericFactClick?: NumericFactClickHandler,
-  language?: string
-): React.ReactNode {
-  const parts: React.ReactNode[] = []
-  let cursor = 0
-
-  while (cursor < text.length) {
-    const next = findNextNumericFact(text, cursor, numericState)
-    if (!next) break
-
-    if (next.index > cursor) {
-      parts.push(text.slice(cursor, next.index))
-    }
-
-    parts.push(
-      <NumericFactInlineTrigger
-        key={`${next.fact.id}-${next.index}`}
-        fact={next.fact}
-        language={language}
-        onClick={onNumericFactClick}
-      />
-    )
-    incrementSeenNumericFact(next.fact.raw_text, numericState)
-    cursor = next.index + next.fact.raw_text.length
-  }
-
-  if (cursor === 0) return text
-  if (cursor < text.length) parts.push(text.slice(cursor))
-
-  return parts
-}
-
-function findNextNumericFact(
-  text: string,
-  startIndex: number,
-  numericState: NumericAnnotationState
-): { fact: CareerPlaybookNumericFact; index: number } | null {
-  let selected: { fact: CareerPlaybookNumericFact; index: number } | null = null
-
-  for (const [rawText, facts] of numericState.factsByRawText.entries()) {
-    const seen = numericState.seenByRawText.get(rawText) ?? 0
-    const fact = facts[seen]
-    if (!fact) continue
-
-    const index = text.indexOf(rawText, startIndex)
-    if (index === -1) continue
-    if (
-      !selected ||
-      index < selected.index ||
-      (index === selected.index && fact.raw_text.length > selected.fact.raw_text.length)
-    ) {
-      selected = { fact, index }
-    }
-  }
-
-  return selected
-}
-
-function incrementSeenNumericFact(rawText: string, numericState: NumericAnnotationState) {
-  const current = numericState.seenByRawText.get(rawText) ?? 0
-  numericState.seenByRawText.set(rawText, current + 1)
-}
-
-function NumericFactInlineTrigger({
-  fact,
-  language,
-  onClick,
-}: {
-  fact: CareerPlaybookNumericFact
-  language?: string
-  onClick?: NumericFactClickHandler
-}) {
-  const className = cn(
-    'mx-0.5 inline-flex rounded px-1 py-0.5 align-baseline text-[0.94em] font-medium ring-1 transition-colors ring-inset',
-    'focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none',
-    getNumericFactStatusClassName(fact.status)
-  )
-  const triggerId = getCareerPlaybookNumericFactDomId(fact.id)
-  const trigger = onClick ? (
-    <button
-      id={triggerId}
-      type="button"
-      className={className}
-      data-numeric-fact-id={fact.id}
-      data-numeric-fact-status={fact.status}
-      data-testid="career-playbook-numeric-fact"
-      onClick={() => onClick(fact)}
-    >
-      {fact.raw_text}
-    </button>
-  ) : (
-    <span
-      id={triggerId}
-      className={className}
-      data-numeric-fact-id={fact.id}
-      data-numeric-fact-status={fact.status}
-      data-testid="career-playbook-numeric-fact"
-      tabIndex={0}
-    >
-      {fact.raw_text}
-    </span>
-  )
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent
-        side="top"
-        className="max-w-xs border border-slate-200 bg-white text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-      >
-        <div className="grid gap-1">
-          <p className="font-medium">{getNumericFactStatusLabel(fact.status, language)}</p>
-          <p className="text-slate-500 dark:text-slate-300">
-            {getNumericFactSourceLabel(fact.source, language)}
-            {fact.source_label ? `: ${fact.source_label}` : ''}
-          </p>
-          {typeof fact.confidence === 'number' ? (
-            <p className="text-slate-500 dark:text-slate-300">
-              {getConfidenceLabel(fact.confidence, language)}
-            </p>
-          ) : null}
-          <p>{fact.explanation}</p>
-          <p className="text-slate-500 dark:text-slate-300">
-            {getNumericFactActionLabel(language)}
-          </p>
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
-function getNumericFactStatusClassName(status: CareerPlaybookNumericFact['status']) {
-  switch (status) {
-    case 'verified':
-      return 'bg-emerald-50 text-emerald-800 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-300/10 dark:text-emerald-100 dark:ring-emerald-300/30'
-    case 'benchmark':
-      return 'bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100 dark:bg-sky-300/10 dark:text-sky-100 dark:ring-sky-300/30'
-    case 'suggested':
-      return 'bg-violet-50 text-violet-800 ring-violet-200 hover:bg-violet-100 dark:bg-violet-300/10 dark:text-violet-100 dark:ring-violet-300/30'
-    case 'structural':
-      return 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700/50 dark:text-slate-100 dark:ring-slate-500/50'
-    case 'conflict':
-      return 'bg-rose-50 text-rose-800 ring-rose-200 hover:bg-rose-100 dark:bg-rose-300/10 dark:text-rose-100 dark:ring-rose-300/30'
-    case 'needs_review':
-    default:
-      return 'bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-300/30'
-  }
-}
-
-function getNumericFactStatusLabel(status: CareerPlaybookNumericFact['status'], language?: string) {
-  const ru = language?.toLowerCase().startsWith('ru')
-  const labels: Record<CareerPlaybookNumericFact['status'], { ru: string; en: string }> = {
-    verified: { ru: 'Подтверждено', en: 'Verified' },
-    benchmark: { ru: 'Бенчмарк', en: 'Benchmark' },
-    suggested: { ru: 'Рекомендация', en: 'Suggested' },
-    structural: { ru: 'Структурная цифра', en: 'Structural number' },
-    needs_review: { ru: 'Требует согласования', en: 'Needs review' },
-    conflict: { ru: 'Есть конфликт источников', en: 'Source conflict' },
-  }
-  return ru ? labels[status].ru : labels[status].en
-}
-
-function getNumericFactSourceLabel(source: CareerPlaybookNumericFact['source'], language?: string) {
-  const ru = language?.toLowerCase().startsWith('ru')
-  const labels: Record<CareerPlaybookNumericFact['source'], { ru: string; en: string }> = {
-    user_input: { ru: 'Источник: ввод пользователя', en: 'Source: user input' },
-    business_context: { ru: 'Источник: контекст бизнеса', en: 'Source: business context' },
-    source_document: { ru: 'Источник: документ', en: 'Source: source document' },
-    web_benchmark: { ru: 'Источник: рыночный бенчмарк', en: 'Source: web benchmark' },
-    methodology: { ru: 'Источник: методология', en: 'Source: methodology' },
-    model_suggestion: { ru: 'Источник: рекомендация модели', en: 'Source: model suggestion' },
-    unknown: { ru: 'Источник: не определён', en: 'Source: unknown' },
-  }
-  return ru ? labels[source].ru : labels[source].en
-}
-
-function getConfidenceLabel(confidence: number, language?: string) {
-  const value = Math.round(confidence * 100)
-  return language?.toLowerCase().startsWith('ru')
-    ? `Уверенность: ${value}%`
-    : `Confidence: ${value}%`
-}
-
-function getNumericFactActionLabel(language?: string) {
-  return language?.toLowerCase().startsWith('ru')
-    ? 'Что сделать: исправьте значение, подтвердите его в источнике или оставьте без проверки.'
-    : 'What to do: correct the value, confirm it in a source, or leave it unverified.'
+  return <article className={wrapperClassName}>{markdown}</article>
 }

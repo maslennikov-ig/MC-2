@@ -27,6 +27,14 @@ CLASSES = {
     "production-api", "production-web", "production-worker",
     "development-api", "development-web", "development-worker",
 }
+# mc2-1kcbv: the compose projects that may hold a Q12 writer, and the ten writer SERVICES inside
+# them. The projects also carry the platform's non-writer services, so the service names are what
+# defines the writer set — one entry per expected class count in `validate_quiesce_writers`.
+QUIESCE_PROJECTS = ("megacampus-blue", "megacampus-green", "megacampus")
+QUIESCE_SERVICES = (
+    "api", "web", "worker", "worker-stage6", "worker-stage7",
+    "api-dev", "web-dev", "worker-dev", "worker-stage6-dev", "worker-stage7-dev",
+)
 ROLLBACK_CONDITIONAL_PHASES = [
     "handoff_rollback_verified",
     "qdrant_rollback_verified",
@@ -475,6 +483,20 @@ def run_quiesce():
         and head["lease_epoch"] == capability["lease_epoch"],
         "writer quiesce claimed journal head is invalid",
     )
+    # mc2-awi6q: an ordinary command's INTENT row does not carry its own (not yet issued)
+    # capability — it INHERITS the predecessor row's value unchanged. That carry is the ratified
+    # rule (docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md item 6)
+    # and the controller's own behaviour (q12-lifecycle-core.py selector_intent_from_head /
+    # append_ordinary_lifecycle: `carried = self.journal[-1]["capability_manifest_sha256"]`, ZERO
+    # only when the journal is empty). The 0×64 intent rule is real but belongs to the
+    # barrier.cleanup lifecycle alone (design :636/:867, core grammar :335). Demanding 0×64 here
+    # made C2 fail closed on a correct production journal after the barrier had already guarded the
+    # database (window attempt #11, 2026-07-28). The inherited value is checked EXACTLY against the
+    # preceding journal row, so this is a corrected expectation, not a relaxed one.
+    carried_before = {
+        entry["seq"]: (journal_entries[position - 1]["capability_manifest_sha256"] if position else "0" * 64)
+        for position, entry in enumerate(journal_entries)
+    }
     quiesce_rows = [entry for entry in journal_entries if entry["phase"] == "quiesced"]
     require(all(entry["command_id"] == "writers.quiesce" for entry in quiesce_rows), "writer quiesce journal command graph is invalid")
     expected_rows = []
@@ -506,7 +528,11 @@ def run_quiesce():
         )
         require(
             observed_outcomes in allowed_outcomes
-            and all(entry["capability_manifest_sha256"] in ({"intent": "0" * 64}.get(entry["outcome"], opened.digest),) for entry in epoch_rows),
+            and all(
+                entry["capability_manifest_sha256"]
+                == (carried_before[entry["seq"]] if entry["outcome"] == "intent" else opened.digest)
+                for entry in epoch_rows
+            ),
             "writer quiesce journal graph is invalid",
         )
         if "recovery_prefix_accepted" in observed_outcomes:
@@ -934,12 +960,28 @@ def run_quiesce():
             )
             previous_overlay_sha256 = overlay_file.digest
     else:
+        # mc2-1kcbv: select by compose SERVICE, not by "everything in the compose project". The
+        # three scanned projects also hold the platform's non-writer services — on production
+        # `megacampus` carries redis, qdrant, qdrant-dev, docling-mcp, docling-mcp-internal,
+        # notebooklm-bridge and notebooklm-bridge-dev alongside the eight writers, so the
+        # project-wide sweep returned 17 containers and C2 failed closed with "writer quiesce
+        # inventory is not exact" (window attempt #12, 2026-07-29) — after the barrier had already
+        # guarded the database. The classifier below would also have called redis a
+        # `production-worker`. The ten writer services are frozen here and the exactness check is
+        # kept, so adding a platform service no longer moves the writer set and REMOVING a writer
+        # still fails closed.
         writer_ids = []
-        for project in ("megacampus-blue", "megacampus-green", "megacampus"):
-            writer_ids.extend(
-                value for value in docker("ps", "-aq", "--no-trunc", "--filter", f"label=com.docker.compose.project={project}").splitlines()
-                if value
-            )
+        for project in QUIESCE_PROJECTS:
+            for service in QUIESCE_SERVICES:
+                writer_ids.extend(
+                    value
+                    for value in docker(
+                        "ps", "-aq", "--no-trunc",
+                        "--filter", f"label=com.docker.compose.project={project}",
+                        "--filter", f"label=com.docker.compose.service={service}",
+                    ).splitlines()
+                    if value
+                )
         require(len(writer_ids) == 10 and len(set(writer_ids)) == 10, "writer quiesce inventory is not exact")
         writers = []
         raw_rows = {}

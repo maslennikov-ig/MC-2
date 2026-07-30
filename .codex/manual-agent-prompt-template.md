@@ -13,13 +13,14 @@ Stage ID: <current stage id>
 ## Context
 
 - Workspace root: <absolute path>
-- Repo: <repo-or-n/a>
+- Repo: <backend/frontend/docs/etc>
 - Base branch: <name>
 - Base commit: <sha>
 - Dedicated worktree: <absolute path>
 - Artifact path: <absolute path>
 - Relevant contract files:
   - AGENTS.md
+  - .codex/delivery-contract.md
   - .codex/orchestrator.toml
   - .codex/handoff.md
 - Prior artifacts / related links:
@@ -52,9 +53,21 @@ Stage ID: <current stage id>
 2. <non-negotiable requirement>
 3. <non-negotiable requirement>
 4. If the orchestrator sends a follow-up correction for this same task, continue in the same task / branch / worktree unless the orchestrator explicitly tells you to split or reset the stream.
-5. After writing the artifact, emit a completion event with `python3 scripts/orchestration/report_child_completion.py ...`. The event is the canonical return signal to the orchestrator.
+5. Work only on the assigned non-protected delivery branch/worktree. Commit there when requested. Push that branch only if this task contract explicitly allows it; never push directly to `main` / `develop` / `dev` or another protected/base branch.
+6. Final commit subjects must follow Conventional Commits.
+7. Update `CHANGELOG.md` in Keep a Changelog format or state exactly why no changelog entry is needed in both the report and the PR body.
+8. When the task maps to a GitHub issue, the PR body must include `Closes rechkaai/<repo>#<N>`.
+9. After writing the artifact, emit a completion event with `python3 scripts/orchestration/report_child_completion.py ...`. The event is the canonical return signal to the orchestrator.
 
 Treat these as hard requirements, not nice-to-haves.
+
+## Artifact Addendum
+
+In the final artifact, add a clear note covering:
+
+- <required explicit conclusion 1>
+- <required explicit conclusion 2>
+- <required explicit justification 3>
 
 ## Completion Event
 
@@ -78,5 +91,10 @@ Optional only when needed:
 
 ## Notes
 
-- Use this as a skeleton. Add repo-specific delivery rules, changelog rules, or PR rules when the repo contract requires them.
-- Keep the chat reply short and uniform; it is a visibility hint, not the acceptance channel.
+- Prefer numbered hard requirements when the task has business-critical constraints.
+- When the user provides a supplemental requirement block, preserve it nearly verbatim under `## Hard Requirements`.
+- When tunability/configurability matters, require the artifact to separate:
+  - what became configurable
+  - what stayed code-defined
+  - why
+- Default delivery mode is PR-only. Say the target base branch explicitly in the prompt.

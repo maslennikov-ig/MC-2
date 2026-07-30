@@ -21,6 +21,8 @@ Use the repo-local verification commands from `.codex/orchestrator.toml`.
 Use `scripts/orchestration/run_process_verification.sh` as the process-verification entrypoint before claiming the orchestration layer is in a good state.
 Use `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` when a stage is actually closing; it is the canonical two-phase closeout entrypoint.
 
+Use `scripts/orchestration/check_stranded_commits.py` before claiming that finished work is delivered. It reports commits that exist only on a side branch and never reached `develop`, matching by commit subject because cherry-pick and squash change sha, tree and patch-id. Closing a Beads issue proves intent, not delivery; on 2026-07-27 an audit found three finished, reviewed, closed changes stranded for weeks. `/push-dev` runs it as an advisory step after delivery. Knowingly undelivered branches belong in `.codex/stranded-commit-allowlist.txt` with a recorded reason.
+
 Typical code-change gates in this repo include:
 
 - `pnpm type-check`
@@ -51,6 +53,7 @@ Typical code-change gates in this repo include:
 - `scripts/orchestration/check_stage_ready.py <stage_id>` is the minimal hard stop before stage close.
 - `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` runs stage-close verification before delivery.
 - `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id>` removes safe local worktrees and branches for completed stage deliveries.
+- `scripts/orchestration/check_stranded_commits.py` detects undelivered work; `.codex/stranded-commit-allowlist.txt` records the branches that are knowingly not in `develop` and why.
 - Beads remains the source of truth for queue, status, and dependencies.
 
 ## Knowledge Graph
@@ -79,34 +82,26 @@ bd close <id>         # Complete work
 
 ### Rules
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Task truth for engineering work lives in `bd`. `TodoWrite` is allowed for in-session skill checklists; it is not a task tracker and does not replace `bd`.
 - Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Use `bd remember` for cross-session project facts. The harness `MEMORY.md` remains the primary memory store — both are in use, neither is banned.
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, follow the repo delivery contract and current user authorization. Remote pushes are not automatic.
 
-**MANDATORY WORKFLOW:**
+**WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
+4. **Deliver when authorized** - `bd dolt push`, then ordinary `git push` only after fresh verification passes and a fetch proves the remote is not ahead or diverged
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+6. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Use `bd` for task truth when available.
+- Run quality gates before completion claims.
+- Ordinary commits and ordinary push are allowed after fresh verification/closeout when the repo contract or current user request authorizes delivery. Before push, fetch and stop if remote is ahead/diverged, branch/protected-target is unclear, or uncommitted/staged scope is unsafe. Subagents may commit/push only their assigned branch/worktree when explicitly allowed by task/contract, never directly to protected/base branches.
 <!-- END BEADS INTEGRATION -->

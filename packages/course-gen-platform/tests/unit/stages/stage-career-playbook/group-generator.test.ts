@@ -255,7 +255,7 @@ describe('Career Playbook group generator', () => {
     });
   });
 
-  it('annotates generated numeric facts with business-context provenance', async () => {
+  it('keeps generated numeric values as plain block content without review metadata', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
     const invokeLLM = vi.fn().mockResolvedValue({
       content: `## Header
@@ -300,25 +300,10 @@ describe('Career Playbook group generator', () => {
       { renderPrompt, invokeLLM }
     );
 
-    expect(result.blocks.block_1.numeric_facts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          raw_text: '80',
-          status: 'verified',
-          source: 'source_document',
-        }),
-        expect.objectContaining({
-          raw_text: '2.5%',
-          status: 'verified',
-          source: 'source_document',
-        }),
-        expect.objectContaining({
-          raw_text: '25%',
-          status: 'needs_review',
-          source: 'model_suggestion',
-        }),
-      ])
-    );
+    expect(result.blocks.block_1.content).toContain('80 MQL/месяц');
+    expect(result.blocks.block_1.content).toContain('2.5%');
+    expect(result.blocks.block_1.content).toContain('25%');
+    expect(result.blocks.block_1).not.toHaveProperty('numeric_facts');
   });
 
   it('passes localized English heading labels into group prompts', async () => {

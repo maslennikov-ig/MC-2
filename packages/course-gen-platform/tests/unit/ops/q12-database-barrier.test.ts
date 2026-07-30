@@ -29,6 +29,16 @@ const POSTGRES_IMAGE = 'postgres:17.10-bookworm';
 const POSTGRES_PASSWORD = 'q12-local-terminal-proof-password';
 const temporaryDirectories: string[] = [];
 
+// The emitted SQL carries load-bearing rationale in `--` comments (mc2-ipwyc explains there why a
+// per-relation DROP TRIGGER is impossible). An assertion that a STATEMENT is absent must therefore
+// look at the executable lines only, or it matches the very comment that documents the absence.
+function executableSql(sql: string): string {
+  return sql
+    .split('\n')
+    .filter(line => !line.trimStart().startsWith('--'))
+    .join('\n');
+}
+
 function source(): string {
   return readFileSync(BARRIER, 'utf8');
 }
@@ -83,14 +93,8 @@ function expectedCatalog(): Record<string, unknown> {
       ...publicRelations,
       ...authRelations,
       ...storageRelations,
-      {
-        schema: 'cron',
-        name: 'job',
-        oid: 400,
-        relkind: 'r',
-        parent_oid: null,
-        owner: 'postgres',
-      },
+      // mc2-34eua: cron.job is NOT guarded — production `postgres` can neither LOCK nor
+      // CREATE TRIGGER on a supabase_admin-owned relation.
       {
         schema: 'net',
         name: 'http_request_queue',
@@ -1018,8 +1022,13 @@ describe('Q12 durable database maintenance barrier', () => {
     const tx1Sql = freshSql.slice(0, freshSql.indexOf('-- Q12_INSTALL_TX1_COMMITTED'));
     expect(tx1Sql.match(/^LOCK TABLE/gmu) ?? []).toHaveLength(1);
     const lockStatement = sql.match(/LOCK TABLE ([^;]+) IN ACCESS EXCLUSIVE MODE;/u)?.[1];
-    expect(lockStatement).toMatch(/"public"\."public_table_00"[\s\S]*"cron"\."job"/u);
+    expect(lockStatement).toMatch(
+      /"public"\."public_table_00"[\s\S]*"net"\."http_request_queue"[\s\S]*"supabase_migrations"\."schema_migrations"/u
+    );
     expect(lockStatement).not.toContain('document_evidence_runs');
+    // mc2-34eua: cron.job must never be a lock target. `postgres` cannot take ACCESS EXCLUSIVE on
+    // a supabase_admin-owned relation (42501), which failed C1 six times against production.
+    expect(lockStatement).not.toContain('"cron"');
     expect(sql).toContain('CREATE TRIGGER q12_guard_row');
     expect(sql).toContain('CREATE TRIGGER q12_guard_truncate');
     expect(sql).toContain('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA q12_guard FROM PUBLIC');
@@ -1149,9 +1158,17 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(lock).toBeGreaterThan(capability);
     expect(verify).toBeGreaterThan(lock);
     expect(restore).toBeGreaterThan(verify);
-    expect(sql).toContain("t.tgname='q12_guard_truncate'");
-    expect(sql).toContain("t.tgname='q12_guard_row'");
-    expect(sql).not.toContain("t.tgname='q12_guard_immutable'");
+    // mc2-ipwyc: the guards are disarmed by dropping the guard FUNCTION with CASCADE, never by
+    // per-relation DROP TRIGGER — that needs OWNERSHIP of the table, which postgres does not have
+    // on the auth/storage relations it is nonetheless allowed to arm.
+    expect(sql).toContain('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;');
+    expect(executableSql(sql)).not.toContain('DROP TRIGGER');
+    // The six immutable guards survive activation: their definitions are captured BEFORE the drop
+    // and replayed after it, and the count is asserted inside the block.
+    expect(sql).toContain('pg_get_triggerdef');
+    expect(sql).toContain("t.tgname IN ('q12_guard_immutable','q12_guard_immutable_truncate')");
+    expect(sql).toContain('Q12 immutable guard trigger set is not exactly six before restore');
+    expect(sql).toContain('FOREACH definition IN ARRAY immutable_definitions');
     expect(sql).toContain('q12_guard_ddl_command_start');
   });
 
@@ -1249,8 +1266,18 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(dropSchema).toBeGreaterThan(restoreDefault);
     expect(sql).not.toContain('prior := NULL');
     expect(sql).toContain('t.tgparentid=0');
-    expect(sql.indexOf("t.tgname='q12_guard_truncate'")).toBeLessThan(
-      sql.indexOf("t.tgname='q12_guard_row'")
+    // mc2-ipwyc: rollback disarms through the same CASCADE and re-creates NOTHING — the schema is
+    // dropped a few statements later. The capture must still precede the drop.
+    expect(sql).toContain('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;');
+    expect(executableSql(sql)).not.toContain('DROP TRIGGER');
+    expect(sql.indexOf('pg_get_functiondef')).toBeLessThan(
+      sql.indexOf('DROP FUNCTION q12_guard.enforce_write_barrier() CASCADE;')
+    );
+    // The replay branch is emitted but provably DEAD on rollback: $drop_schema is substituted into
+    // the guard, so the rollback SQL literally reads IF 'true'='false'.
+    expect(sql).toContain("IF 'true'='false' THEN");
+    expect(sql.indexOf("IF 'true'='false' THEN")).toBeLessThan(
+      sql.indexOf('FOREACH definition IN ARRAY immutable_definitions')
     );
   });
 
@@ -1269,7 +1296,7 @@ describe('Q12 durable database maintenance barrier', () => {
     expect(existsSync(fixture.cleanupProof)).toBe(true);
   });
 
-  it('rejects unknown top-level catalog fields and a seventy-seventh public relation', () => {
+  it('rejects unknown top-level catalog fields, a seventy-sixth public relation, and a guarded cron relation', () => {
     for (const mutate of [
       (catalog: Record<string, any>) => {
         catalog.non_authoritative_relations = [];
@@ -1282,6 +1309,20 @@ describe('Q12 durable database maintenance barrier', () => {
           relkind: 'r',
           parent_oid: null,
           owner: 'postgres',
+        });
+      },
+      // mc2-34eua: a hand-assembled run-root catalog that guards a cron relation must be refused
+      // HERE, before any DB work — not discovered as a 42501 at C1 with ten writers already
+      // stopped. Both legs of the frozen assertion are exercised: the count moves off 75 and the
+      // cron-schema set is no longer empty.
+      (catalog: Record<string, any>) => {
+        catalog.guarded_relations.push({
+          schema: 'cron',
+          name: 'job',
+          oid: 999_998,
+          relkind: 'r',
+          parent_oid: null,
+          owner: 'supabase_admin',
         });
       },
     ]) {
@@ -1720,55 +1761,88 @@ describe('Q12 durable database maintenance barrier', () => {
 describe.runIf(REAL_PG17)(
   'Q12 terminal proof reconnect against disposable PostgreSQL 17.10',
   () => {
-    it('drives the protected cleanup seam through the actual terminal reconnect runner', async () => {
-      const container = `mc2-q12-terminal-${process.pid}-${Date.now()}`;
-      const docker = (args: string[], input?: string) =>
-        spawnSync('docker', args, {
-          encoding: 'utf8',
-          input,
-          timeout: 60_000,
-        });
-      const started = docker([
-        'run',
-        '-d',
-        '--rm',
-        '--name',
-        container,
-        '-e',
-        `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
-        '-p',
-        '127.0.0.1::5432',
-        POSTGRES_IMAGE,
-      ]);
-      expect(started.status, started.stderr).toBe(0);
+    const docker = (args: string[], input?: string) =>
+      spawnSync('docker', args, {
+        encoding: 'utf8',
+        input,
+        timeout: 60_000,
+      });
 
-      try {
-        let ready = false;
-        for (let attempt = 0; attempt < 100; attempt += 1) {
-          const logs = docker(['logs', container]);
-          const probe = docker([
-            'exec',
-            container,
-            'pg_isready',
-            '-U',
-            'postgres',
-            '-d',
-            'postgres',
-          ]);
-          if (
-            probe.status === 0 &&
-            logs.stdout.includes('PostgreSQL init process complete; ready for start up.')
-          ) {
-            ready = true;
-            break;
+    // mc2-38ivn: production reaches PostgreSQL through Supavisor, which REWRITES the startup-packet
+    // application_name to 'Supavisor' (measured against the live pooler on 2026-07-28 by window
+    // pre-flight probe B3). A PG17 `ON login` event trigger reproduces that shape faithfully in a
+    // plain container: it re-sets application_name at session start from the SESSION source, which
+    // outranks the startup packet's PGC_S_CLIENT, and is in turn overridden by a later in-session
+    // SET -- which is exactly the repair. Without it this leg proves nothing, because a direct
+    // connection delivers application_name and the barrier would look correct for the wrong reason.
+    const POOLER_REWRITE = `
+CREATE FUNCTION public.q12_pooler_rewrite() RETURNS event_trigger LANGUAGE plpgsql AS $rewrite$
+BEGIN
+  PERFORM set_config('application_name','Supavisor',false);
+END;
+$rewrite$;
+CREATE EVENT TRIGGER q12_pooler_rewrite ON login EXECUTE FUNCTION public.q12_pooler_rewrite();
+`;
+    const INTRUDER_NAME = 'megacampus-q12-intruder';
+
+    // `%a` puts the application_name the SERVER sees in front of every log line: the same value
+    // pg_stat_activity reports, observable after the short-lived proof session is gone.
+    const LOG_PREFIX = '%a|';
+
+    // Two cases, one container each. `intruderHeld: false` is the green leg: a real cleanup of an
+    // INSTALLED guard, proving the proof names itself under the pooler-rewrite emulation.
+    // `intruderHeld: true` is the same run with one badged session held open, proving the count
+    // that green leg asserts is live. Running them in one container would have let the green leg
+    // clean an already-cleaned database and read the failed run's log lines.
+    it.each([{ intruderHeld: false }, { intruderHeld: true }])(
+      'drives the protected cleanup seam through the actual terminal reconnect runner (intruder held: $intruderHeld)',
+      async ({ intruderHeld }) => {
+        const container = `mc2-q12-terminal-${intruderHeld ? 'intruder' : 'clean'}-${process.pid}-${Date.now()}`;
+        const started = docker([
+          'run',
+          '-d',
+          '--rm',
+          '--name',
+          container,
+          '-e',
+          `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`,
+          '-p',
+          '127.0.0.1::5432',
+          POSTGRES_IMAGE,
+          '-c',
+          'log_statement=all',
+          '-c',
+          `log_line_prefix=${LOG_PREFIX}`,
+        ]);
+        expect(started.status, started.stderr).toBe(0);
+
+        try {
+          let ready = false;
+          for (let attempt = 0; attempt < 100; attempt += 1) {
+            const logs = docker(['logs', container]);
+            const probe = docker([
+              'exec',
+              container,
+              'pg_isready',
+              '-U',
+              'postgres',
+              '-d',
+              'postgres',
+            ]);
+            if (
+              probe.status === 0 &&
+              logs.stdout.includes('PostgreSQL init process complete; ready for start up.')
+            ) {
+              ready = true;
+              break;
+            }
+            await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
           }
-          await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
-        }
-        expect(ready, docker(['logs', container]).stdout).toBe(true);
+          expect(ready, docker(['logs', container]).stdout).toBe(true);
 
-        const setup = docker(
-          ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
-          `
+          const setup = docker(
+            ['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
+            `
 CREATE SCHEMA extensions;
 CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
 CREATE SCHEMA supabase_migrations;
@@ -1793,80 +1867,124 @@ INSERT INTO cron.job(jobid,schedule,command,nodename,nodeport,database,username,
 SELECT value,'0 * * * *','SELECT ' || value,'localhost',5432,'postgres','postgres',true,
        'q12_job_' || value
 FROM generate_series(1,8) AS value;
+${POOLER_REWRITE}
 `
-        );
-        expect(setup.status, setup.stderr).toBe(0);
+          );
+          expect(setup.status, setup.stderr).toBe(0);
 
-        const structuralSql = readFileSync(STRUCTURAL_CATALOG, 'utf8').trim();
-        const structural = docker(
-          ['exec', '-i', container, 'psql', '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'],
-          `SELECT structural_sha256 FROM (\n${structuralSql}\n) AS terminal_catalog;\n`
-        );
-        expect(structural.status, structural.stderr).toBe(0);
-        const structuralSha256 = structural.stdout.trim();
-        expect(structuralSha256).toMatch(/^[a-f0-9]{64}$/u);
+          // The emulation is real before anything depends on it: a fresh session that ASKS for a Q12
+          // name still reports 'Supavisor', and only an in-session SET moves it.
+          const rewriteProof = docker(
+            [
+              'exec',
+              '-e',
+              'PGAPPNAME=megacampus-q12-asked-at-connect',
+              '-i',
+              container,
+              'psql',
+              '-X',
+              '-q',
+              '-At',
+              '-v',
+              'ON_ERROR_STOP=1',
+              '-U',
+              'postgres',
+            ],
+            `SELECT current_setting('application_name');
+SET application_name='megacampus-q12-rewrite-probe';
+SELECT current_setting('application_name');
+`
+          );
+          expect(rewriteProof.status, rewriteProof.stderr).toBe(0);
+          expect(rewriteProof.stdout.trim().split('\n')).toEqual([
+            'Supavisor',
+            'megacampus-q12-rewrite-probe',
+          ]);
 
-        const cronProjection = Array.from({ length: 8 }, (_, index) => {
-          const jobid = index + 1;
-          return {
-            jobid,
-            jobname: `q12_job_${jobid}`,
-            schedule: '0 * * * *',
-            command_sha256: sha256(`SELECT ${jobid}`),
-            nodename: 'localhost',
-            nodeport: 5432,
+          const structuralSql = readFileSync(STRUCTURAL_CATALOG, 'utf8').trim();
+          const structural = docker(
+            [
+              'exec',
+              '-i',
+              container,
+              'psql',
+              '-X',
+              '-At',
+              '-v',
+              'ON_ERROR_STOP=1',
+              '-U',
+              'postgres',
+            ],
+            `SELECT structural_sha256 FROM (\n${structuralSql}\n) AS terminal_catalog;\n`
+          );
+          expect(structural.status, structural.stderr).toBe(0);
+          const structuralSha256 = structural.stdout.trim();
+          expect(structuralSha256).toMatch(/^[a-f0-9]{64}$/u);
+
+          const cronProjection = Array.from({ length: 8 }, (_, index) => {
+            const jobid = index + 1;
+            return {
+              jobid,
+              jobname: `q12_job_${jobid}`,
+              schedule: '0 * * * *',
+              command_sha256: sha256(`SELECT ${jobid}`),
+              nodename: 'localhost',
+              nodeport: 5432,
+              database: 'postgres',
+              username: 'postgres',
+              active: true,
+            };
+          });
+          const databaseDefault = {
+            schema_version: 'megacampus.q12.database-default/v1',
             database: 'postgres',
-            username: 'postgres',
-            active: true,
+            role: null,
+            row_present: false,
+            settings: [],
           };
-        });
-        const databaseDefault = {
-          schema_version: 'megacampus.q12.database-default/v1',
-          database: 'postgres',
-          role: null,
-          row_present: false,
-          settings: [],
-        };
-        const fixture = barrierFixture();
-        rewriteExpectedCatalog(fixture, catalog => {
-          catalog.baseline_structural_sha256 = structuralSha256;
-          catalog.expected_post_migration_catalog_sha256 = structuralSha256;
-          catalog.migrations['20260711151000'].catalog_sha256 = structuralSha256;
-        });
-        const expectedCatalogSha256 =
-          fixture.args[fixture.args.indexOf('--expected-post-migration-catalog-sha256') + 1];
-        const probeReceipt = JSON.parse(readFileSync(fixture.probeReceipt, 'utf8')) as Record<
-          string,
-          unknown
-        >;
-        probeReceipt.expected_catalog_sha256 = expectedCatalogSha256;
-        chmodSync(fixture.probeReceipt, 0o600);
-        writeCanonical(fixture.probeReceipt, probeReceipt);
-        prepareTerminalInputs(fixture, 'cleanup');
+          const fixture = barrierFixture();
+          rewriteExpectedCatalog(fixture, catalog => {
+            catalog.baseline_structural_sha256 = structuralSha256;
+            catalog.expected_post_migration_catalog_sha256 = structuralSha256;
+            catalog.migrations['20260711151000'].catalog_sha256 = structuralSha256;
+          });
+          const expectedCatalogSha256 =
+            fixture.args[fixture.args.indexOf('--expected-post-migration-catalog-sha256') + 1];
+          const probeReceipt = JSON.parse(readFileSync(fixture.probeReceipt, 'utf8')) as Record<
+            string,
+            unknown
+          >;
+          probeReceipt.expected_catalog_sha256 = expectedCatalogSha256;
+          chmodSync(fixture.probeReceipt, 0o600);
+          writeCanonical(fixture.probeReceipt, probeReceipt);
+          prepareTerminalInputs(fixture, 'cleanup');
 
-        const baseline = JSON.parse(readFileSync(fixture.baseline, 'utf8')) as Record<string, any>;
-        baseline.baseline.database_default_sha256 = sha256(canonicalJson(databaseDefault));
-        baseline.baseline.cron_jobs_sha256 = sha256(canonicalJson(cronProjection));
-        baseline.baseline_sha256 = sha256(canonicalJson(baseline.baseline));
-        chmodSync(fixture.baseline, 0o600);
-        writeCanonical(fixture.baseline, baseline);
+          const baseline = JSON.parse(readFileSync(fixture.baseline, 'utf8')) as Record<
+            string,
+            any
+          >;
+          baseline.baseline.database_default_sha256 = sha256(canonicalJson(databaseDefault));
+          baseline.baseline.cron_jobs_sha256 = sha256(canonicalJson(cronProjection));
+          baseline.baseline_sha256 = sha256(canonicalJson(baseline.baseline));
+          chmodSync(fixture.baseline, 0o600);
+          writeCanonical(fixture.baseline, baseline);
 
-        const publishedPort = docker(['port', container, '5432/tcp']);
-        expect(publishedPort.status, publishedPort.stderr).toBe(0);
-        const port = publishedPort.stdout.trim().match(/:(\d+)$/u)?.[1];
-        expect(port).toMatch(/^\d+$/u);
-        writeFileSync(
-          fixture.dbUrl,
-          `postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:${port}/postgres\n`
-        );
-        chmodSync(fixture.dbUrl, 0o600);
+          const publishedPort = docker(['port', container, '5432/tcp']);
+          expect(publishedPort.status, publishedPort.stderr).toBe(0);
+          const port = publishedPort.stdout.trim().match(/:(\d+)$/u)?.[1];
+          expect(port).toMatch(/^\d+$/u);
+          writeFileSync(
+            fixture.dbUrl,
+            `postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:${port}/postgres\n`
+          );
+          chmodSync(fixture.dbUrl, 0o600);
 
-        const testRoot = fixture.env.MC2_Q12_BARRIER_TEST_ROOT as string;
-        const terminalNode = join(testRoot, 'terminal-node');
-        const terminalInvocationLog = join(testRoot, 'terminal-node-invoked.log');
-        writeFileSync(
-          terminalNode,
-          `#!/usr/bin/env bash
+          const testRoot = fixture.env.MC2_Q12_BARRIER_TEST_ROOT as string;
+          const terminalNode = join(testRoot, 'terminal-node');
+          const terminalInvocationLog = join(testRoot, 'terminal-node-invoked.log');
+          writeFileSync(
+            terminalNode,
+            `#!/usr/bin/env bash
 set -euo pipefail
 {
   printf 'invoked url_fd=%s\\n' "$3"
@@ -1875,44 +1993,119 @@ set -euo pipefail
 } > "$MC2_Q12_REAL_TERMINAL_NODE_LOG"
 exec node "$@"
 `,
-          { mode: 0o700 }
-        );
-        chmodSync(terminalNode, 0o700);
+            { mode: 0o700 }
+          );
+          chmodSync(terminalNode, 0o700);
 
-        const result = spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
-          env: {
-            ...fixture.env,
-            MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY: REPO_ROOT,
-            MC2_Q12_BARRIER_TEST_REAL_RECONNECT: 'mc2-local-pg17-terminal-reconnect-only',
-            MC2_Q12_BARRIER_TEST_TERMINAL_NODE: terminalNode,
-            MC2_Q12_REAL_TERMINAL_NODE_LOG: terminalInvocationLog,
-          },
-          encoding: 'utf8',
-          timeout: 60_000,
-        });
+          const runCleanup = () =>
+            spawnSync('bash', [BARRIER, 'cleanup', ...fixture.args], {
+              env: {
+                ...fixture.env,
+                MC2_Q12_BARRIER_TEST_PROJECT_DIRECTORY: REPO_ROOT,
+                MC2_Q12_BARRIER_TEST_REAL_RECONNECT: 'mc2-local-pg17-terminal-reconnect-only',
+                MC2_Q12_BARRIER_TEST_TERMINAL_NODE: terminalNode,
+                MC2_Q12_REAL_TERMINAL_NODE_LOG: terminalInvocationLog,
+              },
+              encoding: 'utf8',
+              timeout: 60_000,
+            });
 
-        expect(
-          result.status,
-          `${result.stderr}\n${readFileSync(terminalInvocationLog, 'utf8')}`
-        ).toBe(0);
-        expect(readFileSync(terminalInvocationLog, 'utf8')).toMatch(/^invoked url_fd=\d+\n/u);
-        expect(JSON.parse(readFileSync(fixture.cleanupProof, 'utf8'))).toMatchObject({
-          structural_catalog_sha256: structuralSha256,
-          database_default_sha256: sha256(canonicalJson(databaseDefault)),
-          cron_jobs_sha256: sha256(canonicalJson(cronProjection)),
-          guard_residue: {
-            q12_guard_schema_count: 0,
-            q12_guard_relation_count: 0,
-            q12_guard_function_count: 0,
-            q12_guard_type_count: 0,
-            q12_guard_trigger_count: 0,
-            q12_guard_event_trigger_count: 0,
-            barrier_era_session_count: 0,
-          },
-        });
-      } finally {
-        docker(['rm', '-f', container]);
-      }
-    }, 120_000);
+          const countSessions = (name: string) =>
+            docker([
+              'exec',
+              container,
+              'psql',
+              '-X',
+              '-q',
+              '-At',
+              '-U',
+              'postgres',
+              '-c',
+              `SELECT count(*) FROM pg_stat_activity WHERE application_name='${name}'`,
+            ]).stdout.trim();
+
+          if (intruderHeld) {
+            // A barrier-era session that outlives the window must be VISIBLE to the terminal proof.
+            // Through the pooler `barrier_era_session_count` could only ever read 0 -- it passed for
+            // the wrong reason (mc2-38ivn). This case holds one badged session open and requires the
+            // terminal proof to refuse, which is the other half of the two-way mutation: the case
+            // below is byte-for-byte the same run WITHOUT the intruder, and it succeeds.
+            const intruder = docker([
+              'exec',
+              '-d',
+              container,
+              'psql',
+              '-X',
+              '-v',
+              'ON_ERROR_STOP=1',
+              '-U',
+              'postgres',
+              '-c',
+              `SET application_name='${INTRUDER_NAME}'`,
+              '-c',
+              'SELECT pg_sleep(120)',
+            ]);
+            expect(intruder.status, intruder.stderr).toBe(0);
+            let intruderVisible = false;
+            for (let attempt = 0; attempt < 100; attempt += 1) {
+              if (countSessions(INTRUDER_NAME) === '1') {
+                intruderVisible = true;
+                break;
+              }
+              await new Promise(resolveDelay => setTimeout(resolveDelay, 200));
+            }
+            expect(intruderVisible).toBe(true);
+
+            const refused = runCleanup();
+            expect(refused.status, refused.stdout).not.toBe(0);
+            expect(refused.stderr).toContain('database terminal reconnect result is invalid');
+            expect(existsSync(fixture.cleanupProof)).toBe(false);
+            // The refusal is about the intruder, not about the proof failing to name itself: its own
+            // session still reached pg_stat_activity under the Q12 name.
+            const refusalLog = docker(['logs', container]);
+            expect(`${refusalLog.stdout}${refusalLog.stderr}`).toContain(
+              'megacampus-q12-database-terminal-proof|LOG:'
+            );
+            expect(`${refusalLog.stdout}${refusalLog.stderr}`).toContain(`${INTRUDER_NAME}|LOG:`);
+            return;
+          }
+
+          const result = runCleanup();
+
+          expect(
+            result.status,
+            `${result.stderr}\n${readFileSync(terminalInvocationLog, 'utf8')}`
+          ).toBe(0);
+          expect(readFileSync(terminalInvocationLog, 'utf8')).toMatch(/^invoked url_fd=\d+\n/u);
+          expect(JSON.parse(readFileSync(fixture.cleanupProof, 'utf8'))).toMatchObject({
+            structural_catalog_sha256: structuralSha256,
+            database_default_sha256: sha256(canonicalJson(databaseDefault)),
+            cron_jobs_sha256: sha256(canonicalJson(cronProjection)),
+            guard_residue: {
+              q12_guard_schema_count: 0,
+              q12_guard_relation_count: 0,
+              q12_guard_function_count: 0,
+              q12_guard_type_count: 0,
+              q12_guard_trigger_count: 0,
+              q12_guard_event_trigger_count: 0,
+              barrier_era_session_count: 0,
+            },
+          });
+
+          // The decisive assertion for mc2-38ivn. `log_line_prefix=%a` records the application_name
+          // the SERVER resolved -- the same value pg_stat_activity publishes. Under the pooler-rewrite
+          // emulation this can only carry the Q12 name if the terminal proof STATED it in its own
+          // session; a runner that trusts the connection is logged as 'Supavisor' and is invisible to
+          // every consumer of the `megacampus-q12-%` prefix, including the count asserted above.
+          const serverLog = docker(['logs', container]);
+          const logText = `${serverLog.stdout}${serverLog.stderr}`;
+          expect(logText).toContain('megacampus-q12-database-terminal-proof|LOG:');
+          expect(logText).not.toContain(`${INTRUDER_NAME}|LOG:`);
+        } finally {
+          docker(['rm', '-f', container]);
+        }
+      },
+      240_000
+    );
   }
 );

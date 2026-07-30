@@ -31,12 +31,15 @@ REQUIRED_KEYS = {
 }
 
 REQUIRED_LIST_KEYS = {"verification", "changed_files", "explicit_defers"}
+OPTIONAL_LIST_KEYS = {"risk_tags", "affected_surfaces", "invariants"}
 ALLOWED_SCHEMA_VERSIONS = {"orchestration-artifact/v1"}
 ALLOWED_STATUSES = {"returned", "accepted", "merged", "blocked"}
 ALLOWED_DELIVERY_METHODS = {"merge", "cherry-pick", "manual integration", "not accepted", "n/a"}
 ALLOWED_ACCEPTED_BY_ORCHESTRATOR = {"yes", "no"}
 ALLOWED_CLEANUP_STATUSES = {"pending", "cleaned", "blocked", "not_applicable"}
 ALLOWED_RISK_LEVELS = {"low", "medium", "high"}
+ALLOWED_VERIFICATION_TIERS = {"inner", "delta", "integration", "release", "n/a"}
+METADATA_TOKEN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 REQUIRED_HEADINGS = [
     "# Summary",
@@ -105,6 +108,15 @@ def list_is_meaningful(value: YamlValue | None) -> bool:
     return any(item.strip() and not is_placeholder(item) for item in value)
 
 
+def list_has_declared_metadata(value: YamlValue | None) -> bool:
+    if not isinstance(value, list):
+        return False
+    return any(
+        item.strip() and not is_placeholder(item) and item.strip().lower() not in {"none", "n/a"}
+        for item in value
+    )
+
+
 def validate_scalar(
     path: pathlib.Path,
     key: str,
@@ -154,10 +166,33 @@ def validate_file(path: pathlib.Path) -> list[str]:
         errors.extend(validate_scalar(path, "cleanup_status", values, ALLOWED_CLEANUP_STATUSES))
     if "risk_level" in values:
         errors.extend(validate_scalar(path, "risk_level", values, ALLOWED_RISK_LEVELS))
+    if "verification_tier" in values:
+        errors.extend(validate_scalar(path, "verification_tier", values, ALLOWED_VERIFICATION_TIERS))
 
     for key in sorted(REQUIRED_LIST_KEYS):
         if key in values and not list_is_meaningful(values.get(key)):
             errors.append(f"{path}: frontmatter key {key!r} must contain at least one non-placeholder item")
+
+    for key in sorted(OPTIONAL_LIST_KEYS):
+        value = values.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, list):
+            errors.append(f"{path}: frontmatter key {key!r} must be a list when provided")
+            continue
+        for item in value:
+            if is_placeholder(item) or item in {"none", "n/a"}:
+                continue
+            if not METADATA_TOKEN.fullmatch(item):
+                errors.append(f"{path}: invalid {key!r} token {item!r}")
+
+    if values.get("risk_level") == "high":
+        tier = values.get("verification_tier")
+        if not isinstance(tier, str) or tier == "n/a":
+            errors.append(f"{path}: high-risk artifact requires a concrete verification_tier")
+        for key in ("risk_tags", "affected_surfaces", "invariants"):
+            if not list_has_declared_metadata(values.get(key)):
+                errors.append(f"{path}: high-risk artifact requires declared {key}")
 
     for heading in REQUIRED_HEADINGS:
         if heading not in body:

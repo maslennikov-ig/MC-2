@@ -12,11 +12,14 @@ import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 // OwnerCustodyExecutor) cannot reach them, so a real run keys pg.backup off a fixture-derived
 // <exported-id> and has no baseline.json. W3-struct lifts that capability behind an isolable seam
 // (SourceSnapshotSeam) that OwnerCustodyExecutor composes, exposing
-// open_window_snapshot(request, run_root) -> (exported_id, baseline_path, coordinator). The exported
-// id from pg_export_snapshot() is only valid while the exporting session stays OPEN and
-// backup-supabase.sh (pg.backup) expects a LIVE snapshot id, so open_window_snapshot HOLDS the
-// coordinator and hands it back; the caller (the W2 resolver) releases it via
-// close_window_snapshot(coordinator) after pg.backup consumes the snapshot. The live psql/tsx legs
+// publish_window_baseline(request, run_root) -> baseline_path and open_window_snapshot(request,
+// run_root) -> (exported_id, coordinator). The exported id from pg_export_snapshot() is only valid
+// while the exporting session stays OPEN and backup-supabase.sh (pg.backup) expects a LIVE snapshot
+// id, so open_window_snapshot HOLDS the coordinator and hands it back; the caller (WindowSnapshotHold,
+// at the pg.backup step) releases it via close_window_snapshot(coordinator) once pg.backup has
+// consumed the snapshot. The two legs are SEPARATE since mc2-6fnrt: the baseline must be captured
+// before barrier.install (cron active + writable) while a coordinator held across barrier.install is
+// terminated by the barrier's own quiesce_client_backends(). The live psql/tsx legs
 // are MC2_Q12_REAL_PG17-gated; the STRUCTURAL wiring (this suite) is proven with a FAKE seam (the
 // same isolation discipline W1 used for _invoke_resume), so no live DB is needed here.
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
@@ -31,16 +34,18 @@ const WINDOW_RUNNER = join(
 describe.runIf(RUN_REAL_CONTROLLER)(
   'Q12 W3-struct: source-snapshot seam reachable by the window executor',
   () => {
-    // STRUCTURAL WIRING (no live DB): open_window_snapshot produces baseline.json (OQ6), opens the
-    // coordinator for the real <exported-id> (OQ5), and HOLDS it (does not close) so the caller can
-    // bind pg.backup against the live snapshot; close_window_snapshot then releases it exactly once.
-    it('wires open_window_snapshot/close_window_snapshot through a composed SourceSnapshotSeam', () => {
+    // STRUCTURAL WIRING (no live DB): publish_window_baseline produces baseline.json (OQ6) and opens
+    // NOTHING; open_window_snapshot opens the coordinator for the real <exported-id> (OQ5) and HOLDS
+    // it (does not close) so the caller can bind pg.backup against the live snapshot;
+    // close_window_snapshot then releases it exactly once.
+    it('wires publish_window_baseline/open_window_snapshot/close through a composed SourceSnapshotSeam', () => {
       const probe = [
         'import importlib.util, sys, pathlib, tempfile',
         's=importlib.util.spec_from_file_location("q12", sys.argv[1])',
         'm=importlib.util.module_from_spec(s); sys.modules[s.name]=m; s.loader.exec_module(m)',
         // The seam MUST be an isolable class so the structural wiring is fakeable.
         'assert hasattr(m, "SourceSnapshotSeam"), "SourceSnapshotSeam missing"',
+        'assert hasattr(m.OwnerCustodyExecutor, "publish_window_baseline"), "publish_window_baseline missing"',
         'assert hasattr(m.OwnerCustodyExecutor, "open_window_snapshot"), "open_window_snapshot missing"',
         'assert hasattr(m.OwnerCustodyExecutor, "close_window_snapshot"), "close_window_snapshot missing"',
         'calls={"close":0, "baseline":0, "open":0}',
@@ -62,7 +67,10 @@ describe.runIf(RUN_REAL_CONTROLLER)(
         'root=pathlib.Path(tempfile.mkdtemp(prefix="mc2-q12-w3-")); root.chmod(0o700)',
         'ex=m.OwnerCustodyExecutor()',
         'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
-        'exported_id, baseline_path, coordinator = ex.open_window_snapshot(request, root)',
+        'baseline_path = ex.publish_window_baseline(request, root)',
+        // the baseline leg opens NO coordinator (mc2-6fnrt): nothing is held across barrier.install
+        'assert calls=={"baseline":1,"open":0,"close":0}, calls',
+        'exported_id, coordinator = ex.open_window_snapshot(request, root)',
         // (a) the exported id is the coordinator real snapshot id and is snapshot-shaped
         'assert exported_id=="ffffffff-ffffffff-1", exported_id',
         'assert m.PLAN_SNAPSHOT_RE.fullmatch(exported_id), exported_id',
@@ -114,9 +122,10 @@ describe.runIf(RUN_REAL_CONTROLLER)(
         'ex=m.OwnerCustodyExecutor()',
         'request={"run_id":"11111111-1111-4111-8111-111111111111"}',
         'refused=False',
+        'ex.publish_window_baseline(request, root)',
         'try:\n ex.open_window_snapshot(request, root)\nexcept m.LifecycleError:\n refused=True',
         'assert refused, "malformed snapshot id was not refused"',
-        // baseline was attempted first, open refused, and no bad coordinator was handed back to close
+        // the baseline leg ran, the open leg refused, and no bad coordinator was handed back to close
         'assert calls=={"baseline":1,"open":1,"close":0}, calls',
         'print("W3_FAILCLOSED_OK")',
       ].join('\n');

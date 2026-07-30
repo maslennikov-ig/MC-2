@@ -8,13 +8,13 @@ Use `.codex/subagent-spawn-template.md` as the concrete prompt shape.
 ## Required Prompt Blocks
 
 - Task ID: Beads task id/reference for any write-heavy, delegated, long-running, or handoff-prone stream.
-- Role: `worker` for bounded implementation/fixes, `explorer` for read-heavy codebase mapping, `docs_researcher` for version-sensitive docs, or another selected custom agent.
+- Role: `worker` for bounded implementation/fixes, `code_mapper` for read-heavy codebase mapping, `docs_researcher` for version-sensitive docs, or another selected custom agent.
 - Agent type to spawn: the exact built-in or custom `agent_type`; specialist roles are custom agent TOML files, not `AGENTS.md`.
 - Visibility: separate spawned Codex agent thread/run; never inline-only.
 - Model/reasoning: inherit by default; choose reasoning by complexity/risk; set explicit model only with current user authorization or a clear task-specific reason; record the rationale.
 - Goal: finished outcome in one short paragraph.
 - Success criteria: observable checks that decide acceptance.
-- Documentation: Docs L1/L2 when dependencies, APIs, CLIs, or platform behavior matter; query @neuledge/context first with lockfile-routed package/version, then use Docs L1/L2 MCP or first-party docs only when L1 is missing, stale, or insufficient; otherwise state `No dependency documentation lookup needed.`
+- Documentation: Docs L1/L2 when dependencies, APIs, CLIs, or platform behavior matter: query `@neuledge/context` first with lockfile-routed package/version; use Context7 MCP or first-party docs as fallback only when L1 is missing, stale, or insufficient. Otherwise state `No dependency documentation lookup needed.`
 - Asset Routing: selected docs, skills, agents/personas, agent type to spawn, skill items to attach, catalog candidates, or `none - <reason>` for each category. Do not omit this block.
 - Skill items to attach: exact selected `SKILL.md` paths for structured `skill` items when the runtime supports them; text-only mentions are fallback.
 - Parallel context: matrix stream id, sibling streams, and any sequencing/dependency boundaries.

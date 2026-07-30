@@ -14,14 +14,19 @@ import { describe, expect, it } from 'vitest';
 // `(job->>'active')` / `(job->>'jobid')` is the loop variable or the implicit
 // whole-row alias of the `cron.job` target -- it raises
 // `column reference "job" is ambiguous`, aborting real activate/rollback in the
-// restore loop. Aliasing the target (`cron.job AS restore_target`) removes the
-// implicit `job` table alias so `job` unambiguously resolves to the loop variable.
+// restore loop.
+//
+// The 2026-07-18 fix aliased the target (`cron.job AS restore_target`). mc2-7ohdj then
+// superseded it entirely: production `postgres` may not write cron.job at all, so the
+// restore goes through pg_cron's own `alter_job`, with an explicit existence check because
+// FOUND cannot carry across a PERFORM of a function call. Both historical forms must stay
+// absent from the barrier; the live form must be present.
 //
 // This gated test drives fixtures/q12-cron-restore-loop-ambiguity-runner.py, which
 // stands up a disposable postgres:17.10 container with a bare cron.job table and runs
 // BOTH restore-loop SQL forms:
-//   * OLD (unaliased) -> raises `column reference "job" is ambiguous` (the RED); and
-//   * NEW (aliased)   -> succeeds and flips active to the captured value (the GREEN).
+//   * OLD (unaliased)  -> raises `column reference "job" is ambiguous` (the RED); and
+//   * LIVE (alter_job) -> succeeds and flips active to the captured value (the GREEN).
 // It also asserts the live barrier bytes carry the NEW aliased statement and not the
 // OLD unaliased form, so the repro is bound to the real fix (fails if reverted).
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
@@ -34,7 +39,7 @@ const RUNNER = resolve(
 describe.runIf(REAL_PG17)(
   'Q12 found-defect #13: cron.job restore-loop variable/column ambiguity (real PostgreSQL 17.10)',
   () => {
-    it('OLD unaliased UPDATE cron.job is ambiguous; NEW aliased restore_target form is clean', () => {
+    it('OLD unaliased UPDATE cron.job is ambiguous; the live alter_job restore form is clean', () => {
       const result = spawnSync('/usr/bin/python3', [RUNNER], {
         encoding: 'utf8',
         timeout: 180_000,
@@ -59,7 +64,7 @@ describe.runIf(REAL_PG17)(
         active_after_new: string;
       };
 
-      // The live barrier carries the ratified aliased form (and not the old one).
+      // The live barrier carries the ratified alter_job form, and neither superseded UPDATE.
       expect(out.fix_present_in_barrier).toBe(true);
       expect(out.old_form_absent_from_barrier).toBe(true);
 
@@ -70,7 +75,7 @@ describe.runIf(REAL_PG17)(
       expect(out.old_stderr).toMatch(/column reference "job" is ambiguous/u);
       expect(out.old_stderr).toMatch(/PL\/pgSQL variable or a table column/u);
 
-      // GREEN: the aliased form runs clean and restores the captured active value.
+      // GREEN: the live alter_job form runs clean and restores the captured active value.
       expect(out.new_rc, out.new_stderr).toBe(0);
       expect(out.new_stderr).toBe('');
       expect(out.active_after_new).toBe('t');

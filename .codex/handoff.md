@@ -1,17 +1,37 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-19 (window executability verified NOT openable; W1-W7 handoff package prepared — see CURRENT STATE below)
-Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion
-Integration branch: `codex/self-hosted-qdrant-platform` at the Root-join
-integration head `fcd05e27` (D6 slice `8717f7ac` pushed; the .13.13 docs
-slice pushes with this update).
-It carries the full accepted correction wave: D5J `66e41cb5`, W FLIP
-`60910053`, H blue/green handoff `70bf6103`, the W activation-tuple addendum
-`3da324d8`, frozen D6 contract/plan docs `d1627f1c`, and the M migration
-credential merge `a73a3651`. The preserved W branch/worktree
-`codex/q12-w-writer-barrier` is clean and pushed at `60910053` (its two
-formerly uncommitted files are committed and integrated). The dedicated
-integration worktree remains authoritative for Q12.
+Updated: 2026-07-30 (attempts #12-#16; C1, C2 and C3 PASS; C4's restore now PASSES; the window is
+SHUT on `mc2-fxlne`)
+
+## THE WINDOW IS NOT RUNNABLE RIGHT NOW — `mc2-fxlne` (P0, owner decision)
+
+`mc2-wl5vn` is CLOSED: the owner ruled remedy (a) on 2026-07-30 and C4's restore now succeeds
+against a guarded dump. The drill restores through a `pg_restore` use-list that comments out exactly
+the `q12_guard` event trigger, derived from the archive's own SQL rather than declared. Proven on
+both real archives — attempt #16's guarded generation skips 1 of 3525 entries and leaves the six
+Supabase event triggers alone; the nightly unguarded generation skips 0 of 3335 and passes the whole
+drill end to end (ratio 0.723).
+
+The dry run then reached the NEXT line and found `mc2-fxlne`: `compare --view cutover_snapshot`
+(`restore-supabase-drill.sh:993`, before the activation cleanup and on the window path in both
+modes) demands the isolate reproduce production's GUARDED snapshot, which the dump cannot carry.
+Four deltas, one cause — every piece of guard-aware machinery in `q12-source-manifest.ts`
+(`filterApprovedGuardCatalog`, `approvedGuardIdentity`, `isExternalGuardTrigger`) is reachable only
+from `validateTransition`, never from `compare`; and `normalizeForTarget` strips
+`default_transaction_read_only` from the target while `normalizeSource` leaves it on a guarded
+source. Nothing here is caused by the event-trigger exclusion: the manifest captures `pg_trigger`,
+never `pg_event_trigger`. Four candidate remedies are on the bead, recommendation (a); each changes
+what C4 proves, so the owner rules. `mc2-i9h3y` now depends on it.
+
+Both defects were found read-only, with no writer stopped, no guard installed and no run-id burnt.
+
+## Single Source of Truth (2026-07-21 — owner-directed consolidation)
+
+- **`develop` is the single source of truth** for all Q12 work; the 2026-07-21 containment audit
+  proved it is the superset of every Q12 line. Keep those branches for history only.
+- **Stale branches RETIRED (2026-07-27 audit).** The primary worktree sits on `develop`; new Q12
+  work branches from it and is delivered via `/push-dev`. Video pipeline parked `mc2-hqfc3`.
+- Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
 
 ## Product Truth
 
@@ -24,372 +44,191 @@ integration worktree remains authoritative for Q12.
 
 ## Read First
 
-- `AGENTS.md`
-- `.codex/orchestrator.toml`
-- `.codex/handoff.md`
-- `.codex/project-index.md`
-- `graphify-out/GRAPH_REPORT.md`
-- `docs/superpowers/specs/2026-07-10-self-hosted-qdrant-platform-design.md`
-- `docs/superpowers/plans/2026-07-10-self-hosted-qdrant-platform.md`
-- `docs/superpowers/specs/2026-07-11-advisory-document-evidence-rag-design.md`
-- `docs/superpowers/plans/2026-07-11-advisory-document-evidence-rag.md`
-- `docs/superpowers/specs/2026-07-13-q12-live-cutover-corrections-design.md`
-- `docs/superpowers/plans/2026-07-13-q12-live-cutover-corrections.md`
-- `docs/superpowers/specs/2026-07-13-q12-recoverable-lifecycle-addendum-design.md`
-- `docs/superpowers/plans/2026-07-13-q12-recoverable-lifecycle-addendum.md`
-- `docs/superpowers/prompts/2026-07-11-self-hosted-qdrant-evidence-continuation-orchestrator.md`
+`AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/project-index.md`,
+`graphify-out/GRAPH_REPORT.md`. Design/plan pairs for the live line, under
+`docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
+`2026-07-11-advisory-document-evidence-rag`, `2026-07-13-q12-live-cutover-corrections`,
+`2026-07-13-q12-recoverable-lifecycle-addendum`, `2026-07-28-q12-window-preflight`.
 
 ## Accepted and Open Work
 
-- Accepted and pushed: Q1-Q9, strict Formula index fix `.15`, evidence E1-E7, and exact 100% local/development document-evidence activation. Final independent activation/docs review at `d3417610` reported no P0-P3 findings; integration merge `ea183d83` passed 24/24 focused tests, package type-check, process verification, and canonical closeout dry-run. Integration history and exact evidence are in `.codex/stages/mc2-jz6y0/summary.md`.
-- Q7 `.8` is reviewed, integrated as `841812be`, verified at focused 85/85 plus pinned Qdrant `1.18.2` 19/19, and its dedicated local worktree/branch are cleaned. The remote evidence branch remains.
-- Q6 `.7`, Q8 `.9`, Q9 `.10`, Q10 `.11` and Q11 `.12` are reviewed and integrated. Q10 reviewed head `42ed1322` merged as `3c9dd641`; 31 Markdown files passed final independent review with P0-P3 zero. The final local release matrix passed backend 1,893/1,893 with zero skips, shared 23/23, web 20/20, PostgreSQL 78/78 with zero skips, exact Qdrant 15/15, applicable local snapshot/restore 5/5, Compose/runtime 8/8, Prometheus 14 rules, Alertmanager config, `pnpm type-check`, and build 75/75. The stale activation-contract test was corrected under `.26`; implementation and independent review are integrated with P0-P3 zero.
-- Q12 local remediation includes guarded migrations `.13.1`, immutable operator `.13.2`, release-bound rollback `.13.3`, and accepted staging-local snapshot mode `.13.5`. Local snapshots now live at `/qdrant/storage/snapshots` on the persistent named volume and pass the exact pinned `1.18.2` recreate/restore matrix; they do not protect against volume, disk, host, or datacenter loss. Off-host S3 is explicitly deferred to production gate `.13.6`. No staging mutation has occurred.
-- Q12 source audit `.13.4` is independently accepted read-only: 261 catalog rows, 240 Qdrant-eligible and 21 `missing_course`; 42 exact no-replace copies can restore 125 eligible rows and raise recoverable coverage from 109 to 234. Exact originals for the final four missing plus two invalid eligible rows were not found anywhere on the host. Eighteen non-eligible Career Playbook originals are also absent. The owner-approved dispositions are six `source_file_unrecoverable` plus eighteen `retained-derived-only`. The complete `.13.4.1` operator is locally accepted, including core, workflow/CAS, audited reindex, Stage 4 failed-coverage integration, concrete multi-ledger adapters, isolated runtime, crash-residue/inode matrix, and exact-count Task 6. Final Task 6 rereview passed P0-P3 zero; fresh integration passed 3/3 focused and 456/456 recovery/reindex tests plus type-check/artifact/process gates. All Task 6 worktrees/local branches are cleaned. No staging copy or remote mutation has run.
-- `.13.7` is CLOSED (2026-07-16, owner-authorized remote window). The owner DSN is installed owner-only at `/opt/megacampus/secrets/supabase_db_url` with the pinned CA; the legacy fail-open cron is suspended (root-owned rollback evidence retained); the fail-closed operator, drill, and helpers are installed root-owned under `/opt/megacampus/deploy` with Node 22 + pnpm 8.15.0 + tsx host prerequisites. The fixed-hash installer finished its canonical proof: fresh scheduled generation `20260716T105950Z-11196fff` published under full systemd hardening, isolated Supabase-PG17.6 drill PASSED (cluster-global + cutover + baseline equality, ratio 0.724, zero residue), daily `00:30 Europe/Amsterdam` timer enabled+active. Twenty-plus never-executed defects in operator/drill/manifest/bootstrap were fixed with TDD and review on the way (`dedcc076`..`da512322`). The owner explicitly deferred `.13.8` password rotation («можешь не менять»).
-- The owner approved the exact Q12 correction specification SHA-256 `5d575bf8424dbd9b94eb79bc5e477c3152327b70593dae811c876c3c222d5c15` on 2026-07-13. On the same date the owner accepted decisions `.13.14` and `.13.15`: the managed Supabase provider plane is an explicit trusted residual boundary, and recovery uses guarded `prepare-recovery`, quiesced completion, no-start mode-bound final manifests, then a separate lease-bound `resume-writers-only` after cleanup. Both decisions are closed. The independently rereviewed normative addendum SHA-256 is `7188d792af79ec881c16ef0729394e5c1f5c2c67aa6d59b86bec1bdf91308b27` with P0-P3 zero; it supersedes the earlier package at `099fc44b` only by freezing cross-language canonical journal bytes and exact object-publication phase/outcome mapping. This permits safe local implementation only; remote/live mutation remains separately gated.
-- Publisher `.13.9`, G7 `.13.7.2`, D5 decision `.13.17`, and Root producer `.13.18` are accepted/integrated. D5W seam `.13.20` is closed: source `3dd9ad53`, correctness/docs delta reviews P0-P3 zero, integration/W reruns 271/271, cleanup evidence `c150a4c2`, source worktree/local branch removed. The preserved W branch is clean and pushed at `60910053`. The joined-fixture task `.13.21` is implemented, independently reviewed, and integrated; W `.13.10`, M `.13.11`, and H `.13.12` are closed and integrated (see below); Root `.13.13` is CLOSED: the join integrated at `fcd05e27` (smoke/observation gate exact to §13 with rotation_required=true, D6 real frame envelope + R-handshake join with validation-at-load; correctness review PASS 0/0/0/5, docs review PASS 0/0/0/1; manifest and barrier bytes unchanged). No remote/live mutation occurred.
-- D6 `.13.19` is IMPLEMENTED and integrated at `3d70eaf2` (contract byte-identity `2a2251ac…`, Option A): the read-only probe (`q12-activation-truth-probe.cjs` + FD-11 SQL, Tasks 1-14) and the Root coordinator authority (`q12-lifecycle-core.py` D6 additions, Tasks 15-19) delivered in two disjoint worktree streams, each independently reviewed (PASS 0/0/2/4 and 0/0/1/4) with delta reviews after correction rounds (real CLI runtime assembly, sentinel coalesce, 3-point snapshot discipline; NFC canonical, after-read secret revalidation + rewind, seal-predecision binding enforced). Cross-language canonical hashing byte parity proven (`764d1b37…`); named convention: hash in-memory canonical NFC no-LF, files store canonical+LF, validation-at-load parses then hashes. Evidence in artifact `mc2-jz6y0.13.19-q12-d6.md`. Pinned-server capability gates stay remote-gated; fields 5/6/8/9 re-freeze stays Task C7.
-- Read-only architecture report SHA-256 `8bf9786c1e97ce4a54bc455d37ec052a8658fa110524fbed1a5ab728b3fda379` found that D5W real-preimage binding is insufficient for W chronology: Root D5-only anchors and W's full source/backup/restore/reindex graph cannot be joined by copying or rehashing authority. The owner approved the Root-owned test-only architecture/drafting direction and, on 2026-07-15, explicitly approved the exact tracked candidate SHA-256 `d7e86193142d260a3b8dcd65ef9ce89b64df88d9c93cec68f19705de68edc75d`. It closed the clean-prefix-1 quiesce-preimage gap and passed final correctness/docs rereviews P0-P3 `0/0/0/0` (report SHA-256 `0eb420fda7099ecdf98d0028cc5f8b89e9a61103018e747228868515eb970bf2` and `02770a81c69474a1445fb7c4f2a05edbfa5cee50d18accf502f074d4e79025ba`). Local planning/TDD/review/integration are authorized; production CLI and W ownership stay unchanged, and remote/live authority remains separate.
-- The D5J product-truth gap is resolved. Decision `.13.22` is closed by the normative amendment `docs/superpowers/specs/2026-07-15-q12-d5j-command-binding-and-fwm-amendment.md` SHA-256 `d6c4d8e4b2b7f6c53d648fdf587a5520db45fa5d8f3c84668b48b09b6bbe075c` (independent correctness/docs reviews PASS P0-P3 `0/0/0/0`): one canonical twenty-command manifest (the enumerated D5J subset moved forward from Task 9), a closed ten-placeholder substitution domain with single authorities, exact phase/command/outcome bindings for every ordinary row (genesis `operator.self-check`, `pg.backup` selector/target split, phase-internal migrations preserving the D5 predecessor heads, the `migrations_applied` witness milestone), two-segment quiesce and evidence-stepped resource bindings, distinct immutable `final-writer-manifest-forward|rollback-<run-id>.json` paths with real `writers.resume.*` hashes, and the Root-owned deterministic thirteen-key writer inventory.
-- `.13.21` is implemented under the reviewed plan SHA-256 `a05ba3c60e1a1a714e7d0ce30298f8124949e67c9dbacc00677a7fc414805b4a` (plan review PASS `0/0/0/0`) and integrated at `66e41cb5`: the Root-owned closed joined composer emits the exact 76-row forward chronology and every rollback profile (prefixes 1-4 clean and exact-next-frontier, activation frontier with both mode-bound manifests and byte-identical target entries) through the production serializer/capability/object/checkpoint primitives; the runner/TS surface is closed; deployed wrappers/parser gain no switch. Independent implementation reviews: correctness PASS `0/0/0/2`, docs PASS `0/0/1/2`, every finding fixed. Evidence: focused four-file suite 300/300 in both file-parallel and serialized modes, static acceptance checks, workspace type-check, synthetic build; stage artifact `mc2-jz6y0.13.21-q12-d5j.md` validated.
-- On 2026-07-15 the owner approved the recommended `.13.22` correction and delegated the remaining local work to Fable, followed by Codex review. Fable is authorized to draft and independently review the narrow normative amendment, freeze the exact canonical bindings/inventory/path rule, plan, implement with TDD, integrate and verify locally without intermediate owner confirmations. Remote/live exclusions are unchanged. The tracked copyable handoff is `docs/superpowers/prompts/2026-07-15-q12-fable-local-completion-handoff.md`.
-- Final handoff correctness and documentation rereviews passed P0/P1/P2/P3 `0/0/0/0`; report SHA-256 values are `8c56c37720e25a5d213fdc2c1c6c7ea8b1da7f1795f34e9078069b257d306a6e` and `b75dccbee85395372e350de79d304647388d8ad061e3b990a261aa9843e00bea`.
-- W `.13.10` is CLOSED. The FLIP is integrated at `60910053`: the
-  genesis-rooted joined journal prefix is the sole resume acceptance in
-  `q12-writer-resume.py`; the fabricated `common_phase_graph` branch is
-  removed; the D4 negative is pinned five ways. Held-capture lever, ruling Z,
-  and the full acceptance matrix are recorded in the stage summary and on the
-  bead. Current amendment SHA
-  `e952f72410c9d49555cd780108e2b94c47284872da69e506b6c2e9ab86fcd4b1`;
-  twenty-command manifest SHA
-  `aaec6fc25a6996facbf6f07f579239ba0a2aa53fd5521c83cb3c87d12087a841` (the
-  historical five-command `af9b21cb…` value belongs to `c93d766d`-era bytes).
-- H `.13.12` is CLOSED and integrated at `70bf6103`: `--q12-mode`
-  prepare/commit/finalize-quiesced with phase-aware rollback, the durable
-  `nginx_switch_intent` marker written before reload (review P1-1), truthful
-  re-prepare (P1-2), and the activation receipt contract
-  (`<run-root>/database-barrier-receipt.json` `state=activated`). Evidence:
-  24 Vitest + 15 shell cases; FAIL→RED-first fixes→delta PASS.
-- M `.13.11` is CLOSED and integrated at merge `a73a3651` from
-  `codex/q12-m-migration-cli` tip `29d73d04`: file-only Q12 migration
-  credentials (O_NOFOLLOW + inode/device recheck, field-built ClientConfig, no
-  connectionString on the Q12 path), same-transaction guards, connection-source
-  mutual exclusion, concurrent index packet preflight, plus the hardening batch
-  (fail-closed on twelve libpq `PG*` variables via
-  `Q12_REJECTED_LIBPQ_ENV_VARS`, embedded `;` rejection, widened leak asserts
-  across five fail-closed branches). Security review PASS P0=0/P1=0 and delta
-  PASS on `29d73d04`; 64/64 focused units; formal e2e 20/20 on the disposable
-  stack. Residual informational P2-4: `PGSSLCERT`/`PGSSLKEY`/`PGSSLPASSWORD`/
-  `PGCHANNELBINDING`/`PGGSSENCMODE` are outside the reject list — proven
-  non-exploitable while `ssl` is an explicit object; optional completeness-only
-  addition.
-- The W activation tuple `.13.10` is now 11/11: field 11 was RATIFIED on
-  2026-07-16 by independent review (PASS P0/P1 zero; F1 carried as the
-  accepted `.13.14` residual note) at `72af414c` — inventory at
-  `deploy/qdrant/q12-managed-session-inventory.json`, canonical hash
-  `c90edb78…` unchanged, pinned by unit test. D6 Task 0 gate passed
-  (manifest `aaec6fc2…` verified). The LIVE-BOUNDARY RE-FREEZE CHECKLIST now
-  covers only item 2: production re-freeze of fields 5/6/8/9 at Task C7.
-- Full local release matrix at `a73a3651`: Q12 unit battery 748 passed /
-  1 known environment failure (`qdrant-observability-contract.test.ts:223`,
-  fails identically on the pre-Q12 base) / 36 skipped; blue/green shell suite
-  15/15; `pnpm type-check` exit 0; `pnpm build` exit 0 with the synthetic web
-  env. PG17-gated suites run under `MC2_Q12_REAL_PG17=1`.
-- PG17 document-evidence security-manifest digests were computed on the isolated restore (pre-120000 `dcc90cc2…`, after-120000 `4df2b22b…`, after-130000 `f7100de0…`, after-140000 `e148e241…`, after-151000 `2597a553…`) and the allowlist delta is integrated at `b8204cde` with independent review PASS P0-P2 zero and new disjointness/hex invariant tests.
-- Decision `.14` is owner-approved and closed: Qdrant `1.18.2`, Prometheus `3.13.1` LTS, Grafana `12.4.5`, node_exporter `1.12.0`, Alertmanager `0.33.1`, approved image locks, authenticated main-listener scrape using `api-key` from a mounted file, no Qdrant `metrics_port`, fail-closed Qdrant secret wrapper, textfile-only unprivileged exporter, and single-node Alertmanager.
-- Design `.17` is approved/closed; grouping `.16` closed as superseded. E1-E7
-  (`.18`-`.24`), Q6 `.7`, Q8 `.9`, Q9 `.10` are reviewed, integrated, and
-  verified; evidence lives in `.codex/stages/mc2-jz6y0/summary.md`.
-- Historical `.13.7` doc correction `7b446d7d` (rereview `0b7ffe67`, P0-P3 zero) is superseded by the delivered gate; runbook state lives in `docs/operations/qdrant-self-hosted.md`.
+Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
+`.codex/stages/mc2-jz6y0/summary.md` § "Accepted and open work history". Current open work is
+`mc2-i9h3y` (owner-present window), BLOCKED by `mc2-1cxna`; tracked residuals `mc2-uha77`,
+`mc2-8m90f`, `mc2-2vtmk`, `mc2-9vbzp`, `mc2-6l2yz`, `mc2-o0g75`, `mc2-c2p8z`, `mc2-n6szm`,
+`mc2-qd12b`, `mc2-e21lo`, `mc2-zls0f`, `mc2-dizgy`, `mc2-0ie27`, plus `mc2-ivjyb`; see § "Explicit defers".
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-### CURRENT STATE (2026-07-19) — window NOT openable; handoff package ready
+Recommended action (SUPERSEDED 2026-07-30 by `mc2-fxlne` above — do not reopen the window until it
+is settled; everything below stays true for the attempt that follows): reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
+defects were found and fixed on 2026-07-29, each by opening the window and each covered afterwards:
+`mc2-awi6q` and `mc2-1kcbv` are CLOSED (the intent-row carry rule, two checkpoint files the
+controller never published, and a writer sweep that returned 17 containers instead of 10);
+`mc2-1cxna` is OPEN with three causes fixed — the frozen `HOME=/root` is unreadable by the operator,
+so libpq could not stat its client certificate and the docker CLI could not find its buildx plugin,
+and the manifest generator was handed `/proc/self/fd/N` paths that do not survive its spawn chain. Attempt #16 ran `pg.backup` to COMPLETION and died at C4 on the third face of that cause; fixed the
+same way. Attempt #17 starts at C4's image-index lookup — but run `mc2-bh3ef` and `mc2-rjy9k` FIRST. Reopen with the sequence in § "Before the next
+attempt", read any new failure from the diagnostics (`fail_command` now prints them), and hold at
+`--stop-after deploy.prepare` for the owner at C9. Full brief:
+`docs/superpowers/prompts/2026-07-28-q12-window-completion-orchestrator.md`.
 
-Fresh read-only verification (base `8af76cfd4`, bead `mc2-uha77`, artifact
-`.codex/stages/mc2-jz6y0/artifacts/mc2-uha77-window-executability-verification.md`)
-established that the live cutover window is **not executable against the
-deployed tree**: `run_live`/`run_recover` fail closed in production at the
-`require_post_activate_executor` pre-flight because `ProductionExecutor` has no
-`execute_forward_resume` (it exists only as a test fixture), and the production
-`run_live` path substitutes **fixture-derived** placeholder values (not real
-snapshot/generation/recovery ids). The R8 controller is a proven journal/parity
-twin, not a real driver. This is the D5J §10 "Task-9 live orchestration" scope,
-still un-wired. OQ1 is resolved (dual-state quiesce); OQ5/OQ6 remain open.
+`mc2-lzft4`, `mc2-1sns3`, `mc2-ot8se`, `mc2-38ivn`, `mc2-awi6q` and `mc2-1kcbv` are all CLOSED;
+detail for each in the stage summary.
 
-A complete handoff package for a fresh orchestrator is prepared:
+RUN ROOTS `6544c7dd-…` (#10), `8915724a-…` (#11), `d6dcb2b7-…` (#12) and `07810dcf-…` (#13) are
+BURNT, as are `a9d88afb-…` (#14), `2cd7e61b-…` (#15) and `96741f4b-…` (#16); `74000355-…` was abandoned before any
+journal row (D1 caught the drift below). A reopen needs
+a fresh `plan` and a fresh run-id, and `--expected-catalog-sha256` is always the `sha256sum` of THAT
+root's OWN `expected-post-migration-catalog.json` (barrier `:302`), never a value quoted for a prior
+root. Everything else in the argv is settled below.
 
-- Design: `docs/superpowers/specs/2026-07-19-q12-window-execution-wiring-design.md`
-- Plan + task graph: `docs/superpowers/plans/2026-07-19-q12-window-execution-wiring.md`
-- Orchestrator prompt (prompt-check PASS, prompt-card):
-  `docs/superpowers/prompts/2026-07-19-q12-window-execution-orchestrator.md`
-- Beads W1 `mc2-yz3xe` → W2 `mc2-j58wi` → W3 `mc2-58tnx` → W4 `mc2-dxcaa` →
-  W5 `mc2-v68w6` → W6 `mc2-naz8j` → W7 `mc2-i9h3y` (owner-gated), tracker
-  `mc2-uha77`.
+THE PLAN IS PERISHABLE (`mc2-0ie27`, found 2026-07-29). Supabase Realtime rotates daily
+`realtime.messages_*` partitions on its own service timer — no pg_cron entry, so C2 stays green —
+and every create/drop moves the structural catalog hash the barrier re-measures at C1. A plan
+captured at 06:31Z was already stale by 07:00Z (`93ca595a…` -> `1a0ac0f0…`). D1 is the detector and
+it works: it refused before the window opened, with zero mutation. Keep plan -> open to minutes.
 
-NEXT: hand off to the new orchestrator per that prompt; execute W1–W6 (real
-owner-custody executor + real-value plumbing + snapshot/baseline producers +
-STOP-point model + rehearsal + runbook), then W7 opens the window on an explicit
-owner go. The historical Phase-A/B and pre-open context below remains accurate;
-its "NEXT" pointer (OQ resolution) is now superseded by the W1–W7 plan.
+PRODUCTION IS CLEAN after attempt #13. Attempt #13 is the first that actually STOPPED writers, so
+production was really down 07:59Z-08:03Z. Recovery order that worked: (1) the barrier's OWN rendered
+`$restore$` under that run's capability, then (2) every writer restored from THAT RUN'S OWN
+`writer-quiesce-<run-id>.json` — `docker update --restart` back to each recorded prior policy
+(`unless-stopped`), then `docker start` where `prior_running` was true. Verified: 17 containers up
+and healthy, both public hosts 200, database-scope pre-flight EXIT=0 (C4 zero `q12_guard` residue,
+C2 8 cron jobs active, C3 empty, D1 agrees, A/B/E pass). Full account in the stage summary.
 
-### PROGRESS (2026-07-20) — W0 + W1 delivered; W2/W3/W4 coupling found
+The deployed Q12 tree is REINSTALLED from `develop` on every code delivery (replaced files kept in
+`/opt/megacampus/backups/q12-assets/`). Do NOT invoke `q12-live-cutover.sh` for `live`: it execs
+`/usr/bin/python3`, 3.12 here, while the runbook requires 3.13+ (`mc2-zls0f`); use
+`/usr/bin/python3.13 … live …` and run the gate by hand immediately before.
 
-- **W0** (rehydrate/baseline) DONE: the §2 gap re-confirmed with fresh evidence
-  at HEAD `aeb9cb14a` (main() wires bare `ProductionExecutor()`; no
-  `execute_forward_resume`; fixture-derived substitution; no CLI `--stop-after`;
-  OQ1 resolved; OQ5/OQ6 open). Baseline matrix GREEN: focused Q12 suite 646
-  passed / 72 skipped; type-check clean; frozen manifest sha `aaec6fc2` intact.
-- **W1** (`mc2-yz3xe`) DONE, committed **`636e96346`**, pushed. Added
-  `OwnerCustodyExecutor(ProductionExecutor).execute_forward_resume` (full
-  fail-closed twin of `q12-writer-resume.py:1088-1134` incl. the probe/residue
-  nested projection, then drives the frozen manifest `writers.resume.forward`
-  under the inherited FD9 lease via `_invoke_resume`, returns
-  `validated_receipt_sha256`); `owner_custody_executor()` factory; `main()`
-  live/recover now use it; post-activate context carries `release_sha`. Resolved
-  the run-id question from frozen truth: resume uses `<run-id>` (cutover), not
-  `<recovery-run-id>`. TDD (5 new tests + fixture); correctness-reviewed
-  (no P0/P1; one P2 projection gap CLOSED by strengthening the gate; one P3
-  low-risk coverage residual noted). Focused Q12 651 passed / 72 skipped;
-  type-check clean; manifest `aaec6fc2` intact.
-- **W2 acceptance-oracle decision LOCKED (owner, 2026-07-20):** real-run oracle =
-  design default — accept iff (1) each real child exits 0 AND (2) barrier receipt
-  v2 reaches `guard_cleanup_complete` (state machine intact) AND (3) coverage
-  evidence (`org:course:run`) present in the recovery journal; the fixture
-  byte-parity suite is kept green separately.
-- **MATERIAL REPLAN (dependency finding from repo truth):** the plan framed W1
-  and W2/W3 as independent streams converging at W4. Repo truth shows otherwise:
-  the controller only COMPOSES the journal and freezes each capability's argv
-  (`command_sha256`); ordinary commands EXECUTE out-of-band via the separate
-  `claim` entrypoint (`run_claim:3240-3243`), which RE-RESOLVES argv from
-  manifest+request and byte-binds `command["command_sha256"]==capability`
-  (D5J 2026-07-15 contract). Mid-window real values (`<exported-id>` from the W3
-  coordinator, `<immutable-generation>` from `pg.backup`,
-  `<accepted-recovery-manifest-sha256>`/coverage after `source.forward`) are
-  unknown at a single upfront compose. Therefore the real path is a **staged
-  compose→claim→execute→compose** loop, and **W2 (`mc2-j58wi`) + W3
-  (`mc2-58tnx`) + W4 (`mc2-dxcaa`) must be CO-DESIGNED as one staged-execution
-  effort** intersecting the D5J claim-time binding — not delivered as independent
-  slices. This needs its own focused design pass; it was NOT rushed. Window stays
-  CLOSED. Full map is on beads `mc2-j58wi` / `mc2-uha77`.
+WINDOW STATE. Opened SIXTEEN times (2026-07-27/29); #1-#8 failed closed with ZERO mutation; #9-#12
+installed the guard and were restored by hand; #13-#16 also stopped the writers and were restored
+the same way plus the writer replay above (outages of ~4 to ~16 minutes, longer once the real dumps
+started running to completion). The rendered restore block is byte-identical every time
+(`2f11b8ed…`). Every attempt BURNS its run-id. C1 and C2 now PASS. Fifteen defects found, fourteen
+fixed and most are now a PROBE (`mc2-34eua`→A2/A4, `mc2-2rzf6`→D1, `mc2-6fnrt`→E2,
+`mc2-ipwyc`→A3/A5/B1/B2, `mc2-38ivn`→B3, `mc2-lzft4`→H2's expected value); `mc2-awi6q` and
+`mc2-1kcbv` are CLOSED with suites that drive the REAL child from the REAL controller; `mc2-1cxna`
+(C3, two causes already fixed) and `mc2-0ie27` (plan perishability) are OPEN. THE PATTERN behind almost all of them: the
+checked environment substituted for the consuming one — a probe carried it in `mc2-lzft4`, a test
+fixture in `mc2-awi6q` and `mc2-1kcbv`. Model the constraint, never the convenience.
 
-### PROGRESS (2026-07-20, cont.) — W4 delivered; W2+W3 co-design written
+BEFORE THE NEXT ATTEMPT — one command on the server immediately before the window:
+`/usr/bin/python3 /opt/megacampus/deploy/qdrant/q12-window-preflight.py --scope all --run-root /opt/megacampus/backups/q12/<fresh-run-id>`.
+Read-only by construction, through the pooled DSN, no lock, no run-id burned. Exits 0 only when all
+29 probes are `pass` or `unprovable` with named evidence. It has been green before every attempt
+since #11 and the window still failed past it each time: a probe covers nothing outside its reach.
+Contract: `docs/superpowers/specs/2026-07-28-q12-window-preflight-contract.md`.
 
-- **W4** (`mc2-dxcaa`) DONE, committed **`ffb7da5fc`**, pushed. Carved off from the
-  W2/W3 coupling: the `--stop-after` CLI exposure is architecturally INDEPENDENT
-  of the real-value work (the internal `stop_after` seam is already end-to-end;
-  `run_recover` never reads it). Exposed `--stop-after` on `live` ONLY,
-  choices-bound to `_STOP_AFTER_STEP`, reversible/#18 boundary operator-visible in
-  the flag help; plumbed into the production request via `getattr`. TDD
-  `q12-live-stop-after-cli.test.ts` (3 tests); behavioural stop-after + recover
-  convergence already covered by `q12-live-controller.test.ts`.
-  Correctness-reviewed: no P0/P1/P2. Focused q12-\* **654 passed / 72 skipped**;
-  type-check clean; manifest `aaec6fc2` intact. False W3→W4 dep removed.
-- **W3 finding (refines §2.5):** OQ5/OQ6 are NOT un-built — they already exist on
-  `LivePlanExecutor` (`q12-lifecycle-core.py:6840` `_open_snapshot_coordinator`,
-  `:6917` `produce_run_root_baseline` → `baseline.json` 0400). The real gap is that
-  the WINDOW executor (`ProductionExecutor`/`OwnerCustodyExecutor`) can't reach
-  them and the window `<exported-id>` is fixture-derived (`:720`,`:4018/:4144`).
-  W3 for the window = lift OQ5/OQ6 into the owner-custody path + feed the real
-  snapshot id into value resolution (W2), consistent with D5J on compose AND claim.
-- **W2+W3 CO-DESIGN WRITTEN:**
-  `docs/superpowers/specs/2026-07-20-q12-w2-w3-staged-execution-codesign.md` — the
-  focused design pass §W2/§W3 required. Decisions: clean `production`-gated
-  fixture/real FORK (parity oracle untouched); staged resolver advanced by
-  lifecycle callbacks (resolve-once, fail-closed on drift); compose↔claim
-  consistency via a run-root authority file read by both sides (D5J single
-  authority); locked real-run oracle; W3 lifts OQ5/OQ6 into `OwnerCustodyExecutor`
-  behind an isolable subprocess seam (W1 pattern).
-- **VERIFIABILITY BOUNDARY (honest):** the fork, resolver scaffold, and
-  compose↔claim byte-consistency are unit-verifiable HERE with fakes; the real
-  `pg_export_snapshot()`/baseline/generation/recovery-manifest/coverage legs and
-  the end-to-end real-run oracle are `MC2_Q12_REAL_PG17`-gated and/or IN-WINDOW-only
-  (#18), validated at W5 (rehearsal) and W7 (owner-gated). Window stays CLOSED.
+GROUP G (`mc2-bh3ef`, 2026-07-29) closed the reach that let five defects through in one day. G1..G4
+measure the environment the twenty FROZEN commands are handed — `$HOME` usability per command and
+per identity, docker CLI plugin discovery, a libpq connection through the pooled DSN, and
+`/proc/self/fd` argv paths that do not survive a re-exec'ing child — for all twenty, including the
+ten that have never run. Repairs are pinned to the consumer's own deployed bytes, so one that is
+refactored away is a `fail`; exemptions name the exact consumer classes they cover and are revoked
+automatically when a consumer reaches further. Each probe is shown RED against the 2026-07-29 state
+in `q12-window-preflight.test.ts` § "the frozen-env surface (group G)". `--scope host` now selects
+`H1..H5,G1,G2,G4`; G3 is database scope.
 
-### PROGRESS (2026-07-20, cont.²) — W2/W3 EXECUTABLE PLAN prepared; owner authorized real-data work
+THE DRY RUN (`mc2-rjy9k`) is
+`/usr/bin/python3 packages/course-gen-platform/tests/unit/ops/fixtures/q12-isolate-dry-run-runner.py --persist-handle <run-root>/restore-persist-handle.json`,
+run on the host against the isolate the plan's persist seam hands back. It drives the two migration
+children — which have never executed, sixteen attempts having died at or before C4, the command
+right before them — under their OWN frozen env, with only the three credential PATHS re-pointed. It
+reports every other child `skipped` with a structural reason: `source.forward`, `reindex.*` and
+`deploy.prepare` all mount or verify the barrier receipt that only `barrier.activate` mints, and
+fabricating one would be the substitution this whole stage exists to stop.
 
-- **Owner authorization (2026-07-20):** project pre-launch/testing — owner authorized
-  touching the production DB for whatever the wiring needs. The earlier "hold W2/W3
-  for a window-adjacent session" caveat is LIFTED. Preserved carve-out: the
-  irreversible `barrier.activate` / nginx switch (W7 / C9) still requires a fresh
-  pre-window `plan` + explicit owner "go".
-- **Empirical grounding (`9c49d8599`):** this box has docker 29.5.3 + local PG17; both
-  `MC2_Q12_REAL_PG17=1` gated suites (`q12-live-baseline-producer`,
-  `q12-live-real-full-window`) PASS against disposable `postgres:17.10`. The un-done
-  surface is precisely the data-movement commands (`pg.backup`/`pg.restore`/
-  `source.forward`/`reindex.*`/`deploy.*`), currently real-SHAPED stubs on fixture
-  values. All W2/W3 increments are now validatable HERE on disposable PG17.
-- **EXECUTABLE PLAN WRITTEN:**
-  `docs/superpowers/plans/2026-07-20-q12-w2-w3-staged-execution.md` — TDD, bite-sized,
-  7 tasks. T1 W3-struct (`mc2-58tnx`): extract `SourceSnapshotSeam` from
-  `LivePlanExecutor` → `OwnerCustodyExecutor.open_window_snapshot`. T2 W2-fork /
-  T3 W2-consistency / T4 W2-oracle (`mc2-j58wi`): `production`-gated
-  `StagedValueResolver`, run-root staged-values authority for compose↔claim
-  byte-parity, structural `accept_real_run` (D4). T5 W5 rehearsal (`mc2-v68w6`),
-  T6 W6 runbook (`mc2-naz8j`), T7 W7 owner-gated STOP (`mc2-i9h3y`).
-- **Beads sequencing fixed:** W3 (`mc2-58tnx`) is the ONLY ready increment; edge
-  reversed so W2 depends on W3 (T2 consumes `open_window_snapshot`); W5 depends on
-  W2+W3. Chain: W3 → W2 → W5 → W6 → W7.
-- **Next executable action:** implement Plan Task 1 (W3-struct), TDD against the fake
-  seam here + `MC2_Q12_REAL_PG17=1` live leg. Window stays CLOSED.
+Outside what the probe can do: run the controller DETACHED (`setsid nohup`; a dropped ssh once
+killed a plan at exit 255, and after C2 that would strand stopped writers), and note that a push
+touching `deploy/**` triggers Deploy to Dev, failing H4 for 30 minutes (docs-only, `.codex/**` and
+test-only pushes do not). Deploy to Dev never scps `deploy/qdrant` — only the master job does,
+broken per `mc2-o0g75`, so the tree is reinstalled by hand.
 
-### PROGRESS (2026-07-20, cont.³) — W2/W3/W5/W6 + CLI wiring DELIVERED; only owner-gated W7 remains
+WINDOW ARGV — SETTLED 2026-07-28 from artefacts, no re-plan. `--release-sha
+23dfe973f18cc6067d386b6eb683bf6906142165` (`.env.green`'s `API_IMAGE` carries that
+`org.opencontainers.image.revision`; its `WEB_IMAGE` labels `50f670b9`, but the diff against
+`23dfe973f` over `packages/web|shared-types|shared-utils` is EMPTY, and the staged root's catalog
+authority records it). `mc2-sdbua`'s closure is SUPERSEDED: it ruled on the spent root `0fa297e4`
+and re-made the operator/app conflation `mc2-v7547` corrected. `--operator-digest b5eb528e…`,
+`--recovery-run-id a417a99c-…`, 64 zeroes for the resource/quiesce digests on a first run.
+`--stop-after deploy.prepare` is the sole resumable pre-C9 head; the barrier is invoked as argv[0],
+so keep it mode 0555, not 0444.
 
-All non-owner-gated Q12-window work is delivered, TDD, and verified against real PG17.
-Commits (all on `codex/self-hosted-qdrant-platform`, manifest `aaec6fc2` intact):
+CAPABILITY — SETTLED 2026-07-28 from the barrier's code, no owner decision needed: RE-MINT per run
+root. `q12-database-barrier.sh:210` binds only the PATH to the run id; `install` registers whatever
+digest the session supplies (`:945-948`) and `assert_capability`/`assert_controller_binding` compare
+only against that row (`:984`, `:999`) — a per-run nonce with no external counterpart.
+`accepted-coverage-run` is deterministic and not secret — copied verbatim.
+THE FROZEN ENV PINS `HOME=/root` FOR EVERY COMMAND while they run as the deploy operator; any child
+resolving something under `$HOME` (libpq's client certificate, the docker CLI's config and plugins)
+fails with EACCES, not "absent". Give every new consumer a HOME it can stat.
 
-- **W3-struct** `bc4726c1e` (`mc2-58tnx` CLOSED): extracted `SourceSnapshotSeam` +
-  `SourceConnectionConfig` mixin; `OwnerCustodyExecutor.open_window_snapshot`/
-  `close_window_snapshot` (real held `pg_export_snapshot()` + 0400 baseline.json).
-  Refactor-preserving (both gated PG17 suites byte-identical).
-- **W2** (`mc2-j58wi` CLOSED): `df86ebea1` StagedValueResolver + `resolve_window_values`
-  fork in run_live; `16e09b67a` run-root staged-values authority (recover determinism,
-  D5J single-authority); `52881cbce` `accept_real_run` (D4).
-- **Correction wave** `4c6d00947`: correctness-review P1 (coordinator-leak guard in
-  run_live) + P2a-e (open_snapshot self-release, ephemeral libpq workdir, named
-  fail-closed, corrupt-authority LifecycleError).
-- **W5** `27d5b2e12` (`mc2-v68w6` CLOSED): production value machinery rehearsed
-  end-to-end vs disposable PG17 (fork→real snapshot→persist→recover determinism→D4).
-  IN-WINDOW-only residual bounded to W7 (full barrier dual-bind window + real
-  data-movement pg.backup/restore/source.forward/reindex/deploy vs real infra).
-- **CLI wiring** `09b63b205` (`mc2-pj5f0` CLOSED): `--recovery-run-id` (live+recover) +
-  fixed source secret paths (`db_url_file`/`ca_file`) into main() request. main() runs
-  live/recover with production=True + owner-custody executor, so the CLI now actually
-  drives the staged production path. **Unblocks W7 invocation.**
-- **W6** `e3b5148e5` (`mc2-naz8j` CLOSED): operator runbook v2
-  `docs/qdrant/q12-window-operator-runbook-v2.md` (invocation incl --recovery-run-id,
-  C1..C10, reversible --stop-after boundary, recover, D4, #18 rollback, owner-held C9).
-
-Verification: focused q12 **676 passed / 74 skipped**; gated PG17 (baseline-producer,
-full-window byte-parity, migration-plan malformed-snapshot, W3 live-leg, W5 rehearsal)
-all PASS; type-check EXIT=0. Plan: `docs/superpowers/plans/2026-07-20-q12-w2-w3-staged-execution.md`.
-
-**REMAINING: W7 (`mc2-i9h3y`, OPEN, OWNER-GATED).** Open the live window C1..C10 +
-Phase D closeout. Requires a fresh pre-window `plan`, owner "go" on C1, and the owner
-personally presses C9 (`barrier.activate` + nginx switch — the irreversible point of no
-return). Everything up to that gate is now runnable via the CLI per the runbook. Preserved
-constraints hold: never change manifest `aaec6fc2` (HARD STOP); never mutate Qdrant Cloud;
-secrets path-only; no production mutation without a fresh pre-window plan + owner go on C1.
-
-### Historical context (Phase A/B complete; pre-open R8 rehearsals)
-
-The Q12 Full Completion program (spec/plan 2026-07-16) is RUNNING under a
-Fable orchestrator. Phase A is COMPLETE (A1 `72af414c`; D6 `.13.19` at
-`3d70eaf2`; Root `.13.13` join at `fcd05e27`; final matrix: focused 463/463
-PG17, broad 952/953 known-env-only, type-check 0, build 75/75). Phase B is
-COMPLETE (`mc2-rl4p9`, owner-approved 2026-07-17): operator image published
-`ghcr.io/maslennikov-ig/mc-2/qdrant-operator:266de3d7…` @ index digest
-`sha256:0fe4265ca80eb100912f6ce8155b061712db90ace4e0b1641e63e9a1a247e199`,
-remote SLSA v1 provenance independently validated (source/revision/
-Dockerfile PASS); two latent publisher defects found by the first live run
-(metadata-file 0644 vs asserted 0600; validator SLSA v0.2-only) fixed with
-TDD, suite 24/24 (receipt: `…artifacts/mc2-rl4p9-q12-b1-publication.md`).
-`.13.7` is DELIVERED; the owner explicitly deferred `.13.8` rotation.
-
-Recommended action: continue the completion program:
-
-1. Phase C window is OPEN (owner approved 2026-07-17; packet
-   `mc2-jz6y0-c0-window-packet.md`; server brought up, operator image pulled
-   by digest). The C1 product-truth gap — the `plan` expected-catalog
-   builder — is DELIVERED on this branch (deterministic builder + full live
-   orchestration: snapshot-coordinated generation, drill persist-seam
-   restore, §3 role bootstrap, structural-equality proof, real loopback
-   CLIs, production seam lockdown; reviews PASS 0 P0/P1:
-   `mc2-jz6y0.13-plan-builder-review.md`,
-   `mc2-jz6y0.13-plan-live-review.md`).
-2. Pre-C1 rehearsals are COMPLETE: 13 read-only server rehearsals drove
-   rounds 8-19 (scheduled drill mode, tsx shim runners, delta-composed
-   prediction ruling, dump-stable identities, delta-neutral extras, frontier
-   repair, read-only lift, search_path-independent catalog checks, single-
-   entry MIGRATION_MODIFIED_IDENTITY_ALLOWLIST). Rehearsal #13 (run
-   `f4afe952`, release `7ba8f372`, core `e287d0fe…` installed 0444 root)
-   fully SUCCEEDED: status `planned`, catalog at `/opt/megacampus/backups/
-q12/f4afe952-68f9-4fea-873e-2e3809982758/expected-post-migration-catalog.
-json` (0400, sha `de9e6b03…`), baseline `edbea709…`, expected post-
-   migration sha `68041d94…`, clean teardown. Four never-executed-path
-   live-window defects repaired (drill tsx, backup tsx, frontier premise,
-   search_path rendering). Independent review of rounds 8-19
-   (`7764cfb4..7ba8f372`, artifact `mc2-jz6y0.13-plan-live-review-r2.md`):
-   correctness PASS, quality PASS, 0 P0/P1/P2, 3 P3 (handled/recorded).
-   HOWEVER the window is BLOCKED pre-open: operator-procedure research
-   (`mc2-jz6y0-c0-window-operator-procedure.md`, orchestrator-verified)
-   shows the D5J §10 "real plan|live|recover controller … and live
-   orchestration" was deliberately kept in Task-9 scope and `.13.13`
-   delivered only the synthetic smoke evaluator + D6 frame join. Six open
-   questions (OQ1 quiesce-ordering contradiction vs frozen chronology; OQ2
-   no production emitter of ordinary journal rows; OQ3 resume needs
-   guard_cleanup_complete + final-writer-manifest producers; OQ4 production
-   resource_manifest_sha256 undefined; OQ5 no production snapshot exporter
-   for pg.backup; OQ6 no baseline.json producer). NEXT: live-controller
-   design (OQ resolutions grounded in frozen truth) → plan → TDD rounds →
-   re-verify → re-present window open; then C1..C10 with C7 in-window
-   re-freeze of W fields 5/6/8/9.
-3. `.13.8` — owner-deferred password rotation (re-confirm explicitly; never
-   rotate on a general "do it"); `.13.6` — off-host S3 production gate;
-   `.25` — Prometheus retention YAML (Phase D). Alertmanager Telegram bot
-   token + chat id still owed by the owner before monitoring bring-up.
-
-Before any live mutation, present exact effects, secrets, observation,
-rollback and downtime/data impact per the window packet.
+The dead GHCR token (`mc2-2vtmk`) does not block the window.
 
 ## Starter prompt for next orchestrator
 
-Full completion program authored (prompt-check pass): copy
-`docs/superpowers/prompts/2026-07-16-q12-full-completion-orchestrator.md`
-(authority: spec `…specs/2026-07-16-q12-full-completion-design.md` + plan
-`…plans/2026-07-16-q12-full-completion.md`; Phase A local D6/Root → B GHCR
-publish → C live cutover → D closeout; every remote/live and credentialed step
-owner-gated). Fallback: Use $orchestrator-stage from this handoff plus the stage
-summary at the resolved `origin/codex/self-hosted-qdrant-platform`.
-
-Use visible subagents, `.codex/subagent-spawn-template.md`, strict write zones, selected installed skills/personas, artifacts, exact verification, and independent review. Do not accept reports without inspecting diffs and evidence.
-
-## Required Skills and Review
-
-- Orchestration: `orchestrator-stage`, `task-router`, `subagent-driven-development`.
-- Behavior changes: `brainstorming` where decisions remain, `test-driven-development`, `verification-before-completion`.
-- Risk/closeout: `senior-architect`, `senior-devops`, `test-pass`, `orchestration-closeout`.
-- Specialists: `docs_researcher`, search/data worker, `deploy_specialist`, `correctness_reviewer`, and `docs_reviewer`.
+`docs/superpowers/prompts/2026-07-29-q12-window-completion-orchestrator.md`, with the plan it
+follows: `docs/superpowers/plans/2026-07-29-q12-window-environment-preflight.md`. The 2026-07-28
+prompt is SUPERSEDED — its §1-§5 are all done. The live sequence is `mc2-bh3ef` (P0, frozen-env
+pre-flight probes), then `mc2-rjy9k` (P1, dry-run the children against the plan's isolate), then ONE
+window attempt. Do not reopen the window first: five defects on 2026-07-29 cost ~40 minutes of
+waiting each and 4-16 minutes of REAL production downtime, and every one of them was establishable
+read-only. Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
 
 ## Verification and Delivery
 
 - Do not weaken RU/EN relevance, strict-mode, restore, resume, coverage, or tenant-isolation tests.
-- Completed local gates: focused Stage 2/4/5/6 backend 1,893/1,893, shared 23/23, web 20/20, PostgreSQL 78/78, pinned Qdrant 15/15, applicable local snapshot/restore 5/5, Compose 8/8, `pnpm type-check`, and `pnpm build` 75/75. Process verification, final Graphify refresh, and canonical closeout are recorded at the delivered HEAD.
-- Keep durable docs, project index, Graphify (`graphify update .`; `graphify cluster-only . --no-viz`), Beads, artifacts, stage summary, and this handoff synchronized before any Q12 continuation.
-- All accepted branches/commits must be pushed under the repo contract.
-- Primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
+- Completed local gates at the delivered HEAD (backend/shared/web/PostgreSQL/Qdrant/Compose,
+  `pnpm type-check`, `pnpm build`, process verification, Graphify refresh, canonical closeout):
+  recorded in `.codex/stages/mc2-jz6y0/summary.md`.
+- Keep durable docs, project index, Graphify, Beads, artifacts, stage summary and this handoff
+  synchronized before any Q12 continuation; push all accepted commits under the repo contract. The
+  primary worktree may contain unrelated `.claude/settings.json`; do not alter or include it.
 
 ## Explicit defers
 
-- Q12 staging mutation is owner-authorized, but remains NO-GO until the
-  approved local correction streams, truthful fresh validated database backup,
-  Supabase-compatible restore and every documented hard gate pass. GHCR
-  publication and password rotation retain their separate secret/effects gates.
-  Missing-source product truth is resolved by the approved six failed plus
-  eighteen retained-derived-only dispositions. Do not partially activate.
-- D6 `.13.19` is integrated (see above); Root `.13.13` join is the next
-  implementation stream. D6 pinned-server capability gates and the fields
-  5/6/8/9 production re-freeze (Task C7) stay live-window scope. No live
-  action outside the owner-gated window.
-- Known accepted boundaries (documented by design, not debt): the joined
-  composer's partial-capture fixture is truthful only while W validates held
-  checkpoints as a creation-order prefix without a journaled counter (review
-  P2-3); §5 tamper-append of a fully valid row is outside the tamper
-  protection by design (append of VALID bytes is indistinguishable from
-  authorship — the guarded property is prefix integrity); M's residual P2-4
-  libpq variables (`PGSSLCERT`/`PGSSLKEY`/`PGSSLPASSWORD`/`PGCHANNELBINDING`/
-  `PGGSSENCMODE`) are proven non-exploitable with the explicit `ssl` object.
-- PG17 security-manifest digests are DONE: computed on the `.13.7` isolated
-  restore and integrated into the allowlists at `b8204cde`.
+- Review P2 `mc2-af1ay` on the `.13.4.1` amendment (duplicate operator-side `DispositionSchema`,
+  `CATALOG_HASH_PATTERN`): DEFERRED past the live window — no operator churn before C1..C10.
+  Detail in `.codex/stages/mc2-jz6y0/summary.md`.
+- Q12 staging mutation is owner-authorized but NO-GO until the approved correction streams, a truthful
+  fresh validated database backup, a Supabase-compatible restore and every documented hard gate pass.
+  GHCR publication and password rotation keep their separate secret/effects gates. Missing-source
+  product truth is settled by the approved six failed plus eighteen retained-derived-only
+  dispositions. Do not partially activate.
+- D6 `.13.19` is integrated; Root `.13.13` join is the next implementation stream. D6 pinned-server
+  capability gates and the fields 5/6/8/9 production re-freeze (Task C7) stay live-window scope. No
+  live action outside the owner-gated window.
+- Known accepted boundaries (by design, not debt): recorded in
+  `.codex/stages/mc2-jz6y0/summary.md` (W prefix-integrity scope, the §5 tamper-append case,
+  M's residual P2-4 libpq variables).
 - Off-host S3 is not a staging blocker after the 2026-07-12 owner decision; it
   remains the explicit production readiness defer `mc2-jz6y0.13.6`.
 - Prometheus retention YAML migration is the bounded nonblocking defer
   `mc2-jz6y0.25`, due before the next Prometheus pin change.
-- The current pushed `codex/self-hosted-qdrant-platform` integration branch/worktree is intentionally retained for Q12. Final cleanup returned non-zero only because it correctly refused to delete this checked-out continuation branch; all Q11-owned worktrees, local branches, containers, ports and temporary data are cleaned.
+- `codex/self-hosted-qdrant-platform` is intentionally retained for Q12; all other Q11-owned
+  worktrees, branches, containers, ports and temporary data are cleaned
+  (`.codex/stages/mc2-jz6y0/summary.md`).
 - Stop if snapshot/alert secrets are required and unavailable, source gaps would change product truth, ownership conflicts cannot be isolated, or a required gate repeatedly fails after in-scope diagnosis.
+- **Q12 W7 window — DURABLE PRECONDITIONS** (superseded argv removed 2026-07-27; the live argv lives
+  in § "Next recommended" only, so there is one source of truth).
+  - The C5/C6 accepted-coverage hard gate is RESOLVED (`mc2-tpdog`, `e7fef75d4`; spec §"Amendment
+    2026-07-25" in `…specs/2026-07-12-q12-source-recovery-design.md`): acceptance derives from the
+    recovered `file_catalog` rows against the sha-bound reviewed manifest, and the frozen manifest's
+    `<accepted-coverage-run>` slot carries `catalog:<recovery-run-id>`.
+  - EXECUTION IDENTITY (`mc2-1by33`): controller and writer operations run as uid 1000 (root cannot
+    complete C2); only `source.forward` needs root, through the root-owned argv-whitelist launcher
+    `deploy/qdrant/q12-privileged-launch.sh` (0555 root:root) via the account's existing sudo. It
+    preflights the launcher + `sudo -n` before any journal row and publishes `writer-recovery-
+state`, which C9 requires. Residual `mc2-9vbzp`; no full `live` rehearsal is possible outside
+    the window.
+  - `mc2-i9h3y` stays owner-gated: C2 quiesces production writers (schedule the slot with the owner)
+    and C9 is pressed by the owner in person, with runbook §8 requiring a fresh green plan plus
+    accepted C1..C8 at that moment.
+  - Post-window defers: `mc2-8m90f`, `mc2-n6szm`.
 - Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding, and JWT RBAC remain out of scope.
 
 docs-reviewed: updated — the D6 integration, ratified 11/11 tuple, review

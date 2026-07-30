@@ -230,20 +230,24 @@ class RealClaimExecutor:
         if subcommand == "install":
             # The install child validates a per-leg input checkpoint whose journal_entry_hash is the
             # capability_claimed head run_claim just appended (q12-database-barrier.sh:420-441).
-            # Publish it by copying the controller phase-checkpoint (authored by Engine.append),
-            # rebinding ONLY journal_device/journal_inode to the trust-view journal the barrier stats.
-            checkpoint = json.loads((run_root_opt / "phase-checkpoint.json").read_bytes())
-            checkpoint["journal_device"] = str(trust_stat.st_dev)
-            checkpoint["journal_inode"] = str(trust_stat.st_ino)
+            # mc2-orsez: this fixture used to PUBLISH that file itself, standing in for a production
+            # step the controller never performed — which is exactly why the C1 blocker stayed
+            # invisible to every local suite until the window was opened for real. run_claim now
+            # publishes it (Engine.publish_database_barrier_input_checkpoint) at the /opt custody
+            # path, so this fixture only OBSERVES it through the barrier's trust view.
             input_checkpoint = (
                 run_root_trust / "database-barrier-input-checkpoint-install-cutover.json"
             )
-            input_checkpoint.write_bytes(CORE.complete_object(checkpoint))
-            input_checkpoint.chmod(0o600)
-            # #15 (iv): the published checkpoint's inode binding is view-independent.
+            checkpoint = json.loads(
+                CORE.validate_regular_file(input_checkpoint, mode=0o600)
+            )
+            # #15 (iv): the published checkpoint's inode binding is view-independent — the barrier
+            # reads it through /tmp and it names the SAME journal inode the /opt custody view sees.
             self.diagnostics["input_checkpoint_view_independent"] = (
                 checkpoint["journal_device"] == str(opt_stat.st_dev)
                 and checkpoint["journal_inode"] == str(opt_stat.st_ino)
+                and checkpoint["journal_device"] == str(trust_stat.st_dev)
+                and checkpoint["journal_inode"] == str(trust_stat.st_ino)
             )
 
         rewritten = _rewrite_opt_to_trust(argv, self.trust_root)
@@ -447,30 +451,44 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
         return CORE.ProductionExecutor().prepare_barrier_cleanup(context)
 
     def execute_barrier_cleanup(self, context: dict, command: dict) -> dict:
+        """mc2-fjcj2: the whole step is now PRODUCTION code. run the real
+        ``OwnerCustodyExecutor.execute_barrier_cleanup`` — it publishes the v1-before-cleanup archive
+        the frozen child's predecessor gate demands (barrier :640-645), launches the child, and then
+        consumes its artifacts through the R8-B-1 seam. This fixture used to do the archive and the
+        launch itself, standing in for production exactly as it did for the input checkpoint.
+
+        The ONE thing that cannot be production here is the literal spawn: the frozen child must be
+        rewritten to the /tmp trust view and run inside the bwrap dual-bind sandbox with the
+        in-namespace pooler proxy. So only ``invoke_barrier_cleanup_child`` is overridden — the same
+        narrow, harness-only argv substitution the forward legs already use.
+        """
+        fixture = self
+
+        class _SandboxedOwnerCustody(CORE.OwnerCustodyExecutor):
+            def invoke_barrier_cleanup_child(self, argv: list[str]) -> None:
+                fixture._spawn_cleanup_child_in_sandbox(context, argv)
+
+        return _SandboxedOwnerCustody().execute_barrier_cleanup(context, command)
+
+    def _spawn_cleanup_child_in_sandbox(self, context: dict, argv: list[str]) -> None:
         run_root = pathlib.Path(context["run_root"])
         run_id = context["run_id"]
-        # The cleanup predecessor gate (q12-database-barrier.sh:640-645) requires a byte-exact
-        # v1-before-cleanup archive of the activate receipt BEFORE the child runs. Create it first.
-        receipt_path = run_root / "database-barrier-receipt.json"
-        archive_path = run_root / "database-barrier-receipt-v1-before-cleanup.json"
-        activate_receipt_bytes = CORE.validate_regular_file(receipt_path, mode=0o400)
-        archive_path.write_bytes(activate_receipt_bytes)
-        archive_path.chmod(0o400)
-        # The cleanup child input checkpoint = the controller phase-checkpoint at the cleanup claimed
-        # head, journal_device/journal_inode bound to the run-root journal the barrier stats
-        # (view-independent inode) -- q12-database-barrier.sh:582-597.
-        journal_stat = os.stat(run_root / "phase.jsonl")
-        checkpoint = json.loads((run_root / "phase-checkpoint.json").read_bytes())
-        checkpoint["journal_device"] = str(journal_stat.st_dev)
-        checkpoint["journal_inode"] = str(journal_stat.st_ino)
-        input_checkpoint = run_root / "database-barrier-input-checkpoint-cleanup-cutover.json"
-        input_checkpoint.write_bytes(CORE.complete_object(checkpoint))
-        input_checkpoint.chmod(0o600)
+        # mc2-orsez: the cleanup child's input checkpoint (q12-database-barrier.sh:582-597) is
+        # published by the CONTROLLER at the cleanup claimed head, into this same run root — this
+        # fixture no longer writes it. Assert its presence so a regression surfaces here instead of
+        # inside the frozen child, past the point of no return. Same for the v1 archive, which the
+        # production executor must have published before reaching this launch.
+        CORE.validate_regular_file(
+            run_root / "database-barrier-input-checkpoint-cleanup-cutover.json", mode=0o600
+        )
+        CORE.validate_regular_file(
+            run_root / "database-barrier-receipt-v1-before-cleanup.json", mode=0o400
+        )
         # Run the real frozen barrier cleanup in the SAME bwrap dual-bind sandbox as the legs,
         # through --real-cleanup (which starts the in-namespace pooler proxy, runs the barrier, and
         # tears the proxy down). The barrier argv is rewritten to the /tmp trust view.
         trust_view = f"{self.context.trust_root}/backups/q12/{run_id}"
-        rewritten = _rewrite_opt_to_trust(command["argv"], self.context.trust_root)
+        rewritten = _rewrite_opt_to_trust(argv, self.context.trust_root)
         rewritten = _rewrite_run_root_to_trust(rewritten, str(run_root), trust_view)
         sandbox = _bwrap_prefix(self.context, run_id)
         env = {
@@ -494,9 +512,6 @@ class RealBarrierWrapperExecutor(rb.LiveOrdinaryExecutor):
             raise CORE.LifecycleError(
                 f"real barrier cleanup failed ({completed.returncode}): {completed.stderr.strip()}"
             )
-        # The REAL R8-B-1 ProductionExecutor seam: consume the barrier's terminal proof + probe,
-        # archive v1 (idempotent), promote the exact 10-key v2, delete the db-capability.
-        return CORE.ProductionExecutor().execute_barrier_cleanup(context, command)
 
 
 # ============================================================================================ #
@@ -590,12 +605,7 @@ def _build_expected_catalog(container: str) -> tuple[dict, str, str, str, str]:
     public_rows = rows("public")
     auth_rows = rows("auth")
     storage_rows = rows("storage")
-    cron_row = _dexec_json(
-        container,
-        "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
-        "JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner "
-        "WHERE n.nspname='cron' AND c.relname='job'",
-    )[0]
+    # mc2-34eua: cron.job is NOT in the guarded set — see q12-migration-plan-capture.py.
     net_row = _dexec_json(
         container,
         "SELECT c.oid::bigint AS oid, r.rolname AS owner FROM pg_class c "
@@ -612,10 +622,9 @@ def _build_expected_catalog(container: str) -> tuple[dict, str, str, str, str]:
         [guarded("public", r["name"], r["oid"], r["owner"]) for r in public_rows]
         + [guarded("auth", r["name"], r["oid"], r["owner"]) for r in auth_rows]
         + [guarded("storage", r["name"], r["oid"], r["owner"]) for r in storage_rows]
-        + [guarded("cron", "job", cron_row["oid"], cron_row["owner"]),
-           guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
+        + [guarded("net", "http_request_queue", net_row["oid"], net_row["owner"])]
     )
-    if len(guarded_relations) != 76:
+    if len(guarded_relations) != 75:
         raise RuntimeError(f"guarded_relations count drifted: {len(guarded_relations)}")
     cron_jobs_catalog = [
         {"jobid": r["jobid"], "username": "postgres",
