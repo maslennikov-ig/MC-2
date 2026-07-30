@@ -206,11 +206,11 @@
       "mode": null,
       "owner": null,
       "path": "scripts/deploy_blue_green.sh",
-      "sha256": "b4d45e0e016b154b10c512b20a6bd5d1e810d99a2b4e94a84506e9245c37318a"
+      "sha256": "4690faa335ea15f375550f7c78708b2db9ccf13f591fa08e71f6d6274c3b2fa5"
     }
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "f0f76e69216b264ed5cfc051eb4c7a92dd92c07c",
+  "generated_from_tree_sha": "1f99bbedc4108b50562d270b24627e10fdcce83c",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

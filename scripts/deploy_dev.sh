@@ -181,8 +181,10 @@ fi
 # 4. Ensure data and secrets directories exist
 echo "Ensuring data directories exist..."
 mkdir -p "$BASE_PATH/data/enrichments" \
-         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
-         "$BASE_PATH/secrets/notebooklm"
+         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+# Same reason as deploy_blue_green.sh: $BASE_PATH/secrets is root-owned 0700, so the deploy user
+# cannot create or stat through it. Dev shares this host and this directory.
+sudo -n mkdir -p "$BASE_PATH/secrets/notebooklm"
 echo "   Directories ready."
 
 # 5. Ensure infrastructure is running (shared with staging)
