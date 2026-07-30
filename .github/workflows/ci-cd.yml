@@ -831,6 +831,28 @@ jobs:
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.production"
 
+      # mc2-c2p8z, the same drift class: QDRANT_METRICS_GID was written from a repository secret
+      # that was never configured, so this step silently replaced a working value with an empty one
+      # and docker compose refused with "required variable QDRANT_METRICS_GID is missing a value".
+      # It is not a secret at all — it is the numeric id of the host's dedicated metrics group, so
+      # it is read from the host that owns it and cannot drift from the group it names. Fails closed
+      # if the group is absent, rather than writing an empty value over a good one again.
+      - name: Resolve host-derived environment values
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            'set -eu
+             gid="$(getent group megacampus-metrics | cut -d: -f3)"
+             case "$gid" in ""|*[!0-9]*) echo "::error::host group megacampus-metrics is missing or not numeric"; exit 1 ;; esac
+             file="${{ env.DEPLOY_PATH }}/.env.production"
+             if grep -q "^QDRANT_METRICS_GID=" "$file"; then
+               sed -i "s/^QDRANT_METRICS_GID=.*/QDRANT_METRICS_GID=$gid/" "$file"
+             else
+               printf "QDRANT_METRICS_GID=%s\n" "$gid" >> "$file"
+             fi
+             grep -q "^QDRANT_METRICS_GID=$gid$" "$file" || { echo "::error::failed to set QDRANT_METRICS_GID"; exit 1; }
+             echo "QDRANT_METRICS_GID resolved from host group megacampus-metrics: $gid"'
+
       - name: Create Qdrant secret files
         env:
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
