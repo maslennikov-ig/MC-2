@@ -1772,3 +1772,72 @@ log this drill captures lives under a TEMP_ROOT that `on_exit` reclaims uncondit
 `mc2-94mmf` remedy is now applied here too — `fail_with_log` carries the scrubbed tail of the
 captured log — which is what turned a one-line refusal into the diagnosis above. Inside a window,
 with the writers already stopped, that difference is the whole cost of an attempt.
+
+## `mc2-wl5vn` — the owner's remedy (a), and what it uncovered (2026-07-30)
+
+The owner ruled remedy (a): skip exactly the guard's event trigger, and state the skip. Implemented
+in `restore-supabase-drill.sh` as `build_restore_toc`, which runs inside `validate_generation` —
+before any container exists, so a defect in the archive's guard shape costs nothing to find.
+
+**Derived, never declared.** The drill names no trigger. Each `EVENT TRIGGER` TOC entry is extracted
+from the archive through a one-entry `--use-list` and skipped only if the archive's own SQL says it
+executes a `q12_guard` function. An unguarded archive therefore excludes nothing, a guard renamed
+upstream is still caught, and a production event trigger that is not the guard's is still restored.
+A `COMMENT` or `SECURITY LABEL` on a skipped trigger follows it; an entry whose SQL cannot be parsed
+fails closed; and the rewrite itself is checked to be a pure comment-out of exactly the derived
+lines, because a use-list that silently lost an entry would restore a quietly smaller database and
+every comparison downstream would still be measuring the archive.
+
+**What it narrows, stated.** The isolate is no longer a full replay of the archive. What it does not
+narrow: the offline full traversal still reads every entry and the pgTLE scanner still sees the
+whole stream; `q12-source-manifest.ts` captures `pg_trigger` and never `pg_event_trigger`, and
+`q12-structural-catalog.sql:975` already excludes this trigger by name, so no comparison ever
+observed the skipped object; and the activation cleanup's `DROP SCHEMA q12_guard CASCADE` is what
+deleted it on a full replay anyway, moments later.
+
+**Proven on the real archives, not only in fixtures.** Attempt #16's guarded generation
+`20260729T113039Z-96741f4b`: 3525 entries, exactly 1 skipped, the six Supabase event triggers
+(`issue_graphql_placeholder`, `issue_pg_cron_access`, `issue_pg_graphql_access`,
+`issue_pg_net_access`, `pgrst_ddl_watch`, `pgrst_drop_watch`) untouched. The nightly unguarded
+`20260729T223006Z-74f805da`: 3335 entries, 0 skipped, produced list byte-identical to the TOC. Full
+drill against the guarded generation: `pg_restore` SUCCEEDED and `cluster-global inventory equality
+passed`. Full drill against the nightly one: PASSED end to end, `restore size ratio=0.723494`,
+`archive entries skipped: 0` — so the change is a no-op on the ordinary scheduled path, measured
+rather than asserted. Seven unit cases run the SHIPPED `build_restore_toc` block, extracted from the
+tracked script at run time, against a stubbed `pg_restore`; the load-bearing one is `unguarded`,
+where the produced list must be byte-equal to the archive's own TOC, because the dangerous failure
+is over-exclusion, not under-exclusion.
+
+## What the dry run found on its SECOND use — `mc2-fxlne` (2026-07-30)
+
+With the restore cleared the drill reached `compare --view cutover_snapshot`
+(`restore-supabase-drill.sh:993`) and failed with four deltas. They are one cause, and it is not the
+exclusion: `compare` was written for an UNGUARDED source.
+
+- `/database/settings: source-only ["default_transaction_read_only","on"]` — `normalizeForTarget`
+  (`q12-source-manifest.ts:841-852`) deliberately strips that setting from the target ("the drill
+  pins the isolated copy read-only; the source is writable"); `normalizeSource` does not strip it
+  from the source. A Q12 generation is dumped at C3, after C1's barrier set it on production.
+- `/catalog/triggers` and `/catalog/object_owners`, source-only x2 —
+  `net.http_request_queue.q12_guard_row` and `.q12_guard_truncate`. Twice unreachable:
+  `net.http_request_queue` is a `pg_net` extension member, so `pg_dump` does not carry its triggers
+  at all; and `isExternalGuardTrigger` (`:1094`) exists to filter exactly this pair, but is reached
+  only from `filterApprovedGuardCatalog` (`:1103`), which is called only from `validateTransition`
+  (`:1484`).
+- `/catalog/object_acls`, target-only x4 — PUBLIC USAGE on the `q12_guard` row types.
+  `approvedGuardIdentity` (`:1071-1079`) already covers those `type` identities, again only on the
+  `validateTransition` path.
+
+All the guard-aware machinery lives in `validateTransition` (baseline-vs-cutover, run at C3 during
+capture). `compare` (source-vs-target, run at C4) has none of it, and a guarded generation had never
+reached it — sixteen attempts died at or before C4 and the seventeenth died inside the restore.
+
+Filed `mc2-fxlne` (P0) with four remedies and recommendation (a): make `compare` guard-aware for a
+guarded source by reusing the SAME approved-guard predicates that already exist, so it tolerates
+exactly the delta the C3 capture already declared approved and nothing more. It is a decision about
+what C4 proves, of the same class the owner reserved when ruling on `mc2-wl5vn`, so the window stays
+shut. `mc2-i9h3y` depends on it.
+
+Both defects cost no downtime: read-only, no writer stopped, no guard installed, no run-id burnt,
+against production's own generations. Sixteen window attempts cost ~40 minutes of waiting and 4-16
+minutes of real outage each to learn one thing.

@@ -1,16 +1,29 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-29 (attempts #12-#16; C1, C2 and C3 PASS; the window is SHUT on `mc2-wl5vn`)
+Updated: 2026-07-30 (attempts #12-#16; C1, C2 and C3 PASS; C4's restore now PASSES; the window is
+SHUT on `mc2-fxlne`)
 
-## THE WINDOW IS NOT RUNNABLE RIGHT NOW — `mc2-wl5vn` (P0, owner decision)
+## THE WINDOW IS NOT RUNNABLE RIGHT NOW — `mc2-fxlne` (P0, owner decision)
 
-Found 2026-07-29 by the `mc2-rjy9k` dry run, read-only, against attempt #16's own generation: C4
-cannot restore a GUARDED dump. C1 installs `q12_guard`; C3 dumps production with it; C4 restores as
-`supabase_admin` and supautils refuses — `Superuser owned event trigger must execute a superuser
-owned function`, because the guard is owned by the managed non-superuser by design (`mc2-ipwyc`).
-The pg_restore invocation is common to both drill modes, so the window hits it identically. Opening
-now would stop the ten writers, run both dumps and die there. Four candidate remedies are on the
-bead; each changes what "strict restore" proves, so the owner rules. `mc2-i9h3y` now depends on it.
+`mc2-wl5vn` is CLOSED: the owner ruled remedy (a) on 2026-07-30 and C4's restore now succeeds
+against a guarded dump. The drill restores through a `pg_restore` use-list that comments out exactly
+the `q12_guard` event trigger, derived from the archive's own SQL rather than declared. Proven on
+both real archives — attempt #16's guarded generation skips 1 of 3525 entries and leaves the six
+Supabase event triggers alone; the nightly unguarded generation skips 0 of 3335 and passes the whole
+drill end to end (ratio 0.723).
+
+The dry run then reached the NEXT line and found `mc2-fxlne`: `compare --view cutover_snapshot`
+(`restore-supabase-drill.sh:993`, before the activation cleanup and on the window path in both
+modes) demands the isolate reproduce production's GUARDED snapshot, which the dump cannot carry.
+Four deltas, one cause — every piece of guard-aware machinery in `q12-source-manifest.ts`
+(`filterApprovedGuardCatalog`, `approvedGuardIdentity`, `isExternalGuardTrigger`) is reachable only
+from `validateTransition`, never from `compare`; and `normalizeForTarget` strips
+`default_transaction_read_only` from the target while `normalizeSource` leaves it on a guarded
+source. Nothing here is caused by the event-trigger exclusion: the manifest captures `pg_trigger`,
+never `pg_event_trigger`. Four candidate remedies are on the bead, recommendation (a); each changes
+what C4 proves, so the owner rules. `mc2-i9h3y` now depends on it.
+
+Both defects were found read-only, with no writer stopped, no guard installed and no run-id burnt.
 
 ## Single Source of Truth (2026-07-21 — owner-directed consolidation)
 
@@ -49,7 +62,7 @@ Accepted-and-integrated history for Q1-Q12 moved on 2026-07-25 to
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action (SUPERSEDED 2026-07-29 by `mc2-wl5vn` above — do not reopen the window until it
+Recommended action (SUPERSEDED 2026-07-30 by `mc2-fxlne` above — do not reopen the window until it
 is settled; everything below stays true for the attempt that follows): reopen the window. C1, C2 and both C3 dumps now PASS in production. Four C2/C3
 defects were found and fixed on 2026-07-29, each by opening the window and each covered afterwards:
 `mc2-awi6q` and `mc2-1kcbv` are CLOSED (the intent-row carry rule, two checkpoint files the
