@@ -673,8 +673,13 @@ fi
 # causing EACCES errors in container.
 echo "Ensuring data directories exist with correct permissions..."
 mkdir -p "$BASE_PATH/data/enrichments" \
-         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
-         "$BASE_PATH/secrets/notebooklm"
+         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+# $BASE_PATH/secrets is root-owned 0700 — the job's own "Create Qdrant secret files" step installs
+# it that way — so the deploy user cannot create, or even stat through, anything inside it. The
+# NotebookLM storage directory lives there and is root-owned, so it is created with the privilege
+# that owns the parent, exactly as read_secret_file already reads the keys beside it. Splitting this
+# off the data-directory mkdir keeps that unprivileged and this privileged, which is what they are.
+sudo -n mkdir -p "$BASE_PATH/secrets/notebooklm"
 sudo chown -R 1001:1001 "$BASE_PATH/data/enrichments" \
                          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
 echo "   Data directories ready (owner: 1001:1001)."
