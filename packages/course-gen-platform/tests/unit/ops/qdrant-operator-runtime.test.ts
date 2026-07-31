@@ -363,3 +363,45 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
     expect(wrapper).toContain('exec /usr/bin/docker compose');
   });
 });
+
+// mc2-q3ju4. Repairing the 48 documents that indexed no vectors runs a tool, and the operator
+// image is the only place that tool has its Supabase, Redis and Qdrant wiring. Overriding
+// --entrypoint to reach it would step around the argv whitelist that exists precisely so a
+// privileged container cannot be told to run something else, so the command is whitelisted here
+// instead — with a guard, because a bulk repair pointed at the wrong list is a bulk deletion.
+describe('operator retry-documents command', () => {
+  it('is a whitelisted command rather than an entrypoint override', () => {
+    const result = runEntrypoint(['retry-documents', '--help']);
+
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toContain('--file-ids');
+  });
+
+  it('refuses a run with no explicit file list', () => {
+    const result = runEntrypoint(['retry-documents', '--confirm']);
+
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toMatch(/--file-ids/u);
+  });
+
+  it('refuses a file list that is not a readable regular file', () => {
+    const result = runEntrypoint(['retry-documents', '--file-ids', '/nonexistent/list.txt']);
+
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toMatch(/--file-ids/u);
+  });
+
+  it('accepts nothing but the file list and the confirmation flag', () => {
+    const directory = mkdtempSync('/tmp/mc2-retry-');
+    try {
+      const list = resolve(directory, 'ids.txt');
+      writeFileSync(list, '11111111-1111-4111-8111-111111111111\n');
+      const result = runEntrypoint(['retry-documents', '--file-ids', list, '--all-courses']);
+
+      expect(result.status).not.toBe(0);
+      expect(String(result.stderr)).toMatch(/--all-courses/u);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});

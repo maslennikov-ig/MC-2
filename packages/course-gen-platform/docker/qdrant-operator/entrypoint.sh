@@ -106,6 +106,31 @@ cli_value_from_args() {
   return 1
 }
 
+# A bulk repair pointed at the wrong list is a bulk deletion: the tool drops each document's
+# vectors before re-enqueueing it. So the list must be named explicitly, must exist, and nothing
+# else may be smuggled in alongside it.
+require_retry_document_arguments() {
+  local list='' seen_list=0
+
+  while (($#)); do
+    case "$1" in
+      --file-ids)
+        [[ $seen_list -eq 0 ]] || fail '--file-ids may be given once'
+        shift
+        list=${1:-}
+        seen_list=1
+        ;;
+      --confirm) ;;
+      *) fail "retry-documents does not accept $1" ;;
+    esac
+    shift || true
+  done
+
+  [[ $seen_list -eq 1 && -n $list ]] || fail 'retry-documents requires --file-ids <path>'
+  [[ -f $list && ! -L $list && -r $list ]] ||
+    fail "--file-ids must name a readable regular file: $list"
+}
+
 require_physical_target() {
   local target alias
   target="$(target_collection_from_args "$@")" ||
@@ -485,6 +510,16 @@ case "$command_name" in
     export QDRANT_SNAPSHOT_MANIFEST_FILE="$STAGED_MANIFEST_FILE"
     export QDRANT_RECOVERY_PROBE_FILE="$STAGED_PROBE_FILE"
     exec_as_node "$TSX_BIN" tools/qdrant/restore-drill.ts
+    ;;
+  retry-documents)
+    if [[ ${1:-} == '-h' || ${1:-} == '--help' ]]; then
+      printf 'Usage: qdrant-operator retry-documents --file-ids <path> [--confirm]\n'
+      exit 0
+    fi
+    require_retry_document_arguments "$@"
+    require_qdrant_url
+    stage_api_key_for_file_client
+    exec_as_node "$TSX_BIN" tools/qdrant/retry-failed-documents.ts "$@"
     ;;
   metrics-check)
     [[ $# -eq 0 ]] || fail 'metrics-check accepts no arguments'
