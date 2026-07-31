@@ -1942,3 +1942,46 @@ lost.
 - 261 total = 234 + 6 + 21. The "roughly 186 without a source" figure in the 2026-07-31 brief is
   `261 rows − 75 files`, which overcounts: mirror rows share one file, so 75 files backed 109 rows
   before the recovery and 117 files back 234 after it.
+
+## 2026-07-31 (evening) — the reindex is partial, and the backups are half proven
+
+`reindex verify` ran for the first time and told the truth the execute step had hidden:
+`expected_documents=234 indexed_documents=186 expected_points=13382 indexed_points=11714
+missing_documents=48 relevance_failures=2 action=repair`. Execute had said `completed=234 failed=0`
+and exited 0.
+
+Four further defects, all found after the five recorded above, all in code that had never run:
+
+6. The operator entrypoint injected `--artifact` for `execute` and not for `verify`, so verify
+   reached for the tool's relative default inside a `--rm` read-only container that no longer
+   existed. `REINDEX_ERROR code=artifact_binding_mismatch`.
+7. `loadIndexedDocumentIdentities` scrolled at limit 256 against a collection this repository
+   creates with `strict_mode_config.max_query_limit` 100 — the same verify asserts that value is
+   still in force. Qdrant: `Bad request: Limit exceeded 256 > 100 for "limit"`.
+8. Execute counted a BullMQ job that RETURNED as an indexed document. These handlers return
+   `{ success: false }` instead of throwing, so 48 failures reported as zero.
+9. Operator secrets were staged into a directory already handed to uid 1001, which a
+   capability-dropped root cannot write — then could not chmod a file it no longer owned — and the
+   snapshot units' `StateDirectory=` re-asserted root ownership over the state directory for every
+   command systemd forks, undoing the units' own chown.
+
+THE 48. 35 Docling conversion failures and 13 finalize races. `megacampus-docling-mcp-internal`
+restarted seven times during the run; every conversion failure falls before its last restart at
+10:47Z and none after. Not the documents — the service (`mc2-lkkcv`).
+
+This run cannot repair itself (`mc2-q3ju4`): the ledger records all 234 as completed, a fresh run id
+is refused at journal phase `reindex_started`, and `plan` requires `verified`. Hand-editing the
+artifact or the journal would falsify the audit record, so it was not done. The rows carry
+`vector_status='failed'`, which is exactly what the product's own `retryDocument` procedure consumes.
+
+BACKUPS. `megacampus-qdrant-snapshot.timer` is enabled and PROVEN: a run published
+`megacampus_qdrant_recovery.prom` with `last_successful_snapshot_unixtime_seconds 1785508659`,
+Prometheus scraped it, and `QdrantSnapshotStale` went `inactive` on its own — against text that had
+first been corrected so it no longer promises off-host retention that does not exist.
+`megacampus-qdrant-restore-drill.timer` is enabled and still FAILS: `/opt/megacampus/recovery/
+probe.json` has never been authored (`mc2-hfz4a`), so `QdrantRestoreDrillStale` keeps firing, which
+is true.
+
+Two production files had to be installed by hand because CI deploys neither `ops/qdrant` nor
+`deploy/systemd`: the corrected Prometheus rules and the two corrected units. Both backed up in
+place as `*.bak-20260731` (`mc2-ugl5g`).

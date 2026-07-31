@@ -155,6 +155,10 @@ is invalid` named only itself; `source_recovery_failed` threw its cause away in 
 
 Next stage id: `mc2-jz6y0`
 
+Recommended action: author `/opt/megacampus/recovery/probe.json` so the restore drill can pass
+(`mc2-hfz4a`), but only after the collection is complete — repair the 48 through `retryDocument`
+first (`mc2-q3ju4`), then re-run `reindex verify` with the six binding values.
+
 1. Watch the first scheduled snapshot and the first restore drill land their `.prom` files in
    `/var/lib/megacampus/qdrant-metrics` and both alerts clear on their own.
 2. Repair the 48 through `retryDocument`, then re-run `reindex verify` with the six binding values —
@@ -169,3 +173,10 @@ Next stage id: `mc2-jz6y0`
 `graphify-out/GRAPH_REPORT.md`, and `.codex/stages/mc2-jz6y0/summary.md`. Design/plan pairs under
 `docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
 `2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
+
+## Starter prompt for next orchestrator
+
+`docs/superpowers/prompts/2026-07-31-qdrant-reindex-completion-orchestrator.md` is accurate on
+authority and on the repository's failure modes; its premise that dropping the Q12 flags is
+sufficient is now known to be necessary but not sufficient — nine defects sat behind it, all fixed
+here. Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
