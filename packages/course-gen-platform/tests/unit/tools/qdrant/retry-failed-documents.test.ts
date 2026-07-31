@@ -32,7 +32,7 @@ function deps(overrides: Partial<RetryDependencies> = {}) {
     err,
     value: {
       loadCandidates: vi.fn(async () => [candidate()]),
-      loadCourseLanguage: vi.fn(async () => 'ru'),
+      loadCourse: vi.fn(async () => ({ language: 'ru', userId: 'owner-1' })),
       resetToPending: vi.fn(async () => undefined),
       deleteVectors: vi.fn(async () => undefined),
       enqueue: vi.fn(async () => ({ id: 'job-1' })),
@@ -124,6 +124,8 @@ describe('runRetryFailedDocuments', () => {
         chunkSize: 512,
         chunkOverlap: 50,
         locale: 'ru',
+        // The course owner, because jobData.userId lands in the permanent failure log's user_id.
+        userId: 'owner-1',
       })
     );
   });

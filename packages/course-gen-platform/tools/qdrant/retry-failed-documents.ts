@@ -45,7 +45,7 @@ export interface RetryCandidate {
 
 export interface RetryDependencies {
   loadCandidates: (fileIds: string[]) => Promise<RetryCandidate[]>;
-  loadCourseLanguage: (courseId: string) => Promise<string | null>;
+  loadCourse: (courseId: string) => Promise<{ language: string | null; userId: string }>;
   resetToPending: (fileId: string) => Promise<void>;
   deleteVectors: (fileId: string, courseId: string) => Promise<unknown>;
   enqueue: (data: DocumentProcessingJobData) => Promise<{ id?: string | number }>;
@@ -124,19 +124,22 @@ export async function runRetryFailedDocuments(
       await deps.deleteVectors(candidate.id, candidate.course_id);
       await deps.resetToPending(candidate.id);
 
-      const language = await deps.loadCourseLanguage(candidate.course_id);
+      // The course owner, not a synthetic string: jobData.userId is written into the permanent
+      // failure log's user_id column, so a placeholder would break the very record that explains
+      // why a repair failed.
+      const course = await deps.loadCourse(candidate.course_id);
       const job = await deps.enqueue({
         jobType: JobType.DOCUMENT_PROCESSING,
         organizationId: candidate.organization_id,
         courseId: candidate.course_id,
-        userId: 'operator-retry',
+        userId: course.userId,
         fileId: candidate.id,
         filePath: resolveUploadStoragePath(candidate.storage_path),
         mimeType: candidate.mime_type,
         chunkSize: 512,
         chunkOverlap: 50,
         createdAt: new Date().toISOString(),
-        locale: validateLocale(language),
+        locale: validateLocale(course.language),
       });
 
       enqueued += 1;
@@ -165,14 +168,15 @@ function createDefaultDependencies(): RetryDependencies {
       if (error) throw new Error(`file_catalog read failed: ${error.message}`);
       return (data ?? []) as RetryCandidate[];
     },
-    loadCourseLanguage: async courseId => {
+    loadCourse: async courseId => {
       const { data, error } = await supabase
         .from('courses')
-        .select('language')
+        .select('language, user_id')
         .eq('id', courseId)
         .single();
       if (error) throw new Error(`courses read failed: ${error.message}`);
-      return (data?.language as string | null) ?? null;
+      if (!data?.user_id) throw new Error(`course ${courseId} has no owner`);
+      return { language: (data.language as string | null) ?? null, userId: data.user_id as string };
     },
     resetToPending: async fileId => {
       const { error } = await supabase
