@@ -190,7 +190,7 @@
       "mode": "0555",
       "owner": "claude-deploy",
       "path": "deploy/qdrant/source-recovery-run.sh",
-      "sha256": "100193d78209d9b9a7af553281ae73f2b17aadd5a543fb04ea353f107993baf0"
+      "sha256": "cf1683d549d8eed550bd1611fda89d24825478354753723c71e604751b071134"
     },
     {
       "group": null,
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "7400607b59cd9a56c6201f80898d072d104fe376",
+  "generated_from_tree_sha": "331f8504e5c5da066c5ab3adbec649d1d41bddc2",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }

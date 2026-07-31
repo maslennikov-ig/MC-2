@@ -797,11 +797,11 @@ jobs:
           QDRANT_SNAPSHOT_STORAGE_MODE=local
           SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT=/opt/megacampus/data/uploads
           SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT=/opt/megacampus/data/uploads-dev
-          SOURCE_RECOVERY_STATE_HOST_DIR=/var/lib/megacampus-source-recovery
-          SOURCE_RECOVERY_CAPABILITY_HOST_DIR=/run/source-recovery/capability
-          SOURCE_RECOVERY_PROGRESS_HOST_DIR=/run/source-recovery/progress
-          SOURCE_RECOVERY_PLAN_INPUT_FILE=/run/source-recovery/plan-input.json
-          SOURCE_RECOVERY_MANIFEST_FILE=/run/source-recovery/manifest.json
+          SOURCE_RECOVERY_STATE_HOST_DIR=/var/lib/megacampus-source-recovery/state
+          SOURCE_RECOVERY_CAPABILITY_HOST_DIR=/opt/megacampus/data/source-recovery-capability
+          SOURCE_RECOVERY_PROGRESS_HOST_DIR=/var/lib/megacampus-source-recovery/state/progress
+          SOURCE_RECOVERY_PLAN_INPUT_FILE=/var/lib/megacampus-source-recovery/plan-input.json
+          SOURCE_RECOVERY_MANIFEST_FILE=/var/lib/megacampus-source-recovery/state/manifest.json
           PROMETHEUS_QDRANT_READ_ONLY_API_KEY_FILE=/opt/megacampus/secrets/prometheus_qdrant_read_only_api_key
           GRAFANA_ADMIN_PASSWORD_FILE=/opt/megacampus/secrets/grafana_admin_password
           ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token

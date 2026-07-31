@@ -181,6 +181,13 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery operator isolation', ()
           expect.stringMatching(/^\/run\/qdrant-operator(?::|$)/u),
         ])
       );
+      // /run/source-recovery must NOT be a tmpfs here: measured 2026-07-31, `compose run` does not
+      // nest these bind mounts inside a tmpfs at the same path — the plan input arrived as an empty
+      // 0755 directory and the capability bind never took. Its mode is fixed in the image instead
+      // (see the mount-parent test below).
+      expect(service.tmpfs).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/^\/run\/source-recovery(?::|$)/u)])
+      );
       expect(service.restart).toBe('no');
       expect(service.secrets).toBeUndefined();
       expect(service.environment.QDRANT_API_KEY ?? '').toBe('');
@@ -231,6 +238,51 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery operator isolation', ()
     expect(
       disposition.volumes.map((candidate: Record<string, any>) => candidate.target).sort()
     ).toEqual(['/run/source-recovery/manifest.json', '/run/source-recovery/progress']);
+  });
+
+  // Compose interpolates these SIX variables as bind SOURCES, i.e. host paths. CI wrote container
+  // paths into four of them (/run/source-recovery/...), which Docker then created as empty
+  // root-owned directories on the host and mounted in place of the real inputs — the plan input
+  // arrived as a 0755 directory. It stayed invisible because the wrapper exports the correct values
+  // and the shell environment outranks --env-file, so only a Compose call made WITHOUT the wrapper
+  // saw it. The frozen command manifest already names every one of these paths; bind them to it.
+  it('writes the frozen host bind sources into the deployed environment, not container paths', () => {
+    const workflow = source('.github/workflows/ci-cd.yml');
+    const argv = COMMAND_MANIFEST.commands['source.forward'].argv;
+    const argumentValue = (option: string): string => {
+      const index = argv.indexOf(option);
+      expect(index).toBeGreaterThanOrEqual(0);
+      return argv[index + 1];
+    };
+    const manifestPath = argumentValue('--manifest');
+    const expected: Record<string, string> = {
+      SOURCE_RECOVERY_PLAN_INPUT_FILE: argumentValue('--plan-input'),
+      SOURCE_RECOVERY_MANIFEST_FILE: manifestPath,
+      SOURCE_RECOVERY_PROGRESS_HOST_DIR: argumentValue('--progress-directory'),
+      SOURCE_RECOVERY_DEVELOPMENT_UPLOAD_ROOT: argumentValue('--development-root'),
+      SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT: argumentValue('--production-root'),
+      SOURCE_RECOVERY_CAPABILITY_HOST_DIR: argumentValue('--capability-directory'),
+      // The wrapper derives the state directory as the manifest's own parent.
+      SOURCE_RECOVERY_STATE_HOST_DIR: manifestPath.slice(0, manifestPath.lastIndexOf('/')),
+    };
+    for (const [key, value] of Object.entries(expected)) {
+      expect(workflow).toContain(`${key}=${value}\n`);
+      expect(value.startsWith('/run/source-recovery')).toBe(false);
+    }
+  });
+
+  // assertOwnerOnlyStateDirectory requires the PARENT of every owner-only operator input to be a
+  // mode-0700 directory owned by the operator uid. The image created both mount parents at 0555, so
+  // `source-recovery plan` refused its own bind-mounted plan input in production on 2026-07-31.
+  it('creates both source-recovery mount parents at the mode the owner-only check demands', () => {
+    const dockerfile = source('packages/course-gen-platform/Dockerfile');
+    for (const directory of ['/run/source-recovery', '/var/lib/megacampus-source-recovery']) {
+      expect(dockerfile).toContain(`install -d -o nodejs -g nodejs -m 0700 ${directory}`);
+      expect(dockerfile).not.toContain(`-m 0555 ${directory}`);
+    }
+    expect(source('packages/course-gen-platform/tools/qdrant/source-recovery.ts')).toContain(
+      '(metadata.mode & 0o777) !== 0o700'
+    );
   });
 
   it('exposes all source-recovery modes without staging a Qdrant credential', () => {
@@ -595,7 +647,10 @@ elif [[ -n "\${DOCKER_RECORDS_FILE:-}" && "$1" == stop ]]; then
     if [[ $count -eq $SOURCE_RECOVERY_TEST_FAIL_STOP_AFTER ]]; then exit 76; fi
   fi
   id="\${@: -1}"
-  jq --arg id "$id" 'map(if .Id == $id then .State.Running=false | .State.Status="exited" else . end)' "$DOCKER_RECORDS_FILE" > "$DOCKER_RECORDS_FILE.tmp"
+  # Real Docker drives a healthcheck-bearing container to Health.Status="unhealthy" when it stops
+  # (measured 2026-07-31 on megacampus-api-dev). Leaving it "healthy" here is the substitution that
+  # let a wrapper clause no stopped writer could ever satisfy stay green through every suite.
+  jq --arg id "$id" 'map(if .Id == $id then .State.Running=false | .State.Status="exited" | (if .State.Health != null then .State.Health.Status="unhealthy" else . end) else . end)' "$DOCKER_RECORDS_FILE" > "$DOCKER_RECORDS_FILE.tmp"
   mv "$DOCKER_RECORDS_FILE.tmp" "$DOCKER_RECORDS_FILE"
 elif [[ -n "\${DOCKER_RECORDS_FILE:-}" && "$1" == start ]]; then
   if [[ -n "\${SOURCE_RECOVERY_TEST_FAIL_START_AFTER:-}" ]]; then
@@ -5119,6 +5174,78 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery host lock and writer re
     expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(
       /^(?:inspect|update|stop|start) /mu
     );
+  });
+
+  // The ordinary non-Q12 forward is the ONLY route left once the window is retired, and it is
+  // reached by dropping the Q12 flags. It requires the writers to be stopped before it collects
+  // them, which is exactly the state in which Docker reports a healthcheck-bearing writer
+  // `unhealthy`. No suite covered that combination, so a clause no stopped writer could satisfy
+  // survived: on 2026-07-31 the real run died at `megacampus-blue/api` with a message that named
+  // only itself.
+  it('runs an ordinary non-Q12 forward over writers already stopped and therefore unhealthy', () => {
+    const fixture = composeWriterFixture();
+    const args = [...fixture.args];
+    removeOption(args, '--database-barrier-receipt');
+    removeOption(args, '--q12-db-capability-file');
+    const records = fixture.records();
+    for (const record of records) {
+      record.State.Running = false;
+      record.State.Status = 'exited';
+      if (record.State.Health !== null) record.State.Health.Status = 'unhealthy';
+    }
+    writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
+
+    const result = spawnSync('bash', [WRAPPER, ...args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    const compose = readFileSync(fixture.composeLog, 'utf8');
+    for (const mode of ['plan', 'execute', 'verify', 'apply-dispositions', 'verify-dispositions']) {
+      expect(compose).toContain(`source-recovery ${mode}`);
+    }
+    // The ordinary route never touches a writer; the operator owns the quiesce.
+    expect(readFileSync(fixture.dockerLog, 'utf8')).not.toMatch(/^(?:update|stop|start) /mu);
+  });
+
+  it('refuses an ordinary non-Q12 forward while a writer is still running', () => {
+    const fixture = composeWriterFixture();
+    const args = [...fixture.args];
+    removeOption(args, '--database-barrier-receipt');
+    removeOption(args, '--q12-db-capability-file');
+
+    const result = spawnSync('bash', [WRAPPER, ...args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('active Compose writers require');
+    expect(existsSync(fixture.composeLog)).toBe(false);
+  });
+
+  it('names the failing clause instead of only itself when a writer identity is invalid', () => {
+    const fixture = composeWriterFixture();
+    const args = [...fixture.args];
+    removeOption(args, '--database-barrier-receipt');
+    removeOption(args, '--q12-db-capability-file');
+    const records = fixture.records();
+    for (const record of records) {
+      record.State.Running = false;
+      record.State.Status = 'exited';
+    }
+    records[0].State.Restarting = true;
+    writeFileSync(fixture.recordsPath, `${JSON.stringify(records)}\n`, { mode: 0o600 });
+
+    const result = spawnSync('bash', [WRAPPER, ...args], {
+      env: fixture.env,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('writer identity/state/policy is invalid: megacampus-blue/api');
+    expect(result.stderr).toContain('container is restarting');
   });
 
   it('publishes the exact immutable quiesce inventory, transitions, and final evidence', () => {

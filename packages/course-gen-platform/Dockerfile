@@ -179,8 +179,13 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src 
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tools ./tools
 COPY packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh /opt/megacampus/qdrant-operator-entrypoint.sh
 
-RUN install -d -o nodejs -g nodejs -m 0555 /run/source-recovery && \
-    install -d -o nodejs -g nodejs -m 0555 /var/lib/megacampus-source-recovery && \
+# Both directories are MOUNT PARENTS for the operator's owner-only inputs, and every one of those
+# inputs is read through assertOwnerOnlyStateDirectory (tools/qdrant/source-recovery.ts), which
+# requires the parent to be a mode-0700 directory owned by this uid. At 0555 the check refused the
+# operator's own bind-mounted plan input, so no source-recovery command could start; measured in
+# production on 2026-07-31. Keep these two modes equal to what that check demands.
+RUN install -d -o nodejs -g nodejs -m 0700 /run/source-recovery && \
+    install -d -o nodejs -g nodejs -m 0700 /var/lib/megacampus-source-recovery && \
     chmod 0555 /opt/megacampus/qdrant-operator-entrypoint.sh && \
     /opt/megacampus/qdrant-operator-entrypoint.sh self-check && \
     /opt/megacampus/qdrant-operator-entrypoint.sh bootstrap --help >/dev/null && \

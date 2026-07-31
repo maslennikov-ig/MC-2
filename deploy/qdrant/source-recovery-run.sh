@@ -906,24 +906,40 @@ inspect_writer() {
   local project="$2"
   local service="$3"
   local class="$4"
-  local raw
+  local raw reason
   raw="$($DOCKER_BIN inspect "$id")"
-  jq -e --arg id "$id" --arg project "$project" --arg service "$service" '
-    length == 1 and (.[0] as $container |
-    $container.Id == $id and
-    $container.Config.Labels["com.docker.compose.project"] == $project and
-    $container.Config.Labels["com.docker.compose.service"] == $service and
-    ($container.Config.Labels["com.docker.compose.project.config_files"] | type == "string" and length > 0) and
-    ($container.Config.Labels["com.docker.compose.project.working_dir"] | type == "string" and length > 0) and
-    ($container.Name | type == "string" and length > 1) and
-    ($container.Image | type == "string" and length > 0) and
-    ($container.Config.Image | type == "string" and length > 0) and
-    ($container.State.Restarting == false) and
-    (($container.State.Health == null) or $container.State.Health.Status == "healthy") and
-    (["running","exited","created"] | index($container.State.Status) != null) and
-    ($container.HostConfig.RestartPolicy.Name | type == "string") and
-    ($container.HostConfig.RestartPolicy.MaximumRetryCount | type == "number"))
-  ' <<<"$raw" >/dev/null || fail "writer identity/state/policy is invalid: $project/$service"
+  # HEALTH IS A PROPERTY OF A RUNNING CONTAINER. Docker reports a stopped container that carries a
+  # healthcheck as `unhealthy` (measured 2026-07-31 on megacampus-api-dev: running -> "healthy",
+  # after `docker stop` -> "unhealthy"), so demanding "healthy" unconditionally made every
+  # already-quiesced API/Web writer unreadable. That closed BOTH non-Q12 routes into this wrapper:
+  # the default branch requires the writers to be stopped before it collects them, and the external
+  # quiesce branch collects them after quiesce-writers-only stopped them. The wrapper's own
+  # --stop-writers branch never saw it because it collects while they still run.
+  # The single compound jq below also used to report only its own name. The failing clause is the
+  # one thing the operator needs, so each check now carries its reason.
+  reason="$(jq -r --arg id "$id" --arg project "$project" --arg service "$service" '
+    if length != 1 then "docker inspect returned \(length) records"
+    else .[0] as $container |
+      if $container.Id != $id then "container id changed"
+      elif $container.Config.Labels["com.docker.compose.project"] != $project then "compose project label is not \($project)"
+      elif $container.Config.Labels["com.docker.compose.service"] != $service then "compose service label is not \($service)"
+      elif (($container.Config.Labels["com.docker.compose.project.config_files"] | type == "string" and length > 0) | not) then "compose config_files label is absent or empty"
+      elif (($container.Config.Labels["com.docker.compose.project.working_dir"] | type == "string" and length > 0) | not) then "compose working_dir label is absent or empty"
+      elif (($container.Name | type == "string" and length > 1) | not) then "container name is absent or empty"
+      elif (($container.Image | type == "string" and length > 0) | not) then "image id is absent or empty"
+      elif (($container.Config.Image | type == "string" and length > 0) | not) then "image reference is absent or empty"
+      elif $container.State.Restarting != false then "container is restarting"
+      elif ($container.State.Running == true and $container.State.Health != null and
+            $container.State.Health.Status != "healthy")
+        then "running container health is \($container.State.Health.Status)"
+      elif (["running","exited","created"] | index($container.State.Status)) == null then "unsupported container state \($container.State.Status)"
+      elif (($container.HostConfig.RestartPolicy.Name | type == "string") | not) then "restart policy name is not a string"
+      elif (($container.HostConfig.RestartPolicy.MaximumRetryCount | type == "number") | not) then "restart policy retry count is not a number"
+      else "ok" end
+    end
+  ' <<<"$raw")"
+  [[ $reason == ok ]] ||
+    fail "writer identity/state/policy is invalid: $project/$service ($reason)"
   jq -c --arg class "$class" '
     .[0] | {
       class:$class,id:.Id,name:.Name,
@@ -1000,22 +1016,33 @@ collect_compose_writers() {
 current_writer_record() {
   local expected="$1"
   local allow_unready_health="${2:-0}"
-  local id project service raw
+  local id project service raw reason
   id="$(jq -r '.id' <<<"$expected")"
   project="$(jq -r '.project' <<<"$expected")"
   service="$(jq -r '.service' <<<"$expected")"
   raw="$($DOCKER_BIN inspect "$id")"
-  jq -e --argjson expected "$expected" --arg allow "$allow_unready_health" '
-    length == 1 and .[0].Id == $expected.id and .[0].Name == $expected.name and
-    .[0].Config.Labels["com.docker.compose.project"] == $expected.project and
-    .[0].Config.Labels["com.docker.compose.service"] == $expected.service and
-    .[0].Config.Labels["com.docker.compose.project.config_files"] == $expected.config_files and
-    .[0].Config.Labels["com.docker.compose.project.working_dir"] == $expected.working_dir and
-    .[0].Image == $expected.image_id and .[0].Config.Image == $expected.image_ref and
-    .[0].State.Restarting == false and
-    ((.[0].State.Health != null) == $expected.healthcheck_present) and
-    ($allow == "1" or (.[0].State.Health == null) or .[0].State.Health.Status == "healthy")
-  ' <<<"$raw" >/dev/null || fail "captured writer identity changed: $project/$service"
+  # Same two repairs as inspect_writer: health is only asserted while the container runs, and the
+  # failing clause is named instead of being collapsed into "identity changed".
+  reason="$(jq -r --argjson expected "$expected" --arg allow "$allow_unready_health" '
+    if length != 1 then "docker inspect returned \(length) records"
+    else .[0] as $container |
+      if $container.Id != $expected.id then "container id changed"
+      elif $container.Name != $expected.name then "container name changed"
+      elif $container.Config.Labels["com.docker.compose.project"] != $expected.project then "compose project label changed"
+      elif $container.Config.Labels["com.docker.compose.service"] != $expected.service then "compose service label changed"
+      elif $container.Config.Labels["com.docker.compose.project.config_files"] != $expected.config_files then "compose config_files label changed"
+      elif $container.Config.Labels["com.docker.compose.project.working_dir"] != $expected.working_dir then "compose working_dir label changed"
+      elif $container.Image != $expected.image_id then "image id changed"
+      elif $container.Config.Image != $expected.image_ref then "image reference changed"
+      elif $container.State.Restarting != false then "container is restarting"
+      elif (($container.State.Health != null) != $expected.healthcheck_present) then "healthcheck presence changed"
+      elif ($allow != "1" and $container.State.Running == true and $container.State.Health != null and
+            $container.State.Health.Status != "healthy")
+        then "running container health is \($container.State.Health.Status)"
+      else "ok" end
+    end
+  ' <<<"$raw")"
+  [[ $reason == ok ]] || fail "captured writer identity changed: $project/$service ($reason)"
   jq -c '.[0]' <<<"$raw"
 }
 

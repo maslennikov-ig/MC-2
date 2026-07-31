@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin.js';
 import { buildReindexPlan, loadReindexSources } from './reindex-plan.js';
-import { createSourceDatabase, probeSourceFiles } from './reindex-course-embeddings.js';
+import {
+  createSourceDatabase,
+  probeSourceFiles,
+  scrubCliErrorDetail,
+} from './reindex-course-embeddings.js';
 import {
   applyDispositionEntry,
   createRecoveryDispositionDatabase,
@@ -861,8 +865,19 @@ async function main(): Promise<void> {
       createDefaultRecoveryDependencies(options)
     );
     process.stdout.write(`${JSON.stringify(result)}\n`);
-  } catch {
-    process.stderr.write(`${JSON.stringify({ ok: false, error: 'source_recovery_failed' })}\n`);
+  } catch (error) {
+    // `{"ok":false,"error":"source_recovery_failed"}` named only itself, and on 2026-07-31 it cost
+    // a second production writer-quiesce window to learn that the real message was
+    // "Recovery protected plan input state directory must be a real mode-0700 owner-only
+    // directory". The detail goes through the same identity redaction the reindex CLI uses, so
+    // catalog ids, absolute paths, connection URIs and digests still never reach the log.
+    process.stderr.write(
+      `${JSON.stringify({
+        ok: false,
+        error: 'source_recovery_failed',
+        detail: scrubCliErrorDetail(error),
+      })}\n`
+    );
     process.exitCode = 1;
   }
 }

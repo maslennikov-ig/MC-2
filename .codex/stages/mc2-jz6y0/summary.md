@@ -1841,3 +1841,60 @@ shut. `mc2-i9h3y` depends on it.
 Both defects cost no downtime: read-only, no writer stopped, no guard installed, no run-id burnt,
 against production's own generations. Sixteen window attempts cost ~40 minutes of waiting and 4-16
 minutes of real outage each to learn one thing.
+
+## 2026-07-31 — the Q12 window track is retired, and the ordinary source-recovery route is reopened
+
+The window was abandoned on the owner's 2026-07-30/31 decision in favour of an ordinary release,
+which succeeded: five migrations applied, 161 commits deployed, production off Qdrant Cloud,
+pipeline green end to end for the first time since 2026-07-04. What was left was the vectors.
+
+### The measurement that matters
+
+Live production, measured 2026-07-31 and matching the 2026-07-24 audit EXACTLY:
+`total 261, eligible 240, recoverable 109, missing 129, invalid 2, unsupported 21`. That equality is
+what makes the frozen `plan-input.json` (run `a417a99c-…`) still valid: `source-recovery plan`
+refuses unless the live inventory equals `EXACT_PRE_COUNTS`, and it does. Its 42 copies restore 125
+`file_catalog` rows, taking `missing` from 129 to 4. `/opt/megacampus/data/uploads` holds 75 files
+backing those 109 rows; the naive "261 rows − 75 files = 186 without a source" overcounts, because
+mirror rows share one file. The honest figures are 131 eligible rows with no readable source today
+(129 missing + 2 invalid) and 21 rows Stage 2 cannot process at all.
+
+### Three defects closed the ordinary route; all three were found on the host
+
+1. **Health asserted on a container that is not running.** Docker reports a stopped
+   healthcheck-bearing container as `unhealthy` (measured on `megacampus-api-dev`:
+   running→`healthy`, after `docker stop`→`unhealthy`). Both non-Q12 routes collect the writer
+   inventory AFTER the writers are stopped, so `inspect_writer` and `current_writer_record` demanded
+   a state no quiesced writer can be in. The wrapper's own `--stop-writers` branch escaped it only
+   because it collects while they still run — and that branch is itself unreachable without Q12
+   (`--stop-writers requires --database-barrier-receipt` → `Q12 writer quiesce requires
+--q12-db-capability-file`), so the ordinary path documented in the wrapper's own `usage()` did
+   not exist. Fixed; health is asserted only while the container runs.
+2. **The operator image created both mount parents at 0555.** `assertOwnerOnlyStateDirectory`
+   requires the PARENT of every owner-only input to be mode 0700 owned by the operator uid, so
+   `source-recovery plan` refused its own bind-mounted plan input. A tmpfs at that path is NOT the
+   fix and was measured failing: `compose run` does not nest these binds inside a tmpfs, and the
+   plan input arrived as an empty 0755 directory. Fixed in the Dockerfile.
+3. **CI wrote container paths into four Compose bind SOURCES.** `SOURCE_RECOVERY_*_HOST_DIR` /
+   `_FILE` named `/run/source-recovery/...` in `.env.production`, so a Compose call made without the
+   wrapper mounted empty root-owned directories over the real inputs. Invisible because the wrapper
+   exports the correct values and the shell environment outranks `--env-file`. Now bound by test to
+   the frozen command manifest, which already names every one of those paths.
+
+THE PATTERN, again: the checked environment substituted for the consuming one. The suite's fake
+`docker stop` left `Health` at `healthy`, which is why defect 1 stayed green through every run.
+
+### One host-side repair, outside the code
+
+All 42 copy targets land in 24 course directories that did not exist under
+`/opt/megacampus/data/uploads`, and the recovery publisher contains no `mkdir` — `resolveRoots`
+lstats the target directory and `publishNoReplace` only links into it. The 24 directories were
+created with exactly the identity Stage 1 produces (`1001:1001` mode 0755, empty), which is the
+precondition the shipped publisher was designed for. `preflightCopies` then passed for all 42.
+Whether the recovery should create them itself is a real design question and is NOT fixed.
+
+### Two production writer windows, both fully restored
+
+07:49:31Z–07:50:05Z (34s) and 08:03:15Z–08:03:50Z (35s), owner-authorized. Both restored all ten
+writers to `running` with `unless-stopped`, API/Web `healthy`, both public hosts 200. The first
+proved defect 1 in production; the second proved the fix and reached the planner.
