@@ -33,6 +33,7 @@ import { addJob, closeQueue, getQueue, QUEUE_NAME } from '../../src/orchestrator
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { qdrantClient } from '../../src/shared/qdrant/client';
 import { verifyPhysicalCourseEmbeddingsCollection } from '../../src/shared/qdrant/collection-manager';
+import { COLLECTION_CREATE_PARAMS } from '../../src/shared/qdrant/collection-schema';
 import { hybridSearchNative } from '../../src/shared/qdrant/search-operations';
 import {
   buildReindexPlan,
@@ -1566,6 +1567,14 @@ function createDefaultReindexQueueAdapter(): ReturnType<typeof createReindexQueu
 
 type ScrollOptions = NonNullable<Parameters<typeof qdrantClient.scroll>[1]>;
 
+// The collection this walks is created with strict mode on and max_query_limit 100
+// (COLLECTION_CREATE_PARAMS.strict_mode_config), and the very same verify run asserts that value is
+// still in force. A hardcoded 256 therefore violated a restriction this tool itself checks: every
+// recovery-bound verify against a real collection died with a bare `Bad Request` from Qdrant --
+// 'Limit exceeded 256 > 100 for "limit"' -- measured 2026-07-31 after a clean 234/234 execute.
+// Pagination already handles the smaller page, so read the declared cap instead of restating one.
+const INDEXED_DOCUMENT_SCROLL_LIMIT = COLLECTION_CREATE_PARAMS.strict_mode_config.max_query_limit;
+
 export async function loadIndexedDocumentIdentities(
   targetCollection: string,
   client: Pick<typeof qdrantClient, 'scroll'> = qdrantClient
@@ -1575,7 +1584,7 @@ export async function loadIndexedDocumentIdentities(
 
   while (true) {
     const response = await client.scroll(targetCollection, {
-      limit: 256,
+      limit: INDEXED_DOCUMENT_SCROLL_LIMIT,
       offset,
       with_payload: ['document_id', 'course_id', 'organization_id'],
       with_vector: false,
@@ -1817,14 +1826,27 @@ function classifyCliError(error: unknown): string {
 // and digests are the shapes that leak, and each is replaced before anything is printed. What
 // survives is the part that actually helps — "connection refused", "collection not found",
 // "relation does not exist".
+// An HTTP client that sets message to the bare status text is the same failure one level down:
+// @qdrant/js-client-rest threw `Bad Request` and kept 'Limit exceeded 256 > 100 for "limit"' in
+// error.data.status.error, so `detail=Bad Request` cost an investigation the server had already
+// answered. Read that nested reason when it exists; everything then goes through the same redaction.
+function nestedApiErrorReason(error: unknown): string {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return '';
+  const { data } = error as { data?: unknown };
+  if (typeof data !== 'object' || data === null || !('status' in data)) return '';
+  const { status } = data as { status?: unknown };
+  if (typeof status !== 'object' || status === null || !('error' in status)) return '';
+  const reason = (status as { error?: unknown }).error;
+  return typeof reason === 'string' ? reason : '';
+}
+
 export function scrubCliErrorDetail(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  const reason = nestedApiErrorReason(error);
+  const raw = reason && !message.includes(reason) ? `${message}: ${reason}` : message;
   return raw
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S*/gi, '<uri>')
-    .replace(
-      /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
-      '<id>'
-    )
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>')
     .replace(/\b[0-9a-f]{32,}\b/gi, '<digest>')
     .replace(/(?<![\w<])\/[^\s"'<>]*/g, '<path>')
     .replace(/\s+/g, ' ')
