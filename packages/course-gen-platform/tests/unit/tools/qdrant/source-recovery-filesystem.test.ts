@@ -164,6 +164,62 @@ describe('source recovery filesystem engine', () => {
     }
   });
 
+  // mc2-vhr79. The recovery must not create directories in the production upload root -- that is an
+  // undeclared mutation -- but the refusal has to be actionable. Before this, a course with no
+  // uploads yet produced a bare `ENOENT ... lstat <root>/<uuid>` from the symlink walk, one name per
+  // run; on 2026-07-31 all 24 target directories were absent and each had to be discovered
+  // separately.
+  it('names every absent target course directory at once instead of one bare ENOENT', async () => {
+    const value = await fixture('first exact bytes');
+    const capabilityDirectory = join(value.root, 'capability');
+    const secondContent = 'second exact bytes';
+    const secondSource = join(value.input.developmentRoot, 'tenant', 'source-2.pdf');
+    const secondEntry = {
+      ...value.input.entry,
+      entry_id: 'copy-2',
+      source_relative_path: 'tenant/source-2.pdf',
+      target_relative_path: 'absent-course/target-2.pdf',
+      expected_size: Buffer.byteLength(secondContent),
+      expected_sha256: sha256(secondContent),
+    };
+    const thirdEntry = {
+      ...value.input.entry,
+      entry_id: 'copy-3',
+      source_relative_path: 'tenant/source-2.pdf',
+      target_relative_path: 'other-absent-course/target-3.pdf',
+      expected_size: Buffer.byteLength(secondContent),
+      expected_sha256: sha256(secondContent),
+    };
+    await mkdir(capabilityDirectory, { mode: 0o700 });
+    await writeFile(secondSource, secondContent);
+
+    try {
+      const failure = await preflightRecoveryCopies({
+        runId: value.input.runId,
+        developmentRoot: value.input.developmentRoot,
+        productionRoot: value.input.productionRoot,
+        rootBinding: value.input.rootBinding,
+        entries: [value.input.entry, secondEntry, thirdEntry],
+        capabilityDirectory,
+      }).then(
+        () => null,
+        (error: Error) => error
+      );
+
+      expect(failure?.message).toMatch(/2 target course directories that do not exist/iu);
+      expect(failure?.message).toContain(join(value.input.productionRoot, 'absent-course'));
+      expect(failure?.message).toContain(join(value.input.productionRoot, 'other-absent-course'));
+      expect(failure?.message).not.toMatch(/ENOENT/u);
+      // Naming them is all it does: nothing was created and no copy was published.
+      await expect(
+        readdir(join(value.input.productionRoot, 'absent-course'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(value.target)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(value.root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a non-owner-only or upload-root capability directory', async () => {
     const value = await fixture();
     const capabilityDirectory = join(value.root, 'capability');
