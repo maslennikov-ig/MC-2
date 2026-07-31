@@ -1522,6 +1522,33 @@ export async function probeSourceFiles(
   return { availableFileIds, invalidPathFileIds, resolvedFilePaths };
 }
 
+// BullMQ calls a job "completed" whenever the processor RETURNS, and this pipeline's document
+// handler returns `{ success: false }` on a permanent failure instead of throwing — the job is
+// completed and its own log line says `"success":false`. waitUntilFinished therefore resolves, and
+// the run counted a document that indexed nothing as indexed.
+//
+// Measured 2026-07-31: execute reported `enqueued=234 completed=234 failed=0` and exited 0, while
+// 48 of those documents wrote no vectors — 35 whose Docling conversion failed while that service
+// was restarting mid-run, 13 that lost a finalize race on vector_status. Only `verify` noticed,
+// afterwards. Reading the returned result restores two things at once: an execute that fails when
+// its documents failed, and the artifact `failures` list that the resume path at
+// `completedJobIds.has(jobId) && !recordedFailure` already keys the retry on.
+//
+// Permissive on shape by design: a result without a `success` field is not evidence of failure.
+export function assertReindexJobResultSucceeded(jobId: string, result: unknown): void {
+  if (typeof result !== 'object' || result === null || !('success' in result)) return;
+  const { success, error, message } = result as {
+    success?: unknown;
+    error?: unknown;
+    message?: unknown;
+  };
+  if (success !== false) return;
+  const reason = [error, message].find(value => typeof value === 'string' && value.length > 0);
+  throw new Error(
+    `Reindex job ${jobId} completed without success${reason ? `: ${String(reason)}` : ''}`
+  );
+}
+
 function createDefaultReindexQueueAdapter(): ReturnType<typeof createReindexQueueAdapter> {
   let queueEvents: QueueEvents | null = null;
   const ensureQueueEvents = async (): Promise<QueueEvents> => {
@@ -1545,8 +1572,9 @@ function createDefaultReindexQueueAdapter(): ReturnType<typeof createReindexQueu
     },
     waitForJob: async (job, timeoutMs) => {
       const events = await ensureQueueEvents();
+      let result: unknown;
       try {
-        await (job as unknown as Job).waitUntilFinished(events, timeoutMs);
+        result = await (job as unknown as Job).waitUntilFinished(events, timeoutMs);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (/timed?\s*out|timeout/i.test(message)) {
@@ -1554,6 +1582,7 @@ function createDefaultReindexQueueAdapter(): ReturnType<typeof createReindexQueu
         }
         throw error;
       }
+      assertReindexJobResultSucceeded(String(job.id ?? 'unknown'), result);
     },
     close: async () => {
       if (queueEvents) {
