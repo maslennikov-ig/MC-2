@@ -241,14 +241,23 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
     const entrypoint = source('packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh');
 
     expect(entrypoint).not.toMatch(/install -d -o "\$NODE_UID"/u);
-    expect(entrypoint).toContain('install -d -o 0 -g 0 -m 0700 "$1"');
-    for (const staging of ['stage_api_key_for_file_client', 'stage_owner_only_file']) {
+    expect(entrypoint).toContain('chown 0:0 "$1"');
+    // No FOWNER either, so `install -o/-g -m` in one call is equally forbidden: coreutils sets the
+    // owner before the mode and the chmod then fails on a file root no longer owns.
+    expect(entrypoint).not.toMatch(/install -o "\$NODE_UID"/u);
+    for (const staging of [
+      'stage_api_key_for_file_client',
+      'stage_owner_only_file',
+      'stage_q12_database_capability_if_requested',
+    ]) {
       const body = entrypoint.slice(entrypoint.indexOf(`${staging}() {`));
       const scoped = body.slice(0, body.indexOf('\n}\n'));
+      const setsMode = Math.max(scoped.indexOf('chmod 0400'), scoped.indexOf('install -m 0400'));
+      const handsOver = scoped.indexOf('stage_owner_only_handover');
       expect(scoped.indexOf('stage_owner_only_directory')).toBeGreaterThanOrEqual(0);
-      expect(scoped.indexOf('stage_owner_only_handover')).toBeGreaterThan(
-        scoped.indexOf('stage_owner_only_directory')
-      );
+      expect(setsMode).toBeGreaterThanOrEqual(0);
+      expect(setsMode).toBeLessThan(handsOver);
+      expect(handsOver).toBeGreaterThan(scoped.indexOf('stage_owner_only_directory'));
     }
   });
 
