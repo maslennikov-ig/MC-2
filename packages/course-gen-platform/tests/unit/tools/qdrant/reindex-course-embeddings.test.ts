@@ -2091,7 +2091,9 @@ describe('reindex CLI parsing', () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(stderr).toHaveBeenCalledWith(`REINDEX_ERROR code=${reasonCode}\n`);
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining(`REINDEX_ERROR code=${reasonCode} detail=`)
+    );
     expect(stderr.mock.calls[0][0]).not.toContain(RUN_ID);
     expect(stderr.mock.calls[0][0]).not.toContain('/private/');
     expect(stdout).not.toHaveBeenCalled();
