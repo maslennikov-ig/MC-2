@@ -331,6 +331,15 @@ for (const [label, script] of [
   }
 }
 
+// mc2-1cxna. The Supabase backup timer is ENABLED and runs scripts under deploy/postgres, which
+// the deploy tarball did not carry: a fix committed to scheduled-backup-run.sh never reached the
+// host, and the only way it surfaced was a metric that failed to appear after a manual run.
+const copyStep = (jobs.deploy?.steps ?? []).find(step => step?.name === 'Copy deployment files')?.run;
+assert(
+  /find deploy\/qdrant deploy\/systemd deploy\/postgres -type f/.test(copyStep ?? ''),
+  'the deploy must ship deploy/postgres, whose scripts a scheduled production timer executes'
+);
+
 // mc2-ugl5g. The monitoring drift gate must report, not block. Placed before the deploy steps it
 // stopped the application rollout entirely on its first run — a stale Prometheus rule file is a
 // real problem and it is not a reason to withhold application code.
