@@ -106,7 +106,11 @@ services:
       - QDRANT_REINDEX_TARGET_COLLECTION=
       - WORKER_CONCURRENCY=2
       - STAGE6_WORKER=false
-      - REDIS_URL=redis://redis:6379
+      # The deployed Redis container answers to `megacampus-redis`, not `redis`: it carries no
+      # service alias on megacampus-network (verified 2026-07-31 — DNSNames are megacampus-redis and
+      # the container id), which is why every production writer sets this exact URL. `redis://redis`
+      # fails DNS resolution and the reindex worker aborts in its own pre-flight.
+      - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       - DOCLING_CACHE_PATH=/app/docling-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
@@ -122,6 +126,12 @@ services:
       - docling-json-cache:/app/docling-cache
       - worker-data:/app/data
       - /var/lib/megacampus-qdrant-recovery:/var/lib/megacampus-qdrant-recovery
+      # `reindex plan|execute|verify` refuse without a verified recovery binding, and they advance
+      # the journal verified -> reindex_started -> complete, so the recovery state directory must be
+      # mounted and writable. Same bind and same in-container paths the planner uses, so one
+      # --recovery-manifest-path / --recovery-journal-path pair works in both services. The manifest
+      # inside it is 0400, so it stays unwritable to the operator uid.
+      - ${SOURCE_RECOVERY_STATE_HOST_DIR:?SOURCE_RECOVERY_STATE_HOST_DIR must be set}:/var/lib/megacampus-source-recovery:rw
       - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
     secrets:
       - qdrant_api_key
@@ -292,8 +302,13 @@ services:
       - /run/qdrant-operator:size=1m,mode=0700,uid=1001,gid=1001
     command: ['source-recovery', '--help']
 
-  # Database dispositions are isolated from every upload tree. Only the
-  # reviewed manifest is read-only and the CAS progress directory is writable.
+  # Database dispositions write only to the database. They still need the PRODUCTION upload root
+  # read-only: apply-dispositions and verify-dispositions both re-derive readSourceCounts() and
+  # refuse unless it equals the exact post-copy totals, and that probe realpath()s the upload root.
+  # Isolated from every upload tree was the intent, but the composed service then could not run its
+  # own two commands -- apply-dispositions died on `ENOENT ... realpath` in production 2026-07-31.
+  # The development root stays absent and the production root stays read-only, so this service still
+  # cannot touch a single byte of either tree.
   qdrant-source-recovery-disposition:
     image: ghcr.io/maslennikov-ig/mc-2/qdrant-operator@sha256:${QDRANT_OPERATOR_IMAGE_SHA256:?QDRANT_OPERATOR_IMAGE_SHA256 must be the 64-character release digest}
     platform: linux/amd64
@@ -316,6 +331,7 @@ services:
       - SOURCE_RECOVERY_MANIFEST_PATH=/run/source-recovery/manifest.json
       - SOURCE_RECOVERY_JOURNAL_PATH=/run/source-recovery/progress/journal.json
     volumes:
+      - ${SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT:?SOURCE_RECOVERY_PRODUCTION_UPLOAD_ROOT must be set}:/opt/megacampus/data/uploads:ro
       - ${SOURCE_RECOVERY_MANIFEST_FILE:?SOURCE_RECOVERY_MANIFEST_FILE must be set}:/run/source-recovery/manifest.json:ro
       - ${SOURCE_RECOVERY_PROGRESS_HOST_DIR:?SOURCE_RECOVERY_PROGRESS_HOST_DIR must be set}:/run/source-recovery/progress:rw
     tmpfs:
