@@ -28,8 +28,18 @@ describe('Qdrant recovery systemd contract', () => {
       expect(unit).toContain('ProtectSystem=strict');
       expect(unit).toContain('ProtectHome=true');
       expect(unit).toContain('PrivateTmp=true');
-      expect(unit).toContain('StateDirectory=megacampus-qdrant-recovery');
-      expect(unit).not.toContain('StateDirectory=megacampus-qdrant-metrics');
+      // NOT StateDirectory: systemd re-asserts its ownership for every command it forks, so the
+      // unit's own `chown 1001:1001` was undone before ExecStart and the tool uid could not open
+      // /var/lib/megacampus-qdrant-recovery/metrics-state.json. Measured 2026-07-31, the first time
+      // these units were ever run. ReadWritePaths already makes the directory writable under
+      // ProtectSystem=strict, so systemd does not need to own it — the unit does, explicitly.
+      expect(unit).not.toMatch(/^StateDirectory=/mu);
+      expect(unit).toContain(
+        'ExecStartPre=/usr/bin/chown 1001:1001 /var/lib/megacampus-qdrant-recovery'
+      );
+      expect(unit).toContain(
+        'ExecStartPre=/usr/bin/chmod 0700 /var/lib/megacampus-qdrant-recovery'
+      );
       expect(unit).toContain('QDRANT_RECOVERY_LOCK_HELD=1');
       expect(unit).toContain(
         'Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics'
