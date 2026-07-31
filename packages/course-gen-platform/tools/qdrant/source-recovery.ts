@@ -282,11 +282,22 @@ async function assertOwnerOnlyStateDirectory(path: string, label: string): Promi
   }
 }
 
-async function readOwnerOnlyFile(path: string, label: string): Promise<string> {
+// The mode is per-artifact, not one constant. The plan input and the journal are mutable owner-only
+// files at 0600; the MANIFEST is immutable and source-recovery-run.sh requires it at exactly 0400
+// (`:619`, and it reads it back through open_operator_file at 400). Reading it at a hardcoded 0600
+// made the two contracts mutually exclusive: no single file could satisfy both, so the wrapper and
+// the operator each rejected a manifest the other had accepted. Measured in production 2026-07-31.
+async function readOwnerOnlyFile(
+  path: string,
+  label: string,
+  expectedMode = 0o600
+): Promise<string> {
   await assertOwnerOnlyStateDirectory(path, label);
   const metadata = await lstat(path);
-  if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-    throw new Error(`${label} must be a non-symlink mode-0600 regular file`);
+  if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o777) !== expectedMode) {
+    throw new Error(
+      `${label} must be a non-symlink mode-0${expectedMode.toString(8)} regular file`
+    );
   }
   assertCurrentOwner(metadata.uid, label);
 
@@ -295,7 +306,7 @@ async function readOwnerOnlyFile(path: string, label: string): Promise<string> {
     const opened = await handle.stat();
     if (
       !opened.isFile() ||
-      (opened.mode & 0o777) !== 0o600 ||
+      (opened.mode & 0o777) !== expectedMode ||
       opened.dev !== metadata.dev ||
       opened.ino !== metadata.ino
     ) {
@@ -313,7 +324,7 @@ export async function loadReviewedRecoveryState(input: {
   journalPath: string;
 }): Promise<ReviewedRecoveryState> {
   const [manifestJson, journalJson] = await Promise.all([
-    readOwnerOnlyFile(input.manifestPath, 'Recovery manifest'),
+    readOwnerOnlyFile(input.manifestPath, 'Recovery manifest', 0o400),
     readOwnerOnlyFile(input.journalPath, 'Recovery journal'),
   ]);
   const manifest = assertExactRecoveryContract(ManifestSchema.parse(JSON.parse(manifestJson)));

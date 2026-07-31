@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
+import { chmod, link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 
@@ -276,6 +276,7 @@ export interface DurableWriteOperations {
   openTemporary(path: string, mode: number): Promise<DurableWriteHandle>;
   rename(from: string, to: string): Promise<void>;
   link(from: string, to: string): Promise<void>;
+  chmodPath(path: string, mode: number): Promise<void>;
   openDirectory(directory: string): Promise<DurableDirectoryHandle>;
   unlink(path: string): Promise<void>;
 }
@@ -313,6 +314,9 @@ const defaultDurableWriteOperations: DurableWriteOperations = {
   },
   async rename(from, to) {
     await rename(from, to);
+  },
+  async chmodPath(path, mode) {
+    await chmod(path, mode);
   },
   async link(from, to) {
     await link(from, to);
@@ -481,7 +485,7 @@ async function reconcileCommittedTemporary(targetPath: string, content: string):
 async function writeDurableReplacement(
   targetPath: string,
   content: string,
-  options: { publication: 'immutable' | 'replace' },
+  options: { publication: 'immutable' | 'replace'; publishedMode?: number },
   operations: DurableWriteOperations = defaultDurableWriteOperations
 ): Promise<void> {
   const directory = dirname(targetPath);
@@ -527,6 +531,13 @@ async function writeDurableReplacement(
         }
         throw error;
       }
+      // The temporary is written 0600 because it is still being written; the PUBLISHED artifact
+      // carries its own mode. The manifest is declared immutable and every consumer demands 0400 —
+      // source-recovery-run.sh refuses a fresh plan whose manifest is not `1001:1001:400` and reads
+      // it back through open_operator_file at 400 — but nothing ever applied it, so the planner
+      // published 0600 and the wrapper rejected a manifest it had just produced correctly. The
+      // journal keeps 0600: it is rewritten on every transition.
+      await operations.chmodPath(targetPath, options.publishedMode ?? 0o600);
       await fsyncDirectory(directory, operations);
       await operations.unlink(temporaryPath);
       await fsyncDirectory(directory, operations);
@@ -549,7 +560,12 @@ export async function writeImmutableManifest(
   const normalized = normalizeRecoveryManifest(manifest);
   const content = serialize(normalized);
   const sha256 = createHash('sha256').update(content).digest('hex');
-  await writeDurableReplacement(targetPath, content, { publication: 'immutable' }, operations);
+  await writeDurableReplacement(
+    targetPath,
+    content,
+    { publication: 'immutable', publishedMode: 0o400 },
+    operations
+  );
   return sha256;
 }
 
@@ -836,5 +852,6 @@ export async function replaceProgressJournal(
 
   await writeDurableReplacement(targetPath, serialize(next), {
     publication: current ? 'replace' : 'immutable',
+    publishedMode: 0o600,
   });
 }

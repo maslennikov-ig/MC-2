@@ -160,7 +160,12 @@ describe('source recovery manifest', () => {
 
       expect(sha256).toMatch(/^[a-f0-9]{64}$/u);
       expect(content.indexOf('copy-a')).toBeLessThan(content.indexOf('copy-b'));
-      expect((await stat(target)).mode & 0o777).toBe(0o600);
+      // 0400, not 0600. The manifest is declared IMMUTABLE and source-recovery-run.sh refuses a
+      // fresh plan whose manifest is not `1001:1001:400`, then reads it back at 400. Nothing ever
+      // applied that mode, so the real planner published 0600 and the wrapper rejected a manifest
+      // it had just produced correctly — measured in production 2026-07-31. This assertion used to
+      // pin 0600, and so pinned the defect.
+      expect((await stat(target)).mode & 0o777).toBe(0o400);
       expect(journal.manifest_sha256).toBe(sha256);
       expect(journal.copy_states).toEqual({ 'copy-a': 'planned', 'copy-b': 'planned' });
       await expect(writeImmutableManifest(target, manifest())).rejects.toThrow(/already exists/iu);
@@ -226,6 +231,9 @@ describe('source recovery manifest', () => {
       async link() {
         calls.push('link-no-replace');
       },
+      async chmodPath(_path, mode) {
+        calls.push(`chmod-published-${mode.toString(8)}`);
+      },
       async openDirectory() {
         calls.push('open-parent');
         return {
@@ -250,6 +258,7 @@ describe('source recovery manifest', () => {
       'fsync-file',
       'close',
       'link-no-replace',
+      'chmod-published-400',
       'open-parent',
       'fsync-parent',
       'close-parent',
@@ -281,6 +290,7 @@ describe('source recovery manifest', () => {
         const error = Object.assign(new Error('target raced'), { code: 'EEXIST' });
         throw error;
       },
+      async chmodPath() {},
       async openDirectory() {
         return { async sync() {}, async close() {} };
       },
@@ -306,6 +316,7 @@ describe('source recovery manifest', () => {
       },
       async rename() {},
       async link() {},
+      async chmodPath() {},
       async openDirectory() {
         return { async sync() {}, async close() {} };
       },
