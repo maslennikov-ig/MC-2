@@ -14,13 +14,17 @@ Environment=QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
 Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
 Environment=QDRANT_RECOVERY_LOCK_PATH=/run/megacampus-qdrant-recovery/recovery.lock
 Environment=QDRANT_RECOVERY_LOCK_HELD=1
+# systemd re-asserts StateDirectory ownership for every command it forks, so with
+# StateDirectory= set this chown was undone before ExecStart ran and the tool uid met
+# "EACCES: permission denied, open '/var/lib/megacampus-qdrant-recovery/metrics-state.json'".
+# The directory is a deployment prerequisite and ReadWritePaths already makes it writable
+# under ProtectSystem=strict, so systemd does not need to own it.
 ExecStartPre=/usr/bin/chown 1001:1001 /var/lib/megacampus-qdrant-recovery
+ExecStartPre=/usr/bin/chmod 0700 /var/lib/megacampus-qdrant-recovery
 ExecStartPre=/usr/bin/install -o 0 -g 0 -m 0400 %d/qdrant_api_key /run/megacampus-qdrant-snapshot-credentials/qdrant_api_key
 ExecStartPre=/opt/megacampus/deploy/qdrant/operator-compose.sh --project-directory /opt/megacampus -f /opt/megacampus/docker-compose.infra.yml --env-file /opt/megacampus/.env.production --profile operator run --rm --no-deps -T qdrant-recovery-operator metrics-check
 ExecStart=/usr/bin/flock --nonblock /run/megacampus-qdrant-recovery/recovery.lock /opt/megacampus/deploy/qdrant/operator-compose.sh --project-directory /opt/megacampus -f /opt/megacampus/docker-compose.infra.yml --env-file /opt/megacampus/.env.production --profile operator run --rm --no-deps -T -e QDRANT_RECOVERY_LOCK_HELD=1 qdrant-recovery-operator snapshot
 TimeoutStartSec=55m
-StateDirectory=megacampus-qdrant-recovery
-StateDirectoryMode=0700
 RuntimeDirectory=megacampus-qdrant-recovery megacampus-qdrant-snapshot-credentials
 RuntimeDirectoryMode=0700
 NoNewPrivileges=true
