@@ -231,6 +231,27 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
     );
   });
 
+  // The real constraint needs a capability-dropped root, which a unit test cannot create, so this
+  // pins the ordering in the source: no staging directory may be handed to NODE_UID before root
+  // writes into it. Without DAC_OVERRIDE — cap_drop ALL, only CHOWN/SETGID/SETUID — a 0700
+  // directory owned by 1001 refuses root's own writes, and every snapshot and restore-drill run
+  // died with '/run/qdrant-operator/qdrant_api_key: Permission denied' the first time the timers
+  // were ever enabled. Proved on the host, not here.
+  it('never hands a staging directory to the tool UID before root writes into it', () => {
+    const entrypoint = source('packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh');
+
+    expect(entrypoint).not.toMatch(/install -d -o "\$NODE_UID"/u);
+    expect(entrypoint).toContain('install -d -o 0 -g 0 -m 0700 "$1"');
+    for (const staging of ['stage_api_key_for_file_client', 'stage_owner_only_file']) {
+      const body = entrypoint.slice(entrypoint.indexOf(`${staging}() {`));
+      const scoped = body.slice(0, body.indexOf('\n}\n'));
+      expect(scoped.indexOf('stage_owner_only_directory')).toBeGreaterThanOrEqual(0);
+      expect(scoped.indexOf('stage_owner_only_handover')).toBeGreaterThan(
+        scoped.indexOf('stage_owner_only_directory')
+      );
+    }
+  });
+
   it('requires exact root-owned mode-0400 input secrets', () => {
     const directory = mkdtempSync('/tmp/mc2-q12o-secret-');
     const secret = resolve(directory, 'qdrant_api_key');

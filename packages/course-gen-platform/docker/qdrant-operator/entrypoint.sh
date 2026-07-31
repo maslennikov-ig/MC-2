@@ -246,13 +246,32 @@ load_raw_api_key() {
   unset REPLY
 }
 
+# These services run as root with `cap_drop: ALL` and only CHOWN/SETGID/SETUID added, so this
+# process has NO DAC_OVERRIDE: a staging directory already owned by NODE_UID at mode 0700 refuses
+# root's own writes. Keep it root-owned while root puts files in it and hand it over afterwards.
+#
+# Handing it over first is why every snapshot and restore-drill run has failed since the units were
+# installed on 2026-07-17: the first enable, on 2026-07-31, died immediately with
+# '/run/qdrant-operator/qdrant_api_key: Permission denied'. The timers had never been enabled, so
+# nothing had ever exercised this path.
+stage_owner_only_directory() {
+  install -d -o 0 -g 0 -m 0700 "$1"
+}
+
+stage_owner_only_handover() {
+  chown "$NODE_UID:$NODE_GID" "$1"
+}
+
 stage_api_key_for_file_client() {
+  local staged_directory
+  staged_directory="$(dirname "$STAGED_API_KEY_FILE")"
   read_secret_file "${QDRANT_API_KEY_FILE:-$DEFAULT_API_KEY_FILE}"
-  install -d -o "$NODE_UID" -g "$NODE_GID" -m 0700 "$(dirname "$STAGED_API_KEY_FILE")"
+  stage_owner_only_directory "$staged_directory"
   printf '%s' "$REPLY" > "$STAGED_API_KEY_FILE"
   unset REPLY
   chown "$NODE_UID:$NODE_GID" "$STAGED_API_KEY_FILE"
   chmod 0400 "$STAGED_API_KEY_FILE"
+  stage_owner_only_handover "$staged_directory"
   export QDRANT_API_KEY_FILE="$STAGED_API_KEY_FILE"
 }
 
@@ -265,8 +284,11 @@ stage_owner_only_file() {
     fail 'Recovery input file is missing or unreadable'
   identity="$(stat -c '%u:%g:%a' -- "$source")"
   [[ $identity == '0:0:400' ]] || fail 'Recovery input file must be root:root mode 0400'
-  install -d -o "$NODE_UID" -g "$NODE_GID" -m 0700 "$(dirname "$target")"
+  local staged_directory
+  staged_directory="$(dirname "$target")"
+  stage_owner_only_directory "$staged_directory"
   install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- "$source" "$target"
+  stage_owner_only_handover "$staged_directory"
 }
 
 stage_q12_database_capability_if_requested() {
@@ -319,9 +341,12 @@ stage_q12_database_capability_if_requested() {
   ' "$probe_receipt" "$Q12_RUN_ID" "$Q12_EXPECTED_CATALOG_SHA256" ||
     fail 'Q12 database probe receipt is incomplete or cross-wired'
 
-  install -d -o "$NODE_UID" -g "$NODE_GID" -m 0700 "$(dirname "$STAGED_Q12_DB_CAPABILITY_FILE")"
+  local staged_directory
+  staged_directory="$(dirname "$STAGED_Q12_DB_CAPABILITY_FILE")"
+  stage_owner_only_directory "$staged_directory"
   install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- \
     "$source" "$STAGED_Q12_DB_CAPABILITY_FILE"
+  stage_owner_only_handover "$staged_directory"
   [[ $(stat -c '%u:%g:%a' -- "$STAGED_Q12_DB_CAPABILITY_FILE") == "$NODE_UID:$NODE_GID:400" ]] ||
     fail 'staged Q12 database capability must be owned by the fixed operator UID:GID with mode 0400'
   export Q12_DB_CAPABILITY_FILE="$STAGED_Q12_DB_CAPABILITY_FILE"
