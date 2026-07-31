@@ -759,7 +759,12 @@ jobs:
           # whitelist launcher and q12-writer-resume.py is its root-owned payload. The deploy user
           # cannot rewrite them, and it must not — root ownership is the security property. They
           # change only through the deliberate manual install, never through an ordinary deploy.
-          find deploy/qdrant deploy/systemd -type f \
+          # deploy/postgres was missing here until 2026-07-31: the Supabase backup scripts the
+          # ENABLED nightly timer executes had no delivery path at all, so a change to
+          # scheduled-backup-run.sh sat in the repository while the host kept running the old copy.
+          # Found by running the unit and watching the metric it was supposed to publish not appear.
+          # The tree is claude-deploy-owned, so unlike ops/qdrant it can simply be shipped.
+          find deploy/qdrant deploy/systemd deploy/postgres -type f \
             ! -name q12-privileged-launch.sh \
             ! -name q12-writer-resume.py \
             ! -path '*/__pycache__/*' \
