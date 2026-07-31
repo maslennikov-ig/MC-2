@@ -247,15 +247,26 @@ load_raw_api_key() {
 }
 
 # These services run as root with `cap_drop: ALL` and only CHOWN/SETGID/SETUID added, so this
-# process has NO DAC_OVERRIDE: a staging directory already owned by NODE_UID at mode 0700 refuses
-# root's own writes. Keep it root-owned while root puts files in it and hand it over afterwards.
+# process has neither DAC_OVERRIDE nor FOWNER. Two consequences, and staging fell over both on
+# 2026-07-31 when the timers were enabled for the first time since their 2026-07-17 install:
 #
-# Handing it over first is why every snapshot and restore-drill run has failed since the units were
-# installed on 2026-07-17: the first enable, on 2026-07-31, died immediately with
-# '/run/qdrant-operator/qdrant_api_key: Permission denied'. The timers had never been enabled, so
-# nothing had ever exercised this path.
+#   * a directory already owned by NODE_UID at mode 0700 refuses root's own writes
+#     -> '/run/qdrant-operator/qdrant_api_key: Permission denied'
+#   * a file already owned by NODE_UID refuses root's chmod
+#     -> "chmod: changing permissions of '/run/qdrant-operator/qdrant_api_key': Operation not
+#        permitted"
+#
+# So ownership is the LAST thing handed over, at both levels: root creates the directory, writes the
+# file, sets the file's mode, then gives away the file, then the directory. `install -o/-g -m` is
+# avoided for the same reason — coreutils sets owner before mode inside one call.
+# Takes the directory BACK, because a second staging call in the same run would otherwise find it
+# already owned by NODE_UID and be unable to write. `install -d` does not re-apply ownership to a
+# directory that already exists, and root cannot chmod one it does not own — so chown first, then
+# chmod. Verified inside the deployed image under exactly these caps, twice in a row.
 stage_owner_only_directory() {
-  install -d -o 0 -g 0 -m 0700 "$1"
+  [[ -d $1 ]] || install -d -m 0700 "$1"
+  chown 0:0 "$1"
+  chmod 0700 "$1"
 }
 
 stage_owner_only_handover() {
@@ -269,8 +280,8 @@ stage_api_key_for_file_client() {
   stage_owner_only_directory "$staged_directory"
   printf '%s' "$REPLY" > "$STAGED_API_KEY_FILE"
   unset REPLY
-  chown "$NODE_UID:$NODE_GID" "$STAGED_API_KEY_FILE"
   chmod 0400 "$STAGED_API_KEY_FILE"
+  stage_owner_only_handover "$STAGED_API_KEY_FILE"
   stage_owner_only_handover "$staged_directory"
   export QDRANT_API_KEY_FILE="$STAGED_API_KEY_FILE"
 }
@@ -287,7 +298,8 @@ stage_owner_only_file() {
   local staged_directory
   staged_directory="$(dirname "$target")"
   stage_owner_only_directory "$staged_directory"
-  install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- "$source" "$target"
+  install -m 0400 -- "$source" "$target"
+  stage_owner_only_handover "$target"
   stage_owner_only_handover "$staged_directory"
 }
 
@@ -344,8 +356,8 @@ stage_q12_database_capability_if_requested() {
   local staged_directory
   staged_directory="$(dirname "$STAGED_Q12_DB_CAPABILITY_FILE")"
   stage_owner_only_directory "$staged_directory"
-  install -o "$NODE_UID" -g "$NODE_GID" -m 0400 -- \
-    "$source" "$STAGED_Q12_DB_CAPABILITY_FILE"
+  install -m 0400 -- "$source" "$STAGED_Q12_DB_CAPABILITY_FILE"
+  stage_owner_only_handover "$STAGED_Q12_DB_CAPABILITY_FILE"
   stage_owner_only_handover "$staged_directory"
   [[ $(stat -c '%u:%g:%a' -- "$STAGED_Q12_DB_CAPABILITY_FILE") == "$NODE_UID:$NODE_GID:400" ]] ||
     fail 'staged Q12 database capability must be owned by the fixed operator UID:GID with mode 0400'

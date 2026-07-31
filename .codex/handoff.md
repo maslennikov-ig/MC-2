@@ -1,7 +1,8 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-31 — the Q12 live-cutover track is RETIRED; the ordinary source-recovery route is
-reopened and one blocker remains before the Qdrant reindex.
+Updated: 2026-07-31 — Qdrant holds real vectors for the first time since the Cloud loss. The Q12
+window track is retired. The reindex is partial and cannot repair itself; both backup timers are
+enabled.
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
 
@@ -14,184 +15,157 @@ Cloud, pipeline green end to end for the first time since 2026-07-04. Do not reo
 Retired 2026-07-31, each with its reason on the bead: `mc2-i9h3y` (the window), `mc2-fxlne` (C4
 compare on a guarded generation), `mc2-0ie27` (plan perishability), `mc2-zls0f`
 (`q12-live-cutover.sh` interpreter), `mc2-e21lo` (barrier restore sweep). Each carries a REOPEN
-CONDITION; none of the underlying fixes were made, because none of them is reachable without a
-barrier install.
+CONDITION; none of the underlying fixes were made, because none is reachable without a barrier
+install.
 
 Deliberately NOT retired: `mc2-y5tgw` — the dev deploy's `docker image prune -f` removes the
-digest-pinned operator image, which is referenced by no running container and is now load-bearing
-for ordinary work. `mc2-1cxna` — re-scoped to its ordinary-path half: `backup-supabase.sh` discards
-the stderr of every failing dump step, and the ENABLED `megacampus-supabase-backup.timer` failed at
-00:30 today with a message that was not true of the file it named.
+digest-pinned operator image, which is referenced by no running container and is load-bearing for
+ordinary work. `mc2-1cxna` — re-scoped to its ordinary-path half: `backup-supabase.sh` discards the
+stderr of every failing dump step, and the ENABLED `megacampus-supabase-backup.timer` failed at
+00:30 on 2026-07-31 with a message that was not true of the file it named. Last good generation:
+`generation-20260730T150719Z-9b5e7a9c`.
 
 **The load-bearing rule.** Every piece of Q12 machinery is opt-in. Migrations, reindex, deploy and
 source recovery each have an ordinary path, reached by NOT passing the Q12 flags. Look for it before
 concluding anything needs a window. For source recovery that is
-`source-recovery-run.sh --operation forward` without `--q12-db-capability-file`; the argv is
-`q12-command-manifest.json`'s `source.forward` argv[0..20], i.e. everything up to but not including
-`--q12-db-capability-file`.
+`source-recovery-run.sh --operation forward` without `--q12-db-capability-file`.
 
-## Product Truth
+## Where the Qdrant reindex actually stands
 
-- Qdrant Cloud data was test-only and is lost. Do not recover or mutate it; rebuild the derived
-  index from authoritative sources.
-- Target remains private self-hosted Qdrant `1.18.2`, native multilingual BM25/IDF, server RRF /
-  Formula priority, strict indexes, aliases, source reindex, Prometheus/Grafana/alerts, and a secure
-  loopback Web UI. Development staging uses persistent local-volume snapshots; off-host S3 is the
-  production gate `mc2-jz6y0.13.6`.
-- Documents are optional but important advisory evidence. A course without documents is fully
-  supported.
-- Every uploaded document must receive a durable `assessed`, `degraded` or `failed` coverage
-  outcome; none may disappear through context truncation.
-- Documents supplement the baseline structure. They may add facts, terminology, constraints,
-  examples and source-backed topics but cannot silently replace baseline curriculum requirements.
-- Material document conflicts use a distinct required-question block. Manual mode pauses at the
-  existing Phase 0.5 boundary. Automatic mode selects the recommendation and appends
-  `resolved_by: system` / `answer_source: system` with rationale.
+**The source recovery is COMPLETE.** `forward exited 0`, journal phase `verified` at revision 94,
+all 42 copies `published`, all 24 dispositions `disposition_verified`. Uploads went 75 → 117 files;
+the inventory moved `recoverable 109 / missing 129` → `recoverable 234 / missing 4`, exactly the
+reviewed `expected_post_counts`.
 
-## Current State, measured 2026-07-31
+**The reindex is PARTIAL.** Run `6bf8051d-6b13-41e5-a735-f4e6f3b87add`:
 
-- Qdrant: physical `course_embeddings_v1`, alias `course_embeddings` → it, **0 points**, status
-  green, dense + sparse vectors and the full 12-key payload schema present.
-- `file_catalog`: 185 `indexed`, 43 `failed`, 25 `pending`, 8 `indexing` = 261. The `indexed` column
-  refers to Qdrant Cloud vectors that no longer exist; it lies.
-- Live inventory equals the audited pre-copy totals EXACTLY — `total 261, eligible 240,
-recoverable 109, missing 129, invalid 2, unsupported 21` — so the frozen
-  `/var/lib/megacampus-source-recovery/plan-input.json` (run `a417a99c-…`) is still valid. Its 42
-  copies restore 125 rows and take `missing` from 129 to 4.
-- `/var/lib/megacampus-source-recovery/state/` and `progress/`: still empty. No manifest, no
-  journal, so a fresh `plan` is still the correct first command.
-- Both `megacampus-qdrant-snapshot.timer` and `megacampus-qdrant-restore-drill.timer` remain
-  `disabled / inactive`; `/var/lib/megacampus/qdrant-metrics` is empty. Deliberate: a snapshot of an
-  empty collection proves nothing.
-- `megacampus-supabase-backup.timer` is enabled; its 00:30 run FAILED and the last good generation
-  is `generation-20260730T150719Z-9b5e7a9c`.
+    VERIFY status=failed expected_documents=234 indexed_documents=186
+    expected_points=13382 indexed_points=11714 missing_documents=48
+    count_mismatches=28 schema_mismatches=0 relevance_failures=2 action=repair
+
+Execute had claimed `enqueued=234 completed=234 failed=0` and exited 0. It was wrong, and the reason
+is now fixed (below). The 48, from the worker's own log: 35 Docling conversion failures and 13
+documents that lost a finalize race on `vector_status`. The 35 are environmental —
+`megacampus-docling-mcp-internal` restarted seven times during the run and every conversion failure
+falls before its last restart, none after (`mc2-lkkcv`).
+
+**This run cannot repair itself** (`mc2-q3ju4`). Execute skips any file whose job the durable ledger
+records as completed, a fresh run id is refused while the journal sits at `reindex_started`, and
+`plan` demands a `verified` journal. Rewriting the artifact or journal by hand would falsify the
+audit record they exist to be, so it was not done. The supported repair is the product's own
+`retryDocument({courseId, fileId})` tRPC procedure, which those 48 rows are already in the right
+state for — it runs as a signed-in user of the owning organization, from the app.
+
+Two host prerequisites were created by hand and are NOT produced by any code: the 24 course
+directories under the production upload root, and `/var/lib/megacampus-qdrant-recovery/reindex` at
+`1001:1001` mode 0700. The first now fails legibly instead of with a bare ENOENT (`mc2-vhr79`).
+
+## Backup guarantees
+
+`megacampus-qdrant-snapshot.timer` and `megacampus-qdrant-restore-drill.timer` are ENABLED as of
+2026-07-31. They had been installed on 2026-07-17 and never enabled, and the first enable proved why
+that mattered: both died instantly on `/run/qdrant-operator/qdrant_api_key: Permission denied`. The
+operator services run as root with `cap_drop: ALL`, so they have no DAC_OVERRIDE, and the entrypoint
+handed the staging directory to uid 1001 before root wrote the secret into it. Fixed at all three
+staging sites; a unit test cannot reproduce it, so the proof is on the host.
+
+**Alert honesty.** `QdrantSnapshotStale` is critical and used to promise off-host retention that
+does not exist — production is `QDRANT_SNAPSHOT_STORAGE_MODE=local` with no bucket
+(`mc2-jz6y0.13.6`, owner-deferred to the production launch). `snapshot.ts` stamps its metric on
+every successful run regardless of storage mode, so enabling the timer would have cleared that alert
+by making its text false. The text now describes what the metric proves and names the open gate.
+
+That correction had to be installed by hand: CI deliberately does not deploy `ops/qdrant`, so a
+green master deploy left production serving the old rules (`mc2-ugl5g`). Backup at
+`alerts.yml.bak-20260731`. Note for any other single-file bind mount on this host: SIGHUP was not
+enough, because `install` replaces the inode and the container keeps the old one — only
+`docker restart megacampus-prometheus` re-resolved it.
 
 ## What the ordinary route cost, in defects
 
-Four independent defects sat between "drop the Q12 flags" and a completed
-`source.forward`. Each was found on the host, and each had never been reachable before because
-sixteen window attempts died at or before C4, the command right before it.
+Nine, each reachable only after the previous one was cleared.
 
-1. Health asserted on a stopped container (`inspect_writer`, `current_writer_record`) — FIXED.
-2. The operator image created both mount parents at 0555 while the code demands 0700 — FIXED.
-3. CI wrote container paths into four Compose bind sources — FIXED.
-4. The manifest had no mode both sides accepted: the publisher never applied one and produced 0600,
-   the wrapper requires 0400, and the operator's reader demanded 0600 — FIXED.
+1. Health asserted on a stopped container (`inspect_writer`, `current_writer_record`).
+2. The operator image created both mount parents at 0555 while the code demands 0700.
+3. CI wrote container paths into four Compose bind sources.
+4. The manifest had no mode both sides accepted: publisher 0600, wrapper 0400, reader 0600.
+5. Three operator services could not reach what their own commands need (upload root, recovery
+   state, a Redis alias that does not exist).
+6. The entrypoint pinned the durable run artifact for `execute` and not for `verify`, so verify
+   reached for a relative default inside a `--rm` container that no longer existed.
+7. The indexed-document walker scrolled at 256 against a collection this repo creates with
+   `max_query_limit` 100 — a restriction the same verify asserts is in force.
+8. Execute counted a returned BullMQ job as an indexed document, so 48 failures reported as 0.
+9. Secrets were staged into a directory already handed to the tool uid, which capability-dropped
+   root cannot write.
 
-Three of the four were kept green by a fixture that supplied what the code did not: the fake
-`docker stop` left `Health` at `healthy`, and the fake planner did the `chmod 0400` the real one
-omits. When a suite models the convenience instead of the constraint, it certifies the defect.
-
-## Where the Qdrant reindex stands
-
-The source recovery is COMPLETE. `forward exited 0`, journal phase `verified`, revision 94, all 42
-copies `published`, all 24 dispositions `disposition_verified`. `/opt/megacampus/data/uploads` went
-from 75 files to 117, and the live inventory moved from `recoverable 109 / missing 129` to
-`recoverable 234 / missing 4` — exactly the reviewed `expected_post_counts`.
-
-`reindex plan` against `course_embeddings_v1` then returned `status=ok eligible=240 recoverable=234
-audited_failed=6 unresolved=0`. Exit 0 means something here: `getReindexPlanExitCode` returns 2
-whenever any unresolved gap remains, and there are none.
-
-`reindex execute` is RUNNING, detached, run id in
-`/var/tmp/mc2-reindex-execute.log`, against the dedicated queue
-`qdrant-reindex-<run-id>` with a `megacampus-qdrant-reindex-worker` container consuming it. It
-enqueues 234 ordinary DOCUMENT_PROCESSING jobs at concurrency 4, about one document per minute, so
-roughly four hours end to end. Progress is visible three ways: the collection's `points_count`, the
-Redis keys `bull:qdrant-reindex-<run-id>:{completed,failed,active}`, and the worker's logs.
-
-WHEN IT FINISHES: run `reindex verify` with the same six values, then read its
-`expected_documents`/`indexed_documents` and `relevance_failures`. Only then enable
-`megacampus-qdrant-snapshot.timer` and `megacampus-qdrant-restore-drill.timer` — a snapshot or drill
-taken while the collection is still filling measures a moving target. The three acceptance values
-come from `emit-source-forward-acceptance.ts`, which the ordinary forward does NOT publish (it has
-no consumer outside Q12); run it yourself in the planner service with `--entrypoint tsx`.
-
-Two host prerequisites were created by hand and are NOT produced by any code: the 24 course
-directories under the production upload root (`mc2-vhr79`) and
-`/var/lib/megacampus-qdrant-recovery/reindex` at `1001:1001` mode 0700, which the operator uid
-cannot create because its parent is root-owned 0755.
+Five of the nine were kept green by a fixture that supplied what the code did not: a fake
+`docker stop` leaving `Health` at `healthy`, a fake planner doing the `chmod 0400` the real one
+omits, fake queue jobs that never return `success: false`, fake scrolls that accept any page size.
+When a suite models the convenience instead of the constraint, it certifies the defect.
 
 ## How this repository fails, so you do not rediscover it
 
-- **Errors get discarded.** Two more instances today, both fixed:
-  `writer identity/state/policy is invalid` named only itself, and `source_recovery_failed` threw
-  its cause away in a bare `catch {}`. The second cost a production writer window to learn a message
-  the process already had. When something fails without a reason, fix the reporting first.
-- **The checked environment gets substituted for the consuming one.** The suite's fake `docker stop`
-  left `Health` at `healthy`, which no real stopped container reports, and that alone kept a clause
-  no quiesced writer could satisfy green through every run.
-- **CI overwrites good server values.** It wrote container paths into four variables Compose
-  interpolates as bind sources. Check what a deploy will write before running it; prefer deriving a
-  value from the host that owns it.
+- **Errors get discarded.** Three instances in this stage, all fixed: `writer identity/state/policy
+is invalid` named only itself; `source_recovery_failed` threw its cause away in a bare `catch {}`;
+  and `detail=Bad Request` hid `Limit exceeded 256 > 100 for "limit"` inside an HTTP client's
+  `data.status.error` while its `message` carried only the status text. When something fails without
+  a reason, fix the reporting first — every one of these paid for itself within the hour.
+- **Completion is not success.** BullMQ completes a job whenever the processor returns, and these
+  handlers return `{ success: false }` rather than throwing.
+- **The checked environment gets substituted for the consuming one.** See the five fixtures above.
+- **CI overwrites good server values, and silently declines to write others.** It wrote container
+  paths into four bind sources, and it does not deploy `ops/qdrant` at all.
 - **Prove it on the host as the user that will run it**, and **prove a new guard red before trusting
   it**.
 - The primary worktree carries unrelated local edits (`AGENTS.md` is rewritten by a `bd` hook).
   Stage explicit paths; never `git add -A`.
 
-## Alert truth — read before enabling the snapshot timer
-
-`QdrantSnapshotStale` is **critical** and its text says "No successful off-host Qdrant snapshot has
-been recorded within eight hours". It fires on `absent(...)`, and it is TRUE: there is no off-host
-snapshot, because `QDRANT_SNAPSHOT_STORAGE_MODE=local` and `QDRANT_S3_BUCKET`/`_REGION` are unset
-(`mc2-jz6y0.13.6`, owner-gated, needs credentials). `snapshot.ts` stamps
-`lastSuccessfulSnapshotEpochSeconds` regardless of storage mode, so simply enabling the timer in
-local mode would clear a critical alert without making its claim true. Split the metric or retitle
-the alert first; an alert that has stopped being true is worse than one that is firing.
-`QdrantRestoreDrillStale` (warning) has no such problem — a local restore drill is exactly what it
-claims to measure.
-
 ## Verification and Delivery
 
 - Do not weaken RU/EN relevance, strict-mode, restore, resume, coverage or tenant-isolation tests.
-- Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` all green;
-  `qdrant-source-recovery-runtime` 205/205; `q12-live-cutover` 248/248 IN ISOLATION.
-- Known and not a stop: `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*` and
+- Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` green (0 errors).
+- Known and not a stop: `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*`,
+  `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred` and
   `qdrant-source-recovery-runtime` can time out under full-suite parallelism; each passes alone.
-- `/push-dev` for dev delivery, `/push` for releases, `/deploy` for staging. `check_stranded_commits.py`
-  before claiming finished work is delivered.
+  Anything else failing in isolation IS a stop.
+- Regenerate `deploy/qdrant/q12-deployed-asset-manifest.json` whenever a tracked asset changes, or
+  the window pre-flight's H2 and lockstep checks fail in isolation. `docker-compose.infra.yml` was
+  left stale by `a95582715` and caught here.
+- `/push-dev` for dev delivery, `/push` for releases, `/deploy` for staging.
+  `check_stranded_commits.py` before claiming finished work is delivered.
 
 ## Explicit defers
 
-- Off-host S3 stays the production readiness defer `mc2-jz6y0.13.6`; it gates the honest form of
-  `QdrantSnapshotStale`.
-- `mc2-jz6y0.13.8` (rotate the exposed Supabase password) remains open and owner-gated; retiring the
-  window changed nothing about it.
-- The recovery publisher creates no target directory. The 24 that its 42 copies need were created by
-  hand on 2026-07-31 with Stage 1's own identity (`1001:1001`, 0755, empty). Whether the recovery
-  should create them itself is unresolved and untracked in code.
-- `mc2-x6en2`: `pnpm lint` and lint-staged now agree, but the 328 pre-existing test-tree findings
-  are untouched and the `tools/` tree (6 errors, 77 warnings) is outside every lint script, so the
-  operator CLIs are unlinted.
-- Review P2 `mc2-af1ay` on the `.13.4.1` amendment (duplicate operator-side `DispositionSchema`,
-  `CATALOG_HASH_PATTERN`) stays deferred.
-- Seventeen post-window residuals stay open on their own beads (`bd list --status open`); several
-  are now window-only and can be retired the way `mc2-fxlne` was. None was mass-closed.
-- Prometheus retention YAML (`mc2-jz6y0.25`); `codex/self-hosted-qdrant-platform` retained; HA,
-  quantization, on-disk hot indexes, custom sharding and JWT RBAC out of scope.
+- Off-host S3 (`mc2-jz6y0.13.6`) — owner deferred 2026-07-31 to the production launch. Needs bucket,
+  region and credentials; nothing else.
+- `mc2-jz6y0.13.8` (Supabase password rotation) — CLOSED 2026-07-31 on the owner's decision that the
+  credential was never exposed. The 2026-07-13 record says otherwise and is preserved unedited in a
+  comment; the owner's current instruction governs.
+- `mc2-q3ju4` — the 48 unindexed documents. Repair runs through the app, not the reindex tool.
+- `mc2-82bt2` — course duplication scrolls 10000 points against the same strict-mode cap of 100. Not
+  a constant swap: it needs pagination, or it turns a loud failure into quiet data loss.
+- `mc2-n6szm` — 328 pre-existing findings in the course-gen-platform test tree, and the `tools/` tree
+  is outside every lint script, so the operator CLIs are unlinted.
+- Review P2 `mc2-af1ay` on the `.13.4.1` amendment stays deferred.
+- Prometheus retention YAML (`mc2-jz6y0.25`); HA, quantization, on-disk hot indexes, custom sharding
+  and JWT RBAC out of scope.
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: deploy `develop` into `master` so the operator image ships its mount parents at
-mode 0700, then re-verify that `.env.production` still resolves an operator image locally
-(`mc2-y5tgw`: the dev deploy prunes it). Then the ordinary forward with the ten writers stopped by
-hand, then `reindex plan|execute|verify` against `course_embeddings_v1`. Read § "The one blocker
-before the reindex" for the exact argv and what is already proven. Do NOT enable the snapshot timer
-until § "Alert truth" is settled.
-
-## Starter prompt for next orchestrator
-
-`docs/superpowers/prompts/2026-07-31-qdrant-reindex-completion-orchestrator.md` remains accurate on
-goal and authority; its §1 premise that a plain forward run only needs the Q12 flags dropped is now
-known to be necessary but not sufficient — three further defects sat behind it, two fixed here and
-one waiting on a deploy. Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
+1. Watch the first scheduled snapshot and the first restore drill land their `.prom` files in
+   `/var/lib/megacampus/qdrant-metrics` and both alerts clear on their own.
+2. Repair the 48 through `retryDocument`, then re-run `reindex verify` with the six binding values —
+   verify reads Qdrant, so it will pass once the vectors exist, whoever wrote them.
+3. Decide `mc2-lkkcv`: Docling backed off nothing and docx has no fallback extractor, so a service
+   restart cost 35 documents.
+4. `mc2-ugl5g`: give monitoring config a delivery path, or a check that fails the deploy on drift.
 
 ## Read First
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/project-index.md`,
-`graphify-out/GRAPH_REPORT.md`, and `.codex/stages/mc2-jz6y0/summary.md` § "2026-07-31 — the Q12
-window track is retired". Design/plan pairs under `docs/superpowers/{specs,plans}/`:
-`2026-07-10-self-hosted-qdrant-platform`, `2026-07-11-advisory-document-evidence-rag`,
-`2026-07-12-q12-source-recovery-design`.
+`graphify-out/GRAPH_REPORT.md`, and `.codex/stages/mc2-jz6y0/summary.md`. Design/plan pairs under
+`docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
+`2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
