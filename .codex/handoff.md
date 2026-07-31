@@ -135,6 +135,10 @@ Twelve commits, `a182df581`..`ccdeb7142`. Each closes something that was silentl
 
 Next stage id: `mc2-jz6y0`
 
+Recommended action: fix the finalize race in `mc2-3gz2m` — it discards vectors it has already
+written, which is a correctness bug and not merely a coverage gap — then re-run
+`qdrant-operator retry-documents` with the two required flags and `reindex verify`.
+
 1. `mc2-3gz2m`: fix the finalize race first — it is a correctness bug that throws away vectors
    already written — then decide what a scanned PDF should tell its uploader.
 2. Watch the first SCHEDULED snapshot, restore drill and Supabase backup land on their own.
@@ -147,3 +151,10 @@ Next stage id: `mc2-jz6y0`
 `graphify-out/GRAPH_REPORT.md`, and `.codex/stages/mc2-jz6y0/summary.md`. Design/plan pairs under
 `docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
 `2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
+
+## Starter prompt for next orchestrator
+
+`docs/superpowers/prompts/2026-07-31-qdrant-reindex-completion-orchestrator.md` is still accurate on
+authority and on this repository's failure modes. Its premise that dropping the Q12 flags is
+sufficient is known to be necessary but not sufficient: thirteen defects sat behind it, all fixed.
+Fallback: Use $orchestrator-stage from this handoff plus the stage summary.
