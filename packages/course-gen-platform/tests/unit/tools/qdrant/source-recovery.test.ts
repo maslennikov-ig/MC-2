@@ -230,7 +230,7 @@ describe('source recovery workflow', () => {
     const journal = journalFor(value);
     try {
       await chmod(directory, 0o700);
-      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o400 });
       await writeFile(journalPath, `${JSON.stringify(journal, null, 2)}\n`, { mode: 0o600 });
       await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).resolves.toMatchObject(
         {
@@ -239,11 +239,13 @@ describe('source recovery workflow', () => {
         }
       );
 
-      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)} \n`, { mode: 0o600 });
+      await rm(manifestPath, { force: true });
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)} \n`, { mode: 0o400 });
       await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).rejects.toThrow(
         /canonical manifest bytes/iu
       );
-      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+      await rm(manifestPath, { force: true });
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o400 });
 
       await writeFile(
         journalPath,
@@ -326,7 +328,7 @@ describe('source recovery workflow', () => {
 
     try {
       await chmod(directory, 0o700);
-      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o400 });
       for (const testCase of cases) {
         await writeFile(journalPath, `${JSON.stringify(testCase.journal, null, 2)}\n`, {
           mode: 0o600,
@@ -352,8 +354,9 @@ describe('source recovery workflow', () => {
     const journal = journalFor(value);
     const writeCanonicalState = async (): Promise<void> => {
       await chmod(stateDirectory, 0o700);
-      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-      await chmod(manifestPath, 0o600);
+      await rm(manifestPath, { force: true });
+      await writeFile(manifestPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o400 });
+      await chmod(manifestPath, 0o400);
       await writeFile(journalPath, `${JSON.stringify(journal, null, 2)}\n`, { mode: 0o600 });
       await chmod(journalPath, 0o600);
     };
@@ -369,7 +372,7 @@ describe('source recovery workflow', () => {
 
       await chmod(manifestPath, 0o640);
       await expect(loadReviewedRecoveryState({ manifestPath, journalPath })).rejects.toThrow(
-        /0600|owner-only/iu
+        /0400|owner-only/iu
       );
       await writeCanonicalState();
 
