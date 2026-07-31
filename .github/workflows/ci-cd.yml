@@ -794,26 +794,6 @@ jobs:
               ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
               "rm -rf ${{ env.DEPLOY_PATH }}/ops-staged && mkdir -p ${{ env.DEPLOY_PATH }}/ops-staged && tar -xf - --no-same-owner -C ${{ env.DEPLOY_PATH }}/ops-staged --strip-components=1"
 
-      - name: Verify monitoring config is not drifted
-        run: |
-          # Monitoring config has no automatic delivery path by design (root-owned). This turns the
-          # silent drift that cost two weeks of a false critical alert into a red check with a
-          # one-command fix. It runs after the app is live, so a stale rule file reports loudly
-          # without holding back an otherwise good deploy.
-          python3 scripts/ci/check_monitoring_drift.py --emit-manifest > /tmp/monitoring-manifest.json
-
-          scp -i ~/.ssh/deploy_key \
-            scripts/ci/check_monitoring_drift.py /tmp/monitoring-manifest.json \
-            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:/tmp/
-
-          ssh -i ~/.ssh/deploy_key \
-            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "python3 /tmp/check_monitoring_drift.py --check --manifest /tmp/monitoring-manifest.json; rc=\$?; rm -f /tmp/check_monitoring_drift.py /tmp/monitoring-manifest.json; exit \$rc"
-
-      # NOTE: Do NOT update nginx config here!
-      # deploy_blue_green.sh applies the template with correct Blue/Green ports.
-      # Manually copying a static config would break the Blue/Green deployment.
-
       - name: Create .env.production
         run: |
           ssh -i ~/.ssh/deploy_key \
@@ -995,6 +975,26 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             "sed -i 's/^status=switched$/status=accepted/' /opt/megacampus/deploy_state && grep -qx 'status=accepted' /opt/megacampus/deploy_state"
+
+      - name: Verify monitoring config is not drifted
+        run: |
+          # Monitoring config has no automatic delivery path by design (root-owned). This turns the
+          # silent drift that cost two weeks of a false critical alert into a red check with a
+          # one-command fix. It runs after the app is live, so a stale rule file reports loudly
+          # without holding back an otherwise good deploy.
+          python3 scripts/ci/check_monitoring_drift.py --emit-manifest > /tmp/monitoring-manifest.json
+
+          scp -i ~/.ssh/deploy_key \
+            scripts/ci/check_monitoring_drift.py /tmp/monitoring-manifest.json \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:/tmp/
+
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "python3 /tmp/check_monitoring_drift.py --check --manifest /tmp/monitoring-manifest.json; rc=\$?; rm -f /tmp/check_monitoring_drift.py /tmp/monitoring-manifest.json; exit \$rc"
+
+      # NOTE: Do NOT update nginx config here!
+      # deploy_blue_green.sh applies the template with correct Blue/Green ports.
+      # Manually copying a static config would break the Blue/Green deployment.
 
       - name: Cleanup SSH
         if: always()
