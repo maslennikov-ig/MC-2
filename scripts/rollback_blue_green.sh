@@ -361,7 +361,11 @@ echo ""
 # document-evidence gates coherent across API, main worker, and Stage 6.
 PRODUCTION_ENV_FILE="$BASE_PATH/.env.$TARGET_COLOR"
 export PRODUCTION_ENV_FILE
-docker compose -f "$BASE_PATH/docker-compose.production.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate --no-deps worker worker-stage6
+# -p megacampus for the same reason as deploy_blue_green.sh: the colour env file sets
+# COMPOSE_PROJECT_NAME=megacampus-<colour>, but these workers carry fixed container_names in the
+# single `megacampus` project. Without it the rollback dies on "container name is already in use" —
+# which is exactly what happened on 2026-07-30, leaving the failed deploy with no way back.
+docker compose -p megacampus -f "$BASE_PATH/docker-compose.production.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate --no-deps worker worker-stage6
 unset PRODUCTION_ENV_FILE
 
 # 7. Switch Traffic

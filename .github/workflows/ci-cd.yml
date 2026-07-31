@@ -853,6 +853,13 @@ jobs:
              grep -q "^QDRANT_METRICS_GID=$gid$" "$file" || { echo "::error::failed to set QDRANT_METRICS_GID"; exit 1; }
              echo "QDRANT_METRICS_GID resolved from host group megacampus-metrics: $gid"'
 
+      # The secrets directory is 0711, not 0700: traversable but not listable. 0700 root locks out
+      # every non-root consumer that legitimately owns a file in there — on 2026-07-30 this step ran
+      # for the first time since the deploy broke, and it took down both the NotebookLM directory
+      # creation and the nightly Supabase backup, whose DSN is a claude-deploy-owned 0600 file the
+      # service could no longer even stat. 0711 keeps the enumeration guard (you cannot list what
+      # you cannot name) while each file's own mode stays the real access control: the Qdrant and
+      # Telegram keys remain 0400 root/nobody and are still unreadable to the deploy user.
       - name: Create Qdrant secret files
         env:
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
@@ -887,7 +894,7 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:"$upload_dir"/
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "set -e; trap 'rm -rf \"$upload_dir\"' EXIT; sudo install -d -o 0 -g 0 -m 0700 '${{ env.DEPLOY_PATH }}/secrets'; sudo install -o 0 -g 0 -m 0400 '$upload_dir/qdrant_api_key' '$upload_dir/qdrant_read_only_api_key' '${{ env.DEPLOY_PATH }}/secrets/'; sudo install -o 65534 -g 65534 -m 0400 '$upload_dir/prometheus_qdrant_read_only_api_key' '$upload_dir/alertmanager_telegram_bot_token' '$upload_dir/alertmanager_telegram_chat_id' '${{ env.DEPLOY_PATH }}/secrets/'; sudo install -o 472 -g 472 -m 0400 '$upload_dir/grafana_admin_password' '${{ env.DEPLOY_PATH }}/secrets/grafana_admin_password'"
+            "set -e; trap 'rm -rf \"$upload_dir\"' EXIT; sudo install -d -o 0 -g 0 -m 0711 '${{ env.DEPLOY_PATH }}/secrets'; sudo install -o 0 -g 0 -m 0400 '$upload_dir/qdrant_api_key' '$upload_dir/qdrant_read_only_api_key' '${{ env.DEPLOY_PATH }}/secrets/'; sudo install -o 65534 -g 65534 -m 0400 '$upload_dir/prometheus_qdrant_read_only_api_key' '$upload_dir/alertmanager_telegram_bot_token' '$upload_dir/alertmanager_telegram_chat_id' '${{ env.DEPLOY_PATH }}/secrets/'; sudo install -o 472 -g 472 -m 0400 '$upload_dir/grafana_admin_password' '${{ env.DEPLOY_PATH }}/secrets/grafana_admin_password'"
 
       - name: Cleanup Qdrant secret upload
         if: always()

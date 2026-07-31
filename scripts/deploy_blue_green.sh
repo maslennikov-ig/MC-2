@@ -362,7 +362,8 @@ PY
             q12_write_recovery prepared "nginx_switch_intent=true"
             q12_switch_nginx "$Q12_TARGET_COLOR" "$Q12_TARGET_WEB_PORT" "$Q12_TARGET_API_PORT"
             echo "$Q12_TARGET_COLOR" > "$Q12_BASE_PATH/active_color"
-            docker compose -f "$Q12_WORKER_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
+            docker compose -p megacampus -f "$Q12_WORKER_COMPOSE" \
+                --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
                 up --no-start worker worker-stage6 \
                 || q12_fail "target production workers were not created"
             docker compose -f "$Q12_INFRA_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_ENV" \
@@ -826,9 +827,15 @@ if [ "$APP_DEPLOY_NEEDED" = "true" ]; then
     PRODUCTION_ENV_FILE="$WORKER_ENV_FILE"
     export PRODUCTION_ENV_FILE
     echo "Updating API-backed workers..."
+    # The colour env files set COMPOSE_PROJECT_NAME=megacampus-<colour>, which is right for the
+    # colour-scoped api/web but wrong here: the workers carry fixed container_names and live in the
+    # single `megacampus` project, exactly as the comment above says — they are NOT part of
+    # blue/green. Without pinning the project, compose tries to create megacampus-worker under
+    # megacampus-green and docker refuses with "container name is already in use", which is how the
+    # 2026-07-30 deploy left web and api on the new code and worker-stage6 four weeks behind.
     for SVC in worker worker-stage6; do
         echo "   Restarting $SVC..."
-        docker compose -f "$WORKER_COMPOSE" --env-file "$WORKER_ENV_FILE" up -d --force-recreate --no-deps "$SVC"
+        docker compose -p megacampus -f "$WORKER_COMPOSE" --env-file "$WORKER_ENV_FILE" up -d --force-recreate --no-deps "$SVC"
     done
     unset PRODUCTION_ENV_FILE
     echo "   Updating worker-stage7..."
