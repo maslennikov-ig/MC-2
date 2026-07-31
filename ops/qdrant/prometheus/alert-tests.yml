@@ -242,3 +242,39 @@ tests:
             exp_annotations:
               summary: A critical document conflict remains unresolved
               description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+
+  # supabase-backup-stale: the metric is a timestamp, so a run that never happened leaves it
+  # behind wall-clock time. Matches the QdrantSnapshotStale pattern above: hold the stamp at 0 and
+  # evaluate past the threshold.
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_supabase_last_successful_backup_unixtime_seconds'
+        values: '0x1900'
+    alert_rule_test:
+      - eval_time: 31h
+        alertname: SupabaseBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Supabase backup is stale or missing
+              description: No successful verified Supabase backup has been recorded within thirty hours. The metric is stamped only after pg_restore validation and pointer publication succeed.
+      # A backup inside the window must NOT fire, or the alert is just noise on a timer.
+      - eval_time: 29h
+        alertname: SupabaseBackupStale
+        exp_alerts: []
+
+  # supabase-backup-absent: never published is as bad as stale, and must not read as healthy.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="qdrant",environment="staging"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: SupabaseBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Supabase backup is stale or missing
+              description: No successful verified Supabase backup has been recorded within thirty hours. The metric is stamped only after pg_restore validation and pointer publication succeed.

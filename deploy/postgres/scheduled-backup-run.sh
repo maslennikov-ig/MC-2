@@ -44,6 +44,33 @@ configure_test_mode() {
     fail 'protected scheduler UUID source is invalid' 64
 }
 
+# mc2-1cxna: publish a freshness gauge for the node_exporter textfile collector, so a failed or
+# skipped nightly run goes stale and raises SupabaseBackupStale instead of leaving a log line
+# nobody reads. Stamped ONLY here — after pg_restore validation and pointer publication have both
+# succeeded — so the metric cannot report a backup that does not exist.
+#
+# Publishing is best effort: a metrics directory that is missing or unwritable must never turn a
+# good backup into a failed run. Missing metric reads as stale, which is the honest outcome.
+publish_backup_metric() {
+  local directory=${METRICS_TEXTFILE_DIR:-/var/lib/megacampus/qdrant-metrics}
+  local output="$directory/megacampus_supabase_backup.prom"
+  local temporary
+
+  [[ -d "$directory" && -w "$directory" ]] || {
+    printf 'Scheduled Supabase backup: metrics directory %s is not writable, metric not published\n' \
+      "$directory" >&2
+    return 0
+  }
+
+  temporary=$(/usr/bin/mktemp --tmpdir="$directory" '.megacampus_supabase_backup.XXXXXX') || return 0
+  {
+    echo '# TYPE megacampus_supabase_last_successful_backup_unixtime_seconds gauge'
+    echo "megacampus_supabase_last_successful_backup_unixtime_seconds $(/usr/bin/date -u +%s)"
+  } >"$temporary"
+  /usr/bin/chmod 0644 -- "$temporary"
+  /usr/bin/mv -- "$temporary" "$output" || /usr/bin/rm -f -- "$temporary"
+}
+
 require_owned_lock() {
   local label=$1 path=$2
   [[ -f "$path" && ! -L "$path" ]] || fail "$label must be a regular non-symlink file"
@@ -123,4 +150,5 @@ PY
 )
 [[ "$generation" =~ ^generation-[0-9]{8}T[0-9]{6}Z-[0-9a-f-]{36}$ ]] || fail 'published pointer is invalid'
 append_journal passed "$generation"
+publish_backup_metric
 completed=1

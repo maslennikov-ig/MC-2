@@ -23,4 +23,8 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ReadOnlyPaths=/opt/megacampus/deploy /opt/megacampus/secrets
-ReadWritePaths=/opt/megacampus/backups/supabase /opt/megacampus/logs
+ReadWritePaths=/opt/megacampus/backups/supabase /opt/megacampus/logs /var/lib/megacampus/qdrant-metrics
+# mc2-1cxna: the textfile collector directory is group-writable by megacampus-metrics, the group
+# that exists for exactly this. Granting it here rather than adding claude-deploy to the group
+# keeps the privilege scoped to this one oneshot instead of to every session that user opens.
+SupplementaryGroups=megacampus-metrics
