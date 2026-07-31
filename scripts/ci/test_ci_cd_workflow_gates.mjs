@@ -304,9 +304,31 @@ assert(
 assert(
   rollbackScript.includes('PRODUCTION_ENV_FILE="$BASE_PATH/.env.$TARGET_COLOR"') &&
     rollbackScript.includes(
-      'docker compose -f "$BASE_PATH/docker-compose.production.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate --no-deps worker worker-stage6'
+      'docker compose -p megacampus -f "$BASE_PATH/docker-compose.production.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --force-recreate --no-deps worker worker-stage6'
     ),
   'rollback must recreate main and Stage 6 workers with the target color environment'
 );
+// The colour env files set COMPOSE_PROJECT_NAME=megacampus-<colour>, but the workers carry fixed
+// container_names in the single `megacampus` project — they are not colour-scoped. Without -p the
+// 2026-07-30 deploy AND its rollback both died on "container name is already in use", which is the
+// worst combination: a half-applied deploy with no way back. Assert the pinning everywhere it is
+// load-bearing, so the literal above cannot be "fixed" by dropping it again.
+for (const [label, script] of [
+  ['deploy', deployScript],
+  ['rollback', rollbackScript],
+]) {
+  for (const line of script.split('\n')) {
+    if (!line.includes('docker compose')) continue;
+    // The worker compose is named literally in the rollback and through WORKER_COMPOSE /
+    // Q12_WORKER_COMPOSE in the deploy; catch both, or this guard silently covers only half of it.
+    const isWorkerCompose =
+      line.includes('docker-compose.production.yml') || /\$\{?Q12_WORKER_COMPOSE|\$\{?WORKER_COMPOSE/.test(line);
+    if (!isWorkerCompose) continue;
+    assert(
+      line.includes('docker compose -p megacampus '),
+      `${label} must pin the worker compose to the megacampus project, not the colour one: ${line.trim()}`
+    );
+  }
+}
 
 console.log('CI/CD workflow deploy gate test passed');
