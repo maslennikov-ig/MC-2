@@ -1898,3 +1898,47 @@ Whether the recovery should create them itself is a real design question and is 
 07:49:31Z–07:50:05Z (34s) and 08:03:15Z–08:03:50Z (35s), owner-authorized. Both restored all ten
 writers to `running` with `unless-stopped`, API/Web `healthy`, both public hosts 200. The first
 proved defect 1 in production; the second proved the fix and reached the planner.
+
+### The recovery completed, and what it took after the first three defects
+
+Two more contradictions sat behind them, each reachable only once the previous one was cleared:
+
+4. **The manifest had no mode both sides accepted.** `writeImmutableManifest` publishes through
+   `link()` from a 0600 temporary and applied no published mode, so the planner produced 0600 while
+   `source-recovery-run.sh` refuses a fresh plan whose manifest is not `1001:1001:400` and reads it
+   back at 400. The planner's own successful output — `ok, 42 copies, 125 affected rows`, counts
+   exactly the audited totals — was discarded by the next line. `readOwnerOnlyFile` then demanded
+   0600 of the manifest from the other side, so no single file could satisfy both. The mode is now
+   per artifact: manifest 0400, plan input and journal 0600.
+5. **Three composed services could not run their own commands.** The disposition service was
+   isolated from every upload tree, but `apply-dispositions` and `verify-dispositions` both
+   re-derive `readSourceCounts()`, whose probe `realpath()`s the production upload root; the reindex
+   service had no recovery-state mount at all; and `qdrant-operator` pinned
+   `REDIS_URL=redis://redis:6379` while the deployed Redis answers only to `megacampus-redis`.
+
+Both fixture patterns repeated: the manifest test asserted 0600 on the published file, and the
+wrapper's fake planner performed the `chmod 0400` the real one omits.
+
+FOUR production writer windows, all owner-authorized, all fully restored: 34s, 35s, 39s, 44s, 47s.
+Every one ended with all ten writers `running` under `unless-stopped`, API/Web `healthy`, and both
+public hosts 200.
+
+RESULT. `forward exited 0`; journal `verified` at revision 94; 42 copies `published`; 24 dispositions
+`disposition_verified`; uploads 75 → 117 files; live inventory `recoverable 109 / missing 129` →
+`recoverable 234 / missing 4`, matching the reviewed `expected_post_counts` exactly. `reindex plan`
+then returned `status=ok eligible=240 recoverable=234 audited_failed=6 unresolved=0`, and `execute`
+began writing real vectors into `course_embeddings_v1` for the first time since the Cloud data was
+lost.
+
+### The honest document count
+
+- **234** eligible documents have a readable source and are being reindexed.
+- **6** eligible documents will never come back from a reindex: 4 whose source is absent from both
+  upload roots and 2 whose `storage_path` is not a valid path under the upload root. These are the
+  owner-approved failed dispositions in the reviewed manifest, not a new loss.
+- **21** are not eligible for Stage 2 at all, every one of them for the same reason —
+  `missing_course`: 18 Career Playbook markdown sources with `course_id` null, plus 3 others. They
+  are the approved retained-derived-only dispositions.
+- 261 total = 234 + 6 + 21. The "roughly 186 without a source" figure in the 2026-07-31 brief is
+  `261 rows − 75 files`, which overcounts: mirror rows share one file, so 75 files backed 109 rows
+  before the recovery and 117 files back 234 after it.

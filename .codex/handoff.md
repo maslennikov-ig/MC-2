@@ -66,24 +66,51 @@ recoverable 109, missing 129, invalid 2, unsupported 21` — so the frozen
 - `megacampus-supabase-backup.timer` is enabled; its 00:30 run FAILED and the last good generation
   is `generation-20260730T150719Z-9b5e7a9c`.
 
-## The one blocker before the reindex
+## What the ordinary route cost, in defects
 
-`source-recovery plan` cannot read its own bind-mounted plan input until the operator image ships
-`/run/source-recovery` and `/var/lib/megacampus-source-recovery` at mode 0700 instead of 0555. The
-Dockerfile fix is on `develop` (`6dab8d86c`); production still pins the OLD digest, so the fix
-reaches production only through a `develop` → `master` deploy, which rewrites
-`QDRANT_OPERATOR_IMAGE_SHA256` in `.env.production` from the freshly published image.
+Four independent defects sat between "drop the Q12 flags" and a completed
+`source.forward`. Each was found on the host, and each had never been reachable before because
+sixteen window attempts died at or before C4, the command right before it.
 
-Everything else on that path is already proven against production, read-only, with the writers up:
-`createPlan` ok, `readSourceCounts` ok and equal to the audited totals, `preflightCopies` ok for all
-42 copies. The proof is a `compose run` of the planner service with `--entrypoint tsx` over a small
-script that calls the three dependency methods and stops before `writePlan`; it leaves no residue
-(capability directory empty, state and progress still empty afterwards).
+1. Health asserted on a stopped container (`inspect_writer`, `current_writer_record`) — FIXED.
+2. The operator image created both mount parents at 0555 while the code demands 0700 — FIXED.
+3. CI wrote container paths into four Compose bind sources — FIXED.
+4. The manifest had no mode both sides accepted: the publisher never applied one and produced 0600,
+   the wrapper requires 0400, and the operator's reader demanded 0600 — FIXED.
 
-When the image lands: stop the ten writers, run the ordinary forward, restart them, then
-`reindex plan` against `course_embeddings_v1`, read the gap report, `execute`, `verify`. The six
-required reindex values all come out of that run: manifest path, journal path, the recovery run id
-`a417a99c-…`, the manifest sha256, the coverage fingerprint, and `catalog:a417a99c-…`.
+Three of the four were kept green by a fixture that supplied what the code did not: the fake
+`docker stop` left `Health` at `healthy`, and the fake planner did the `chmod 0400` the real one
+omits. When a suite models the convenience instead of the constraint, it certifies the defect.
+
+## Where the Qdrant reindex stands
+
+The source recovery is COMPLETE. `forward exited 0`, journal phase `verified`, revision 94, all 42
+copies `published`, all 24 dispositions `disposition_verified`. `/opt/megacampus/data/uploads` went
+from 75 files to 117, and the live inventory moved from `recoverable 109 / missing 129` to
+`recoverable 234 / missing 4` — exactly the reviewed `expected_post_counts`.
+
+`reindex plan` against `course_embeddings_v1` then returned `status=ok eligible=240 recoverable=234
+audited_failed=6 unresolved=0`. Exit 0 means something here: `getReindexPlanExitCode` returns 2
+whenever any unresolved gap remains, and there are none.
+
+`reindex execute` is RUNNING, detached, run id in
+`/var/tmp/mc2-reindex-execute.log`, against the dedicated queue
+`qdrant-reindex-<run-id>` with a `megacampus-qdrant-reindex-worker` container consuming it. It
+enqueues 234 ordinary DOCUMENT_PROCESSING jobs at concurrency 4, about one document per minute, so
+roughly four hours end to end. Progress is visible three ways: the collection's `points_count`, the
+Redis keys `bull:qdrant-reindex-<run-id>:{completed,failed,active}`, and the worker's logs.
+
+WHEN IT FINISHES: run `reindex verify` with the same six values, then read its
+`expected_documents`/`indexed_documents` and `relevance_failures`. Only then enable
+`megacampus-qdrant-snapshot.timer` and `megacampus-qdrant-restore-drill.timer` — a snapshot or drill
+taken while the collection is still filling measures a moving target. The three acceptance values
+come from `emit-source-forward-acceptance.ts`, which the ordinary forward does NOT publish (it has
+no consumer outside Q12); run it yourself in the planner service with `--entrypoint tsx`.
+
+Two host prerequisites were created by hand and are NOT produced by any code: the 24 course
+directories under the production upload root (`mc2-vhr79`) and
+`/var/lib/megacampus-qdrant-recovery/reindex` at `1001:1001` mode 0700, which the operator uid
+cannot create because its parent is root-owned 0755.
 
 ## How this repository fails, so you do not rediscover it
 
@@ -138,15 +165,10 @@ claims to measure.
   operator CLIs are unlinted.
 - Review P2 `mc2-af1ay` on the `.13.4.1` amendment (duplicate operator-side `DispositionSchema`,
   `CATALOG_HASH_PATTERN`) stays deferred.
-- Post-window residuals kept for their own reasons: `mc2-uha77`, `mc2-8m90f`, `mc2-2vtmk`,
-  `mc2-9vbzp`, `mc2-6l2yz`, `mc2-o0g75`, `mc2-c2p8z`, `mc2-n6szm`, `mc2-qd12b`, `mc2-dizgy`,
-  `mc2-ivjyb`, `mc2-oa7om`, `mc2-oc83n`, `mc2-evduu`, `mc2-urw5d`, `mc2-xssva`, `mc2-af1ay`. Several
-  are now window-only and can be retired the same way `mc2-fxlne` was; none was mass-closed.
-- Prometheus retention YAML migration is the bounded nonblocking defer `mc2-jz6y0.25`.
-- `codex/self-hosted-qdrant-platform` is intentionally retained; all other Q11-owned worktrees,
-  branches, containers, ports and temporary data are cleaned.
-- Capacity-triggered HA, quantization, on-disk hot indexes, custom sharding and JWT RBAC stay out of
-  scope.
+- Seventeen post-window residuals stay open on their own beads (`bd list --status open`); several
+  are now window-only and can be retired the way `mc2-fxlne` was. None was mass-closed.
+- Prometheus retention YAML (`mc2-jz6y0.25`); `codex/self-hosted-qdrant-platform` retained; HA,
+  quantization, on-disk hot indexes, custom sharding and JWT RBAC out of scope.
 
 ## Next recommended
 

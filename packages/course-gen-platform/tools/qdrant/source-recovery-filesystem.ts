@@ -78,6 +78,31 @@ async function assertNoSymlinkComponents(root: string, relativePath: string): Pr
   }
 }
 
+// A course that has never received an upload simply has no directory under the production root, and
+// the recovery deliberately does not create one: a directory creation is a mutation, and this
+// recovery's whole contract is that every mutation is declared in the reviewed manifest and checked
+// by verify-dispositions. What it owes the operator instead is a legible refusal. It did not give
+// one: on 2026-07-31 all 24 target course directories were absent and the run died on
+// `ENOENT: no such file or directory, lstat <root>/09f3092d-...` from the symlink walk -- an errno
+// naming an opaque UUID, one directory at a time, for a precondition that is trivially fixable.
+export class MissingRecoveryTargetDirectoryError extends Error {
+  constructor(readonly directory: string) {
+    super(`Recovery target course directory does not exist: ${directory}`);
+    this.name = 'MissingRecoveryTargetDirectoryError';
+  }
+}
+
+async function assertTargetDirectoryPresent(targetDirectory: string): Promise<void> {
+  try {
+    await lstat(targetDirectory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new MissingRecoveryTargetDirectoryError(targetDirectory);
+    }
+    throw error;
+  }
+}
+
 async function resolveRoots(
   input: PublishInput,
   options: { requireSource?: boolean } = {}
@@ -120,7 +145,10 @@ async function resolveRoots(
   }
 
   const targetParentRelative = relative(productionRoot, targetDirectory);
-  if (targetParentRelative) await assertNoSymlinkComponents(productionRoot, targetParentRelative);
+  if (targetParentRelative) {
+    await assertTargetDirectoryPresent(targetDirectory);
+    await assertNoSymlinkComponents(productionRoot, targetParentRelative);
+  }
   const targetParentPhysicalPath = await realpath(targetDirectory);
   assertContained(productionRoot, targetParentPhysicalPath, 'Physical target directory');
 
@@ -401,9 +429,23 @@ export async function inspectRecoveryTarget(
 export async function preflightRecoveryCopies(input: RecoveryCopiesPreflightInput): Promise<void> {
   if (input.entries.length === 0) throw new Error('Recovery preflight requires copy entries');
   const targetDirectories: string[] = [];
+  // Report EVERY absent course directory, not the first. Preflight is the one place that sees the
+  // whole reviewed plan, and an operator who has to rerun the run to learn the next missing name
+  // pays for that 24 times.
+  const missingTargetDirectories = new Set<string>();
   for (const entry of input.entries) {
     const publishInput: PublishInput = { ...input, entry };
-    const { sourcePath, targetPath, targetDirectory } = await resolveRoots(publishInput);
+    let resolved;
+    try {
+      resolved = await resolveRoots(publishInput);
+    } catch (error) {
+      if (error instanceof MissingRecoveryTargetDirectoryError) {
+        missingTargetDirectories.add(error.directory);
+        continue;
+      }
+      throw error;
+    }
+    const { sourcePath, targetPath, targetDirectory } = resolved;
     assertExpectedIdentity(entry, await hashOpenFile(sourcePath), 'Recovery preflight source');
     await assertTargetAbsent(targetPath);
     const temporaryPath = recoveryTemporaryPath(publishInput, targetPath);
@@ -411,6 +453,14 @@ export async function preflightRecoveryCopies(input: RecoveryCopiesPreflightInpu
       throw new Error('Recovery preflight found pre-existing execution temporary state');
     }
     targetDirectories.push(targetDirectory);
+  }
+  if (missingTargetDirectories.size > 0) {
+    const listed = [...missingTargetDirectories].sort().join(', ');
+    throw new Error(
+      `Recovery preflight requires ${missingTargetDirectories.size} target course ` +
+        `director${missingTargetDirectories.size === 1 ? 'y' : 'ies'} that do not exist; create ` +
+        `them and rerun preflight, which does not create them: ${listed}`
+    );
   }
   const capabilityDirectory = await assertOwnerOnlyCapabilityDirectory(input, targetDirectories);
   await proveFilesystemCapabilities(input, capabilityDirectory);

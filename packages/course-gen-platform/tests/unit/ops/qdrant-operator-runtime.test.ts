@@ -19,9 +19,7 @@ function serviceBlock(compose: string, service: string): string {
   const lines = compose.split('\n');
   const start = lines.findIndex(line => line === `  ${service}:`);
   if (start < 0) return '';
-  const end = lines.findIndex(
-    (line, index) => index > start && /^ {2}[a-zA-Z0-9_-]+:$/.test(line)
-  );
+  const end = lines.findIndex((line, index) => index > start && /^ {2}[a-zA-Z0-9_-]+:$/.test(line));
   return lines.slice(start, end < 0 ? undefined : end).join('\n');
 }
 
@@ -118,42 +116,42 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
     const cases = [
       [
         {
-        BULLMQ_QUEUE_NAME: 'course-generation',
-        DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
-        QDRANT_URL: 'http://qdrant:6333',
+          BULLMQ_QUEUE_NAME: 'course-generation',
+          DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
+          QDRANT_URL: 'http://qdrant:6333',
         },
         'dedicated qdrant-reindex-<uuid> queue',
       ],
       [
         {
-        BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
-        DOCLING_UPLOADS_BASE_PATH: '/app',
-        QDRANT_URL: 'http://qdrant:6333',
+          BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
+          DOCLING_UPLOADS_BASE_PATH: '/app',
+          QDRANT_URL: 'http://qdrant:6333',
         },
         'DOCLING_UPLOADS_BASE_PATH must equal /opt/megacampus/data',
       ],
       [
         {
-        BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
-        DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
-        QDRANT_URL: 'https://retired.example.invalid',
+          BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
+          DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
+          QDRANT_URL: 'https://retired.example.invalid',
         },
         'QDRANT_URL must equal http://qdrant:6333',
       ],
       [
         {
-        BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
-        DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
-        QDRANT_URL: 'http://qdrant:6333',
+          BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
+          DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
+          QDRANT_URL: 'http://qdrant:6333',
         },
         'QDRANT_REINDEX_TARGET_COLLECTION must name an explicit physical collection',
       ],
       [
         {
-        BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
-        DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
-        QDRANT_URL: 'http://qdrant:6333',
-        QDRANT_REINDEX_TARGET_COLLECTION: 'course_embeddings',
+          BULLMQ_QUEUE_NAME: 'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000',
+          DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
+          QDRANT_URL: 'http://qdrant:6333',
+          QDRANT_REINDEX_TARGET_COLLECTION: 'course_embeddings',
         },
         'QDRANT_REINDEX_TARGET_COLLECTION must not equal the stable alias',
       ],
@@ -183,6 +181,41 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
       [
         'reindex',
         'execute',
+        '--target-collection',
+        'course_embeddings_v2',
+        '--run-id',
+        '123e4567-e89b-42d3-a456-426614174000',
+        '--artifact',
+        '/app/reindex.json',
+      ],
+      baseEnv
+    );
+    expect(wrongArtifact.status).not.toBe(0);
+    expect(wrongArtifact.stderr).toContain(
+      '--artifact must equal /var/lib/megacampus-qdrant-recovery/reindex/<run-id>.json'
+    );
+  });
+
+  // Recovery-bound verify reads the SAME durable artifact execute wrote, so it needs the same
+  // pinning. It did not have it: on 2026-07-31 a 234/234 execute verified only after --artifact was
+  // supplied by hand, because verify fell back to the tool's relative default inside a --rm
+  // container that no longer existed.
+  it('requires the same durable run-bound artifact path before reindex verify', () => {
+    const baseEnv = {
+      DOCLING_UPLOADS_BASE_PATH: '/opt/megacampus/data',
+      QDRANT_URL: 'http://qdrant:6333',
+    };
+    const missingRun = runEntrypoint(
+      ['reindex', 'verify', '--target-collection', 'course_embeddings_v2'],
+      baseEnv
+    );
+    expect(missingRun.status).not.toBe(0);
+    expect(missingRun.stderr).toContain('--run-id must be an explicit UUIDv4');
+
+    const wrongArtifact = runEntrypoint(
+      [
+        'reindex',
+        'verify',
         '--target-collection',
         'course_embeddings_v2',
         '--run-id',
@@ -234,9 +267,7 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
   });
 
   it('stages every root-owned restore input for the non-root tool process', () => {
-    const entrypoint = source(
-      'packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh'
-    );
+    const entrypoint = source('packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh');
 
     expect(entrypoint).toContain('stage_owner_only_file()');
     expect(entrypoint).toContain(
@@ -293,9 +324,7 @@ describe('Q12 reproducible Qdrant operator runtime', () => {
     expect(restore).toContain('snapshot_manifest');
     expect(restore).toContain('recovery_probe');
 
-    const entrypoint = source(
-      'packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh'
-    );
+    const entrypoint = source('packages/course-gen-platform/docker/qdrant-operator/entrypoint.sh');
     expect(entrypoint).toContain("[[ $identity == '0:0:400' ]]");
     expect(entrypoint).toContain('metrics-check)');
 

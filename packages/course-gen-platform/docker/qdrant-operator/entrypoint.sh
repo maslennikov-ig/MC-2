@@ -115,11 +115,18 @@ require_physical_target() {
     fail '--target-collection must name a physical collection, not the stable alias'
 }
 
-require_reindex_execution_artifact() {
+# Both `execute` and `verify` are recovery-bound and share ONE durable run artifact under
+# REINDEX_ARTIFACT_ROOT: execute writes it, verify refuses without it (verifyReindex ->
+# 'Recovery-bound verify requires its exact durable run artifact'). The tool's own default is the
+# relative artifacts/qdrant-reindex/<run-id>.json, which under `compose run --rm` on a read_only
+# image resolves inside the container and dies with the run. Pinning only execute left verify
+# reaching for that vanished default: measured 2026-07-31, a completed 234/234 execute could not be
+# verified at all until --artifact was passed by hand.
+require_reindex_run_artifact() {
   local run_id artifact expected
   run_id="$(cli_value_from_args --run-id "$@" || true)"
   [[ $run_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
-    fail '--run-id must be an explicit UUIDv4 for reindex execution'
+    fail '--run-id must be an explicit UUIDv4 for a recovery-bound reindex run'
   expected="$REINDEX_ARTIFACT_ROOT/$run_id.json"
   artifact="$(cli_value_from_args --artifact "$@" || true)"
   if [[ -n $artifact && $artifact != "$expected" ]]; then
@@ -379,10 +386,11 @@ case "$command_name" in
       execute)
         require_reindex_queue
         require_physical_target "$@"
-        require_reindex_execution_artifact "$@"
+        require_reindex_run_artifact "$@"
         ;;
       verify)
         require_physical_target "$@"
+        require_reindex_run_artifact "$@"
         ;;
       *)
         fail 'reindex mode must be plan, execute, or verify'

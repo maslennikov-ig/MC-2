@@ -27,6 +27,7 @@ import {
   type ReindexCommandDependencies,
   type ReindexCommandOptions,
 } from '../../../../tools/qdrant/reindex-course-embeddings';
+import { COLLECTION_CREATE_PARAMS } from '../../../../src/shared/qdrant/collection-schema';
 import {
   buildReindexPlan,
   calculateAcceptedFailedCoverageFingerprint,
@@ -839,6 +840,37 @@ describe('Qdrant reindex command', () => {
     await expect(loadIndexedDocumentIdentities(TARGET, { scroll } as never)).resolves.toEqual([
       { ...indexed(row), pointCount: 3 },
     ]);
+  });
+
+  // The fake above accepted any page size, so nothing noticed that the walker asked for 256 against
+  // a collection this repo creates with strict mode and max_query_limit 100. Real Qdrant answers
+  // 'Bad request: Limit exceeded 256 > 100 for "limit"', which made recovery-bound verify
+  // impossible. This fake enforces the same restriction the shipped schema declares.
+  it('scrolls within the strict-mode query limit its own collection schema declares', async () => {
+    const cap = COLLECTION_CREATE_PARAMS.strict_mode_config.max_query_limit;
+    const row = source('60000000-0000-4000-8000-000000000006');
+    const scroll = vi.fn().mockImplementation((_collection: string, options: { limit: number }) => {
+      if (options.limit > cap) {
+        throw new Error(`Bad request: Limit exceeded ${options.limit} > ${cap} for "limit".`);
+      }
+      return Promise.resolve({
+        points: [
+          {
+            payload: {
+              document_id: row.id,
+              course_id: row.courseId,
+              organization_id: row.organizationId,
+            },
+          },
+        ],
+        next_page_offset: null,
+      });
+    });
+
+    await expect(loadIndexedDocumentIdentities(TARGET, { scroll } as never)).resolves.toEqual([
+      { ...indexed(row), pointCount: 1 },
+    ]);
+    expect(scroll.mock.calls[0][1].limit).toBeLessThanOrEqual(cap);
   });
 
   it('keeps plan mode structurally read-only and returns 2 for every unresolved gap', async () => {

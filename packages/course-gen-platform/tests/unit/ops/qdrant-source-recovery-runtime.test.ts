@@ -228,16 +228,26 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 source-recovery operator isolation', ()
     ]);
 
     expect(disposition.networks).toHaveProperty('megacampus');
-    expect(disposition.volumes).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ target: expect.stringContaining('/uploads') }),
-      ])
-    );
+    // apply-dispositions and verify-dispositions both re-derive readSourceCounts(), whose probe
+    // realpath()s the production upload root, so the service cannot run its own commands without
+    // it — measured as `ENOENT ... realpath` in production 2026-07-31. It stays READ-ONLY, and the
+    // development root stays absent, so nothing here can write to either tree.
+    expect(volume(disposition, '/opt/megacampus/data/uploads')?.read_only).toBe(true);
+    expect(volume(disposition, '/opt/megacampus/data/uploads-dev')).toBeUndefined();
     expect(volume(disposition, '/run/source-recovery/manifest.json')?.read_only).toBe(true);
     expect(volume(disposition, '/run/source-recovery/progress')?.read_only ?? false).toBe(false);
     expect(
       disposition.volumes.map((candidate: Record<string, any>) => candidate.target).sort()
-    ).toEqual(['/run/source-recovery/manifest.json', '/run/source-recovery/progress']);
+    ).toEqual([
+      '/opt/megacampus/data/uploads',
+      '/run/source-recovery/manifest.json',
+      '/run/source-recovery/progress',
+    ]);
+    expect(
+      disposition.volumes
+        .filter((candidate: Record<string, any>) => !(candidate.read_only ?? false))
+        .map((candidate: Record<string, any>) => candidate.target)
+    ).toEqual(['/run/source-recovery/progress']);
   });
 
   // Compose interpolates these SIX variables as bind SOURCES, i.e. host paths. CI wrote container
