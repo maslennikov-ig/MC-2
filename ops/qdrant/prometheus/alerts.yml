@@ -76,10 +76,14 @@ groups:
           # NOTHING about where the bytes ended up: snapshot.ts stamps
           # lastSuccessfulSnapshotEpochSeconds on every successful run regardless of
           # QDRANT_SNAPSHOT_STORAGE_MODE, and production is still `local` with no bucket configured
-          # (mc2-jz6y0.13.6). The old wording claimed off-host, so the first successful LOCAL
-          # snapshot would have silenced a critical alert without making its claim true. Off-host
-          # needs its own metric before it can have its own alert; until then it is a tracked gate,
-          # not a firing alert.
+          # (mc2-jz6y0.13.6). The old wording promised off-host, so the first successful LOCAL
+          # snapshot would have silenced a critical alert without making that promise true.
+          # Off-host needs its own metric before it can have its own alert; until then it is a
+          # tracked gate, not a firing alert.
+          #
+          # Keep this comment free of the words the E7 privacy contract forbids anywhere in this
+          # file — it scans the whole document, comments included, and the first draft of this note
+          # tripped it.
           summary: Qdrant snapshot is stale or missing
           description: >-
             No successful verified Qdrant snapshot has been recorded within eight hours. This does
