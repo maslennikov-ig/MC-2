@@ -328,7 +328,22 @@ jobs:
     needs: [ci-success]
     if: always() && needs.ci-success.result == 'success' && !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
     timeout-minutes: 15
-    continue-on-error: true
+
+    # mc2-2i78i: dev and staging share ONE Supabase project, and the contract fixtures create their
+    # test users at FIXED uuids (…0012/0013/0014), then move their organization_id, then tear them
+    # down. Two runs are two writers to the same three rows: on 2026-07-31 commit c5eeb1ced passed
+    # on develop and failed on master six seconds apart, with the fixture reading two different
+    # organization_ids for the same user inside one setup.
+    #
+    # The group name is deliberately constant — it names the shared database, not the branch, which
+    # is what the runs are actually contending for. cancel-in-progress stays false: the second run
+    # must wait, not be discarded, or a real regression goes unreported.
+    concurrency:
+      group: contract-tests-shared-supabase
+      cancel-in-progress: false
+
+    # NOT continue-on-error. It made every contract failure render as a passing check, so the suite
+    # could not report the collision above, let alone a real regression.
 
     services:
       redis:
@@ -767,9 +782,33 @@ jobs:
           # mc2-o0g75, second face: /opt/megacampus/ops/qdrant is root-owned all the way down
           # (Prometheus/Grafana/Alertmanager config, installed root-owned by deliberate hardening),
           # so this scp could never have succeeded as the deploy user either. It is monitoring
-          # configuration, not application code, and the deployed tree is byte-identical to the
-          # repository as of 2026-07-30 — an ordinary app deploy has no business rewriting it.
-          # It changes through the same deliberate root install that put it there.
+          # configuration, not application code — an ordinary app deploy has no business rewriting
+          # it, and it changes through the same deliberate root install that put it there.
+          #
+          # mc2-ugl5g: this used to end with the claim "the deployed tree is byte-identical to the
+          # repository", which nothing checked and which went false the moment 89b4cdd9d changed
+          # alerts.yml. Stage the tree where the deploy user CAN write, so the root install has a
+          # source, and measure the live tree in the gate below instead of asserting it.
+          tar -cf - ops/qdrant \
+            | ssh -i ~/.ssh/deploy_key \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "rm -rf ${{ env.DEPLOY_PATH }}/ops-staged && mkdir -p ${{ env.DEPLOY_PATH }}/ops-staged && tar -xf - --no-same-owner -C ${{ env.DEPLOY_PATH }}/ops-staged --strip-components=1"
+
+      - name: Verify monitoring config is not drifted
+        run: |
+          # Monitoring config has no automatic delivery path by design (root-owned). This turns the
+          # silent drift that cost two weeks of a false critical alert into a red check with a
+          # one-command fix. It runs after the app is live, so a stale rule file reports loudly
+          # without holding back an otherwise good deploy.
+          python3 scripts/ci/check_monitoring_drift.py --emit-manifest > /tmp/monitoring-manifest.json
+
+          scp -i ~/.ssh/deploy_key \
+            scripts/ci/check_monitoring_drift.py /tmp/monitoring-manifest.json \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:/tmp/
+
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "python3 /tmp/check_monitoring_drift.py --check --manifest /tmp/monitoring-manifest.json; rc=\$?; rm -f /tmp/check_monitoring_drift.py /tmp/monitoring-manifest.json; exit \$rc"
 
       # NOTE: Do NOT update nginx config here!
       # deploy_blue_green.sh applies the template with correct Blue/Green ports.

@@ -1979,6 +1979,26 @@ export async function runReindexCli(
   return exitCode;
 }
 
+/**
+ * Bring a finished one-shot run down.
+ *
+ * Setting `process.exitCode` waits for the event loop to drain, and this CLI does not own every
+ * handle that holds it: on 2026-07-31 four operator containers were still Up hours after their
+ * runs had printed results and closed their queue, so `--rm` never fired and each leaked a live
+ * Redis connection. Flush first — container stdout is a pipe, and a bare exit truncates it — then
+ * exit unconditionally, including when the teardown itself fails.
+ */
+export async function finalizeReindexCliProcess(options: {
+  exitCode: number;
+  closeQueue: () => Promise<unknown>;
+  flushStdout: () => Promise<void>;
+  exit: (code: number) => void;
+}): Promise<void> {
+  await options.closeQueue().catch(() => undefined);
+  await options.flushStdout().catch(() => undefined);
+  options.exit(options.exitCode);
+}
+
 function isDirectExecution(metaUrl: string, argvPath = process.argv[1]): boolean {
   if (!argvPath) return false;
   return resolve(fileURLToPath(metaUrl)) === resolve(argvPath);
@@ -2000,5 +2020,15 @@ if (isDirectExecution(import.meta.url)) {
       );
       process.exitCode = 1;
     })
-    .finally(async () => closeQueue());
+    .finally(async () =>
+      finalizeReindexCliProcess({
+        exitCode: process.exitCode === undefined ? 0 : Number(process.exitCode),
+        closeQueue,
+        flushStdout: async () =>
+          new Promise<void>(resolve => {
+            process.stdout.write('', () => resolve());
+          }),
+        exit: code => process.exit(code),
+      })
+    );
 }

@@ -144,6 +144,25 @@ describe('replacement Supabase backup systemd units', () => {
     );
   });
 
+  // mc2-1cxna: the timer is ENABLED and its 00:30 run on 2026-07-31 failed, leaving a one-night
+  // hole in the backup chain that nothing raised — the only trace was a log line nobody reads.
+  it('publishes a freshness metric only after the backup has actually been validated', () => {
+    const service = tracked(SERVICE);
+    const scheduler = tracked(WRAPPER);
+
+    expect(service).toContain('/var/lib/megacampus/qdrant-metrics');
+    // Scoped to this oneshot rather than added to the login user's own groups.
+    expect(service).toContain('SupplementaryGroups=megacampus-metrics');
+
+    expect(scheduler).toContain('megacampus_supabase_last_successful_backup_unixtime_seconds');
+    // The stamp must come after pointer publication, or it would report a backup that failed.
+    expect(scheduler.indexOf('publish_backup_metric\ncompleted=1')).toBeGreaterThan(
+      scheduler.indexOf('append_journal passed')
+    );
+    // Best effort: an unwritable metrics directory must not fail an otherwise good backup.
+    expect(scheduler).toContain('metric not published');
+  });
+
   it('fires at 00:30 Europe/Amsterdam with deterministic persistent catch-up', () => {
     const timer = tracked(TIMER);
 

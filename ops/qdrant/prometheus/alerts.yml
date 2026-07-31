@@ -165,3 +165,24 @@ groups:
         annotations:
           summary: A critical document conflict remains unresolved
           description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+
+  - name: supabase-backup-alerts
+    rules:
+      # mc2-1cxna. megacampus-supabase-backup.timer is ENABLED and its 00:30 run on 2026-07-31
+      # failed; the only trace was a log line nobody reads, so a one-night hole opened in the
+      # backup chain and nothing raised it. The scheduler now stamps this metric only after the
+      # published pointer validates, so a failed, skipped or never-started run simply lets it go
+      # stale. The schedule is daily, and the threshold leaves six hours of slack before a single
+      # missed run is called out.
+      - alert: SupabaseBackupStale
+        expr: |
+          (time() - megacampus_supabase_last_successful_backup_unixtime_seconds > 30 * 60 * 60)
+          or absent(megacampus_supabase_last_successful_backup_unixtime_seconds)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Supabase backup is stale or missing
+          description: >-
+            No successful verified Supabase backup has been recorded within thirty hours. The
+            metric is stamped only after pg_restore validation and pointer publication succeed.

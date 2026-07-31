@@ -32,6 +32,13 @@ import type {
 } from '../types/database-queries';
 import * as LifecycleHelpers from './lifecycle-helpers';
 import { generatePointId } from './upload-helpers';
+import { COLLECTION_CREATE_PARAMS } from './collection-schema';
+
+/**
+ * Page size for scrolling a document's points, taken from the strict-mode cap this repo declares
+ * when it creates the collection rather than restated as a literal that can drift out of it.
+ */
+const DUPLICATION_SCROLL_PAGE_SIZE = COLLECTION_CREATE_PARAMS.strict_mode_config.max_query_limit;
 
 /**
  * UUID validation regex pattern
@@ -220,17 +227,29 @@ export async function duplicateVectorsForNewCourse(
   );
 
   try {
-    // 1. Get all vectors for original file from Qdrant
-    const scrollResult = await qdrantClient.scroll(COLLECTION_CONFIG.name, {
-      filter: {
-        must: [{ key: 'document_id', match: { value: originalFileId } }],
-      },
-      limit: 10000, // Adjust based on expected max chunks per document
-      with_payload: true,
-      with_vector: true,
-    });
+    // 1. Get all vectors for original file from Qdrant.
+    //
+    // The page size is the cap this repo declares when it creates the collection, not a number
+    // chosen here: strict mode rejects anything larger, and the previous 10000 made every
+    // duplication fail with HTTP 400 (mc2-82bt2). Paginate, because one page is no longer enough
+    // to hold a whole document — reading only the first page would duplicate a truncated course.
+    const originalPoints: Awaited<ReturnType<typeof qdrantClient.scroll>>['points'] = [];
+    let scrollOffset: string | number | Record<string, unknown> | undefined | null;
 
-    const originalPoints = scrollResult.points || [];
+    do {
+      const scrollResult = await qdrantClient.scroll(COLLECTION_CONFIG.name, {
+        filter: {
+          must: [{ key: 'document_id', match: { value: originalFileId } }],
+        },
+        limit: DUPLICATION_SCROLL_PAGE_SIZE,
+        offset: scrollOffset ?? undefined,
+        with_payload: true,
+        with_vector: true,
+      });
+
+      originalPoints.push(...(scrollResult.points || []));
+      scrollOffset = scrollResult.next_page_offset;
+    } while (scrollOffset !== null && scrollOffset !== undefined);
 
     if (originalPoints.length === 0) {
       // Graceful handling: vectors may not exist yet due to async indexing
