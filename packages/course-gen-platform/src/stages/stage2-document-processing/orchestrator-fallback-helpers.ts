@@ -16,6 +16,38 @@ import { logger } from '../../shared/logger/index.js';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator, type Locale } from '../../shared/i18n/translator';
 
+const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
+ * Remove the markdown escapes the converter adds around ordinary punctuation.
+ *
+ * A markdown serializer escapes every `.`, `-`, `#` and friend so its output round-trips. That is
+ * correct markdown and wrong prose: this text is chunked and embedded, so a rescued document would
+ * carry a backslash before every sentence-ending period into every vector.
+ */
+function unescapeMarkdownPunctuation(markdown: string): string {
+  return markdown.replace(/\\([\\`*_{}[\]()#+\-.!])/gu, '$1');
+}
+
+/**
+ * Convert a DOCX package to markdown.
+ *
+ * mammoth's supported public API emits HTML, so the headings, lists and tables it recovers are
+ * turned into markdown by turndown rather than by mammoth's undeclared `convertToMarkdown`, which
+ * is absent from its type definitions and could vanish in a minor release.
+ */
+async function convertDocxToMarkdown(filePath: string): Promise<string> {
+  const [{ default: mammoth }, { default: TurndownService }] = await Promise.all([
+    import('mammoth'),
+    import('turndown'),
+  ]);
+
+  const { value: html } = await mammoth.convertToHtml({ path: filePath });
+  const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
+
+  return unescapeMarkdownPunctuation(turndown.turndown(html)).trim();
+}
+
 /**
  * Attempt fallback text extraction when Docling fails
  */
@@ -73,6 +105,43 @@ export async function attemptFallbackExtraction(
           stats: {
             markdown_length: markdown.length,
             pages: textResult.total || 1,
+            images: 0,
+            tables: 0,
+            sections: 0,
+            processing_time_ms: 0,
+          },
+        };
+      }
+    }
+
+    // Try DOCX fallback. Until 2026-07-31 this format had none, so a Docling outage turned every
+    // Word upload in flight into a permanent failure (mc2-lkkcv). mammoth reads the OOXML package
+    // directly and keeps headings, which is what the chunker segments on.
+    if (mimeType === DOCX_MIME_TYPE) {
+      logger.info({ fileId, filePath }, 'Attempting DOCX fallback extraction');
+
+      const markdown = await convertDocxToMarkdown(filePath);
+
+      if (markdown.length > 50) {
+        if (courseId) {
+          await logTrace({
+            courseId,
+            stage: 'stage_2',
+            phase: 'processing',
+            stepName: 'fallback_extraction_success',
+            inputData: { fileId, mimeType, fallbackMethod: 'mammoth' },
+            outputData: { markdownLength: markdown.length },
+            durationMs: Date.now() - startTime,
+          }).catch(err => logger.debug({ err }, 'Failed to log fallback trace'));
+        }
+
+        return {
+          markdown,
+          json: createMinimalDoclingDocument(filePath, 1),
+          images: [],
+          stats: {
+            markdown_length: markdown.length,
+            pages: 1,
             images: 0,
             tables: 0,
             sections: 0,
