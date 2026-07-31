@@ -331,6 +331,21 @@ for (const [label, script] of [
   }
 }
 
+// mc2-ugl5g. The monitoring drift gate must report, not block. Placed before the deploy steps it
+// stopped the application rollout entirely on its first run — a stale Prometheus rule file is a
+// real problem and it is not a reason to withhold application code.
+const deploySteps = (jobs.deploy?.steps ?? []).map(step => step?.name);
+const driftIndex = deploySteps.indexOf('Verify monitoring config is not drifted');
+assert(driftIndex !== -1, 'the production deploy must check monitoring config drift');
+assert(
+  driftIndex > deploySteps.indexOf('Deploy'),
+  'the monitoring drift gate must run AFTER the deploy, or it blocks the rollout it only reports on'
+);
+assert(
+  driftIndex > deploySteps.indexOf('Verify deployment'),
+  'the monitoring drift gate must run after deployment verification'
+);
+
 // mc2-2i78i. The contract suite writes test users at fixed uuids into the ONE Supabase project dev
 // and staging share, so two concurrent runs are two writers to the same three rows — measured on
 // 2026-07-31, the same commit passing on develop and failing on master six seconds apart. And it
