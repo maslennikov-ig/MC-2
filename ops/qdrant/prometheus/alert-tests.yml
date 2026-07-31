@@ -109,8 +109,12 @@ tests:
           - exp_labels:
               severity: critical
             exp_annotations:
-              summary: Qdrant off-host snapshot is stale or missing
-              description: No successful off-host Qdrant snapshot has been recorded within eight hours.
+              summary: Qdrant snapshot is stale or missing
+              description: >-
+                No successful verified Qdrant snapshot has been recorded within eight hours. This
+                does not prove off-host retention: production runs
+                QDRANT_SNAPSHOT_STORAGE_MODE=local and off-host storage remains the open gate
+                mc2-jz6y0.13.6.
       - eval_time: 36d
         alertname: QdrantRestoreDrillStale
         exp_alerts:
@@ -137,8 +141,12 @@ tests:
           - exp_labels:
               severity: critical
             exp_annotations:
-              summary: Qdrant off-host snapshot is stale or missing
-              description: No successful off-host Qdrant snapshot has been recorded within eight hours.
+              summary: Qdrant snapshot is stale or missing
+              description: >-
+                No successful verified Qdrant snapshot has been recorded within eight hours. This
+                does not prove off-host retention: production runs
+                QDRANT_SNAPSHOT_STORAGE_MODE=local and off-host storage remains the open gate
+                mc2-jz6y0.13.6.
       - eval_time: 1m
         alertname: QdrantRestoreDrillStale
         exp_alerts:
