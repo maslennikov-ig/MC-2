@@ -1313,5 +1313,9 @@ describe('runDocumentEvidencePreflight', () => {
     );
     expect(replayPort.reduceSummary).not.toHaveBeenCalled();
     expect(acceptedRestart.downstreamRepresentation).toEqual(resumed.downstreamRepresentation);
-  });
+    // This case simulates 1,000 sources twice and takes ~11s alone; under full-suite parallelism on
+    // a CI runner it exceeded the 30s default and failed the deploy on 2026-07-31 while passing in
+    // isolation. The work is deterministic, so a longer bound costs nothing and removes a red check
+    // that carried no signal.
+  }, 120_000);
 });
