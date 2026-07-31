@@ -331,4 +331,22 @@ for (const [label, script] of [
   }
 }
 
+// mc2-2i78i. The contract suite writes test users at fixed uuids into the ONE Supabase project dev
+// and staging share, so two concurrent runs are two writers to the same three rows — measured on
+// 2026-07-31, the same commit passing on develop and failing on master six seconds apart. And it
+// carried continue-on-error, which rendered every one of those failures as a passing check.
+const contractJob = jobs['test-contract'] ?? {};
+assert(
+  contractJob.concurrency?.group === 'contract-tests-shared-supabase',
+  'test-contract must serialise on a branch-independent concurrency group naming the shared database'
+);
+assert(
+  contractJob.concurrency?.['cancel-in-progress'] === false,
+  'the second contract run must wait, not be cancelled, or a real regression goes unreported'
+);
+assert(
+  contractJob['continue-on-error'] !== true,
+  'test-contract must not report a failing suite as a passing check'
+);
+
 console.log('CI/CD workflow deploy gate test passed');
