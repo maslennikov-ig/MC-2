@@ -1810,6 +1810,28 @@ function classifyCliError(error: unknown): string {
   return 'internal';
 }
 
+// A bare `REINDEX_ERROR code=internal` says only "none of the known patterns matched" — precisely
+// the case where the operator most needs the message, and the mc2-94mmf lesson is that a failure
+// naming only itself costs a whole investigation. This carries the message WITHOUT weakening the
+// identity redaction the surrounding tests pin: run/file/job ids, absolute paths, connection URIs
+// and digests are the shapes that leak, and each is replaced before anything is printed. What
+// survives is the part that actually helps — "connection refused", "collection not found",
+// "relation does not exist".
+export function scrubCliErrorDetail(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S*/gi, '<uri>')
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+      '<id>'
+    )
+    .replace(/\b[0-9a-f]{32,}\b/gi, '<digest>')
+    .replace(/(?<![\w<])\/[^\s"'<>]*/g, '<path>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
 function countGapReasons(gaps: ReindexPlan['gaps']): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const gap of gaps) counts[gap.reason] = (counts[gap.reason] ?? 0) + 1;
@@ -1892,7 +1914,9 @@ export async function runReindexCli(
     );
     exitCode = result.exitCode;
   } catch (error) {
-    runtime.stderr(`REINDEX_ERROR code=${classifyCliError(error)}\n`);
+    runtime.stderr(
+      `REINDEX_ERROR code=${classifyCliError(error)} detail=${scrubCliErrorDetail(error)}\n`
+    );
     errorReported = true;
   }
   try {
@@ -1920,7 +1944,9 @@ if (isDirectExecution(import.meta.url)) {
       process.exitCode = exitCode;
     })
     .catch(error => {
-      process.stderr.write(`REINDEX_ERROR code=${classifyCliError(error)}\n`);
+      process.stderr.write(
+        `REINDEX_ERROR code=${classifyCliError(error)} detail=${scrubCliErrorDetail(error)}\n`
+      );
       process.exitCode = 1;
     })
     .finally(async () => closeQueue());
