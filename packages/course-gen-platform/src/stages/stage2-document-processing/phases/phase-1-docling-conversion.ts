@@ -18,6 +18,43 @@ import {
 import { DocumentProcessingResult } from '../types';
 
 /**
+ * Shortest conversion this pipeline will treat as a document.
+ *
+ * The same floor the fallback extractors apply, so the primary path cannot hand downstream text
+ * that a fallback would have refused.
+ */
+export const MINIMUM_EXTRACTED_TEXT_LENGTH = 50;
+
+export class EmptyConversionError extends Error {
+  constructor(
+    readonly filePath: string,
+    readonly extractedLength: number
+  ) {
+    super(
+      `Conversion produced no usable text for ${filePath}: ${extractedLength} characters. ` +
+        'The file is most likely a scan with no text layer, which only OCR can read.'
+    );
+    this.name = 'EmptyConversionError';
+  }
+}
+
+/**
+ * Refuse a conversion that succeeded and returned nothing.
+ *
+ * MEASURED 2026-07-31: Docling turned a scanned PDF into fourteen characters and reported success.
+ * Nothing threw, so the fallback extractor never ran; there were no chunks, so nothing was
+ * uploaded; nothing was uploaded, so vector_status stayed 'indexing' and finalization refused. The
+ * operator was left with 'Failed to convert document to markdown', which is the last true statement
+ * about the document and points at the wrong step (mc2-3gz2m).
+ */
+export function assertConversionProducedText(markdown: string, filePath: string): void {
+  const text = markdown.replace(/^#\s*Document\s*$/gmu, '').trim();
+  if (text.length < MINIMUM_EXTRACTED_TEXT_LENGTH) {
+    throw new EmptyConversionError(filePath, text.length);
+  }
+}
+
+/**
  * Execute Docling conversion phase
  *
  * Converts document to DoclingDocument JSON with markdown, images, and metadata
@@ -41,6 +78,10 @@ export async function executeDoclingConversion(
     max_heading_level: 6,
     include_page_markers: false,
   });
+
+  // Before anything downstream spends time on it: an empty conversion is not a conversion.
+  // Throwing here is what lets the fallback extractor run at all.
+  assertConversionProducedText(conversionResult.markdown, filePath);
 
   await job.updateProgress(40);
 

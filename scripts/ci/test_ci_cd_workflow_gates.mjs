@@ -331,6 +331,22 @@ for (const [label, script] of [
   }
 }
 
+// mc2-y5tgw. `docker image prune -f` runs on every deploy and removes dangling images. An image
+// pinned by digest loses its only tag as soon as the floating release tag moves, and the operator
+// image is referenced by no running container, so it is the one most exposed to this. Losing it
+// breaks source recovery and the document repair, and it cannot be re-pulled while the GHCR token
+// is dead. A local hold tag takes it out of prune's scope.
+assert(
+  /docker tag "\$OPERATOR_IMAGE" hold\/qdrant-operator:pinned/.test(deployScript),
+  'the deploy must hold the digest-pinned operator image under a local tag before any prune'
+);
+assert(
+  // Anchor on the invocation, not on any mention: the comment above the tag names the prune too.
+  deployScript.indexOf('docker tag "$OPERATOR_IMAGE" hold/qdrant-operator:pinned') <
+    deployScript.indexOf('$(docker image prune -f'),
+  'the operator image must be held BEFORE the prune that would remove it'
+);
+
 // mc2-1cxna. The Supabase backup timer is ENABLED and runs scripts under deploy/postgres, which
 // the deploy tarball did not carry: a fix committed to scheduled-backup-run.sh never reached the
 // host, and the only way it surfaced was a metric that failed to appear after a manual run.
