@@ -1965,7 +1965,9 @@ Four further defects, all found after the five recorded above, all in code that 
    snapshot units' `StateDirectory=` re-asserted root ownership over the state directory for every
    command systemd forks, undoing the units' own chown.
 
-THE 48. 35 Docling conversion failures and 13 finalize races. `megacampus-docling-mcp-internal`
+THE 48. 35 Docling conversion failures and 13 counted at the time as finalize races — that reading
+did not survive: see the corrected `mc2-3gz2m` note at the end of this file, where the measured
+cause is an empty conversion, not a discarded upload. `megacampus-docling-mcp-internal`
 restarted seven times during the run; every conversion failure falls before its last restart at
 10:47Z and none after. Not the documents — the service (`mc2-lkkcv`).
 
@@ -2011,5 +2013,10 @@ making it true.
 The second was found only because the change was observable: a metric that did not appear after a
 run that reported success.
 
-**Still open.** `mc2-3gz2m`: 16 scanned PDFs with no text layer, and a finalize race that discards
-vectors it has already uploaded — proven in isolation on a document that converted cleanly.
+**Still open.** `mc2-3gz2m`: 16 PDFs. CORRECTED 2026-08-01 — the sentence that stood here named two
+causes, "scanned PDFs with no text layer" and "a finalize race that discards vectors it has already
+uploaded", and BOTH were wrong. There is no race: the log line reads `pointsUploaded: 0`, so nothing
+was ever written to discard. They are not scans either: rendering the page shows exported diagrams,
+one page 4296pt tall, with the type converted to curves, so no extractor can find a text layer and
+OCR returns nothing even forced at 3x. Docling emits `<!-- image -->` — fourteen characters — and
+reports success. Reading them is feature work, not a fix.
