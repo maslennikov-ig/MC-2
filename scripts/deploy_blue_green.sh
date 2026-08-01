@@ -647,6 +647,17 @@ QDRANT_OPERATOR_IMAGE_SHA256="${OPERATOR_IMAGE#"$OPERATOR_REPOSITORY@sha256:"}"
     exit 1
 }
 upsert_env "$BASE_PATH/.env.$ENV" QDRANT_OPERATOR_IMAGE_SHA256 "$QDRANT_OPERATOR_IMAGE_SHA256"
+
+# mc2-y5tgw: pin the digest under a local tag so `docker image prune -f` cannot take it.
+# Prune removes DANGLING images, and the floating release tag moves to whatever the next deploy
+# pulls -- including a dev deploy -- which leaves the digest .env.production still points at with no
+# tag of its own. The operator image is the most exposed image on this host because no container
+# references it: all six of its services are one-shot `compose run --rm` with pull_policy: never.
+# It is also load-bearing for source recovery and for the document repair, and claude-deploy cannot
+# re-pull it while the GHCR token is dead (mc2-2vtmk), so losing it is unrecoverable in the moment.
+docker tag "$OPERATOR_IMAGE" hold/qdrant-operator:pinned
+echo "   Operator image held as hold/qdrant-operator:pinned ($OPERATOR_IMAGE)"
+
 unset OPERATOR_IMAGE QDRANT_OPERATOR_IMAGE_SHA256
 
 # 2. Check docling-mcp image exists (manually built, 8GB)

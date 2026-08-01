@@ -4,6 +4,16 @@ global:
   external_labels:
     environment: staging
 
+# mc2-jz6y0.25. Prometheus 3.13.1 marks --storage.tsdb.retention.time and .size DEPRECATED and
+# names these fields as the replacement; verified against `prometheus --help` from the pinned image.
+# Raised from the 15d/5GB the flags carried: the host has 87GB free, and 30 days is the window an
+# incident review actually needs. Whichever limit is reached first wins.
+storage:
+  tsdb:
+    retention:
+      time: 30d
+      size: 20GB
+
 rule_files:
   - /etc/prometheus/alerts.yml
 

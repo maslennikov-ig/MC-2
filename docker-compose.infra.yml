@@ -356,10 +356,11 @@ services:
     ports:
       - '127.0.0.1:9090:9090'
     command:
+      # mc2-jz6y0.25: retention lives in prometheus.yml under storage.tsdb.retention. The CLI flags
+      # that used to set it are DEPRECATED in 3.13.1, and a flag silently overrides the config file,
+      # so leaving them here would make the tracked YAML a lie about what the server does.
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
-      - --storage.tsdb.retention.size=5GB
     volumes:
       - ./ops/qdrant/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./ops/qdrant/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
