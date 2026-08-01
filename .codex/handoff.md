@@ -13,19 +13,25 @@ the release succeeded: production moved off Qdrant Cloud, pipeline green end to 
 time since 2026-07-04. Do not reopen C1..C10.
 
 Retired 2026-07-31, each with its reason and a REOPEN CONDITION on the bead: `mc2-i9h3y`,
-`mc2-fxlne`, `mc2-0ie27`, `mc2-zls0f`, `mc2-e21lo`. None of the underlying fixes were made, because
-none is reachable without a barrier install.
+`mc2-fxlne`, `mc2-0ie27`, `mc2-zls0f`, `mc2-e21lo`. Retired 2026-08-01 the same way: `mc2-jz6y0.13`
+(the cutover itself), `mc2-uha77`, `mc2-dizgy`, `mc2-ivjyb`, `mc2-9vbzp`, `mc2-xssva`, `mc2-evduu`;
+`mc2-urw5d` closed as obsolete and `mc2-oa7om` as superseded by `mc2-qd12b`. None of the underlying
+fixes were made, because none is reachable without a barrier install — the findings are preserved
+verbatim on each bead rather than deleted, so reopening restores the evidence with the task.
 
-`mc2-y5tgw` CLOSED 2026-08-01: the operator image is held under `hold/qdrant-operator:pinned`,
-tagged before the prune that would have taken it.
+Q12 beads still OPEN, each for a reason recorded on it, and none window-dependent: `mc2-8m90f`,
+`mc2-qd12b`, `mc2-n6szm`.
 
 **The load-bearing rule.** Every piece of Q12 machinery is opt-in. Migrations, reindex, deploy and
 source recovery each have an ordinary path, reached by NOT passing the Q12 flags.
 
 ## Where the Qdrant reindex stands
 
-**The source recovery is COMPLETE.** Journal phase `verified` at revision 94, all 42 copies
-`published`, all 24 dispositions `disposition_verified`.
+**The source recovery is COMPLETE** and `mc2-jz6y0.13.4` is closed on that evidence. Measured
+2026-08-01 from `/var/lib/megacampus-source-recovery/state`: 42/42 `copy_states` `published`, 24/24
+`disposition_states` `disposition_verified`, of which 18 `career_playbook_retained_derived` and 6
+`eligible_unrecoverable`. Recovery reached `verified` at revision 94; the journal now reads
+revision 95 / phase `reindex_started`, because the reindex ran after it.
 
 **The 16 that remain are one family, and the diagnosis took three tries.** They are NOT scans and
 there is NO race: exported diagrams, one page, 4296pt tall, type converted to curves, so no text
@@ -83,25 +89,16 @@ and records the answers. It is deliberately NOT in the repository: it embeds rea
 **Regenerate it after anything that rewrites course `0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then take
 a fresh snapshot before the drill** — the probe must match the snapshot the drill restores.
 
-## What is delivered, and what it cost
+## What is delivered
 
-Seventeen commits, `a182df581`..`1273fb74a`. Each closes something that was silently wrong:
-
-1. DOCX had no fallback extractor, so a Docling outage destroyed 32 documents. It fired 7 times in
-   production during the repair and rescued all 7.
-2. Course duplication scrolled 10000 points against a strict-mode cap of 100, so that path could
-   not read a single vector.
-3. The reindex CLI never exited: four operator containers were Up for hours, `--rm` never fired.
-4. CI asserted the deployed monitoring tree matched the repository and nothing checked it.
-5. `deploy/postgres` had NO delivery path at all, while an enabled timer runs its scripts nightly.
-6. The contract suite carried `continue-on-error`, rendering every failure as a passing check.
-7. The 1,000-source preflight case crossed the 30s default under CI parallelism and failed a deploy
-   while passing in isolation.
-8. `docker image prune -f` could take the digest-pinned operator image, which no container
-   references and which cannot be re-pulled while the GHCR token is dead. It is now held under
-   `hold/qdrant-operator:pinned`, tagged before the prune runs.
-9. Prometheus retention lived in CLI flags 3.13.1 marks DEPRECATED, and a flag silently overrides
-   the config file. Now 30d/20GB in `prometheus.yml`, flags removed.
+Eighteen commits, `a182df581`..`6e3d33eb8` on `develop`, merged to `master` through `85d22daf2`.
+Each closes something that was silently wrong; the full list with evidence is in
+`.codex/stages/mc2-jz6y0/summary.md`. Two of them changed how the host behaves and are stated here
+because nothing in the repository shows them: the digest-pinned operator image is held under
+`hold/qdrant-operator:pinned`, tagged BEFORE `docker image prune -f`, which would otherwise take an
+image no container references and that cannot be re-pulled while the GHCR token is dead
+(`mc2-2vtmk`); and Prometheus retention is 30d/20GB in `prometheus.yml` with the CLI flags REMOVED,
+because a flag silently overrides the config file.
 
 **A deploy can ship an image that does not contain the commit.** `DEPLOY_API_CHANGED=false` makes
 the deploy keep the CURRENT image even when a new one was built. After the rollback above, the next
@@ -146,26 +143,41 @@ push did not restore the new code because its commit touched no api source. `wor
 
 - Off-host S3 (`mc2-jz6y0.13.6`) — owner deferred 2026-07-31 to the production launch. Needs bucket,
   region and credentials; nothing else. `QdrantSnapshotStale` names it and does not promise it.
-- `mc2-3gz2m` — the 16 remaining PDFs. Two causes, both measured: scans with no text layer that only
-  OCR can read, and a finalize race that discards vectors it just uploaded.
-- `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`, `mc2-2i78i`, `mc2-1cxna` — CLOSED 2026-07-31.
+- `mc2-3gz2m` — the 16 remaining PDFs, ONE cause, stated correctly at the top of this file. Ignore
+  any older note claiming two causes: neither "scans that only OCR can read" nor "a finalize race
+  that discards vectors it just uploaded" survived measurement. Reading these is feature work
+  (tile the page before OCR, or rasterise per region at high DPI), not a fix.
+- `mc2-8m90f` — the coverage-ledger check for the 6 unrecoverable sources. Its precondition is
+  MEASURED as not yet fired: `document_evidence_runs` and `document_evidence_items` are both empty,
+  so no Stage-4 generation has minted a card for anyone. The 6 ids are recorded on the bead. Note
+  the join column is `document_id`, NOT `file_catalog_id`.
+- `mc2-qd12b` — host-gated fixtures rot because `RUN_REAL_CONTROLLER` auto-enables at uid 1000 and
+  is off on GitHub runners. `mc2-oa7om` was folded into it as its own option (в).
 - `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
-- Review P2 `mc2-af1ay`; Prometheus retention YAML (`mc2-jz6y0.25`); HA, quantization, on-disk hot
-  indexes, custom sharding and JWT RBAC out of scope.
+- Review P2 `mc2-af1ay`; HA, quantization, on-disk hot indexes, custom sharding and JWT RBAC are
+  out of scope.
+- CLOSED 2026-07-31/08-01, listed so they are not re-opened by habit: `mc2-82bt2`, `mc2-lkkcv`,
+  `mc2-ugl5g`, `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25` (retention YAML,
+  delivered), `mc2-6l2yz` + `mc2-oc83n` (same restore-drill failure, fixed in `mc2-34eua`, verified
+  47/47 with the gate genuinely ON at uid 1000).
 
 ## Next recommended
 
 Next stage id: `mc2-jz6y0`
 
-Recommended action: fix the finalize race in `mc2-3gz2m` — it discards vectors it has already
-written, which is a correctness bug and not merely a coverage gap — then re-run
-`qdrant-operator retry-documents` with the two required flags and `reindex verify`.
+Recommended action: nothing is broken and nothing is half-done, so the next move is to WATCH, not
+to fix. Let the three timers fire on their own schedule and confirm each publishes without a hand
+on it.
 
-1. `mc2-3gz2m`: fix the finalize race first — it is a correctness bug that throws away vectors
-   already written — then decide what a scanned PDF should tell its uploader.
-2. Watch the first SCHEDULED snapshot, restore drill and Supabase backup land on their own.
+1. Watch the first SCHEDULED snapshot, restore drill and Supabase backup land unattended. Every
+   PASSED run so far was triggered by hand; the scheduled path has not yet proven itself.
+2. `mc2-3gz2m` is FEATURE work, not a fix — the 16 diagrams carry no text layer for any extractor,
+   so reading them means tiling the page before OCR or rasterising per region at high DPI. Decide
+   whether it is worth it before starting; two of the affected courses are test fixtures.
 3. `mc2-lkkcv` stays worth watching: Docling restarted three more times during the repair (7 → 10).
    The blast radius is now a delay for DOCX, but PDFs still have no OCR fallback.
+4. `mc2-jz6y0` stays open on ONE thing: `mc2-jz6y0.13.6`, the off-host S3 gate, which needs a
+   bucket, a region and credentials from the owner and nothing else.
 
 ## Read First
 
