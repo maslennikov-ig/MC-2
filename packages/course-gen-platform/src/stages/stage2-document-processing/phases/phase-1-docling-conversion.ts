@@ -32,7 +32,8 @@ export class EmptyConversionError extends Error {
   ) {
     super(
       `Conversion produced no usable text for ${filePath}: ${extractedLength} characters. ` +
-        'The file is most likely a scan with no text layer, which only OCR can read.'
+        'It carries no extractable text layer: either a scan, or a diagram whose type was ' +
+        'converted to curves. Only OCR can read it, and OCR did not find anything either.'
     );
     this.name = 'EmptyConversionError';
   }
@@ -41,7 +42,9 @@ export class EmptyConversionError extends Error {
 /**
  * Refuse a conversion that succeeded and returned nothing.
  *
- * MEASURED 2026-07-31: Docling turned a scanned PDF into fourteen characters and reported success.
+ * MEASURED 2026-07-31/08-01: Docling turned a one-page PDF into fourteen characters and reported
+ * success. The 16 documents this affects are not scans but exported diagrams, 4296pt tall, whose
+ * type was converted to curves, so they carry no text layer for any extractor to find.
  * Nothing threw, so the fallback extractor never ran; there were no chunks, so nothing was
  * uploaded; nothing was uploaded, so vector_status stayed 'indexing' and finalization refused. The
  * operator was left with 'Failed to convert document to markdown', which is the last true statement

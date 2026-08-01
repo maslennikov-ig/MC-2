@@ -38,7 +38,8 @@ describe('assertConversionProducedText', () => {
     }
 
     expect(String(caught)).toMatch(/3 characters/u);
-    expect(String(caught)).toMatch(/text layer/u);
+    expect(String(caught)).toMatch(/no extractable text layer/u);
+    expect(String(caught)).toMatch(/converted to curves/u);
   });
 
   it('accepts a document that actually carries text', () => {
