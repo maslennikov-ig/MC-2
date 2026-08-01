@@ -1,7 +1,8 @@
 # Orchestrator Handoff
 
-Updated: 2026-07-31 (late) — 218 of 234 documents hold vectors, both backup timers are enabled and
-both have PASSED for real, and no Qdrant or backup alert is firing. Sixteen scanned PDFs remain.
+Updated: 2026-08-01 — 218 of 234 documents hold vectors, all three backup timers are enabled and
+have PASSED for real, and no alert is firing. The 16 that remain are exported diagrams with no text
+layer, not scans and not a race; both earlier diagnoses were wrong (`mc2-3gz2m`).
 
 Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
 
@@ -15,8 +16,8 @@ Retired 2026-07-31, each with its reason and a REOPEN CONDITION on the bead: `mc
 `mc2-fxlne`, `mc2-0ie27`, `mc2-zls0f`, `mc2-e21lo`. None of the underlying fixes were made, because
 none is reachable without a barrier install.
 
-Deliberately NOT retired: `mc2-y5tgw` — the dev deploy's `docker image prune -f` removes the
-digest-pinned operator image, which is load-bearing for ordinary work.
+`mc2-y5tgw` CLOSED 2026-08-01: the operator image is held under `hold/qdrant-operator:pinned`,
+tagged before the prune that would have taken it.
 
 **The load-bearing rule.** Every piece of Q12 machinery is opt-in. Migrations, reindex, deploy and
 source recovery each have an ordinary path, reached by NOT passing the Q12 flags.
@@ -25,6 +26,14 @@ source recovery each have an ordinary path, reached by NOT passing the Q12 flags
 
 **The source recovery is COMPLETE.** Journal phase `verified` at revision 94, all 42 copies
 `published`, all 24 dispositions `disposition_verified`.
+
+**The 16 that remain are one family, and the diagnosis took three tries.** They are NOT scans and
+there is NO race: exported diagrams, one page, 4296pt tall, type converted to curves, so no text
+layer exists for any extractor. OCR is installed, enabled and loads its models, and returns nothing
+even with `force_full_page_ocr` at 3x scale. Docling converts them to `<!-- image -->` -- fourteen
+characters -- and REPORTS SUCCESS, after which zero chunks, zero embeddings and zero points are all
+correct behaviour on empty input. See `mc2-3gz2m`; the two earlier explanations on that bead are
+marked wrong there rather than deleted.
 
 **The reindex is 218/234.** Measured after the repair:
 
@@ -76,7 +85,7 @@ a fresh snapshot before the drill** — the probe must match the snapshot the dr
 
 ## What is delivered, and what it cost
 
-Twelve commits, `a182df581`..`ccdeb7142`. Each closes something that was silently wrong:
+Seventeen commits, `a182df581`..`1273fb74a`. Each closes something that was silently wrong:
 
 1. DOCX had no fallback extractor, so a Docling outage destroyed 32 documents. It fired 7 times in
    production during the repair and rescued all 7.
@@ -88,6 +97,16 @@ Twelve commits, `a182df581`..`ccdeb7142`. Each closes something that was silentl
 6. The contract suite carried `continue-on-error`, rendering every failure as a passing check.
 7. The 1,000-source preflight case crossed the 30s default under CI parallelism and failed a deploy
    while passing in isolation.
+8. `docker image prune -f` could take the digest-pinned operator image, which no container
+   references and which cannot be re-pulled while the GHCR token is dead. It is now held under
+   `hold/qdrant-operator:pinned`, tagged before the prune runs.
+9. Prometheus retention lived in CLI flags 3.13.1 marks DEPRECATED, and a flag silently overrides
+   the config file. Now 30d/20GB in `prometheus.yml`, flags removed.
+
+**A deploy can ship an image that does not contain the commit.** `DEPLOY_API_CHANGED=false` makes
+the deploy keep the CURRENT image even when a new one was built. After the rollback above, the next
+push did not restore the new code because its commit touched no api source. `workflow_dispatch` with
+`force_deploy=true` sets every `*_changed` and is the supported way out.
 
 ## How this repository fails, so you do not rediscover it
 
@@ -113,7 +132,10 @@ Twelve commits, `a182df581`..`ccdeb7142`. Each closes something that was silentl
   `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred` and
   `qdrant-source-recovery-runtime` can time out under full-suite parallelism; each passes alone.
   Anything else failing in isolation IS a stop.
-- Monitoring config drift is now a red check at the END of the deploy job; fix it with
+- Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`. As a
+  step it failed the deploy job, and `rollback` triggers on exactly that: on 2026-08-01 a rule file
+  one commit behind rolled production back to the previous image while the pipeline reported
+  success. Production then ran stale code with a green pipeline for twenty minutes. Fix drift with
   `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh`, which validates with promtool
   before it replaces anything and restarts Prometheus rather than signalling it.
 - Regenerate `deploy/qdrant/q12-deployed-asset-manifest.json` whenever a tracked asset changes.
