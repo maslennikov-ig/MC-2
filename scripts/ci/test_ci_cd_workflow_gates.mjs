@@ -356,19 +356,28 @@ assert(
   'the deploy must ship deploy/postgres, whose scripts a scheduled production timer executes'
 );
 
-// mc2-ugl5g. The monitoring drift gate must report, not block. Placed before the deploy steps it
-// stopped the application rollout entirely on its first run — a stale Prometheus rule file is a
-// real problem and it is not a reason to withhold application code.
-const deploySteps = (jobs.deploy?.steps ?? []).map(step => step?.name);
-const driftIndex = deploySteps.indexOf('Verify monitoring config is not drifted');
-assert(driftIndex !== -1, 'the production deploy must check monitoring config drift');
+// mc2-ugl5g. The monitoring drift check must live in its OWN job. As a step inside `deploy` it
+// failed the deploy JOB, and the rollback job keys on exactly that: on 2026-08-01 a Prometheus rule
+// file one commit behind rolled production back to the previous image while the pipeline reported
+// success. Drift has to be loud and must never move production.
+const deployStepNames = (jobs.deploy?.steps ?? []).map(step => step?.name);
 assert(
-  driftIndex > deploySteps.indexOf('Deploy'),
-  'the monitoring drift gate must run AFTER the deploy, or it blocks the rollout it only reports on'
+  !deployStepNames.includes('Verify monitoring config is not drifted'),
+  'the monitoring drift check must not be a step of the deploy job; a failing step triggers rollback'
+);
+const driftJob = jobs['monitoring-drift'];
+assert(driftJob, 'a monitoring-drift job must exist');
+assert(
+  needsList(driftJob).includes('deploy'),
+  'the monitoring drift job must run after the deploy it measures'
 );
 assert(
-  driftIndex > deploySteps.indexOf('Verify deployment'),
-  'the monitoring drift gate must run after deployment verification'
+  (driftJob.steps ?? []).some(step => step?.name === 'Verify monitoring config is not drifted'),
+  'the monitoring drift job must actually run the check'
+);
+assert(
+  !needsList(jobs.rollback ?? {}).includes('monitoring-drift'),
+  'rollback must not depend on monitoring drift'
 );
 
 // mc2-2i78i. The contract suite writes test users at fixed uuids into the ONE Supabase project dev

@@ -981,12 +981,39 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             "sed -i 's/^status=switched$/status=accepted/' /opt/megacampus/deploy_state && grep -qx 'status=accepted' /opt/megacampus/deploy_state"
 
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # ============================================
+  # STAGE 7: Rollback on Failure
+  # ============================================
+  # ============================================
+  # Monitoring config drift (reports; never rolls back)
+  # ============================================
+  monitoring-drift:
+    name: Monitoring Config Drift
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    # A SEPARATE JOB on purpose. As a step inside `deploy` this failed the deploy JOB, and the
+    # rollback job keys on exactly that -- so on 2026-08-01 a Prometheus rule file being one commit
+    # behind rolled production back to the previous image, and the pipeline reported success.
+    # Drift must be loud and must never move production.
+    if: ${{ always() && needs.deploy.result == 'success' }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
       - name: Verify monitoring config is not drifted
         run: |
-          # Monitoring config has no automatic delivery path by design (root-owned). This turns the
-          # silent drift that cost two weeks of a false critical alert into a red check with a
-          # one-command fix. It runs after the app is live, so a stale rule file reports loudly
-          # without holding back an otherwise good deploy.
           python3 scripts/ci/check_monitoring_drift.py --emit-manifest > /tmp/monitoring-manifest.json
 
           scp -i ~/.ssh/deploy_key \
@@ -997,17 +1024,10 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             "python3 /tmp/check_monitoring_drift.py --check --manifest /tmp/monitoring-manifest.json; rc=\$?; rm -f /tmp/check_monitoring_drift.py /tmp/monitoring-manifest.json; exit \$rc"
 
-      # NOTE: Do NOT update nginx config here!
-      # deploy_blue_green.sh applies the template with correct Blue/Green ports.
-      # Manually copying a static config would break the Blue/Green deployment.
-
       - name: Cleanup SSH
         if: always()
         run: rm -f ~/.ssh/deploy_key
 
-  # ============================================
-  # STAGE 7: Rollback on Failure
-  # ============================================
   rollback:
     name: Rollback
     runs-on: ubuntu-latest
