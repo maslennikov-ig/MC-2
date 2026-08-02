@@ -2020,3 +2020,38 @@ was ever written to discard. They are not scans either: rendering the page shows
 one page 4296pt tall, with the type converted to curves, so no extractor can find a text layer and
 OCR returns nothing even forced at 3x. Docling emits `<!-- image -->` — fourteen characters — and
 reports success. Reading them is feature work, not a fix.
+
+## Closeout 2026-08-02
+
+`graph-reviewed: updated` — Graphify 0.9.14 local graph refreshed with `graphify update .` after the
+2026-07-27 graph fell five days and eighteen code commits behind. Rebuilt to 60288 nodes / 86501
+edges / 7222 communities. No external semantic/model/API backend and no Git hook: the run's own tip
+about `GEMINI_API_KEY` was deliberately not acted on. Verified the refresh actually took rather than
+trusting the exit code — `graphify query assertConversionProducedText` and
+`graphify query runRetryFailedDocuments` both resolve, and neither symbol existed on 2026-07-27.
+
+**The Q12 window track is retired bead by bead, not swept.** Nine beads settled 2026-08-01 on
+individual reasons, each carrying a REOPEN CONDITION and its findings preserved verbatim rather than
+deleted: `mc2-jz6y0.13` (the cutover itself), `mc2-uha77`, `mc2-dizgy`, `mc2-ivjyb`, `mc2-9vbzp`,
+`mc2-xssva`, `mc2-evduu` retired as unreachable without a barrier install; `mc2-urw5d` obsolete
+because no window day exists; `mc2-oa7om` superseded by `mc2-qd12b`, which already contained it as
+one of its three options. `mc2-jz6y0.13.6` was reparented to the epic because the off-host gate
+outlives the staging cutover.
+
+**Two beads were closed on evidence that contradicted their own text.** `mc2-jz6y0.13.4` met its
+acceptance criterion exactly — 42/42 `copy_states` published and 24/24 dispositions verified, read
+from the production journal. `mc2-6l2yz` and `mc2-oc83n` turned out to be the SAME restore-drill
+failure filed twice from two rounds, already fixed in `mc2-34eua` and never closed; re-verified 47/47
+at uid 1000, which is what turns the `RUN_REAL_CONTROLLER` gate ON, with `-t "exact guard"` proving
+the case ran rather than skipped.
+
+**The measurement that moved the risk.** Asked why local-only backup was not enough, the honest
+answer turned out to be about something else entirely. `file_catalog.storage_path` is a RELATIVE
+FILESYSTEM PATH, not a Supabase Storage key — 261 rows, 128 distinct paths, none starting with
+`http`. The uploaded originals live at `/opt/megacampus/data/uploads` and NOWHERE else: 206MB, 117
+files. Everything else on that host is recoverable: Qdrant vectors are derived and regenerable, the
+Supabase dumps are redundant against Supabase's own managed backups, enrichments cost generation
+spend but come back. So the only irreplaceable artifact on the box is also the smallest, and it had
+no bead until `mc2-bygu1`. Six documents have already lost their sources permanently, which is what
+this failure looks like when it happens. Owner decided 2026-08-02 to stay local for now and give
+off-host backup its own dedicated server later; both beads are parked on that.
