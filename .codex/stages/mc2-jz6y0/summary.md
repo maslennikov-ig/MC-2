@@ -2192,3 +2192,79 @@ once in between, correctly, because `/etc/systemd/system` still held the previou
 `monitoring config OK: 20 files match the repository`, alerts firing NONE, timer next 2026-08-04
 00:30 CEST. Installed and proven: `generation-20260803T072934Z-e542a166-fe96-43f5-a150-ff0a5fd760aa`,
 restore `3540 archive entries, 0 skipped`, `restore size ratio=0.800961`.
+
+## Continuation 2026-08-03 — the suspect measured, and the handoff cap stopped costing truth
+
+Level: `slice_acceptance`. One owner, local, no delegation — the work was one read-only measurement,
+one SQL preamble change with a guard, one docs extraction and one test nit. None of parallel
+latency, context isolation, specialist capability or write isolation applied.
+
+**The suspect became a measurement.** `mc2-0rj7i` was recorded yesterday as a named suspect and
+deliberately not acted on. It is now evidence-backed as REACHABLE. The Supabase MCP session connects
+as `postgres` with `statement_timeout` of 2min — the same role and the same ceiling the backup gets,
+verified in-session rather than assumed — so `EXPLAIN (ANALYZE, BUFFERS)` against the tool's own hash
+formula measures exactly what the nightly run experiences:
+
+    file_catalog       261 rows / 129MB   34.5s   external merge, 276MB spilled
+    lesson_contents   4140 rows /  63MB   20.4s   external merge, 202MB spilled
+    generation_trace 36824 rows /  40MB    5.5s   external merge, ~100MB spilled
+
+One relation was already spending 29% of the whole budget, warm, with nothing else running — and the
+nightly does this AFTER `pg_dump`, with workers active. The cost tracks table BYTES rather than rows:
+`file_catalog` is 261 rows and the slowest of the three, so it grows with every upload. Every sort
+spills because `work_mem` is 2184kB and the sort key is the full row JSON.
+
+That is enough to justify a bounded, reversible mitigation and NOT enough to call it the cause of
+the 2026-08-03 00:30 failure. Both halves are stated on the bead; the second is not quietly dropped.
+
+**The fix, and what it deliberately is not.** All four transactions the manifest opens — catalog
+capture, per-relation hash, barrier probe, inventory — now `SET LOCAL statement_timeout = '10min'`.
+`SET LOCAL`, so it reverts at COMMIT and cannot leak onto the connection; verified against the live
+source that a READ ONLY REPEATABLE READ transaction accepts it and reads back `10min` inside the
+transaction. Sizing is ~17x the worst measured relation, generous on purpose: a cancelled manifest
+costs a night of backup coverage, while the headroom costs only a longer-held snapshot, still
+bounded and far inside `TimeoutStartSec=2h`. Setting it to 0 was REFUSED and the guard enforces
+that, because removing the timeout would leave the 2h unit timeout as the only bound on a session
+holding an exported snapshot. `q12-source-manifest-statement-timeout.test.ts` also fails if a fifth
+transaction is added without the ceiling — the silent-inheritance trap this whole thread is about.
+
+This raises a ceiling. It does not make the hash cheaper. Serializing an entire table to JSON,
+sorting by that full text and concatenating it is O(table bytes) and will keep growing; changing it
+alters manifest semantics and invalidates baselines, so it is deliberate work, not a tweak. Recorded
+with `work_mem` as the measured-next lever, unmeasured because that experiment exceeded the client
+timeout and was cancelled server-side by the 2min ceiling — leaving nothing behind, checked.
+
+**Proven in production rather than assumed.** The changed SQL runs nightly, so it was exercised
+immediately instead of at 00:30: `generation-20260803T083159Z-4c363f02-61b9-48eb-aa49-40c5fea7a9f0`
+published, metric stamped, alerts still empty. A syntax error in a transaction preamble would
+otherwise have surfaced as a failed backup tonight.
+
+**The handoff cap stopped costing truth.** Four sessions running, something true had to be shortened
+to fit something else true, because "How this repository fails" was competing for room in a file
+capped at 200 lines and defined as CURRENT STATE ONLY. It is neither current nor state. Extracted to
+`.codex/repository-failure-modes.md` — allowlisted in `.gitignore` next to `handoff.md`, since
+`.codex/` is an allowlist rather than a tracked directory — and expanded there with what these two
+days added: staged-versus-active systemd units, that a diagnostic which only runs where the tool
+cannot fail is not a diagnostic, and that a named suspect with evidence beats a confident cause
+without it. Raising the limit was the alternative and was rejected: the cap is what keeps the
+handoff current-state, so the fix is to stop putting non-current things under it. Handoff is now
+196 lines; the two costliest traps stay duplicated there.
+
+**Nit from the review round, closed.** The diagnostic test wrote to a fixed `/tmp/unused.json`; it
+now owns a per-run `mkdtemp` directory and removes it, and a stale comment about an unbound TCP port
+was corrected to the socket directory the test actually uses.
+
+**NOT started, and why.** `mc2-bygu1` — the 206MB of uploads with no off-host copy — stays untouched
+despite being the highest-value item on the list. The owner parked it on 2026-08-02 pending a
+dedicated server, and the one thing that would move it, choosing where a copy goes, is the owner's
+to answer. A blanket "finish everything" is not a revocation of a specific decision.
+
+graph-reviewed: updated — `graphify update .`, no external semantic/model backend and no git hooks.
+60306 nodes / 86517 edges / 7245 communities. docs-reviewed: handoff, stage summary and the new
+`.codex/repository-failure-modes.md`; no README, AGENTS.md or runbook claim changed behaviour.
+
+**Verification.** Ops acceptance set green (7 files, 107 passed / 27 skipped), `pnpm type-check`
+clean, eslint and prettier clean, process verification OK. Pipeline green end to end with
+`Deploy to Production` success, `Rollback` skipped and `Monitoring Config Drift` passing — no unit
+changed this round, so no reinstall was needed. Host: `monitoring config OK: 20 files match the
+repository`, timer enabled, alerts firing NONE.

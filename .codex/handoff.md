@@ -80,10 +80,16 @@ UNATTRIBUTABLE: psql's stderr was dropped, leaving `... failed with status 1`. I
 words, and a spawn failure names itself. The unit had no `Restart=`; it now retries after 10min,
 bounded to 4 starts / 6h, excluding exit 64/75. Install ONLY via
 `install-supabase-backup-schedule.sh`, which clears the start-limit first — without that, the night
-after repeated failures its own proof fails and the trap DISABLES the timer. **Cause is `mc2-0rj7i`,
-a suspect not a finding:** `statement_timeout=120000` inherited by `postgres`, against hash queries
-that serialize a whole table to JSON. Idle-in-transaction is FALSIFIED (both timeouts 0, no role
-override). Do not raise the timeout before the next occurrence names it in the log.
+after repeated failures its own proof fails and the trap DISABLES the timer.
+
+**`mc2-0rj7i` — measured, mitigated, still NOT proven to be the cause.** `statement_timeout=120000`,
+and the backup connects as `postgres`, which has no override. Its hash queries serialize a whole
+table to JSON, sort by that text and concatenate it, so cost tracks table BYTES: `file_catalog`
+measured 34.5s, `lesson_contents` 20.4s, all spilling 200-276MB because `work_mem` is 2184kB — one
+relation burning 29% of the budget before nightly load counts. All four manifest transactions now
+`SET LOCAL statement_timeout = '10min'`; a fresh run published `generation-20260803T083159Z`.
+Idle-in-transaction is FALSIFIED. This RAISED A CEILING; the hash stays O(table bytes). Next levers
+on the bead: measure `work_mem`, then the formula.
 
 **All 13 alerting rules are inactive.** Every one was cleared by making it true, never by editing
 the rule to stop asking. **`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from
@@ -110,11 +116,10 @@ restore the new code because its commit touched no api source. `workflow_dispatc
 ## How this repository fails, so you do not rediscover it
 
 **Moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU START.** It is the
-durable half of this file and it does not expire with a stage, which is exactly why it did not
-belong under a 200-line current-state cap — four sessions running, a true thing had to be shortened
-to fit another true thing. Two traps are repeated here because they cost the most time: host port
-6333 is the DEV Qdrant and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by
-a `bd` hook, so stage explicit paths and never `git add -A`.
+durable half of this file, it does not expire with a stage, and that is why it did not belong under
+a current-state cap. Two traps repeated here because they cost the most time: host port 6333 is the
+DEV Qdrant and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by a `bd`
+hook, so stage explicit paths and never `git add -A`.
 
 ## Verification and Delivery
 
@@ -168,10 +173,9 @@ Next stage id: `mc2-jz6y0`
 
 Recommended action: nothing is broken and nothing is half-done, so the next move is to WATCH.
 
-1. Two of three schedules have PROVEN THEMSELVES UNATTENDED (2026-08-02): snapshot fired on its own
-   at 04:23 CEST (every 4h, 136MB, 11 kept = under two days of history) and Supabase produced a
-   140MB validated dump. The RESTORE DRILL has not — monthly, next 2026-09-01. Watch that one, and
-   watch whether the new `Restart=` actually absorbs the next transient (`mc2-0tcyw`).
+1. Two of three schedules have PROVEN THEMSELVES UNATTENDED (2026-08-02); the RESTORE DRILL has not
+   — monthly, next 2026-09-01. Watch that, and watch whether `Restart=` absorbs the next transient
+   and whether the raised ceiling ends the manifest failures (`mc2-0tcyw`, `mc2-0rj7i`).
 2. `mc2-3gz2m` is FEATURE work, not a fix: reading those diagrams means tiling the page before OCR
    or rasterising per region at high DPI. Two of the affected courses are test fixtures.
 3. `mc2-lkkcv`: Docling restarted three more times during the repair (7 → 10). Blast radius is now
