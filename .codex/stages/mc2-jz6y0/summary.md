@@ -2055,3 +2055,64 @@ spend but come back. So the only irreplaceable artifact on the box is also the s
 no bead until `mc2-bygu1`. Six documents have already lost their sources permanently, which is what
 this failure looks like when it happens. Owner decided 2026-08-02 to stay local for now and give
 off-host backup its own dedicated server later; both beads are parked on that.
+
+## Closeout 2026-08-03 — mc2-0tcyw
+
+graph-reviewed: updated — `graphify update .` after the code and docs changes, no external
+semantic/model backend and no git hooks. 60296 nodes / 86509 edges / 7224 communities, up from
+60288 / 86501 / 7222. Verified with two focused queries: the new
+`q12-source-manifest-psql-diagnostic.test.ts` is a start node, and `backup-supabase.sh` resolves
+with its `fail()` and `main()`.
+
+**The alert was right and the message was useless.** At 00:30 CEST the nightly Supabase backup ran
+for seven minutes, got through `pg_dump`, and died in the source-manifest phase. `SupabaseBackupStale`
+fired thirty hours later, correctly: there was no backup that night. What the operator got was one
+line — `source manifest failed: PostgreSQL 17 manifest query failed with status 1` — naming no
+relation, no SQL state and no reason. An identical manual re-run at 07:26 published
+`generation-20260803T052610Z-a499f10d-951a-4324-8739-8d2b07a0faf1` and the alert cleared itself,
+Prometheus `/api/v1/alerts` returning an empty list rather than a silence. So the cause was
+transient — and unattributable, which is the part worth fixing.
+
+**Where it went.** `deploy/postgres/q12-source-manifest.ts` ran psql through `spawnSync`, and on a
+non-zero exit called `fail()` with the exit STATUS only. `result.stderr` was captured and discarded;
+it was read one line further down, but only on the success path. The fix appends it, collapsed to
+one bounded line because the shell surfaces just the last ten lines of that stderr. Safe for the
+same reason `backup-supabase.sh` already cats `pg_dump`'s stderr into the service log: the password
+reaches psql through `PGPASSFILE`, never argv and never the environment.
+
+**The second half is that nothing retried.** `megacampus-supabase-backup.service` had no `Restart=`
+at all, so one blip cost a whole night of coverage and woke a person. It now carries
+`Restart=on-failure`, `RestartSec=10min`, `StartLimitIntervalSec=6h` and `StartLimitBurst=4`, so a
+genuinely broken backup still reaches failed state and still alerts, and `RestartPreventExitStatus=64
+75` — 64 is the wrapper's usage refusal and 75 its contention refusal (Q12 active, or another backup
+holding the lock), both decisions rather than failures a retry could change. `systemd-analyze verify`
+passes on the host's own systemd, which is where `Restart=` under `Type=oneshot` was confirmed legal.
+
+**Two guards fired during delivery, both correctly.** Editing `q12-source-manifest.ts` left
+`deploy/qdrant/q12-deployed-asset-manifest.json` stale — it is one of the 26 assets the window
+pre-flight byte-checks on the host — and `q12-window-preflight.test.ts` went red in CI rather than
+letting H2 pass against stale expectations on the server. Regenerated with `--emit-asset-manifest`.
+Then the monitoring-drift job went red because `/etc/systemd/system` still held the old unit: CI
+deploys `deploy/systemd` to `/opt/megacampus` but never installs into systemd, by design. That is
+also how the remediation text turned out to be too generic, and it now names
+`install-supabase-backup-schedule.sh` for this pair specifically.
+
+**Installed with proof, not with a copy.** `install-supabase-backup-schedule.sh` ran as root with the
+two unit digests taken from `sha256sum` output on the host, stopped the timer, installed both units,
+reloaded systemd, then PROVED the schedule: a real backup, `pg_restore` validation, and the isolated
+restore drill — `3540 archive entries, 0 skipped`, `restore size ratio=0.800917`, cluster-global
+inventory plus both manifest equalities passing — before re-enabling the timer. It disables the timer
+if any of that fails, which is why it is the right installer here and the generic one is not.
+Published `generation-20260803T062215Z-d5b90a18-3d1f-420f-9229-d06dc6fc9c52`.
+
+**A test that skips is not a guard.** The behavioural test drives the real tool at a socket directory
+that does not exist, so psql genuinely fails and its words are proven to survive; an unbound TCP port
+is not equivalent, because under WSL it hangs instead of being refused. But it needs
+`/usr/lib/postgresql/17/bin/psql`, the interpreter the tool hardcodes, and GitHub's runners carry
+PostgreSQL 16 — so in CI it skipped and guarded nothing. A source guard that runs everywhere was
+added alongside it, anchored on the interpolation rather than the phrase, because the same words
+appear in the comment above the failure site.
+
+**End state.** Pipeline green end to end, `Deploy to Production` success, `Rollback` skipped —
+the 2026-08-01 job split holding. Drift check on the host: `monitoring config OK: 20 files match the
+repository`. Timer enabled and active, next 2026-08-04 00:30 CEST. Alerts firing: NONE.
