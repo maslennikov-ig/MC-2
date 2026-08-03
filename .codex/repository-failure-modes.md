@@ -41,6 +41,13 @@ it green.** Several defects here survived a green suite because the suite never 
 the host takes: different uid, different `HOME`, different filesystem protections, a hardened unit
 with `ProtectSystem=strict`.
 
+**A known-flaky label is a place for a real failure to hide.** This repository keeps a list of
+suites that time out under full-suite parallelism and pass alone, and that list is legitimate. On
+2026-08-03 one of them, `qdrant-source-recovery-runtime`, had been failing for three days for an
+entirely different reason — `chown 0:0` in code that is root in the image and an ordinary uid in the
+test — and the label absorbed it. Before charging a failure to the known list, check that it matches
+the known SHAPE: a timeout under parallelism is not an assertion failure in 76ms alone.
+
 **Measure before you name a cause.** Two `mc2-3gz2m` diagnoses and one `mc2-0tcyw` diagnosis were
 stated confidently and were wrong; each was killed by a single cheap query or a page render. A named
 suspect with evidence is worth more than a confident cause without it, and it is honest to ship the

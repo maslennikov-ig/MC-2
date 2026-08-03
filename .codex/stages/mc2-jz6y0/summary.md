@@ -2268,3 +2268,78 @@ clean, eslint and prettier clean, process verification OK. Pipeline green end to
 `Deploy to Production` success, `Rollback` skipped and `Monitoring Config Drift` passing — no unit
 changed this round, so no reinstall was needed. Host: `monitoring config OK: 20 files match the
 repository`, timer enabled, alerts firing NONE.
+
+## Continuation 2026-08-03 — mc2-0rj7i finished
+
+**The lever I planned to pull turned out not to exist.** The bead's next step was to measure
+`work_mem`, on the theory that three sorts spilling 200-276MB were spilling because 2184kB is small.
+They were — but the reason the sort was that big is that the sort key was a whole row of JSON.
+Hashing each row first and sorting the 64-byte digests instead makes every sort fit in the
+`work_mem` that is already there. Raising it would have bought a fraction of what removing the need
+for it did, and would have cost backend memory on a box that also runs the workers.
+
+**Measured warm against the live source, before → after.** Same role, same 2min ceiling as the
+backup, `EXPLAIN (ANALYZE, BUFFERS)` on the tool's own formula:
+
+    file_catalog       261 rows / 129MB   37.2s, 276MB spilled  →   8.9s, no spill
+    lesson_contents   4212 rows /  63MB   20.4s, 202MB spilled  →   5.8s, no spill
+    generation_trace 37085 rows /  40MB    5.5s, ~100MB spilled →   4.3s, no spill
+
+`generation_trace`, the widest sort left, uses 1537kB of the 2184kB available. Cost now grows with
+ROW COUNT, not with table bytes, which is the part that mattered: `file_catalog` is 261 rows and was
+the slowest relation in the manifest because it carries 129MB of TOAST, and it gains bytes with
+every upload.
+
+**A cliff that had nothing to do with time.** `string_agg` built a single text value the size of the
+table, and `text` tops out at 1GB. `file_catalog` was at 129MB of that budget and climbing, and
+nothing in the tool would have explained the failure when it arrived — it would have read as one
+more unattributable night. The aggregate is now 65 bytes per row.
+
+**`AS MATERIALIZED` is load-bearing, and I only know that because I measured the version without
+it.** The obvious first cut — a plain subquery — was 13.4s and still spilled 122MB, because the
+planner inlines the subquery and sorts the underlying rows anyway. It looks like a stylistic
+keyword. It is the difference between 8.9s and 13.4s. `COLLATE "C"` came free with the rewrite and
+removes a dependency nobody had noticed: the digest ordering was the database's collation, so a
+source and a restored target were trusting a locale to agree.
+
+**The schema is v2, deliberately.** The same database now yields different digests, so v1 and v2
+manifests are not comparable and a v1 generation drilled by this tool stops at `source manifest
+schema mismatch`. The alternative was to leave the version alone and let that case surface as every
+authoritative relation reporting drift at once, which is the exact shape of failure this repository
+keeps paying for. Those generations stay restorable; only the comparison is gone. All 14 pins moved
+together.
+
+**A red I found by running the gate, and it was not the flake it looked like.**
+`qdrant-source-recovery-runtime` sits on the known "times out under full-suite parallelism, passes
+alone" list, so its failure in the ops sweep read as that. It was not: it reproduced alone, in 76ms,
+deterministically. `stage_owner_only_directory` hands the staged directory to `0:0` before setting
+its mode — correct in the image, where it runs as root — and the isolated copy the test builds
+substitutes four uid/gid literals but not that one, so as an ordinary uid it died on EPERM before
+asserting anything. Red since 2026-07-31, when that `chown` was introduced. Fixed in the shim, and
+the file is 205/205 alone. The lesson is on the failure-modes doc's own terms: a known-flaky label
+is a place for a real failure to hide.
+
+**Proof, in the order it was taken.** Real PostgreSQL 17.10 in docker
+(`q12-cron-row-hash-normalization`, `MC2_Q12_REAL_PG17=1`, 111s): the new SQL executes for real, the
+sanctioned `cron.job` `active`-only flip still leaves `row_sha256` unchanged, and a real command
+tamper still changes it. Both new source guards proven red before green. Then production: a fresh
+backup published `generation-20260803T094814Z-36a4cc27-5afb-4e6c-982d-08e1249dc5bf` with the metric
+stamped, and a full restore drill on it returned `cutover_snapshot manifest equality passed`,
+`baseline manifest equality passed`, `restore size ratio=0.800987`. That last one is the proof that
+counts: the digests computed on the live source and on the fully restored target agree under the new
+formula.
+
+**What is still NOT proven.** Nothing here demonstrates that `statement_timeout` caused the
+2026-08-03 00:30 failure. It remains a measured, reachable suspect, and the confirmation is still
+free — the next manifest failure prints psql's own words (`mc2-0tcyw`).
+
+graph-reviewed: updated — `graphify update .`, no external semantic/model backend and no git hooks.
+docs-reviewed: handoff (`mc2-0rj7i` paragraph rewritten, still exactly 200 lines) and this summary;
+no README, `AGENTS.md` or runbook claim changed behaviour.
+
+**Verification.** `pnpm type-check` clean, eslint and prettier clean on the changed tree. Ops
+acceptance set green, including the four files that fail only under parallelism — each re-run alone:
+`q12-live-controller` 26/26, `q12-live-quiesce-deferred` 8/8,
+`q12-retained-barrier-w-composition-seam` 30/30, `qdrant-source-recovery-runtime` 205/205. Pipeline
+`30801561042` green end to end with `Deploy to Production` success, `Rollback` skipped and
+`Monitoring Config Drift` passing. Host: timer next 2026-08-04 00:30 CEST, alerts firing NONE.
