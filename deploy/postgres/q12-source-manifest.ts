@@ -8,6 +8,24 @@ import { pathToFileURL } from 'node:url';
 type JsonObject = Record<string, unknown>;
 
 const PSQL = '/usr/lib/postgresql/17/bin/psql';
+
+// mc2-0rj7i. The source inherits statement_timeout=120000 from its configuration file, and the
+// backup connects as `postgres`, which carries no per-role override (measured 2026-08-03 from
+// pg_settings and pg_db_role_setting). Every relation hash below serializes a whole table to JSON,
+// SORTS by that full text and concatenates it before hashing, so the cost tracks table bytes rather
+// than row count. Measured against the live source, warm and with nothing else running:
+//
+//   file_catalog       261 rows / 129MB   34.5s   external merge, 276MB to disk
+//   lesson_contents   4140 rows /  63MB   20.4s   external merge, 202MB to disk
+//   generation_trace 36824 rows /  40MB    5.5s   external merge, ~100MB to disk
+//
+// One relation was already burning 29% of the whole budget, and it grows with every upload. Ten
+// minutes is deliberately generous against the worst measured 34.5s because the failure it prevents
+// costs a night of backup coverage, while the cost of the headroom is only that a pathological
+// query holds the exported snapshot longer -- still bounded, and still far inside the unit's
+// TimeoutStartSec=2h. This raises a ceiling; it does not make the hash cheaper, which stays the
+// durable concern on the bead.
+const STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '10min';";
 const SCHEMA = 'megacampus.supabase-source-manifest/v1';
 const SNAPSHOT_PATTERN = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+$/;
 
@@ -179,8 +197,8 @@ function catalogSql(snapshot: string | null): string {
   // pinned empty to force deterministic full qualification on both the
   // source and the restored target.
   const begin = snapshot
-    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)}; SET LOCAL search_path TO '';`
-    : `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path TO '';`;
+    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)}; SET LOCAL search_path TO ''; ${STATEMENT_TIMEOUT}`
+    : `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path TO ''; ${STATEMENT_TIMEOUT}`;
   return `${begin}
 COPY (
 WITH database_row AS (
@@ -354,8 +372,8 @@ function relationHash(
     fail('relation identity cannot be safely quoted');
   }
   const begin = snapshot
-    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`
-    : 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;';
+    ? `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)}; ${STATEMENT_TIMEOUT}`
+    : `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; ${STATEMENT_TIMEOUT}`;
   const qualified = `"${schema.replaceAll('"', '""')}"."${relation.replaceAll('"', '""')}"`;
   // barrier.install deactivates every cron job (cron.job.active true->false)
   // as its own SANCTIONED maintenance delta; validateTransition already
@@ -686,7 +704,7 @@ function validateExpectedCatalog(
     fail('expected guarded relation duplicates');
   assertFrozenGuardedRelations(expectedRelations, array(cutover.relations, 'cutover.relations'));
 
-  const begin = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)};`;
+  const begin = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT ${quoteLiteral(snapshot)}; ${STATEMENT_TIMEOUT}`;
   const barrier = object(
     JSON.parse(
       runPsql(
@@ -892,7 +910,7 @@ function normalizeSource(value: JsonObject): JsonObject {
 }
 
 function captureInventory(): JsonObject {
-  const sql = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+  const sql = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; ${STATEMENT_TIMEOUT}
 COPY (
 WITH roles AS (
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
