@@ -46,12 +46,33 @@ describe('Supabase source manifest psql failure diagnostic (source guard)', () =
     const tool = readFileSync(TOOL, 'utf8');
 
     expect(tool).toContain('psqlDiagnostic(result.stderr)');
+    // spawnSync leaves stderr undefined when the process never started, so the diagnostic must be
+    // nullish-guarded and the spawn error must be reported as its own, differently-worded failure.
+    expect(tool).toContain('stderr: string | null | undefined');
+    expect(tool).toContain('could not start');
     // Anchored on the interpolation, which only the failure site has — the same words also appear
     // in the comment above it explaining why this guard exists.
     const site = tool.slice(
       tool.indexOf('PostgreSQL 17 manifest query failed with status ${result.status')
     );
     expect(site.slice(0, 200)).toContain('psqlDiagnostic');
+  });
+});
+
+// The mirror image of the suite below, and deliberately so: this one runs exactly where the
+// hardcoded interpreter is ABSENT, which is GitHub's runners. Between the two, both failure shapes
+// are covered on some machine, and neither skips everywhere.
+describe.skipIf(existsSync(PSQL))('Supabase source manifest psql spawn failure', () => {
+  it('names the spawn error instead of dying on a TypeError', () => {
+    const result = captureAgainstUnreachableSource();
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('could not start');
+    expect(result.stderr).toContain('ENOENT');
+    // The regression this replaced: reading an undefined stderr threw, and the operator got
+    // "Cannot read properties of undefined" instead of the path that does not exist.
+    expect(result.stderr).not.toContain('Cannot read properties');
+    expect(result.stderr).not.toContain('with status signal');
   });
 });
 

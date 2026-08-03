@@ -2,9 +2,14 @@
 Description=MegaCampus atomic Supabase backup generation
 Wants=network-online.target
 After=network-online.target
-# mc2-0tcyw: bounds the retry policy below. Four starts per six hours is the whole budget, so a
-# genuinely broken backup still reaches failed state and still pages, and it cannot loop. The
-# window is far shorter than the daily schedule, so it is always clear before the next night.
+# mc2-0tcyw: bounds the retry policy below. Four starts per six hours — for a normal ~7min run that
+# is the original plus three retries inside forty minutes, then failed state and the page.
+#
+# It is a SLIDING window, not a hard cap, and the difference matters for one case: a run that hangs
+# all the way to TimeoutStartSec=2h ages its own earlier starts out of the window, so it keeps
+# retrying at roughly one start every two hours instead of stopping. That is tolerable rather than
+# clever — a hang publishes no metric either way, so SupabaseBackupStale still fires — but do not
+# read this pair as a promise that the unit cannot repeat.
 StartLimitIntervalSec=6h
 StartLimitBurst=4
 

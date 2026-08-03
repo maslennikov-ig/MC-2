@@ -369,6 +369,21 @@ describe('fixed-hash backup schedule installer', () => {
     expect(log).not.toContain('enable megacampus-supabase-backup.timer');
   });
 
+  // mc2-0tcyw: with Restart= in play, a unit that exhausted StartLimitBurst refuses every further
+  // start until the window elapses. That is precisely the night an operator reaches for this
+  // installer, and without clearing the counter first its proof would fail and the trap would
+  // DISABLE the timer — turning backups off at the worst possible moment.
+  it('clears an exhausted start-limit before it tries to prove the schedule', () => {
+    const result = runInstallerLifecycleHarness('success');
+    expect(result.status, result.stderr).toBe(0);
+    const log = readFileSync(result.log, 'utf8');
+
+    expect(log).toContain('reset-failed megacampus-supabase-backup.service');
+    expect(log.indexOf('reset-failed megacampus-supabase-backup.service')).toBeLessThan(
+      log.indexOf('start megacampus-supabase-backup.timer')
+    );
+  });
+
   it('uses the Persistent timer catch-up as one launch without a duplicate service start', () => {
     const result = runInstallerLifecycleHarness('success');
     expect(result.status, result.stderr).toBe(0);
@@ -410,6 +425,7 @@ function runInstallerLifecycleHarness(scenario: string): {
 set -eu
 printf '%s\n' "$*" >>'${log}'
 if [[ "$1" == show && "$*" == *'InvocationID'* ]]; then /usr/bin/cat '${invocation}'; exit 0; fi
+if [[ "$1" == reset-failed ]]; then exit 0; fi
 if [[ "$1" == start && "$2" == megacampus-supabase-backup.timer ]]; then
   printf 'new\n' >'${invocation}'; printf '1' >'${launches}'
   if [[ '${scenario}' == backup-fail ]]; then printf 'failed\n' >'${resultFile}'; exit 0; fi
