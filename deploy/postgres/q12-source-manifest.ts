@@ -77,8 +77,13 @@ function quoteLiteral(value: string): string {
 //
 // Collapsed to one bounded line because the shell surfaces only the last ten lines of the
 // generator's stderr; an unbounded psql error would push the failure itself out of that window.
-function psqlDiagnostic(stderr: string): string {
-  const collapsed = stderr.replace(/\s+/g, ' ').trim();
+//
+// Nullish-guarded: spawnSync leaves stdout and stderr UNDEFINED when the process never started, so
+// reading them unconditionally replaced a clean failure with a TypeError — the same unattributable
+// message this whole change exists to remove. The spawn error is handled at the call site, where it
+// is the only thing that names the cause.
+function psqlDiagnostic(stderr: string | null | undefined): string {
+  const collapsed = (stderr ?? '').replace(/\s+/g, ' ').trim();
   if (collapsed === '') return '';
   return `: ${collapsed.length > 500 ? `${collapsed.slice(0, 500)}...` : collapsed}`;
 }
@@ -116,6 +121,10 @@ function runPsql(sql: string): string {
       maxBuffer: 64 * 1024 * 1024,
     }
   );
+  // A process that never started has no exit status and no stderr; calling that "status signal"
+  // would name the wrong thing. psql is an absolute path under a hardened unit, so ENOENT and
+  // EACCES here are real failure modes, not theory.
+  if (result.error) fail(`PostgreSQL 17 manifest query could not start: ${result.error.message}`);
   if (result.status !== 0)
     fail(
       `PostgreSQL 17 manifest query failed with status ${result.status ?? 'signal'}` +

@@ -85,6 +85,14 @@ prove_supabase_backup_schedule() {
   before_generation=$(read_pointer_generation "$BACKUP_ROOT/latest.json" 2>/dev/null || true)
   before_invocation=$("$SYSTEMCTL" show "$SERVICE_NAME" --property=InvocationID --value)
 
+  # mc2-0tcyw: the service now retries on failure, bounded by StartLimitBurst. A unit that has
+  # exhausted that budget refuses every further start until the limit window elapses -- including
+  # this proof's, which would fail and make the trap below DISABLE the timer. So the night after a
+  # run of failures is exactly when an operator reaches for this installer, and exactly when it
+  # would have turned backups off. Clearing the counter is safe: nothing below trusts it, and the
+  # proof measures a real backup rather than the unit's start history.
+  "$SYSTEMCTL" reset-failed "$SERVICE_NAME" >/dev/null 2>&1 || true
+
   # Starting the Persistent timer first lets systemd perform a missed-run
   # catch-up. A direct service start is used only when no new invocation was
   # observed, so one installation cannot launch the backup twice.
