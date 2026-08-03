@@ -67,6 +67,22 @@ function quoteLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+// mc2-0tcyw: psql's stderr is the only thing that says WHY a manifest query failed, and it used
+// to be captured below and then dropped on the failure path. That is how the 2026-08-03 00:30
+// nightly run reached the operator as "PostgreSQL 17 manifest query failed with status 1" and
+// nothing else — no relation, no SQL state, no reason, and no way to tell a transient pooler drop
+// apart from a real defect. Surfacing it is the same trade backup-supabase.sh already makes for
+// pg_dump, and it is safe for the same reason: the password reaches psql through PGPASSFILE, never
+// through argv or the environment, so it cannot appear in a diagnostic.
+//
+// Collapsed to one bounded line because the shell surfaces only the last ten lines of the
+// generator's stderr; an unbounded psql error would push the failure itself out of that window.
+function psqlDiagnostic(stderr: string): string {
+  const collapsed = stderr.replace(/\s+/g, ' ').trim();
+  if (collapsed === '') return '';
+  return `: ${collapsed.length > 500 ? `${collapsed.slice(0, 500)}...` : collapsed}`;
+}
+
 function runPsql(sql: string): string {
   const result = spawnSync(
     PSQL,
@@ -101,7 +117,10 @@ function runPsql(sql: string): string {
     }
   );
   if (result.status !== 0)
-    fail(`PostgreSQL 17 manifest query failed with status ${result.status ?? 'signal'}`);
+    fail(
+      `PostgreSQL 17 manifest query failed with status ${result.status ?? 'signal'}` +
+        psqlDiagnostic(result.stderr)
+    );
   if (result.stderr.trim() !== '') fail('PostgreSQL 17 manifest query emitted stderr');
   // Every runPsql statement returns one COPY TO STDOUT text-format line, so
   // the COPY escape sequences must be decoded before the jsonb is parsed.
