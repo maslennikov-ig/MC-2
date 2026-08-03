@@ -14,6 +14,9 @@ node_modules/
 !.codex/skills/**
 !.codex/orchestrator.toml
 !.codex/handoff.md
+# The durable half of the handoff, extracted 2026-08-03 so it stops competing for room under the
+# 200-line current-state cap. Tracked for the same reason handoff.md is: agents read it first.
+!.codex/repository-failure-modes.md
 !.codex/project-index.md
 !.codex/report-template.md
 !.codex/stage-artifact-template.md

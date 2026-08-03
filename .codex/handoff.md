@@ -109,17 +109,12 @@ restore the new code because its commit touched no api source. `workflow_dispatc
 
 ## How this repository fails, so you do not rediscover it
 
-- **Delivery is not deployment.** Two directories production executes had no delivery path; both
-  were found by looking for an observable effect, not by reading the workflow.
-- **Completion is not success.** BullMQ completes a job whenever the processor returns, and these
-  handlers return `{ success: false }` rather than throwing.
-- **The producing container is not the consuming one** — paths and queue names do not carry over.
-- **Errors get discarded.** Repeatedly, and it keeps costing whole nights: `mc2-0tcyw` is the fourth
-  instance. When something fails without a reason, fix the reporting FIRST.
-- **The checked environment gets substituted for the consuming one** — fakes that accept anything.
-- **Prove it on the host as the user that will run it**, and **prove a new guard red first**.
-- `AGENTS.md` is rewritten by a `bd` hook; stage explicit paths, never `git add -A`.
-- Host port 6333 is the **dev** Qdrant and is empty. Production answers on **6335**.
+**Moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU START.** It is the
+durable half of this file and it does not expire with a stage, which is exactly why it did not
+belong under a 200-line current-state cap — four sessions running, a true thing had to be shortened
+to fit another true thing. Two traps are repeated here because they cost the most time: host port
+6333 is the DEV Qdrant and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by
+a `bd` hook, so stage explicit paths and never `git add -A`.
 
 ## Verification and Delivery
 
@@ -187,8 +182,9 @@ Recommended action: nothing is broken and nothing is half-done, so the next move
 
 ## Read First
 
-`AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/project-index.md`,
-`graphify-out/GRAPH_REPORT.md`, and `.codex/stages/mc2-jz6y0/summary.md`. Design/plan pairs under
+`AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
+`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `.codex/stages/mc2-jz6y0/summary.md`.
+Design/plan pairs under
 `docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
 `2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
 
