@@ -390,7 +390,7 @@ for name, expected in manifest["files"].items():
     if expected != {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}:
         raise SystemExit("generation file checksum mismatch")
 source = json.loads((root / "source-manifest.json").read_text(encoding="utf-8"))
-if source.get("schema") != "megacampus.supabase-source-manifest/v1":
+if source.get("schema") != "megacampus.supabase-source-manifest/v2":
     raise SystemExit("source manifest schema mismatch")
 PY
   "$PG_RESTORE" --list "$GENERATION/database.dump" >"$TEMP_ROOT/archive.toc" 2>"$TEMP_ROOT/pg-restore-list.stderr" || fail 'archive TOC validation failed'

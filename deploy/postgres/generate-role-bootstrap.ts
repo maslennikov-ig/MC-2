@@ -366,7 +366,7 @@ function main(): void {
   const manifest = JSON.parse(readFileSync(args.manifest, 'utf8')) as JsonObject;
   const image = JSON.parse(readFileSync(args.image, 'utf8')) as JsonObject;
   scanSecretShape(image);
-  if (manifest.schema !== 'megacampus.supabase-source-manifest/v1')
+  if (manifest.schema !== 'megacampus.supabase-source-manifest/v2')
     fail('source manifest schema mismatch');
   const source = object(manifest.cutover_snapshot, 'cutover_snapshot');
   // The bootstrap renders SQL only from the role plane; manifest catalog
@@ -401,7 +401,7 @@ function main(): void {
   }
 
   const sql: string[] = [
-    '-- Generated from megacampus.supabase-source-manifest/v1; raw pg_dumpall SQL is never executed.',
+    '-- Generated from megacampus.supabase-source-manifest/v2; raw pg_dumpall SQL is never executed.',
     '\\set ON_ERROR_STOP on',
   ];
   for (const role of roles.sort((left, right) => left.name.localeCompare(right.name))) {

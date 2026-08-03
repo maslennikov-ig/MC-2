@@ -690,7 +690,7 @@ import pathlib
 import sys
 
 value = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-if value.get("schema") != "megacampus.supabase-source-manifest/v1":
+if value.get("schema") != "megacampus.supabase-source-manifest/v2":
     raise SystemExit("invalid source manifest schema")
 if value.get("snapshot_id") != sys.argv[2]:
     raise SystemExit("source manifest snapshot mismatch")
