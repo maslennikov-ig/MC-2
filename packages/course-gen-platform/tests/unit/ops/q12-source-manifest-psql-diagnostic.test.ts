@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 // mc2-0tcyw: on 2026-08-03 the nightly Supabase backup failed in the manifest phase and told the
 // operator exactly this and nothing more:
@@ -14,16 +14,26 @@ import { describe, expect, it } from 'vitest';
 // then dropped on the failure path. An identical re-run passed, so the cause was transient — and
 // with that message it was impossible to tell WHICH transient, or to tell one from a real defect.
 //
-// This drives the real tool at a port nothing listens on, so psql genuinely fails, and proves its
-// own words survive into the message the operator reads.
+// This drives the real tool at a socket directory that does not exist, so psql genuinely fails, and
+// proves its own words survive into the message the operator reads.
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const TOOL = resolve(REPO_ROOT, 'deploy/postgres/q12-source-manifest.ts');
 const TSX = resolve(REPO_ROOT, 'packages/course-gen-platform/node_modules/.bin/tsx');
 // The hardcoded interpreter the tool itself uses; without it there is nothing to test.
 const PSQL = '/usr/lib/postgresql/17/bin/psql';
+const roots: string[] = [];
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 function captureAgainstUnreachableSource(): { status: number | null; stderr: string } {
-  const result = spawnSync(TSX, [TOOL, 'capture-target', '--output', join('/tmp', 'unused.json')], {
+  // Owned per-run rather than a fixed /tmp name: the tool fails long before it writes, but a shared
+  // path in a world-writable directory is not something to leave lying in a test either way.
+  const root = mkdtempSync('/tmp/mc2-source-manifest-diagnostic-');
+  roots.push(root);
+  const output = join(root, 'unused.json');
+  const result = spawnSync(TSX, [TOOL, 'capture-target', '--output', output], {
     encoding: 'utf8',
     cwd: REPO_ROOT,
     env: {
