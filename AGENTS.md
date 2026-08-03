@@ -83,7 +83,8 @@ bd close <id>         # Complete work
 ### Rules
 
 - Task truth for engineering work lives in `bd`. `TodoWrite` is allowed for in-session skill checklists; it is not a task tracker and does not replace `bd`.
-- Run `bd prime` for detailed command reference and session close protocol
+- Run `bd prime` only for command/reference facts; its injected session-close
+  wording does not override this repository workflow.
 - Use `bd remember` for cross-session project facts. The harness `MEMORY.md` remains the primary memory store — both are in use, neither is banned.
 
 ## Session Completion
@@ -93,15 +94,15 @@ bd close <id>         # Complete work
 **WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
+2. **Run final acceptance** - one risk-selected set after implementation; full suite only at epic/release
 3. **Update issue status** - Close finished work, update in-progress items
-4. **Deliver when authorized** - `bd dolt push`, then ordinary `git push` only after fresh verification passes and a fetch proves the remote is not ahead or diverged
-5. **Clean up** - Clear stashes, prune remote branches
+4. **Deliver when authorized** - `bd dolt push`, then ordinary `git push` only after final acceptance passes and a fetch proves the remote is not ahead or diverged
+5. **Preserve unrelated state** - do not clear stashes or prune branches without explicit current authorization
 6. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 
 - Use `bd` for task truth when available.
-- Run quality gates before completion claims.
-- Ordinary commits and ordinary push are allowed after fresh verification/closeout when the repo contract or current user request authorizes delivery. Before push, fetch and stop if remote is ahead/diverged, branch/protected-target is unclear, or uncommitted/staged scope is unsafe. Subagents may commit/push only their assigned branch/worktree when explicitly allowed by task/contract, never directly to protected/base branches.
+- Run one risk-selected final acceptance set before completion claims; do not rerun unchanged passing evidence for freshness.
+- Ordinary commits and ordinary push are allowed after final acceptance when the repo contract or current user request authorizes delivery. Before push, fetch and stop if remote is ahead/diverged, branch/protected-target is unclear, or uncommitted/staged scope is unsafe. Subagents may commit/push only their assigned branch/worktree when explicitly allowed by task/contract, never directly to protected/base branches.
 <!-- END BEADS INTEGRATION -->
