@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,6 +37,23 @@ function captureAgainstUnreachableSource(): { status: number | null; stderr: str
   });
   return { status: result.status, stderr: result.stderr };
 }
+
+// The behavioural test below needs the exact interpreter the tool hardcodes, and GitHub's runners
+// carry PostgreSQL 16, so there it skips — like every other pg17 suite here. This source guard
+// runs everywhere, so CI is not blind to a revert of the one line that matters.
+describe('Supabase source manifest psql failure diagnostic (source guard)', () => {
+  it('appends the captured stderr to the failure, not just the exit status', () => {
+    const tool = readFileSync(TOOL, 'utf8');
+
+    expect(tool).toContain('psqlDiagnostic(result.stderr)');
+    // Anchored on the interpolation, which only the failure site has — the same words also appear
+    // in the comment above it explaining why this guard exists.
+    const site = tool.slice(
+      tool.indexOf('PostgreSQL 17 manifest query failed with status ${result.status')
+    );
+    expect(site.slice(0, 200)).toContain('psqlDiagnostic');
+  });
+});
 
 describe.skipIf(!existsSync(PSQL))('Supabase source manifest psql failure diagnostic', () => {
   it("carries psql's own reason into the failure the operator reads", () => {

@@ -14,7 +14,7 @@
       "mode": "0444",
       "owner": "claude-deploy",
       "path": "deploy/postgres/q12-source-manifest.ts",
-      "sha256": "7bafc373fcf8e41c128e69187347a8a9c06cdf4ea208840bbedf0cbaf2bd8e92"
+      "sha256": "d103e6a925ba52e300e54175df558818aaa74f1787bd81cb9829f0274e99cf87"
     },
     {
       "group": "claude-deploy",
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "27aa968f2829e72ce57ee40b47ec60cdcde94e58",
+  "generated_from_tree_sha": "151b03cb48f56a6b7c0660c826c91e19298b8d31",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
