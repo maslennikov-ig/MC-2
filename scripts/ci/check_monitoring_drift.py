@@ -41,7 +41,16 @@ SYSTEMD_SUFFIXES = (".service", ".timer")
 REMEDIATION = (
     "Run the deliberate root install on the host, which validates the rules before touching "
     "anything:\n"
-    "    sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh"
+    "    sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh\n"
+    "\n"
+    "mc2-0tcyw: that installer replaces every staged unit and reloads systemd, which clears the\n"
+    "drift, but it proves nothing about the schedule it just changed. When the drift is\n"
+    "megacampus-supabase-backup.service or .timer, prefer the installer that carries its own\n"
+    "proof -- it runs a real backup, validates it with pg_restore, runs the restore drill, and\n"
+    "disables the timer again if any of that fails:\n"
+    "    sudo /opt/megacampus/deploy/postgres/install-supabase-backup-schedule.sh \\\n"
+    "        --run-id <uuid> --service-sha256 <sha> --timer-sha256 <sha> \\\n"
+    "        --confirm 'INSTALL MC2 SUPABASE BACKUP SCHEDULE'"
 )
 
 

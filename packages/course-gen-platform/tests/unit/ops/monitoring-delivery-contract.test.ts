@@ -42,6 +42,11 @@ describe('monitoring config delivery contract', () => {
     // staged copy would prove nothing about the units systemd actually runs.
     expect(checker).toContain('SYSTEMD_DEPLOYED_DIR = "/etc/systemd/system"');
     expect(checker).toContain('install-monitoring-config.sh');
+    // mc2-0tcyw: the generic installer clears backup-schedule drift without proving the schedule
+    // still works, so the remediation must also name the installer that runs a real backup, a
+    // pg_restore validation and the restore drill before it re-enables the timer.
+    expect(checker).toContain('install-supabase-backup-schedule.sh');
+    expect(checker).toContain('INSTALL MC2 SUPABASE BACKUP SCHEDULE');
   });
 
   it('refuses to install rules it has not validated, and replaces rather than signals', async () => {
