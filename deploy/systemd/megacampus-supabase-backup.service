@@ -2,6 +2,11 @@
 Description=MegaCampus atomic Supabase backup generation
 Wants=network-online.target
 After=network-online.target
+# mc2-0tcyw: bounds the retry policy below. Four starts per six hours is the whole budget, so a
+# genuinely broken backup still reaches failed state and still pages, and it cannot loop. The
+# window is far shorter than the daily schedule, so it is always clear before the next night.
+StartLimitIntervalSec=6h
+StartLimitBurst=4
 
 [Service]
 Type=oneshot
@@ -11,6 +16,16 @@ UMask=0077
 WorkingDirectory=/opt/megacampus
 ExecStart=/opt/megacampus/deploy/postgres/scheduled-backup-run.sh
 TimeoutStartSec=2h
+# mc2-0tcyw: the 2026-08-03 00:30 run failed in the manifest phase and an identical manual re-run
+# at 07:26 passed, so a single transient cost a whole night of backup coverage and woke a human.
+# There was no Restart= at all. Ten minutes is long enough for a pooler blip to clear and short
+# enough that all retries finish inside the nightly window.
+Restart=on-failure
+RestartSec=10min
+# 64 is the wrapper's usage/configuration refusal and 75 is its contention refusal — Q12 active,
+# or another backup already holding the lock. Both are deliberate decisions, not failures a retry
+# could change, and retrying 75 would fight whatever holds the lock.
+RestartPreventExitStatus=64 75
 StandardOutput=append:/opt/megacampus/logs/backup-supabase.log
 StandardError=append:/opt/megacampus/logs/backup-supabase.log
 NoNewPrivileges=true

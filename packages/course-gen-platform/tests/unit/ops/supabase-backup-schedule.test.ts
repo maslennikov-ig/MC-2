@@ -163,6 +163,27 @@ describe('replacement Supabase backup systemd units', () => {
     expect(scheduler).toContain('metric not published');
   });
 
+  // mc2-0tcyw: the 2026-08-03 00:30 run failed on a transient and an identical manual re-run at
+  // 07:26 passed. With no Restart= at all, that single blip cost a whole night of backup coverage
+  // and paged a human for something the machine could have retried.
+  it('retries a transient failure inside the night, without ever looping', () => {
+    const service = tracked(SERVICE);
+
+    expect(service).toContain('Restart=on-failure');
+    expect(service).toContain('RestartSec=10min');
+    // A genuinely broken backup must still reach failed state and still alert.
+    expect(service).toContain('StartLimitIntervalSec=6h');
+    expect(service).toContain('StartLimitBurst=4');
+    // 64 is the wrapper's usage refusal and 75 its contention refusal (Q12 active, or another
+    // backup holding the lock). Both are decisions, not failures a retry could change.
+    expect(service).toContain('RestartPreventExitStatus=64 75');
+    expect(service).not.toContain('Restart=always');
+
+    const wrapper = tracked(WRAPPER);
+    expect(wrapper).toContain("fail 'refusing scheduled backup while Q12 is active' 75");
+    expect(wrapper).toContain("fail 'another backup process is active' 75");
+  });
+
   it('fires at 00:30 Europe/Amsterdam with deterministic persistent catch-up', () => {
     const timer = tracked(TIMER);
 
