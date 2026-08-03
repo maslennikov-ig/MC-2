@@ -1943,7 +1943,7 @@ ${body}`;
       ['roles.sql', '-- roles\n'],
       [
         'source-manifest.json',
-        `${JSON.stringify({ schema: 'megacampus.supabase-source-manifest/v1' })}\n`,
+        `${JSON.stringify({ schema: 'megacampus.supabase-source-manifest/v2' })}\n`,
       ],
     ]) {
       writeFileSync(join(dir, name), body, { mode: 0o600 });

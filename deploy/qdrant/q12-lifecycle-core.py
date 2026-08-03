@@ -7975,7 +7975,7 @@ class LivePlanExecutor(SourceConnectionConfig):
         # placeholder the fake drill accepts.
         if self.source_container:
             placeholder = {
-                "schema": "megacampus.supabase-source-manifest/v1",
+                "schema": "megacampus.supabase-source-manifest/v2",
                 "snapshot_id": "00000000-00000000-0",
                 "baseline": {},
                 "cutover_snapshot": {},

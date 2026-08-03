@@ -144,7 +144,7 @@ function sourceManifest(): Record<string, unknown> {
     catalog: {},
   };
   return {
-    schema: 'megacampus.supabase-source-manifest/v1',
+    schema: 'megacampus.supabase-source-manifest/v2',
     snapshot_id: '00000003-0000001B-1',
     baseline: view,
     cutover_snapshot: view,
@@ -438,7 +438,7 @@ function exactGuardTransitionManifest(): Record<string, unknown> {
     object_acls: objectAcls,
   };
   return {
-    schema: 'megacampus.supabase-source-manifest/v1',
+    schema: 'megacampus.supabase-source-manifest/v2',
     snapshot_id: '00000003-0000001B-1',
     baseline,
     cutover_snapshot: cutover,

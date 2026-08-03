@@ -203,7 +203,7 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 [[ -n "$output" && -n "$snapshot" ]] || exit 91
-printf '{"schema":"megacampus.supabase-source-manifest/v1","snapshot_id":"%s","baseline":{},"cutover_snapshot":{}}\\n' "$snapshot" > "$output"
+printf '{"schema":"megacampus.supabase-source-manifest/v2","snapshot_id":"%s","baseline":{},"cutover_snapshot":{}}\\n' "$snapshot" > "$output"
 `
   );
 

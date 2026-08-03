@@ -11,22 +11,18 @@ const PSQL = '/usr/lib/postgresql/17/bin/psql';
 
 // mc2-0rj7i. The source inherits statement_timeout=120000 from its configuration file, and the
 // backup connects as `postgres`, which carries no per-role override (measured 2026-08-03 from
-// pg_settings and pg_db_role_setting). Every relation hash below serializes a whole table to JSON,
-// SORTS by that full text and concatenates it before hashing, so the cost tracks table bytes rather
-// than row count. Measured against the live source, warm and with nothing else running:
-//
-//   file_catalog       261 rows / 129MB   34.5s   external merge, 276MB to disk
-//   lesson_contents   4140 rows /  63MB   20.4s   external merge, 202MB to disk
-//   generation_trace 36824 rows /  40MB    5.5s   external merge, ~100MB to disk
-//
-// One relation was already burning 29% of the whole budget, and it grows with every upload. Ten
-// minutes is deliberately generous against the worst measured 34.5s because the failure it prevents
-// costs a night of backup coverage, while the cost of the headroom is only that a pathological
-// query holds the exported snapshot longer -- still bounded, and still far inside the unit's
-// TimeoutStartSec=2h. This raises a ceiling; it does not make the hash cheaper, which stays the
-// durable concern on the bead.
+// pg_settings and pg_db_role_setting). Every relation hash below reads a whole table, so a nightly
+// backup can be cancelled by that ceiling with nothing but "failed with status 1" to show for it.
+// Ten minutes is deliberately generous against the worst relation measured on the live source
+// (8.9s, see relationHash) because the failure it prevents costs a night of backup coverage, while
+// the cost of the headroom is only that a pathological query holds the exported snapshot longer --
+// still bounded, and still far inside the unit's TimeoutStartSec=2h.
 const STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '10min';";
-const SCHEMA = 'megacampus.supabase-source-manifest/v1';
+// v2 (mc2-0rj7i, 2026-08-03): relationHash changed how row_sha256 is computed, so the same
+// database now produces different digests. Nothing about the manifest is comparable across the
+// two, and the version is what makes that say so. A v1 generation drilled by this tool stops at
+// "source manifest schema mismatch" instead of reporting every authoritative relation as drifted.
+const SCHEMA = 'megacampus.supabase-source-manifest/v2';
 const SNAPSHOT_PATTERN = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{8}-[0-9]+$/;
 
 function fail(message: string): never {
@@ -390,12 +386,36 @@ function relationHash(
   // relation is completely unaffected by this branch.
   const rowExpression =
     schema === 'cron' && relation === 'job' ? `(to_jsonb(t) - 'active')` : 'to_jsonb(t)';
+  // mc2-0rj7i. The digest is taken over the SORTED PER-ROW DIGESTS, not over the sorted row text.
+  // Both bind every byte of every row and both are order-independent; the difference is what the
+  // sort and the aggregate have to carry. Sorting megabyte-sized JSON keys and concatenating the
+  // whole table into one text value made this O(table bytes) and spilled to disk, measured warm
+  // against the live source, before -> after:
+  //
+  //   file_catalog       261 rows / 129MB   37.2s, 276MB spilled  ->   8.9s, no spill
+  //   lesson_contents   4212 rows /  63MB   20.4s, 202MB spilled  ->   5.8s, no spill
+  //   generation_trace 37085 rows /  40MB    5.5s, ~100MB spilled ->   4.3s, no spill
+  //
+  // The sort key is now 64 hex bytes, so every sort fits in the source's 2184kB work_mem
+  // (generation_trace, the widest, uses 1537kB) and raising work_mem stopped being a lever at all.
+  // It also retires a cliff that had nothing to do with time: string_agg built a single text value
+  // the size of the table, and text tops out at 1GB. file_catalog was at 129MB of that budget and
+  // grows with every upload; the aggregate is now 65 bytes per row.
+  //
+  // AS MATERIALIZED is load-bearing, not decoration. Without the fence the planner inlines the
+  // subquery and sorts the underlying rows again -- measured, it still spilled 122MB and cost 13.4s
+  // instead of 8.9s. COLLATE "C" makes the ordering of the hex digests byte-order rather than
+  // locale-order, so a source and a restored target cannot disagree about it.
   const sql = `${begin}
 COPY (
+  WITH hashed AS MATERIALIZED (
+    SELECT encode(extensions.digest(convert_to(${rowExpression}::text, 'UTF8'), 'sha256'), 'hex') AS row_digest
+    FROM ${qualified} t
+  )
   SELECT jsonb_build_object(
     'row_count', count(*)::text,
-    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(${rowExpression}::text, E'\\n' ORDER BY ${rowExpression}::text), ''), 'UTF8'), 'sha256'), 'hex')
-  ) FROM ${qualified} t
+    'row_sha256', encode(extensions.digest(convert_to(COALESCE(string_agg(row_digest, E'\\n' ORDER BY row_digest COLLATE "C"), ''), 'UTF8'), 'sha256'), 'hex')
+  ) FROM hashed
 ) TO STDOUT;
 COMMIT;`;
   const value = JSON.parse(runPsql(sql)) as { row_count: string; row_sha256: string };

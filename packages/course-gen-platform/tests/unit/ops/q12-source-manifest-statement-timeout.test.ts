@@ -6,17 +6,14 @@ import { describe, expect, it } from 'vitest';
 
 // mc2-0rj7i. The source carries statement_timeout=120000 in its configuration file and the backup
 // connects as `postgres`, which has no per-role override — both measured 2026-08-03 from pg_settings
-// and pg_db_role_setting. Every relation hash serializes a whole table to JSON, sorts by that full
-// text and concatenates it before hashing, so cost tracks table BYTES, not row count:
+// and pg_db_role_setting. Every relation hash reads a whole table, and a cancelled manifest query
+// costs a whole night of backup coverage, so every transaction the tool opens raises the ceiling
+// for its own duration. The hash itself was made ~4x cheaper afterwards (see
+// q12-source-manifest-row-hash.test.ts); the ceiling stays, because cost still tracks table size
+// and the headroom is what keeps a slow night from becoming an uncovered one.
 //
-//   file_catalog       261 rows / 129MB   34.5s   external merge, 276MB to disk
-//   lesson_contents   4140 rows /  63MB   20.4s   external merge, 202MB to disk
-//   generation_trace 36824 rows /  40MB    5.5s   external merge, ~100MB to disk
-//
-// One relation was already spending 29% of the budget, and it grows with every upload. A cancelled
-// manifest query costs a whole night of backup coverage, so every transaction the tool opens raises
-// the ceiling for its own duration. This guard exists because the next transaction added to the
-// tool would otherwise inherit the two-minute cap silently.
+// This guard exists because the next transaction added to the tool would otherwise inherit the
+// two-minute cap silently.
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const TOOL = resolve(REPO_ROOT, 'deploy/postgres/q12-source-manifest.ts');
 const OPENER = /BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;[^`\n]*/g;
