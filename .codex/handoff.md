@@ -82,14 +82,14 @@ bounded to 4 starts / 6h, excluding exit 64/75. Install ONLY via
 `install-supabase-backup-schedule.sh`, which clears the start-limit first — without that, the night
 after repeated failures its own proof fails and the trap DISABLES the timer.
 
-**`mc2-0rj7i` — measured, mitigated, still NOT proven to be the cause.** `statement_timeout=120000`,
-and the backup connects as `postgres`, which has no override. Its hash queries serialize a whole
-table to JSON, sort by that text and concatenate it, so cost tracks table BYTES: `file_catalog`
-measured 34.5s, `lesson_contents` 20.4s, all spilling 200-276MB because `work_mem` is 2184kB — one
-relation burning 29% of the budget before nightly load counts. All four manifest transactions now
-`SET LOCAL statement_timeout = '10min'`; a fresh run published `generation-20260803T083159Z`.
-Idle-in-transaction is FALSIFIED. This RAISED A CEILING; the hash stays O(table bytes). Next levers
-on the bead: measure `work_mem`, then the formula.
+**`mc2-0rj7i` — FINISHED 2026-08-03; still NOT proven to be the cause of that night.** All four
+manifest transactions `SET LOCAL statement_timeout = '10min'`, because the source carries 120000 and
+`postgres` has no override. Then the hash stopped being O(table bytes): it digests each row and
+sorts 64-byte digests instead of sorting whole rows. Measured warm, `file_catalog` 37.2s/276MB
+spilled → 8.9s/no spill, `lesson_contents` 20.4s → 5.8s, `generation_trace` 5.5s → 4.3s. `work_mem`
+stopped being a lever — nothing spills now. Manifest schema is **v2**, so a generation captured
+before this drills to `source manifest schema mismatch` rather than reporting every relation as
+drifted; those generations stay restorable. Idle-in-transaction is FALSIFIED.
 
 **All 13 alerting rules are inactive.** Every one was cleared by making it true, never by editing
 the rule to stop asking. **`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from

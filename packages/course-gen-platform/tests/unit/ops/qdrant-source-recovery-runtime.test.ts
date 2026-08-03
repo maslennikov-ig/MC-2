@@ -432,6 +432,13 @@ printf 'bound|%s|%s\n' "$Q12_DB_CAPABILITY_FILE" "$identity"
       .replace("readonly CONTROLLER_UID='1000'", `readonly CONTROLLER_UID='${currentUid}'`)
       .replace("readonly CONTROLLER_GID='1000'", `readonly CONTROLLER_GID='${currentGid}'`)
       .replace("readonly NODE_BIN='/usr/local/bin/node'", `readonly NODE_BIN='${process.execPath}'`)
+      // In the image this staging runs as root, which is why the directory is handed to 0:0 before
+      // its mode is set. Here it runs as an ordinary uid, and an ordinary uid cannot chown to root:
+      // this substitution is the same kind of isolation shim as the four above it, and without it
+      // the whole case dies on EPERM before it can assert anything. Added 2026-08-03, after the
+      // case had been red on this host since `chown 0:0` was introduced on 2026-07-31 and the
+      // failure was being read as the parallelism flake it is not.
+      .replace('chown 0:0 "$1"', `chown ${currentUid}:${currentGid} "$1"`)
       .replace(
         "readonly DEFAULT_Q12_DB_CAPABILITY_FILE='/run/secrets/q12_db_capability'",
         `readonly DEFAULT_Q12_DB_CAPABILITY_FILE='${sourceCapability}'`
