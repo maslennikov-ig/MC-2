@@ -2116,3 +2116,79 @@ appear in the comment above the failure site.
 **End state.** Pipeline green end to end, `Deploy to Production` success, `Rollback` skipped —
 the 2026-08-01 job split holding. Drift check on the host: `monitoring config OK: 20 files match the
 repository`. Timer enabled and active, next 2026-08-04 00:30 CEST. Alerts firing: NONE.
+
+## Review round 2026-08-03 — the mc2-0tcyw fix reviewed against itself
+
+graph-reviewed: updated (see below). docs-reviewed: handoff and this summary updated; no README,
+AGENTS.md or runbook claim changed behaviour, so nothing else was in scope.
+
+No delegation. The diff was six files and roughly 150 lines with the whole context already in the
+session, so none of parallel latency, context isolation, specialist capability or write isolation
+applied. Reviewed locally against the delivered diff.
+
+**Finding 1, ACCEPTED, P1 — the fix reintroduced its own disease.** `spawnSync` leaves `stdout` and
+`stderr` UNDEFINED when the process never starts, and `psqlDiagnostic(result.stderr)` read it
+unconditionally. Reproduced before fixing:
+
+    status = null   stderr = undefined
+    error  = spawnSync .../psql-DOES-NOT-EXIST ENOENT
+    CRASH  = TypeError: Cannot read properties of undefined (reading 'replace')
+
+So a psql that cannot be executed would have produced `source manifest failed: Cannot read
+properties of undefined` — less attributable than the message the change was written to replace.
+Not theory: the interpreter is an absolute path under a unit with `ProtectSystem=strict` and
+`ReadOnlyPaths`, and an ordinary deploy rewrites asset modes. Fixed two ways: the diagnostic is
+nullish-guarded, and a spawn failure became its own differently-worded failure carrying
+`result.error.message`, because "failed with status signal" names the wrong thing for a process
+that never ran. Proven against an absent binary:
+
+    source manifest failed: PostgreSQL 17 manifest query could not start: spawnSync .../psql-ABSENT ENOENT
+
+**Finding 2, ACCEPTED, P2 — the retry policy could disable backups through the installer.** A unit
+that has exhausted `StartLimitBurst` refuses every further start until the window elapses, including
+the one `prove_supabase_backup_schedule` issues. Its `disable_unproven_timer` trap then turns the
+timer OFF. The night after a run of failures is exactly when an operator reaches for that installer,
+so the guard against a broken backup could have become the thing that stopped backups. The installer
+now clears the counter before proving; the lifecycle harness asserts the call lands before the timer
+start, and the 07:29 reinstall exercised it live.
+
+**Finding 3, ACCEPTED, nit — a comment that flattered the design.** "Four starts per six hours ...
+it cannot loop" is false: `StartLimitIntervalSec` is a sliding window, so a run that hangs to
+`TimeoutStartSec=2h` ages its own earlier starts out of it and keeps retrying about every two hours.
+Harmless — a hang publishes no metric either way, so `SupabaseBackupStale` still fires — but the
+unit now says that instead of promising otherwise.
+
+**Finding 4, ACCEPTED as a gap, fixed — a test that skipped everywhere it ran.** The behavioural
+test needs the interpreter the tool hardcodes and GitHub's runners carry PostgreSQL 16, so CI
+executed 0 of 2 cases. The new spawn-failure test is its mirror: `skipIf(existsSync(PSQL))`, so it
+runs exactly where the other cannot. CI now reports `4 tests | 2 skipped` instead of `2 tests | 2
+skipped`, and the ENOENT path is exercised on every push.
+
+**REJECTED — psql stderr could quote row data into a log.** True in principle for some error
+classes, and dismissed on consequence: the log lives on the same host as the pg_dump archives, which
+contain every row already, so the marginal exposure is nil. Rejecting it here rather than silently.
+
+**REJECTED for now — raise `statement_timeout` for the manifest transaction.** It is the obvious
+move and the wrong first one: it removes the only bound on a session holding an exported snapshot,
+leaving `TimeoutStartSec=2h` as the sole stop. Tracked in `mc2-0rj7i` behind confirmation.
+
+**The measurement that replaced a guess.** mc2-0tcyw's leading hypothesis — the coordinator's
+idle-in-transaction session being terminated — was FALSIFIED by read-only catalog query:
+`idle_in_transaction_session_timeout` and `idle_session_timeout` are both 0 by default, and
+`pg_db_role_setting` carries no override for `postgres`, which `backup-supabase.sh:934` asserts is
+the connecting role. What replaced it fits every observation: `statement_timeout = 120000` from the
+configuration file, inherited by `postgres`, against per-relation hash queries that serialize an
+entire table to JSON, sort by that text and concatenate it before hashing — `file_catalog` is 129MB
+across 261 rows. Still a hypothesis, and deliberately left as one: the next occurrence will print
+`canceling statement due to statement timeout` verbatim now, which is the whole point of the fix.
+
+graph-reviewed: updated — `graphify update .`, no external semantic/model backend and no git hooks.
+60297 nodes / 86510 edges / 7197 communities.
+
+**Verification.** Ops acceptance set green (9 files, including the window pre-flight ratchet and the
+asset-manifest consumer identity after re-pinning), `pnpm type-check` clean, prettier clean. Pipeline
+green with `Deploy to Production` success and `Rollback` skipped; the monitoring-drift job went red
+once in between, correctly, because `/etc/systemd/system` still held the previous unit. Host reads
+`monitoring config OK: 20 files match the repository`, alerts firing NONE, timer next 2026-08-04
+00:30 CEST. Installed and proven: `generation-20260803T072934Z-e542a166-fe96-43f5-a150-ff0a5fd760aa`,
+restore `3540 archive entries, 0 skipped`, `restore size ratio=0.800961`.

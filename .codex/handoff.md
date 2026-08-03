@@ -28,16 +28,16 @@ source recovery each have an ordinary path, reached by NOT passing the Q12 flags
 
 **The source recovery is COMPLETE** and `mc2-jz6y0.13.4` is closed on that evidence. Measured
 2026-08-01 from `/var/lib/megacampus-source-recovery/state`: 42/42 `copy_states` `published`, 24/24
-`disposition_states` `disposition_verified`, of which 18 `career_playbook_retained_derived` and 6
-`eligible_unrecoverable`. Recovery reached `verified` at revision 94; the journal now reads
-revision 95 / phase `reindex_started`, because the reindex ran after it.
+`disposition_states` `disposition_verified` — 18 `career_playbook_retained_derived`, 6
+`eligible_unrecoverable`. Recovery reached `verified` at revision 94; the journal now reads revision
+95 / phase `reindex_started`, because the reindex ran after it.
 
 **The 16 that remain are one family, and the diagnosis took three tries.** They are NOT scans and
 there is NO race: exported diagrams, one page, 4296pt tall, type converted to curves, so no text
 layer exists for any extractor. OCR is installed, loads its models, and returns nothing even with
-`force_full_page_ocr` at 3x. Docling converts them to `<!-- image -->` — fourteen characters — and
-REPORTS SUCCESS, after which zero chunks, embeddings and points are correct on empty input. See
-`mc2-3gz2m`; both earlier explanations are marked wrong there rather than deleted.
+`force_full_page_ocr` at 3x. Docling converts them to `<!-- image -->` and REPORTS SUCCESS, after
+which zero chunks and points are correct on empty input. See `mc2-3gz2m`; both earlier explanations
+are marked wrong there rather than deleted.
 
 **The reindex is 218/234.** Measured after the repair:
 
@@ -75,17 +75,18 @@ ru_bm25, en_bm25, formula_priority, tenant_course_isolation — evidence under
 `megacampus_supabase_last_successful_backup_unixtime_seconds` only after pg_restore validation AND
 pointer publication both succeed. Snapshots are `storage_mode local` (`mc2-jz6y0.13.6`).
 
-**`mc2-0tcyw`, 2026-08-03.** The 00:30 run failed in the manifest phase, after `pg_dump` had already
-succeeded, and paged `SupabaseBackupStale` honestly — there was no backup that night. An identical
-re-run passed, so the cause was transient, and it was UNATTRIBUTABLE: the tool dropped psql's stderr
-and reported only `... failed with status 1`. It now carries psql's own words. The unit had no
-`Restart=` at all and now retries after 10min, bounded to 4 starts / 6h, excluding exit 64 and 75 —
-installed through `install-supabase-backup-schedule.sh`, which PROVED it with a real backup.
+**`mc2-0tcyw`, 2026-08-03.** The 00:30 run failed past `pg_dump` and paged honestly, and was
+UNATTRIBUTABLE: psql's stderr was dropped, leaving `... failed with status 1`. It now carries psql's
+words, and a spawn failure names itself. The unit had no `Restart=`; it now retries after 10min,
+bounded to 4 starts / 6h, excluding exit 64/75. Install ONLY via
+`install-supabase-backup-schedule.sh`, which clears the start-limit first — without that, the night
+after repeated failures its own proof fails and the trap DISABLES the timer. **Cause is `mc2-0rj7i`,
+a suspect not a finding:** `statement_timeout=120000` inherited by `postgres`, against hash queries
+that serialize a whole table to JSON. Idle-in-transaction is FALSIFIED (both timeouts 0, no role
+override). Do not raise the timeout before the next occurrence names it in the log.
 
 **All 13 alerting rules are inactive.** Every one was cleared by making it true, never by editing
-the rule to stop asking.
-
-**`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from
+the rule to stop asking. **`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from
 `deploy/qdrant/generate-recovery-probe.py`, deliberately NOT in the repository because it embeds
 real course content. **Regenerate it after anything that rewrites course
 `0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill** — it must match.
@@ -124,13 +125,12 @@ restore the new code because its commit touched no api source. `workflow_dispatc
 
 - Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` green (0 errors).
 - Known and not a stop: `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*`,
-  `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred` and
-  `qdrant-source-recovery-runtime` can time out under full-suite parallelism; each passes alone.
-  Anything else failing in isolation IS a stop.
+  `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred`,
+  `qdrant-source-recovery-runtime` time out under full-suite parallelism but pass alone. Anything
+  else failing in isolation IS a stop.
 - Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`. As a
-  step it failed the deploy job, and `rollback` triggers on exactly that: on 2026-08-01 a rule file
-  one commit behind rolled production back while the pipeline reported success, and production ran
-  stale code green for twenty minutes. Fix drift with
+  step it failed the deploy job, and `rollback` triggers on exactly that: on 2026-08-01 a stale rule
+  file rolled production back under a green pipeline for twenty minutes. Fix drift with
   `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh`, which validates with promtool
   first and restarts Prometheus rather than signalling it. EXCEPT for
   `megacampus-supabase-backup.{service,timer}`: it clears their drift while proving nothing about
@@ -163,7 +163,7 @@ restore the new code because its commit touched no api source. `workflow_dispatc
   GitHub runners (`mc2-oa7om` folded in as option в). Same class as the psql-17 skip in
   `q12-source-manifest-psql-diagnostic.test.ts`, so that file also carries a source guard.
 - `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
-- Review P2 `mc2-af1ay`; HA, quantization, on-disk hot indexes, sharding and JWT RBAC out of scope.
+  Review P2 `mc2-af1ay`; HA, quantization, on-disk hot indexes, sharding and JWT RBAC out of scope.
 - CLOSED 2026-07-31/08-01, so do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
   `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`, `mc2-oc83n`.
 
