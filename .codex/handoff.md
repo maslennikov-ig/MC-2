@@ -1,19 +1,20 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-05 — Docling 2.118 / Serve 1.29 / MCP 3 and TypeScript/Python MCP SDK 2 are locally
-accepted; the controlled corpus is 5/5 and deployment is explicitly authorized and in progress.
+Updated: 2026-08-05 — Docling 2.118 / Serve 1.29 / MCP 3 and TypeScript/Python MCP SDK 2 are live in
+production; the controlled corpus and live OCR smoke pass, with no document reindex.
 
 Current stage id: `mc2-nxd3g`
-Stage: Docling/MCP client-first migration; implementation and release acceptance complete, delivery in progress.
+Stage: Docling/MCP client-first migration delivered and production-verified.
 
-## Docling migration is accepted; delivery is authorized
+## Docling migration is live
 
 The split stack, SDK 2 client, JSON adapter/cache cleanup, admin MCP health probe, immutable rollout
 and MCP 1.x rollback are implemented. `.tmp/docling-benchmark/new-2.118-quality-fixed/report.md`
-passes all five cases, including EasyOCR `ru,en`, semantic DOCX nesting and the controlled empty
-negative. Keep `DOCLING_STACK_V2_ENABLED=false` until candidate and rollback digests are published;
-then use the guarded rollout and one smoke document. No reindex. Follow-up `mc2-vlskb` removes the
-upstream wrapper. Full details: `.codex/stages/mc2-nxd3g/summary.md` and `docs/DOCLING-MCP-REFERENCE.md`.
+passes all five cases. Production has `DOCLING_STACK_V2_ENABLED=true`; Serve and MCP 3 are healthy
+on immutable digests, the exact MCP 1.x rollback image remains pullable, and a non-cached Russian OCR
+smoke found all control phrases. No reindex was run. Follow-up `mc2-vlskb` removes the upstream
+timeout wrapper. Full evidence: `.codex/stages/mc2-nxd3g/summary.md` and
+`docs/DOCLING-MCP-REFERENCE.md`.
 
 ## THE WINDOW IS GONE
 
@@ -178,15 +179,15 @@ hook, so stage explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-nxd3g` delivery (authorized 2026-08-05)
-Recommended action: publish immutable Serve/MCP images, record the existing MCP 1.x rollback digest,
-then use the guarded deployment flow and convert one smoke document. Do not reindex existing data.
+Next stage id: choose from `bd ready`; `mc2-nxd3g` is complete.
+Recommended action: monitor ordinary document conversions; do not reindex existing data. Address
+`mc2-vlskb` only after upstream Docling MCP consumes its declared timeout settings.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage to finish authorized delivery of `mc2-nxd3g`; preserve
-`DOCLING_STACK_V2_ENABLED=false` until immutable candidate and rollback digests are validated, and do
-not reindex existing documents.
+Use $orchestrator-stage for the next selected Beads task. Treat the Docling split stack as live;
+preserve immutable image references and the MCP 1.x rollback digest, and do not reindex existing
+documents without a separate task and authority.
 
 ## Read First
 
