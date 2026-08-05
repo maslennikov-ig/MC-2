@@ -1,9 +1,9 @@
 # Stage Summary: mc2-nxd3g
 
 Updated: 2026-08-05
-Branch: current worktree (not delivered)
+Branch: `develop`; merged to `master` at `66b01524b974e661eb2ccf06d09099162708b536`
 Beads: `mc2-nxd3g`
-Status: implementation complete; final release acceptance pending; production rollout awaits separate authorization
+Status: complete; production rollout accepted; no reindex performed
 
 ## Scope
 
@@ -16,7 +16,8 @@ Status: implementation complete; final release acceptance pending; production ro
   that upstream does not forward to Serve.
 - Corrected the DOCX fixture to use one true multilevel numbering definition, proving semantic list
   nesting instead of relying on unrelated Word paragraph styles.
-- Did not deploy, reindex, or mutate production data.
+- Deployed client-first, then switched production to the split Serve + MCP 3 stack. Existing
+  documents were not reindexed.
 
 ## Verification
 
@@ -39,8 +40,23 @@ Status: implementation complete; final release acceptance pending; production ro
   saved JSON is verified against the bundle key and the SDK client is recreated after failed initial
   connect; cache cleanup matches Python `json.dumps(ensure_ascii=True)` for Unicode paths. Focused
   regression tests pass 14/14 plus the rollout shell contract and syntax checks.
-- Final root-owned release acceptance runs after this summary, Beads, Compose/search proof, and graph
-  refresh; its receipt is the acceptance authority rather than any incomplete earlier attempt.
+- The final local full suite passed before delivery; GitHub run `30997869869` then passed type-check,
+  lint, unit, integration, contract, package/image builds, and the client-first production deploy.
+- Client-first production smoke used the TypeScript MCP 2 client against Docling MCP 1.26, negotiated
+  the legacy protocol, validated the required tools, and converted a one-page DOCX to 492 characters
+  of Markdown.
+- Immutable image run `30997545725` published MCP
+  `sha256:76b0d76d17742074a0c1b890c528ceb3bbd5d8d565dbe1ee3d2e176a21fabba0` and Serve
+  `sha256:72ad1514aff5afdf57a5683d7676fc6b3170e3edf5f992e705ce7cdc463e7476`.
+- The first guarded server cutover stopped before mutation because the original rollback package was
+  not repository-linked. The exact running MCP 1.x image was republished in the linked package;
+  manifest config `sha256:cba83fc462f91cc570a02e38881fad721a6e8334676c49789815d90121da97df`
+  matches the old container. Final run `31000043538` passed deploy and monitoring drift checks.
+- Production runtime versions are Serve 1.29.0, Docling Slim 2.118.0, Core 2.90.0, MCP 3.0.0,
+  Python MCP 2.0.0 and TypeScript MCP client/core 2.0.0. The live Russian raster OCR smoke used the
+  modern `2026-07-28` protocol, was not cached, produced 294 Markdown characters, and found all five
+  control values. Post-smoke Serve used 2.576 GiB/4 GiB and MCP used 144.3 MiB/512 MiB; both had zero
+  restarts.
 
 ## Quality Gate
 
@@ -49,20 +65,18 @@ Status: implementation complete; final release acceptance pending; production ro
   Russian raster OCR phrases/table, and the vector-outline negative case with controlled
   `EmptyConversionError`.
 - A trustworthy full Docling 2.80 baseline could not be reconstructed locally because the prior image/digest was not present. Historical cache contains only the scientific Markdown, not the full corpus/raw JSON. No production access was assumed.
-- Result: the quality blocker is removed. `DOCLING_STACK_V2_ENABLED` still remains `false` until a
-  separately authorized production rollout supplies immutable candidate and rollback digests.
+- Result: the quality blocker is removed and `DOCLING_STACK_V2_ENABLED=true` is live with immutable
+  candidate and rollback digests.
 
 ## Documentation
 
 - docs-reviewed: updated - runtime topology, exact versions, quality harness, immutable rollout, health/tool checks, and automatic MCP 1.x rollback are documented.
 - project-index: updated - stable Docling client, image, benchmark, and operations entrypoints are indexed.
 - graph-reviewed: updated - Graphify 0.9.14 rebuilt the local code graph without an external
-  semantic/model backend (`60453` nodes, `86900` edges, `7242` communities); the focused Docling
-  query resolves the new client and Markdown consumer. The report is built from current HEAD plus
-  the explicitly reported uncommitted stage diff.
+  semantic/model backend (`60455` nodes, `86901` edges; communities refreshed); the focused Docling
+  query resolves the SDK 2 client, adapter, benchmark, admin health route and Markdown consumer.
 
 ## Explicit Defers
 
 - `mc2-vlskb` (P2): remove the Docling MCP 3.0 timeout wrapper after upstream consumes its declared settings.
-- Production image publication/deploy and one live smoke conversion require separate user authority;
-  existing documents are not reindexed.
+- Existing documents remain intentionally unreindexed.
