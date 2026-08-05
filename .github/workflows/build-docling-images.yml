@@ -32,6 +32,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve lowercase image reference
+        id: image-ref
+        env:
+          GITHUB_REPOSITORY_NAME: ${{ github.repository }}
+          DOCLING_IMAGE: ${{ matrix.image }}
+          DOCLING_VERSION: ${{ matrix.version }}
+        run: |
+          scripts/ci/resolve_docling_image_ref.sh \
+            "$GITHUB_REPOSITORY_NAME" \
+            "$DOCLING_IMAGE" \
+            "$DOCLING_VERSION" \
+            >> "$GITHUB_OUTPUT"
       - name: Build and publish versioned image
         id: build
         uses: docker/build-push-action@v7
@@ -40,7 +52,7 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository }}/${{ matrix.image }}:${{ matrix.version }}
+          tags: ${{ steps.image-ref.outputs.tag }}
           provenance: mode=max
           sbom: true
           cache-from: type=gha,scope=${{ matrix.image }}
@@ -48,7 +60,7 @@ jobs:
       - name: Record immutable deployment reference
         run: |
           printf '%s\n' \
-            'ghcr.io/${{ github.repository }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}' \
+            '${{ steps.image-ref.outputs.repository }}@${{ steps.build.outputs.digest }}' \
             > '${{ matrix.image }}-digest.txt'
       - uses: actions/upload-artifact@v6
         with:

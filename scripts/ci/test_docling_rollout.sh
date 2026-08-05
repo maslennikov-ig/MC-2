@@ -4,6 +4,22 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 
+IMAGE_REF_OUTPUT="$(
+    "$ROOT_DIR/scripts/ci/resolve_docling_image_ref.sh" \
+        'maslennikov-ig/MC-2' \
+        'docling-mcp' \
+        '3.0.0-docling-2.118.0'
+)"
+EXPECTED_IMAGE_REF_OUTPUT="$(cat <<'EOF'
+repository=ghcr.io/maslennikov-ig/mc-2/docling-mcp
+tag=ghcr.io/maslennikov-ig/mc-2/docling-mcp:3.0.0-docling-2.118.0
+EOF
+)"
+[ "$IMAGE_REF_OUTPUT" = "$EXPECTED_IMAGE_REF_OUTPUT" ] || {
+    echo "Docling image reference was not normalized to lowercase" >&2
+    exit 1
+}
+
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_DIR"' EXIT
 
