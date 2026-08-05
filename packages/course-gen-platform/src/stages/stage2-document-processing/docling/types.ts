@@ -102,6 +102,9 @@ export interface DoclingText {
 
   /** Reading order index */
   order?: number;
+
+  /** Explicit heading level supplied by Docling for section headers */
+  level?: number;
 }
 
 /**
@@ -286,7 +289,7 @@ export interface DoclingClientConfig {
   /** Request timeout in milliseconds (default: 1200000 = 20 minutes for large file processing) */
   timeout?: number;
 
-  /** Maximum retries for failed requests (default: 3) */
+  /** Maximum bundle retries after a lost connection/session (default: 1) */
   maxRetries?: number;
 
   /** Retry delay in milliseconds (default: 1000) */
@@ -294,6 +297,17 @@ export interface DoclingClientConfig {
 
   /** Enable debug logging (default: false) */
   debug?: boolean;
+
+  /** Shared directory containing JSON/Markdown files saved by Docling MCP */
+  cachePath?: string;
+}
+
+export interface DoclingConversionBundle {
+  markdown: string;
+  document: DoclingDocument;
+  documentKey: string;
+  fromCache: boolean;
+  processingTimeMs: number;
 }
 
 /**

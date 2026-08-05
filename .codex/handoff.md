@@ -1,10 +1,19 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-03 — 218 of 234 documents hold vectors, all three backup timers are enabled and
-have PASSED for real, and no alert is firing. The 16 that remain are exported diagrams with no text
-layer, not scans and not a race; both earlier diagnoses were wrong (`mc2-3gz2m`).
+Updated: 2026-08-05 — Docling 2.118 / Serve 1.29 / MCP 3 and TypeScript/Python MCP SDK 2 are locally
+accepted; the controlled corpus is 5/5 and deployment is explicitly authorized and in progress.
 
-Stage: `mc2-jz6y0` — self-hosted Qdrant plus approved document-evidence expansion.
+Current stage id: `mc2-nxd3g`
+Stage: Docling/MCP client-first migration; implementation and release acceptance complete, delivery in progress.
+
+## Docling migration is accepted; delivery is authorized
+
+The split stack, SDK 2 client, JSON adapter/cache cleanup, admin MCP health probe, immutable rollout
+and MCP 1.x rollback are implemented. `.tmp/docling-benchmark/new-2.118-quality-fixed/report.md`
+passes all five cases, including EasyOCR `ru,en`, semantic DOCX nesting and the controlled empty
+negative. Keep `DOCLING_STACK_V2_ENABLED=false` until candidate and rollback digests are published;
+then use the guarded rollout and one smoke document. No reindex. Follow-up `mc2-vlskb` removes the
+upstream wrapper. Full details: `.codex/stages/mc2-nxd3g/summary.md` and `docs/DOCLING-MCP-REFERENCE.md`.
 
 ## THE WINDOW IS GONE
 
@@ -169,32 +178,21 @@ hook, so stage explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-jz6y0`
+Next stage id: `mc2-nxd3g` delivery (authorized 2026-08-05)
+Recommended action: publish immutable Serve/MCP images, record the existing MCP 1.x rollback digest,
+then use the guarded deployment flow and convert one smoke document. Do not reindex existing data.
 
-Recommended action: nothing is broken and nothing is half-done, so the next move is to WATCH.
+## Starter prompt for next orchestrator
 
-1. Two of three schedules have PROVEN THEMSELVES UNATTENDED (2026-08-02); the RESTORE DRILL has not
-   — monthly, next 2026-09-01. Watch that, and watch whether `Restart=` absorbs the next transient
-   and whether the raised ceiling ends the manifest failures (`mc2-0tcyw`, `mc2-0rj7i`).
-2. `mc2-3gz2m` is FEATURE work, not a fix: reading those diagrams means tiling the page before OCR
-   or rasterising per region at high DPI. Two of the affected courses are test fixtures.
-3. `mc2-lkkcv`: Docling restarted three more times during the repair (7 → 10). Blast radius is now
-   a delay for DOCX, but PDFs still have no OCR fallback.
-4. `mc2-jz6y0` stays open on ONE thing: `mc2-jz6y0.13.6`, parked on the owner's 2026-08-02 decision
-   that off-host backup gets its own dedicated server. Nothing is actionable until it exists; when
-   it does, do `mc2-bygu1` FIRST — those 206MB are the only unregenerable thing on the host.
+Use $orchestrator-stage to finish authorized delivery of `mc2-nxd3g`; preserve
+`DOCLING_STACK_V2_ENABLED=false` until immutable candidate and rollback digests are validated, and do
+not reindex existing documents.
 
 ## Read First
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `.codex/stages/mc2-jz6y0/summary.md`.
+`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `.codex/stages/mc2-nxd3g/summary.md`, and
+`.codex/stages/mc2-jz6y0/summary.md`.
 Design/plan pairs under
 `docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
 `2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
-
-## Starter prompt for next orchestrator
-
-`docs/superpowers/prompts/2026-07-31-qdrant-reindex-completion-orchestrator.md` is still accurate on
-authority and on this repository's failure modes; its premise that dropping the Q12 flags suffices
-is necessary but not sufficient — thirteen defects sat behind it, all fixed. Fallback:
-Use $orchestrator-stage from this handoff plus the stage summary.

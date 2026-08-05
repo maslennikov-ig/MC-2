@@ -83,6 +83,8 @@ Read at runtime, can be changed without rebuilding:
 | `ENRICHMENTS_PUBLIC_BASE_URL` | Base domain for absolute URLs        | —                               |
 | `ENRICHMENTS_LOCAL_PATH`      | Local storage path (workers only)    | —                               |
 | `DOCLING_MCP_URL`             | Docling MCP endpoint                 | `http://docling-mcp:8000/mcp`   |
+| `DOCLING_MCP_TIMEOUT`         | MCP tool timeout, milliseconds       | `1200000`                       |
+| `DOCLING_MCP_MAX_RETRIES`     | Full-bundle reconnect retries        | `1`                             |
 | `NOTEBOOKLM_BRIDGE_URL`       | NotebookLM bridge endpoint           | `http://notebooklm-bridge:8000` |
 | `NOTEBOOKLM_BRIDGE_TOKEN`     | Bearer auth token for bridge         | Required                        |
 | `LOG_LEVEL`                   | Pino log level                       | `info` (prod), `debug` (dev)    |
@@ -199,7 +201,7 @@ bash scripts/rollback_blue_green.sh production '<same-40-character-release-commi
    - every release image receives the exact `${github.sha}` tag used by deploy;
    - mutable convenience tags are never consumed by the Qdrant operator path;
    - deploy resolves the operator tag to `repo@sha256:<digest>` and pre-pulls it;
-   - `docling-mcp` is NOT built in CI (too large)
+   - Docling MCP/Serve are built only by the manual `build-docling-images.yml` workflow; no mutable tag is emitted
 7. **deploy** (master only, deploy-relevant changes only) — SCP files to server, run `deploy_blue_green.sh`
 8. **rollback** — Auto on deploy failure
 9. **deploy-dev** (develop only, deploy-relevant changes only) — SCP `docker-compose.dev.yml` + nginx conf, run `deploy_dev.sh`
@@ -244,48 +246,22 @@ Dev uses SOCKS5 geo-proxy: `HTTPS_PROXY=socks5h://172.19.0.1:1080`
 
 See `.claude/docs/nlm-generation-guide.md` for NLM pipeline details.
 
-## Docling MCP Image
+## Docling Serve + MCP 3 images
 
-**IMPORTANT:** NOT built in CI/CD — too large (~8GB with PyTorch/CUDA).
+The manual `build-docling-images.yml` workflow builds two CPU/amd64 images and
+publishes only versioned tags. Copy its digest artifacts into repository
+variables `DOCLING_SERVE_IMAGE` and `DOCLING_MCP_IMAGE`. Record the currently
+running MCP 1.x image as `DOCLING_ROLLBACK_IMAGE` before the switch.
 
-| Property      | Value                                              |
-| ------------- | -------------------------------------------------- |
-| Image name    | `ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest`   |
-| Size          | ~8GB                                               |
-| Build context | `packages/course-gen-platform/docker/docling-mcp/` |
-| Pull policy   | `if_not_present` (never auto-pull)                 |
-| RAM limit     | 4G                                                 |
+Normal deploys keep `DOCLING_STACK_V2_ENABLED=false`, so a client-first release
+does not recreate Docling. Set it to `true` only after the A/B report is accepted
+and a separate production deploy is approved. The deploy script rejects mutable
+image references and verifies that the rollback digest matches the running MCP
+container. After startup it performs an MCP initialize/list-tools probe; a
+failed facade or tool check restores MCP 1.x and stops Docling Serve.
 
-### Manual Build (on server)
-
-```bash
-cd /opt/megacampus
-docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
-  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
-```
-
-### If Image Missing After Cleanup
-
-```bash
-# Option 1: Retag from old name (if exists)
-docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest \
-  ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
-
-# Option 2: Rebuild (takes ~30 min)
-cd /opt/megacampus
-docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
-  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
-```
-
-### Protect from Cleanup
-
-```bash
-# Use selective prune (dangling only, not -a)
-docker image prune -f
-
-# Or exclude docling when using -a
-docker image prune -a --filter "label!=docling"
-```
+See `docs/DOCLING-MCP-REFERENCE.md` for topology, timeouts, quality settings,
+benchmark commands, and rollback behavior.
 
 ## Rollback
 
@@ -462,7 +438,7 @@ The health dashboard at `/admin` checks these services via Docker DNS:
 | ----------------- | -------------------------------------- | ---------------- |
 | API               | `http://api:4000/health`               | `app.yml`        |
 | Redis             | TCP `redis:6379`                       | `infra.yml`      |
-| Docling MCP       | `http://docling-mcp:8000/health`       | `infra.yml`      |
+| Docling MCP       | MCP connect + `listTools` on `/mcp`    | `infra.yml`      |
 | NotebookLM Bridge | `http://notebooklm-bridge:8000/health` | `infra.yml`      |
 | Supabase          | External HTTPS                         | Cloud (external) |
 

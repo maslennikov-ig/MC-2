@@ -1,0 +1,6 @@
+# Direct runtime contract. Transitive versions and hashes are generated into
+# requirements.lock with the command recorded in that file's header.
+docling-mcp==3.0.0
+docling-slim[service-client]==2.118.0
+docling-core==2.90.0
+mcp[cli]==2.0.0

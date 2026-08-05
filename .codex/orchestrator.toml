@@ -10,9 +10,10 @@ manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
+current_stage_id = "mc2-nxd3g"
 
 [baseline]
-profile = "balanced-v2.16"
+profile = "balanced-v2.19"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -42,17 +43,19 @@ ask_before = [
 mode = "current_state_plus_stages"
 current_state_max_lines = 200
 legacy_archive_dir = ".codex/agent-reports"
+hard_limit_lines = 200
 
 [artifacts]
 tracked_in_git = true
 format = "frontmatter_plus_short_note"
 sensitivity = "internal_no_secrets"
+current_stage_summary = ".codex/stages/mc2-nxd3g/summary.md"
 
 [completion_inbox]
-scope = "git_common_dir"
+scope = "repo_root"
 transport = "local_ndjson"
-events_file = "codex-orchestration/completions.ndjson"
-review_state_file = "codex-orchestration/review-state.json"
+events_file = ".codex/stages/mc2-nxd3g/completions.ndjson"
+review_state_file = ".codex/stages/mc2-nxd3g/review-state.json"
 report_entrypoint = "scripts/orchestration/report_child_completion.py"
 review_entrypoint = "scripts/orchestration/review_completion_inbox.py"
 
@@ -103,7 +106,9 @@ git_hooks_allowed = false
 codex_pre_tool_use_hook = true
 codex_pre_tool_use_command = "/home/me/.local/bin/graphify hook-check"
 closeout_marker = "graph-reviewed"
-refresh_policy = "read-only uses/query only; after code/docs/architecture/durable workflow changes refresh local graph during closeout when safe; otherwise graph-reviewed blocked/no-change-needed"
+refresh_policy = "accepted_relevant_integration_or_release_boundary"
+query_first = true
+freshness_check_required = true
 
 [delivery]
 dev_branch = "develop"
@@ -112,6 +117,7 @@ dev_delivery_command = "/push-dev"
 release_command = "/push"
 staging_deploy_command = "/deploy"
 direct_push_to_protected_branches_forbidden = true
+push_after_closeout = "ask"
 
 [delegation]
 launcher = "codex_subagents"
@@ -127,26 +133,16 @@ require_dedicated_worktree = true
 require_strict_write_zone = true
 require_clean_git_status = true
 require_artifact = true
-artifact_fields = [
-  "task_id",
-  "stage_id",
-  "branch",
-  "base_branch",
-  "base_commit",
-  "worktree",
-  "status",
-  "verification",
-  "changed_files",
-]
+artifact_fields = ["task_id", "stage_id", "branch", "base_branch", "base_commit", "worktree", "status", "verification", "changed_files"]
 write_heavy_requires_dedicated_worktree = true
 worker_isolation = "dedicated_branch_worktree"
-
-parallel_decomposition_matrix = "required_for_complex"
+parallel_decomposition_matrix = "required_for_complex_candidates"
 parallel_execution_default = "spawn_eligible_complex_streams"
 sequential_requires_reason = true
 max_concurrent_subagents = 4
 max_parallel_write_streams = 3
 critical_path_priority = true
+write_heavy_isolation_default = "dedicated_branch_or_worktree"
 
 [subagent_model_policy]
 default_model = "inherit_orchestrator"
@@ -154,15 +150,7 @@ default_reasoning_effort = "inherit_orchestrator"
 reasoning_policy = "complexity_based"
 model_override_requires_current_user_authorization = true
 record_model_reasoning_rationale = true
-high_reasoning_triggers = [
-  "architecture",
-  "security",
-  "data_migration",
-  "cross_module_change",
-  "critical_bug",
-  "review",
-  "ambiguous_requirements",
-]
+high_reasoning_triggers = ["architecture", "security", "migrations", "cross-module", "critical-bugs", "reviews", "ambiguity"]
 
 [review]
 require_findings_first = true
@@ -186,6 +174,11 @@ auto_remove_stage_worktrees = true
 auto_delete_local_branch_after_remote_delivery = true
 
 [verification]
+release_commands = [
+  "pnpm type-check",
+  "pnpm build",
+  "pnpm test",
+]
 process_only_commands = [
   "scripts/orchestration/run_process_verification.sh",
 ]
@@ -198,48 +191,20 @@ stage_level_optional_commands = [
 ]
 
 [verification_policy]
-mode = "risk_adaptive"
-default_tier = "integration"
-
-[verification_policy.tier_groups]
-inner = ["code_change_commands"]
-delta = ["code_change_commands"]
-integration = ["code_change_commands"]
-release = ["code_change_commands", "stage_level_optional_commands"]
-
-[verification_policy.risk_tag_groups]
-migration = ["code_change_commands"]
-rls = ["code_change_commands"]
-authorization = ["code_change_commands"]
-security = ["code_change_commands"]
-concurrency = ["code_change_commands"]
-atomicity = ["code_change_commands"]
-retry = ["code_change_commands"]
-tenancy = ["code_change_commands"]
-state-transition = ["code_change_commands"]
-idempotency = ["code_change_commands"]
-rollback = ["code_change_commands"]
-public-api = ["code_change_commands"]
-data = ["code_change_commands"]
-ui = ["code_change_commands"]
-user-flow = ["code_change_commands"]
-api = ["code_change_commands"]
-
-[verification_policy.surface_groups]
-database = ["code_change_commands"]
-ui = ["code_change_commands"]
-user-flow = ["code_change_commands"]
-api = ["code_change_commands"]
-backend = ["code_change_commands"]
-data = ["code_change_commands"]
+mode = "explicit"
+default_level = "slice_acceptance"
+reuse_unchanged_evidence = true
 
 [stage_limits]
 epic_scope = "roadmap_only"
-stage_unit = "accepted_integration_slice"
+stage_unit = "cohesive_vertical_slice"
 automatic_advance_after_acceptance = true
 replan_on_material_boundary = true
 max_correction_loops = 2
 p0_p1_block_acceptance = true
+cost_anomaly_action = "replan_not_stop"
+hard_stop_on_time_or_token_budget = false
+continuation_lineage = "selected_beads_goal"
 
 [session_completion]
 required_steps = [
@@ -253,3 +218,49 @@ required_steps = [
 [exceptions]
 shared_types_import_policy = "@megacampus/shared-types only"
 manual_launch_is_default = true
+
+[orchestration_levels]
+default = "slice_acceptance"
+stage_levels = ["slice_acceptance", "integration", "release"]
+legacy_inner = "inner_loop"
+legacy_delta = "slice_acceptance"
+
+[stage_sizing]
+mode = "cohesive_vertical_slice"
+manifest_schema = "orchestration-stage/v1"
+ledger_schema = "scope-preservation-ledger/v1"
+scope_anchor_schema = "scope-criterion-snapshot/v1"
+one_active_implementation_stage = true
+parallel_streams_inside_stage = true
+merge_adjacent_when_shared = ["acceptance_owner", "subsystem", "risk_model", "test_environment", "rollback_boundary", "acceptance_proof"]
+allowed_split_reasons = ["unresolved_public_ownership_or_public_contract", "hard_dependency", "independent_rollback_or_migration_boundary", "distinct_security_or_compliance_risk", "external_authorization"]
+scope_preservation_ledger_required_on_replan = true
+accepted_history_immutable = true
+migration_scope = "future_work_only"
+legacy_active_stage_id = "mc2-nxd3g"
+
+[evidence]
+schema = "verification-evidence/v1"
+source_paths_are_repo_relative = true
+reject_symlinks_and_path_escape = true
+exact_identity_required_for_reuse = true
+release_requires_release_level_evidence = true
+
+[cost_guard]
+enabled = true
+action = "replan_required"
+missing_counts = "null"
+may_shrink_epic_or_skip_gate = false
+
+[foundation_guard]
+scope_kinds = ["product_slice", "foundation"]
+required_foundation_fields = ["immediate_consumer", "public_facade", "bounded_acceptance", "non_goals"]
+
+[stage_state]
+exact_identity_required = true
+closeout_lock = "exclusive_nonblocking"
+idempotent_retries = true
+
+[documentation]
+closeout_docs_review_required = true
+project_index_required = true

@@ -6,6 +6,7 @@ set -e
 # Usage: ./deploy_dev.sh
 
 BASE_PATH="/opt/megacampus"
+source "$BASE_PATH/scripts/lib/docling-rollout.sh"
 DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
 DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
 DEPLOY_BRIDGE_CHANGED=${DEPLOY_BRIDGE_CHANGED:-true}
@@ -159,24 +160,9 @@ if docker inspect megacampus-qdrant-dev > /dev/null 2>&1; then
     fi
 fi
 
-# 3. Check docling-mcp image exists (manually built, 8GB)
-DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
-if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
-    echo ""
-    echo "ERROR: docling-mcp image not found!"
-    echo ""
-    echo "This image is built manually (too large for CI/CD)."
-    echo "To fix, run one of:"
-    echo ""
-    echo "  # Option 1: Retag from old name (if exists)"
-    echo "  docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest $DOCLING_IMAGE"
-    echo ""
-    echo "  # Option 2: Rebuild (~30 min)"
-    echo "  cd $BASE_PATH && docker build -t $DOCLING_IMAGE \\"
-    echo "    -f packages/course-gen-platform/docker/docling-mcp/Dockerfile ."
-    echo ""
-    exit 1
-fi
+# 3. Keep the existing MCP 1.x runtime during client-first delivery. The
+# v3/Serve services are added only after the production rollout flag is set.
+docling_prepare_rollout "$BASE_PATH/.env.production"
 
 # 4. Ensure data and secrets directories exist
 echo "Ensuring data directories exist..."
@@ -189,8 +175,17 @@ echo "   Directories ready."
 
 # 5. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
+INFRA_SERVICES=(redis notebooklm-bridge worker-stage7)
+INFRA_SERVICES+=("${DOCLING_ROLLOUT_SERVICES[@]}")
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.production" \
-    up -d redis docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
+    up -d "${INFRA_SERVICES[@]}"
+if ! docling_check_facade || \
+    { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
+    docling_rollback_rollout "$BASE_PATH/.env.production" "$BASE_PATH/docker-compose.infra.yml" \
+        || { echo "ERROR: Docling MCP health failed and rollback failed" >&2; exit 1; }
+    echo "ERROR: Docling MCP health failed; MCP 1.x was restored and Docling Serve stopped" >&2
+    exit 1
+fi
 echo "   Infrastructure ready."
 echo ""
 

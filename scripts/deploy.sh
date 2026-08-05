@@ -10,6 +10,8 @@ TAG="${2:-latest}"
 COMPOSE_FILE="docker-compose.production.yml"
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/docling-rollout.sh"
 
 # Colors for output
 RED='\033[0;31m'
@@ -120,11 +122,21 @@ else
     log_warn "GITHUB_TOKEN not set, assuming already logged in"
 fi
 
-# Pull latest images (skip docling-mcp - built manually, too large for CI)
+# Pull application images. Docling images are resolved separately by the rollout gate.
 log_step "Pulling latest Docker images..."
-# Pull specific services, excluding docling-mcp which has pull_policy: if_not_present
 docker compose -f "${COMPOSE_FILE}" pull redis web api || error_exit "Failed to pull images"
-log_info "Skipping docling-mcp pull (built manually on server)"
+docling_prepare_rollout .env.production || error_exit "Docling rollout gate failed"
+if [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ]; then
+    docker compose -f "${COMPOSE_FILE}" --env-file .env.production \
+        up -d "${DOCLING_ROLLOUT_SERVICES[@]}" \
+        || error_exit "Failed to start Docling v3 stack"
+fi
+if ! docling_check_facade || \
+    { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
+    docling_rollback_rollout .env.production "${COMPOSE_FILE}" \
+        || error_exit "Docling MCP health failed and rollback failed"
+    error_exit "Docling MCP health failed; MCP 1.x was restored and Docling Serve stopped"
+fi
 
 # Check if any services are running
 if docker compose -f "${COMPOSE_FILE}" ps --quiet | grep -q .; then

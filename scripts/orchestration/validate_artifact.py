@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import sys
+import tomllib
 from typing import TypeAlias
 
 YamlValue: TypeAlias = str | list[str]
@@ -31,14 +33,34 @@ REQUIRED_KEYS = {
 }
 
 REQUIRED_LIST_KEYS = {"verification", "changed_files", "explicit_defers"}
-OPTIONAL_LIST_KEYS = {"risk_tags", "affected_surfaces", "invariants"}
-ALLOWED_SCHEMA_VERSIONS = {"orchestration-artifact/v1"}
+OPTIONAL_LIST_KEYS = {"risk_tags", "affected_surfaces", "invariants", "evidence"}
+ALLOWED_SCHEMA_VERSIONS = {
+    "orchestration-artifact/v1",
+    "orchestration-artifact/v2",
+    "orchestration-artifact/v3",
+}
 ALLOWED_STATUSES = {"returned", "accepted", "merged", "blocked"}
 ALLOWED_DELIVERY_METHODS = {"merge", "cherry-pick", "manual integration", "not accepted", "n/a"}
 ALLOWED_ACCEPTED_BY_ORCHESTRATOR = {"yes", "no"}
 ALLOWED_CLEANUP_STATUSES = {"pending", "cleaned", "blocked", "not_applicable"}
 ALLOWED_RISK_LEVELS = {"low", "medium", "high"}
-ALLOWED_VERIFICATION_TIERS = {"inner", "delta", "integration", "release", "n/a"}
+ALLOWED_VERIFICATION_TIERS = {
+    "inner",
+    "delta",
+    "inner_loop",
+    "slice_acceptance",
+    "integration",
+    "release",
+    "n/a",
+}
+ORCHESTRATION_LEVELS = {
+    "inner_loop",
+    "slice_acceptance",
+    "integration",
+    "release",
+}
+LEGACY_LEVEL_ALIASES = {"inner": "inner_loop", "delta": "slice_acceptance"}
+ALLOWED_SCOPE_KINDS = {"product_slice", "foundation"}
 METADATA_TOKEN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 REQUIRED_HEADINGS = [
@@ -133,19 +155,60 @@ def validate_scalar(
     return []
 
 
-def validate_file(path: pathlib.Path) -> list[str]:
+def require_level(path: pathlib.Path, value: YamlValue | None) -> list[str]:
+    if not isinstance(value, str) or not value.strip() or is_placeholder(value):
+        return [f"{path}: orchestration_level must be a concrete scalar"]
+    raw = value.strip().lower()
+    normalized = LEGACY_LEVEL_ALIASES.get(raw, raw)
+    if normalized not in ORCHESTRATION_LEVELS:
+        return [
+            f"{path}: unsupported orchestration_level {value!r}; expected one of "
+            f"{sorted(ORCHESTRATION_LEVELS | set(LEGACY_LEVEL_ALIASES))}"
+        ]
+    return []
+
+
+def require_non_placeholder(
+    path: pathlib.Path, values: dict[str, YamlValue], field: str
+) -> list[str]:
+    value = values.get(field)
+    if isinstance(value, str):
+        if value.strip() and not is_placeholder(value) and value.strip().lower() != "n/a":
+            return []
+    elif isinstance(value, list):
+        if any(
+            item.strip()
+            and not is_placeholder(item)
+            and item.strip().lower() not in {"n/a", "none"}
+            for item in value
+        ):
+            return []
+    return [f"{path}: foundation artifact requires non-placeholder {field}"]
+
+
+def validate_optional_evidence(
+    path: pathlib.Path, values: dict[str, YamlValue]
+) -> list[str]:
+    evidence = values.get("evidence")
+    if evidence is None:
+        return []
+    if not isinstance(evidence, list):
+        return [f"{path}: frontmatter key 'evidence' must be a list when provided"]
     errors: list[str] = []
-    try:
-        text = path.read_text()
-    except OSError as exc:
-        return [f"{path}: cannot read file: {exc}"]
+    for item in evidence:
+        stripped = item.strip()
+        if not stripped or stripped.lower() in {"none", "n/a"} or is_placeholder(stripped):
+            continue
+        evidence_path = pathlib.PurePosixPath(stripped)
+        if evidence_path.is_absolute() or ".." in evidence_path.parts:
+            errors.append(f"{path}: evidence path must be repo-relative: {item!r}")
+    return errors
 
-    try:
-        frontmatter, body = parse_frontmatter(text)
-    except ValueError as exc:
-        return [f"{path}: {exc}"]
 
-    values = extract_frontmatter_values(frontmatter)
+def validate_common_fields(
+    path: pathlib.Path, values: dict[str, YamlValue], body: str
+) -> list[str]:
+    errors: list[str] = []
     missing = sorted(REQUIRED_KEYS - set(values))
     if missing:
         errors.append(f"{path}: missing frontmatter keys: {', '.join(missing)}")
@@ -154,8 +217,6 @@ def validate_file(path: pathlib.Path) -> list[str]:
         if key in values:
             errors.extend(validate_scalar(path, key, values))
 
-    if "schema_version" in values:
-        errors.extend(validate_scalar(path, "schema_version", values, ALLOWED_SCHEMA_VERSIONS))
     if "status" in values:
         errors.extend(validate_scalar(path, "status", values, ALLOWED_STATUSES))
     if "delivery_method" in values:
@@ -168,6 +229,10 @@ def validate_file(path: pathlib.Path) -> list[str]:
         errors.extend(validate_scalar(path, "risk_level", values, ALLOWED_RISK_LEVELS))
     if "verification_tier" in values:
         errors.extend(validate_scalar(path, "verification_tier", values, ALLOWED_VERIFICATION_TIERS))
+        if values.get("schema_version") == "orchestration-artifact/v3":
+            errors.append(
+                f"{path}: v3 artifacts use orchestration_level; verification_tier is legacy-only"
+            )
 
     for key in sorted(REQUIRED_LIST_KEYS):
         if key in values and not list_is_meaningful(values.get(key)):
@@ -187,9 +252,9 @@ def validate_file(path: pathlib.Path) -> list[str]:
                 errors.append(f"{path}: invalid {key!r} token {item!r}")
 
     if values.get("risk_level") == "high":
-        tier = values.get("verification_tier")
-        if not isinstance(tier, str) or tier == "n/a":
-            errors.append(f"{path}: high-risk artifact requires a concrete verification_tier")
+        tier = values.get("orchestration_level", values.get("verification_tier"))
+        if not isinstance(tier, str) or tier == "n/a" or is_placeholder(tier):
+            errors.append(f"{path}: high-risk artifact requires a concrete orchestration_level")
         for key in ("risk_tags", "affected_surfaces", "invariants"):
             if not list_has_declared_metadata(values.get(key)):
                 errors.append(f"{path}: high-risk artifact requires declared {key}")
@@ -199,9 +264,115 @@ def validate_file(path: pathlib.Path) -> list[str]:
             errors.append(f"{path}: missing section heading {heading!r}")
 
     for pattern in SECRET_PATTERNS:
-        if pattern.search(text):
+        if pattern.search(body):
             errors.append(f"{path}: matched blocked secret pattern {pattern.pattern!r}")
 
+    return errors
+
+
+def validate_document(
+    path: pathlib.Path, values: dict[str, YamlValue], body: str
+) -> list[str]:
+    errors = validate_common_fields(path, values, body)
+    schema = values.get("schema_version")
+    if schema in {"orchestration-artifact/v2", "orchestration-artifact/v3"}:
+        errors.extend(require_level(path, values.get("orchestration_level")))
+        scope_kind = values.get("scope_kind")
+        if not isinstance(scope_kind, str) or scope_kind not in ALLOWED_SCOPE_KINDS:
+            errors.append(
+                f"{path}: scope_kind must be one of {sorted(ALLOWED_SCOPE_KINDS)}"
+            )
+        if scope_kind == "foundation":
+            for field in (
+                "immediate_consumer",
+                "public_facade",
+                "bounded_acceptance",
+                "non_goals",
+            ):
+                errors.extend(require_non_placeholder(path, values, field))
+        errors.extend(validate_optional_evidence(path, values))
+        if schema == "orchestration-artifact/v3":
+            for field in ("stage_manifest", "stream_owner"):
+                errors.extend(validate_scalar(path, field, values))
+            raw_manifest = values.get("stage_manifest")
+            if isinstance(raw_manifest, str):
+                manifest_path = pathlib.PurePosixPath(raw_manifest)
+                if manifest_path.is_absolute() or ".." in manifest_path.parts:
+                    errors.append(
+                        f"{path}: stage_manifest path must be repo-relative: {raw_manifest!r}"
+                    )
+                stage_id = values.get("stage_id")
+                if isinstance(stage_id, str) and not is_placeholder(stage_id):
+                    expected = f".codex/stages/{stage_id}/stage-manifest.json"
+                    if raw_manifest != expected:
+                        errors.append(
+                            f"{path}: stage_manifest must match stage_id exactly: {expected!r}"
+                        )
+    elif schema != "orchestration-artifact/v1":
+        errors.append(f"{path}: unsupported artifact schema: {schema}")
+    return errors
+
+
+def validate_file(path: pathlib.Path) -> list[str]:
+    try:
+        text = path.read_text()
+    except OSError as exc:
+        return [f"{path}: cannot read file: {exc}"]
+    try:
+        frontmatter, body = parse_frontmatter(text)
+    except ValueError as exc:
+        return [f"{path}: {exc}"]
+    values = extract_frontmatter_values(frontmatter)
+    errors = validate_document(path, values, body)
+    stage_id = values.get("stage_id")
+    schema = values.get("schema_version")
+    if isinstance(stage_id, str) and not is_placeholder(stage_id):
+        repo = pathlib.Path.cwd().resolve()
+        manifest_path = repo / ".codex" / "stages" / stage_id / "stage-manifest.json"
+        contract_path = repo / ".codex" / "orchestrator.toml"
+        profile = None
+        if contract_path.is_file() and not contract_path.is_symlink():
+            try:
+                contract = tomllib.loads(contract_path.read_text(encoding="utf-8"))
+                baseline = contract.get("baseline")
+                profile = baseline.get("profile") if isinstance(baseline, dict) else None
+            except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+                errors.append(f"{path}: cannot read orchestration contract: {exc}")
+        if profile == "balanced-v2.19" and manifest_path.is_file():
+            if schema != "orchestration-artifact/v3":
+                errors.append(
+                    f"{path}: newly reported delegated artifacts in a v2.19 stage must use orchestration-artifact/v3"
+                )
+            else:
+                try:
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    errors.append(f"{path}: cannot read stage manifest: {exc}")
+                else:
+                    entries = manifest.get("stream_artifacts") if isinstance(manifest, dict) else None
+                    try:
+                        resolved = path.resolve(strict=True)
+                        relative = resolved.relative_to(repo).as_posix()
+                    except (OSError, ValueError):
+                        relative = ""
+                    matching = [
+                        entry
+                        for entry in entries
+                        if isinstance(entry, dict)
+                        and entry.get("artifact_path") == relative
+                    ] if isinstance(entries, list) else []
+                    if len(matching) != 1:
+                        errors.append(f"{path}: v3 artifact is unlisted in owning stage manifest")
+                    else:
+                        entry = matching[0]
+                        for field in ("task_id", "stream_owner"):
+                            if entry.get(field) != values.get(field):
+                                errors.append(
+                                    f"{path}: {field} does not match owning stage manifest aggregation"
+                                )
+    for pattern in SECRET_PATTERNS:
+        if pattern.search(frontmatter):
+            errors.append(f"{path}: matched blocked secret pattern {pattern.pattern!r}")
     return errors
 
 

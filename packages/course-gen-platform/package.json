@@ -68,6 +68,7 @@
     "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
     "benchmark-llm": "tsx scripts/benchmark-llm/index.ts",
+    "benchmark:docling": "tsx scripts/docling-quality-benchmark.ts",
     "smoke:career-playbook:preflight": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-smoke-preflight.ts",
     "smoke:career-playbook:live": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-live-smoke.ts"
   },
@@ -81,7 +82,8 @@
     "@megacampus/shared-logger": "workspace:*",
     "@megacampus/shared-types": "workspace:*",
     "@megacampus/shared-utils": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/core": "2.0.0",
     "@qdrant/js-client-rest": "1.18.0",
     "@sentry/node": "^10.38.0",
     "@supabase/supabase-js": "^2.87.2",

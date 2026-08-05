@@ -1,906 +1,477 @@
 /**
- * Docling MCP Client
- * Wrapper for communicating with Docling MCP server via Streamable HTTP transport
+ * Docling MCP client built on the split TypeScript MCP SDK 2 packages.
+ *
+ * The client opts into automatic protocol negotiation so the application can
+ * be shipped before the Docling MCP 3 server during the client-first rollout.
  */
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import fs from 'fs/promises';
+import path from 'path';
 import {
-  DoclingClientConfig,
-  ConvertDocumentRequest,
-  ConvertDocumentResponse,
-  DoclingDocument,
+  Client,
+  ProtocolError,
+  SdkError,
+  SdkErrorCode,
+  StreamableHTTPClientTransport,
+  type CallToolResult,
+} from '@modelcontextprotocol/client';
+
+import { logger } from '../../../shared/logger/index.js';
+import { normalizeDoclingDocument } from './raw-adapter.js';
+import {
+  type ConvertDocumentRequest,
+  type ConvertDocumentResponse,
+  type DoclingClientConfig,
+  type DoclingConversionBundle,
   DoclingError,
   DoclingErrorCode,
-  isSupportedFormat,
   getFileExtension,
+  isSupportedFormat,
 } from './types.js';
-import { logger } from '../../../shared/logger/index.js';
 
-/**
- * Transform local file path to Docker container path
- * Local:     /home/user/code/mc2/packages/course-gen-platform/uploads/org/course/file.pdf
- * Container: /app/uploads/org/course/file.pdf
- */
-function transformPathForContainer(localPath: string): string {
+const REQUIRED_TOOLS = new Set([
+  'convert_document_into_docling_document',
+  'export_docling_document_to_markdown',
+  'save_docling_document',
+]);
+
+const MARKDOWN_EXPORT_MAX_SIZE_BYTES = 100 * 1024 * 1024;
+const CONNECTION_LOSS_CODES = new Set<SdkErrorCode>([
+  SdkErrorCode.NotConnected,
+  SdkErrorCode.ConnectionClosed,
+  SdkErrorCode.SendFailed,
+]);
+
+type ToolPayload = Record<string, unknown>;
+
+function isRecord(value: unknown): value is ToolPayload {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function transformPathForDocling(localPath: string): string {
   const uploadsBasePath = process.env.DOCLING_UPLOADS_BASE_PATH;
   const containerUploadsPath = process.env.DOCLING_CONTAINER_UPLOADS_PATH || '/app/uploads';
 
-  // If DOCLING_UPLOADS_BASE_PATH is set and path contains uploads/, transform it
-  if (uploadsBasePath && localPath.startsWith(uploadsBasePath)) {
-    // Extract the relative path after the base
-    const relativePath = localPath.slice(uploadsBasePath.length);
-    // Find /uploads/ in the path and replace everything before it
-    const uploadsIndex = relativePath.indexOf('/uploads/');
-    if (uploadsIndex !== -1) {
-      const pathAfterUploads = relativePath.slice(uploadsIndex + '/uploads/'.length);
-      const containerPath = `${containerUploadsPath}/${pathAfterUploads}`;
-      logger.debug(
-        {
-          original: localPath,
-          transformed: containerPath,
-        },
-        'Transformed path for Docker container'
-      );
-      return containerPath;
-    }
+  if (!uploadsBasePath || !localPath.startsWith(uploadsBasePath)) return localPath;
+
+  const marker = '/uploads/';
+  const uploadsIndex = localPath.indexOf(marker, uploadsBasePath.length);
+  if (uploadsIndex === -1) return localPath;
+
+  return `${containerUploadsPath}/${localPath.slice(uploadsIndex + marker.length)}`;
+}
+
+function extractToolError(result: CallToolResult): string {
+  const messages = result.content
+    .filter(content => content.type === 'text')
+    .map(content => content.text.trim())
+    .filter(Boolean);
+  return messages.join('\n') || 'Docling MCP tool returned an error';
+}
+
+function classifyToolError(message: string, details?: unknown): DoclingError {
+  if (/ENOENT|file (?:does not exist|not found)|no such file/i.test(message)) {
+    return new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, message, details);
   }
-
-  // Fallback: if path already starts with /app/ or no transformation needed
-  return localPath;
+  if (/out of memory|\bOOM\b|killed process/i.test(message)) {
+    return new DoclingError(DoclingErrorCode.OUT_OF_MEMORY, message, details);
+  }
+  if (/corrupt|malformed document/i.test(message)) {
+    return new DoclingError(DoclingErrorCode.CORRUPTED_FILE, message, details);
+  }
+  return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, message, details);
 }
 
-/**
- * Maximum size for markdown export in bytes
- * Set to 100MB to prevent OOM errors on very large documents
- * while still accommodating most realistic course materials
- */
-const MARKDOWN_EXPORT_MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
-
-/**
- * Known session error patterns from Docling MCP server
- * UPDATE: Add new patterns as discovered in production
- */
-const SESSION_ERROR_PATTERNS = [
-  /no valid session/i,
-  /session expired/i,
-  /session not found/i,
-  /invalid session/i,
-  /session.*timeout/i, // More flexible pattern
-] as const;
-
-const CONNECTION_ERROR_PATTERNS = [
-  /not connected/i,
-  /terminated/i,
-  /ECONNRESET/i,
-  /socket hang up/i,
-  /bad request/i,
-  /connection refused/i,
-] as const;
-
-function matchesAnyPattern(message: string, patterns: readonly RegExp[]): boolean {
-  return patterns.some(pattern => pattern.test(message));
-}
-
-/**
- * Docling MCP Client
- * High-level interface for document processing operations
- */
 export class DoclingClient {
   private client: Client;
-  private transport: Transport | null = null;
-  private config: Required<DoclingClientConfig>;
-  private isConnected: boolean = false;
+  private transport: StreamableHTTPClientTransport | null = null;
+  private readonly config: Required<DoclingClientConfig>;
+  private connected = false;
   private connectionPromise: Promise<void> | null = null;
-  private reconnectionPromise: Promise<void> | null = null; // Guard against concurrent reconnections
-  private useSSE: boolean;
 
   constructor(config: DoclingClientConfig) {
     this.config = {
       serverUrl: config.serverUrl,
-      timeout: config.timeout ?? 1200000, // 20 minutes default (for large file processing)
-      maxRetries: config.maxRetries ?? 5, // Increased from 3 for better connection recovery
-      retryDelay: config.retryDelay ?? 2000, // Increased from 1000 for better backoff
+      timeout: config.timeout ?? 1_200_000,
+      maxRetries: config.maxRetries ?? 1,
+      retryDelay: config.retryDelay ?? 250,
       debug: config.debug ?? false,
+      cachePath: config.cachePath ?? process.env.DOCLING_CACHE_PATH ?? '/app/docling-json-cache',
     };
-
-    // Detect SSE transport from URL path (e.g., /sse vs /mcp)
-    this.useSSE = config.serverUrl.includes('/sse');
-
-    this.client = new Client({
-      name: 'megacampus-docling-client',
-      version: '1.0.0',
-    });
-    this.setupClientErrorHandlers();
+    this.client = this.createSdkClient();
   }
 
-  /**
-   * Set up out-of-band error/close handlers on MCP Client
-   * Prevents uncaught exceptions from transport-level errors (SSE disconnects, parse errors)
-   */
-  private setupClientErrorHandlers(): void {
-    this.client.onerror = error => {
-      logger.error({ err: error }, 'Docling MCP client out-of-band error');
-      this.isConnected = false;
+  private createSdkClient(): Client {
+    const client = new Client(
+      { name: 'megacampus-docling-client', version: '2.0.0' },
+      {
+        versionNegotiation: { mode: 'auto', probe: { maxRetries: 0 } },
+      }
+    );
+    client.onerror = error => {
+      this.connected = false;
+      logger.error({ err: error }, 'Docling MCP client transport error');
     };
-    this.client.onclose = () => {
+    client.onclose = () => {
+      this.connected = false;
       logger.warn('Docling MCP client connection closed');
-      this.isConnected = false;
     };
+    return client;
   }
 
-  /**
-   * Connect to the Docling MCP server
-   * Prevents race conditions when multiple calls happen simultaneously
-   */
   async connect(): Promise<void> {
-    // If already connected, return immediately
-    if (this.isConnected && this.transport) {
-      return;
-    }
+    if (this.connected && this.transport) return;
+    if (this.connectionPromise) return this.connectionPromise;
 
-    // If connection is in progress, wait for it
-    if (this.connectionPromise) {
-      logger.info('Connection already in progress, waiting...');
-      return this.connectionPromise;
-    }
-
-    // Start new connection
-    this.connectionPromise = (async () => {
-      try {
-        // Create transport based on URL path
-        // SSE transport is simpler and avoids DNS rebinding/session issues in Docker
-        if (this.useSSE) {
-          this.transport = new SSEClientTransport(new URL(this.config.serverUrl));
-          logger.info({ serverUrl: this.config.serverUrl }, 'Using SSE transport');
-        } else {
-          this.transport = new StreamableHTTPClientTransport(new URL(this.config.serverUrl), {
-            requestInit: {
-              headers: {
-                Accept: 'application/json, text/event-stream',
-              },
-            },
-          });
-          logger.info({ serverUrl: this.config.serverUrl }, 'Using Streamable HTTP transport');
-        }
-
-        // NOTE: MCP SDK transports (StreamableHTTPClientTransport, SSEClientTransport) do NOT
-        // extend EventEmitter — they use callback-based error handling via client.onerror/onclose
-        // (set up in setupClientErrorHandlers). No .on('error') guards needed here.
-
-        await this.client.connect(this.transport);
-        this.isConnected = true;
-        logger.info(
-          {
-            serverUrl: this.config.serverUrl,
-            transport: this.useSSE ? 'SSE' : 'StreamableHTTP',
-          },
-          'Connected to Docling MCP server'
-        );
-      } catch (error) {
-        this.transport = null;
-        // Normalize error — MCP SDK can throw non-Error objects or Errors without messages
-        const normalized = this.normalizeError(error, `connect(${this.config.serverUrl})`);
-        logger.error({ err: normalized }, 'Failed to connect to Docling MCP server');
-        throw new DoclingError(
-          DoclingErrorCode.NETWORK_ERROR,
-          `Failed to connect to Docling MCP server: ${normalized.message}`,
-          error
-        );
-      } finally {
-        this.connectionPromise = null;
-      }
-    })();
-
-    return this.connectionPromise;
-  }
-
-  /**
-   * Ensures connection is alive, reconnects if needed
-   * Forces fresh connection to avoid stale session issues
-   * @private
-   */
-  private async ensureConnected(): Promise<void> {
-    // If reconnection already in progress, wait for it (prevents race condition)
-    if (this.reconnectionPromise) {
-      logger.debug('Reconnection already in progress, waiting...');
-      return this.reconnectionPromise;
-    }
-
-    // Check if transport is alive
-    if (!this.isConnected || !this.transport) {
-      logger.warn({ serverUrl: this.config.serverUrl }, 'Docling connection lost, reconnecting...');
-      this.reconnectionPromise = this.reconnect().finally(() => {
-        this.reconnectionPromise = null;
-      });
-      return this.reconnectionPromise;
-    }
-
-    // Verify with lightweight health check
+    this.connectionPromise = this.openConnection();
     try {
-      await this.client.listTools();
-      logger.debug({ serverUrl: this.config.serverUrl }, 'Docling health check passed');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { serverUrl: this.config.serverUrl, err: errorMessage },
-        'Docling health check failed, forcing fresh connection...'
-      );
-      // Force fresh connection by resetting state
-      this.isConnected = false;
-      this.reconnectionPromise = this.reconnect().finally(() => {
-        this.reconnectionPromise = null;
-      });
-      return this.reconnectionPromise;
+      await this.connectionPromise;
+    } finally {
+      this.connectionPromise = null;
     }
   }
 
-  /**
-   * Reconnect to MCP server
-   * Creates a fresh Client instance to avoid stale state after close()
-   * @private
-   */
-  private async reconnect(): Promise<void> {
-    this.isConnected = false;
-    this.connectionPromise = null;
-
-    // Store reference to old transport before disconnect (for cleanup fallback)
-    const oldTransport = this.transport;
-
-    try {
-      await this.disconnect();
-    } catch (error) {
-      // Ignore disconnect errors
-      logger.debug({ err: error }, 'Error during disconnect (expected if connection dead)');
-
-      // Fallback: ensure old transport is closed even if disconnect() failed
-      if (oldTransport) {
-        try {
-          await oldTransport.close();
-        } catch {
-          // Already dead, ignore
-        }
-      }
-    }
-
-    // CRITICAL: Create a new Client instance after close()
-    // The MCP SDK Client becomes unusable after close() - arguments are not sent correctly
-    this.client = new Client({
-      name: 'megacampus-docling-client',
-      version: '1.0.0',
+  private async openConnection(): Promise<void> {
+    this.transport = new StreamableHTTPClientTransport(new URL(this.config.serverUrl), {
+      requestInit: { headers: { Accept: 'application/json, text/event-stream' } },
     });
-    this.setupClientErrorHandlers();
-
-    // Reset transport so connect() creates a new one
-    this.transport = null;
-    await this.connect();
-  }
-
-  /**
-   * Disconnect from the Docling MCP server
-   * Explicitly closes transport to prevent memory leaks from stale connections
-   */
-  async disconnect(): Promise<void> {
-    if (!this.isConnected && !this.transport) {
-      return;
-    }
-
-    // Close transport first to prevent memory leak (Critical fix #1)
-    if (this.transport) {
-      try {
-        await this.transport.close();
-        logger.debug('Transport closed successfully');
-      } catch (closeErr) {
-        // Expected if transport already dead
-        logger.debug({ err: closeErr }, 'Error closing transport (expected if connection dead)');
-      }
-    }
 
     try {
-      await this.client.close();
-      this.isConnected = false;
-      this.transport = null;
-      logger.info('Disconnected from Docling MCP server');
-    } catch (error) {
-      logger.error({ err: error }, 'Error disconnecting from Docling MCP server');
-      // Still reset state even on error
-      this.isConnected = false;
-      this.transport = null;
-    }
-  }
-
-  /**
-   * Parse MCP tool response with error handling
-   *
-   * Handles cases where Docling MCP returns plain text errors instead of JSON
-   *
-   * @param text - Response text from MCP tool
-   * @param toolName - Name of the tool that was called (for error messages)
-   * @returns Parsed JSON object
-   * @throws DoclingError if response is not valid JSON or is an error message
-   */
-  private parseToolResponse<T>(text: string, toolName: string): T {
-    // Check if response is a plain text error (starts with "Error")
-    if (text.trim().startsWith('Error')) {
-      const errorText = text.trim();
-
-      // Detect file not found errors specifically (ENOENT, Errno 2)
-      if (
-        errorText.includes('No such file or directory') ||
-        errorText.includes('[Errno 2]') ||
-        errorText.includes('ENOENT')
-      ) {
-        throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, `File not found: ${errorText}`, {
-          tool: toolName,
-          responseText: text,
-        });
-      }
-
-      // Generic processing error
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        `Docling MCP tool '${toolName}' failed: ${errorText}`,
-        { tool: toolName, responseText: text }
-      );
-    }
-
-    // Try to parse as JSON
-    try {
-      return JSON.parse(text) as T;
-    } catch (parseError) {
-      // If parsing fails, provide detailed error
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        `Invalid JSON response from Docling MCP tool '${toolName}': ${text.substring(0, 100)}...`,
-        { tool: toolName, responseText: text, parseError }
-      );
-    }
-  }
-
-  /**
-   * Convert a document to structured format
-   *
-   * @param request - Document conversion request
-   * @returns Conversion response with DoclingDocument or content string
-   */
-  async convertDocument(request: ConvertDocumentRequest): Promise<ConvertDocumentResponse> {
-    // Validate file format FIRST - before connecting to server
-    const extension = getFileExtension(request.file_path);
-    if (!isSupportedFormat(extension)) {
-      throw new DoclingError(
-        DoclingErrorCode.UNSUPPORTED_FORMAT,
-        `Unsupported file format: ${extension}`,
-        { file_path: request.file_path, extension }
-      );
-    }
-
-    let retries = 0;
-    const maxRetries = 2;
-
-    while (retries <= maxRetries) {
-      try {
-        await this.ensureConnected();
-
-        const startTime = Date.now();
-
-        logger.info(
-          {
-            file_path: request.file_path,
-            output_format: request.output_format,
-          },
-          'Converting document'
-        );
-
-        // Call the MCP tool with retry logic
-        // Docling MCP server provides tool: convert_document_into_docling_document
-        const containerPath = transformPathForContainer(request.file_path);
-        const result = await this.callWithRetry(async () => {
-          return await this.client.callTool({
-            name: 'convert_document_into_docling_document',
-            arguments: {
-              source: containerPath,
-            },
-          });
-        });
-
-        const processingTime = Date.now() - startTime;
-
-        // Parse convert_document_into_docling_document response
-        // Response format: {from_cache: boolean, document_key: string}
-        const content = result.content as Array<{ type: string; text?: string }>;
-        const textContent = content.find(c => c.type === 'text');
-        if (!textContent || !textContent.text) {
-          throw new DoclingError(
-            DoclingErrorCode.PROCESSING_ERROR,
-            'No text content in conversion response'
-          );
-        }
-
-        const conversionResult = this.parseToolResponse<{
-          from_cache: boolean;
-          document_key: string;
-        }>(textContent.text, 'convert_document_into_docling_document');
-
-        logger.info(
-          {
-            document_key: conversionResult.document_key,
-            from_cache: conversionResult.from_cache,
-          },
-          'Document converted to Docling format'
-        );
-
-        // Export to requested format
-        if (request.output_format === 'docling_document') {
-          // DoclingDocument format not yet implemented - graceful fallback to markdown
-          // This is intentional: markdown format is sufficient for our pipeline
-          // and DoclingDocument retrieval requires additional MCP tool implementation
-          logger.info(
-            { file_path: request.file_path },
-            'DoclingDocument format requested but not implemented, using markdown fallback'
-          );
-          request.output_format = 'markdown';
-        } else {
-          // For markdown, export using export_docling_document_to_markdown tool
-          const exportResult = await this.callWithRetry(async () => {
-            return await this.client.callTool({
-              name: 'export_docling_document_to_markdown',
-              arguments: {
-                document_key: conversionResult.document_key,
-                max_size: MARKDOWN_EXPORT_MAX_SIZE_BYTES,
-              },
-            });
-          });
-
-          const exportContent = exportResult.content as Array<{ type: string; text?: string }>;
-          const exportTextContent = exportContent.find(c => c.type === 'text');
-          if (!exportTextContent || !exportTextContent.text) {
-            throw new DoclingError(
-              DoclingErrorCode.PROCESSING_ERROR,
-              'No text content in markdown export'
-            );
-          }
-
-          logger.info(
-            {
-              raw_export_text_length: exportTextContent.text.length,
-              raw_export_preview: exportTextContent.text.substring(0, 500),
-            },
-            'Raw export response from Docling MCP'
-          );
-
-          const markdownResult = this.parseToolResponse<{
-            document_key: string;
-            markdown: string;
-          }>(exportTextContent.text, 'export_docling_document_to_markdown');
-
-          logger.info(
-            {
-              has_markdown: !!markdownResult.markdown,
-              markdown_length: markdownResult.markdown?.length || 0,
-              result_keys: Object.keys(markdownResult),
-            },
-            'Markdown export result parsed'
-          );
-
-          return {
-            success: true,
-            content: markdownResult.markdown,
-            metadata: {
-              processing_time_ms: processingTime,
-              from_cache: conversionResult.from_cache,
-              pages_processed: 0, // Unknown without full DoclingDocument
-            },
-          };
-        }
-      } catch (error) {
-        // Normalize error before handling — MCP SDK can throw non-Error objects
-        const normalized = this.normalizeError(error, `convertDocument(${request.file_path})`);
-        // Handle terminated error with retry
-        const errorMessage = normalized.message;
-        if (errorMessage.includes('terminated') && retries < maxRetries) {
-          retries++;
-          logger.warn(
-            { file_path: request.file_path, err: error, retries, maxRetries },
-            `Docling connection terminated, retry ${retries}/${maxRetries}`
-          );
-          await this.reconnect();
-          continue;
-        }
-
-        logger.error({ err: errorMessage, request }, 'Document conversion failed');
-
-        if (normalized instanceof DoclingError) {
-          throw normalized;
-        }
-
-        // Map common errors to DoclingErrorCode
-        if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
-          throw new DoclingError(
-            DoclingErrorCode.FILE_NOT_FOUND,
-            'Document file not found',
-            normalized
-          );
-        }
-
-        if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-          throw new DoclingError(
-            DoclingErrorCode.TIMEOUT,
-            'Document processing timed out',
-            normalized
-          );
-        }
-
-        if (errorMessage.includes('memory') || errorMessage.includes('OOM')) {
-          throw new DoclingError(
-            DoclingErrorCode.OUT_OF_MEMORY,
-            'Out of memory during processing',
-            normalized
-          );
-        }
-
-        // Generic processing error
+      await this.client.connect(this.transport);
+      const { tools } = await this.client.listTools();
+      const availableTools = new Set(tools.map(tool => tool.name));
+      const missingTools = [...REQUIRED_TOOLS].filter(tool => !availableTools.has(tool));
+      if (missingTools.length > 0) {
         throw new DoclingError(
           DoclingErrorCode.PROCESSING_ERROR,
-          `Document conversion failed: ${errorMessage}`,
-          normalized
-        );
-      }
-    }
-
-    throw new Error(`Docling conversion failed after ${maxRetries} retries`);
-  }
-
-  /**
-   * Convert document to DoclingDocument JSON
-   * Convenience method for the most common use case
-   *
-   * @param filePath - Path to the document file
-   * @param options - Optional conversion parameters
-   * @param options.enableOCR - Enable OCR for scanned documents (default: true)
-   * @param options.extractImages - Extract images from document (default: true)
-   * @param options.extractTables - Extract tables with structure (default: true)
-   */
-  async convertToDoclingDocument(
-    filePath: string,
-    options: {
-      enableOCR?: boolean;
-      extractImages?: boolean;
-      extractTables?: boolean;
-    } = {}
-  ): Promise<DoclingDocument> {
-    const response = await this.convertDocument({
-      file_path: filePath,
-      output_format: 'docling_document',
-      enable_ocr: options.enableOCR ?? true,
-      extract_images: options.extractImages ?? true,
-      extract_tables: options.extractTables ?? true,
-    });
-
-    if (!response.document) {
-      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No document in response');
-    }
-
-    return response.document;
-  }
-
-  /**
-   * Convert document to Markdown
-   * Convenience method for markdown export
-   */
-  async convertToMarkdown(filePath: string): Promise<string> {
-    await this.ensureConnected();
-
-    const response = await this.convertDocument({
-      file_path: filePath,
-      output_format: 'markdown',
-    });
-
-    if (!response.content) {
-      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No content in response');
-    }
-
-    return response.content;
-  }
-
-  /**
-   * Get full DoclingDocument JSON from cache
-   *
-   * This method retrieves the complete DoclingDocument structure including
-   * texts[], pictures[], tables[], pages{} etc.
-   *
-   * Workflow:
-   * 1. Convert document → get document_key
-   * 2. Save document to JSON file via save_docling_document tool
-   * 3. Read JSON file from Docker container filesystem
-   *
-   * @param filePath - Path to the document file
-   * @returns Full DoclingDocument structure
-   */
-  async getDoclingDocumentJSON(filePath: string): Promise<DoclingDocument> {
-    await this.ensureConnected();
-
-    try {
-      // Step 1: Convert document to get document_key
-      const containerPath = transformPathForContainer(filePath);
-      const convertResult = await this.callWithRetry(async () => {
-        return await this.client.callTool({
-          name: 'convert_document_into_docling_document',
-          arguments: {
-            source: containerPath,
-          },
-        });
-      });
-
-      const content = convertResult.content as Array<{ type: string; text?: string }>;
-      const textContent = content.find(c => c.type === 'text');
-      if (!textContent || !textContent.text) {
-        throw new DoclingError(
-          DoclingErrorCode.PROCESSING_ERROR,
-          'No text content in conversion response'
+          `Docling MCP is missing required tools: ${missingTools.join(', ')}`
         );
       }
 
-      const conversionResult = this.parseToolResponse<{
-        from_cache: boolean;
-        document_key: string;
-      }>(textContent.text, 'convert_document_into_docling_document');
-
+      this.connected = true;
       logger.info(
         {
-          document_key: conversionResult.document_key,
-          from_cache: conversionResult.from_cache,
+          serverUrl: this.config.serverUrl,
+          server: this.client.getServerVersion(),
+          protocolVersion: this.client.getNegotiatedProtocolVersion(),
+          protocolEra: this.client.getProtocolEra(),
         },
-        'Document converted, fetching JSON'
+        'Connected to Docling MCP server'
       );
-
-      // Step 2: Save document to JSON file
-      const saveResult = await this.callWithRetry(async () => {
-        return await this.client.callTool({
-          name: 'save_docling_document',
-          arguments: {
-            document_key: conversionResult.document_key,
-          },
-        });
-      });
-
-      const saveContent = saveResult.content as Array<{ type: string; text?: string }>;
-      const saveTextContent = saveContent.find(c => c.type === 'text');
-      if (!saveTextContent || !saveTextContent.text) {
-        throw new DoclingError(
-          DoclingErrorCode.PROCESSING_ERROR,
-          'No text content in save response'
-        );
-      }
-
-      const saveResponse = this.parseToolResponse<{
-        json_file: string;
-        md_file: string;
-      }>(saveTextContent.text, 'save_docling_document');
-
-      logger.info(
-        {
-          json_file: saveResponse.json_file,
-        },
-        'Document saved to JSON file'
-      );
-
-      // Step 3: Read JSON file from volume mount
-      // The cache directory is mounted to .tmp/docling-cache via docker-compose.yml
-      // Extract filename from container path: /usr/local/lib/python3.12/site-packages/_cache/{filename}
-      const filename = saveResponse.json_file.split('/').pop();
-      if (!filename) {
-        throw new DoclingError(
-          DoclingErrorCode.PROCESSING_ERROR,
-          'Invalid JSON file path returned: ' + saveResponse.json_file
-        );
-      }
-
-      // Read from mounted volume (configurable via DOCLING_CACHE_PATH env)
-      const cacheDir = process.env.DOCLING_CACHE_PATH || '/app/docling-cache';
-      const localPath = `${cacheDir}/${filename}`;
-
-      // Dynamic import of fs/promises for Node.js 18+ compatibility
-      const fs = await import('fs/promises');
-
-      try {
-        const jsonContent = await fs.readFile(localPath, 'utf-8');
-        const doclingDocument = JSON.parse(jsonContent) as DoclingDocument;
-
-        logger.info(
-          {
-            texts_count: doclingDocument.texts?.length || 0,
-            tables_count: doclingDocument.tables?.length || 0,
-            pictures_count: doclingDocument.pictures?.length || 0,
-            pages_count: Object.keys(doclingDocument.pages || {}).length,
-          },
-          'DoclingDocument JSON loaded successfully'
-        );
-
-        return doclingDocument;
-      } catch (readError) {
-        throw new DoclingError(
-          DoclingErrorCode.PROCESSING_ERROR,
-          `Failed to read JSON file from mounted volume: ${localPath}`,
-          readError
-        );
-      }
     } catch (error) {
-      logger.error({ err: error, filePath }, 'Failed to get DoclingDocument JSON');
-
-      if (error instanceof DoclingError) {
-        throw error;
-      }
-
+      this.connected = false;
+      await this.closeAfterFailedConnection();
+      // SDK clients are terminal after close(); keep the singleton reusable
+      // for a later BullMQ attempt even when the initial connection failed.
+      this.client = this.createSdkClient();
+      if (error instanceof DoclingError) throw error;
       throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        'Failed to retrieve DoclingDocument JSON',
+        DoclingErrorCode.NETWORK_ERROR,
+        `Failed to connect to Docling MCP server: ${this.errorMessage(error)}`,
         error
       );
     }
   }
 
-  /**
-   * List available tools on the MCP server
-   * Useful for debugging and verification
-   */
-  async listTools(): Promise<Array<Record<string, unknown>>> {
-    if (!this.isConnected) {
-      await this.connect();
+  private async closeAfterFailedConnection(): Promise<void> {
+    try {
+      await this.client.close();
+    } catch {
+      try {
+        await this.transport?.close();
+      } catch {
+        // The failed transport is already closed.
+      }
+    }
+    this.transport = null;
+  }
+
+  async disconnect(): Promise<void> {
+    if (!this.transport && !this.connected) return;
+    const transport = this.transport;
+    this.connected = false;
+    this.transport = null;
+
+    if (transport) {
+      try {
+        await transport.terminateSession();
+      } catch (error) {
+        logger.debug({ err: error }, 'Docling MCP session termination was not accepted');
+      }
     }
 
     try {
-      const result = await this.client.listTools();
-      return result.tools;
+      await this.client.close();
     } catch (error) {
-      logger.error({ err: error }, 'Failed to list tools');
-      throw new DoclingError(DoclingErrorCode.NETWORK_ERROR, 'Failed to list tools', error);
+      logger.debug({ err: error }, 'Docling MCP client was already closed');
+      try {
+        await transport?.close();
+      } catch {
+        // Nothing else to release.
+      }
     }
   }
 
-  /**
-   * Normalize any error into a proper Error with message
-   * MCP SDK can throw non-Error objects or Errors without messages
-   */
-  private normalizeError(error: unknown, context: string): Error {
-    if (error instanceof DoclingError) return error;
-
-    if (error instanceof Error) {
-      if (!error.message || error.message === 'Error') {
-        return new DoclingError(
-          DoclingErrorCode.PROCESSING_ERROR,
-          `${context}: ${error.name || 'Error'} (no message)`,
-          error
-        );
-      }
-      return error;
-    }
-
-    // Non-Error objects (MCP SDK can throw these)
-    const msg =
-      typeof error === 'object' && error !== null
-        ? JSON.stringify(error).substring(0, 500)
-        : String(error);
-    return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, `${context}: ${msg}`, error);
+  private async reconnect(): Promise<void> {
+    await this.disconnect();
+    this.client = this.createSdkClient();
+    await this.connect();
   }
 
-  /**
-   * Execute function with retry logic
-   * Handles reconnection for "Not connected" and "terminated" errors
-   */
-  private async callWithRetry<T>(fn: () => Promise<T>, attempt: number = 1): Promise<T> {
-    try {
-      return await fn();
-    } catch (error) {
-      const normalized = this.normalizeError(error, `callWithRetry attempt ${attempt}`);
-      if (attempt >= this.config.maxRetries) {
-        throw normalized;
-      }
+  private async ensureConnected(): Promise<void> {
+    if (!this.connected || !this.transport) await this.connect();
+  }
 
-      // Don't retry on certain errors
-      if (normalized instanceof DoclingError) {
-        const nonRetryableErrors = [
-          DoclingErrorCode.FILE_NOT_FOUND,
-          DoclingErrorCode.UNSUPPORTED_FORMAT,
-          DoclingErrorCode.CORRUPTED_FILE,
-        ];
+  async convertDocumentBundle(filePath: string): Promise<DoclingConversionBundle> {
+    const extension = getFileExtension(filePath);
+    if (!isSupportedFormat(extension)) {
+      throw new DoclingError(
+        DoclingErrorCode.UNSUPPORTED_FORMAT,
+        `Unsupported document format: ${extension || '(none)'}`
+      );
+    }
 
-        if (nonRetryableErrors.includes(normalized.code)) {
+    for (let attempt = 0; ; attempt += 1) {
+      const startedAt = Date.now();
+      try {
+        await this.ensureConnected();
+        return await this.convertBundleOnce(filePath, startedAt);
+      } catch (error) {
+        const normalized = this.normalizeError(error, 'Docling conversion failed');
+        if (attempt >= this.config.maxRetries || !this.isConnectionLoss(error)) {
           throw normalized;
         }
-      }
 
-      const errorMessage = normalized.message;
-
-      // Handle connection and session issues - reconnect before retry
-      // Session errors occur when Docling MCP server loses its session state
-      const isSessionError = matchesAnyPattern(errorMessage, SESSION_ERROR_PATTERNS);
-      const isConnectionError = matchesAnyPattern(errorMessage, CONNECTION_ERROR_PATTERNS);
-
-      if (isSessionError || isConnectionError) {
         logger.warn(
-          {
-            err: errorMessage,
-            attempt,
-            maxRetries: this.config.maxRetries,
-            errorType: isSessionError ? 'session' : 'connection',
-          },
-          `Docling ${isSessionError ? 'session' : 'connection'} error, reconnecting before retry...`
+          { err: normalized, attempt: attempt + 1 },
+          'Docling MCP connection was lost; retrying the complete conversion bundle once'
         );
+        if (this.config.retryDelay > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+        }
         await this.reconnect();
       }
-
-      // Exponential backoff
-      const delay = this.config.retryDelay * Math.pow(2, attempt - 1);
-      logger.warn(
-        {
-          err: errorMessage,
-        },
-        `Retrying after ${delay}ms (attempt ${attempt}/${this.config.maxRetries})`
-      );
-
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return this.callWithRetry(fn, attempt + 1);
     }
   }
 
-  /**
-   * Check if client is connected
-   */
+  private async convertBundleOnce(
+    filePath: string,
+    startedAt: number
+  ): Promise<DoclingConversionBundle> {
+    const source = transformPathForDocling(filePath);
+    const conversion = await this.callTool('convert_document_into_docling_document', { source });
+    const documentKey = this.requiredString(
+      conversion,
+      'document_key',
+      'convert_document_into_docling_document'
+    );
+    const fromCache = conversion.from_cache === true;
+
+    const markdownResult = await this.callTool('export_docling_document_to_markdown', {
+      document_key: documentKey,
+      max_size: MARKDOWN_EXPORT_MAX_SIZE_BYTES,
+    });
+    const markdownKey = this.requiredString(
+      markdownResult,
+      'document_key',
+      'export_docling_document_to_markdown'
+    );
+    if (markdownKey !== documentKey) {
+      throw new DoclingError(
+        DoclingErrorCode.PROCESSING_ERROR,
+        `Docling MCP returned inconsistent document keys: ${documentKey} and ${markdownKey}`
+      );
+    }
+    const markdown = this.requiredString(
+      markdownResult,
+      'markdown',
+      'export_docling_document_to_markdown',
+      true
+    );
+
+    const saveResult = await this.callTool('save_docling_document', {
+      document_key: documentKey,
+    });
+    const jsonFile = this.requiredString(saveResult, 'json_file', 'save_docling_document');
+    const jsonBasename = path.basename(jsonFile);
+    if (jsonBasename !== `${documentKey}.json`) {
+      throw new DoclingError(
+        DoclingErrorCode.PROCESSING_ERROR,
+        `Docling MCP returned an inconsistent saved JSON key: ${documentKey} and ${jsonBasename}`
+      );
+    }
+    const cacheFile = path.join(this.config.cachePath, jsonBasename);
+
+    let rawDocument: unknown;
+    try {
+      rawDocument = JSON.parse(await fs.readFile(cacheFile, 'utf8'));
+    } catch (error) {
+      throw new DoclingError(
+        DoclingErrorCode.PROCESSING_ERROR,
+        `Failed to read saved Docling JSON: ${cacheFile}`,
+        error
+      );
+    }
+
+    const document = normalizeDoclingDocument(rawDocument);
+    return {
+      markdown,
+      document,
+      documentKey,
+      fromCache,
+      processingTimeMs: Date.now() - startedAt,
+    };
+  }
+
+  private async callTool(name: string, args: ToolPayload): Promise<ToolPayload> {
+    const result: CallToolResult = await this.client.callTool(
+      { name, arguments: args },
+      { timeout: this.config.timeout, maxTotalTimeout: this.config.timeout }
+    );
+
+    if (result.isError) throw classifyToolError(extractToolError(result), result);
+    if (isRecord(result.structuredContent)) return result.structuredContent;
+
+    const text = result.content.find(content => content.type === 'text')?.text;
+    if (!text) {
+      throw new DoclingError(
+        DoclingErrorCode.PROCESSING_ERROR,
+        `${name} returned neither structuredContent nor text JSON`
+      );
+    }
+
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!isRecord(parsed)) throw new Error('response is not an object');
+      return parsed;
+    } catch (error) {
+      throw new DoclingError(
+        DoclingErrorCode.PROCESSING_ERROR,
+        `${name} returned invalid text JSON`,
+        error
+      );
+    }
+  }
+
+  private requiredString(
+    value: ToolPayload,
+    field: string,
+    tool: string,
+    allowEmpty = false
+  ): string {
+    const candidate = value[field];
+    if (typeof candidate === 'string' && (allowEmpty || candidate.length > 0)) return candidate;
+    throw new DoclingError(
+      DoclingErrorCode.PROCESSING_ERROR,
+      `${tool} response is missing ${field}`
+    );
+  }
+
+  private isConnectionLoss(error: unknown): boolean {
+    return error instanceof SdkError && CONNECTION_LOSS_CODES.has(error.code);
+  }
+
+  private normalizeError(error: unknown, context = 'Docling operation failed'): Error {
+    if (error instanceof DoclingError) return error;
+    if (error instanceof SdkError) {
+      if (error.code === SdkErrorCode.RequestTimeout) {
+        return new DoclingError(DoclingErrorCode.TIMEOUT, error.message, error);
+      }
+      if (CONNECTION_LOSS_CODES.has(error.code)) {
+        return new DoclingError(DoclingErrorCode.NETWORK_ERROR, error.message, error);
+      }
+      return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, error.message, error);
+    }
+    if (error instanceof ProtocolError) {
+      return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, error.message, error);
+    }
+    if (error instanceof Error && error.message.trim() && error.message !== 'Error') return error;
+
+    const detail = this.errorMessage(error);
+    const suffix = detail && detail !== 'Error' ? `: ${detail}` : '';
+    return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, `${context}${suffix}`, error);
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string') return error;
+    try {
+      const serialized = JSON.stringify(error);
+      return typeof serialized === 'string' ? serialized : String(error);
+    } catch {
+      return String(error);
+    }
+  }
+
+  async listTools(): Promise<Array<Record<string, unknown>>> {
+    await this.ensureConnected();
+    const result = await this.client.listTools();
+    return result.tools as Array<Record<string, unknown>>;
+  }
+
   isConnectedToServer(): boolean {
-    return this.isConnected;
+    return this.connected;
+  }
+
+  /** @deprecated Prefer convertDocumentBundle to keep JSON and Markdown consistent. */
+  async convertToMarkdown(filePath: string): Promise<string> {
+    return (await this.convertDocumentBundle(filePath)).markdown;
+  }
+
+  /** @deprecated Prefer convertDocumentBundle to keep JSON and Markdown consistent. */
+  async getDoclingDocumentJSON(filePath: string) {
+    return (await this.convertDocumentBundle(filePath)).document;
+  }
+
+  /** @deprecated Prefer convertDocumentBundle to keep JSON and Markdown consistent. */
+  async convertToDoclingDocument(filePath: string) {
+    return (await this.convertDocumentBundle(filePath)).document;
+  }
+
+  /** Compatibility wrapper for callers that still use the v1 client facade. */
+  async convertDocument(request: ConvertDocumentRequest): Promise<ConvertDocumentResponse> {
+    const bundle = await this.convertDocumentBundle(request.file_path);
+    return request.output_format === 'docling_document' || request.output_format === 'json'
+      ? {
+          success: true,
+          document: bundle.document,
+          metadata: {
+            processing_time_ms: bundle.processingTimeMs,
+            from_cache: bundle.fromCache,
+            pages_processed: bundle.document.metadata.page_count,
+          },
+        }
+      : {
+          success: true,
+          content: bundle.markdown,
+          metadata: {
+            processing_time_ms: bundle.processingTimeMs,
+            from_cache: bundle.fromCache,
+            pages_processed: bundle.document.metadata.page_count,
+          },
+        };
   }
 }
 
-/**
- * Factory function to create a DoclingClient instance
- * Uses environment variables for configuration
- */
 export function createDoclingClient(): DoclingClient {
-  const serverUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp';
-  const timeout = parseInt(process.env.DOCLING_MCP_TIMEOUT || '1200000', 10); // 20 minutes default
-
   return new DoclingClient({
-    serverUrl,
-    timeout,
+    serverUrl: process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp',
+    timeout: Number.parseInt(process.env.DOCLING_MCP_TIMEOUT || '1200000', 10),
+    maxRetries: Number.parseInt(process.env.DOCLING_MCP_MAX_RETRIES || '1', 10),
+    cachePath: process.env.DOCLING_CACHE_PATH || '/app/docling-json-cache',
     debug: process.env.NODE_ENV === 'development',
   });
 }
 
-/**
- * Singleton instance for reuse within a single worker process
- *
- * IMPORTANT: In BullMQ sandboxed workers, each worker process has its own instance.
- * This singleton is per-process, NOT shared across workers.
- * Connection reuse is handled internally by the DoclingClient class.
- */
 let clientInstance: DoclingClient | null = null;
 
-/**
- * Get or create the singleton DoclingClient instance for this worker process
- *
- * @remarks
- * In multi-worker BullMQ setups, each worker process maintains its own
- * singleton instance. This provides connection reuse within a worker
- * while avoiding cross-process state sharing issues.
- *
- * @returns DoclingClient instance (singleton per-process)
- */
 export function getDoclingClient(): DoclingClient {
-  if (!clientInstance) {
-    clientInstance = createDoclingClient();
-  }
+  clientInstance ??= createDoclingClient();
   return clientInstance;
 }
 
-/**
- * Close and reset the singleton instance
- * Useful for testing and cleanup
- */
 export async function resetDoclingClient(): Promise<void> {
-  if (clientInstance) {
-    await clientInstance.disconnect();
-    clientInstance = null;
-  }
+  if (!clientInstance) return;
+  await clientInstance.disconnect();
+  clientInstance = null;
 }

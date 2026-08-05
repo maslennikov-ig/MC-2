@@ -28,6 +28,9 @@ fi
 #   Blue:  web:3001, api:4001
 #   Green: web:3002, api:4002
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/docling-rollout.sh"
+
 # ============================================================================
 # Q12 quiesce-aware blue/green handoff (fail-closed).
 #
@@ -329,9 +332,19 @@ PY
                     || q12_fail "re-prepare parameters differ from the existing prepared handoff recovery"
             fi
             echo "Q12 prepare: creating target $Q12_TARGET_COLOR web/api without starting them"
+            docling_prepare_rollout "$Q12_BASE_PATH/.env.$Q12_ENV" \
+                || q12_fail "Docling rollout gate failed"
+            Q12_INFRA_SERVICES=(redis qdrant prometheus grafana notebooklm-bridge)
+            Q12_INFRA_SERVICES+=("${DOCLING_ROLLOUT_SERVICES[@]}")
             docker compose -f "$Q12_INFRA_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_ENV" \
-                up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge \
+                up -d "${Q12_INFRA_SERVICES[@]}" \
                 || q12_fail "shared infrastructure did not come up"
+            if ! docling_check_facade || \
+                { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
+                docling_rollback_rollout "$Q12_BASE_PATH/.env.$Q12_ENV" "$Q12_INFRA_COMPOSE" \
+                    || q12_fail "Docling MCP facade is unhealthy and rollback failed"
+                q12_fail "Docling MCP facade is unhealthy; MCP 1.x was restored"
+            fi
             docker compose -f "$Q12_APP_COMPOSE" --env-file "$Q12_BASE_PATH/.env.$Q12_TARGET_COLOR" \
                 up --no-start web api \
                 || q12_fail "target web/api were not created"
@@ -660,24 +673,8 @@ echo "   Operator image held as hold/qdrant-operator:pinned ($OPERATOR_IMAGE)"
 
 unset OPERATOR_IMAGE QDRANT_OPERATOR_IMAGE_SHA256
 
-# 2. Check docling-mcp image exists (manually built, 8GB)
-DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
-if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
-    echo ""
-    echo "ERROR: docling-mcp image not found!"
-    echo ""
-    echo "This image is built manually (too large for CI/CD)."
-    echo "To fix, run one of:"
-    echo ""
-    echo "  # Option 1: Retag from old name (if exists)"
-    echo "  docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest $DOCLING_IMAGE"
-    echo ""
-    echo "  # Option 2: Rebuild (~30 min)"
-    echo "  cd $BASE_PATH && docker build -t $DOCLING_IMAGE \\"
-    echo "    -f packages/course-gen-platform/docker/docling-mcp/Dockerfile ."
-    echo ""
-    exit 1
-fi
+# 2. Keep MCP 1.x untouched unless the separately approved rollout flag is on.
+docling_prepare_rollout "$BASE_PATH/.env.$ENV"
 
 # 3. Ensure data directories exist with correct ownership
 # Docker bind mounts inherit host permissions. Container runs as nodejs (uid 1001).
@@ -699,8 +696,17 @@ echo ""
 
 # 4. Ensure Infrastructure is Running (shared by all colors)
 echo "Ensuring infrastructure is running..."
+INFRA_SERVICES=(redis qdrant prometheus grafana notebooklm-bridge worker-stage7)
+INFRA_SERVICES+=("${DOCLING_ROLLOUT_SERVICES[@]}")
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.$ENV" \
-    up -d redis qdrant prometheus grafana docling-mcp-internal docling-mcp notebooklm-bridge worker-stage7
+    up -d "${INFRA_SERVICES[@]}"
+if ! docling_check_facade || \
+    { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
+    docling_rollback_rollout "$BASE_PATH/.env.$ENV" "$BASE_PATH/docker-compose.infra.yml" \
+        || { echo "ERROR: Docling MCP health failed and rollback failed" >&2; exit 1; }
+    echo "ERROR: Docling MCP health failed; MCP 1.x was restored and Docling Serve stopped" >&2
+    exit 1
+fi
 echo "   Infrastructure ready."
 echo ""
 

@@ -9,12 +9,21 @@ import { logger } from '../logger/index.js';
  * Why 7 days:
  * - Covers long-running pipelines that may span multiple days
  * - Allows for retry scenarios after weekend/holiday breaks
- * - Docling cache is path-based (MD5 of file path), so it only helps
+ * - Docling cache is path-based (SHA-256 of canonical conversion input), so it only helps
  *   when retrying the SAME file path (not cross-course deduplication,
  *   which uses SHA-256 content hashes in file_catalog)
  * - After 7 days, cache files are considered stale and safe to delete
  */
 export const DEFAULT_DOCLING_TTL_HOURS = 168;
+
+function pythonJsonString(value: string): string {
+  // Python json.dumps defaults to ensure_ascii=True. Work at UTF-16 code-unit
+  // level so astral characters become the same pair of \uXXXX surrogates.
+  return JSON.stringify(value).replace(
+    /[\u0080-\uFFFF]/g,
+    character => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
+  );
+}
 
 /**
  * Result of Docling cache cleanup operation
@@ -72,7 +81,7 @@ export async function cleanupDoclingCache(
     const files = await fs.readdir(cacheDir);
 
     for (const file of files) {
-      // Only process .json files to be safe
+      // JSON is the anchor; its Markdown sibling has the same key and lifetime.
       if (!file.endsWith('.json')) {
         continue;
       }
@@ -83,10 +92,18 @@ export async function cleanupDoclingCache(
         const stats = await fs.stat(filePath);
 
         if (stats.mtimeMs < thresholdTime) {
-          await fs.unlink(filePath);
-          result.deletedCount++;
-          result.totalSizeFreed += stats.size;
-          logger.debug({ file, mtime: stats.mtime }, 'Deleted old cache file');
+          for (const extension of ['json', 'md']) {
+            const pairedPath = path.join(cacheDir, `${path.basename(file, '.json')}.${extension}`);
+            try {
+              const pairedStats = await fs.stat(pairedPath);
+              await fs.unlink(pairedPath);
+              result.deletedCount++;
+              result.totalSizeFreed += pairedStats.size;
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+            }
+          }
+          logger.debug({ file, mtime: stats.mtime }, 'Deleted old cache pair');
         } else {
           result.keptCount++;
         }
@@ -112,22 +129,43 @@ export async function cleanupDoclingCache(
 }
 
 /**
- * Generates MD5 hash cache key for a file path.
- * This matches Docling's internal cache key format.
+ * Generates the Docling MCP 3 cache key for the default conversion request.
  *
  * @param filePath - The absolute file path
- * @returns MD5 hex string (32 characters)
+ * @returns First 32 hexadecimal characters of the SHA-256 digest
  */
 export function generateCacheKey(filePath: string): string {
+  // Python's json.dumps(sort_keys=True) uses this exact key order and spacing.
+  const canonicalRequest = `{"enable_ocr": false, "ocr_language": [], "source": ${pythonJsonString(filePath)}}`;
+  return crypto.createHash('sha256').update(canonicalRequest).digest('hex').slice(0, 32);
+}
+
+function generateLegacyCacheKey(filePath: string): string {
   return crypto.createHash('md5').update(filePath).digest('hex');
+}
+
+function getCachePathCandidates(filePath: string): string[] {
+  const candidates = new Set([filePath]);
+  const uploadsBasePath = process.env.DOCLING_UPLOADS_BASE_PATH;
+  const containerUploadsPath = process.env.DOCLING_CONTAINER_UPLOADS_PATH || '/app/uploads';
+  const marker = '/uploads/';
+
+  if (uploadsBasePath && filePath.startsWith(uploadsBasePath)) {
+    const uploadsIndex = filePath.indexOf(marker, uploadsBasePath.length);
+    if (uploadsIndex !== -1) {
+      candidates.add(`${containerUploadsPath}/${filePath.slice(uploadsIndex + marker.length)}`);
+    }
+  }
+
+  return [...candidates];
 }
 
 /**
  * Cleans up Docling cache files for a specific course.
  *
  * Called during course deletion to remove cached document parsing results.
- * Docling uses MD5 hash of the file path as the cache key, so we need to
- * generate the same hash from the original file paths.
+ * Docling MCP 3 uses SHA-256 over a canonical request. The prior MC2 image
+ * used MD5, so both key families are removed during the compatibility window.
  *
  * Note: This only cleans up cache for documents that were processed via
  * the SAME file paths. If files were re-uploaded with different paths,
@@ -183,50 +221,49 @@ export async function cleanupDoclingCacheForCourse(
   }
 
   // Generate cache keys for each file path
-  const cacheKeys = filePaths.map(filePath => ({
-    filePath,
-    cacheKey: generateCacheKey(filePath),
-  }));
+  const cacheKeys = filePaths.flatMap(filePath =>
+    getCachePathCandidates(filePath).flatMap(candidatePath =>
+      [generateCacheKey(candidatePath), generateLegacyCacheKey(candidatePath)].map(cacheKey => ({
+        filePath,
+        candidatePath,
+        cacheKey,
+      }))
+    )
+  );
 
   // Delete cache files
-  for (const { filePath, cacheKey } of cacheKeys) {
-    const cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
-
-    try {
-      const stats = await fs.stat(cacheFilePath);
-      await fs.unlink(cacheFilePath);
-      result.deletedCount++;
-      result.totalSizeFreed += stats.size;
-      logger.debug(
-        {
-          cacheKey,
-          originalPath: filePath,
-          sizeMB: (stats.size / 1024 / 1024).toFixed(2),
-        },
-        '[Docling Cleanup] Deleted cache file for document'
-      );
-    } catch (err) {
-      // File might not exist (document was never processed, or was processed with different path)
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        result.keptCount++; // Not an error, just not found
+  for (const { filePath, candidatePath, cacheKey } of cacheKeys) {
+    let foundForKey = false;
+    for (const extension of ['json', 'md']) {
+      const cacheFilePath = path.join(cacheDir, `${cacheKey}.${extension}`);
+      try {
+        const stats = await fs.stat(cacheFilePath);
+        await fs.unlink(cacheFilePath);
+        foundForKey = true;
+        result.deletedCount++;
+        result.totalSizeFreed += stats.size;
         logger.debug(
           {
             cacheKey,
+            extension,
             originalPath: filePath,
+            cachePathSource: candidatePath,
+            sizeMB: (stats.size / 1024 / 1024).toFixed(2),
           },
-          '[Docling Cleanup] Cache file not found (already deleted or never created)'
+          '[Docling Cleanup] Deleted cache artifact for document'
         );
-      } else {
-        result.errorCount++;
-        logger.error(
-          {
-            err,
-            cacheKey,
-            originalPath: filePath,
-          },
-          '[Docling Cleanup] Failed to delete cache file'
-        );
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          result.errorCount++;
+          logger.error(
+            { err, cacheKey, extension, originalPath: filePath, cachePathSource: candidatePath },
+            '[Docling Cleanup] Failed to delete cache artifact'
+          );
+        }
       }
+    }
+    if (!foundForKey) {
+      result.keptCount++;
     }
   }
 
