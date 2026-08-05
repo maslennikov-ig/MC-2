@@ -320,6 +320,7 @@ export class DoclingClient {
       documentKey,
       fromCache,
       processingTimeMs: Date.now() - startedAt,
+      rawJsonPath: cacheFile,
     };
   }
 

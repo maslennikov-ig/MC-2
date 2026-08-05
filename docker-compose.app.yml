@@ -67,6 +67,8 @@ services:
       - QDRANT_METRICS_SERVICE=api
       - QDRANT_METRICS_INSTANCE=api-${COLOR:-blue}
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://megacampus-docling-serve:5001}
+      - DOCLING_CHUNK_STRATEGY=${DOCLING_CHUNK_STRATEGY:-legacy_markdown}
       - DOCLING_MCP_TIMEOUT=1200000
       - DOCLING_MCP_MAX_RETRIES=1
       - NOTEBOOKLM_BRIDGE_URL=http://megacampus-notebooklm-bridge:8000

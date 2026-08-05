@@ -288,6 +288,13 @@ function determinePageRange(
   chunk: TextChunk,
   docling_json?: DoclingDocument
 ): [number, number] | null {
+  // Native Docling provenance is exact: it comes from the element the chunk was
+  // built from, not from a Markdown pattern match. Prefer it whenever present.
+  const provenancePages = chunk.provenance?.page_numbers ?? [];
+  if (provenancePages.length > 0) {
+    return [Math.min(...provenancePages), Math.max(...provenancePages)];
+  }
+
   if (!docling_json) return null;
 
   // Strategy: Find page numbers from images/tables in this chunk
@@ -444,6 +451,19 @@ export function toQdrantPayload(chunk: EnrichedChunk): Record<string, unknown> {
     // Priority for RAG boosting
     document_priority: chunk.document_priority,
     document_weight: chunk.document_weight,
+
+    // Native Docling provenance. Additive and optional: points written before
+    // structure-aware chunking simply do not carry these keys, and every reader
+    // must tolerate their absence. No existing point is rewritten for them.
+    ...(chunk.provenance
+      ? {
+          source_refs: chunk.provenance.self_refs,
+          provenance_page_numbers: chunk.provenance.page_numbers,
+          provenance_bboxes: chunk.provenance.bboxes,
+          provenance_labels: chunk.provenance.labels,
+          native_token_count: chunk.provenance.native_token_count,
+        }
+      : {}),
   };
 }
 

@@ -20,7 +20,24 @@ from reportlab.pdfgen import canvas
 
 
 ROOT = Path(__file__).resolve().parent
-FONT_PATH = Path("C:/Windows/Fonts/arial.ttf")
+
+# Any Cyrillic-capable TTF. The first existing candidate wins so the generator
+# runs on both the Windows and the WSL/Linux checkout without editing.
+FONT_CANDIDATES = (
+    Path("C:/Windows/Fonts/arial.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+)
+
+
+def _font_path() -> Path:
+    for candidate in FONT_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "No Cyrillic-capable TTF found; add one to FONT_CANDIDATES: "
+        + ", ".join(str(path) for path in FONT_CANDIDATES)
+    )
 
 
 def _append_value(parent, tag: str, value: str):
@@ -117,6 +134,94 @@ def make_docx() -> None:
     document.save(ROOT / "structured-lists-and-table.docx")
 
 
+def make_hierarchy_docx() -> None:
+    """Three real heading levels, with values that are ambiguous without them.
+
+    Both subsections state a "Целевое значение", and only the heading path says
+    which product each belongs to. A chunking strategy that loses headings can
+    still retrieve the number and cannot answer the question.
+    """
+    document = Document()
+    document.add_heading("Регламент обработки документов", level=1)
+    document.add_paragraph(
+        "Документ описывает требования к двум продуктовым линиям и порядок их проверки."
+    )
+
+    document.add_heading("Линия Альфа", level=2)
+    document.add_paragraph("Линия Альфа обслуживает корпоративных клиентов.")
+    document.add_heading("Целевые показатели Альфы", level=3)
+    document.add_paragraph("Целевое значение: 42 единицы в сутки при полной загрузке.")
+    document.add_heading("Ограничения Альфы", level=3)
+    document.add_paragraph("Максимальная задержка обработки составляет 15 минут.")
+
+    document.add_heading("Линия Бета", level=2)
+    document.add_paragraph("Линия Бета обслуживает розничных клиентов.")
+    document.add_heading("Целевые показатели Беты", level=3)
+    document.add_paragraph("Целевое значение: 77 единиц в сутки при полной загрузке.")
+    document.add_heading("Ограничения Беты", level=3)
+    document.add_paragraph("Максимальная задержка обработки составляет 30 минут.")
+
+    document.save(ROOT / "hierarchy-multilevel.docx")
+
+
+# Markers carry the hierarchy: Docling's numbering inference recognises `1.` as
+# an arabic marker of depth 1 and `1.1.` as a dotted marker of depth 2, and the
+# two distinct families are what it compresses into two heading levels.
+NUMBERED_SECTIONS = (
+    (1, "1. Введение", "Введение объясняет цель регламента и область его применения."),
+    (2, "1.1. Область применения", "Регламент применяется ко всем входящим документам."),
+    (2, "1.2. Термины", "Термин «партия» означает набор документов одной загрузки."),
+    (1, "2. Порядок обработки", "Обработка выполняется в три последовательных этапа."),
+    (2, "2.1. Приём", "На приёме проверяется формат и целостность файла."),
+    (2, "2.2. Проверка", "Контрольное значение проверки равно 64 пунктам."),
+    (1, "3. Заключение", "Заключение фиксирует ответственных и сроки пересмотра."),
+)
+
+
+def make_numbered_sections_pdf() -> None:
+    """A text-layer PDF whose outline numbering encodes a two-level hierarchy.
+
+    Docling reports every section header at level 1 unless heading-hierarchy
+    inference is enabled, so this fixture is what proves the feature flag does
+    something, and proves it on structure rather than on heading count.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    font_path = _font_path()
+    bold_path = font_path.with_name(font_path.name.replace(".ttf", "-Bold.ttf"))
+    pdfmetrics.registerFont(TTFont("FixtureSans", str(font_path)))
+    pdfmetrics.registerFont(
+        TTFont("FixtureSans-Bold", str(bold_path if bold_path.exists() else font_path))
+    )
+
+    pdf = canvas.Canvas(
+        str(ROOT / "numbered-sections.pdf"), pagesize=A4, pageCompression=1
+    )
+    page_width, page_height = A4
+    y = page_height - 80
+
+    # Headings are bold and clearly larger than body text: the layout model has
+    # to classify them as section headers before numbering can order them.
+    pdf.setFont("FixtureSans-Bold", 22)
+    pdf.drawString(70, y, "Регламент обработки: нумерованные разделы")
+    y -= 60
+
+    for level, heading, body in NUMBERED_SECTIONS:
+        if y < 140:
+            pdf.showPage()
+            y = page_height - 80
+        pdf.setFont("FixtureSans-Bold", 18 if level == 1 else 15)
+        pdf.drawString(70, y, heading)
+        y -= 30
+        pdf.setFont("FixtureSans", 11)
+        pdf.drawString(70, y, body)
+        y -= 46
+
+    pdf.showPage()
+    pdf.save()
+
+
 def add_textbox(slide, left, top, width, height, text, size=20, bold=False):
     shape = slide.shapes.add_textbox(Cm(left), Cm(top), Cm(width), Cm(height))
     paragraph = shape.text_frame.paragraphs[0]
@@ -159,11 +264,12 @@ def make_pptx() -> None:
 
 def make_raster_ocr_pdf() -> None:
     width, height = 2480, 3508
+    font_path = _font_path()
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype(str(FONT_PATH), 62)
-    heading = ImageFont.truetype(str(FONT_PATH), 74)
-    small = ImageFont.truetype(str(FONT_PATH), 48)
+    font = ImageFont.truetype(str(font_path), 62)
+    heading = ImageFont.truetype(str(font_path), 74)
+    small = ImageFont.truetype(str(font_path), 48)
 
     draw.text((160, 180), "РУССКИЙ OCR: КОНТРОЛЬНЫЙ ДОКУМЕНТ", font=heading, fill="black")
     draw.text(
@@ -235,9 +341,22 @@ def make_vector_outline_pdf() -> None:
     pdf.save()
 
 
+GENERATORS = {
+    "structured-docx": make_docx,
+    "hierarchy-docx": make_hierarchy_docx,
+    "numbered-sections-pdf": make_numbered_sections_pdf,
+    "reading-order-pptx": make_pptx,
+    "raster-ocr-pdf": make_raster_ocr_pdf,
+    "vector-outline-pdf": make_vector_outline_pdf,
+}
+
+
 if __name__ == "__main__":
+    import sys
+
     ROOT.mkdir(parents=True, exist_ok=True)
-    make_docx()
-    make_pptx()
-    make_raster_ocr_pdf()
-    make_vector_outline_pdf()
+    selected = sys.argv[1:] or list(GENERATORS)
+    for name in selected:
+        if name not in GENERATORS:
+            raise SystemExit(f"Unknown fixture {name}; known: {', '.join(GENERATORS)}")
+        GENERATORS[name]()

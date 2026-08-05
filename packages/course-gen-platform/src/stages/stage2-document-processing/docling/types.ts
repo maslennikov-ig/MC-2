@@ -308,6 +308,13 @@ export interface DoclingConversionBundle {
   documentKey: string;
   fromCache: boolean;
   processingTimeMs: number;
+  /**
+   * Absolute path of the raw DoclingDocument JSON that produced `document`.
+   *
+   * Native chunking re-reads these exact bytes instead of re-converting the
+   * source, so chunks and the accepted document are the same document.
+   */
+  rawJsonPath: string;
 }
 
 /**

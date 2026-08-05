@@ -11,7 +11,10 @@ services:
       DOCLING_SERVE_MAX_SYNC_WAIT: '1200'
       DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT: '1200'
       DOCLING_SERVE_LOAD_MODELS_AT_BOOT: 'true'
+      DOCLING_SERVE_PDF_HEADING_HIERARCHY: '${DOCLING_SERVE_PDF_HEADING_HIERARCHY:-false}'
       DOCLING_SERVE_ARTIFACTS_PATH: /opt/app-root/src/.cache/docling/models
+    ports:
+      - '127.0.0.1:5001:5001'
     healthcheck:
       test:
         - CMD
@@ -63,6 +66,7 @@ services:
       DOCLING_MCP_OCR_PRESET: easyocr
       DOCLING_MCP_OCR_LANG: ru,en
       DOCLING_MCP_DO_TABLE_STRUCTURE: 'true'
+      DOCLING_MCP_PDF_HEADING_HIERARCHY: '${DOCLING_MCP_PDF_HEADING_HIERARCHY:-false}'
     depends_on:
       docling-serve:
         condition: service_healthy

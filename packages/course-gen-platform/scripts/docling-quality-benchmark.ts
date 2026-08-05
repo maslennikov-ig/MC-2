@@ -1,3 +1,21 @@
+/**
+ * Docling quality and chunking A/B harness.
+ *
+ * Runs the controlled corpus through the live MCP conversion boundary, then
+ * chunks every case with every requested strategy and scores the result. Each
+ * case persists its Markdown, raw JSON, normalized JSON, per-strategy chunks and
+ * retrieval metrics under `.tmp/docling-benchmark/<label>/` so a claim can be
+ * re-checked instead of believed.
+ *
+ * Honest-metric notes:
+ *
+ * - Heading hierarchy is asserted on the DISTINCT levels present, not on the
+ *   deepest `#` count. A document with only H2 does not prove two levels.
+ * - Retrieval scoring is the lexical half of production retrieval (BM25 with the
+ *   collection's own parameters). Dense Jina v3 ranking is not exercised here,
+ *   so a win reported by this harness is a lexical-reachability win.
+ */
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,25 +26,57 @@ import type {
   DoclingConversionBundle,
   DoclingDocument,
 } from '../src/stages/stage2-document-processing/docling/types.js';
+import { DoclingServeChunker } from '../src/stages/stage2-document-processing/docling/serve-chunker.js';
+import type { DoclingChunkingStrategy } from '../src/stages/stage2-document-processing/docling/serve-chunker.js';
 import {
   assertConversionProducedText,
   EmptyConversionError,
 } from '../src/stages/stage2-document-processing/phases/phase-1-docling-conversion.js';
+import {
+  evaluateHeadingHierarchy,
+  type HeadingHierarchyExpectation,
+} from '../src/shared/embeddings/heading-hierarchy.js';
+import { chunkWithStrategy } from '../src/shared/embeddings/chunking-strategy.js';
+import { DEFAULT_CHUNKING_CONFIG } from '../src/shared/embeddings/markdown-chunker.js';
+import {
+  evaluateRetrieval,
+  type GroundTruthQuestion,
+  type RetrievalReport,
+} from '../src/shared/embeddings/retrieval-metrics.js';
+
+type ConversionProfile = 'baseline' | 'pdf-heading-hierarchy';
 
 interface BenchmarkCase {
   id: string;
   source: string;
   expectedTokens?: string[];
   expectedOrder?: string[];
-  minimumHeadingDepth?: number;
+  headingHierarchy?: Partial<Record<ConversionProfile, HeadingHierarchyExpectation>>;
   requiresNestedList?: boolean;
   minimumColspan?: number;
   expectedError?: 'EmptyConversionError';
+  provenance?: { minimumRefCoverage?: number; minimumLocationCoverage?: number };
+  retrieval?: GroundTruthQuestion[];
 }
 
 interface Manifest {
   schemaVersion: number;
   cases: BenchmarkCase[];
+}
+
+interface StrategyOutcome {
+  strategy: DoclingChunkingStrategy;
+  chunkingProfileId: string;
+  parentChunks: number;
+  childChunks: number;
+  avgChildTokens: number;
+  refCoverage: number;
+  locationCoverage: number;
+  locationEligible: boolean;
+  headingPathCoverage: number;
+  durationMs: number;
+  retrieval: RetrievalReport | null;
+  error?: string;
 }
 
 interface CaseResult {
@@ -41,6 +91,7 @@ interface CaseResult {
   pictures: number;
   tables: number;
   assertions: Array<{ name: string; passed: boolean; details?: string }>;
+  strategies: StrategyOutcome[];
   error?: string;
 }
 
@@ -48,6 +99,11 @@ const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const REPO_ROOT = path.resolve(PACKAGE_ROOT, '../..');
 const FIXTURE_ROOT = path.join(PACKAGE_ROOT, 'tests/integration/fixtures/docling-quality');
 const MANIFEST_PATH = path.join(FIXTURE_ROOT, 'manifest.json');
+const ALL_STRATEGIES: DoclingChunkingStrategy[] = [
+  'legacy_markdown',
+  'docling_hierarchical',
+  'docling_hybrid',
+];
 
 function argument(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -56,13 +112,6 @@ function argument(name: string): string | undefined {
 
 function normalize(value: string): string {
   return value.toLocaleLowerCase('ru-RU').replace(/\s+/gu, ' ').trim();
-}
-
-function maximumHeadingDepth(markdown: string): number {
-  return Math.max(
-    0,
-    ...markdown.split('\n').map(line => /^(#{1,6})\s/u.exec(line)?.[1].length ?? 0)
-  );
 }
 
 function validateStableDocument(document: DoclingDocument): string[] {
@@ -87,7 +136,11 @@ function validateStableDocument(document: DoclingDocument): string[] {
 }
 
 function runtimeStats(): Record<string, string | number | null> {
-  for (const container of ['megacampus-docling-serve', 'docling-serve']) {
+  for (const container of [
+    'megacampus-docling-serve',
+    'docling-serve',
+    'docling-mcp-docling-serve-1',
+  ]) {
     try {
       const memory = execFileSync(
         'docker',
@@ -100,12 +153,162 @@ function runtimeStats(): Record<string, string | number | null> {
           stdio: ['ignore', 'pipe', 'ignore'],
         }).trim()
       );
-      return { serveMemory: memory || null, serveRestartCount: restartCount };
+      // `docker stats` answers `0B / 0B` for a name it cannot really measure and
+      // still exits 0, so an empty reading must fall through to the next name
+      // instead of being reported as a measurement.
+      if (!memory || memory.startsWith('0B / 0B')) continue;
+      return { serveContainer: container, serveMemory: memory, serveRestartCount: restartCount };
     } catch {
-      // Try the other local/production container name.
+      // Try the next local/production container name.
     }
   }
-  return { serveMemory: null, serveRestartCount: null };
+  return { serveContainer: null, serveMemory: null, serveRestartCount: null };
+}
+
+/**
+ * Runs one chunking strategy over an accepted conversion and scores it.
+ */
+async function runStrategy(
+  strategy: DoclingChunkingStrategy,
+  bundle: DoclingConversionBundle,
+  benchmarkCase: BenchmarkCase,
+  chunker: DoclingServeChunker,
+  caseDirectory: string
+): Promise<StrategyOutcome> {
+  const startedAt = Date.now();
+  try {
+    const result = await chunkWithStrategy(bundle.markdown, {
+      strategy,
+      source: { documentKey: bundle.documentKey, rawJsonPath: bundle.rawJsonPath },
+      config: DEFAULT_CHUNKING_CONFIG,
+      chunker,
+    });
+
+    await fs.writeFile(
+      path.join(caseDirectory, `chunks-${strategy}.json`),
+      `${JSON.stringify(
+        {
+          strategy: result.strategy,
+          chunkingProfileId: result.chunkingProfileId,
+          coverage: result.coverage,
+          metadata: result.metadata,
+          parents: result.parent_chunks,
+          children: result.child_chunks,
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    const headingPathCoverage =
+      result.child_chunks.length > 0
+        ? result.child_chunks.filter(chunk => chunk.heading_path !== 'Root').length /
+          result.child_chunks.length
+        : 0;
+
+    return {
+      strategy: result.strategy,
+      chunkingProfileId: result.chunkingProfileId,
+      parentChunks: result.parent_chunks.length,
+      childChunks: result.child_chunks.length,
+      avgChildTokens: result.metadata.avg_child_tokens,
+      refCoverage: result.coverage.refCoverage,
+      locationCoverage: result.coverage.locationCoverage,
+      locationEligible: result.coverage.locationEligible,
+      headingPathCoverage,
+      durationMs: Date.now() - startedAt,
+      retrieval: benchmarkCase.retrieval
+        ? evaluateRetrieval(result.child_chunks, benchmarkCase.retrieval, 5)
+        : null,
+    };
+  } catch (error) {
+    return {
+      strategy,
+      chunkingProfileId: 'n/a',
+      parentChunks: 0,
+      childChunks: 0,
+      avgChildTokens: 0,
+      refCoverage: 0,
+      locationCoverage: 0,
+      locationEligible: false,
+      headingPathCoverage: 0,
+      durationMs: Date.now() - startedAt,
+      retrieval: null,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    };
+  }
+}
+
+function strategyAssertions(
+  benchmarkCase: BenchmarkCase,
+  outcomes: StrategyOutcome[],
+  candidate: DoclingChunkingStrategy,
+  notes: string[]
+): CaseResult['assertions'] {
+  const assertions: CaseResult['assertions'] = [];
+
+  for (const outcome of outcomes) {
+    if (outcome.error) {
+      assertions.push({
+        name: `strategy:${outcome.strategy}`,
+        passed: false,
+        details: outcome.error,
+      });
+      continue;
+    }
+    if (outcome.strategy === 'legacy_markdown') continue;
+
+    const minimumRef = benchmarkCase.provenance?.minimumRefCoverage;
+    if (minimumRef !== undefined) {
+      assertions.push({
+        name: `provenance-refs:${outcome.strategy}`,
+        passed: outcome.refCoverage >= minimumRef,
+        details: `${(outcome.refCoverage * 100).toFixed(1)}% >= ${(minimumRef * 100).toFixed(1)}%`,
+      });
+    }
+
+    const minimumLocation = benchmarkCase.provenance?.minimumLocationCoverage;
+    if (minimumLocation !== undefined && outcome.locationEligible) {
+      assertions.push({
+        name: `provenance-location:${outcome.strategy}`,
+        passed: outcome.locationCoverage >= minimumLocation,
+        details: `${(outcome.locationCoverage * 100).toFixed(1)}% >= ${(minimumLocation * 100).toFixed(1)}%`,
+      });
+    }
+  }
+
+  // No control question may regress against the legacy strategy. This blocks
+  // only for the candidate default; the other strategies stay measured and
+  // reported, because knowing that a non-selected strategy regresses is the
+  // evidence that selected the candidate in the first place.
+  const legacy = outcomes.find(outcome => outcome.strategy === 'legacy_markdown');
+  if (legacy?.retrieval) {
+    for (const outcome of outcomes) {
+      if (outcome.strategy === 'legacy_markdown' || !outcome.retrieval) continue;
+      const regressed = outcome.retrieval.questions.filter(question => {
+        const before = legacy.retrieval!.questions.find(other => other.id === question.id);
+        return before !== undefined && question.reciprocalRank < before.reciprocalRank;
+      });
+      if (outcome.strategy === candidate) {
+        assertions.push({
+          name: `no-retrieval-regression:${outcome.strategy}`,
+          passed: regressed.length === 0,
+          details:
+            regressed.length === 0
+              ? undefined
+              : `regressed: ${regressed.map(question => question.id).join(', ')}`,
+        });
+      } else if (regressed.length > 0) {
+        notes.push(
+          `- ${benchmarkCase.id} · ${outcome.strategy} (не кандидат): регрессия MRR по ${regressed
+            .map(question => question.id)
+            .join(', ')}`
+        );
+      }
+    }
+  }
+
+  return assertions;
 }
 
 async function compareBaseline(
@@ -114,7 +317,7 @@ async function compareBaseline(
 ): Promise<string[]> {
   if (!baselineDirectory) return [];
   const baseline = JSON.parse(
-    await fs.readFile(path.resolve(baselineDirectory, 'metrics.json'), 'utf8')
+    await fs.readFile(path.resolve(REPO_ROOT, baselineDirectory, 'metrics.json'), 'utf8')
   ) as { cases: CaseResult[] };
   return current.map(result => {
     const previous = baseline.cases.find(candidate => candidate.id === result.id);
@@ -127,6 +330,14 @@ async function compareBaseline(
 async function main(): Promise<void> {
   const label = argument('--label') ?? `run-${new Date().toISOString().replace(/[:.]/gu, '-')}`;
   const serverUrl = argument('--url') ?? process.env.DOCLING_MCP_URL ?? 'http://127.0.0.1:8000/mcp';
+  const serveUrl =
+    argument('--serve-url') ?? process.env.DOCLING_SERVE_URL ?? 'http://127.0.0.1:5001';
+  const conversionProfile = (argument('--conversion-profile') ?? 'baseline') as ConversionProfile;
+  const strategies = (argument('--strategies')
+    ?.split(',')
+    .map(value => value.trim()) ?? ALL_STRATEGIES) as DoclingChunkingStrategy[];
+  const candidate = (argument('--candidate') ?? 'docling_hybrid') as DoclingChunkingStrategy;
+  const notes: string[] = [];
   const cachePath = path.resolve(
     argument('--cache') ??
       process.env.DOCLING_CACHE_PATH ??
@@ -135,6 +346,7 @@ async function main(): Promise<void> {
   const outputDirectory = path.join(REPO_ROOT, '.tmp/docling-benchmark', label);
   const stagingDirectory = path.join(PACKAGE_ROOT, 'uploads/docling-benchmark', label);
   const baselineDirectory = argument('--baseline');
+  const onlyCase = argument('--case');
   const nonBlocking = process.argv.includes('--non-blocking');
   const manifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 
@@ -145,10 +357,12 @@ async function main(): Promise<void> {
   process.env.DOCLING_CONTAINER_UPLOADS_PATH = '/app/uploads';
 
   const client = new DoclingClient({ serverUrl, cachePath, timeout: 1_200_000, maxRetries: 1 });
+  const chunker = new DoclingServeChunker({ baseUrl: serveUrl });
   const results: CaseResult[] = [];
 
   try {
     for (const benchmarkCase of manifest.cases) {
+      if (onlyCase && benchmarkCase.id !== onlyCase) continue;
       const caseDirectory = path.join(outputDirectory, benchmarkCase.id);
       const source = path.resolve(FIXTURE_ROOT, benchmarkCase.source);
       const stagedSource = path.join(stagingDirectory, path.basename(source));
@@ -156,16 +370,14 @@ async function main(): Promise<void> {
       await fs.copyFile(source, stagedSource);
       const startedAt = Date.now();
       const assertions: CaseResult['assertions'] = [];
+      const strategyOutcomes: StrategyOutcome[] = [];
       let bundle: DoclingConversionBundle | undefined;
 
       try {
         bundle = await client.convertDocumentBundle(stagedSource);
         await Promise.all([
           fs.writeFile(path.join(caseDirectory, 'document.md'), bundle.markdown),
-          fs.copyFile(
-            path.join(cachePath, `${bundle.documentKey}.json`),
-            path.join(caseDirectory, 'raw.json')
-          ),
+          fs.copyFile(bundle.rawJsonPath, path.join(caseDirectory, 'raw.json')),
           fs.writeFile(
             path.join(caseDirectory, 'normalized.json'),
             `${JSON.stringify(bundle.document, null, 2)}\n`
@@ -193,14 +405,19 @@ async function main(): Promise<void> {
           assertions.push({ name: `order:${token}`, passed: index > previousIndex });
           previousIndex = index;
         }
-        if (benchmarkCase.minimumHeadingDepth !== undefined) {
-          const headingDepth = maximumHeadingDepth(bundle.markdown);
+
+        // Distinct heading levels, not maximum heading depth: a document whose
+        // only headings are H2 must not prove a two-level hierarchy.
+        const expectation = benchmarkCase.headingHierarchy?.[conversionProfile];
+        if (expectation) {
+          const verdict = evaluateHeadingHierarchy(bundle.markdown, expectation);
           assertions.push({
-            name: 'heading-depth',
-            passed: headingDepth >= benchmarkCase.minimumHeadingDepth,
-            details: `${headingDepth}`,
+            name: `heading-hierarchy[${conversionProfile}]`,
+            passed: verdict.passed,
+            details: verdict.details,
           });
         }
+
         if (benchmarkCase.requiresNestedList) {
           const hasNestedList = /\n[ \t]+(?:[-*+]\s+)?\d+(?:\.\d+)*[.)]\s+Вложенный/iu.test(
             bundle.markdown
@@ -231,6 +448,13 @@ async function main(): Promise<void> {
           details: stableFailures.join(', ') || undefined,
         });
 
+        for (const strategy of strategies) {
+          strategyOutcomes.push(
+            await runStrategy(strategy, bundle, benchmarkCase, chunker, caseDirectory)
+          );
+        }
+        assertions.push(...strategyAssertions(benchmarkCase, strategyOutcomes, candidate, notes));
+
         results.push({
           id: benchmarkCase.id,
           status: assertions.every(assertion => assertion.passed) ? 'passed' : 'failed',
@@ -243,6 +467,7 @@ async function main(): Promise<void> {
           pictures: bundle.document.pictures.length,
           tables: bundle.document.tables.length,
           assertions,
+          strategies: strategyOutcomes,
         });
       } catch (error) {
         const isExpectedEmpty =
@@ -265,6 +490,7 @@ async function main(): Promise<void> {
           pictures: bundle?.document.pictures.length ?? 0,
           tables: bundle?.document.tables.length ?? 0,
           assertions,
+          strategies: strategyOutcomes,
           error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
         });
       }
@@ -277,9 +503,15 @@ async function main(): Promise<void> {
   const comparison = await compareBaseline(baselineDirectory, results);
   const stats = runtimeStats();
   const metrics = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     label,
     serverUrl,
+    serveUrl,
+    conversionProfile,
+    strategies,
+    candidate,
+    notes,
+    chunkingConfig: DEFAULT_CHUNKING_CONFIG,
     generatedAt: new Date().toISOString(),
     runtime: stats,
     cases: results,
@@ -289,12 +521,21 @@ async function main(): Promise<void> {
     `${JSON.stringify(metrics, null, 2)}\n`
   );
 
+  const strategyRows = results.flatMap(result =>
+    result.strategies.map(
+      outcome =>
+        `| ${result.id} | ${outcome.strategy} | ${outcome.parentChunks} | ${outcome.childChunks} | ${outcome.avgChildTokens} | ${(outcome.headingPathCoverage * 100).toFixed(0)}% | ${(outcome.refCoverage * 100).toFixed(0)}% | ${outcome.locationEligible ? `${(outcome.locationCoverage * 100).toFixed(0)}%` : 'n/a'} | ${outcome.retrieval ? outcome.retrieval.recallAtK.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.mrr.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.ndcgAtK.toFixed(2) : '—'} | ${outcome.durationMs} |`
+    )
+  );
+
   const report = [
     `# Docling A/B — ${label}`,
     '',
-    `Endpoint: \`${serverUrl}\``,
+    `MCP: \`${serverUrl}\` · Serve: \`${serveUrl}\` · conversion profile: \`${conversionProfile}\` · кандидат: \`${candidate}\``,
     '',
     `Serve memory: ${stats.serveMemory ?? 'not measured'}; restarts: ${stats.serveRestartCount ?? 'not measured'}`,
+    '',
+    '## Конвертация',
     '',
     '| Case | Result | Time, ms | Markdown | Pages | Assertions |',
     '|---|---:|---:|---:|---:|---:|',
@@ -302,6 +543,31 @@ async function main(): Promise<void> {
       result =>
         `| ${result.id} | ${result.status} | ${result.processingTimeMs} | ${result.markdownLength} | ${result.pages} | ${result.assertions.filter(assertion => assertion.passed).length}/${result.assertions.length} |`
     ),
+    '',
+    '## Стратегии чанкинга',
+    '',
+    'Recall@5/MRR/nDCG@5 — лексический прокси (BM25 с параметрами коллекции), не dense-ранжирование Jina.',
+    '',
+    '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | R@5 | MRR | nDCG@5 | ms |',
+    '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+    ...strategyRows,
+    '',
+    '## Проваленные проверки',
+    '',
+    ...(results.flatMap(result =>
+      result.assertions
+        .filter(assertion => !assertion.passed)
+        .map(assertion => `- ${result.id} · ${assertion.name}: ${assertion.details ?? 'failed'}`)
+    ).length > 0
+      ? results.flatMap(result =>
+          result.assertions
+            .filter(assertion => !assertion.passed)
+            .map(
+              assertion => `- ${result.id} · ${assertion.name}: ${assertion.details ?? 'failed'}`
+            )
+        )
+      : ['Нет.']),
+    ...(notes.length > 0 ? ['', '## Наблюдения по не-кандидатам', '', ...notes] : []),
     ...(comparison.length > 0 ? ['', '## Было → стало', '', ...comparison] : []),
     '',
   ].join('\n');

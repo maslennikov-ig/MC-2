@@ -147,6 +147,8 @@ services:
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant-dev:6333
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://megacampus-docling-serve:5001}
+      - DOCLING_CHUNK_STRATEGY=${DOCLING_CHUNK_STRATEGY:-docling_hybrid}
       - DOCLING_MCP_TIMEOUT=1200000
       - DOCLING_MCP_MAX_RETRIES=1
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
@@ -213,6 +215,8 @@ services:
       - DOCUMENT_EVIDENCE_MODE=active
       - DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://megacampus-docling-serve:5001}
+      - DOCLING_CHUNK_STRATEGY=${DOCLING_CHUNK_STRATEGY:-docling_hybrid}
       - DOCLING_MCP_TIMEOUT=1200000
       - DOCLING_MCP_MAX_RETRIES=1
       - DOCLING_CACHE_PATH=/app/docling-json-cache

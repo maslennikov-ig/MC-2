@@ -112,6 +112,7 @@ export async function executeDoclingConversion(
     markdown: conversionResult.markdown,
     json: conversionResult.json,
     images: conversionResult.images,
+    docling_source: conversionResult.docling_source,
     stats: {
       markdown_length: conversionResult.markdown.length,
       pages: conversionResult.metadata.pages_processed,

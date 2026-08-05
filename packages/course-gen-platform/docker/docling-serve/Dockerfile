@@ -30,10 +30,19 @@ ENV UVICORN_HOST=0.0.0.0 \
     DOCLING_SERVE_MAX_SYNC_WAIT=1200 \
     DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT=1200 \
     DOCLING_SERVE_LOAD_MODELS_AT_BOOT=true \
+    DOCLING_SERVE_PDF_HEADING_HIERARCHY=false \
     DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
+
+# Compatibility glue for a request field the pinned jobkit accepts and drops.
+# The test asserts the upstream gap red before asserting the wrapper green, and
+# is removed from the shipped image.
+COPY runtime.py test_runtime.py /opt/app-root/src/
+RUN cd /opt/app-root/src \
+    && python -m unittest -v test_runtime.py \
+    && rm /opt/app-root/src/test_runtime.py
 
 EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
   CMD python -c "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5001/readyz', timeout=5); raise SystemExit(0 if r.status == 200 else 1)"
 
-CMD ["docling-serve", "run"]
+CMD ["python", "/opt/app-root/src/runtime.py", "run"]
