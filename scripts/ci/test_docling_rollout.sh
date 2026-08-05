@@ -7,16 +7,20 @@ source "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 IMAGE_REF_OUTPUT="$(
     "$ROOT_DIR/scripts/ci/resolve_docling_image_ref.sh" \
         'maslennikov-ig/MC-2' \
-        'docling-mcp' \
+        'docling-mcp-v3' \
         '3.0.0-docling-2.118.0'
 )"
 EXPECTED_IMAGE_REF_OUTPUT="$(cat <<'EOF'
-repository=ghcr.io/maslennikov-ig/mc-2/docling-mcp
-tag=ghcr.io/maslennikov-ig/mc-2/docling-mcp:3.0.0-docling-2.118.0
+repository=ghcr.io/maslennikov-ig/mc-2/docling-mcp-v3
+tag=ghcr.io/maslennikov-ig/mc-2/docling-mcp-v3:3.0.0-docling-2.118.0
 EOF
 )"
 [ "$IMAGE_REF_OUTPUT" = "$EXPECTED_IMAGE_REF_OUTPUT" ] || {
     echo "Docling image reference was not normalized to lowercase" >&2
+    exit 1
+}
+grep -q 'registry_image: docling-mcp-v3' "$ROOT_DIR/.github/workflows/build-docling-images.yml" || {
+    echo "Docling MCP 3 must publish separately from the immutable MCP 1.x rollback package" >&2
     exit 1
 }
 

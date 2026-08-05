@@ -17,10 +17,12 @@ jobs:
       matrix:
         include:
           - image: docling-serve
+            registry_image: docling-serve
             dockerfile: packages/course-gen-platform/docker/docling-serve/Dockerfile
             context: packages/course-gen-platform/docker/docling-serve
             version: 1.29.0-docling-2.118.0
           - image: docling-mcp
+            registry_image: docling-mcp-v3
             dockerfile: packages/course-gen-platform/docker/docling-mcp/Dockerfile
             context: packages/course-gen-platform/docker/docling-mcp
             version: 3.0.0-docling-2.118.0
@@ -36,7 +38,7 @@ jobs:
         id: image-ref
         env:
           GITHUB_REPOSITORY_NAME: ${{ github.repository }}
-          DOCLING_IMAGE: ${{ matrix.image }}
+          DOCLING_IMAGE: ${{ matrix.registry_image }}
           DOCLING_VERSION: ${{ matrix.version }}
         run: |
           scripts/ci/resolve_docling_image_ref.sh \
