@@ -11,14 +11,17 @@
  *
  * - Heading hierarchy is asserted on the DISTINCT levels present, not on the
  *   deepest `#` count. A document with only H2 does not prove two levels.
- * - Retrieval scoring is the lexical half of production retrieval (BM25 with the
- *   collection's own parameters). Dense Jina v3 ranking is not exercised here,
- *   so a win reported by this harness is a lexical-reachability win.
+ * - Retrieval is scored on two channels. `--dense` runs the PRODUCTION path —
+ *   real Jina v3 vectors, server-side BM25, RRF — and blocks; the offline BM25
+ *   proxy always runs and is an observation whenever the dense one is present.
+ *   Without `--dense` the proxy blocks, and a win is only lexical reachability.
  * - Recall@K is divided by all relevant chunks, and its reachable ceiling is
  *   printed next to it, so a saturated top-k cannot read as a perfect score.
- * - A control question must not regress on Recall, MRR or nDCG. Guarding the
- *   reciprocal rank alone passed strategies that kept the first hit first and
- *   lost the rest of the evidence.
+ *   The RATIO is never gated: its denominator is how finely the strategy cut
+ *   the document, not how good the answer was.
+ * - A control question must not regress on the COUNT of relevant chunks in the
+ *   top-k, on MRR, or on nDCG. Guarding the reciprocal rank alone passed
+ *   strategies that kept the first hit first and lost the rest of the evidence.
  */
 
 import { execFileSync } from 'node:child_process';

@@ -170,6 +170,9 @@ stay under `.tmp/docling-benchmark/`, untracked by repository convention. See
 suites pass during the build, each asserting the upstream gap red before
 asserting the wrapper green.
 
+- graph-reviewed: updated — `graphify update .` rebuilt the local graph at the
+  delivered HEAD: 60,697 nodes, 87,386 edges, 7,267 communities.
+
 # Delivery / Cleanup
 
 Accepted by the root owner and committed on `develop` through the repository dev
