@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "scientific-pdf",
+      "source": "../common/2510.13928v1.pdf",
+      "expectedTokens": ["LLM Brain Rot", "ABSTRACT", "74.9", "57.2"],
+      "minimumHeadingDepth": 2
+    },
+    {
+      "id": "structured-docx",
+      "source": "structured-lists-and-table.docx",
+      "expectedTokens": [
+        "Первый обязательный шаг",
+        "Вложенный шаг А",
+        "1.1.",
+        "1.2.",
+        "Сводные показатели",
+        "98",
+        "процентов"
+      ],
+      "minimumHeadingDepth": 2,
+      "requiresNestedList": true,
+      "minimumColspan": 3
+    },
+    {
+      "id": "reading-order-pptx",
+      "source": "reading-order-chart.pptx",
+      "expectedTokens": [
+        "Шаг один: собрать данные",
+        "Шаг два: проверить результат",
+        "Подпись схемы",
+        "10",
+        "20",
+        "30"
+      ],
+      "expectedOrder": ["Шаг один: собрать данные", "Шаг два: проверить результат", "Подпись схемы"]
+    },
+    {
+      "id": "russian-raster-ocr",
+      "source": "russian-raster-ocr.pdf",
+      "expectedTokens": [
+        "КОНТРОЛЬНАЯ ФРАЗА: КАЧЕСТВО РАСПОЗНАВАНИЯ",
+        "ВТОРАЯ ФРАЗА: ДОКУМЕНТЫ ПРЕВРАЩАЮТСЯ В ЗНАНИЯ",
+        "Точность",
+        "98",
+        "процентов"
+      ]
+    },
+    {
+      "id": "vector-outlines-negative",
+      "source": "vector-outlines-no-text.pdf",
+      "expectedError": "EmptyConversionError"
+    }
+  ]
+}

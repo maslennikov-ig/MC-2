@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { ENV } from '@/lib/env'
+import { probeDoclingMcp } from '@/lib/health/docling-mcp'
 
 export const runtime = 'nodejs'
 
@@ -215,110 +216,15 @@ async function checkRedis(): Promise<ServiceStatus> {
 async function checkDoclingMcp(): Promise<ServiceStatus> {
   const startTime = Date.now()
   const lastCheck = new Date().toISOString()
-
-  // DOCLING_MCP_URL may contain a stale /sse path from env files,
-  // but the server uses streamable-http transport which listens on /mcp.
-  // Extract base URL and always use /mcp for health checks.
-  const rawUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
-  const baseUrl = rawUrl.replace(/\/(mcp|sse)\/?$/, '')
-  const mcpUrl = `${baseUrl}/mcp`
-  const fallbackMcpUrl = 'http://localhost:8000/mcp'
-
-  // Always test the actual MCP endpoint (not just nginx /health which returns 200 without proxying)
-  // Use MCP initialize request - lightweight, verifies full proxy→backend path
-  const mcpRequest = {
-    jsonrpc: '2.0',
-    method: 'initialize',
-    id: 1,
-    params: {
-      protocolVersion: '2024-11-05',
-      capabilities: {},
-      clientInfo: { name: 'health-check', version: '1.0.0' },
-    },
-  }
-  const mcpHeaders = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json, text/event-stream',
-  }
+  const mcpUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
 
   try {
-    let response: Response | null = null
-
-    try {
-      response = await fetchWithTimeout(mcpUrl, {
-        method: 'POST',
-        headers: mcpHeaders,
-        body: JSON.stringify(mcpRequest),
-      })
-    } catch {
-      response = await fetchWithTimeout(fallbackMcpUrl, {
-        method: 'POST',
-        headers: mcpHeaders,
-        body: JSON.stringify(mcpRequest),
-      })
-    }
-
-    const responseTime = Date.now() - startTime
-    const contentType = response.headers.get('content-type') || ''
-
-    // SSE response = MCP Streamable HTTP transport is working correctly
-    if (contentType.includes('text/event-stream')) {
-      return {
-        name: 'Docling MCP',
-        status: 'healthy',
-        responseTime,
-        message: 'MCP streaming transport active',
-        lastCheck,
-      }
-    }
-
-    // Try to parse JSON-RPC response
-    try {
-      const data = await response.json()
-
-      if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
-        return {
-          name: 'Docling MCP',
-          status: 'healthy',
-          responseTime,
-          message: data.result?.serverInfo?.name
-            ? `MCP server: ${data.result.serverInfo.name}`
-            : 'MCP responding',
-          lastCheck,
-        }
-      }
-    } catch {
-      // JSON parse failed — but server responded
-    }
-
-    // Server responded but with unexpected format
-    if (response.ok || response.status === 400 || response.status === 405) {
-      return {
-        name: 'Docling MCP',
-        status: 'healthy',
-        responseTime,
-        message: `MCP server responding (HTTP ${response.status})`,
-        lastCheck,
-      }
-    }
-
-    // 502 Bad Gateway = nginx can't reach backend (the exact bug we're detecting)
-    if (response.status === 502) {
-      return {
-        name: 'Docling MCP',
-        status: 'error',
-        responseTime,
-        message:
-          '502 Bad Gateway — nginx cannot reach Docling backend (check DNS resolver or container)',
-        lastCheck,
-      }
-    }
-
+    const probe = await probeDoclingMcp(mcpUrl, SERVICE_TIMEOUT)
     return {
       name: 'Docling MCP',
-      status: 'degraded',
-      responseTime,
-      message: `HTTP ${response.status}: ${response.statusText}`,
+      status: 'healthy',
+      responseTime: probe.responseTime,
+      message: `${probe.serverName}${probe.serverVersion ? ` ${probe.serverVersion}` : ''}; MCP ${probe.protocolVersion ?? probe.protocolEra ?? 'negotiated'}`,
       lastCheck,
     }
   } catch (error) {

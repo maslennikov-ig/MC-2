@@ -43,6 +43,135 @@ def resolve_runtime_path(repo_root: pathlib.Path, inbox: dict, key: str) -> path
     return repo_root / raw_path
 
 
+def exact_identity_required(contract: dict) -> bool:
+    baseline = contract.get("baseline")
+    stage_state = contract.get("stage_state")
+    return (
+        isinstance(baseline, dict)
+        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19"}
+    ) or (
+        isinstance(stage_state, dict)
+        and stage_state.get("exact_identity_required") is True
+    )
+
+
+def parse_artifact_metadata(path: pathlib.Path) -> dict[str, str]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SystemExit(f"cannot read artifact {path}: {exc}") from exc
+    if not text.startswith("---\n") or "\n---\n" not in text[4:]:
+        raise SystemExit(f"artifact lacks YAML frontmatter: {path}")
+    frontmatter = text[4 : text.find("\n---\n", 4)]
+    values: dict[str, str] = {}
+    for line in frontmatter.splitlines():
+        if line.startswith(" ") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if value.strip():
+            values[key.strip()] = value.strip()
+    task_id = values.get("task_id", "")
+    stage_id = values.get("stage_id", "")
+    if not task_id or not stage_id:
+        raise SystemExit(f"artifact must declare task_id and stage_id: {path}")
+    return values
+
+
+def require_v219_stream_aggregation(
+    repo_root: pathlib.Path,
+    contract: dict,
+    artifact: pathlib.Path,
+    metadata: dict[str, str],
+) -> None:
+    baseline = contract.get("baseline")
+    if not isinstance(baseline, dict) or baseline.get("profile") != "balanced-v2.19":
+        return
+    stage_id = metadata["stage_id"]
+    manifest_path = repo_root / ".codex" / "stages" / stage_id / "stage-manifest.json"
+    sizing = contract.get("stage_sizing")
+    legacy = sizing.get("legacy_active_stage_id") if isinstance(sizing, dict) else None
+    if not manifest_path.is_file():
+        if legacy == stage_id:
+            return
+        raise SystemExit(f"new v2.19 delegated stage {stage_id!r} requires a stage manifest")
+    if metadata.get("schema_version") != "orchestration-artifact/v3":
+        raise SystemExit("newly reported delegated artifacts in a v2.19 stage must use orchestration-artifact/v3")
+    expected_manifest = f".codex/stages/{stage_id}/stage-manifest.json"
+    if metadata.get("stage_manifest") != expected_manifest:
+        raise SystemExit("artifact stage_manifest does not match the owning stage")
+    stream_owner = metadata.get("stream_owner")
+    if not stream_owner:
+        raise SystemExit("v3 artifact must declare stream_owner")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read owning stage manifest: {exc}") from exc
+    entries = manifest.get("stream_artifacts") if isinstance(manifest, dict) else None
+    relative = artifact.relative_to(repo_root).as_posix()
+    matching = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("artifact_path") == relative
+        and entry.get("task_id") == metadata.get("task_id")
+        and entry.get("stream_owner") == stream_owner
+    ] if isinstance(entries, list) else []
+    if len(matching) != 1:
+        raise SystemExit("v3 artifact is unlisted or mismatched in the owning stage manifest")
+
+
+def require_exact_artifact(
+    repo_root: pathlib.Path,
+    contract: dict,
+    task_id: str,
+    stage_id: str,
+    raw_artifact: str,
+) -> pathlib.Path:
+    workspace = contract.get("workspace")
+    current_stage = workspace.get("current_stage_id") if isinstance(workspace, dict) else None
+    if current_stage != stage_id:
+        raise SystemExit(
+            f"reported stage {stage_id!r} does not match workspace.current_stage_id {current_stage!r}"
+        )
+    stage_root = (repo_root / ".codex" / "stages" / stage_id).resolve()
+    artifacts_root = stage_root / "artifacts"
+    candidate = pathlib.Path(raw_artifact)
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    for component in (candidate, *candidate.parents):
+        if component.is_symlink():
+            raise SystemExit(f"artifact path may not traverse a symlink: {raw_artifact}")
+        if component == repo_root:
+            break
+    try:
+        artifact = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise SystemExit(f"artifact path does not exist: {raw_artifact}") from exc
+    if artifact.parent != artifacts_root:
+        raise SystemExit(
+            f"artifact must be a direct file in configured stage root {artifacts_root}: {artifact}"
+        )
+    metadata = parse_artifact_metadata(artifact)
+    artifact_task = metadata["task_id"]
+    artifact_stage = metadata["stage_id"]
+    if artifact_task != task_id or artifact_stage != stage_id:
+        raise SystemExit(
+            "completion identity mismatch: "
+            f"CLI task/stage={task_id}/{stage_id}, "
+            f"artifact task/stage={artifact_task}/{artifact_stage}"
+        )
+    require_v219_stream_aggregation(repo_root, contract, artifact, metadata)
+    return artifact
+
+
+def require_stage_runtime_path(path: pathlib.Path, stage_id: str, label: str) -> None:
+    parent = path.parent
+    if parent.name != stage_id or parent.parent.name != "stages":
+        raise SystemExit(
+            f"{label} must be inside the exact configured stage root for {stage_id}: {path}"
+        )
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", required=True)
@@ -69,9 +198,19 @@ def main(argv: list[str]) -> int:
         raise SystemExit("missing [completion_inbox] section in .codex/orchestrator.toml")
 
     events_file = resolve_runtime_path(repo_root, inbox, "events_file")
-    artifact_path = pathlib.Path(args.artifact)
-    if not artifact_path.exists():
-        raise SystemExit(f"artifact path does not exist: {artifact_path}")
+    if exact_identity_required(contract):
+        artifact_path = require_exact_artifact(
+            repo_root, contract, args.task, args.stage, args.artifact
+        )
+        require_stage_runtime_path(
+            events_file, args.stage, "completion_inbox.events_file"
+        )
+        artifact_display = artifact_path.relative_to(repo_root).as_posix()
+    else:
+        artifact_path = pathlib.Path(args.artifact)
+        if not artifact_path.exists():
+            raise SystemExit(f"artifact path does not exist: {artifact_path}")
+        artifact_display = str(artifact_path)
 
     events_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +221,7 @@ def main(argv: list[str]) -> int:
         "stage_id": args.stage,
         "stream_id": args.task,
         "status": args.status,
-        "artifact_path": str(artifact_path),
+        "artifact_path": artifact_display,
         "commit": args.commit,
         "verify": args.verify,
         "clean": args.clean,

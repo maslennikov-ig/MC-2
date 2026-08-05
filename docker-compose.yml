@@ -17,26 +17,119 @@ services:
     networks:
       - megacampus
 
-  # Docling MCP Server for document processing (PDF, DOCX, PPTX)
-  # Used by document-processing worker for text extraction
+  docling-serve:
+    build:
+      context: ./packages/course-gen-platform/docker/docling-serve
+      dockerfile: Dockerfile
+    image: mc2/docling-serve:1.29.0-docling-2.118.0
+    container_name: docling-serve
+    restart: unless-stopped
+    environment:
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=5001
+      - UVICORN_WORKERS=1
+      - DOCLING_SERVE_MAX_SYNC_WAIT=1200
+      - DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT=1200
+      - DOCLING_SERVE_LOAD_MODELS_AT_BOOT=true
+      - DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5001/readyz', timeout=5); raise SystemExit(0 if r.status == 200 else 1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  docling-cache-init:
+    image: mc2/docling-mcp:3.0.0-docling-2.118.0
+    user: '0:0'
+    command:
+      [
+        'sh',
+        '-c',
+        'chown -R 1001:1001 /app/docling-json-cache && chmod 0777 /app/docling-json-cache',
+      ]
+    restart: 'no'
+    volumes:
+      - ./.tmp/docling-cache:/app/docling-json-cache
+    networks:
+      - megacampus
+
+  docling-mcp-internal:
+    build:
+      context: ./packages/course-gen-platform/docker/docling-mcp
+      dockerfile: Dockerfile
+    image: mc2/docling-mcp:3.0.0-docling-2.118.0
+    container_name: docling-mcp-internal
+    restart: unless-stopped
+    volumes:
+      - ./packages/course-gen-platform/uploads:/app/uploads:ro
+      - ./packages/course-gen-platform/tests:/app/tests:ro
+      - ./.tmp/docling-cache:/app/docling-json-cache
+    environment:
+      - CACHE_DIR=/app/docling-json-cache
+      - DOCLING_MCP_SERVICE_URL=http://docling-serve:5001
+      - DOCLING_MCP_CONVERSION_MODE=remote
+      - DOCLING_MCP_SERVICE_TIMEOUT=1200.0
+      - DOCLING_MCP_SERVICE_MAX_RETRIES=2
+      - DOCLING_MCP_FALLBACK_TO_LOCAL=false
+      - DOCLING_MCP_KEEP_IMAGES=false
+      - DOCLING_MCP_IMAGES_SCALE=2.0
+      - DOCLING_MCP_DO_OCR=true
+      - DOCLING_MCP_OCR_PRESET=easyocr
+      - DOCLING_MCP_OCR_LANG=ru,en
+      - DOCLING_MCP_DO_TABLE_STRUCTURE=true
+    depends_on:
+      docling-serve:
+        condition: service_healthy
+      docling-cache-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import socket; s=socket.create_connection((''127.0.0.1'', 8000), 5); s.close()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
   docling-mcp:
-    image: docling-mcp-docling-mcp # Custom image from docling-mcp project
+    image: nginx:alpine
     container_name: docling-mcp-server
     restart: unless-stopped
     ports:
       - '127.0.0.1:8000:8000'
-    environment:
-      - PORT=8000
     volumes:
-      # Mount uploads directory for file access (read-only)
-      - ./packages/course-gen-platform/uploads:/app/uploads:ro
-      # Mount test fixtures for integration tests (read-only)
-      - ./packages/course-gen-platform/tests:/app/tests:ro
-      # Shared cache with host for backend to read DoclingDocument JSON files
-      # Docling saves to /usr/local/lib/python3.12/site-packages/_cache/ internally
-      - ./.tmp/docling-cache:/usr/local/lib/python3.12/site-packages/_cache
-    # Note: Docling MCP server uses MCP protocol, not REST
-    # Health check is disabled as /health endpoint doesn't exist
+      - ./nginx-docling-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      docling-mcp-internal:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - megacampus
 
@@ -55,7 +148,7 @@ volumes:
 #
 # Start specific service:
 #   docker compose up redis -d
-#   docker compose up docling-mcp -d
+#   docker compose up docling-serve docling-mcp-internal docling-mcp -d
 #
 # Stop services:
 #   docker compose stop

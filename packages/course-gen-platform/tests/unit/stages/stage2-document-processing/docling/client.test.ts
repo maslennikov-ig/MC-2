@@ -1,41 +1,81 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { DoclingClient } from '@/stages/stage2-document-processing/docling/client';
-import { DoclingErrorCode, DoclingError } from '@/stages/stage2-document-processing/docling/types';
+import { DoclingError, DoclingErrorCode } from '@/stages/stage2-document-processing/docling/types';
 
-// Strategy requirements
-vi.mock('@/shared/supabase/admin', () => ({
-  getSupabaseAdmin: vi.fn(),
-}));
+const sdk = vi.hoisted(() => {
+  const connect = vi.fn();
+  const close = vi.fn();
+  const listTools = vi.fn();
+  const callTool = vi.fn();
+  const terminateSession = vi.fn();
+  const transportClose = vi.fn();
+  const clientOptions: unknown[] = [];
 
-// Mock MCP SDK
-const mockConnect = vi.fn();
-const mockClose = vi.fn();
-const mockListTools = vi.fn();
-const mockCallTool = vi.fn();
+  enum SdkErrorCode {
+    NotConnected = 'NOT_CONNECTED',
+    RequestTimeout = 'REQUEST_TIMEOUT',
+    ConnectionClosed = 'CONNECTION_CLOSED',
+    SendFailed = 'SEND_FAILED',
+  }
 
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+  class SdkError extends Error {
+    constructor(
+      public code: SdkErrorCode,
+      message: string
+    ) {
+      super(message);
+    }
+  }
+
   return {
-    Client: class Client {
-      connect = mockConnect;
-      close = mockClose;
-      listTools = mockListTools;
-      callTool = mockCallTool;
-    },
+    connect,
+    close,
+    listTools,
+    callTool,
+    terminateSession,
+    transportClose,
+    clientOptions,
+    SdkError,
+    SdkErrorCode,
   };
 });
 
-const mockTransportClose = vi.fn();
+vi.mock('@modelcontextprotocol/client', () => ({
+  Client: class Client {
+    onerror?: (error: Error) => void;
+    onclose?: () => void;
+    connect = sdk.connect;
+    close = sdk.close;
+    listTools = sdk.listTools;
+    callTool = sdk.callTool;
 
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+    constructor(_identity: unknown, options: unknown) {
+      sdk.clientOptions.push(options);
+    }
+
+    getServerVersion() {
+      return { name: 'docling-mcp', version: '3.0.0' };
+    }
+
+    getNegotiatedProtocolVersion() {
+      return '2026-07-28';
+    }
+
+    getProtocolEra() {
+      return 'modern';
+    }
+  },
   StreamableHTTPClientTransport: class StreamableHTTPClientTransport {
-    close = mockTransportClose;
+    close = sdk.transportClose;
+    terminateSession = sdk.terminateSession;
   },
-}));
-
-vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => ({
-  SSEClientTransport: class SSEClientTransport {
-    close = mockTransportClose;
-  },
+  SdkError: sdk.SdkError,
+  SdkErrorCode: sdk.SdkErrorCode,
+  ProtocolError: class ProtocolError extends Error {},
 }));
 
 vi.mock('@/shared/logger/index.js', () => ({
@@ -47,259 +87,224 @@ vi.mock('@/shared/logger/index.js', () => ({
   },
 }));
 
-describe('DoclingClient', () => {
-  let client: DoclingClient;
+const REQUIRED_TOOLS = [
+  'convert_document_into_docling_document',
+  'export_docling_document_to_markdown',
+  'save_docling_document',
+];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    client = new DoclingClient({
-      serverUrl: 'http://localhost:8080/mcp',
-      timeout: 1000,
-      maxRetries: 2,
-      retryDelay: 1,
+const temporaryDirectories: string[] = [];
+
+async function createClient() {
+  const cachePath = await fs.mkdtemp(path.join(os.tmpdir(), 'docling-client-'));
+  temporaryDirectories.push(cachePath);
+  return {
+    cachePath,
+    client: new DoclingClient({
+      serverUrl: 'http://localhost:8000/mcp',
+      cachePath,
+      timeout: 1200,
+      maxRetries: 1,
+      retryDelay: 0,
+    }),
+  };
+}
+
+async function writeRawDocument(cachePath: string, key: string) {
+  await fs.writeFile(
+    path.join(cachePath, `${key}.json`),
+    JSON.stringify({
+      schema_name: 'DoclingDocument',
+      version: '1.9.0',
+      name: 'fixture',
+      pages: { '1': { page_no: 1, size: { width: 100, height: 200 } } },
+      texts: [{ self_ref: '#/texts/0', label: 'text', text: 'Hello', prov: [] }],
+      pictures: [],
+      tables: [],
+    })
+  );
+}
+
+function queueSuccessfulBundle(key: string, structured = true) {
+  const values = [
+    { document_key: key, from_cache: false },
+    { document_key: key, markdown: '# Hello' },
+    {
+      json_file: `/app/docling-json-cache/${key}.json`,
+      md_file: `/app/docling-json-cache/${key}.md`,
+    },
+  ];
+  for (const value of values) {
+    sdk.callTool.mockResolvedValueOnce(
+      structured
+        ? { structuredContent: value, content: [] }
+        : { content: [{ type: 'text', text: JSON.stringify(value) }] }
+    );
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  sdk.clientOptions.length = 0;
+  sdk.connect.mockResolvedValue(undefined);
+  sdk.close.mockResolvedValue(undefined);
+  sdk.terminateSession.mockResolvedValue(undefined);
+  sdk.transportClose.mockResolvedValue(undefined);
+  sdk.listTools.mockResolvedValue({ tools: REQUIRED_TOOLS.map(name => ({ name })) });
+});
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map(directory => fs.rm(directory, { recursive: true, force: true }))
+  );
+});
+
+describe('DoclingClient MCP SDK 2 contract', () => {
+  it('negotiates automatically and validates required tools once per connection', async () => {
+    const { client } = await createClient();
+
+    await client.connect();
+    await client.connect();
+
+    expect(sdk.clientOptions).toEqual([
+      expect.objectContaining({ versionNegotiation: { mode: 'auto', probe: { maxRetries: 0 } } }),
+    ]);
+    expect(sdk.connect).toHaveBeenCalledTimes(1);
+    expect(sdk.listTools).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns one normalized bundle from MCP 2 structured output with real request timeouts', async () => {
+    const { client, cachePath } = await createClient();
+    await writeRawDocument(cachePath, 'doc-1');
+    queueSuccessfulBundle('doc-1');
+
+    const result = await client.convertDocumentBundle('/app/uploads/example.pdf');
+
+    expect(result).toMatchObject({
+      markdown: '# Hello',
+      documentKey: 'doc-1',
+      fromCache: false,
+      document: {
+        name: 'fixture',
+        texts: [expect.objectContaining({ id: '#/texts/0', text: 'Hello' })],
+      },
+    });
+    expect(result.processingTimeMs).toBeGreaterThanOrEqual(0);
+    expect(sdk.callTool.mock.calls.map(call => call[0].name)).toEqual([
+      'convert_document_into_docling_document',
+      'export_docling_document_to_markdown',
+      'save_docling_document',
+    ]);
+    expect(sdk.callTool.mock.calls.every(call => call[1].timeout === 1200)).toBe(true);
+    expect(sdk.callTool.mock.calls.every(call => call[1].maxTotalTimeout === 1200)).toBe(true);
+  });
+
+  it('accepts MCP 1 text JSON during the client-first rollout', async () => {
+    const { client, cachePath } = await createClient();
+    await writeRawDocument(cachePath, 'legacy-doc');
+    queueSuccessfulBundle('legacy-doc', false);
+
+    await expect(client.convertDocumentBundle('/app/uploads/legacy.pdf')).resolves.toMatchObject({
+      markdown: '# Hello',
+      documentKey: 'legacy-doc',
     });
   });
 
-  afterEach(() => {});
-
-  describe('connect()', () => {
-    it('should connect using StreamableHTTPClientTransport when URL does not contain /sse', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      await client.connect();
-      expect(mockConnect).toHaveBeenCalled();
-      expect(client.isConnectedToServer()).toBe(true);
+  it('surfaces tool isError without retrying the conversion', async () => {
+    const { client } = await createClient();
+    sdk.callTool.mockResolvedValueOnce({
+      isError: true,
+      content: [{ type: 'text', text: 'conversion rejected' }],
     });
 
-    it('should connect using SSEClientTransport when URL contains /sse', async () => {
-      const sseClient = new DoclingClient({
-        serverUrl: 'http://localhost:8080/sse',
-      });
-      mockConnect.mockResolvedValueOnce(undefined);
-      await sseClient.connect();
-      expect(mockConnect).toHaveBeenCalled();
-      expect(sseClient.isConnectedToServer()).toBe(true);
-    });
-
-    it('should not connect again if already connected', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      await client.connect();
-      expect(mockConnect).toHaveBeenCalledTimes(1);
-
-      await client.connect();
-      expect(mockConnect).toHaveBeenCalledTimes(1); // Still 1
-    });
-
-    it('should throw DoclingError on connection failure', async () => {
-      mockConnect.mockRejectedValueOnce(new Error('Network error'));
-      await expect(client.connect()).rejects.toThrow(DoclingError);
-      expect(client.isConnectedToServer()).toBe(false);
-    });
+    await expect(client.convertDocumentBundle('/app/uploads/broken.pdf')).rejects.toMatchObject({
+      code: DoclingErrorCode.PROCESSING_ERROR,
+    } satisfies Partial<DoclingError>);
+    expect(sdk.callTool).toHaveBeenCalledTimes(1);
   });
 
-  describe('disconnect()', () => {
-    it('should disconnect successfully if connected', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      await client.connect();
+  it('rejects a saved JSON artifact that does not match the bundle document key', async () => {
+    const { client } = await createClient();
+    sdk.callTool
+      .mockResolvedValueOnce({
+        structuredContent: { document_key: 'expected-key', from_cache: false },
+        content: [],
+      })
+      .mockResolvedValueOnce({
+        structuredContent: { document_key: 'expected-key', markdown: '# Expected' },
+        content: [],
+      })
+      .mockResolvedValueOnce({
+        structuredContent: { json_file: '/app/docling-json-cache/other-key.json' },
+        content: [],
+      });
 
-      mockClose.mockResolvedValueOnce(undefined);
-      await client.disconnect();
-
-      expect(mockTransportClose).toHaveBeenCalled();
-      expect(mockClose).toHaveBeenCalled();
-      expect(client.isConnectedToServer()).toBe(false);
-    });
-
-    it('should handle disconnect if transport close throws', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      await client.connect();
-
-      mockTransportClose.mockRejectedValueOnce(new Error('Already closed'));
-      mockClose.mockResolvedValueOnce(undefined);
-
-      await client.disconnect();
-      expect(client.isConnectedToServer()).toBe(false);
-    });
-
-    it('should do nothing if disconnected', async () => {
-      await client.disconnect();
-      expect(mockClose).not.toHaveBeenCalled();
-    });
+    await expect(client.convertDocumentBundle('/app/uploads/mismatch.pdf')).rejects.toThrow(
+      'inconsistent saved JSON key'
+    );
   });
 
-  describe('listTools()', () => {
-    it('should return tools', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      mockListTools.mockResolvedValueOnce({ tools: [{ name: 'test_tool' }] });
+  it('does not retry SDK timeouts', async () => {
+    const { client } = await createClient();
+    sdk.callTool.mockRejectedValueOnce(
+      new sdk.SdkError(sdk.SdkErrorCode.RequestTimeout, 'request timed out')
+    );
 
-      const tools = await client.listTools();
-      expect(tools).toEqual([{ name: 'test_tool' }]);
-    });
-
-    it('should throw DoclingError if listTools fails', async () => {
-      mockConnect.mockResolvedValueOnce(undefined);
-      mockListTools.mockRejectedValueOnce(new Error('Failed list'));
-
-      await expect(client.listTools()).rejects.toThrow(DoclingError);
-    });
+    await expect(client.convertDocumentBundle('/app/uploads/slow.pdf')).rejects.toMatchObject({
+      code: DoclingErrorCode.TIMEOUT,
+    } satisfies Partial<DoclingError>);
+    expect(sdk.callTool).toHaveBeenCalledTimes(1);
   });
 
-  describe('convertDocument()', () => {
-    const file_path = '/home/user/code/course/test.pdf';
+  it('reconnects and retries the whole bundle once after a typed connection loss', async () => {
+    const { client, cachePath } = await createClient();
+    await writeRawDocument(cachePath, 'retry-doc');
+    sdk.callTool.mockRejectedValueOnce(
+      new sdk.SdkError(sdk.SdkErrorCode.ConnectionClosed, 'connection closed')
+    );
+    queueSuccessfulBundle('retry-doc');
 
-    beforeEach(() => {
-      mockConnect.mockResolvedValue(undefined);
-      mockListTools.mockResolvedValue({ tools: [] }); // For health check
+    await expect(client.convertDocumentBundle('/app/uploads/retry.pdf')).resolves.toMatchObject({
+      documentKey: 'retry-doc',
     });
-
-    it('should throw unsupported format error for bad extension', async () => {
-      await expect(
-        client.convertDocument({ file_path: 'test.exe', output_format: 'markdown' })
-      ).rejects.toThrow(DoclingError);
-    });
-
-    it('should convert document to markdown successfully', async () => {
-      mockCallTool
-        .mockResolvedValueOnce({
-          content: [
-            { type: 'text', text: JSON.stringify({ document_key: 'doc_123', from_cache: false }) },
-          ],
-        })
-        .mockResolvedValueOnce({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ document_key: 'doc_123', markdown: '# Hello' }),
-            },
-          ],
-        });
-
-      const response = await client.convertDocument({
-        file_path,
-        output_format: 'markdown',
-      });
-
-      expect(response.content).toBe('# Hello');
-      expect(response.success).toBe(true);
-      expect(response.metadata?.from_cache).toBe(false);
-    });
-
-    it('should fallback to markdown if docling_document is requested', async () => {
-      mockCallTool
-        .mockResolvedValueOnce({
-          content: [
-            { type: 'text', text: JSON.stringify({ document_key: 'doc_123', from_cache: true }) },
-          ],
-        })
-        .mockResolvedValueOnce({
-          content: [
-            { type: 'text', text: JSON.stringify({ document_key: 'doc_123', from_cache: true }) },
-          ],
-        })
-        .mockResolvedValueOnce({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ document_key: 'doc_123', markdown: '# Fallback' }),
-            },
-          ],
-        });
-
-      const response = await client.convertDocument({
-        file_path,
-        output_format: 'docling_document',
-      });
-
-      expect(mockCallTool).toHaveBeenCalledTimes(3);
-      expect(response.success).toBe(true);
-      expect(response.content).toBe('# Fallback');
-    });
-
-    it('should handle retries on transient errors', async () => {
-      // First call fails with session error
-      mockCallTool.mockRejectedValueOnce(new Error('session expired'));
-
-      // Health check fails, forcing reconnect
-      mockListTools.mockRejectedValueOnce(new Error('health failed'));
-
-      // Second call succeeds
-      mockCallTool
-        .mockResolvedValueOnce({
-          content: [
-            { type: 'text', text: JSON.stringify({ document_key: 'doc_retry', from_cache: true }) },
-          ],
-        })
-        .mockResolvedValueOnce({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ document_key: 'doc_retry', markdown: '# Retry' }),
-            },
-          ],
-        });
-
-      // We need to advance timers so sleep finishes
-      const response = await client.convertDocument({ file_path, output_format: 'markdown' });
-      expect(response.content).toBe('# Retry');
-    });
-
-    it('should throw FILE_NOT_FOUND error', async () => {
-      mockCallTool.mockRejectedValue(new Error('ENOENT file missing'));
-      await expect(
-        client.convertDocument({ file_path, output_format: 'markdown' })
-      ).rejects.toThrowError('file not found');
-    });
-
-    it('should throw out of memory error', async () => {
-      mockCallTool.mockRejectedValue(new Error('OOM kill'));
-      await expect(
-        client.convertDocument({ file_path, output_format: 'markdown' })
-      ).rejects.toThrowError('Out of memory');
-    });
-
-    it('should handle terminated connection properly with retries', async () => {
-      mockCallTool.mockRejectedValue(new Error('connection terminated'));
-
-      await expect(
-        client.convertDocument({ file_path, output_format: 'markdown' })
-      ).rejects.toThrow('Document conversion failed');
-    });
+    expect(sdk.connect).toHaveBeenCalledTimes(2);
+    expect(sdk.callTool).toHaveBeenCalledTimes(4);
   });
 
-  describe('convertToDoclingDocument()', () => {
-    it('should convert and return document', async () => {
-      // Mocking convertDocument internally
-      vi.spyOn(client, 'convertDocument').mockResolvedValueOnce({
-        success: true,
-        document: { type: 'docling_document', pages: {} } as any,
-      });
+  it('fails connection when a required Docling tool is missing', async () => {
+    const { client } = await createClient();
+    sdk.listTools.mockResolvedValueOnce({ tools: [{ name: REQUIRED_TOOLS[0] }] });
 
-      const doc = await client.convertToDoclingDocument('test.pdf');
-      expect(doc.type).toBe('docling_document');
-    });
-
-    it('should throw if no document is returned', async () => {
-      vi.spyOn(client, 'convertDocument').mockResolvedValueOnce({
-        success: true,
-      });
-      await expect(client.convertToDoclingDocument('test.pdf')).rejects.toThrow();
-    });
+    await expect(client.connect()).rejects.toThrow('missing required tools');
+    expect(client.isConnectedToServer()).toBe(false);
   });
 
-  describe('convertToMarkdown()', () => {
-    it('should return markdown string', async () => {
-      vi.spyOn(client, 'convertDocument').mockResolvedValueOnce({
-        success: true,
-        content: '# Test',
-      });
-      const md = await client.convertToMarkdown('test.pdf');
-      expect(md).toBe('# Test');
-    });
+  it('recreates the SDK client after a failed initial connection', async () => {
+    const { client } = await createClient();
+    sdk.connect
+      .mockRejectedValueOnce(new sdk.SdkError(sdk.SdkErrorCode.NotConnected, 'server unavailable'))
+      .mockResolvedValueOnce(undefined);
 
-    it('should throw if no content is returned', async () => {
-      vi.spyOn(client, 'convertDocument').mockResolvedValueOnce({
-        success: true,
-      });
-      await expect(client.convertToMarkdown('test.pdf')).rejects.toThrow();
-    });
+    await expect(client.connect()).rejects.toMatchObject({
+      code: DoclingErrorCode.NETWORK_ERROR,
+    } satisfies Partial<DoclingError>);
+    await expect(client.connect()).resolves.toBeUndefined();
+
+    expect(sdk.clientOptions).toHaveLength(2);
+    expect(sdk.connect).toHaveBeenCalledTimes(2);
+    expect(sdk.listTools).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminates the HTTP session before closing the client', async () => {
+    const { client } = await createClient();
+    await client.connect();
+
+    await client.disconnect();
+
+    expect(sdk.terminateSession).toHaveBeenCalledTimes(1);
+    expect(sdk.close).toHaveBeenCalledTimes(1);
+    expect(client.isConnectedToServer()).toBe(false);
   });
 });

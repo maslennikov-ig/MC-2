@@ -1,115 +1,59 @@
-# Docling MCP Server
+# Docling MCP 3 runtime
 
-Docker service for document processing using Docling with Model Context Protocol (MCP).
+MegaCampus runs document conversion as two independently versioned services:
 
-## Features
+```text
+workers -> nginx :8000/mcp -> Docling MCP 3.0.0 -> Docling Serve 1.29.0
+                                                    Docling 2.118.0
+                                                    Core 2.90.0
+```
 
-- Converts documents (PDF, DOCX, PPTX, XLSX, HTML, MD, images) to structured DoclingDocument JSON
-- Runs as standalone HTTP service using Streamable HTTP transport
-- Integrated with BullMQ for async job processing
-- Docker containerized for isolation and reproducibility
-- Built-in health checks and monitoring
+The MCP image is a thin remote client. It contains no conversion models and
+never falls back to local conversion. Serve contains the CPU models downloaded
+after the Docling upgrade.
 
-## Quick Start
+## Local run
 
-### Build and run with Docker Compose
+From the repository root:
 
 ```bash
-cd packages/course-gen-platform/docker/docling-mcp
-docker compose up -d
+docker compose up -d docling-serve docling-mcp-internal docling-mcp
+curl --fail http://127.0.0.1:8000/health
 ```
 
-### Test the service
+The shared cache is `.tmp/docling-cache/` on the host and
+`/app/docling-json-cache` in MCP/backend containers.
+
+## Exact versions
+
+- `docling-mcp==3.0.0`
+- `mcp[cli]==2.0.0`
+- `docling-slim[service-client]==2.118.0`
+- `docling-core==2.90.0`
+
+`requirements.lock` is hash-locked. The small `runtime.py` wrapper maps the
+timeout/retry settings declared by Docling MCP 3.0.0 into
+`DoclingServiceClient`; upstream 3.0.0 declares but does not consume them. The
+same compatibility wrapper supplies `easyocr` with `ru,en`, because upstream
+3.0.0 also omits the OCR preset/language when it builds the Serve request. The
+Serve image downloads both language models during its build. Keep `force_ocr`
+off unless a future quality corpus demonstrates that it is needed.
+
+## Quality benchmark
 
 ```bash
-curl http://localhost:8000/health
+pnpm --filter @megacampus/course-gen-platform benchmark:docling -- \
+  --label candidate
 ```
 
-### View logs
+Artifacts are written to `.tmp/docling-benchmark/<label>/`. Add
+`--baseline <directory>` to create a before/after report.
 
-```bash
-docker compose logs -f docling-mcp
-```
+The accepted local candidate is `new-2.118-quality-fixed`: all five controlled
+documents pass. Its tracked DOCX source uses one real multilevel numbering
+definition; changing styles without preserving `numId`/`ilvl` would invalidate
+the nesting assertion rather than expose a Docling regression.
 
-## Configuration
-
-### Environment Variables
-
-| Variable                | Default           | Description                                 |
-| ----------------------- | ----------------- | ------------------------------------------- |
-| `DOCLING_CACHE_DIR`     | `/app/cache`      | Directory for document cache                |
-| `DOCLING_MODELS_PATH`   | `/app/models`     | Directory for ML models                     |
-| `DOCLING_LOG_LEVEL`     | `INFO`            | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `DOCLING_MAX_FILE_SIZE` | `104857600`       | Maximum file size in bytes (100MB)          |
-| `DOCLING_TIMEOUT`       | `300`             | Processing timeout in seconds               |
-| `MCP_TRANSPORT`         | `streamable-http` | MCP transport protocol                      |
-| `MCP_HOST`              | `0.0.0.0`         | Server host                                 |
-| `MCP_PORT`              | `8000`            | Server port                                 |
-
-## Resource Requirements
-
-- **CPU**: 1-2 cores (2 recommended for concurrent processing)
-- **Memory**: 2-4GB RAM (4GB recommended)
-- **Disk**: 5-10GB for models and cache
-- **Network**: Internal Docker network
-
-## Supported Formats
-
-- PDF (primary format with advanced understanding)
-- Microsoft Office: DOCX, PPTX, XLSX
-- Web: HTML
-- Markup: Markdown
-- Images: PNG, JPEG, GIF (via OCR)
-- Structured: XML/JATS
-
-## Performance
-
-- 1-page PDF: ~1-3 seconds
-- 10-page PDF: ~5-15 seconds
-- 100-page PDF: ~30-120 seconds
-
-## Health Check
-
-The container includes a built-in health check that runs every 30 seconds:
-
-```bash
-curl http://localhost:8000/health
-```
-
-## Troubleshooting
-
-### Container won't start
-
-Check logs:
-
-```bash
-docker compose logs docling-mcp
-```
-
-### Out of memory
-
-Increase memory limit in docker-compose.yml:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 6G
-```
-
-### Processing timeout
-
-Increase timeout environment variable:
-
-```bash
-DOCLING_TIMEOUT=600
-```
-
-## Integration
-
-This service is designed to be called by BullMQ workers in the Node.js backend through the TypeScript MCP client located at:
-`src/stages/stage2-document-processing/docling/client.ts`
-
-## License
-
-Part of MegaCampusAI Platform
+Production images are built only by the manual
+`build-docling-images.yml` workflow. It publishes versioned tags; deployment
+uses the recorded `image@sha256` references, never a mutable tag.

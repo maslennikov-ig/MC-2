@@ -112,7 +112,7 @@ services:
       # fails DNS resolution and the reindex worker aborts in its own pre-flight.
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
-      - DOCLING_CACHE_PATH=/app/docling-cache
+      - DOCLING_CACHE_PATH=/app/docling-json-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       - QDRANT_RECOVERY_STATE_DIR=/var/lib/megacampus-qdrant-recovery
       - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
@@ -123,7 +123,7 @@ services:
       - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     volumes:
       - ./data/uploads:/opt/megacampus/data/uploads:ro
-      - docling-json-cache:/app/docling-cache
+      - docling-json-cache:/app/docling-json-cache
       - worker-data:/app/data
       - /var/lib/megacampus-qdrant-recovery:/var/lib/megacampus-qdrant-recovery
       # `reindex plan|execute|verify` refuse without a verified recovery binding, and they advance
@@ -484,39 +484,33 @@ services:
         max-size: '20m'
         max-file: '3'
 
-  # Docling MCP Server for document processing (internal - behind nginx proxy)
-  # NOTE: Image built manually on server (too large for GitHub Actions)
-  docling-mcp-internal:
-    image: ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
-    pull_policy: if_not_present # Don't pull if local image exists (too large: 8GB)
-    container_name: megacampus-docling-mcp-internal
+  # Heavy document conversion runtime. Never exposed outside the Docker network.
+  docling-serve:
+    image: ${DOCLING_SERVE_IMAGE:-ghcr.io/maslennikov-ig/mc-2/docling-serve@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    platform: linux/amd64
+    pull_policy: always
+    container_name: megacampus-docling-serve
     restart: unless-stopped
-    # No external ports - only accessible via nginx proxy
-    volumes:
-      - ./data/uploads:/app/uploads:ro
-      - ./data/uploads-dev:/app/uploads-dev:ro
-      - docling-models:/app/models
-      - docling-cache:/app/cache
-      # Shared JSON cache - worker reads from here
-      - docling-json-cache:/usr/local/lib/python3.12/site-packages/_cache
     environment:
-      - DOCLING_CACHE_DIR=/app/cache
-      - DOCLING_MODELS_PATH=/app/models
-      - DOCLING_LOG_LEVEL=INFO
-      - MCP_TRANSPORT=streamable-http
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8000
-      - PYTHONUNBUFFERED=1
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=5001
+      - UVICORN_WORKERS=1
+      - DOCLING_SERVE_MAX_SYNC_WAIT=1200
+      - DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT=1200
+      - DOCLING_SERVE_LOAD_MODELS_AT_BOOT=true
+      - DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
     healthcheck:
       test:
         [
-          'CMD-SHELL',
-          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5001/readyz', timeout=5); raise SystemExit(0 if r.status == 200 else 1)",
         ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 180s
     networks:
       - megacampus
     deploy:
@@ -526,6 +520,78 @@ services:
           memory: 4G
         reservations:
           memory: 2G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  docling-cache-init:
+    image: ${DOCLING_MCP_IMAGE:-ghcr.io/maslennikov-ig/mc-2/docling-mcp@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    platform: linux/amd64
+    pull_policy: always
+    restart: 'no'
+    user: '0:0'
+    command:
+      [
+        'sh',
+        '-c',
+        'chown -R 1001:1001 /app/docling-json-cache && chmod 0770 /app/docling-json-cache',
+      ]
+    volumes:
+      - docling-json-cache:/app/docling-json-cache
+    networks:
+      - megacampus
+
+  # Stable MCP boundary, backed exclusively by docling-serve.
+  docling-mcp-internal:
+    image: ${DOCLING_MCP_IMAGE:-ghcr.io/maslennikov-ig/mc-2/docling-mcp@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    platform: linux/amd64
+    pull_policy: always
+    container_name: megacampus-docling-mcp-internal
+    restart: unless-stopped
+    volumes:
+      - ./data/uploads:/app/uploads:ro
+      - ./data/uploads-dev:/app/uploads-dev:ro
+      - docling-json-cache:/app/docling-json-cache
+    environment:
+      - CACHE_DIR=/app/docling-json-cache
+      - DOCLING_MCP_SERVICE_URL=http://docling-serve:5001
+      - DOCLING_MCP_CONVERSION_MODE=remote
+      - DOCLING_MCP_SERVICE_TIMEOUT=1200.0
+      - DOCLING_MCP_SERVICE_MAX_RETRIES=2
+      - DOCLING_MCP_FALLBACK_TO_LOCAL=false
+      - DOCLING_MCP_KEEP_IMAGES=false
+      - DOCLING_MCP_IMAGES_SCALE=2.0
+      - DOCLING_MCP_DO_OCR=true
+      - DOCLING_MCP_OCR_PRESET=easyocr
+      - DOCLING_MCP_OCR_LANG=ru,en
+      - DOCLING_MCP_DO_TABLE_STRUCTURE=true
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      docling-serve:
+        condition: service_healthy
+      docling-cache-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
     logging:
       driver: 'json-file'
       options:
@@ -544,8 +610,11 @@ services:
     depends_on:
       docling-mcp-internal:
         condition: service_healthy
-    # No healthcheck needed - docling-mcp-internal has its own healthcheck
-    # and nginx is just a transparent proxy
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - megacampus
     logging:
@@ -620,15 +689,16 @@ services:
       - QDRANT_METRICS_SERVICE=worker
       - QDRANT_METRICS_INSTANCE=worker
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
-      # Path to shared docling JSON cache
-      - DOCLING_CACHE_PATH=/app/docling-cache
+      - DOCLING_MCP_TIMEOUT=1200000
+      - DOCLING_MCP_MAX_RETRIES=1
+      - DOCLING_CACHE_PATH=/app/docling-json-cache
       # LKG config persistence
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
     volumes:
       - ./data/uploads:/app/uploads
       - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
       # Shared JSON cache from docling-mcp
-      - docling-json-cache:/app/docling-cache
+      - docling-json-cache:/app/docling-json-cache
       # LKG config persistence
       - worker-data:/app/data
     networks:
@@ -706,10 +776,6 @@ volumes:
   alertmanager-data:
     name: megacampus_alertmanager
   redis-data:
-    driver: local
-  docling-models:
-    driver: local
-  docling-cache:
     driver: local
   # Shared volume for docling JSON output - written by docling-mcp, read by worker
   docling-json-cache:

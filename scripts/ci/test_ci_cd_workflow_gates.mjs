@@ -40,6 +40,7 @@ for (const contractCommand of [
   'node scripts/ci/test_ci_cd_workflow_gates.mjs',
   'bash scripts/ci/test_detect_deploy_changes.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
+  'bash scripts/ci/test_docling_rollout.sh',
 ]) {
   assert(
     deployContractStep?.includes(contractCommand),
@@ -235,9 +236,10 @@ assert(
   mainDeployFlowStart !== -1,
   'deploy script must contain the main blue/green flow marker "# 1. Determine Active Color"'
 );
+const mainInfraStart = deployScript.indexOf('up -d "${INFRA_SERVICES[@]}"', mainDeployFlowStart);
+assert(mainInfraStart !== -1, 'main deploy flow must start the explicit infrastructure service set');
 assert(
-  deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256', mainDeployFlowStart) <
-    deployScript.indexOf('up -d redis qdrant prometheus grafana', mainDeployFlowStart),
+  deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256', mainDeployFlowStart) < mainInfraStart,
   'operator image digest must be resolved and persisted before infrastructure Compose starts'
 );
 assert(
@@ -278,11 +280,13 @@ for (const requiredGuard of [
   );
 }
 
+const infrastructureSection = deployScript.slice(
+  deployScript.indexOf('# 4. Ensure Infrastructure'),
+  deployScript.indexOf('echo "   Infrastructure ready."')
+);
 for (const service of ['qdrant', 'prometheus', 'grafana']) {
   assert(
-    new RegExp(`\\b${service}\\b`).test(
-      deployScript.match(/up -d redis[\s\S]*?\necho "   Infrastructure ready\."/)?.[0] ?? ''
-    ),
+    new RegExp(`\\b${service}\\b`).test(infrastructureSection),
     `staging infrastructure startup must include ${service}`
   );
 }

@@ -182,6 +182,7 @@ jobs:
           node scripts/ci/test_ci_cd_workflow_gates.mjs
           bash scripts/ci/test_detect_deploy_changes.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
+          bash scripts/ci/test_docling_rollout.sh
 
   type-check:
     name: Type Check
@@ -728,7 +729,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "mkdir -p ${{ env.DEPLOY_PATH }}/deploy ${{ env.DEPLOY_PATH }}/ops"
+            "mkdir -p ${{ env.DEPLOY_PATH }}/deploy ${{ env.DEPLOY_PATH }}/ops ${{ env.DEPLOY_PATH }}/scripts/lib"
 
           scp -i ~/.ssh/deploy_key \
             docker-compose.infra.yml \
@@ -746,6 +747,9 @@ jobs:
             scripts/deploy_blue_green.sh \
             scripts/rollback_blue_green.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
+          scp -i ~/.ssh/deploy_key \
+            scripts/lib/docling-rollout.sh \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
           # mc2-o0g75: deploy/qdrant/** is deployed read-only (0444, 0555) by the Q12 asset
           # convention, and scp overwrites a file in place rather than replacing it — so the
@@ -842,7 +846,13 @@ jobs:
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
           CORS_ORIGIN=https://ai.megacampus.ru
-          DOCLING_MCP_URL=http://docling-mcp:8000/sse
+          DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+          DOCLING_MCP_TIMEOUT=1200000
+          DOCLING_MCP_MAX_RETRIES=1
+          DOCLING_STACK_V2_ENABLED=${{ vars.DOCLING_STACK_V2_ENABLED || 'false' }}
+          DOCLING_MCP_IMAGE=${{ vars.DOCLING_MCP_IMAGE }}
+          DOCLING_SERVE_IMAGE=${{ vars.DOCLING_SERVE_IMAGE }}
+          DOCLING_ROLLBACK_IMAGE=${{ vars.DOCLING_ROLLBACK_IMAGE }}
           NOTEBOOKLM_BRIDGE_TOKEN=${{ secrets.NOTEBOOKLM_BRIDGE_TOKEN }}
           NOTEBOOKLM_STORAGE_STATE_DIR=./secrets/notebooklm
           NOTEBOOKLM_STORAGE_PATH=/app/secrets/notebooklm/storage_state.json
@@ -1084,6 +1094,9 @@ jobs:
 
       - name: Copy deployment files
         run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "mkdir -p ${{ env.DEPLOY_PATH }}/scripts/lib"
           scp -i ~/.ssh/deploy_key \
             docker-compose.dev.yml \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
@@ -1096,6 +1109,9 @@ jobs:
           scp -i ~/.ssh/deploy_key \
             scripts/deploy_dev.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
+          scp -i ~/.ssh/deploy_key \
+            scripts/lib/docling-rollout.sh \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
       - name: Create .env.dev
         run: |
@@ -1121,7 +1137,9 @@ jobs:
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru
-          DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/sse
+          DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+          DOCLING_MCP_TIMEOUT=1200000
+          DOCLING_MCP_MAX_RETRIES=1
           NOTEBOOKLM_BRIDGE_TOKEN=${{ secrets.NOTEBOOKLM_BRIDGE_TOKEN }}
           NOTEBOOKLM_STORAGE_STATE_DIR=./secrets/notebooklm
           NOTEBOOKLM_STORAGE_PATH=/app/secrets/notebooklm/storage_state.json

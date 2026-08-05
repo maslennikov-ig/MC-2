@@ -112,6 +112,10 @@ classify_path() {
   esac
 
   case "$path" in
+    packages/course-gen-platform/docker/docling-mcp/*|packages/course-gen-platform/docker/docling-serve/*)
+      deploy_config_changed=true
+      return
+      ;;
     packages/course-gen-platform/docker/notebooklm-bridge/*)
       bridge_changed=true
       runtime_changed=true

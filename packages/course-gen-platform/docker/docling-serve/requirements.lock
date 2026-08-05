@@ -1,0 +1,8 @@
+# Overlay lock for linux/amd64 CPython 3.12. Install with --no-deps because
+# every transitive dependency is supplied by the immutable official base image.
+docling-core==2.90.0 \
+    --hash=sha256:e8d739c51db4ea29d25217de1b1c3854dba9dd2483cd2f95aaafb09e4e52d3c5
+docling-slim[format-opendocument,models-remote,service-client,standard]==2.118.0 \
+    --hash=sha256:30d248aa0b25158e66050a7c48a353728e2af01577813afb74ace1ca911e94d2
+grpcio==1.67.1 \
+    --hash=sha256:1d7616d2ded471231c701489190379e0c311ee0a6c756f3c03e6a62b95a7146e

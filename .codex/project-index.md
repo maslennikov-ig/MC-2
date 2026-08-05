@@ -71,6 +71,9 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
 - Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
+- Docling MCP SDK 2 client and stable JSON adapter: `packages/course-gen-platform/src/stages/stage2-document-processing/docling/`; downstream Markdown entrypoint: `packages/course-gen-platform/src/shared/embeddings/markdown-converter.ts`.
+- Docling runtime images: `packages/course-gen-platform/docker/docling-mcp/` and `packages/course-gen-platform/docker/docling-serve/`; stable nginx facade: `nginx-docling-proxy.conf`.
+- Docling quality corpus and benchmark: `packages/course-gen-platform/tests/integration/fixtures/docling-quality/` and `packages/course-gen-platform/scripts/docling-quality-benchmark.ts`; operational contract: `docs/DOCLING-MCP-REFERENCE.md`.
 - Shared Career Playbook contracts: `packages/shared-types/src/career-playbook.ts`.
 - Shared document-evidence contracts: `packages/shared-types/src/document-evidence.ts`; compact Stage 5 audit contract: `packages/shared-types/src/generation-result.ts`.
 - Stage 4 evidence ownership: `packages/course-gen-platform/src/stages/stage4-analysis/evidence/`, with production ordering in `orchestrator.ts` / `orchestrator-phase-helpers.ts` and durable behavior in `stage4-analysis/README.md`.

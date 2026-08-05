@@ -199,11 +199,11 @@ export async function convertDocumentToMarkdown(
   try {
     const client = getDoclingClient();
 
-    // Get full DoclingDocument JSON (T074.5: Implemented via save_docling_document tool)
-    const doclingDoc = await client.getDoclingDocumentJSON(filePath);
-
-    // Get Markdown from Docling MCP server
-    const rawMarkdown = await client.convertToMarkdown(filePath);
+    // One MCP bundle guarantees that JSON and Markdown originate from the
+    // same conversion and document key.
+    const bundle = await client.convertDocumentBundle(filePath);
+    const doclingDoc = bundle.document;
+    const rawMarkdown = bundle.markdown;
 
     logger.info(
       {
@@ -499,6 +499,7 @@ function convertTextElementToMarkdown(
   }
 
   switch (text.type) {
+    case 'section_header':
     case 'heading':
     case 'title': {
       // Determine heading level from font size or order
@@ -531,6 +532,8 @@ function convertTextElementToMarkdown(
  * Determine heading level from text element properties
  */
 function determineHeadingLevel(text: DoclingText): number {
+  if (text.level) return Math.max(1, Math.min(6, text.level));
+
   // Use font size if available
   if (text.font?.size) {
     const size = text.font.size;

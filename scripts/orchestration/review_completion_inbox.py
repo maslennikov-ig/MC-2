@@ -50,6 +50,150 @@ def resolve_runtime_path(repo_root: pathlib.Path, inbox: dict, key: str) -> path
     return repo_root / raw_path
 
 
+def exact_identity_required(contract: dict) -> bool:
+    baseline = contract.get("baseline")
+    stage_state = contract.get("stage_state")
+    return (
+        isinstance(baseline, dict)
+        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19"}
+    ) or (
+        isinstance(stage_state, dict)
+        and stage_state.get("exact_identity_required") is True
+    )
+
+
+def parse_artifact_metadata(path: pathlib.Path) -> dict[str, str]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SystemExit(f"cannot read event artifact {path}: {exc}") from exc
+    if not text.startswith("---\n") or "\n---\n" not in text[4:]:
+        raise SystemExit(f"event artifact lacks YAML frontmatter: {path}")
+    frontmatter = text[4 : text.find("\n---\n", 4)]
+    values: dict[str, str] = {}
+    for line in frontmatter.splitlines():
+        if line.startswith(" ") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if value.strip():
+            values[key.strip()] = value.strip()
+    task_id = values.get("task_id", "")
+    stage_id = values.get("stage_id", "")
+    if not task_id or not stage_id:
+        raise SystemExit(f"event artifact must declare task_id and stage_id: {path}")
+    return values
+
+
+def require_v219_stream_aggregation(
+    repo_root: pathlib.Path,
+    contract: dict,
+    artifact: pathlib.Path,
+    metadata: dict[str, str],
+) -> None:
+    baseline = contract.get("baseline")
+    if not isinstance(baseline, dict) or baseline.get("profile") != "balanced-v2.19":
+        return
+    stage_id = metadata["stage_id"]
+    manifest_path = repo_root / ".codex" / "stages" / stage_id / "stage-manifest.json"
+    sizing = contract.get("stage_sizing")
+    legacy = sizing.get("legacy_active_stage_id") if isinstance(sizing, dict) else None
+    if not manifest_path.is_file():
+        if legacy == stage_id:
+            return
+        raise SystemExit(f"new v2.19 delegated stage {stage_id!r} requires a stage manifest")
+    if metadata.get("schema_version") != "orchestration-artifact/v3":
+        raise SystemExit("newly reported delegated artifacts in a v2.19 stage must use orchestration-artifact/v3")
+    if metadata.get("stage_manifest") != f".codex/stages/{stage_id}/stage-manifest.json":
+        raise SystemExit("event artifact stage_manifest does not match the owning stage")
+    stream_owner = metadata.get("stream_owner")
+    if not stream_owner:
+        raise SystemExit("event v3 artifact must declare stream_owner")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read owning stage manifest: {exc}") from exc
+    entries = manifest.get("stream_artifacts") if isinstance(manifest, dict) else None
+    relative = artifact.relative_to(repo_root).as_posix()
+    matching = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict)
+        and entry.get("artifact_path") == relative
+        and entry.get("task_id") == metadata.get("task_id")
+        and entry.get("stream_owner") == stream_owner
+    ] if isinstance(entries, list) else []
+    if len(matching) != 1:
+        raise SystemExit("event v3 artifact is unlisted or mismatched in the owning stage manifest")
+
+
+def require_exact_events(
+    repo_root: pathlib.Path,
+    contract: dict,
+    events: list[dict],
+    events_file: pathlib.Path,
+    state_file: pathlib.Path,
+) -> str:
+    workspace = contract.get("workspace")
+    stage_id = workspace.get("current_stage_id") if isinstance(workspace, dict) else None
+    if not isinstance(stage_id, str) or not stage_id:
+        raise SystemExit("exact inbox review requires workspace.current_stage_id")
+    for label, path in (
+        ("completion_inbox.events_file", events_file),
+        ("completion_inbox.review_state_file", state_file),
+    ):
+        if path.parent.name != stage_id or path.parent.parent.name != "stages":
+            raise SystemExit(f"{label} is outside exact stage root for {stage_id}: {path}")
+    artifacts_root = (
+        repo_root / ".codex" / "stages" / stage_id / "artifacts"
+    ).resolve()
+    for event in events:
+        event_id = event.get("event_id")
+        task_id = event.get("task_id")
+        if not isinstance(event_id, str) or not event_id:
+            raise SystemExit("completion event is missing event_id")
+        if not isinstance(task_id, str) or not task_id:
+            raise SystemExit(f"completion event {event_id!r} is missing task_id")
+        if event.get("stage_id") != stage_id:
+            raise SystemExit(
+                f"completion event {event_id!r} stage does not match {stage_id!r}"
+            )
+        raw_artifact = event.get("artifact_path")
+        if not isinstance(raw_artifact, str) or not raw_artifact:
+            raise SystemExit(f"completion event {event_id!r} is missing artifact_path")
+        relative = pathlib.Path(raw_artifact)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise SystemExit(
+                f"completion event {event_id!r} artifact_path must be repo-relative"
+            )
+        candidate = repo_root / relative
+        for component in (candidate, *candidate.parents):
+            if component.is_symlink():
+                raise SystemExit(
+                    f"completion event {event_id!r} artifact_path traverses a symlink"
+                )
+            if component == repo_root:
+                break
+        try:
+            artifact = candidate.resolve(strict=True)
+        except OSError as exc:
+            raise SystemExit(
+                f"completion event {event_id!r} artifact does not exist"
+            ) from exc
+        if artifact.parent != artifacts_root:
+            raise SystemExit(
+                f"completion event {event_id!r} artifact escapes exact stage root"
+            )
+        metadata = parse_artifact_metadata(artifact)
+        artifact_task = metadata["task_id"]
+        artifact_stage = metadata["stage_id"]
+        if artifact_task != task_id or artifact_stage != stage_id:
+            raise SystemExit(
+                f"completion event {event_id!r} task/stage does not match artifact frontmatter"
+            )
+        require_v219_stream_aggregation(repo_root, contract, artifact, metadata)
+    return stage_id
+
+
 def load_events(path: pathlib.Path) -> list[dict]:
     if not path.exists():
         return []
@@ -152,6 +296,8 @@ def main(argv: list[str]) -> int:
     state_file = resolve_runtime_path(repo_root, inbox, "review_state_file")
 
     events = load_events(events_file)
+    if exact_identity_required(contract):
+        require_exact_events(repo_root, contract, events, events_file, state_file)
     if args.task:
         events = [event for event in events if event.get("task_id") == args.task]
 

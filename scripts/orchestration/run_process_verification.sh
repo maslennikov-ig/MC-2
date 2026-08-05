@@ -30,7 +30,8 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.16"
+EXPECTED_PROFILE = "balanced-v2.19"
+COMPATIBLE_LEGACY_PROFILES = {"balanced-v2.17", "balanced-v2.18"}
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -48,6 +49,7 @@ required = [
     pathlib.Path(".codex/subagent-task-contract.md"),
     pathlib.Path(".codex/subagent-spawn-template.md"),
     pathlib.Path("scripts/orchestration/run_stage_closeout.py"),
+    pathlib.Path("scripts/orchestration/run_bounded_node_tests.py"),
     pathlib.Path("scripts/orchestration/record_stage_telemetry.py"),
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
     pathlib.Path("scripts/orchestration/report_child_completion.py"),
@@ -67,6 +69,13 @@ if launcher not in {"codex_subagents", "manual_user_launch", "none"}:
         "delegation.launcher must be one of codex_subagents, manual_user_launch, or none"
     )
 
+if launcher == "none":
+    delegated_names = {
+        "report_child_completion.py",
+        "review_completion_inbox.py",
+    }
+    required = [path for path in required if path.name not in delegated_names]
+
 if launcher == "codex_subagents":
     visibility = delegation.get("subagent_visibility")
     if visibility != "separate_spawned_threads":
@@ -83,7 +92,7 @@ if launcher == "codex_subagents":
         "simple_checks_owner": "orchestrator",
         "delegation_gate": "complex_and_material_benefit",
         "independence_alone_sufficient": False,
-        "parallel_decomposition_matrix": "required_for_complex",
+        "parallel_decomposition_matrix": "required_for_complex_candidates",
         "parallel_execution_default": "spawn_eligible_complex_streams",
     }
     actual_delegation = {key: delegation.get(key) for key in expected_delegation}
@@ -145,7 +154,7 @@ source_skill = baseline.get("source_skill")
 if not profile or not source_skill:
     raise SystemExit("Baseline metadata must define profile and source_skill")
 
-if profile != EXPECTED_PROFILE or source_skill != EXPECTED_SOURCE_SKILL:
+if profile not in {EXPECTED_PROFILE, *COMPATIBLE_LEGACY_PROFILES} or source_skill != EXPECTED_SOURCE_SKILL:
     raise SystemExit(
         f"Expected baseline {EXPECTED_PROFILE} via {EXPECTED_SOURCE_SKILL}, got {profile} via {source_skill}"
     )
@@ -158,33 +167,127 @@ if not isinstance(stage_limits, dict):
     raise SystemExit("Missing [stage_limits] section")
 if stage_limits.get("epic_scope") != "roadmap_only":
     raise SystemExit("stage_limits.epic_scope must be 'roadmap_only'")
-if stage_limits.get("stage_unit") != "accepted_integration_slice":
-    raise SystemExit("stage_limits.stage_unit must be 'accepted_integration_slice'")
+expected_stage_unit = (
+    "cohesive_vertical_slice" if profile == EXPECTED_PROFILE else "accepted_integration_slice"
+)
+if stage_limits.get("stage_unit") != expected_stage_unit:
+    raise SystemExit(f"stage_limits.stage_unit must be {expected_stage_unit!r}")
 if stage_limits.get("automatic_advance_after_acceptance") is not True:
     raise SystemExit("stage_limits.automatic_advance_after_acceptance must be true")
 if stage_limits.get("replan_on_material_boundary") is not True:
     raise SystemExit("stage_limits.replan_on_material_boundary must be true")
+if stage_limits.get("cost_anomaly_action") != "replan_not_stop":
+    raise SystemExit("stage_limits.cost_anomaly_action must be 'replan_not_stop'")
+if stage_limits.get("hard_stop_on_time_or_token_budget") is not False:
+    raise SystemExit("stage_limits.hard_stop_on_time_or_token_budget must be false")
+if stage_limits.get("continuation_lineage") != "selected_beads_goal":
+    raise SystemExit("stage_limits.continuation_lineage must be 'selected_beads_goal'")
 max_correction_loops = stage_limits.get("max_correction_loops")
 if isinstance(max_correction_loops, bool) or not isinstance(max_correction_loops, int) or max_correction_loops < 0:
     raise SystemExit("stage_limits.max_correction_loops must be a non-negative non-bool integer")
 if stage_limits.get("p0_p1_block_acceptance") is not True:
     raise SystemExit("stage_limits.p0_p1_block_acceptance must be true")
 
+if profile == EXPECTED_PROFILE:
+    v219_required = [
+        pathlib.Path(".codex/stage-manifest-template.json"),
+        pathlib.Path(".codex/scope-preservation-ledger-template.json"),
+        pathlib.Path(".codex/scope-criterion-snapshot-template.json"),
+        pathlib.Path("scripts/orchestration/lint_stage_sizing.py"),
+    ]
+    missing_v219 = [str(path) for path in v219_required if not path.exists()]
+    if missing_v219:
+        raise SystemExit(f"Missing required v2.19 sizing files: {', '.join(missing_v219)}")
+    stage_sizing = contract.get("stage_sizing")
+    if not isinstance(stage_sizing, dict):
+        raise SystemExit("v2.19 requires [stage_sizing]")
+    expected_sizing = {
+        "mode": "cohesive_vertical_slice",
+        "manifest_schema": "orchestration-stage/v1",
+        "ledger_schema": "scope-preservation-ledger/v1",
+        "scope_anchor_schema": "scope-criterion-snapshot/v1",
+        "one_active_implementation_stage": True,
+        "parallel_streams_inside_stage": True,
+        "scope_preservation_ledger_required_on_replan": True,
+        "accepted_history_immutable": True,
+        "migration_scope": "future_work_only",
+    }
+    actual_sizing = {key: stage_sizing.get(key) for key in expected_sizing}
+    if actual_sizing != expected_sizing:
+        raise SystemExit(f"stage_sizing contract is stale: {actual_sizing!r}")
+    expected_merge_axes = [
+        "acceptance_owner",
+        "subsystem",
+        "risk_model",
+        "test_environment",
+        "rollback_boundary",
+        "acceptance_proof",
+    ]
+    if stage_sizing.get("merge_adjacent_when_shared") != expected_merge_axes:
+        raise SystemExit("stage_sizing.merge_adjacent_when_shared is stale")
+    expected_split_reasons = [
+        "unresolved_public_ownership_or_public_contract",
+        "hard_dependency",
+        "independent_rollback_or_migration_boundary",
+        "distinct_security_or_compliance_risk",
+        "external_authorization",
+    ]
+    if stage_sizing.get("allowed_split_reasons") != expected_split_reasons:
+        raise SystemExit("stage_sizing.allowed_split_reasons is stale")
+
+knowledge_graph = contract.get("knowledge_graph")
+if not isinstance(knowledge_graph, dict):
+    raise SystemExit("Missing [knowledge_graph] section")
+if knowledge_graph.get("query_first") is not True:
+    raise SystemExit("knowledge_graph.query_first must be true")
+if knowledge_graph.get("freshness_check_required") is not True:
+    raise SystemExit("knowledge_graph.freshness_check_required must be true")
+if knowledge_graph.get("refresh_policy") != "accepted_relevant_integration_or_release_boundary":
+    raise SystemExit(
+        "knowledge_graph.refresh_policy must be 'accepted_relevant_integration_or_release_boundary'"
+    )
+
 verification_policy = contract.get("verification_policy")
-if not isinstance(verification_policy, dict) or verification_policy.get("mode") != "risk_adaptive":
-    raise SystemExit("verification_policy.mode must be 'risk_adaptive'")
-if verification_policy.get("default_tier") != "integration":
-    raise SystemExit("verification_policy.default_tier must be 'integration'")
-for key in ("tier_groups", "risk_tag_groups", "surface_groups"):
-    if not isinstance(verification_policy.get(key), dict):
-        raise SystemExit(f"verification_policy.{key} must be a table")
+if not isinstance(verification_policy, dict):
+    raise SystemExit("Missing [verification_policy] section")
+if profile == EXPECTED_PROFILE:
+    if verification_policy.get("mode") != "explicit":
+        raise SystemExit("v2.19 requires verification_policy.mode = 'explicit'")
+    levels = contract.get("orchestration_levels")
+    if not isinstance(levels, dict) or levels.get("default") != "slice_acceptance":
+        raise SystemExit("v2.19 requires orchestration_levels.default = 'slice_acceptance'")
+    if verification_policy.get("default_level") != "slice_acceptance":
+        raise SystemExit("v2.19 requires verification_policy.default_level = 'slice_acceptance'")
+    removed_selectors = (
+        "default_tier",
+        "level_groups",
+        "tier_groups",
+        "risk_tag_groups",
+        "surface_groups",
+        "e2e_triggers",
+    )
+    present = [key for key in removed_selectors if key in verification_policy]
+    if present:
+        raise SystemExit(
+            "v2.19 explicit verification forbids selector fields: " + ", ".join(present)
+        )
+else:
+    if verification_policy.get("mode") != "risk_adaptive":
+        raise SystemExit("legacy verification_policy.mode must be 'risk_adaptive'")
+    if verification_policy.get("default_tier") != "integration":
+        raise SystemExit("legacy verification_policy.default_tier must be 'integration'")
+    required_policy_tables = ("tier_groups", "risk_tag_groups", "surface_groups")
+    for key in required_policy_tables:
+        if not isinstance(verification_policy.get(key), dict):
+            raise SystemExit(f"verification_policy.{key} must be a table")
 
 completion_inbox = contract.get("completion_inbox")
-if not isinstance(completion_inbox, dict):
-    raise SystemExit("Missing [completion_inbox] section in .codex/orchestrator.toml")
-for key in ("scope", "events_file", "review_state_file", "report_entrypoint", "review_entrypoint"):
-    if not completion_inbox.get(key):
-        raise SystemExit(f"completion_inbox.{key} is required")
+if launcher != "none":
+    if not isinstance(completion_inbox, dict):
+        raise SystemExit("Missing [completion_inbox] section in .codex/orchestrator.toml")
+    for key in ("scope", "events_file", "review_state_file", "report_entrypoint", "review_entrypoint"):
+        if not completion_inbox.get(key):
+            raise SystemExit(f"completion_inbox.{key} is required")
 
 for blocked in (pathlib.Path("tasks.json"), pathlib.Path(".codex/tasks.json")):
     if blocked.exists():

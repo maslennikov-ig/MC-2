@@ -1,0 +1,80 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-nxd3g",
+  "goal_id": "mc2-nxd3g",
+  "profile_at_creation": "balanced-v2.16",
+  "status": "active",
+  "sequence": 1,
+  "acceptance_boundary_id": "docling-mcp2-integration",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "stage2-docling-client",
+      "admin-health",
+      "docling-runtime",
+      "docling-quality-harness"
+    ],
+    "risk_models": ["migration", "public-api", "retry", "rollback"],
+    "test_environments": ["vitest", "docker-compose", "local-docling-stack"],
+    "rollback_boundary": "Keep the MCP SDK 2 application client and repoint the nginx-backed docling-mcp service to the recorded legacy MCP 1.x image; no data migration or reindex is performed.",
+    "acceptance_proofs": [
+      "Focused client, adapter, cache and health tests",
+      "Docker Compose config validation and MCP-to-Serve smoke",
+      "A/B quality report for the controlled fixture corpus",
+      "pnpm type-check and pnpm build"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-nxd3g",
+    "source_digest": "db86a4fa668d92748d65566bcb1dde9da8e850f1bd8fa3e715953da12e1b1b5a",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Приложение использует TypeScript MCP SDK 2.0.0 через split-пакеты, автоматически согласует протокол и остаётся совместимым со старым MCP 1.x сервером.",
+        "text_digest": "23c99c8eb7805f9da76c129a3ccfe4d7e48135512ae4402f796183ffd26011b2"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "DoclingClient выполняет одну согласованную bundle-конвертацию, проверяет обязательные инструменты, structuredContent/isError/timeout и повторяет только потерянную сессию не более одного раза.",
+        "text_digest": "61e4dd69d135d9ef23a848e1a1bdb91c3bfadfa461969cc253f6786c78df5752"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Сырой Docling JSON версий 2.80 и 2.118 нормализуется в стабильный внутренний DoclingDocument; кэш использует совместимый SHA-256 ключ MCP 3 и удаляет JSON/Markdown пары.",
+        "text_digest": "d02ed3ec140254224b7ff42d738687b5659e58bc55859fbc8925db4c687c9e9e"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Docker-архитектура разделяет digest-pinned Docling Serve 1.29/Docling 2.118 и тонкий Docling MCP 3/Python MCP 2, сохраняет nginx /mcp и согласованные лимиты ресурсов/таймаутов.",
+        "text_digest": "c59153b8709eec5fbf9a71da8c29eece998303551633999fe7cffb7fe090e8b2"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Репозиторий содержит воспроизводимый A/B quality harness и контрольный корпус без переиндексации production; негативный пустой документ остаётся ошибкой.",
+        "text_digest": "e6ce1651d5126cf00a04007a150d7f210e0d0746bc3048946d2dd62d98b9804a"
+      },
+      {
+        "criterion_id": "AC-6",
+        "text": "Фокусные тесты, compose validation, type-check и build проходят; production deploy не выполняется без отдельного разрешения.",
+        "text_digest": "5116cf1ac23b76f492e093d667418bf7bd4620405d9fb9c3861f0ab32ab3d244"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-nxd3g/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "db86a4fa668d92748d65566bcb1dde9da8e850f1bd8fa3e715953da12e1b1b5a",
+  "scope_ledger": "none",
+  "stream_artifacts": []
+}

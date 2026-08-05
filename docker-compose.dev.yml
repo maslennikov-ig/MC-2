@@ -147,6 +147,8 @@ services:
       - REDIS_URL=redis://megacampus-redis:6379
       - QDRANT_URL=http://qdrant-dev:6333
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - DOCLING_MCP_TIMEOUT=1200000
+      - DOCLING_MCP_MAX_RETRIES=1
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
       - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
@@ -211,7 +213,9 @@ services:
       - DOCUMENT_EVIDENCE_MODE=active
       - DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
-      - DOCLING_CACHE_PATH=/app/docling-cache
+      - DOCLING_MCP_TIMEOUT=1200000
+      - DOCLING_MCP_MAX_RETRIES=1
+      - DOCLING_CACHE_PATH=/app/docling-json-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
@@ -225,7 +229,7 @@ services:
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
     volumes:
       - ./data/uploads-dev:/app/uploads
-      - docling-json-cache:/app/docling-cache
+      - docling-json-cache:/app/docling-json-cache
       - worker-dev-data:/app/data
     networks:
       - megacampus
@@ -267,14 +271,14 @@ services:
       - STAGE6_WORKER=true
       # DEV queue isolation - listens to DEV-only stage6 queue
       - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
-      - DOCLING_CACHE_PATH=/app/docling-cache
+      - DOCLING_CACHE_PATH=/app/docling-json-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
-      - docling-json-cache:/app/docling-cache
+      - docling-json-cache:/app/docling-json-cache
       - worker-dev-data:/app/data
     networks:
       - megacampus

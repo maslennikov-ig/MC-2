@@ -1,0 +1,5 @@
+# The official Serve image digest pins the full transitive runtime. These are
+# the only overlay packages required to move it from Docling 2.117/Core 2.88.
+docling-slim[standard,service-client,models-remote,format-opendocument]==2.118.0
+docling-core==2.90.0
+grpcio==1.67.1

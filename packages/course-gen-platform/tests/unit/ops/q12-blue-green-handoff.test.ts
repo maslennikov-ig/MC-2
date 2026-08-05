@@ -87,8 +87,9 @@ function harness(activeColor?: 'blue' | 'green'): Harness {
     })}\n`
   );
 
-  // Stub docker/nginx on PATH: docker logs argv and returns a restart=no
-  // identity for inspect; nginx always succeeds.
+  // Stub docker/nginx/curl on PATH: docker logs argv and returns a restart=no
+  // identity for inspect; nginx succeeds; curl exposes only the healthy
+  // Docling facade endpoint used by the prepare handoff.
   const binDir = join(base, 'bin');
   mkdirSync(binDir);
   const dockerLog = join(base, 'docker.log');
@@ -112,6 +113,17 @@ function harness(activeColor?: 'blue' | 'green'): Harness {
       // switch window (config written, reload failing) can be exercised.
       'if [ -n "${NGINX_FAIL:-}" ] && [ "$1" = "-s" ]; then exit 1; fi',
       'exit 0',
+      '',
+    ].join('\n')
+  );
+  writeExecutable(
+    join(binDir, 'curl'),
+    [
+      '#!/usr/bin/env bash',
+      'case " $* " in',
+      '  *" http://127.0.0.1:8000/health "*) exit 0 ;;',
+      '  *) echo "unexpected curl invocation: $*" >&2; exit 1 ;;',
+      'esac',
       '',
     ].join('\n')
   );
