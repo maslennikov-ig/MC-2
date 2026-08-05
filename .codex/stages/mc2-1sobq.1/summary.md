@@ -6,10 +6,14 @@ Level: integration · Owner: root · Status: accepted 2026-08-05
 ## What changed observably
 
 Docling's own document structure now reaches chunking, metadata enrichment and
-the Qdrant payload. On the controlled corpus, native chunking carries a real
-heading path for **100%** of child chunks where the legacy Markdown splitter
-carried one for **0%**, and resolves **100%** of chunks to Docling `self_ref`s
-with page numbers and bounding boxes.
+the Qdrant payload. On the controlled corpus, native chunking resolves **100% of
+child chunks in all six chunkable cases** to Docling `self_ref`s, with page
+numbers and bounding boxes wherever the source has pages (n/a for DOCX). Heading
+paths are carried for **100% of child chunks in five of those six cases** and
+for **0% in `reading-order-pptx`**, because Docling emits no headings at all for
+that deck — the coverage figure reports what the converter supplied, and a
+strategy cannot invent a heading that does not exist. The legacy Markdown
+splitter carried a heading path for **0%** of chunks in every case.
 
 Nothing changed for production yet: `DOCLING_CHUNK_STRATEGY` defaults to
 `legacy_markdown` everywhere except the dev compose, no document was reindexed,
@@ -54,30 +58,58 @@ resolved from the running Serve 1.29.0 `/openapi.json`, not from memory.
 Refs that do not resolve are a `DoclingChunkConsistencyError` before upload, not
 a chunk with less metadata.
 
-## A/B result
+## A/B result: no native strategy is promoted
 
-Evidence: `.tmp/docling-benchmark/stageA-baseline/` and
-`.tmp/docling-benchmark/stageA-heading-inference/` — 7/7 cases pass in both
-conversion profiles. Serve peaked at 3.032 GiB of 4 GiB with zero restarts.
+Evidence: `evidence/stageA-corrected-{baseline,heading-inference}-*` — 7/7 cases
+in both conversion profiles, Serve 2.70 GiB and 2.96 GiB of 4 GiB, zero
+restarts. `evidence/stageA-rejected-hybrid-candidate-report.md` is the same
+corpus run with `--candidate docling_hybrid`, kept because it is the run whose
+gate went red.
 
-| Case               | Strategy             | Heading path | Refs | Page/bbox |      R@5 |      MRR |
-| ------------------ | -------------------- | -----------: | ---: | --------: | -------: | -------: |
-| scientific-pdf     | legacy_markdown      |           0% |   0% |       n/a |     0.50 |     0.50 |
-| scientific-pdf     | docling_hierarchical |         100% | 100% |      100% |     0.40 |     0.50 |
-| scientific-pdf     | **docling_hybrid**   |         100% | 100% |      100% | **0.65** | **0.67** |
-| reading-order-pptx | docling_hierarchical |           0% | 100% |      100% |     1.00 |     0.33 |
-| reading-order-pptx | **docling_hybrid**   |           0% | 100% |      100% |     1.00 |     1.00 |
+The first version of this stage scored Recall@K as
+`relevantInTopK / min(relevantTotal, k)`, which returns 1.00 whenever the top-k
+is saturated: "5 of 8 relevant chunks retrieved" was printed as a perfect
+score. The regression gate then compared only the reciprocal rank, so a strategy
+that kept the first hit first while losing the rest of the evidence passed.
+Recall@K is now `relevantInTopK / relevantTotal`, its reachable ceiling is
+printed beside it, and every control question is guarded on Recall, MRR and
+nDCG with an explicit 0.01 tolerance.
 
-**Selected candidate: `docling_hybrid`.** It regresses no control question on
-any case, improves the scientific PDF, and is the only native strategy that does
-not over-fragment a slide. `docling_hierarchical` split the PPTX into six
-fragments and pushed the answer from rank 1 to rank 3; that is recorded rather
-than hidden, and the strategy stays available as configuration.
+Per control question, `docling_hybrid` against `legacy_markdown` (baseline
+profile; the heading-inference profile agrees on every sign):
 
-**The retrieval numbers are the lexical half of production retrieval** — BM25
-with the collection's own `k`/`b`, offline. No `JINA_API_KEY` exists in this
-environment, so dense ranking was not exercised and no paid call was made. A
-win here is a lexical-reachability win. Follow-up `mc2-j1axa`.
+| Question            | legacy R@5/MRR/nDCG | hybrid R@5/MRR/nDCG | Verdict          |
+| ------------------- | ------------------: | ------------------: | ---------------- |
+| `sci-accuracy-drop` |   0.000/0.000/0.000 |   0.500/0.333/0.307 | hybrid wins      |
+| `sci-hypothesis`    |   0.625/1.000/1.000 |   0.444/1.000/0.830 | hybrid regresses |
+| 8 remaining         |   1.000/1.000/1.000 |   1.000/1.000/1.000 | identical        |
+
+So the honest reading is a trade, not a win: hybrid is the only strategy that
+retrieves the table value in `sci-accuracy-drop` at all — legacy never places it
+in the top 5 — and it gives up one of five top slots on `sci-hypothesis`, where
+both answer at rank 1. `docling_hierarchical` is strictly worse: it takes the
+same `sci-hypothesis` loss, wins nothing, and additionally splits the PPTX into
+six fragments, pushing `pptx-steps` from rank 1 to rank 3.
+
+The stage's acceptance criterion requires a candidate that does not regress a
+control question. **No native strategy meets it, so none is promoted.**
+`DOCLING_CHUNK_STRATEGY` stays `legacy_markdown` everywhere except dev; both
+native strategies remain available as configuration and are fully instrumented.
+The default decision moves to the dense A/B (`mc2-j1axa`), which is now a hard
+blocker of Stage E.
+
+Two limitations that must be read with the table:
+
+- **Recall@K is not comparable across strategies.** A strategy that cuts the
+  same document finer raises `relevantTotal` and lowers its own ceiling. With
+  heading inference on, contextualized headings push `sci-hypothesis`'s relevant
+  count from 8 to 29 for hybrid, so its Recall@5 reads 0.138 against a 0.172
+  ceiling. The ceiling column exists so this is visible; it is not a reason to
+  discount the drop, which nDCG confirms independently.
+- **This is the lexical half of production retrieval** — BM25 with the
+  collection's own `k`/`b`, offline. No `JINA_API_KEY` exists in this
+  environment and paid calls are unauthorized, so dense ranking was never
+  exercised. Nothing here shows what Jina v3 would rank. `mc2-j1axa`.
 
 ## Also fixed on the way
 
@@ -94,8 +126,11 @@ oversized parent that the Jina batcher would reject.
 ## Verification
 
 - `pnpm type-check`, `pnpm build`, `pnpm lint` — green, 0 errors.
-- Focused tests: `tests/unit/shared/embeddings` (73) and
-  `tests/unit/stages/stage2-document-processing` — 131 passed across 17 files.
+- Focused tests: `tests/unit/shared/embeddings` and
+  `tests/unit/stages/stage2-document-processing`. `retrieval-metrics.test.ts`
+  now pins the Recall@K denominator with a case where 8 chunks are relevant and
+  only 5 fit in the window: 0.625, which the previous implementation scored as
+  1.00.
 - `docker/docling-serve/test_runtime.py` and `docker/docling-mcp/test_runtime.py`
   run inside their image builds; both images rebuilt locally and green.
 - Benchmark corpus 7/7 in both conversion profiles.

@@ -55,6 +55,48 @@ describe('evaluateRetrieval', () => {
     expect(report.unreachableQuestions).toEqual([]);
   });
 
+  it('divides by every relevant chunk, not by the top-k window', () => {
+    // The bug this replaces: Recall@K divided by `min(relevantTotal, k)`, so a
+    // saturated top-k always scored 1.00. Here 8 chunks carry the evidence and
+    // only 5 can be retrieved: the honest score is 0.625, not 1.
+    const many: ScorableChunk[] = Array.from({ length: 8 }, (_, index) =>
+      chunk(`r${index}`, `Сводные показатели точности достигают 98 процентов, вариант ${index}.`)
+    );
+    const noise: ScorableChunk[] = Array.from({ length: 4 }, (_, index) =>
+      chunk(`n${index}`, `Посторонний текст без чисел, фрагмент ${index}.`)
+    );
+    const report = evaluateRetrieval(
+      [...many, ...noise],
+      [
+        {
+          id: 'q-many',
+          // BM25 here does no stemming, so the query has to share surface forms
+          // with the chunks it is meant to rank.
+          query: 'сводные показатели точности 98 процентов',
+          expectedTokens: ['98', 'процентов'],
+        },
+      ],
+      5
+    );
+
+    const [outcome] = report.questions;
+    expect(outcome.relevantTotal).toBe(8);
+    expect(outcome.relevantInTopK).toBe(5);
+    expect(outcome.recallAtK).toBeCloseTo(0.625, 10);
+    // Recall@5 cannot exceed 5/8 here — the ceiling is reported so that a
+    // strategy which merely produced more chunks is not read as a regression.
+    expect(outcome.recallCeilingAtK).toBeCloseTo(0.625, 10);
+    // Rank quality is unaffected: the first relevant chunk is still first.
+    expect(outcome.reciprocalRank).toBe(1);
+    expect(outcome.ndcgAtK).toBe(1);
+  });
+
+  it('keeps the ceiling at 1 when every relevant chunk fits inside k', () => {
+    const report = evaluateRetrieval(CHUNKS, QUESTIONS, 5);
+    expect(report.recallCeilingAtK).toBe(1);
+    expect(report.recallAtK).toBe(1);
+  });
+
   it('reports a question whose evidence is in no chunk as unreachable', () => {
     const report = evaluateRetrieval(
       [chunk('c1', 'Ничего по теме здесь нет.')],

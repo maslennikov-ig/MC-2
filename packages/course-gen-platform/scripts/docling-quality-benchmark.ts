@@ -14,6 +14,11 @@
  * - Retrieval scoring is the lexical half of production retrieval (BM25 with the
  *   collection's own parameters). Dense Jina v3 ranking is not exercised here,
  *   so a win reported by this harness is a lexical-reachability win.
+ * - Recall@K is divided by all relevant chunks, and its reachable ceiling is
+ *   printed next to it, so a saturated top-k cannot read as a perfect score.
+ * - A control question must not regress on Recall, MRR or nDCG. Guarding the
+ *   reciprocal rank alone passed strategies that kept the first hit first and
+ *   lost the rest of the evidence.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -239,10 +244,40 @@ async function runStrategy(
   }
 }
 
+/**
+ * Numeric slack allowed before a per-question drop counts as a regression.
+ *
+ * Set to floating-point noise, not to a quality allowance: every metric here is
+ * rank-derived, so the smallest real drop a question can suffer (first hit
+ * falling from rank 1 to rank 2) is 0.5 for the reciprocal rank and ~0.37 for
+ * nDCG@5. A tolerance of 0.01 therefore admits no genuine quality loss.
+ */
+const RETRIEVAL_REGRESSION_TOLERANCE = 0.01;
+
+/** Every metric a control question is guarded on. */
+const RETRIEVAL_METRICS: Array<{
+  name: string;
+  read: (outcome: RetrievalReport['questions'][number]) => number;
+}> = [
+  { name: 'recall@5', read: outcome => outcome.recallAtK },
+  { name: 'mrr', read: outcome => outcome.reciprocalRank },
+  { name: 'ndcg@5', read: outcome => outcome.ndcgAtK },
+];
+
+/**
+ * `--candidate none`: no strategy is proposed as the default.
+ *
+ * The no-regression gate then blocks nothing and every strategy is recorded as
+ * an observation. This is the honest setting while the evidence does not name a
+ * winner — it is not a way to silence a red gate for a strategy one still
+ * intends to ship as the default.
+ */
+type CandidateSelection = DoclingChunkingStrategy | 'none';
+
 function strategyAssertions(
   benchmarkCase: BenchmarkCase,
   outcomes: StrategyOutcome[],
-  candidate: DoclingChunkingStrategy,
+  candidate: CandidateSelection,
   notes: string[]
 ): CaseResult['assertions'] {
   const assertions: CaseResult['assertions'] = [];
@@ -277,32 +312,40 @@ function strategyAssertions(
     }
   }
 
-  // No control question may regress against the legacy strategy. This blocks
-  // only for the candidate default; the other strategies stay measured and
-  // reported, because knowing that a non-selected strategy regresses is the
-  // evidence that selected the candidate in the first place.
+  // No control question may regress against the legacy strategy on ANY of the
+  // three metrics. Checking only the reciprocal rank passes a strategy that
+  // keeps the first hit first while losing the rest of the evidence, which is
+  // exactly how a Recall and nDCG regression stayed invisible. This blocks only
+  // for the candidate default; the other strategies stay measured and reported,
+  // because knowing that a non-selected strategy regresses is the evidence that
+  // selected the candidate in the first place.
   const legacy = outcomes.find(outcome => outcome.strategy === 'legacy_markdown');
   if (legacy?.retrieval) {
     for (const outcome of outcomes) {
       if (outcome.strategy === 'legacy_markdown' || !outcome.retrieval) continue;
-      const regressed = outcome.retrieval.questions.filter(question => {
+      const regressed = outcome.retrieval.questions.flatMap(question => {
         const before = legacy.retrieval!.questions.find(other => other.id === question.id);
-        return before !== undefined && question.reciprocalRank < before.reciprocalRank;
+        if (!before) return [];
+        return RETRIEVAL_METRICS.flatMap(metric => {
+          const drop = metric.read(before) - metric.read(question);
+          return drop > RETRIEVAL_REGRESSION_TOLERANCE
+            ? [
+                `${question.id}/${metric.name} ${metric.read(before).toFixed(3)}→${metric
+                  .read(question)
+                  .toFixed(3)}`,
+              ]
+            : [];
+        });
       });
       if (outcome.strategy === candidate) {
         assertions.push({
           name: `no-retrieval-regression:${outcome.strategy}`,
           passed: regressed.length === 0,
-          details:
-            regressed.length === 0
-              ? undefined
-              : `regressed: ${regressed.map(question => question.id).join(', ')}`,
+          details: regressed.length === 0 ? undefined : `regressed: ${regressed.join('; ')}`,
         });
       } else if (regressed.length > 0) {
         notes.push(
-          `- ${benchmarkCase.id} · ${outcome.strategy} (не кандидат): регрессия MRR по ${regressed
-            .map(question => question.id)
-            .join(', ')}`
+          `- ${benchmarkCase.id} · ${outcome.strategy} (не кандидат): ${regressed.join('; ')}`
         );
       }
     }
@@ -336,7 +379,7 @@ async function main(): Promise<void> {
   const strategies = (argument('--strategies')
     ?.split(',')
     .map(value => value.trim()) ?? ALL_STRATEGIES) as DoclingChunkingStrategy[];
-  const candidate = (argument('--candidate') ?? 'docling_hybrid') as DoclingChunkingStrategy;
+  const candidate = (argument('--candidate') ?? 'none') as CandidateSelection;
   const notes: string[] = [];
   const cachePath = path.resolve(
     argument('--cache') ??
@@ -524,7 +567,7 @@ async function main(): Promise<void> {
   const strategyRows = results.flatMap(result =>
     result.strategies.map(
       outcome =>
-        `| ${result.id} | ${outcome.strategy} | ${outcome.parentChunks} | ${outcome.childChunks} | ${outcome.avgChildTokens} | ${(outcome.headingPathCoverage * 100).toFixed(0)}% | ${(outcome.refCoverage * 100).toFixed(0)}% | ${outcome.locationEligible ? `${(outcome.locationCoverage * 100).toFixed(0)}%` : 'n/a'} | ${outcome.retrieval ? outcome.retrieval.recallAtK.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.mrr.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.ndcgAtK.toFixed(2) : '—'} | ${outcome.durationMs} |`
+        `| ${result.id} | ${outcome.strategy} | ${outcome.parentChunks} | ${outcome.childChunks} | ${outcome.avgChildTokens} | ${(outcome.headingPathCoverage * 100).toFixed(0)}% | ${(outcome.refCoverage * 100).toFixed(0)}% | ${outcome.locationEligible ? `${(outcome.locationCoverage * 100).toFixed(0)}%` : 'n/a'} | ${outcome.retrieval ? `${outcome.retrieval.recallAtK.toFixed(2)} / ${outcome.retrieval.recallCeilingAtK.toFixed(2)}` : '—'} | ${outcome.retrieval ? outcome.retrieval.mrr.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.ndcgAtK.toFixed(2) : '—'} | ${outcome.durationMs} |`
     )
   );
 
@@ -533,6 +576,14 @@ async function main(): Promise<void> {
     '',
     `MCP: \`${serverUrl}\` · Serve: \`${serveUrl}\` · conversion profile: \`${conversionProfile}\` · кандидат: \`${candidate}\``,
     '',
+    ...(candidate === 'none'
+      ? [
+          'Кандидат не назначен: ни одна стратегия не предлагается в качестве',
+          'default, поэтому блокирующая проверка регрессий не применяется, а все',
+          'стратегии записаны как наблюдения.',
+          '',
+        ]
+      : []),
     `Serve memory: ${stats.serveMemory ?? 'not measured'}; restarts: ${stats.serveRestartCount ?? 'not measured'}`,
     '',
     '## Конвертация',
@@ -548,7 +599,14 @@ async function main(): Promise<void> {
     '',
     'Recall@5/MRR/nDCG@5 — лексический прокси (BM25 с параметрами коллекции), не dense-ранжирование Jina.',
     '',
-    '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | R@5 | MRR | nDCG@5 | ms |',
+    'Колонка `R@5` — «факт / потолок». Потолок = `min(релевантных, 5) / релевантных`:',
+    'стратегия, которая режет тот же документ мельче, механически снижает свой',
+    'собственный потолок, поэтому Recall@5 между стратегиями напрямую не сравним,',
+    'и выбор кандидата опирается на ранговые метрики и на отсутствие регрессий.',
+    '',
+    `Регрессией считается падение больше ${RETRIEVAL_REGRESSION_TOLERANCE} по любой из трёх метрик на любом контрольном вопросе.`,
+    '',
+    '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | R@5 факт/потолок | MRR | nDCG@5 | ms |',
     '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
     ...strategyRows,
     '',

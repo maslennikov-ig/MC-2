@@ -17,6 +17,11 @@ looked right in both cases. Corollary: after changing anything under `deploy/`, 
 actually has, and remember that `/opt/megacampus/deploy/systemd` is STAGED, never active — systemd
 runs `/etc/systemd/system`, and only a deliberate root install moves bytes between them.
 
+**A deploy can ship an image that does not contain the commit.** `DEPLOY_API_CHANGED=false` keeps
+the CURRENT image even when a new one was built; after a rollback in 2026-08, the next push did not
+restore the new code because its commit touched no api source. `workflow_dispatch` with
+`force_deploy=true` sets every `*_changed` and is the supported way out.
+
 **Completion is not success.** BullMQ marks a job completed whenever the processor returns, and
 these handlers return `{ success: false }` rather than throwing. A queue that looks drained can be a
 queue that failed quietly, in bulk.

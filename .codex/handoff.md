@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-05 — Docling Intelligence Stage A accepted on `develop`. Structure-aware chunking
-exists and is proven, and production still runs the legacy chunker until Stage E.
+Updated: 2026-08-05 — Docling Intelligence Stage A accepted on `develop` after a metric correction.
+Structure-aware chunking exists and is proven; NO native strategy earned the default.
 
 Current stage id: `mc2-1sobq.1`
 Stage: structure-aware Docling RAG with provenance, accepted; epic continues at `mc2-1sobq.2`.
@@ -10,14 +10,20 @@ Stage: structure-aware Docling RAG with provenance, accepted; epic continues at 
 
 Native Docling structure now reaches chunking, metadata enrichment and the Qdrant payload behind
 `DOCLING_CHUNK_STRATEGY` (`legacy_markdown` | `docling_hierarchical` | `docling_hybrid`). On the
-corpus, native chunks carry a real heading path for 100% of children where the Markdown splitter
-carried one for 0%, and resolve 100% to Docling refs with page/bbox. **`docling_hybrid` is the
-selected candidate**; `legacy_markdown` remains the default everywhere except the dev compose, so
-production behaviour is unchanged until Stage E flips it with authorization. No reindex.
+corpus, native chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable
+cases, and carry a real heading path for 100% in five of them; `reading-order-pptx` is 0% because
+Docling emits no headings for that deck. Legacy carried a heading path for 0% everywhere.
+
+**No native strategy is the default and none was promoted.** Recall@K was miscomputed as
+`relevantInTopK / min(relevantTotal, k)` (a saturated top-k scored 1.00) and the regression gate
+compared only MRR. Corrected, `docling_hybrid` wins `sci-accuracy-drop` (legacy 0.000 →
+0.500/0.333/0.307, the only strategy that retrieves that table value) and regresses `sci-hypothesis`
+(Recall 0.625 → 0.444, nDCG 1.000 → 0.830); `docling_hierarchical` is strictly worse. So
+`legacy_markdown` stays default everywhere but dev compose, and the choice moves to the dense A/B.
 
 **The retrieval A/B is lexical only.** BM25 with the collection's own parameters, offline; there is
-no `JINA_API_KEY` here, so dense ranking was never exercised (`mc2-j1axa`). Do not quote the win as
-a full retrieval win.
+no `JINA_API_KEY` here, so dense ranking was never exercised. `mc2-j1axa` is now a HARD BLOCKER of
+Stage E `mc2-1sobq.5`: no native default ships without it.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
 `/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`, so chunks and the
@@ -25,13 +31,11 @@ accepted document are one document by construction. Unresolvable refs fail befor
 
 **Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
 `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:**
-`docling_jobkit._parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, so
-`do_pdf_heading_hierarchy` did nothing; and `docling_mcp.docling_cache.get_cache_key` hashes only
-the source string and OCR flags, so a profile change returned the previous artifact. Remove at
-`mc2-ibzcc`. **Both images were rebuilt locally, so their digests differ from production**;
-publishing and pinning new digests belongs to Stage E.
-
-Evidence: `.codex/stages/mc2-1sobq.1/summary.md` and `.codex/stages/mc2-1sobq.1/evidence/`.
+`docling_jobkit._parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and
+`docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags, so a profile change returned
+the previous artifact. Remove at `mc2-ibzcc`. **Both images were rebuilt locally, so their digests
+differ from production**; publishing and pinning belongs to Stage E. Evidence:
+`.codex/stages/mc2-1sobq.1/summary.md` and `.../evidence/`.
 
 ## Docling migration is live
 
@@ -61,8 +65,8 @@ source recovery each have an ordinary path, reached by NOT passing the Q12 flags
 **The 16 that remain are one family, and the diagnosis took three tries.** NOT scans, NO race:
 exported diagrams, one page, 4296pt tall, type converted to curves, so no text layer exists for any
 extractor. OCR loads its models and returns nothing even with `force_full_page_ocr` at 3x. Docling
-converts them to `<!-- image -->` and REPORTS SUCCESS. See `mc2-3gz2m`; both earlier explanations are
-marked wrong there rather than deleted.
+converts them to `<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`, where both earlier explanations
+are marked wrong rather than deleted).
 
 **The reindex is 218/234.** Measured after the repair: `VERIFY status=failed
 expected_documents=234 indexed_documents=218 expected_points=13650 indexed_points=13712 gaps=21
@@ -80,11 +84,10 @@ idempotent. Two flags are NOT optional here:
 The first because the operator pins `qdrant-reindex-disabled` while production workers consume
 `course-generation`; the second because the job payload carries a path resolved by the PRODUCER (see
 `.codex/repository-failure-modes.md`). Do not re-enqueue while a previous round still retries — the
-old jobs' failure path overwrites what the new round fixed.
-
-`reindex execute` cannot repair its own run: it skips whatever its ledger calls completed, a fresh
-run id is refused while the journal sits at `reindex_started`, and `plan` demands a `verified`
-journal. Rewriting the artifact by hand would falsify the audit record it exists to be.
+old jobs' failure path overwrites what the new round fixed. `reindex execute` cannot repair its own
+run: it skips whatever its ledger calls completed, a fresh run id is refused while the journal sits
+at `reindex_started`, and `plan` demands a `verified` journal. Rewriting the artifact by hand would
+falsify the audit record it exists to be.
 
 ## Backup guarantees
 
@@ -124,11 +127,6 @@ under `hold/qdrant-operator:pinned`, tagged BEFORE `docker image prune -f` (`mc2
 token is dead so a pruned digest cannot be re-pulled); and Prometheus retention is 30d/20GB in
 `prometheus.yml` with the CLI flags REMOVED, because a flag silently overrides the config file.
 
-**A deploy can ship an image that does not contain the commit.** `DEPLOY_API_CHANGED=false` keeps
-the CURRENT image even when a new one was built; after the rollback above, the next push did not
-restore the new code because its commit touched no api source. `workflow_dispatch` with
-`force_deploy=true` sets every `*_changed` and is the supported way out.
-
 ## How this repository fails, so you do not rediscover it
 
 **Moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU START.** It is the
@@ -158,8 +156,7 @@ hook, so stage explicit paths and never `git add -A`.
 
 - Off-host backup (`mc2-jz6y0.13.6`) — owner decided 2026-08-02 to stay local and give it its OWN
   DEDICATED SERVER later. Do NOT go shopping for an S3 bucket: the shape changed. Local snapshots
-  cover a dropped collection, a bad reindex or a corrupting upgrade — never losing the machine,
-  because they sit on the same disk as the data.
+  cover a dropped collection, a bad reindex or a corrupting upgrade — never losing the machine.
 - **`mc2-bygu1` — the uploads are the only irreplaceable thing on that host, and the smallest.**
   `file_catalog.storage_path` is a RELATIVE FILESYSTEM PATH, not a Supabase Storage key: 261 rows,
   128 distinct paths, none starting with `http`. 206MB / 117 files under
@@ -167,7 +164,8 @@ hook, so stage explicit paths and never `git add -A`.
   these, and six documents already lost their sources. The cheap mitigation needs no credentials.
 - `mc2-3gz2m` — the 16 remaining PDFs, ONE cause, stated above. Ignore any older note claiming two:
   neither "scans only OCR can read" nor "a finalize race" survived measurement. Reading them is
-  feature work (tile before OCR, or rasterise per region at high DPI), not a fix.
+  feature work (tile before OCR, or rasterise per region at high DPI), not a fix. `mc2-1sobq.4`
+  evaluates OCR candidates on fixed controls; it does not promise these 16 become readable.
 - `mc2-8m90f` — coverage ledger for the 6 unrecoverable sources. Precondition MEASURED as not yet
   fired: `document_evidence_runs`/`document_evidence_items` are empty. Ids are on the bead; the join
   column is `document_id`, NOT `file_catalog_id`.
@@ -182,15 +180,16 @@ hook, so stage explicit paths and never `git add -A`.
 ## Next recommended
 
 Next stage id: `mc2-1sobq.2` — selective Docling enrichments; `mc2-1sobq.3` is also unblocked.
+Stage E `mc2-1sobq.5` is blocked by `mc2-j1axa` (dense A/B) as well as by the implementation stages.
 Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for `mc2-1sobq.2` under `specs/024-docling-intelligence/`. Treat the Docling
 split stack as live and Stage A as accepted: chunking strategy and PDF heading inference are
-feature-flagged and off in production. Preserve the immutable production image references and the
-MCP 1.x rollback digest, do not publish new digests outside Stage E, and do not reindex existing
-documents without a separate task and authority.
+feature-flagged and off in production, and no native chunker is the default. Preserve the immutable
+production image references and the MCP 1.x rollback digest, publish no digests outside Stage E, and
+do not reindex existing documents without a separate task and authority.
 
 ## Read First
 

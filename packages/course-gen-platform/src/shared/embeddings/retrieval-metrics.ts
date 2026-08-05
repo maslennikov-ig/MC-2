@@ -9,6 +9,16 @@
  * query, and it cannot show what the dense half would do. Any report built on it
  * must say so.
  *
+ * Recall@K here is the textbook definition — retrieved relevant divided by ALL
+ * relevant chunks, never by `min(relevantTotal, k)`. Dividing by the capped
+ * count reports a full score whenever the top-k happens to be saturated, which
+ * turns "5 of 8 relevant chunks were retrieved" into 1.00 and hides the miss.
+ * The consequence is that Recall@K is NOT comparable across strategies that cut
+ * the same document into different numbers of chunks: a finer strategy raises
+ * `relevantTotal` and mechanically lowers its own ceiling. `recallCeilingAtK`
+ * reports that ceiling so a reader can see the effect instead of inferring it,
+ * and cross-strategy conclusions belong to the rank-based metrics.
+ *
  * @module shared/embeddings/retrieval-metrics
  */
 
@@ -38,7 +48,10 @@ export interface QuestionOutcome {
   firstRelevantRank: number | null;
   relevantInTopK: number;
   relevantTotal: number;
+  /** Retrieved relevant / ALL relevant. Bounded by `recallCeilingAtK`. */
   recallAtK: number;
+  /** `min(relevantTotal, k) / relevantTotal`: the best Recall@K reachable here. */
+  recallCeilingAtK: number;
   reciprocalRank: number;
   ndcgAtK: number;
   /** True when a retrieved top-k chunk also matched an expected ref. */
@@ -49,6 +62,8 @@ export interface RetrievalReport {
   k: number;
   questions: QuestionOutcome[];
   recallAtK: number;
+  /** Mean of the per-question ceilings; a Recall@K below it is a real miss. */
+  recallCeilingAtK: number;
   mrr: number;
   ndcgAtK: number;
   /** Questions whose evidence exists in no chunk at all. */
@@ -176,7 +191,8 @@ export function evaluateRetrieval(
       firstRelevantRank,
       relevantInTopK,
       relevantTotal,
-      recallAtK: relevantTotal > 0 ? relevantInTopK / Math.min(relevantTotal, k) : 0,
+      recallAtK: relevantTotal > 0 ? relevantInTopK / relevantTotal : 0,
+      recallCeilingAtK: relevantTotal > 0 ? Math.min(relevantTotal, k) / relevantTotal : 0,
       reciprocalRank: firstRelevantRank === null ? 0 : 1 / firstRelevantRank,
       ndcgAtK: ideal > 0 ? discounted / ideal : 0,
       refMatched,
@@ -190,6 +206,7 @@ export function evaluateRetrieval(
     k,
     questions: outcomes,
     recallAtK: mean(outcomes.map(outcome => outcome.recallAtK)),
+    recallCeilingAtK: mean(outcomes.map(outcome => outcome.recallCeilingAtK)),
     mrr: mean(outcomes.map(outcome => outcome.reciprocalRank)),
     ndcgAtK: mean(outcomes.map(outcome => outcome.ndcgAtK)),
     unreachableQuestions,

@@ -1,13 +1,15 @@
 {
   "schemaVersion": 2,
-  "label": "stageA-baseline",
+  "label": "stageA-corrected-heading-inference",
   "serverUrl": "http://127.0.0.1:8000/mcp",
   "serveUrl": "http://127.0.0.1:5001",
-  "conversionProfile": "baseline",
+  "conversionProfile": "pdf-heading-hierarchy",
   "strategies": ["legacy_markdown", "docling_hierarchical", "docling_hybrid"],
-  "candidate": "docling_hybrid",
+  "candidate": "none",
   "notes": [
-    "- reading-order-pptx · docling_hierarchical (не кандидат): регрессия MRR по pptx-steps"
+    "- scientific-pdf · docling_hierarchical (не кандидат): sci-hypothesis/recall@5 0.625→0.103; sci-hypothesis/ndcg@5 1.000→0.786",
+    "- scientific-pdf · docling_hybrid (не кандидат): sci-hypothesis/recall@5 0.625→0.138; sci-hypothesis/ndcg@5 1.000→0.854",
+    "- reading-order-pptx · docling_hierarchical (не кандидат): pptx-steps/mrr 1.000→0.333; pptx-steps/ndcg@5 1.000→0.500"
   ],
   "chunkingConfig": {
     "parent_chunk_size": 1500,
@@ -15,20 +17,20 @@
     "child_chunk_overlap": 50,
     "tiktoken_model": "gpt-3.5-turbo"
   },
-  "generatedAt": "2026-08-05T14:12:31.042Z",
+  "generatedAt": "2026-08-05T16:25:19.542Z",
   "runtime": {
     "serveContainer": "docling-mcp-docling-serve-1",
-    "serveMemory": "3.032GiB / 4GiB",
+    "serveMemory": "2.957GiB / 4GiB",
     "serveRestartCount": 0
   },
   "cases": [
     {
       "id": "scientific-pdf",
       "status": "passed",
-      "processingTimeMs": 227898,
+      "processingTimeMs": 414403,
       "fromCache": false,
-      "documentKey": "1dfba0cb623a1a767aa48748703aa400",
-      "markdownLength": 132019,
+      "documentKey": "3e973ca5508aa7178a07ff5678a7d3b6",
+      "markdownLength": 132021,
       "pages": 20,
       "textElements": 433,
       "pictures": 7,
@@ -51,9 +53,9 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[baseline]",
+          "name": "heading-hierarchy[pdf-heading-hierarchy]",
           "passed": true,
-          "details": "expected levels [2], found [2]"
+          "details": "2 distinct level(s) [2, 3], required 2"
         },
         {
           "name": "stable-normalized-json",
@@ -78,10 +80,6 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -95,7 +93,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 12187,
+          "durationMs": 11861,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -105,6 +103,7 @@
                 "relevantInTopK": 0,
                 "relevantTotal": 2,
                 "recallAtK": 0,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 0,
                 "ndcgAtK": 0,
                 "refMatched": null
@@ -114,13 +113,15 @@
                 "firstRelevantRank": 1,
                 "relevantInTopK": 5,
                 "relevantTotal": 8,
-                "recallAtK": 1,
+                "recallAtK": 0.625,
+                "recallCeilingAtK": 0.625,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
-            "recallAtK": 0.5,
+            "recallAtK": 0.3125,
+            "recallCeilingAtK": 0.8125,
             "mrr": 0.5,
             "ndcgAtK": 0.5,
             "unreachableQuestions": []
@@ -131,12 +132,12 @@
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
           "parentChunks": 31,
           "childChunks": 139,
-          "avgChildTokens": 197,
+          "avgChildTokens": 199,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2264,
+          "durationMs": 2269,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -146,6 +147,7 @@
                 "relevantInTopK": 0,
                 "relevantTotal": 2,
                 "recallAtK": 0,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 0,
                 "ndcgAtK": 0,
                 "refMatched": null
@@ -154,16 +156,18 @@
                 "id": "sci-hypothesis",
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
-                "relevantTotal": 9,
-                "recallAtK": 0.8,
+                "relevantTotal": 39,
+                "recallAtK": 0.10256410256410256,
+                "recallCeilingAtK": 0.1282051282051282,
                 "reciprocalRank": 1,
-                "ndcgAtK": 0.830419897363192,
+                "ndcgAtK": 0.7860137352654724,
                 "refMatched": null
               }
             ],
-            "recallAtK": 0.4,
+            "recallAtK": 0.05128205128205128,
+            "recallCeilingAtK": 0.5641025641025641,
             "mrr": 0.5,
-            "ndcgAtK": 0.415209948681596,
+            "ndcgAtK": 0.3930068676327362,
             "unreachableQuestions": []
           }
         },
@@ -172,12 +176,12 @@
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
           "parentChunks": 31,
           "childChunks": 106,
-          "avgChildTokens": 254,
+          "avgChildTokens": 256,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2191,
+          "durationMs": 6199,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -187,6 +191,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 2,
                 "recallAtK": 0.5,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 0.3333333333333333,
                 "ndcgAtK": 0.3065735963827292,
                 "refMatched": null
@@ -195,16 +200,18 @@
                 "id": "sci-hypothesis",
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
-                "relevantTotal": 9,
-                "recallAtK": 0.8,
+                "relevantTotal": 29,
+                "recallAtK": 0.13793103448275862,
+                "recallCeilingAtK": 0.1724137931034483,
                 "reciprocalRank": 1,
-                "ndcgAtK": 0.830419897363192,
+                "ndcgAtK": 0.8539316501572937,
                 "refMatched": null
               }
             ],
-            "recallAtK": 0.65,
+            "recallAtK": 0.31896551724137934,
+            "recallCeilingAtK": 0.5862068965517242,
             "mrr": 0.6666666666666666,
-            "ndcgAtK": 0.5684967468729606,
+            "ndcgAtK": 0.5802526232700114,
             "unreachableQuestions": []
           }
         }
@@ -213,10 +220,10 @@
     {
       "id": "numbered-sections-pdf",
       "status": "passed",
-      "processingTimeMs": 3825,
+      "processingTimeMs": 3792,
       "fromCache": false,
-      "documentKey": "2f1906cc3709e541335c51c7eefc2ef9",
-      "markdownLength": 558,
+      "documentKey": "f94e4f5688400789301351cec8a84d9f",
+      "markdownLength": 562,
       "pages": 1,
       "textElements": 16,
       "pictures": 0,
@@ -235,9 +242,9 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[baseline]",
+          "name": "heading-hierarchy[pdf-heading-hierarchy]",
           "passed": true,
-          "details": "expected levels [2], found [2]"
+          "details": "expected levels [2, 3], found [2, 3]"
         },
         {
           "name": "stable-normalized-json",
@@ -262,10 +269,6 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -279,7 +282,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 76,
+          "durationMs": 67,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -289,6 +292,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -299,12 +303,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -315,7 +321,7 @@
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
           "parentChunks": 7,
           "childChunks": 7,
-          "avgChildTokens": 30,
+          "avgChildTokens": 35,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
@@ -330,6 +336,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -340,12 +347,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -356,12 +365,12 @@
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
           "parentChunks": 7,
           "childChunks": 7,
-          "avgChildTokens": 30,
+          "avgChildTokens": 35,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2042,
+          "durationMs": 2041,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -371,6 +380,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -381,12 +391,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -397,9 +409,9 @@
     {
       "id": "hierarchy-docx",
       "status": "passed",
-      "processingTimeMs": 241,
+      "processingTimeMs": 188,
       "fromCache": false,
-      "documentKey": "53413724868f251a79ca9de59939255b",
+      "documentKey": "2e566e0096ab2c2454afeec50a9622dc",
       "markdownLength": 572,
       "pages": 1,
       "textElements": 15,
@@ -427,7 +439,7 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[baseline]",
+          "name": "heading-hierarchy[pdf-heading-hierarchy]",
           "passed": true,
           "details": "expected levels [2, 3, 4], found [2, 3, 4]"
         },
@@ -444,10 +456,6 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -461,7 +469,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 73,
+          "durationMs": 64,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -471,6 +479,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -481,6 +490,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -491,12 +501,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -505,57 +517,6 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "parentChunks": 7,
-          "childChunks": 7,
-          "avgChildTokens": 48,
-          "refCoverage": 1,
-          "locationCoverage": 0,
-          "locationEligible": false,
-          "headingPathCoverage": 1,
-          "durationMs": 2045,
-          "retrieval": {
-            "k": 5,
-            "questions": [
-              {
-                "id": "alpha-target",
-                "firstRelevantRank": 1,
-                "relevantInTopK": 1,
-                "relevantTotal": 1,
-                "recallAtK": 1,
-                "reciprocalRank": 1,
-                "ndcgAtK": 1,
-                "refMatched": null
-              },
-              {
-                "id": "beta-target",
-                "firstRelevantRank": 1,
-                "relevantInTopK": 1,
-                "relevantTotal": 1,
-                "recallAtK": 1,
-                "reciprocalRank": 1,
-                "ndcgAtK": 1,
-                "refMatched": null
-              },
-              {
-                "id": "beta-latency",
-                "firstRelevantRank": 1,
-                "relevantInTopK": 1,
-                "relevantTotal": 1,
-                "recallAtK": 1,
-                "reciprocalRank": 1,
-                "ndcgAtK": 1,
-                "refMatched": null
-              }
-            ],
-            "recallAtK": 1,
-            "mrr": 1,
-            "ndcgAtK": 1,
-            "unreachableQuestions": []
-          }
-        },
-        {
-          "strategy": "docling_hybrid",
-          "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
           "parentChunks": 7,
           "childChunks": 7,
           "avgChildTokens": 48,
@@ -573,6 +534,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -583,6 +545,7 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
@@ -593,12 +556,69 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          }
+        },
+        {
+          "strategy": "docling_hybrid",
+          "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "parentChunks": 7,
+          "childChunks": 7,
+          "avgChildTokens": 48,
+          "refCoverage": 1,
+          "locationCoverage": 0,
+          "locationEligible": false,
+          "headingPathCoverage": 1,
+          "durationMs": 2041,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -609,9 +629,9 @@
     {
       "id": "structured-docx",
       "status": "passed",
-      "processingTimeMs": 217,
+      "processingTimeMs": 221,
       "fromCache": false,
-      "documentKey": "76b4fe9bfd65196f7d8e51eb9c12e16b",
+      "documentKey": "683bdfc454a30fb504e37982e701e134",
       "markdownLength": 500,
       "pages": 1,
       "textElements": 8,
@@ -647,7 +667,7 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[baseline]",
+          "name": "heading-hierarchy[pdf-heading-hierarchy]",
           "passed": true,
           "details": "expected levels [2, 3], found [2, 3]"
         },
@@ -673,10 +693,6 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -690,7 +706,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 73,
+          "durationMs": 71,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -700,12 +716,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -721,7 +739,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2043,
+          "durationMs": 2044,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -731,12 +749,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -752,7 +772,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2040,
+          "durationMs": 2041,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -762,12 +782,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -778,9 +800,9 @@
     {
       "id": "reading-order-pptx",
       "status": "passed",
-      "processingTimeMs": 220,
+      "processingTimeMs": 170,
       "fromCache": false,
-      "documentKey": "150cf8b9af42400e97fcab3b6528a8cb",
+      "documentKey": "97c21626f8b2a72ece2dfdb7e1a6732d",
       "markdownLength": 373,
       "pages": 1,
       "textElements": 7,
@@ -836,10 +858,6 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -853,7 +871,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 69,
+          "durationMs": 64,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -863,12 +881,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -884,7 +904,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2042,
+          "durationMs": 2040,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -894,12 +914,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 0.3333333333333333,
                 "ndcgAtK": 0.5,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 0.3333333333333333,
             "ndcgAtK": 0.5,
             "unreachableQuestions": []
@@ -915,7 +937,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2043,
+          "durationMs": 2039,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -925,12 +947,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -941,9 +965,9 @@
     {
       "id": "russian-raster-ocr",
       "status": "passed",
-      "processingTimeMs": 8653,
+      "processingTimeMs": 8349,
       "fromCache": false,
-      "documentKey": "899019668071068e39a2715469d2787f",
+      "documentKey": "9d7a9efcfb52b8e4d4410c90cc6ccc53",
       "markdownLength": 294,
       "pages": 1,
       "textElements": 3,
@@ -993,10 +1017,6 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
-        },
-        {
-          "name": "no-retrieval-regression:docling_hybrid",
-          "passed": true
         }
       ],
       "strategies": [
@@ -1010,7 +1030,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 72,
+          "durationMs": 66,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1020,12 +1040,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -1041,7 +1063,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2041,
+          "durationMs": 2044,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1051,12 +1073,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -1072,7 +1096,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2042,
+          "durationMs": 2040,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1082,12 +1106,14 @@
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
                 "recallAtK": 1,
+                "recallCeilingAtK": 1,
                 "reciprocalRank": 1,
                 "ndcgAtK": 1,
                 "refMatched": null
               }
             ],
             "recallAtK": 1,
+            "recallCeilingAtK": 1,
             "mrr": 1,
             "ndcgAtK": 1,
             "unreachableQuestions": []
@@ -1098,9 +1124,9 @@
     {
       "id": "vector-outlines-negative",
       "status": "passed",
-      "processingTimeMs": 3179,
+      "processingTimeMs": 3150,
       "fromCache": false,
-      "documentKey": "765c2092270a308076d2850569cad2ed",
+      "documentKey": "ac26a955bfe7a9c07dfff9b9cd503987",
       "markdownLength": 7,
       "pages": 1,
       "textElements": 2,
@@ -1110,11 +1136,11 @@
         {
           "name": "EmptyConversionError",
           "passed": true,
-          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-corrected-heading-inference/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
         }
       ],
       "strategies": [],
-      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-corrected-heading-inference/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
     }
   ]
 }

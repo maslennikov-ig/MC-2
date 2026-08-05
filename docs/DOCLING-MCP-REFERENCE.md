@@ -146,7 +146,7 @@ docker compose -f packages/course-gen-platform/docker/docling-mcp/docker-compose
 DOCLING_SERVE_URL=http://127.0.0.1:5001 \
   pnpm --filter @megacampus/course-gen-platform exec tsx \
   scripts/docling-quality-benchmark.ts --label candidate \
-  --conversion-profile baseline --candidate docling_hybrid
+  --conversion-profile baseline --candidate none
 ```
 
 Benchmark outputs live under `.tmp/docling-benchmark/` and include Markdown,
@@ -156,20 +156,36 @@ infrastructure smoke is green.
 
 `--conversion-profile` selects which heading-hierarchy expectation applies and
 must match the MCP container's `DOCLING_MCP_PDF_HEADING_HIERARCHY`.
-`--candidate` names the strategy whose retrieval regressions BLOCK; the other
-strategies are still measured and reported as observations.
+`--candidate` names the strategy proposed as the default; its retrieval
+regressions BLOCK. Other strategies are still measured and reported as
+observations. `--candidate none` proposes nothing and blocks nothing — the
+honest setting while no strategy has earned the default, and not a way to
+silence a red gate for a strategy one still intends to ship.
 
 Heading assertions check the set of DISTINCT heading levels, not the deepest
 `#` count. The old `minimumHeadingDepth` rule let a document whose only headings
 were `##` prove a two-level hierarchy, and a scientific PDF passed the corpus on
 exactly that false positive.
 
+A control question regresses when Recall@5, MRR or nDCG@5 drops by more than
+0.01 against `legacy_markdown`. Guarding the reciprocal rank alone passed a
+strategy that kept the first hit first while losing the rest of the evidence.
+
+Recall@5 is `retrieved relevant / all relevant`, printed as `факт / потолок`
+next to the reachable ceiling `min(relevant, 5) / relevant`. It is NOT
+comparable across strategies: a finer strategy raises the relevant count and
+lowers its own ceiling. Cross-strategy conclusions belong to the rank metrics.
+
 Retrieval numbers are the lexical half of production retrieval: BM25 with the
 collection's own parameters, offline. Dense Jina v3 ranking is not exercised, so
 a win reported here is a lexical-reachability win, not a full retrieval win.
 
-The accepted Stage A candidates are
-`.tmp/docling-benchmark/stageA-baseline/report.md` and
-`.tmp/docling-benchmark/stageA-heading-inference/report.md`: 7/7 cases pass in
-both profiles. The corpus is a release gate, not authorization to enable the
-production flag.
+Accepted Stage A evidence lives in
+`.codex/stages/mc2-1sobq.1/evidence/stageA-corrected-*`: 7/7 cases in both
+conversion profiles, with `--candidate none`. **No native chunking strategy is
+the default.** `docling_hybrid` is the only strategy that retrieves the
+`sci-accuracy-drop` table value at all, and it also gives up a top-5 slot on
+`sci-hypothesis`, so it did not clear the no-regression bar;
+`stageA-rejected-hybrid-candidate-report.md` is that red run. The default moves
+only after the dense A/B (`mc2-j1axa`). The corpus is a release gate, not
+authorization to enable the production flag.
