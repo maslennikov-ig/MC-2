@@ -1,15 +1,17 @@
 {
   "schemaVersion": 2,
-  "label": "stageA-corrected-heading-inference",
+  "label": "stageA-final-baseline",
   "serverUrl": "http://127.0.0.1:8000/mcp",
   "serveUrl": "http://127.0.0.1:5001",
-  "conversionProfile": "pdf-heading-hierarchy",
+  "conversionProfile": "baseline",
   "strategies": ["legacy_markdown", "docling_hierarchical", "docling_hybrid"],
-  "candidate": "none",
+  "candidate": "docling_hybrid",
   "notes": [
-    "- scientific-pdf · docling_hierarchical (не кандидат): sci-hypothesis/recall@5 0.625→0.103; sci-hypothesis/ndcg@5 1.000→0.786",
-    "- scientific-pdf · docling_hybrid (не кандидат): sci-hypothesis/recall@5 0.625→0.138; sci-hypothesis/ndcg@5 1.000→0.854",
-    "- reading-order-pptx · docling_hierarchical (не кандидат): pptx-steps/mrr 1.000→0.333; pptx-steps/ndcg@5 1.000→0.500"
+    "- scientific-pdf · docling_hierarchical (не кандидат, lexical): sci-hypothesis/relevant-in-top-k 5→4; sci-hypothesis/ndcg@k 1.000→0.830",
+    "- scientific-pdf · docling_hybrid (кандидат, не блокирует, lexical): sci-hypothesis/relevant-in-top-k 5→4; sci-hypothesis/ndcg@k 1.000→0.830",
+    "- scientific-pdf · docling_hierarchical (не кандидат, dense): sci-hypothesis/relevant-in-top-k 5→4; sci-hypothesis/ndcg@k 1.000→0.869",
+    "- reading-order-pptx · docling_hierarchical (не кандидат, lexical): pptx-steps/mrr 1.000→0.333; pptx-steps/ndcg@k 1.000→0.500",
+    "- reading-order-pptx · docling_hierarchical (не кандидат, dense): pptx-steps/mrr 1.000→0.500; pptx-steps/ndcg@k 1.000→0.631"
   ],
   "chunkingConfig": {
     "parent_chunk_size": 1500,
@@ -17,20 +19,20 @@
     "child_chunk_overlap": 50,
     "tiktoken_model": "gpt-3.5-turbo"
   },
-  "generatedAt": "2026-08-05T16:25:19.542Z",
+  "generatedAt": "2026-08-05T18:43:38.371Z",
   "runtime": {
     "serveContainer": "docling-mcp-docling-serve-1",
-    "serveMemory": "2.957GiB / 4GiB",
+    "serveMemory": "2.298GiB / 4GiB",
     "serveRestartCount": 0
   },
   "cases": [
     {
       "id": "scientific-pdf",
       "status": "passed",
-      "processingTimeMs": 414403,
+      "processingTimeMs": 232548,
       "fromCache": false,
-      "documentKey": "3e973ca5508aa7178a07ff5678a7d3b6",
-      "markdownLength": 132021,
+      "documentKey": "d049222eee510fbe49c0a3eba077d889",
+      "markdownLength": 132019,
       "pages": 20,
       "textElements": 433,
       "pictures": 7,
@@ -53,9 +55,9 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[pdf-heading-hierarchy]",
+          "name": "heading-hierarchy[baseline]",
           "passed": true,
-          "details": "2 distinct level(s) [2, 3], required 2"
+          "details": "expected levels [2], found [2]"
         },
         {
           "name": "stable-normalized-json",
@@ -80,12 +82,49 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "firstRelevantRank": null,
+                "relevantInTopK": 0,
+                "relevantTotal": 2,
+                "recallAtK": 0,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 0,
+                "ndcgAtK": 0,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 5,
+                "relevantTotal": 8,
+                "recallAtK": 0.625,
+                "recallCeilingAtK": 0.625,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 0.3125,
+            "recallCeilingAtK": 0.8125,
+            "mrr": 0.5,
+            "ndcgAtK": 0.5,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 155,
           "childChunks": 155,
           "avgChildTokens": 169,
@@ -93,7 +132,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 11861,
+          "durationMs": 14690,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -130,14 +169,47 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "firstRelevantRank": null,
+                "relevantInTopK": 0,
+                "relevantTotal": 2,
+                "recallAtK": 0,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 0,
+                "ndcgAtK": 0,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 4,
+                "relevantTotal": 9,
+                "recallAtK": 0.4444444444444444,
+                "recallCeilingAtK": 0.5555555555555556,
+                "reciprocalRank": 1,
+                "ndcgAtK": 0.8687949224876582,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 0.2222222222222222,
+            "recallCeilingAtK": 0.7777777777777778,
+            "mrr": 0.5,
+            "ndcgAtK": 0.4343974612438291,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 31,
           "childChunks": 139,
-          "avgChildTokens": 199,
+          "avgChildTokens": 197,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2269,
+          "durationMs": 3800,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -156,32 +228,65 @@
                 "id": "sci-hypothesis",
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
-                "relevantTotal": 39,
-                "recallAtK": 0.10256410256410256,
-                "recallCeilingAtK": 0.1282051282051282,
+                "relevantTotal": 9,
+                "recallAtK": 0.4444444444444444,
+                "recallCeilingAtK": 0.5555555555555556,
                 "reciprocalRank": 1,
-                "ndcgAtK": 0.7860137352654724,
+                "ndcgAtK": 0.830419897363192,
                 "refMatched": null
               }
             ],
-            "recallAtK": 0.05128205128205128,
-            "recallCeilingAtK": 0.5641025641025641,
+            "recallAtK": 0.2222222222222222,
+            "recallCeilingAtK": 0.7777777777777778,
             "mrr": 0.5,
-            "ndcgAtK": 0.3930068676327362,
+            "ndcgAtK": 0.415209948681596,
             "unreachableQuestions": []
           }
         },
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "firstRelevantRank": 3,
+                "relevantInTopK": 1,
+                "relevantTotal": 2,
+                "recallAtK": 0.5,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 0.3333333333333333,
+                "ndcgAtK": 0.3065735963827292,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 5,
+                "relevantTotal": 9,
+                "recallAtK": 0.5555555555555556,
+                "recallCeilingAtK": 0.5555555555555556,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 0.5277777777777778,
+            "recallCeilingAtK": 0.7777777777777778,
+            "mrr": 0.6666666666666666,
+            "ndcgAtK": 0.6532867981913646,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 31,
           "childChunks": 106,
-          "avgChildTokens": 256,
+          "avgChildTokens": 254,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 6199,
+          "durationMs": 3636,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -200,18 +305,18 @@
                 "id": "sci-hypothesis",
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
-                "relevantTotal": 29,
-                "recallAtK": 0.13793103448275862,
-                "recallCeilingAtK": 0.1724137931034483,
+                "relevantTotal": 9,
+                "recallAtK": 0.4444444444444444,
+                "recallCeilingAtK": 0.5555555555555556,
                 "reciprocalRank": 1,
-                "ndcgAtK": 0.8539316501572937,
+                "ndcgAtK": 0.830419897363192,
                 "refMatched": null
               }
             ],
-            "recallAtK": 0.31896551724137934,
-            "recallCeilingAtK": 0.5862068965517242,
+            "recallAtK": 0.4722222222222222,
+            "recallCeilingAtK": 0.7777777777777778,
             "mrr": 0.6666666666666666,
-            "ndcgAtK": 0.5802526232700114,
+            "ndcgAtK": 0.5684967468729606,
             "unreachableQuestions": []
           }
         }
@@ -220,10 +325,10 @@
     {
       "id": "numbered-sections-pdf",
       "status": "passed",
-      "processingTimeMs": 3792,
+      "processingTimeMs": 1268,
       "fromCache": false,
-      "documentKey": "f94e4f5688400789301351cec8a84d9f",
-      "markdownLength": 562,
+      "documentKey": "ebbfe3d5cb93288fa559c4ed398dfce3",
+      "markdownLength": 558,
       "pages": 1,
       "textElements": 16,
       "pictures": 0,
@@ -242,9 +347,9 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[pdf-heading-hierarchy]",
+          "name": "heading-hierarchy[baseline]",
           "passed": true,
-          "details": "expected levels [2, 3], found [2, 3]"
+          "details": "expected levels [2], found [2]"
         },
         {
           "name": "stable-normalized-json",
@@ -269,12 +374,49 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 244,
@@ -282,7 +424,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 67,
+          "durationMs": 1429,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -319,14 +461,47 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 7,
           "childChunks": 7,
-          "avgChildTokens": 35,
+          "avgChildTokens": 30,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2043,
+          "durationMs": 3323,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -363,14 +538,47 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 7,
           "childChunks": 7,
-          "avgChildTokens": 35,
+          "avgChildTokens": 30,
           "refCoverage": 1,
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2041,
+          "durationMs": 3302,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -409,9 +617,9 @@
     {
       "id": "hierarchy-docx",
       "status": "passed",
-      "processingTimeMs": 188,
+      "processingTimeMs": 256,
       "fromCache": false,
-      "documentKey": "2e566e0096ab2c2454afeec50a9622dc",
+      "documentKey": "d55d3c4b45c9f7595fd54e5d7acf6d5b",
       "markdownLength": 572,
       "pages": 1,
       "textElements": 15,
@@ -439,7 +647,7 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[pdf-heading-hierarchy]",
+          "name": "heading-hierarchy[baseline]",
           "passed": true,
           "details": "expected levels [2, 3, 4], found [2, 3, 4]"
         },
@@ -456,12 +664,60 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 243,
@@ -469,7 +725,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 64,
+          "durationMs": 1458,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -517,6 +773,50 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 7,
           "childChunks": 7,
           "avgChildTokens": 48,
@@ -524,7 +824,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2044,
+          "durationMs": 3566,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -572,6 +872,50 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 7,
           "childChunks": 7,
           "avgChildTokens": 48,
@@ -579,7 +923,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2041,
+          "durationMs": 3469,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -629,9 +973,9 @@
     {
       "id": "structured-docx",
       "status": "passed",
-      "processingTimeMs": 221,
+      "processingTimeMs": 294,
       "fromCache": false,
-      "documentKey": "683bdfc454a30fb504e37982e701e134",
+      "documentKey": "c13c72b406ce0af466ae265122092e20",
       "markdownLength": 500,
       "pages": 1,
       "textElements": 8,
@@ -667,7 +1011,7 @@
           "passed": true
         },
         {
-          "name": "heading-hierarchy[pdf-heading-hierarchy]",
+          "name": "heading-hierarchy[baseline]",
           "passed": true,
           "details": "expected levels [2, 3], found [2, 3]"
         },
@@ -693,12 +1037,38 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 172,
@@ -706,7 +1076,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 71,
+          "durationMs": 1457,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -732,6 +1102,28 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 2,
           "childChunks": 2,
           "avgChildTokens": 90,
@@ -739,7 +1131,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2044,
+          "durationMs": 3453,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -765,6 +1157,28 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 2,
           "childChunks": 2,
           "avgChildTokens": 89,
@@ -772,7 +1186,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2041,
+          "durationMs": 3378,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -800,9 +1214,9 @@
     {
       "id": "reading-order-pptx",
       "status": "passed",
-      "processingTimeMs": 170,
+      "processingTimeMs": 231,
       "fromCache": false,
-      "documentKey": "97c21626f8b2a72ece2dfdb7e1a6732d",
+      "documentKey": "66fbe1dc622bbfbfda1f12e50bc2a9eb",
       "markdownLength": 373,
       "pages": 1,
       "textElements": 7,
@@ -858,12 +1272,38 @@
           "name": "provenance-refs:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 138,
@@ -871,7 +1311,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 64,
+          "durationMs": 1527,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -897,6 +1337,28 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "firstRelevantRank": 2,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 0.5,
+                "ndcgAtK": 0.6309297535714575,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 0.5,
+            "ndcgAtK": 0.6309297535714575,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 6,
           "avgChildTokens": 22,
@@ -904,7 +1366,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2040,
+          "durationMs": 3313,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -930,6 +1392,28 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 135,
@@ -937,7 +1421,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2039,
+          "durationMs": 3303,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -965,9 +1449,9 @@
     {
       "id": "russian-raster-ocr",
       "status": "passed",
-      "processingTimeMs": 8349,
+      "processingTimeMs": 8571,
       "fromCache": false,
-      "documentKey": "9d7a9efcfb52b8e4d4410c90cc6ccc53",
+      "documentKey": "e556f5e94281e294522d29c10dc3c413",
       "markdownLength": 294,
       "pages": 1,
       "textElements": 3,
@@ -1017,12 +1501,38 @@
           "name": "provenance-location:docling_hybrid",
           "passed": true,
           "details": "100.0% >= 95.0%"
+        },
+        {
+          "name": "no-dense-regression:docling_hybrid",
+          "passed": true
         }
       ],
       "strategies": [
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 172,
@@ -1030,7 +1540,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 66,
+          "durationMs": 1349,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1056,6 +1566,28 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 2,
           "avgChildTokens": 102,
@@ -1063,7 +1595,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2044,
+          "durationMs": 3441,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1089,6 +1621,28 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
           "avgChildTokens": 171,
@@ -1096,7 +1650,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2040,
+          "durationMs": 3359,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1124,9 +1678,9 @@
     {
       "id": "vector-outlines-negative",
       "status": "passed",
-      "processingTimeMs": 3150,
+      "processingTimeMs": 3245,
       "fromCache": false,
-      "documentKey": "ac26a955bfe7a9c07dfff9b9cd503987",
+      "documentKey": "fe42e742a9becfe195620e858e9dd651",
       "markdownLength": 7,
       "pages": 1,
       "textElements": 2,
@@ -1136,11 +1690,11 @@
         {
           "name": "EmptyConversionError",
           "passed": true,
-          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-corrected-heading-inference/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-final-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
         }
       ],
       "strategies": [],
-      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-corrected-heading-inference/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/stageA-final-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
     }
   ]
 }

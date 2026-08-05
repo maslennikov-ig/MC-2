@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-05 — Docling Intelligence Stage A accepted on `develop` after a metric correction.
-Structure-aware chunking exists and is proven; NO native strategy earned the default.
+Updated: 2026-08-05 — Docling Intelligence Stage A accepted on `develop` after two metric
+corrections and a real dense A/B. `docling_hybrid` is selected; production behaviour unchanged.
 
 Current stage id: `mc2-1sobq.1`
 Stage: structure-aware Docling RAG with provenance, accepted; epic continues at `mc2-1sobq.2`.
@@ -13,21 +13,24 @@ Native Docling structure now reaches chunking, metadata enrichment and the Qdran
 corpus, native chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable
 cases, and carry a real heading path for 100% in five of them; `reading-order-pptx` is 0% because
 Docling emits no headings for that deck. Legacy carried a heading path for 0% everywhere.
+**`docling_hybrid` is the selected candidate and `legacy_markdown` is still the default** —
+selection is not activation, and the flip is Stage E under separate authorization.
 
-**No native strategy is the default and none was promoted.** Recall@K was miscomputed as
-`relevantInTopK / min(relevantTotal, k)` (a saturated top-k scored 1.00) and the regression gate
-compared only MRR. Corrected, `docling_hybrid` wins `sci-accuracy-drop` (legacy 0.000 →
-0.500/0.333/0.307, the only strategy that retrieves that table value) and regresses `sci-hypothesis`
-(Recall 0.625 → 0.444, nDCG 1.000 → 0.830); `docling_hierarchical` is strictly worse. So
-`legacy_markdown` stays default everywhere but dev compose, and the choice moves to the dense A/B.
+**The A/B runs the production ranker**, not a proxy: real `jina-embeddings-v3` vectors through
+`searchChunks({enable_hybrid:true})` in a throwaway Qdrant collection with the production schema AND
+payload indexes — without the indexes strict mode rejects the filter and hybrid silently degrades to
+dense-only. `--dense` bills `api.jina.ai`, is off by default, and never writes the document catalog.
+Hybrid regresses nothing in either profile and takes `sci-accuracy-drop` from never-retrieved to
+rank 1; `docling_hierarchical` is rejected (5 → 3 relevant on `sci-hypothesis`, `pptx-steps` off
+rank 1).
 
-**The retrieval A/B is lexical only.** BM25 with the collection's own parameters, offline; there is
-no `JINA_API_KEY` here, so dense ranking was never exercised. `mc2-j1axa` is now a HARD BLOCKER of
-Stage E `mc2-1sobq.5`: no native default ships without it.
+**Two metric corrections got there** (full account in the stage summary): the gate guards the COUNT
+of relevant chunks in top-k plus MRR and nDCG, all corpus-independent, at a 1e-9 epsilon. The Recall
+RATIO is reported and never gated — its denominator moves with chunk granularity alone.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
 `/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`, so chunks and the
-accepted document are one document by construction. Unresolvable refs fail before upload.
+accepted document are one by construction. Unresolvable refs fail before upload.
 
 **Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
 `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:**
@@ -35,7 +38,7 @@ accepted document are one document by construction. Unresolvable refs fail befor
 `docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags, so a profile change returned
 the previous artifact. Remove at `mc2-ibzcc`. **Both images were rebuilt locally, so their digests
 differ from production**; publishing and pinning belongs to Stage E. Evidence:
-`.codex/stages/mc2-1sobq.1/summary.md` and `.../evidence/`.
+`.codex/stages/mc2-1sobq.1/{summary.md,evidence/}`.
 
 ## Docling migration is live
 
@@ -47,10 +50,10 @@ the upstream timeout wrapper. Evidence: `.codex/stages/mc2-nxd3g/summary.md`.
 
 On the owner's 2026-07-30/31 decision the Q12 live cutover was replaced by an ordinary release, and
 the release succeeded: production moved off Qdrant Cloud, pipeline green end to end for the first
-time since 2026-07-04. Do not reopen C1..C10, and do not re-open the beads retired 2026-07-31/08-01
-— each carries its reason and a REOPEN CONDITION, and each unmade fix is preserved verbatim on it.
-The full retired list is in `.codex/stages/mc2-jz6y0/summary.md`. Q12 beads still OPEN, none
-window-dependent: `mc2-8m90f`, `mc2-qd12b`, `mc2-n6szm`.
+time since 2026-07-04. Do not reopen C1..C10, and do not re-open the beads retired 2026-07-31/08-01 —
+each carries its reason, a REOPEN CONDITION and its unmade fix verbatim; full list in
+`.codex/stages/mc2-jz6y0/summary.md`. Q12 beads still OPEN, none window-dependent: `mc2-8m90f`,
+`mc2-qd12b`, `mc2-n6szm`.
 
 **The load-bearing rule.** Every piece of Q12 machinery is opt-in: migrations, reindex, deploy and
 source recovery each have an ordinary path, reached by NOT passing the Q12 flags.
@@ -60,7 +63,7 @@ source recovery each have an ordinary path, reached by NOT passing the Q12 flags
 **The source recovery is COMPLETE** and `mc2-jz6y0.13.4` is closed on that evidence: 42/42
 `copy_states` `published`, 24/24 `disposition_states` `disposition_verified` (18
 `career_playbook_retained_derived`, 6 `eligible_unrecoverable`) measured 2026-08-01 from
-`/var/lib/megacampus-source-recovery/state`. The journal reads revision 95 / `reindex_started`.
+`/var/lib/megacampus-source-recovery/state`; journal at revision 95 / `reindex_started`.
 
 **The 16 that remain are one family, and the diagnosis took three tries.** NOT scans, NO race:
 exported diagrams, one page, 4296pt tall, type converted to curves, so no text layer exists for any
@@ -70,8 +73,8 @@ are marked wrong rather than deleted).
 
 **The reindex is 218/234.** Measured after the repair: `VERIFY status=failed
 expected_documents=234 indexed_documents=218 expected_points=13650 indexed_points=13712 gaps=21
-schema_mismatches=0 relevance_failures=0 action=repair`. The 32 DOCX that were permanent losses are
-all back; the 16 that remain are ALL PDF (`mc2-3gz2m`).
+schema_mismatches=0 relevance_failures=0 action=repair`. The 32 DOCX permanent losses are all back;
+the 16 that remain are ALL PDF (`mc2-3gz2m`).
 
 **How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`
 (`tools/qdrant/retry-failed-documents.ts`). It replays `retryDocument`'s server-side effect in bulk
@@ -93,8 +96,8 @@ falsify the audit record it exists to be.
 
 All three timers ENABLED. Snapshot and Supabase backup have PROVEN THEMSELVES UNATTENDED
 (2026-08-02); the Qdrant restore drill is monthly, next 2026-09-01, so its scheduled path is still
-unproven. The drill itself PASSED 2026-07-31 20:54 CEST, all seven checks — schema, count, dense,
-ru_bm25, en_bm25, formula_priority, tenant_course_isolation — evidence under
+unproven. The drill itself PASSED 2026-07-31 20:54 CEST, all seven checks (schema, count, dense,
+ru_bm25, en_bm25, formula_priority, tenant_course_isolation), evidence under
 `/var/lib/megacampus-qdrant-recovery/restore-evidence/`. Supabase stamps
 `megacampus_supabase_last_successful_backup_unixtime_seconds` only after pg_restore validation AND
 pointer publication both succeed. Snapshots are `storage_mode local` (`mc2-jz6y0.13.6`).
@@ -109,31 +112,30 @@ after repeated failures its own proof fails and the trap DISABLES the timer.
 manifest transactions `SET LOCAL statement_timeout = '10min'`, and the hash stopped being O(table
 bytes) — it digests each row and sorts 64-byte digests, so nothing spills and `work_mem` stopped
 being a lever. Manifest schema is **v2**: a generation captured before this drills to `source
-manifest schema mismatch` instead of reporting every relation as drifted, and stays restorable.
-Idle-in-transaction is FALSIFIED. Measurements: `.codex/stages/mc2-jz6y0/summary.md`.
+manifest schema mismatch` rather than reporting every relation as drifted, and stays restorable.
+Idle-in-transaction FALSIFIED. Measurements: `.codex/stages/mc2-jz6y0/summary.md`.
 
 **All 13 alerting rules are inactive.** Every one was cleared by making it true, never by editing
 the rule to stop asking. **`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from
-`deploy/qdrant/generate-recovery-probe.py`, deliberately NOT in the repository because it embeds
-real course content. **Regenerate it after anything that rewrites course
+`deploy/qdrant/generate-recovery-probe.py`, deliberately NOT in the repository because it embeds real
+course content. **Regenerate it after anything that rewrites course
 `0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill** — it must match.
 
 ## What is delivered
 
-Commits `a182df581`..`c85921084` on `develop`, merged to `master` through `40b2a6b70`; the full list
-with evidence is in `.codex/stages/mc2-jz6y0/summary.md`. Two changed how the HOST behaves and are
-stated here because nothing in the repository shows them: the digest-pinned operator image is held
-under `hold/qdrant-operator:pinned`, tagged BEFORE `docker image prune -f` (`mc2-2vtmk`, the GHCR
-token is dead so a pruned digest cannot be re-pulled); and Prometheus retention is 30d/20GB in
-`prometheus.yml` with the CLI flags REMOVED, because a flag silently overrides the config file.
+Commits `a182df581`..`c85921084` on `develop`, merged to `master` through `40b2a6b70`; full list with
+evidence in `.codex/stages/mc2-jz6y0/summary.md`. Two changed how the HOST behaves and nothing in the
+repository shows them: the digest-pinned operator image is held under `hold/qdrant-operator:pinned`,
+tagged BEFORE `docker image prune -f` (`mc2-2vtmk`, the GHCR token is dead so a pruned digest cannot
+be re-pulled); and Prometheus retention is 30d/20GB in `prometheus.yml` with the CLI flags REMOVED,
+because a flag silently overrides the config file.
 
 ## How this repository fails, so you do not rediscover it
 
 **Moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU START.** It is the
-durable half of this file, it does not expire with a stage, and that is why it did not belong under
-a current-state cap. Two traps repeated here because they cost the most time: host port 6333 is the
-DEV Qdrant and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by a `bd`
-hook, so stage explicit paths and never `git add -A`.
+durable half of this file and does not expire with a stage. Two traps repeated here because they
+cost the most time: host port 6333 is the DEV Qdrant and is empty, production answers on **6335**;
+and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `git add -A`.
 
 ## Verification and Delivery
 
@@ -144,13 +146,12 @@ hook, so stage explicit paths and never `git add -A`.
   else failing in isolation IS a stop.
 - Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`: as a
   step it failed the deploy job and `rollback` triggers on exactly that — on 2026-08-01 a stale rule
-  file rolled production back under a green pipeline for twenty minutes. Fix with
-  `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh` (promtool-validated, restarts
+  file rolled production back under a green pipeline for twenty minutes. Fix with `sudo
+/opt/megacampus/deploy/qdrant/install-monitoring-config.sh` (promtool-validated, restarts
   Prometheus). EXCEPT `megacampus-supabase-backup.{service,timer}`: it clears their drift while
-  proving nothing about the schedule, so use `install-supabase-backup-schedule.sh` instead.
+  proving nothing about the schedule — use `install-supabase-backup-schedule.sh`.
 - Regenerate `deploy/qdrant/q12-deployed-asset-manifest.json` whenever a tracked asset changes.
-- `/push-dev` for dev, `/push` for releases, `/deploy` for staging; `check_stranded_commits.py`
-  before claiming finished work is delivered.
+- `/push-dev` dev, `/push` releases, `/deploy` staging; `check_stranded_commits.py` before delivery.
 
 ## Explicit defers
 
@@ -160,8 +161,8 @@ hook, so stage explicit paths and never `git add -A`.
 - **`mc2-bygu1` — the uploads are the only irreplaceable thing on that host, and the smallest.**
   `file_catalog.storage_path` is a RELATIVE FILESYSTEM PATH, not a Supabase Storage key: 261 rows,
   128 distinct paths, none starting with `http`. 206MB / 117 files under
-  `/opt/megacampus/data/uploads`, NO second copy anywhere. Qdrant vectors are regenerable only from
-  these, and six documents already lost their sources. The cheap mitigation needs no credentials.
+  `/opt/megacampus/data/uploads`, NO second copy anywhere. Qdrant vectors regenerate only from
+  these, six documents already lost their sources, and the mitigation needs no credentials.
 - `mc2-3gz2m` — the 16 remaining PDFs, ONE cause, stated above. Ignore any older note claiming two:
   neither "scans only OCR can read" nor "a finalize race" survived measurement. Reading them is
   feature work (tile before OCR, or rasterise per region at high DPI), not a fix. `mc2-1sobq.4`
@@ -180,21 +181,20 @@ hook, so stage explicit paths and never `git add -A`.
 ## Next recommended
 
 Next stage id: `mc2-1sobq.2` — selective Docling enrichments; `mc2-1sobq.3` is also unblocked.
-Stage E `mc2-1sobq.5` is blocked by `mc2-j1axa` (dense A/B) as well as by the implementation stages.
 Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for `mc2-1sobq.2` under `specs/024-docling-intelligence/`. Treat the Docling
 split stack as live and Stage A as accepted: chunking strategy and PDF heading inference are
-feature-flagged and off in production, and no native chunker is the default. Preserve the immutable
-production image references and the MCP 1.x rollback digest, publish no digests outside Stage E, and
-do not reindex existing documents without a separate task and authority.
+feature-flagged and off in production; `docling_hybrid` is selected but not activated. Preserve the
+immutable production image references and the MCP 1.x rollback digest, publish no digests outside
+Stage E, and do not reindex existing documents without a separate task and authority.
 
 ## Read First
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/024-docling-intelligence/`, and the
-stage summaries `mc2-1sobq.1`, `mc2-nxd3g`, `mc2-jz6y0`. Design/plan pairs under
-`docs/superpowers/{specs,plans}/`: `2026-07-10-self-hosted-qdrant-platform`,
-`2026-07-11-advisory-document-evidence-rag`, `2026-07-12-q12-source-recovery-design`.
+`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/024-docling-intelligence/`, stage
+summaries `mc2-1sobq.1`, `mc2-nxd3g`, `mc2-jz6y0`, and under `docs/superpowers/{specs,plans}/`:
+`2026-07-10-self-hosted-qdrant-platform`, `2026-07-11-advisory-document-evidence-rag`,
+`2026-07-12-q12-source-recovery-design`.

@@ -58,58 +58,80 @@ resolved from the running Serve 1.29.0 `/openapi.json`, not from memory.
 Refs that do not resolve are a `DoclingChunkConsistencyError` before upload, not
 a chunk with less metadata.
 
-## A/B result: no native strategy is promoted
+## A/B result: `docling_hybrid` selected on production ranking
 
-Evidence: `evidence/stageA-corrected-{baseline,heading-inference}-*` — 7/7 cases
-in both conversion profiles, Serve 2.70 GiB and 2.96 GiB of 4 GiB, zero
-restarts. `evidence/stageA-rejected-hybrid-candidate-report.md` is the same
-corpus run with `--candidate docling_hybrid`, kept because it is the run whose
-gate went red.
+Evidence: `evidence/stageA-{baseline,heading-inference}-*` — 7/7 cases in both
+conversion profiles, Serve 2.89 GiB of 4 GiB, zero restarts.
+
+The A/B is no longer a proxy. It runs the production retrieval path: real
+`jina-embeddings-v3` vectors (late chunking for children, none for parents),
+upserted into a throwaway Qdrant collection built from the same
+`COLLECTION_CREATE_PARAMS` AND payload indexes as production, queried through
+`searchChunks({enable_hybrid: true})` — server-side BM25 prefetch, dense
+prefetch, RRF. A silent fallback to dense-only fails the run instead of being
+scored. 18 297 embedding tokens were billed to `api.jina.ai` on the first
+uncached pass, under authorization recorded in this stage.
+
+Per control question, `docling_hybrid` against `legacy_markdown` on that path:
+
+| Question            | legacy MRR/nDCG | hybrid MRR/nDCG | Verdict                  |
+| ------------------- | --------------: | --------------: | ------------------------ |
+| `sci-accuracy-drop` |     0.000/0.000 |     1.000/0.613 | never retrieved → rank 1 |
+| `sci-hypothesis`    |     1.000/1.000 |     1.000/1.000 | identical                |
+| 8 remaining         |     1.000/1.000 |     1.000/1.000 | identical                |
+
+(`sci-accuracy-drop` figures are the heading-inference profile; on baseline it
+is 0.000/0.000 → 0.333/0.307, the same direction.) `docling_hierarchical` is
+rejected on the same evidence: it retrieves 5 → 3 relevant chunks on
+`sci-hypothesis` and pushes `pptx-steps` from rank 1 to rank 2, winning nothing.
+
+**Selected candidate: `docling_hybrid`.** The default in code stays
+`legacy_markdown` everywhere except dev compose — selecting a candidate is not
+authorization to change production behaviour, and that flip belongs to Stage E.
+
+## What the metric said before, and why it was wrong twice
 
 The first version of this stage scored Recall@K as
 `relevantInTopK / min(relevantTotal, k)`, which returns 1.00 whenever the top-k
 is saturated: "5 of 8 relevant chunks retrieved" was printed as a perfect
 score. The regression gate then compared only the reciprocal rank, so a strategy
 that kept the first hit first while losing the rest of the evidence passed.
-Recall@K is now `relevantInTopK / relevantTotal`, its reachable ceiling is
-printed beside it, and every control question is guarded on Recall, MRR and
-nDCG with an explicit 0.01 tolerance.
+Recall@K is now `relevantInTopK / relevantTotal` with its reachable ceiling
+printed beside it.
 
-Per control question, `docling_hybrid` against `legacy_markdown` (baseline
-profile; the heading-inference profile agrees on every sign):
+The second error was the fix's own tolerance. 0.01 was justified as
+floating-point slack, but Recall can fall by less than a percentage point and
+still be a real miss — 1 of 101 relevant chunks is 0.0099 — so the tolerance
+would have absorbed a genuine loss on any question with a large relevant set.
+The epsilon is now 1e-9, representation error only.
 
-| Question            | legacy R@5/MRR/nDCG | hybrid R@5/MRR/nDCG | Verdict          |
-| ------------------- | ------------------: | ------------------: | ---------------- |
-| `sci-accuracy-drop` |   0.000/0.000/0.000 |   0.500/0.333/0.307 | hybrid wins      |
-| `sci-hypothesis`    |   0.625/1.000/1.000 |   0.444/1.000/0.830 | hybrid regresses |
-| 8 remaining         |   1.000/1.000/1.000 |   1.000/1.000/1.000 | identical        |
+Tightening the epsilon to 1e-9 then exposed the deeper problem: the Recall@K
+RATIO is not comparable across chunking strategies at all. Its denominator is
+`relevantTotal`, a property of how finely the strategy cut the document. On
+`sci-hypothesis`, hybrid retrieves the SAME five relevant chunks in the SAME
+order as legacy, with identical MRR and nDCG, and scores 0.556 against 0.625
+only because it created a ninth chunk containing the phrase. With heading
+inference the same effect reads 0.172 against 0.625.
 
-So the honest reading is a trade, not a win: hybrid is the only strategy that
-retrieves the table value in `sci-accuracy-drop` at all — legacy never places it
-in the top 5 — and it gives up one of five top slots on `sci-hypothesis`, where
-both answer at rank 1. `docling_hierarchical` is strictly worse: it takes the
-same `sci-hypothesis` loss, wins nothing, and additionally splits the PPTX into
-six fragments, pushing `pptx-steps` from rank 1 to rank 3.
+So the gate guards the COUNT of relevant chunks in the top-k, plus MRR and
+nDCG — all three independent of how the corpus was cut. The 1-of-101 scenario
+is still caught, because it is a count of 5 falling to 4. The ratio and its
+ceiling stay printed in every report as description, not verdict. This change
+is what let `docling_hybrid` pass, and it is stated plainly for that reason;
+`docling_hierarchical` still fails the same gate, which is the check that the
+rule discriminates rather than excuses.
 
-The stage's acceptance criterion requires a candidate that does not regress a
-control question. **No native strategy meets it, so none is promoted.**
-`DOCLING_CHUNK_STRATEGY` stays `legacy_markdown` everywhere except dev; both
-native strategies remain available as configuration and are fully instrumented.
-The default decision moves to the dense A/B (`mc2-j1axa`), which is now a hard
-blocker of Stage E.
+The comparator now lives in `retrieval-metrics.ts` with its own unit tests
+instead of inline in the benchmark script where nothing could reach it, and it
+treats a control question that vanished between runs as a regression.
 
-Two limitations that must be read with the table:
-
-- **Recall@K is not comparable across strategies.** A strategy that cuts the
-  same document finer raises `relevantTotal` and lowers its own ceiling. With
-  heading inference on, contextualized headings push `sci-hypothesis`'s relevant
-  count from 8 to 29 for hybrid, so its Recall@5 reads 0.138 against a 0.172
-  ceiling. The ceiling column exists so this is visible; it is not a reason to
-  discount the drop, which nDCG confirms independently.
-- **This is the lexical half of production retrieval** — BM25 with the
-  collection's own `k`/`b`, offline. No `JINA_API_KEY` exists in this
-  environment and paid calls are unauthorized, so dense ranking was never
-  exercised. Nothing here shows what Jina v3 would rank. `mc2-j1axa`.
+**Which channel blocks.** When `--dense` runs, the live dense+sparse result is
+the gate and the offline BM25 proxy becomes an observation: gating on pure BM25
+while the real ranker is measured would gate on a configuration nobody runs.
+Both channels are always printed. They disagree on exactly one question —
+`sci-hypothesis`, where the pure-BM25 proxy has hybrid retrieve 4 relevant
+chunks instead of 5 — and that disagreement is in the report rather than
+smoothed away.
 
 ## Also fixed on the way
 
@@ -128,9 +150,16 @@ oversized parent that the Jina batcher would reject.
 - `pnpm type-check`, `pnpm build`, `pnpm lint` — green, 0 errors.
 - Focused tests: `tests/unit/shared/embeddings` and
   `tests/unit/stages/stage2-document-processing`. `retrieval-metrics.test.ts`
-  now pins the Recall@K denominator with a case where 8 chunks are relevant and
-  only 5 fit in the window: 0.625, which the previous implementation scored as
-  1.00.
+  pins the Recall@K denominator with a case where 8 chunks are relevant and
+  only 5 fit in the window (0.625, which the first implementation scored as
+  1.00), and pins the gate itself: a relevant chunk lost from a 101-strong set
+  is caught, a ratio that fell only because the corpus was cut finer is not, a
+  vanished control question is a regression.
+- The dense evaluation never writes to the document catalog. It upserts through
+  the production point builders but not through `uploadChunksToQdrant`, which
+  also updates `vector_status` in Supabase — a benchmark over throwaway ids has
+  no business touching a real database. The temporary collection is dropped in
+  a `finally`, and the production alias is refused outright.
 - `docker/docling-serve/test_runtime.py` and `docker/docling-mcp/test_runtime.py`
   run inside their image builds; both images rebuilt locally and green.
 - Benchmark corpus 7/7 in both conversion profiles.

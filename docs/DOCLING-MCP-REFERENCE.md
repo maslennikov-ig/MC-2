@@ -167,9 +167,43 @@ Heading assertions check the set of DISTINCT heading levels, not the deepest
 were `##` prove a two-level hierarchy, and a scientific PDF passed the corpus on
 exactly that false positive.
 
-A control question regresses when Recall@5, MRR or nDCG@5 drops by more than
-0.01 against `legacy_markdown`. Guarding the reciprocal rank alone passed a
-strategy that kept the first hit first while losing the rest of the evidence.
+`--dense` additionally runs the PRODUCTION retrieval path: real
+`jina-embeddings-v3` vectors (late chunking for children, none for parents) in a
+throwaway Qdrant collection built from `COLLECTION_CREATE_PARAMS` **and**
+`PAYLOAD_INDEXES`, queried through `searchChunks({enable_hybrid: true})`. Both
+are required — without the payload indexes, strict mode rejects the filtered
+query and hybrid search silently degrades to dense-only; the harness now fails
+instead of scoring that. It calls a paid API and needs `JINA_API_KEY`, so it is
+off by default. It never writes to the document catalog and always drops its
+collection.
+
+When `--dense` runs it is the BLOCKING channel and the offline BM25 proxy
+becomes an observation: gating on pure BM25 while the real ranker is measured
+would gate on a configuration nobody runs. Both are always printed, including
+where they disagree.
+
+A control question regresses on ANY drop in the COUNT of relevant chunks in the
+top-5, MRR or nDCG@5 against `legacy_markdown`; the 1e-9 epsilon covers float
+representation only and must not be widened into a "too small to matter"
+allowance — losing 1 of 101 relevant chunks is a real miss the old 0.01
+tolerance absorbed. A control question that disappears from a run is itself a
+regression. Guarding the reciprocal rank alone passed a strategy that kept the
+first hit first while losing the rest of the evidence. The comparator lives in
+`src/shared/embeddings/retrieval-metrics.ts` (`detectRetrievalRegressions`) and
+is unit-tested there, rather than inline in this script where nothing could
+reach it.
+
+The Recall@5 RATIO is deliberately NOT gated. Its denominator is the number of
+chunks that match the answer, which is a property of how finely a strategy cuts
+the document: on `sci-hypothesis` the hybrid chunker retrieves the same five
+relevant chunks in the same order as legacy and scores 0.556 against 0.625 only
+because it created a ninth matching chunk. The count is corpus-independent and
+catches every real loss.
+
+`--conversion-profile`, `--strategies` and `--candidate` are validated against
+their allowed sets and exit 2 on anything else. A typo used to be silent: a
+misspelled candidate matched no strategy, so the blocking assertion was never
+emitted and the run went green exactly as `--candidate none` does.
 
 Recall@5 is `retrieved relevant / all relevant`, printed as `факт / потолок`
 next to the reachable ceiling `min(relevant, 5) / relevant`. It is NOT
@@ -181,11 +215,14 @@ collection's own parameters, offline. Dense Jina v3 ranking is not exercised, so
 a win reported here is a lexical-reachability win, not a full retrieval win.
 
 Accepted Stage A evidence lives in
-`.codex/stages/mc2-1sobq.1/evidence/stageA-corrected-*`: 7/7 cases in both
-conversion profiles, with `--candidate none`. **No native chunking strategy is
-the default.** `docling_hybrid` is the only strategy that retrieves the
-`sci-accuracy-drop` table value at all, and it also gives up a top-5 slot on
-`sci-hypothesis`, so it did not clear the no-regression bar;
-`stageA-rejected-hybrid-candidate-report.md` is that red run. The default moves
-only after the dense A/B (`mc2-j1axa`). The corpus is a release gate, not
-authorization to enable the production flag.
+`.codex/stages/mc2-1sobq.1/evidence/stageA-{baseline,heading-inference}-*`: 7/7
+cases in both conversion profiles with `--candidate docling_hybrid --dense`.
+**`docling_hybrid` is the selected candidate**, chosen on the production ranking
+path: it regresses no control question and takes `sci-accuracy-drop` from
+never-retrieved to rank 1. `docling_hierarchical` is rejected on the same
+evidence and stays available only as configuration.
+
+Selection is not activation. `DOCLING_CHUNK_STRATEGY` still defaults to
+`legacy_markdown` everywhere except dev compose; flipping it is Stage E work
+under separate authorization. The corpus is a release gate, not authorization to
+enable the production flag.

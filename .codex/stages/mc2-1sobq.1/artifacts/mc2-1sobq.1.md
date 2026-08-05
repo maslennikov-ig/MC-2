@@ -40,7 +40,7 @@ write_zone:
   - docs/DOCLING-MCP-REFERENCE.md
 success_criteria:
   - distinct heading levels are asserted honestly and an all-H2 document no longer proves a hierarchy
-  - native Hierarchical/Hybrid chunking is A/B tested against legacy_markdown on the same corpus
+  - native Hierarchical/Hybrid chunking is A/B tested against legacy_markdown on the production dense+sparse ranking path
   - at least 95% of applicable child chunks carry self_refs and page/bbox provenance
   - parent/child, siblings, priority metadata and late chunking keep their contract
   - legacy_markdown rollback restores the current payload and no document is reindexed
@@ -83,13 +83,14 @@ verification:
   - pnpm lint: passed
   - pnpm --filter @megacampus/course-gen-platform exec vitest run tests/unit/shared/embeddings tests/unit/stages/stage2-document-processing tests/unit/shared/cleanup: passed
   - docker compose build docling-serve docling-mcp-internal (runs both test_runtime.py suites): passed
-  - tsx scripts/docling-quality-benchmark.ts --conversion-profile baseline: passed
-  - tsx scripts/docling-quality-benchmark.ts --conversion-profile pdf-heading-hierarchy: passed
+  - tsx scripts/docling-quality-benchmark.ts --conversion-profile baseline --candidate docling_hybrid --dense: passed
+  - tsx scripts/docling-quality-benchmark.ts --conversion-profile pdf-heading-hierarchy --candidate docling_hybrid --dense: passed
 changed_files:
   - packages/course-gen-platform/src/shared/embeddings/heading-hierarchy.ts
   - packages/course-gen-platform/src/shared/embeddings/native-chunk-adapter.ts
   - packages/course-gen-platform/src/shared/embeddings/chunking-strategy.ts
   - packages/course-gen-platform/src/shared/embeddings/retrieval-metrics.ts
+  - packages/course-gen-platform/src/shared/embeddings/dense-retrieval-eval.ts
   - packages/course-gen-platform/src/shared/embeddings/markdown-chunker.ts
   - packages/course-gen-platform/src/shared/embeddings/metadata-enricher.ts
   - packages/course-gen-platform/src/shared/embeddings/markdown-converter.ts
@@ -123,8 +124,7 @@ changed_files:
   - docs/DOCLING-MCP-REFERENCE.md
   - specs/024-docling-intelligence/
 explicit_defers:
-  - AC-2 is NOT met and its text is left unchanged - no native strategy passed the corrected no-regression gate, so none was promoted and the default stays legacy_markdown
-  - mc2-j1axa - dense retrieval A/B, because no JINA_API_KEY exists here and paid calls are unauthorized; now a hard blocker of Stage E mc2-1sobq.5
+  - production activation of docling_hybrid - the candidate is selected on evidence, the default in code stays legacy_markdown, and the flip belongs to Stage E under separate authorization
   - mc2-ibzcc - remove both runtime wrappers once upstream wires the dropped fields
 ---
 
@@ -138,14 +138,15 @@ heading path for 100% of child chunks in five of them — `reading-order-pptx` i
 0%, because Docling emits no headings for that deck at all. The legacy Markdown
 splitter carried a heading path for 0% everywhere.
 
-**No native strategy is promoted to default.** With Recall@K corrected to divide
-by all relevant chunks and the regression gate widened from MRR alone to
-Recall/MRR/nDCG, `docling_hybrid` both wins a control question legacy cannot
-answer (`sci-accuracy-drop` 0.000 → 0.500/0.333/0.307) and regresses another
-(`sci-hypothesis` Recall 0.625 → 0.444, nDCG 1.000 → 0.830). That fails the
-stage's no-regression criterion, so `legacy_markdown` stays the default and the
-choice moves to the dense A/B (`mc2-j1axa`), now a hard blocker of Stage E.
-Nothing was reindexed.
+**`docling_hybrid` is the selected candidate, chosen on production ranking.**
+The A/B now runs real `jina-embeddings-v3` vectors through the production
+hybrid search path in a throwaway Qdrant collection with the production schema
+and payload indexes. On that path hybrid regresses no control question in either
+conversion profile and takes `sci-accuracy-drop` from never-retrieved to rank 1;
+`docling_hierarchical` is rejected on the same evidence (5 → 3 relevant chunks
+on `sci-hypothesis`, `pptx-steps` from rank 1 to rank 2). The default in code
+stays `legacy_markdown`: selecting a candidate is not authorization to change
+production behaviour. Nothing was reindexed.
 
 # Scope / Routing
 
@@ -158,15 +159,14 @@ upstream gaps were confirmed in the installed sources before being named.
 # Verification
 
 Tracked evidence copies live in `.codex/stages/mc2-1sobq.1/evidence/`
-(`stageA-corrected-baseline-*`, `stageA-corrected-heading-inference-*`, and
-`stageA-rejected-hybrid-candidate-report.md`, the red run that rejected the
-candidate). The earlier `stageA-baseline-*` / `stageA-heading-inference-*` pair
-was deleted rather than kept: it was produced by the miscomputed Recall@K and
-the MRR-only gate, so reusing it would reintroduce the false result. The full
-per-strategy chunk dumps stay under `.tmp/docling-benchmark/`, untracked by
-repository convention. See `verification:` above. The benchmark ran in both
-conversion profiles and passed 7/7 in each; Serve peaked at 2.96 GiB of its
-4 GiB limit with zero restarts. Both Docker images were rebuilt locally and their `test_runtime.py`
+(`stageA-baseline-*` and `stageA-heading-inference-*`), each carrying both the
+lexical proxy and the live dense+sparse run. Every earlier evidence pair was
+deleted rather than kept: they were produced by a Recall@K that divided by the
+capped top-k and by a gate that compared only MRR, so reusing them would
+reintroduce a result now known to be false. The full per-strategy chunk dumps
+stay under `.tmp/docling-benchmark/`, untracked by repository convention. See
+`verification:` above. The benchmark ran in both conversion profiles and passed
+7/7 in each; Serve peaked at 2.89 GiB of its 4 GiB limit with zero restarts. Both Docker images were rebuilt locally and their `test_runtime.py`
 suites pass during the build, each asserting the upstream gap red before
 asserting the wrapper green.
 
@@ -179,16 +179,21 @@ container on `127.0.0.1:6343` stay up for the next stage.
 
 # Risks / Follow-ups / Explicit Defers
 
-- The retrieval A/B is lexical only; the dense half of production ranking was
-  not exercised. `mc2-j1axa` is therefore a hard blocker of Stage E: the native
-  chunking default cannot be chosen on this proxy alone.
-- `docling_hierarchical` is strictly worse than `docling_hybrid`: it takes the
-  same `sci-hypothesis` loss, wins nothing, and additionally pushes `pptx-steps`
-  from rank 1 to rank 3. Both stay available as configuration and every
-  regression is printed in the report rather than suppressed.
-- Recall@K is not comparable across strategies that cut a document differently.
-  The report prints the reachable ceiling next to it so the effect is visible;
-  candidate selection relies on the rank metrics and the regression gate.
+- The A/B measures retrieval quality on a seven-document controlled corpus with
+  ten control questions, not on production traffic. It exercises the real
+  ranker, not a real workload.
+- `docling_hierarchical` is strictly worse than `docling_hybrid` on both
+  channels: same `sci-hypothesis` loss, no win, and `pptx-steps` drops from
+  rank 1. Both stay available as configuration and every regression is printed
+  in the report rather than suppressed.
+- The Recall@K RATIO is not comparable across strategies that cut a document
+  differently, so the gate guards the COUNT of relevant chunks in the top-k
+  alongside MRR and nDCG. The ratio and its ceiling stay in the report as
+  description. This is the change that let the candidate pass, and
+  `docling_hierarchical` still fails the same gate.
+- Embedding costs were billed to `api.jina.ai` (18 297 tokens) under
+  authorization recorded for this stage. Re-runs may bill less because the
+  embedding cache is warm.
 - Rebuilding the Serve and MCP images changes their digests. The production
   compose still points at the recorded immutable digests, so Stage E owns
   publishing and pinning the new ones.

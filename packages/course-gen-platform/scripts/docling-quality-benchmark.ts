@@ -42,14 +42,23 @@ import {
   type HeadingHierarchyExpectation,
 } from '../src/shared/embeddings/heading-hierarchy.js';
 import { chunkWithStrategy } from '../src/shared/embeddings/chunking-strategy.js';
-import { DEFAULT_CHUNKING_CONFIG } from '../src/shared/embeddings/markdown-chunker.js';
 import {
+  DEFAULT_CHUNKING_CONFIG,
+  getAllChunks,
+} from '../src/shared/embeddings/markdown-chunker.js';
+import { enrichChunks } from '../src/shared/embeddings/metadata-enricher.js';
+import { evaluateDenseRetrieval } from '../src/shared/embeddings/dense-retrieval-eval.js';
+import {
+  detectRetrievalRegressions,
   evaluateRetrieval,
+  formatRetrievalRegression,
+  RETRIEVAL_REGRESSION_EPSILON,
   type GroundTruthQuestion,
   type RetrievalReport,
 } from '../src/shared/embeddings/retrieval-metrics.js';
 
-type ConversionProfile = 'baseline' | 'pdf-heading-hierarchy';
+const CONVERSION_PROFILES = ['baseline', 'pdf-heading-hierarchy'] as const;
+type ConversionProfile = (typeof CONVERSION_PROFILES)[number];
 
 interface BenchmarkCase {
   id: string;
@@ -72,6 +81,9 @@ interface Manifest {
 interface StrategyOutcome {
   strategy: DoclingChunkingStrategy;
   chunkingProfileId: string;
+  /** Live dense+sparse retrieval, only when --dense was requested. */
+  denseRetrieval?: RetrievalReport | null;
+  denseBilledTokens?: number;
   parentChunks: number;
   childChunks: number;
   avgChildTokens: number;
@@ -113,6 +125,27 @@ const ALL_STRATEGIES: DoclingChunkingStrategy[] = [
 function argument(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+/**
+ * Reads an enumerated flag, refusing anything outside the allowed set.
+ *
+ * Casting the raw string instead would make a typo silent and, for
+ * `--candidate`, dangerous: `docling_hybrd` matches no strategy, so the
+ * blocking no-regression assertion is never emitted and the run reports green
+ * exactly as `--candidate none` does — while the author believes a candidate
+ * was gated.
+ */
+function choice<T extends string>(name: string, allowed: readonly T[], fallback: T): T {
+  const raw = argument(name);
+  if (raw === undefined) return fallback;
+  const match = allowed.find(value => value === raw);
+  if (match === undefined) {
+    console.error(`${name}: неизвестное значение ${JSON.stringify(raw)}`);
+    console.error(`Допустимо: ${allowed.join(', ')}`);
+    process.exit(2);
+  }
+  return match;
 }
 
 function normalize(value: string): string {
@@ -178,7 +211,8 @@ async function runStrategy(
   bundle: DoclingConversionBundle,
   benchmarkCase: BenchmarkCase,
   chunker: DoclingServeChunker,
-  caseDirectory: string
+  caseDirectory: string,
+  dense: boolean
 ): Promise<StrategyOutcome> {
   const startedAt = Date.now();
   try {
@@ -211,9 +245,32 @@ async function runStrategy(
           result.child_chunks.length
         : 0;
 
+    let denseRetrieval: RetrievalReport | null = null;
+    let denseBilledTokens = 0;
+    if (dense && benchmarkCase.retrieval) {
+      const enriched = enrichChunks(getAllChunks(result), {
+        document_id: `bench-${benchmarkCase.id}`,
+        document_name: benchmarkCase.id,
+        organization_id: 'bench-org',
+        course_id: 'bench-course',
+        document_priority: 'CORE',
+        document_weight: 1,
+      });
+      const evaluation = await evaluateDenseRetrieval(enriched, benchmarkCase.retrieval, {
+        // Collection names must not collide across strategies or cases, and must
+        // never be the production alias; the module refuses that outright.
+        collectionName: `bench_${benchmarkCase.id}_${strategy}`.replace(/[^a-z0-9_]/giu, '_'),
+        k: 5,
+      });
+      denseRetrieval = evaluation.report;
+      denseBilledTokens = evaluation.billedTokens;
+    }
+
     return {
       strategy: result.strategy,
       chunkingProfileId: result.chunkingProfileId,
+      denseRetrieval,
+      denseBilledTokens,
       parentChunks: result.parent_chunks.length,
       childChunks: result.child_chunks.length,
       avgChildTokens: result.metadata.avg_child_tokens,
@@ -245,26 +302,6 @@ async function runStrategy(
 }
 
 /**
- * Numeric slack allowed before a per-question drop counts as a regression.
- *
- * Set to floating-point noise, not to a quality allowance: every metric here is
- * rank-derived, so the smallest real drop a question can suffer (first hit
- * falling from rank 1 to rank 2) is 0.5 for the reciprocal rank and ~0.37 for
- * nDCG@5. A tolerance of 0.01 therefore admits no genuine quality loss.
- */
-const RETRIEVAL_REGRESSION_TOLERANCE = 0.01;
-
-/** Every metric a control question is guarded on. */
-const RETRIEVAL_METRICS: Array<{
-  name: string;
-  read: (outcome: RetrievalReport['questions'][number]) => number;
-}> = [
-  { name: 'recall@5', read: outcome => outcome.recallAtK },
-  { name: 'mrr', read: outcome => outcome.reciprocalRank },
-  { name: 'ndcg@5', read: outcome => outcome.ndcgAtK },
-];
-
-/**
  * `--candidate none`: no strategy is proposed as the default.
  *
  * The no-regression gate then blocks nothing and every strategy is recorded as
@@ -273,6 +310,8 @@ const RETRIEVAL_METRICS: Array<{
  * intends to ship as the default.
  */
 type CandidateSelection = DoclingChunkingStrategy | 'none';
+
+const CANDIDATE_SELECTIONS: readonly CandidateSelection[] = [...ALL_STRATEGIES, 'none'];
 
 function strategyAssertions(
   benchmarkCase: BenchmarkCase,
@@ -320,32 +359,38 @@ function strategyAssertions(
   // because knowing that a non-selected strategy regresses is the evidence that
   // selected the candidate in the first place.
   const legacy = outcomes.find(outcome => outcome.strategy === 'legacy_markdown');
-  if (legacy?.retrieval) {
+  const channels: Array<{
+    label: string;
+    read: (outcome: StrategyOutcome) => RetrievalReport | null | undefined;
+  }> = [
+    { label: 'lexical', read: outcome => outcome.retrieval },
+    { label: 'dense', read: outcome => outcome.denseRetrieval },
+  ];
+
+  // When the live dense+sparse run is present it is the one that blocks: it IS
+  // production ranking. The offline BM25 proxy exists for when it is not, and
+  // it stays reported either way — but gating on pure BM25 while the real
+  // ranker is measured would gate on a configuration nobody runs.
+  const blockingChannel = outcomes.some(outcome => outcome.denseRetrieval) ? 'dense' : 'lexical';
+
+  for (const channel of channels) {
+    const before = legacy && channel.read(legacy);
+    if (!before) continue;
     for (const outcome of outcomes) {
-      if (outcome.strategy === 'legacy_markdown' || !outcome.retrieval) continue;
-      const regressed = outcome.retrieval.questions.flatMap(question => {
-        const before = legacy.retrieval!.questions.find(other => other.id === question.id);
-        if (!before) return [];
-        return RETRIEVAL_METRICS.flatMap(metric => {
-          const drop = metric.read(before) - metric.read(question);
-          return drop > RETRIEVAL_REGRESSION_TOLERANCE
-            ? [
-                `${question.id}/${metric.name} ${metric.read(before).toFixed(3)}→${metric
-                  .read(question)
-                  .toFixed(3)}`,
-              ]
-            : [];
-        });
-      });
-      if (outcome.strategy === candidate) {
+      if (outcome.strategy === 'legacy_markdown') continue;
+      const after = channel.read(outcome);
+      if (!after) continue;
+      const regressed = detectRetrievalRegressions(before, after).map(formatRetrievalRegression);
+      if (outcome.strategy === candidate && channel.label === blockingChannel) {
         assertions.push({
-          name: `no-retrieval-regression:${outcome.strategy}`,
+          name: `no-${channel.label}-regression:${outcome.strategy}`,
           passed: regressed.length === 0,
           details: regressed.length === 0 ? undefined : `regressed: ${regressed.join('; ')}`,
         });
       } else if (regressed.length > 0) {
+        const role = outcome.strategy === candidate ? 'кандидат, не блокирует' : 'не кандидат';
         notes.push(
-          `- ${benchmarkCase.id} · ${outcome.strategy} (не кандидат): ${regressed.join('; ')}`
+          `- ${benchmarkCase.id} · ${outcome.strategy} (${role}, ${channel.label}): ${regressed.join('; ')}`
         );
       }
     }
@@ -375,11 +420,31 @@ async function main(): Promise<void> {
   const serverUrl = argument('--url') ?? process.env.DOCLING_MCP_URL ?? 'http://127.0.0.1:8000/mcp';
   const serveUrl =
     argument('--serve-url') ?? process.env.DOCLING_SERVE_URL ?? 'http://127.0.0.1:5001';
-  const conversionProfile = (argument('--conversion-profile') ?? 'baseline') as ConversionProfile;
-  const strategies = (argument('--strategies')
+  const conversionProfile = choice<ConversionProfile>(
+    '--conversion-profile',
+    CONVERSION_PROFILES,
+    'baseline'
+  );
+  const requestedStrategies = argument('--strategies')
     ?.split(',')
-    .map(value => value.trim()) ?? ALL_STRATEGIES) as DoclingChunkingStrategy[];
-  const candidate = (argument('--candidate') ?? 'none') as CandidateSelection;
+    .map(value => value.trim())
+    .filter(value => value.length > 0);
+  const unknownStrategies = (requestedStrategies ?? []).filter(
+    value => !ALL_STRATEGIES.includes(value as DoclingChunkingStrategy)
+  );
+  if (unknownStrategies.length > 0) {
+    console.error(`--strategies: неизвестные значения ${unknownStrategies.join(', ')}`);
+    console.error(`Допустимо: ${ALL_STRATEGIES.join(', ')}`);
+    process.exit(2);
+  }
+  const strategies = (requestedStrategies ?? ALL_STRATEGIES) as DoclingChunkingStrategy[];
+  const candidate = choice<CandidateSelection>('--candidate', CANDIDATE_SELECTIONS, 'none');
+  // A candidate that is not measured cannot be gated, and reporting it as the
+  // proposed default would be a claim nothing checked.
+  if (candidate !== 'none' && !strategies.includes(candidate)) {
+    console.error(`--candidate ${candidate} отсутствует в --strategies ${strategies.join(',')}`);
+    process.exit(2);
+  }
   const notes: string[] = [];
   const cachePath = path.resolve(
     argument('--cache') ??
@@ -391,6 +456,13 @@ async function main(): Promise<void> {
   const baselineDirectory = argument('--baseline');
   const onlyCase = argument('--case');
   const nonBlocking = process.argv.includes('--non-blocking');
+  // Off by default: --dense embeds every chunk through the PAID Jina API and
+  // needs a reachable Qdrant. It must be an explicit, authorized choice.
+  const dense = process.argv.includes('--dense');
+  if (dense && !process.env.JINA_API_KEY) {
+    console.error('--dense требует JINA_API_KEY (реальные платные вызовы api.jina.ai)');
+    process.exit(2);
+  }
   const manifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 
   await fs.mkdir(outputDirectory, { recursive: true });
@@ -493,7 +565,7 @@ async function main(): Promise<void> {
 
         for (const strategy of strategies) {
           strategyOutcomes.push(
-            await runStrategy(strategy, bundle, benchmarkCase, chunker, caseDirectory)
+            await runStrategy(strategy, bundle, benchmarkCase, chunker, caseDirectory, dense)
           );
         }
         assertions.push(...strategyAssertions(benchmarkCase, strategyOutcomes, candidate, notes));
@@ -604,7 +676,10 @@ async function main(): Promise<void> {
     'собственный потолок, поэтому Recall@5 между стратегиями напрямую не сравним,',
     'и выбор кандидата опирается на ранговые метрики и на отсутствие регрессий.',
     '',
-    `Регрессией считается падение больше ${RETRIEVAL_REGRESSION_TOLERANCE} по любой из трёх метрик на любом контрольном вопросе.`,
+    `Регрессия — падение числа релевантных чанков в top-5, MRR или nDCG@5 на любом контрольном вопросе; допуск ${RETRIEVAL_REGRESSION_EPSILON} покрывает только погрешность представления чисел. Исчезнувший вопрос тоже регрессия. Отношение Recall@5 не входит в gate: его знаменатель зависит от того, насколько мелко стратегия режет документ, а не от качества выдачи.`,
+    dense
+      ? 'Блокирует dense+sparse канал (это и есть production-ранжирование); лексический прокси — наблюдение.'
+      : 'Блокирует лексический прокси: dense-прогон не запрашивался (`--dense`).',
     '',
     '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | R@5 факт/потолок | MRR | nDCG@5 | ms |',
     '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
@@ -625,6 +700,35 @@ async function main(): Promise<void> {
             )
         )
       : ['Нет.']),
+    ...(dense
+      ? [
+          '',
+          '## Dense+sparse retrieval (реальные jina-embeddings-v3)',
+          '',
+          'Тот же production-путь: late chunking для children, server-side BM25 + dense prefetch,',
+          'RRF, поиск через `searchChunks({enable_hybrid:true})` во временной коллекции с',
+          `production-схемой (включая payload-индексы: без них strict mode отклоняет фильтр и hybrid молча падает в dense-only). Оплачено токенов в этом прогоне: ${results.reduce(
+            (sum, result) =>
+              sum +
+              result.strategies.reduce(
+                (inner, outcome) => inner + (outcome.denseBilledTokens ?? 0),
+                0
+              ),
+            0
+          )}.`,
+          '',
+          '| Case | Strategy | R@5 факт/потолок | MRR | nDCG@5 |',
+          '|---|---|---:|---:|---:|',
+          ...results.flatMap(result =>
+            result.strategies
+              .filter(outcome => outcome.denseRetrieval)
+              .map(
+                outcome =>
+                  `| ${result.id} | ${outcome.strategy} | ${outcome.denseRetrieval!.recallAtK.toFixed(2)} / ${outcome.denseRetrieval!.recallCeilingAtK.toFixed(2)} | ${outcome.denseRetrieval!.mrr.toFixed(2)} | ${outcome.denseRetrieval!.ndcgAtK.toFixed(2)} |`
+              )
+          ),
+        ]
+      : []),
     ...(notes.length > 0 ? ['', '## Наблюдения по не-кандидатам', '', ...notes] : []),
     ...(comparison.length > 0 ? ['', '## Было → стало', '', ...comparison] : []),
     '',
@@ -638,3 +742,6 @@ async function main(): Promise<void> {
 }
 
 await main();
+// Redis and the MCP transport keep the event loop alive after the report is
+// written, so an ordinary return would hang the run instead of ending it.
+process.exit(process.exitCode ?? 0);

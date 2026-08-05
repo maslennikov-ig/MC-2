@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  detectRetrievalRegressions,
   evaluateRetrieval,
+  formatRetrievalRegression,
+  RETRIEVAL_REGRESSION_EPSILON,
   tokenize,
   type GroundTruthQuestion,
+  type QuestionOutcome,
+  type RetrievalReport,
   type ScorableChunk,
 } from '../../../../src/shared/embeddings/retrieval-metrics.js';
 
@@ -136,5 +141,128 @@ describe('evaluateRetrieval', () => {
       5
     );
     expect(report.questions[0].refMatched).toBe(true);
+  });
+});
+
+function outcome(id: string, overrides: Partial<QuestionOutcome> = {}): QuestionOutcome {
+  return {
+    id,
+    firstRelevantRank: 1,
+    relevantInTopK: 1,
+    relevantTotal: 1,
+    recallAtK: 1,
+    recallCeilingAtK: 1,
+    reciprocalRank: 1,
+    ndcgAtK: 1,
+    refMatched: null,
+    ...overrides,
+  };
+}
+
+function report(questions: QuestionOutcome[]): RetrievalReport {
+  const mean = (read: (item: QuestionOutcome) => number): number =>
+    questions.length > 0
+      ? questions.reduce((sum, item) => sum + read(item), 0) / questions.length
+      : 0;
+  return {
+    k: 5,
+    questions,
+    recallAtK: mean(item => item.recallAtK),
+    recallCeilingAtK: mean(item => item.recallCeilingAtK),
+    mrr: mean(item => item.reciprocalRank),
+    ndcgAtK: mean(item => item.ndcgAtK),
+    unreachableQuestions: [],
+  };
+}
+
+describe('detectRetrievalRegressions', () => {
+  it('catches a relevant chunk lost from the window, however small the ratio move', () => {
+    // The scenario a 0.01 tolerance would have absorbed: with 101 relevant
+    // chunks, dropping one out of the top-5 moves Recall@5 by 0.0099. The gate
+    // guards the COUNT, so the size of the ratio move is irrelevant.
+    const before = report([
+      outcome('q', { relevantTotal: 101, relevantInTopK: 5, recallAtK: 5 / 101 }),
+    ]);
+    const after = report([
+      outcome('q', { relevantTotal: 101, relevantInTopK: 4, recallAtK: 4 / 101 }),
+    ]);
+
+    const regressions = detectRetrievalRegressions(before, after);
+    expect(regressions).toHaveLength(1);
+    expect(regressions[0]).toMatchObject({ questionId: 'q', metric: 'relevant-in-top-k' });
+    expect(before.questions[0].recallAtK - after.questions[0].recallAtK).toBeLessThan(0.01);
+  });
+
+  it('does not report a Recall ratio that fell only because the corpus was cut finer', () => {
+    // Measured on `sci-hypothesis`: the same five relevant chunks are retrieved
+    // in the same order, but the finer strategy created a ninth chunk matching
+    // the phrase, so the ratio reads 0.556 against 0.625. Nothing about the
+    // answer the user receives got worse, and MRR and nDCG confirm it.
+    const before = report([
+      outcome('q', { relevantTotal: 8, relevantInTopK: 5, recallAtK: 5 / 8 }),
+    ]);
+    const after = report([outcome('q', { relevantTotal: 9, relevantInTopK: 5, recallAtK: 5 / 9 })]);
+
+    expect(detectRetrievalRegressions(before, after)).toEqual([]);
+    expect(after.questions[0].recallAtK).toBeLessThan(before.questions[0].recallAtK);
+  });
+
+  it('reports nothing when the two runs are identical', () => {
+    const questions = [outcome('a'), outcome('b', { recallAtK: 0.5, ndcgAtK: 0.4 })];
+    expect(detectRetrievalRegressions(report(questions), report(questions))).toEqual([]);
+  });
+
+  it('absorbs representation noise but nothing larger', () => {
+    const before = report([outcome('q', { ndcgAtK: 1 / 3 })]);
+    const noise = report([outcome('q', { ndcgAtK: 1 / 3 - RETRIEVAL_REGRESSION_EPSILON / 2 })]);
+    const real = report([outcome('q', { ndcgAtK: 1 / 3 - RETRIEVAL_REGRESSION_EPSILON * 100 })]);
+
+    expect(detectRetrievalRegressions(before, noise)).toEqual([]);
+    expect(detectRetrievalRegressions(before, real)).toHaveLength(1);
+  });
+
+  it('guards each of the three metrics independently', () => {
+    const before = report([
+      outcome('found', { relevantTotal: 4, relevantInTopK: 4 }),
+      outcome('rank'),
+      outcome('gain'),
+    ]);
+    const after = report([
+      outcome('found', { relevantTotal: 4, relevantInTopK: 2 }),
+      outcome('rank', { reciprocalRank: 0.5 }),
+      outcome('gain', { ndcgAtK: 0.5 }),
+    ]);
+
+    expect(detectRetrievalRegressions(before, after).map(item => item.metric)).toEqual([
+      'relevant-in-top-k',
+      'mrr',
+      'ndcg@k',
+    ]);
+  });
+
+  it('treats a control question that vanished as a regression', () => {
+    // A shrinking control set must never read as a clean run.
+    const regressions = detectRetrievalRegressions(
+      report([outcome('kept'), outcome('dropped')]),
+      report([outcome('kept')])
+    );
+    expect(regressions).toEqual([
+      { questionId: 'dropped', metric: 'question-missing', before: 1, after: 0 },
+    ]);
+    expect(formatRetrievalRegression(regressions[0])).toContain('dropped');
+  });
+
+  it('does not report an improvement', () => {
+    const before = report([
+      outcome('q', { relevantInTopK: 0, reciprocalRank: 0.25, ndcgAtK: 0.3 }),
+    ]);
+    const after = report([outcome('q')]);
+    expect(detectRetrievalRegressions(before, after)).toEqual([]);
+  });
+
+  it('formats a drop with both values so the report is checkable', () => {
+    expect(
+      formatRetrievalRegression({ questionId: 'q', metric: 'ndcg@k', before: 1, after: 0.83 })
+    ).toBe('q/ndcg@k 1.000→0.830');
   });
 });
