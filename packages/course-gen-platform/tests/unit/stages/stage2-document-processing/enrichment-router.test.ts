@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  applyEnrichment,
   CHART_CLASSIFICATION_MIN_CONFIDENCE,
   decideEnrichments,
+  DoclingServeEnricher,
+  enrichmentEnabled,
   mergeEnrichment,
   needsClassificationPass,
   REJECTED_CAPABILITIES,
@@ -320,5 +323,128 @@ describe('resolveConversionProfile with enrichment', () => {
     expect(withHeadings).not.toBe(
       resolveConversionProfile({} as NodeJS.ProcessEnv, { capabilities: ['code'] })
     );
+  });
+});
+
+describe('applyEnrichment', () => {
+  const file = { name: 'f.pdf', bytes: new Uint8Array([1]) };
+  const accepted = document({
+    texts: [text({ id: '#/texts/0', type: 'code', code_language: 'unknown', text: 'def f():' })],
+    pictures: [picture({ id: '#/pictures/0' })],
+  });
+
+  function enricher(behaviour: Record<string, unknown>) {
+    return { run: vi.fn(behaviour.run as never) } as unknown as DoclingServeEnricher;
+  }
+
+  it('classifies first, then asks the advanced service only for what is justified', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({
+        document: document({
+          pictures: [
+            picture({
+              id: '#/pictures/0',
+              enrichment: { classification: { class_name: 'bar_chart', confidence: 0.99 } },
+            }),
+          ],
+        }),
+        capabilities: ['picture_classification'],
+        durationMs: 1,
+        profile: 'baseline',
+      })
+      .mockResolvedValueOnce({
+        document: document({
+          texts: [text({ id: '#/texts/0', type: 'code', code_language: 'Python' })],
+          pictures: [
+            picture({ id: '#/pictures/0', enrichment: { chart: { rows: [['Альфа', '12']] } } }),
+          ],
+        }),
+        capabilities: ['chart', 'code'],
+        durationMs: 2,
+        profile: 'advanced',
+      });
+
+    const result = await applyEnrichment(accepted, file, enricher({ run }), {
+      documentKey: 'doc',
+    });
+
+    expect(run.mock.calls[0][1]).toEqual(['picture_classification']);
+    expect(run.mock.calls[0][2]).toBe('baseline');
+    expect(run.mock.calls[1][1].sort()).toEqual(['chart', 'code']);
+    expect(run.mock.calls[1][2]).toBe('advanced');
+    expect(result.document.texts[0].code_language).toBe('Python');
+    expect(result.failure).toBeUndefined();
+  });
+
+  it('returns the accepted document untouched when the advanced pass fails', async () => {
+    // An enrichment is an addition to an artifact the pipeline already
+    // committed to. Losing it must cost metadata, never the conversion.
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({
+        document: document({
+          pictures: [
+            picture({
+              id: '#/pictures/0',
+              enrichment: { classification: { class_name: 'bar_chart', confidence: 0.99 } },
+            }),
+          ],
+        }),
+        capabilities: ['picture_classification'],
+        durationMs: 1,
+        profile: 'baseline',
+      })
+      .mockRejectedValueOnce(new Error('advanced profile lacks a model'));
+
+    const result = await applyEnrichment(accepted, file, enricher({ run }), {
+      documentKey: 'doc',
+    });
+
+    expect(result.failure).toMatchObject({ stage: 'advanced' });
+    expect(result.document.texts[0].code_language).toBe('unknown');
+    expect(result.document.texts[0].text).toBe('def f():');
+  });
+
+  it('skips the expensive pass entirely when classification fails', async () => {
+    const run = vi.fn().mockRejectedValueOnce(new Error('serve down'));
+    const result = await applyEnrichment(accepted, file, enricher({ run }), {
+      documentKey: 'doc',
+    });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.failure).toMatchObject({ stage: 'classification' });
+    expect(result.document).toBe(accepted);
+  });
+
+  it('calls nothing when the document asks for nothing', async () => {
+    const run = vi.fn();
+    const settled = document({
+      texts: [text({ id: '#/texts/0', type: 'code', code_language: 'Python' })],
+      pictures: [
+        picture({
+          id: '#/pictures/0',
+          enrichment: {
+            classification: { class_name: 'photograph', confidence: 0.9 },
+          },
+        }),
+      ],
+    });
+
+    const result = await applyEnrichment(settled, file, enricher({ run }), { documentKey: 'doc' });
+    expect(run).not.toHaveBeenCalled();
+    expect(result.applied).toEqual([]);
+  });
+});
+
+describe('enrichmentEnabled', () => {
+  it('is off unless explicitly turned on', () => {
+    expect(enrichmentEnabled({} as NodeJS.ProcessEnv)).toBe(false);
+    expect(
+      enrichmentEnabled({ DOCLING_ENRICHMENT_ENABLED: 'false' } as unknown as NodeJS.ProcessEnv)
+    ).toBe(false);
+    expect(
+      enrichmentEnabled({ DOCLING_ENRICHMENT_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)
+    ).toBe(true);
   });
 });

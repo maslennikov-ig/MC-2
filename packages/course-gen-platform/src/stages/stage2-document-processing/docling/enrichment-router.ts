@@ -336,6 +336,111 @@ export function mergeEnrichment(
   return { document: { ...accepted, pictures, texts }, matched, unmatched };
 }
 
+/** Off unless explicitly enabled: this changes what documents cost. */
+export function enrichmentEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.DOCLING_ENRICHMENT_ENABLED === 'true';
+}
+
+export interface AppliedEnrichmentResult {
+  /** The accepted document, with enrichment merged in when any ran. */
+  document: DoclingDocument;
+  /** Capabilities whose output actually reached the document. */
+  applied: EnrichmentCapability[];
+  decision: EnrichmentDecision;
+  /** Set when a pass failed; the document is still the accepted one. */
+  failure?: { stage: 'classification' | 'advanced'; message: string };
+  durationMs: number;
+}
+
+/**
+ * The whole routing decision, end to end, for one accepted document.
+ *
+ * Every failure path returns the ACCEPTED document unchanged. An enrichment is
+ * an addition to an artifact the pipeline already committed to, so losing it
+ * costs metadata and never costs the conversion (FR-015). The caller sees the
+ * failure in `failure` and in the log, and keeps going.
+ */
+export async function applyEnrichment(
+  accepted: DoclingDocument,
+  file: { name: string; bytes: Uint8Array },
+  enricher: DoclingServeEnricher,
+  context: { documentKey: string }
+): Promise<AppliedEnrichmentResult> {
+  const startedAt = Date.now();
+  let document = accepted;
+  const applied: EnrichmentCapability[] = [];
+
+  // Tier 2: the cheap classification pass, on the BASELINE service. Its model
+  // ships in that image, so this costs seconds and is what makes the expensive
+  // decision informed instead of a guess.
+  if (needsClassificationPass(document)) {
+    try {
+      const pass = await enricher.run(file, ['picture_classification'], 'baseline');
+      const merged = mergeEnrichment(document, pass.document);
+      document = merged.document;
+      applied.push('picture_classification');
+      logger.debug(
+        { documentKey: context.documentKey, matched: merged.matched, ms: pass.durationMs },
+        'Docling picture classification pass completed'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        { documentKey: context.documentKey, err: message },
+        'Docling classification pass failed; keeping the accepted document and skipping the advanced pass'
+      );
+      return {
+        document: accepted,
+        applied: [],
+        decision: decideEnrichments(accepted),
+        failure: { stage: 'classification', message },
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }
+
+  // Tier 3: the advanced service, only for what a concrete item asked for.
+  const decision = decideEnrichments(document);
+  logEnrichmentDecision(decision, context);
+  if (decision.requested.length === 0) {
+    return { document, applied, decision, durationMs: Date.now() - startedAt };
+  }
+
+  try {
+    const pass = await enricher.run(file, decision.requested, 'advanced');
+    const merged = mergeEnrichment(document, pass.document);
+    logger.info(
+      {
+        documentKey: context.documentKey,
+        capabilities: decision.requested,
+        matched: merged.matched,
+        unmatched: merged.unmatched,
+        ms: pass.durationMs,
+      },
+      'Docling advanced enrichment pass completed'
+    );
+    return {
+      document: merged.document,
+      applied: [...applied, ...decision.requested],
+      decision,
+      durationMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(
+      { documentKey: context.documentKey, capabilities: decision.requested, err: message },
+      'Docling advanced enrichment failed; keeping the accepted document'
+    );
+    return {
+      document,
+      applied,
+      decision,
+      failure: { stage: 'advanced', message },
+      durationMs: Date.now() - startedAt,
+    };
+  }
+}
+
 /** Logs a decision so the cost of a document is explainable after the fact. */
 export function logEnrichmentDecision(
   decision: EnrichmentDecision,
