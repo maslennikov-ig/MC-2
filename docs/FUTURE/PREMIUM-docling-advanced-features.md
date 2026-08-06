@@ -1,5 +1,25 @@
 # PREMIUM Tier: Advanced Docling Features
 
+> **SUPERSEDED on 2026-08-06 by `specs/024-docling-intelligence/` (epic `mc2-1sobq`).**
+> Kept for the investigation history behind it; do not plan from it.
+>
+> What actually shipped, and where it differs:
+>
+> - **Structure-aware chunking** is delivered (Stage A, `mc2-1sobq.1`), not as
+>   "advanced parsing" but as native Docling chunking behind
+>   `DOCLING_CHUNK_STRATEGY`, with `docling_hybrid` selected on a dense
+>   retrieval A/B and still not activated in production.
+> - **Semantic image descriptions via a Vision API** are NOT shipping. Sending
+>   document images to an external API was ruled out, and the local candidate
+>   was measured and REJECTED: on 2026-08-06 `SmolVLM-256M` described a chart
+>   labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented
+>   title. Invented labels are a blocking failure by FR-014.
+> - **What replaced it**: picture CLASSIFICATION (a real class, with a
+>   confidence), chart data extraction, code language and formula recovery —
+>   all grounded in fixture truth rather than in free-form prose.
+> - **Tier policy is unchanged.** New formats stay Premium-only and that is
+>   Stage C (`mc2-1sobq.3`) work, not this document's.
+
 **Task ID**: FUTURE-PREMIUM-001
 **Priority**: P2 (Stage 3)
 **Tier**: PREMIUM ($149/month)

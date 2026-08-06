@@ -1,44 +1,54 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-06 — Docling Intelligence Stage A accepted on `develop`. `docling_hybrid` selected
-on a dense A/B that measures production; chunking behaviour unchanged, embedding cache fixed.
+Updated: 2026-08-06 — Stage A accepted; Stage B (selective enrichments) delivered on `develop` and
+blocked on one owner decision. Production conversion behaviour is unchanged by both.
 
-Current stage id: `mc2-1sobq.1`
-Stage: structure-aware Docling RAG with provenance, accepted; epic continues at `mc2-1sobq.2`.
+Current stage id: `mc2-1sobq.2`
+Stage: selective Docling enrichments; router built and tested, not yet called from the live phase.
+
+## Docling Stage B: enrichments are wired, and one candidate is rejected
+
+Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`, 30.6 GB) behind
+compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched. MEASURED
+2026-08-06: baseline peaked 1.82 GiB, advanced 4.34 GiB of 12 GiB, zero restarts; the advanced pass
+costs 134s against 4s. Full account: `.codex/stages/mc2-1sobq.2/summary.md`.
+
+**The router is three-tiered.** Baseline (MCP) → a CHEAP classification pass on the BASELINE
+service, whose classifier is already in that image → the advanced service, only for capabilities a
+concrete item asks for. Without the middle step a photograph and a bar chart look identical and the
+8 GB model gets spent on a guess. A PPTX asks for NOTHING: it declares its series in embedded XML
+and the baseline conversion already returns them plus `classification: bar_chart`.
+
+**`picture_description` is REJECTED on evidence.** SmolVLM-256M described a chart labelled
+Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title; FR-014 makes invented labels
+blocking. The model stays in the image so Stage D can retry a bigger VLM on the same fixture.
+Chart extraction uses granite-vision-**4.1-4b**: this Serve build hardcodes V4 and has no preset
+registry, and shipping only the 3.3-2b model made it fetch V4 mid-request despite `artifacts_path`.
 
 ## Docling Intelligence: Stage A is in, and it is opt-in
 
-Native Docling structure now reaches chunking, enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY` (`legacy_markdown` | `docling_hierarchical` | `docling_hybrid`). Native
-chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable cases.
-**`docling_hybrid` is selected, `legacy_markdown` is still the default** — selection is not
-activation; the flip is Stage E under separate authorization.
+Native Docling structure reaches chunking, enrichment and the Qdrant payload behind
+`DOCLING_CHUNK_STRATEGY`; native chunks resolve 100% of children to Docling refs with page/bbox in
+all six chunkable cases. **`docling_hybrid` is selected, `legacy_markdown` is still the default** —
+selection is not activation; the flip is Stage E under separate authorization.
 
-**The A/B runs the production ranker**: ONE late-chunking call over every chunk, exactly as
-`phase-5-embedding.ts` makes it, real Jina v3 vectors, `searchChunks({enable_hybrid:true})` in a
-throwaway collection with the production schema AND payload indexes. 7/7 in both profiles. On the
-BASELINE profile hybrid regresses nothing and takes `sci-accuracy-drop` from unanswerable (legacy
-retrieves neither fact) to both facts at rank 3; with heading inference ON it wins nothing, so the
-improvement is specific to the default profile. `docling_hierarchical` rejected.
+The A/B ran the production ranker (one late-chunking call over every chunk, real Jina v3 vectors,
+hybrid search with the production schema and payload indexes), 7/7 in both profiles. Full account
+and the atom-gate rules: `.codex/stages/mc2-1sobq.1/summary.md` and `docs/DOCLING-MCP-REFERENCE.md`.
 
-**Two production fixes came out of it.** The cache key now covers model, width, task,
-`late_chunking` and — under late chunking — the whole ordered batch; a partial late-chunking hit
-re-embeds the batch, and old keys expire on their 1-hour TTL, so a document's first re-processing
-after deploy re-embeds it. And a 429 is now retried by waiting out Jina's per-minute TOKEN window
-(`Retry-After` wins); it was fatal, so one large document could permanently fail its job.
-
-**The gate counts EVIDENCE ATOMS**, never chunks (rules in `docs/DOCLING-MCP-REFERENCE.md`): a
-ratio penalises a finer cut and a count rewards one. Scored top-5s are written out as chunk ids.
+**Two production fixes came out of it.** The embedding cache key now covers model, width, task,
+`late_chunking` and — under late chunking — the whole ordered batch; a partial hit re-embeds the
+batch, and old keys expire on their 1-hour TTL, so a document's first re-processing after deploy
+re-embeds it. And a 429 is now retried by waiting out Jina's per-minute TOKEN window (`Retry-After`
+wins); it was fatal, so one large document could permanently fail its job.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
-`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`. Bad refs fail early.
-
+`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`; bad refs fail early.
 **Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
 `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:**
 `docling_jobkit._parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and
-`docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags, so a profile change returned
-the previous artifact. Remove at `mc2-ibzcc`. **Both images were rebuilt locally, so their digests
-differ from production**; publishing and pinning is Stage E. Evidence: `.codex/stages/mc2-1sobq.1/`.
+`docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags. Remove at `mc2-ibzcc`.
+**All images were rebuilt locally, so their digests differ from production**; publishing is Stage E.
 
 ## Docling migration is live
 
@@ -50,10 +60,9 @@ the upstream timeout wrapper. Evidence: `.codex/stages/mc2-nxd3g/summary.md`.
 
 On the owner's 2026-07-30/31 decision the Q12 live cutover was replaced by an ordinary release, and
 the release succeeded: production moved off Qdrant Cloud, pipeline green end to end for the first
-time since 2026-07-04. Do not reopen C1..C10, and do not re-open the beads retired 2026-07-31/08-01 —
-each carries its reason, a REOPEN CONDITION and its unmade fix verbatim; full list in
-`.codex/stages/mc2-jz6y0/summary.md`. Q12 beads still OPEN, none window-dependent: `mc2-8m90f`,
-`mc2-qd12b`, `mc2-n6szm`.
+time since 2026-07-04. Do not reopen C1..C10, nor the beads retired 2026-07-31/08-01 — each carries
+its reason, a REOPEN CONDITION and its unmade fix verbatim in `.codex/stages/mc2-jz6y0/summary.md`.
+Q12 beads still OPEN, none window-dependent: `mc2-8m90f`, `mc2-qd12b`, `mc2-n6szm`.
 
 **The load-bearing rule.** Every piece of Q12 machinery is opt-in: migrations, reindex, deploy and
 source recovery each have an ordinary path, reached by NOT passing the Q12 flags.
@@ -61,15 +70,13 @@ source recovery each have an ordinary path, reached by NOT passing the Q12 flags
 ## Where the Qdrant reindex stands
 
 **The source recovery is COMPLETE** and `mc2-jz6y0.13.4` is closed on that evidence: 42/42
-`copy_states` `published`, 24/24 `disposition_states` `disposition_verified` (18
-`career_playbook_retained_derived`, 6 `eligible_unrecoverable`) measured 2026-08-01 from
-`/var/lib/megacampus-source-recovery/state`; journal at revision 95 / `reindex_started`.
+`copy_states` `published`, 24/24 `disposition_states` `disposition_verified`, measured 2026-08-01
+from `/var/lib/megacampus-source-recovery/state`; journal at revision 95 / `reindex_started`.
 
 **The 16 that remain are one family, and the diagnosis took three tries.** NOT scans, NO race:
 exported diagrams, one page, 4296pt tall, type converted to curves, so no text layer exists for any
-extractor. OCR loads its models and returns nothing even with `force_full_page_ocr` at 3x. Docling
-converts them to `<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`, where both earlier explanations
-are marked wrong rather than deleted).
+extractor. OCR returns nothing even with `force_full_page_ocr` at 3x, and Docling converts them to
+`<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`, where both earlier explanations are kept wrong).
 
 **The reindex is 218/234.** Measured after the repair: `VERIFY status=failed
 expected_documents=234 indexed_documents=218 expected_points=13650 indexed_points=13712 gaps=21
@@ -77,27 +84,19 @@ schema_mismatches=0 relevance_failures=0 action=repair`. The 32 DOCX permanent l
 the 16 that remain are ALL PDF (`mc2-3gz2m`).
 
 **How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`
-(`tools/qdrant/retry-failed-documents.ts`). It replays `retryDocument`'s server-side effect in bulk
-and keeps its guard — a document is touched only when the catalog calls it `failed` — so it is
-idempotent. Two flags are NOT optional here:
-
-    -e BULLMQ_QUEUE_NAME=course-generation
-    -e DOCLING_UPLOADS_BASE_PATH=/app
-
-The first because the operator pins `qdrant-reindex-disabled` while production workers consume
-`course-generation`; the second because the job payload carries a path resolved by the PRODUCER (see
+(`tools/qdrant/retry-failed-documents.ts`), idempotent because it only touches documents the catalog
+calls `failed`. Two flags are NOT optional: `-e BULLMQ_QUEUE_NAME=course-generation` (the operator
+otherwise pins `qdrant-reindex-disabled` while production workers consume `course-generation`) and
+`-e DOCLING_UPLOADS_BASE_PATH=/app` (the payload path is resolved by the PRODUCER; see
 `.codex/repository-failure-modes.md`). Do not re-enqueue while a previous round still retries — the
 old jobs' failure path overwrites what the new round fixed. `reindex execute` cannot repair its own
-run: it skips whatever its ledger calls completed, a fresh run id is refused while the journal sits
-at `reindex_started`, and `plan` demands a `verified` journal. Rewriting the artifact by hand would
-falsify the audit record it exists to be.
+run, and rewriting the artifact by hand would falsify the audit record it exists to be.
 
 ## Backup guarantees
 
 All three timers ENABLED. Snapshot and Supabase backup have PROVEN THEMSELVES UNATTENDED
 (2026-08-02); the Qdrant restore drill is monthly, next 2026-09-01, so its scheduled path is still
-unproven. The drill itself PASSED 2026-07-31 20:54 CEST, all seven checks (schema, count, dense,
-ru_bm25, en_bm25, formula_priority, tenant_course_isolation), evidence under
+unproven. The drill itself PASSED 2026-07-31 20:54 CEST, all seven checks, evidence under
 `/var/lib/megacampus-qdrant-recovery/restore-evidence/`. Supabase stamps
 `megacampus_supabase_last_successful_backup_unixtime_seconds` only after pg_restore validation AND
 pointer publication both succeed. Snapshots are `storage_mode local` (`mc2-jz6y0.13.6`).
@@ -180,7 +179,8 @@ and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.2` — selective Docling enrichments; `mc2-1sobq.3` is also unblocked.
+Next stage id: `mc2-1sobq.2` — enrichment router wiring into the live Stage 2 phase is the one piece
+left; `mc2-1sobq.3` is unblocked.
 Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator

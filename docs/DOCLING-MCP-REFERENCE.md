@@ -247,3 +247,68 @@ Selection is not activation. `DOCLING_CHUNK_STRATEGY` defaults to
 `legacy_markdown` everywhere except dev compose; flipping it is Stage E work
 under separate authorization. The corpus is a release gate, not authorization to
 enable the production flag.
+
+## Selective enrichments (Stage B)
+
+Advanced enrichments run in a SEPARATE Serve image, `mc2/docling-serve-advanced`,
+behind compose `--profile advanced` on loopback 5002. The baseline 4 GiB service
+is untouched and starts exactly as before. Measured 2026-08-06: baseline peaked
+1.82 GiB, advanced 4.34 GiB of 12 GiB, zero restarts on either side; the
+advanced pass costs 134s against 4s for baseline on the same small PDF.
+
+Model set, named explicitly and asserted at build time by `test_models.py`:
+
+| capability             | model                                           | where              |
+| ---------------------- | ----------------------------------------------- | ------------------ |
+| picture classification | `docling-project/DocumentFigureClassifier-v2.5` | baseline image     |
+| code, formula          | `docling-project/CodeFormulaV2`                 | advanced image     |
+| chart extraction       | `ibm-granite/granite-vision-4.1-4b`             | advanced image     |
+| picture description    | `HuggingFaceTB/SmolVLM-256M-Instruct`           | advanced, REJECTED |
+
+Chart extraction uses the V4 checkpoint because this Serve build hardcodes
+`ChartExtractionModelGraniteVisionV4` and exposes no preset registry for chart
+models. Shipping only the smaller 3.3-2b `chart2csv` model made the service log
+"Model artifacts not found … they will be downloaded" mid-request despite
+`DOCLING_SERVE_ARTIFACTS_PATH`.
+
+**The router is three-tiered.** Baseline conversion through `/mcp` stays the
+accepted artifact. Then a CHEAP classification pass on the BASELINE service,
+whose classifier is already in that image, turns "this document has a picture"
+into "this picture is a bar chart at 0.9997". Only then does the advanced
+service run, and only for capabilities a concrete item asks for: a code block
+whose language is `unknown`, a formula region that came back empty, a
+chart-classified picture with no source-declared series. A PPTX asks for
+nothing — it declares its series in embedded chart XML and the baseline
+conversion already returns them.
+
+The advanced result never replaces the accepted document. `mergeEnrichment`
+copies enrichment metadata by Docling `self_ref` only, never overwrites text the
+baseline already read, and drops anything the accepted document does not
+contain, so a failed or shifted advanced pass cannot corrupt what the pipeline
+committed to.
+
+**A missing model fails closed and misreports why.** Serve answers `HTTP 404
+{"detail": "Task result not found. Please wait for a completion status."}` in
+about two seconds and puts the real cause in its own log. The enrichment adapter
+therefore names the capability set and profile in its error rather than
+repeating a message that misdirects.
+
+**Two tiers of assertion.** An INVENTED value is blocking: a chart number absent
+from the ground truth, or a formula symbol the source never contained. A MISSED
+value is recorded with the exact delta and does not block. The control fixture
+draws `4ac` and the model reads `4a`; that is printed as
+`enrichment-formula-exact` with both strings, while the fabrication check stays
+green and blocking. Keeping the tiers apart is what stops the gate from being
+relaxed to whatever the current model happens to produce.
+
+**`picture_description` is rejected, not deferred.** `SmolVLM-256M` described a
+chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented
+title. FR-014 makes invented labels blocking, so the capability sits in
+`REJECTED_CAPABILITIES` and the router refuses it unless a caller explicitly
+passes `allowRejected`. The model stays in the image so Stage D can measure a
+larger VLM against the same fixture.
+
+Cache identity carries all of this: `resolveConversionProfile` folds the applied
+capabilities and their exact models into the string that chunk ids and cache
+keys are built from, so `baseline+enrich[code,formula]@docling-project/CodeFormulaV2`
+can never be answered from a `baseline` entry.
