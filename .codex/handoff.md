@@ -1,10 +1,10 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-06 — Stage A accepted; Stage B (selective enrichments) delivered on `develop` and
-blocked on one owner decision. Production conversion behaviour is unchanged by both.
+accepted. Production conversion behaviour is unchanged by both.
 
 Current stage id: `mc2-1sobq.2`
-Stage: selective Docling enrichments; router built and tested, not yet called from the live phase.
+Stage: selective Docling enrichments, accepted; router wired behind `DOCLING_ENRICHMENT_ENABLED` (off).
 
 ## Docling Stage B: enrichments are wired, and one candidate is rejected
 
@@ -179,8 +179,8 @@ and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.2` — enrichment router wiring into the live Stage 2 phase is the one piece
-left; `mc2-1sobq.3` is unblocked.
+Next stage id: `mc2-1sobq.3` — Premium XLSX/CSV, ODF, EPUB, LaTeX; `mc2-1sobq.4` needs Stage B, now done
+and is unblocked too.
 Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator

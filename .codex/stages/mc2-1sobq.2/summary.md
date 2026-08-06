@@ -1,7 +1,7 @@
 # Stage `mc2-1sobq.2` — selective Docling enrichments
 
 Epic: `mc2-1sobq` (`specs/024-docling-intelligence/spec.md`)
-Level: integration · Owner: root · Status: delivered, acceptance pending
+Level: integration · Owner: root · Status: accepted 2026-08-06
 
 ## What changed observably
 
@@ -16,8 +16,15 @@ difference is exact:
 | picture classification | none         | `bar_chart` @ 0.9997                        |
 | chart series           | none         | Альфа=12, Бета=34, Гамма=56                 |
 
-Production conversion behaviour is unchanged: the advanced service is behind a
-compose profile, and the router is not yet called from the live Stage 2 phase.
+The router is called from `phase-1-docling-conversion.ts` behind
+`DOCLING_ENRICHMENT_ENABLED`, which defaults to false. With the flag off the
+phase behaves exactly as before; the advanced service is behind a compose
+profile and does not even start.
+
+End to end on the live stack with the flag on, the wired path applied
+`picture_classification`, then `code`, `formula` and `chart`, in 84.4s — faster
+than the 134s single-shot request, because the router asked for three
+capabilities instead of five. Every blocking check passed.
 
 ## Measured before anything was built
 
@@ -132,28 +139,29 @@ the need for a third runtime wrapper.
 
 ## Verification
 
-- `pnpm type-check` 0 errors; focused tests 184 across 20 files, including 19
-  new ones for the router, the merge and the profile identity.
+- `pnpm type-check` 0 errors, `pnpm lint` 0 errors, `pnpm build` green; focused
+  tests 189 across 20 files, including 24 new ones for the router, the merge,
+  the profile identity and every failure path of the wired call site.
 - `docker build docling-serve-advanced` runs `test_models.py`, which asserts the
   three advanced models are present WITH real weight files, and that the
   baseline models survived the layer.
 - Live baseline-versus-advanced probe on `enrichment-code-formula-chart.pdf`:
   baseline fails four blocking enrichment checks, advanced passes all of them.
+- Live end-to-end run through `applyEnrichment` against both services: applied
+  `picture_classification`, `code`, `formula`, `chart` in 84.4s with no failure
+  and no blocking check red.
 
 ## Rollback
 
-1. Stop the advanced service: it is a compose profile, so not passing
-   `--profile advanced` is the rollback.
-2. The router requests nothing when no signal is present, and is not yet wired
-   into the live phase, so production conversion is unaffected either way.
+1. `DOCLING_ENRICHMENT_ENABLED=false` — the default — restores the previous
+   phase behaviour exactly; the router is never entered.
+2. Stop the advanced service: it is a compose profile, so not passing
+   `--profile advanced` is the second rollback step. With it gone the router
+   would fail its advanced pass and return the accepted document untouched.
 3. Enrichment fields on the document are additive; a consumer that ignores them
    sees exactly the previous shape.
 
 ## Not done here, on purpose
 
-- **Wiring the router into the live Stage 2 phase.** The adapter, decision
-  logic, merge and identity are delivered and tested; the call site is not
-  changed, so this stage cannot alter production conversion. That wiring is the
-  one remaining piece of Stage B's outcome and it is named rather than implied.
 - Picture description, rejected above.
 - New input formats (Stage C) and the OCR/VLM A/B (Stage D).

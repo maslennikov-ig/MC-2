@@ -4,7 +4,7 @@
   "goal_id": "mc2-1sobq.2",
   "epic_id": "mc2-1sobq",
   "profile_at_creation": "balanced-v2.19",
-  "status": "blocked",
+  "status": "accepted",
   "sequence": 2,
   "orchestration_level": "integration",
   "acceptance_boundary_id": "selective-docling-enrichments",
@@ -85,7 +85,7 @@
       "artifact_path": ".codex/stages/mc2-1sobq.2/artifacts/mc2-1sobq.2.md",
       "task_id": "mc2-1sobq.2",
       "stream_owner": "root-owner",
-      "status": "blocked"
+      "status": "accepted"
     }
   ]
 }

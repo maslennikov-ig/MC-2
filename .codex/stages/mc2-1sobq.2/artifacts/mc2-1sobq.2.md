@@ -18,7 +18,7 @@ epic_id: mc2-1sobq
 stage_id: mc2-1sobq.2
 session_id: docling-intelligence
 milestone: selective Docling enrichments behind an explainable two-pass router
-milestone_status: blocked
+milestone_status: accepted
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -56,11 +56,11 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: blocked
+status: accepted
 delivery_method: merge
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: advanced Serve profile stays up behind the compose profile for the remaining stage work
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: advanced Serve profile stays up behind the compose profile for Stage D; no branch or worktree was created
 risk_level: medium
 risk_tags:
   - data
@@ -98,7 +98,7 @@ changed_files:
   - docs/FUTURE/docling-fallback-strategy.md
 explicit_defers:
   - picture description - candidate measured and REJECTED for fabrication; the model stays in the image so Stage D can retry a larger VLM against the same fixture
-  - wiring the router into the live Stage 2 phase - the adapter, decision logic and merge are delivered and tested; the phase call site is Stage E integration work
+  - none beyond the rejected picture-description candidate
 ---
 
 # Summary
@@ -168,9 +168,10 @@ against 4s for baseline, which is the number the router exists to avoid paying.
   caller explicitly passes `allowRejected`.
 - The advanced image is 30.6 GB and carries an 8 GB vision model. It is behind a
   compose profile and does not start with the ordinary stack.
-- The router is delivered and unit-tested but not yet called from the live
-  Stage 2 phase; that wiring is deliberately deferred so this stage does not
-  change production conversion behaviour.
+- The router IS called from `phase-1-docling-conversion.ts`, behind
+  `DOCLING_ENRICHMENT_ENABLED` (default false). With the flag off the phase
+  behaves exactly as before; with it on, every failure path returns the
+  accepted document untouched.
 - Chart extraction uses the V4 checkpoint because this Serve build hardcodes it
   and there is no preset registry for chart models. Shipping only the smaller
   3.3-2b model made the service try to download V4 mid-request despite
