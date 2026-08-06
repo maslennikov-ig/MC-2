@@ -21,29 +21,44 @@ LABEL org.opencontainers.image.version="1.29.0-docling-2.118.0-advanced"
 
 USER 1001
 
-# Exactly the three model sets the measured gap requires, named explicitly
-# rather than via `--all`:
-#   code_formula                docling-project/CodeFormulaV2  (code + formula)
-#   smolvlm                     HuggingFaceTB/SmolVLM-256M-Instruct (descriptions)
-#   granite_chart_extraction_v4 ibm-granite/granite-vision-4.1-4b  (chart data)
-# `picture_classifier` is already in the baseline image and is NOT re-downloaded.
+# WHICH models this image carries is a deployment decision, not a constant.
 #
-# V4 and not the smaller `granite_chart_extraction` (3.3-2b chart2csv):
-# `do_chart_extraction` is a plain boolean with no preset registry behind it,
-# and this Serve build hardcodes `ChartExtractionModelGraniteVisionV4`. MEASURED
-# on 2026-08-06 with only the 2b model present: the request failed and the log
-# read "Model artifacts not found at .../ibm-granite--granite-vision-4.1-4b,
-# they will be downloaded" — an artifacts_path service silently reaching for the
-# network mid-request. Matching the pinned stack's own default costs 8 GB and
-# avoids both a third runtime wrapper and that non-determinism.
+# The default is `code_formula` alone — 611 MB on disk, measured peak 1.46 GiB —
+# because that is what fits the production host. The chart model is
+# `ibm-granite/granite-vision-4.1-4b`: 7.5 GB on disk and a measured 4.34 GiB
+# peak, on a server whose compose limits already sum to about twice its RAM.
+# Carrying it "just in case" would put a 4-billion-parameter vision model in the
+# hot path of every document upload.
+#
+# Build the heavy profile explicitly when a host can hold it:
+#
+#   docker build --build-arg ADVANCED_MODEL_SET="code_formula granite_chart_extraction_v4" .
+#
+# `granite_chart_extraction_v4` and not the smaller 3.3-2b `chart2csv`:
+# `do_chart_extraction` is a plain boolean with no preset registry behind it and
+# this Serve build hardcodes `ChartExtractionModelGraniteVisionV4`. MEASURED on
+# 2026-08-06 with only the 2b model present, the request failed and the log read
+# "Model artifacts not found at .../ibm-granite--granite-vision-4.1-4b, they
+# will be downloaded" — an artifacts_path service reaching for the network
+# mid-request.
+#
+# `smolvlm` is deliberately absent. Its capability (picture description) is
+# rejected on measured evidence, and the download is 3.3 GB of which 2.9 GB is
+# an `onnx/` tree this runtime cannot even open — it uses the transformers
+# engine. Stage D re-adds whatever VLM it decides to measure.
+#
+# `picture_classifier` is already in the baseline image and is NOT re-downloaded.
+ARG ADVANCED_MODEL_SET="code_formula"
 RUN HF_HUB_DOWNLOAD_TIMEOUT=600 HF_HUB_ETAG_TIMEOUT=600 \
     docling-tools models download \
       -o /opt/app-root/src/.cache/docling/models \
-      code_formula smolvlm granite_chart_extraction_v4
+      ${ADVANCED_MODEL_SET}
 
 # A missing model does not degrade gracefully — Serve answers 404 with a
 # message about a task result, and the real cause is only in its log. So the
 # build refuses to ship an image whose model set does not match its promise.
+ENV DOCLING_ADVANCED_MODEL_SET=${ADVANCED_MODEL_SET}
+
 COPY test_models.py /opt/app-root/src/
 RUN cd /opt/app-root/src \
     && python -m unittest -v test_models.py \

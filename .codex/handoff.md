@@ -8,22 +8,22 @@ Stage: selective Docling enrichments, accepted; router wired behind `DOCLING_ENR
 
 ## Docling Stage B: enrichments are wired, and one candidate is rejected
 
-Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`, 30.6 GB) behind
-compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched. MEASURED
-2026-08-06: baseline peaked 1.82 GiB, advanced 4.34 GiB of 12 GiB, zero restarts; the advanced pass
-costs 134s against 4s. Full account: `.codex/stages/mc2-1sobq.2/summary.md`.
+Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`, **10.5 GB**)
+behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
+MEASURED 2026-08-06: both peak 1.82 GiB, zero restarts, advanced pass 77s against 4s. **Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` makes the image 30.6 GB and
+the peak 4.34 GiB, against a host recorded at 11 GiB whose compose limits already sum to ~2x that.
+The model set is a build arg, `DOCLING_ENRICHMENT_CAPABILITIES` defaults to
+`code,formula,picture_classification`, and the router SUPPRESSES chart with a reason instead of
+paying for a conversion that 404s. Condition and command: `mc2-x72bq`.
 
 **The router is three-tiered.** Baseline (MCP) → a CHEAP classification pass on the BASELINE
-service, whose classifier is already in that image → the advanced service, only for capabilities a
-concrete item asks for. Without the middle step a photograph and a bar chart look identical and the
-8 GB model gets spent on a guess. A PPTX asks for NOTHING: it declares its series in embedded XML
-and the baseline conversion already returns them plus `classification: bar_chart`.
+service, whose classifier is already in that image → the advanced service, only for what a concrete
+item asks for. A PPTX asks for NOTHING: its series come from embedded XML in the baseline pass.
 
-**`picture_description` is REJECTED on evidence.** SmolVLM-256M described a chart labelled
-Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title; FR-014 makes invented labels
-blocking. The model stays in the image so Stage D can retry a bigger VLM on the same fixture.
-Chart extraction uses granite-vision-**4.1-4b**: this Serve build hardcodes V4 and has no preset
-registry, and shipping only the 3.3-2b model made it fetch V4 mid-request despite `artifacts_path`.
+**`picture_description` is REJECTED on evidence** and its model is out of the image: SmolVLM-256M
+described a chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title.
+Chart extraction needs granite-vision-**4.1-4b** — this build hardcodes V4, and shipping only the
+3.3-2b model made it fetch V4 mid-request despite `artifacts_path`.
 
 ## Docling Intelligence: Stage A is in, and it is opt-in
 

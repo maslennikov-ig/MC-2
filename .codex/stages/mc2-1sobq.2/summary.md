@@ -123,11 +123,19 @@ and not just the capability means swapping a model invalidates the identity too.
 Measured with `docker stats` during the live probes:
 
 - baseline Serve: peaked **1.82 GiB of its unchanged 4 GiB**, zero restarts;
-- advanced Serve: peaked **4.34 GiB of 12 GiB**, zero restarts.
+- advanced Serve, default model set: idle 502 MiB, peaked **1.82 GiB of 4 GiB**,
+  zero restarts, advanced pass 77s;
+- advanced Serve with the chart model: peaked **4.34 GiB**, pass 134s. Measured,
+  then deliberately not deployed.
 
-The advanced image is 30.6 GB on disk, carrying `CodeFormulaV2` (0.64 GB),
-`SmolVLM-256M` and `granite-vision-4.1-4b` (8 GB). It is behind compose
-`--profile advanced` and does not start with the ordinary stack.
+The advanced image ships **10.5 GB** carrying `CodeFormulaV2` alone, and its
+model set is a build argument rather than a constant. Adding
+`granite_chart_extraction_v4` makes it 30.6 GB and moves the peak to 4.34 GiB —
+against a production host recorded at 11 GiB RAM whose compose limits already
+sum to roughly twice that. So chart extraction is built and proven but NOT
+shipped: `mc2-x72bq` holds the exact rebuild command and the capacity condition
+for turning it on. `SmolVLM` is gone entirely; its capability is rejected and
+2.9 of its 3.3 GB were ONNX exports this runtime cannot open.
 
 Chart extraction uses the V4 checkpoint because this Serve build hardcodes
 `ChartExtractionModelGraniteVisionV4` and exposes no preset registry for chart
@@ -164,4 +172,9 @@ the need for a third runtime wrapper.
 ## Not done here, on purpose
 
 - Picture description, rejected above.
+- **Chart extraction: built, measured, proven on the fixture, and not shipped.**
+  The router refuses to request it because `DOCLING_ENRICHMENT_CAPABILITIES`
+  defaults to `code,formula,picture_classification`, so a document that
+  justifies it gets a recorded suppression instead of a two-minute conversion
+  ending in a 404. Reversal condition and command: `mc2-x72bq`.
 - New input formats (Stage C) and the OCR/VLM A/B (Stage D).

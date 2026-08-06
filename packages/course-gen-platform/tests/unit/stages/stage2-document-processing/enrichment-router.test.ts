@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   applyEnrichment,
   CHART_CLASSIFICATION_MIN_CONFIDENCE,
+  DEFAULT_ENABLED_CAPABILITIES,
+  resolveEnabledCapabilities,
   decideEnrichments,
   DoclingServeEnricher,
   enrichmentEnabled,
@@ -16,6 +18,15 @@ import type {
   DoclingPicture,
   DoclingText,
 } from '@/stages/stage2-document-processing/docling/types';
+
+/** Every capability, for the tests that exercise a heavy deployment profile. */
+const ALL_CAPABILITIES = [
+  'code',
+  'formula',
+  'picture_classification',
+  'chart',
+  'picture_description',
+] as const;
 
 function text(overrides: Partial<DoclingText> & Pick<DoclingText, 'id'>): DoclingText {
   return { text: '', type: 'text', page_no: 1, ...overrides };
@@ -152,7 +163,7 @@ describe('decideEnrichments', () => {
           }),
         ],
       }),
-      { allowRejected: false }
+      { allowRejected: false, enabled: ALL_CAPABILITIES }
     );
     // Chart extraction is not rejected, so it still goes through.
     expect(decision.requested).toEqual(['chart']);
@@ -172,7 +183,8 @@ describe('decideEnrichments', () => {
             enrichment: { classification: { class_name: 'line_chart', confidence: 0.9 } },
           }),
         ],
-      })
+      }),
+      { enabled: ALL_CAPABILITIES }
     );
     expect(decision.requested.sort()).toEqual(['chart', 'code', 'formula']);
   });
@@ -360,7 +372,7 @@ describe('applyEnrichment', () => {
             picture({ id: '#/pictures/0', enrichment: { chart: { rows: [['Альфа', '12']] } } }),
           ],
         }),
-        capabilities: ['chart', 'code'],
+        capabilities: ['code'],
         durationMs: 2,
         profile: 'advanced',
       });
@@ -371,7 +383,10 @@ describe('applyEnrichment', () => {
 
     expect(run.mock.calls[0][1]).toEqual(['picture_classification']);
     expect(run.mock.calls[0][2]).toBe('baseline');
-    expect(run.mock.calls[1][1].sort()).toEqual(['chart', 'code']);
+    // `chart` is justified by the document and NOT requested: the default
+    // deployment profile cannot serve it, and the wired path honours that
+    // rather than paying for a conversion that ends in a 404.
+    expect(run.mock.calls[1][1]).toEqual(['code']);
     expect(run.mock.calls[1][2]).toBe('advanced');
     expect(result.document.texts[0].code_language).toBe('Python');
     expect(result.failure).toBeUndefined();
@@ -446,5 +461,57 @@ describe('enrichmentEnabled', () => {
     expect(
       enrichmentEnabled({ DOCLING_ENRICHMENT_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)
     ).toBe(true);
+  });
+});
+
+describe('deployment capability profile', () => {
+  it('excludes chart extraction by default', () => {
+    // granite-vision-4.1-4b is 7.5 GB on disk and peaks at 4.34 GiB, against a
+    // production host with 11 GiB whose compose limits already sum to ~2x that.
+    expect(DEFAULT_ENABLED_CAPABILITIES).not.toContain('chart');
+    expect([...DEFAULT_ENABLED_CAPABILITIES].sort()).toEqual([
+      'code',
+      'formula',
+      'picture_classification',
+    ]);
+  });
+
+  it('suppresses a justified capability the profile cannot serve, and says why', () => {
+    // The alternative is a two-minute conversion ending in a 404 that names
+    // neither the capability nor the missing model.
+    const decision = decideEnrichments(
+      document({
+        pictures: [
+          picture({
+            id: '#/pictures/0',
+            enrichment: { classification: { class_name: 'bar_chart', confidence: 0.99 } },
+          }),
+        ],
+      }),
+      { enabled: DEFAULT_ENABLED_CAPABILITIES }
+    );
+
+    expect(decision.requested).toEqual([]);
+    expect(decision.suppressed).toEqual([
+      { capability: 'chart', reason: 'not enabled for this deployment profile' },
+    ]);
+    // The signal is still recorded: the document did ask, the host could not.
+    expect(decision.signals.map(s => s.capability)).toEqual(['chart']);
+  });
+
+  it('reads an explicit capability list from the environment', () => {
+    expect(
+      resolveEnabledCapabilities({
+        DOCLING_ENRICHMENT_CAPABILITIES: 'code, chart',
+      } as unknown as NodeJS.ProcessEnv)
+    ).toEqual(['code', 'chart']);
+  });
+
+  it('keeps the default set when the variable names something unknown', () => {
+    expect(
+      resolveEnabledCapabilities({
+        DOCLING_ENRICHMENT_CAPABILITIES: 'code,chrat',
+      } as unknown as NodeJS.ProcessEnv)
+    ).toEqual([...DEFAULT_ENABLED_CAPABILITIES]);
   });
 });

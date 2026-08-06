@@ -29,14 +29,23 @@ ARTIFACTS = Path(
 
 # Folder names come from each model class's `_model_repo_folder`, read off the
 # pinned docling build rather than guessed from the repo id.
-ADVANCED_MODELS = {
+# Downloader name -> artifacts folder, read off each model class's
+# `_model_repo_folder` on the pinned docling build rather than guessed.
+MODEL_FOLDERS = {
     "code_formula": "docling-project--CodeFormulaV2",
-    "picture_description": "HuggingFaceTB--SmolVLM-256M-Instruct",
+    "smolvlm": "HuggingFaceTB--SmolVLM-256M-Instruct",
     # The V4 checkpoint this Serve build hardcodes for `do_chart_extraction`.
     # Shipping only the smaller 3.3-2b chart2csv model looked complete and then
     # made the service try to download V4 during a request.
-    "chart_extraction": "ibm-granite--granite-vision-4.1-4b",
+    "granite_chart_extraction_v4": "ibm-granite--granite-vision-4.1-4b",
+    "granite_chart_extraction": "ibm-granite--granite-vision-3.3-2b-chart2csv-preview",
 }
+
+# The image asserts exactly what it was BUILT to carry. Hardcoding the full set
+# would fail the light production build, and hardcoding the light set would let
+# a heavy build silently ship without its chart model.
+REQUESTED = [name for name in os.environ.get("DOCLING_ADVANCED_MODEL_SET", "").split() if name]
+ADVANCED_MODELS = {name: MODEL_FOLDERS[name] for name in REQUESTED}
 
 # Inherited from the baseline image; the advanced build must not lose them.
 BASELINE_MODELS = {
@@ -57,6 +66,11 @@ def _weight_bytes(directory: Path) -> int:
 
 
 class AdvancedModelSet(unittest.TestCase):
+    def test_the_build_declared_a_model_set(self) -> None:
+        # An empty set means the build arg never reached the download step, and
+        # the image would be an ordinary baseline wearing an advanced name.
+        self.assertTrue(REQUESTED, "DOCLING_ADVANCED_MODEL_SET is empty")
+
     def test_advanced_models_are_present(self) -> None:
         for name, folder in ADVANCED_MODELS.items():
             with self.subTest(model=name):

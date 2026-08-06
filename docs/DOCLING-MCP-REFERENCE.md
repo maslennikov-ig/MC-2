@@ -252,19 +252,38 @@ enable the production flag.
 
 Advanced enrichments run in a SEPARATE Serve image, `mc2/docling-serve-advanced`,
 behind compose `--profile advanced` on loopback 5002. The baseline 4 GiB service
-is untouched and starts exactly as before. Measured 2026-08-06: baseline peaked
-1.82 GiB, advanced 4.34 GiB of 12 GiB, zero restarts on either side; the
-advanced pass costs 134s against 4s for baseline on the same small PDF.
+is untouched and starts exactly as before. Measured 2026-08-06 with the default
+model set: baseline peaked 1.82 GiB, advanced 1.82 GiB of its 4 GiB, zero
+restarts on either side; the advanced pass costs 77s against 4s for baseline on
+the same small PDF. With the chart model added the advanced peak is 4.34 GiB.
 
 Model set, named explicitly and asserted at build time by `test_models.py`:
 
-| capability             | model                                           | where              |
-| ---------------------- | ----------------------------------------------- | ------------------ |
-| picture classification | `docling-project/DocumentFigureClassifier-v2.5` | baseline image     |
-| code, formula          | `docling-project/CodeFormulaV2`                 | advanced image     |
-| chart extraction       | `ibm-granite/granite-vision-4.1-4b`             | advanced image     |
-| picture description    | `HuggingFaceTB/SmolVLM-256M-Instruct`           | advanced, REJECTED |
+| capability             | model                                           | where                   |
+| ---------------------- | ----------------------------------------------- | ----------------------- |
+| picture classification | `docling-project/DocumentFigureClassifier-v2.5` | baseline image          |
+| code, formula          | `docling-project/CodeFormulaV2` (611 MB)        | advanced image, default |
+| chart extraction       | `ibm-granite/granite-vision-4.1-4b` (7.5 GB)    | opt-in build arg        |
+| picture description    | `HuggingFaceTB/SmolVLM-256M-Instruct`           | absent — REJECTED       |
 
+**The model set is a deployment decision.** The image defaults to
+`code_formula` alone: 10.5 GB, idle 502 MiB, peak 1.82 GiB on the control
+fixture. Adding the chart model makes it 30.6 GB and 4.34 GiB peak, against a
+production host recorded at 11 GiB RAM whose compose limits already sum to about
+twice that. Build the heavy profile only where it fits:
+
+```bash
+docker build --build-arg ADVANCED_MODEL_SET="code_formula granite_chart_extraction_v4" \
+  packages/course-gen-platform/docker/docling-serve-advanced
+```
+
+`DOCLING_ENRICHMENT_CAPABILITIES` (default `code,formula,picture_classification`)
+tells the router what the deployed profile can serve. A capability the document
+justifies but the profile lacks is SUPPRESSED with that reason and never
+requested — otherwise it costs a full conversion and comes back as a 404 naming
+neither the capability nor the missing model. `test_models.py` asserts the image
+carries exactly the set it was built with, so a light build cannot pass itself
+off as a heavy one. Turning chart extraction on later is tracked in `mc2-x72bq`.
 Chart extraction uses the V4 checkpoint because this Serve build hardcodes
 `ChartExtractionModelGraniteVisionV4` and exposes no preset registry for chart
 models. Shipping only the smaller 3.3-2b `chart2csv` model made the service log

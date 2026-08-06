@@ -167,8 +167,10 @@ against 4s for baseline, which is the number the router exists to avoid paying.
   title "Bemma". FR-014 makes invented labels blocking, so the capability is in
   `REJECTED_CAPABILITIES` with that reason and the router refuses it unless a
   caller explicitly passes `allowRejected`.
-- The advanced image is 30.6 GB and carries an 8 GB vision model. It is behind a
-  compose profile and does not start with the ordinary stack.
+- The advanced image ships 10.5 GB with `CodeFormulaV2` only. The chart model is
+  an opt-in build arg: it was measured at 30.6 GB and 4.34 GiB peak, which does
+  not fit the recorded 11 GiB production host, so it is proven and not shipped
+  (`mc2-x72bq` holds the rebuild command and the capacity condition).
 - The router IS called from `phase-1-docling-conversion.ts`, behind
   `DOCLING_ENRICHMENT_ENABLED` (default false). With the flag off the phase
   behaves exactly as before; with it on, every failure path returns the

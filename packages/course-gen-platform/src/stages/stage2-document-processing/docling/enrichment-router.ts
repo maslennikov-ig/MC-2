@@ -95,6 +95,47 @@ export interface EnrichmentDecision {
   suppressed: Array<{ capability: EnrichmentCapability; reason: string }>;
 }
 
+/**
+ * Capabilities the DEPLOYED advanced profile can actually serve.
+ *
+ * The image is built with a model set chosen per host, so the router must not
+ * ask for what the running profile does not carry. Asking anyway costs a full
+ * conversion and comes back as `HTTP 404 "Task result not found"` — a message
+ * that names neither the capability nor the missing model.
+ *
+ * The default excludes `chart`: `granite-vision-4.1-4b` is 7.5 GB on disk with
+ * a measured 4.34 GiB peak, and the production host has 11 GiB of RAM against
+ * compose limits that already sum to roughly twice that. Hosts that can hold it
+ * set the variable and build the image with the matching model set.
+ */
+export const DEFAULT_ENABLED_CAPABILITIES: readonly EnrichmentCapability[] = [
+  'code',
+  'formula',
+  'picture_classification',
+];
+
+export function resolveEnabledCapabilities(
+  env: NodeJS.ProcessEnv = process.env
+): EnrichmentCapability[] {
+  const raw = env.DOCLING_ENRICHMENT_CAPABILITIES;
+  if (raw === undefined) return [...DEFAULT_ENABLED_CAPABILITIES];
+
+  const known = new Set<string>(Object.keys(CAPABILITY_FIELD));
+  const requested = raw
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => value.length > 0);
+  const unknown = requested.filter(value => !known.has(value));
+  if (unknown.length > 0) {
+    logger.warn(
+      { unknown, using: DEFAULT_ENABLED_CAPABILITIES },
+      'DOCLING_ENRICHMENT_CAPABILITIES names unknown capabilities; keeping the default set'
+    );
+    return [...DEFAULT_ENABLED_CAPABILITIES];
+  }
+  return requested as EnrichmentCapability[];
+}
+
 function isMissingLanguage(language: string | undefined): boolean {
   return language === undefined || language.trim().length === 0 || language === 'unknown';
 }
@@ -109,8 +150,9 @@ function isMissingLanguage(language: string | undefined): boolean {
  */
 export function decideEnrichments(
   document: DoclingDocument,
-  options: { allowRejected?: boolean } = {}
+  options: { allowRejected?: boolean; enabled?: readonly EnrichmentCapability[] } = {}
 ): EnrichmentDecision {
+  const enabled = new Set(options.enabled ?? resolveEnabledCapabilities());
   const signals: EnrichmentSignal[] = [];
 
   // Docling labels a code block without running any model, but leaves the
@@ -163,6 +205,16 @@ export function decideEnrichments(
     const rejection = REJECTED_CAPABILITIES.get(signal.capability);
     if (rejection && !options.allowRejected) {
       suppressed.push({ capability: signal.capability, reason: rejection });
+      continue;
+    }
+    if (!enabled.has(signal.capability)) {
+      // The document wants it and the deployed profile cannot serve it. Saying
+      // so is the whole point: the alternative is a two-minute conversion that
+      // ends in a 404 naming neither the capability nor the missing model.
+      suppressed.push({
+        capability: signal.capability,
+        reason: 'not enabled for this deployment profile',
+      });
       continue;
     }
     requested.push(signal.capability);
@@ -373,7 +425,8 @@ export async function applyEnrichment(
   // Tier 2: the cheap classification pass, on the BASELINE service. Its model
   // ships in that image, so this costs seconds and is what makes the expensive
   // decision informed instead of a guess.
-  if (needsClassificationPass(document)) {
+  const enabled = resolveEnabledCapabilities();
+  if (enabled.includes('picture_classification') && needsClassificationPass(document)) {
     try {
       const pass = await enricher.run(file, ['picture_classification'], 'baseline');
       const merged = mergeEnrichment(document, pass.document);

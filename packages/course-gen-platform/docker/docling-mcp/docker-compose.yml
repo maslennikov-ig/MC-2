@@ -68,9 +68,12 @@ services:
       resources:
         limits:
           cpus: '4'
-          # Measured envelope, not a guess: see the stage summary. The baseline
-          # service keeps its own 4 GiB and is untouched by this profile.
-          memory: 12G
+          # Measured, not guessed: the default `code_formula` model set idles at
+          # 502 MiB and peaked at 1.82 GiB on the control fixture, so it gets the
+          # same 4 GiB envelope the baseline service has for comparable work.
+          # A build that adds `granite_chart_extraction_v4` peaked at 4.34 GiB
+          # and needs this raised to 8G together with a host that can hold it.
+          memory: 4G
 
   docling-cache-init:
     image: mc2/docling-mcp:3.0.0-docling-2.118.0
