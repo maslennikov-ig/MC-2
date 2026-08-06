@@ -53,10 +53,15 @@ docker() {
     fi
     case "$*" in
         "inspect -f {{.Image}} megacampus-docling-mcp-internal")
-            printf '%s\n' 'sha256:current-mcp-image'
+            # `SWITCHED_RUNNING_ID` lets a case say what the host is actually
+            # running; unset means the pre-cutover 1.x image.
+            printf '%s\n' "${SWITCHED_RUNNING_ID:-sha256:current-mcp-image}"
             ;;
         "image inspect -f {{.Id}} $ROLLBACK_REF")
             printf '%s\n' 'sha256:current-mcp-image'
+            ;;
+        "image inspect -f {{.Id}} $CANDIDATE_REF")
+            printf '%s\n' 'sha256:already-switched-mcp-image'
             ;;
     esac
 }
@@ -81,6 +86,36 @@ DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
 EOF
 if DOCKER_FAIL_PULL="$CANDIDATE_REF" docling_prepare_rollout "$TEST_DIR/pull-failure.env"; then
     echo 'rollout gate ignored a failed candidate pull' >&2
+    exit 1
+fi
+
+# Steady state after a successful cutover: the running container is the MCP 3
+# candidate, not the 1.x rollback. The gate must still pass, or the first
+# successful switch permanently blocks every later deploy — which is exactly
+# what happened on 2026-08-06 (run 31112111522, mc2-h89lo).
+cat > "$TEST_DIR/already-switched.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_SERVE_IMAGE=$SERVE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+EOF
+SWITCHED_RUNNING_ID='sha256:already-switched-mcp-image' \
+    docling_prepare_rollout "$TEST_DIR/already-switched.env" || {
+    echo 'rollout gate refused a host that is already on the MCP 3 candidate' >&2
+    exit 1
+}
+
+# And it must still refuse a host running something that is NEITHER the
+# rollback nor the candidate: that is a host nobody can prove a rollback for.
+cat > "$TEST_DIR/unknown-running.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_SERVE_IMAGE=$SERVE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+EOF
+if SWITCHED_RUNNING_ID='sha256:some-unrelated-image' \
+    docling_prepare_rollout "$TEST_DIR/unknown-running.env"; then
+    echo 'rollout gate accepted a host running neither the rollback nor the candidate' >&2
     exit 1
 fi
 
