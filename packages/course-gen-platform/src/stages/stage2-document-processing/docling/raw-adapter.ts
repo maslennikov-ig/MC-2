@@ -1,4 +1,4 @@
-import type { DoclingDocument } from './types.js';
+import type { DoclingDocument, DoclingPictureEnrichment } from './types.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -87,6 +87,99 @@ function extractAnnotationText(item: UnknownRecord): string | undefined {
   return texts.length > 0 ? texts.join('\n') : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+/** Row-major text grid from a Docling `TableData`, header row first. */
+function chartRows(data: UnknownRecord): string[][] {
+  const rows = new Map<number, Map<number, string>>();
+  for (const rawCell of asArray(data.table_cells)) {
+    const cell = asRecord(rawCell);
+    const rowIndex = asFiniteNumber(cell.start_row_offset_idx, 0);
+    const columnIndex = asFiniteNumber(cell.start_col_offset_idx, 0);
+    const row = rows.get(rowIndex) ?? new Map<number, string>();
+    row.set(columnIndex, asString(cell.text));
+    rows.set(rowIndex, row);
+  }
+
+  return [...rows.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, row]) =>
+      [...row.entries()].sort(([left], [right]) => left - right).map(([, text]) => text)
+    );
+}
+
+/**
+ * Pulls advanced enrichment out of Docling's `meta` into a stable shape.
+ *
+ * Two things this deliberately does NOT do. It does not require the advanced
+ * conversion profile: a PPTX declares its chart series in the source file, and
+ * MEASURED on 2026-08-06 the baseline stack already returns both
+ * `classification: bar_chart` and the full series for `reading-order-chart.pptx`
+ * with no enrichment flag set — the previous adapter simply dropped `meta` on
+ * the floor. And it does not invent a field from a neighbouring one: an absent
+ * key stays absent, so a consumer can tell "no model ran" from "the model found
+ * nothing".
+ */
+function pictureEnrichment(picture: UnknownRecord): DoclingPictureEnrichment | undefined {
+  const meta = asRecord(picture.meta);
+  const enrichment: DoclingPictureEnrichment = {};
+
+  const predictions = asArray(asRecord(meta.classification).predictions).map(asRecord);
+  const best = predictions
+    .filter(prediction => optionalString(prediction.class_name))
+    .sort(
+      (left, right) =>
+        (optionalNumber(right.confidence) ?? 0) - (optionalNumber(left.confidence) ?? 0)
+    )[0];
+  if (best) {
+    enrichment.classification = {
+      class_name: asString(best.class_name),
+      confidence: optionalNumber(best.confidence),
+      created_by: optionalString(best.created_by),
+    };
+  }
+
+  const description = asRecord(meta.description);
+  const descriptionText = optionalString(description.text);
+  if (descriptionText) {
+    enrichment.description = {
+      text: descriptionText,
+      confidence: optionalNumber(description.confidence),
+      created_by: optionalString(description.created_by),
+    };
+  }
+
+  const code = asRecord(meta.code);
+  const codeText = optionalString(code.text);
+  if (codeText) {
+    enrichment.code = {
+      text: codeText,
+      language: optionalString(code.language),
+      confidence: optionalNumber(code.confidence),
+      created_by: optionalString(code.created_by),
+    };
+  }
+
+  const chart = asRecord(meta.tabular_chart);
+  const rows = chartRows(asRecord(chart.chart_data));
+  if (rows.length > 0) {
+    enrichment.chart = {
+      title: optionalString(chart.title),
+      rows,
+      confidence: optionalNumber(chart.confidence),
+      created_by: optionalString(chart.created_by),
+    };
+  }
+
+  return Object.keys(enrichment).length > 0 ? enrichment : undefined;
+}
+
 function normalizeTableCells(data: UnknownRecord): DoclingDocument['tables'][number]['cells'] {
   const rows = new Map<number, DoclingDocument['tables'][number]['cells'][number]>();
   for (const rawCell of asArray(data.table_cells ?? data.cells)) {
@@ -143,6 +236,9 @@ export function normalizeDoclingDocument(raw: unknown): DoclingDocument {
       typeof text.level === 'number' && Number.isFinite(text.level)
         ? Math.max(1, text.level)
         : undefined,
+    // A top-level Docling field on code items, not enrichment metadata: the
+    // advanced pass makes it accurate rather than makes it exist.
+    code_language: optionalString(text.code_language),
     font: isRecord(text.font) ? text.font : undefined,
   }));
 
@@ -154,6 +250,7 @@ export function normalizeDoclingDocument(raw: unknown): DoclingDocument {
       page_no: pageNumber(picture),
       caption: resolveCaption(picture, textByRef),
       ocr_text: asString(picture.ocr_text) || extractAnnotationText(picture),
+      enrichment: pictureEnrichment(picture),
       ...extractImage(picture),
     };
   });

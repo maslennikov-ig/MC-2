@@ -1,6 +1,67 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "cases": [
+    {
+      "id": "enrichment-pdf",
+      "source": "enrichment-code-formula-chart.pdf",
+      "expectedTokens": [
+        "Листинг нормализации веса",
+        "normalize_weight",
+        "Диаграмма обработанных документов"
+      ],
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
+      "enrichment": {
+        "code": {
+          "language": "Python",
+          "mustContain": [
+            "def normalize_weight",
+            "raise ValueError",
+            "min(maximum, float(raw_weight))"
+          ]
+        },
+        "formula": {
+          "groundTruth": "x = \\frac { -b \\pm \\sqrt { ( b ^ { 2 } - 4ac ) } } { 2a }",
+          "mustContain": ["\\frac", "\\sqrt", "b ^ { 2 }", "2 a"],
+          "forbiddenSymbols": ["\\int", "\\sum", "\\lim", "\\partial"]
+        },
+        "classification": {
+          "className": "bar_chart",
+          "minimumConfidence": 0.5
+        },
+        "chart": {
+          "rows": [
+            ["Альфа", "12"],
+            ["Бета", "34"],
+            ["Гамма", "56"]
+          ]
+        }
+      },
+      "retrieval": [
+        {
+          "id": "enrich-code-language",
+          "query": "нормализация веса документа функция",
+          "evidence": [
+            {
+              "id": "normalize-weight-code",
+              "tokens": ["normalize_weight"]
+            }
+          ]
+        },
+        {
+          "id": "enrich-chart-values",
+          "query": "сколько документов обработано Гамма",
+          "evidence": [
+            {
+              "id": "gamma-56",
+              "tokens": ["Гамма", "56"]
+            }
+          ]
+        }
+      ]
+    },
     {
       "id": "scientific-pdf",
       "source": "../common/2510.13928v1.pdf",

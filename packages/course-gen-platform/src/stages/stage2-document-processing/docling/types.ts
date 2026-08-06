@@ -105,6 +105,15 @@ export interface DoclingText {
 
   /** Explicit heading level supplied by Docling for section headers */
   level?: number;
+
+  /**
+   * Programming language Docling assigned to a code block.
+   *
+   * Only ever set on items whose `type` is `code`. It is a top-level Docling
+   * field rather than enrichment metadata, so it can be present without the
+   * advanced pass — the enrichment model makes it accurate, not existent.
+   */
+  code_language?: string;
 }
 
 /**
@@ -131,6 +140,54 @@ export interface DoclingPicture {
 
   /** OCR text from image (if OCR was applied) */
   ocr_text?: string;
+
+  /** Normalized advanced enrichment metadata, when any is present. */
+  enrichment?: DoclingPictureEnrichment;
+}
+
+/**
+ * What a model (or the source file) said ABOUT a picture, normalized.
+ *
+ * Docling carries this under `meta` with version-specific shapes; downstream
+ * TypeScript must never see those. Every field is optional because each one
+ * comes from a different source: `classification` and `chart` can arrive from
+ * the source file itself with no model at all — a PPTX embeds its chart series
+ * as XML — while `description` only ever comes from a vision model.
+ */
+export interface DoclingPictureEnrichment {
+  /** Highest-confidence class, e.g. `bar_chart`. */
+  classification?: {
+    class_name: string;
+    confidence?: number;
+    /** Model or backend that produced it; absent when the file declared it. */
+    created_by?: string;
+  };
+
+  /** Grounded natural-language description produced by a vision model. */
+  description?: {
+    text: string;
+    confidence?: number;
+    created_by?: string;
+  };
+
+  /** Code recovered from a picture OF code (not from a code text block). */
+  code?: {
+    text: string;
+    language?: string;
+    confidence?: number;
+    created_by?: string;
+  };
+
+  /**
+   * Chart series recovered either from the source file or by a vision model.
+   * `rows` is row-major with the header row first when the source has one.
+   */
+  chart?: {
+    title?: string;
+    rows: string[][];
+    confidence?: number;
+    created_by?: string;
+  };
 }
 
 /**

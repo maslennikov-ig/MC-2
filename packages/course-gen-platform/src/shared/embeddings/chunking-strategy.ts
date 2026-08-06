@@ -51,14 +51,51 @@ export function resolveChunkingStrategy(
 }
 
 /**
+ * Exact models behind each advanced enrichment capability.
+ *
+ * Named here rather than left implicit because they are part of the artifact's
+ * identity: swapping a model changes what the document says, and an identity
+ * that ignored the swap would serve the old answer forever. Read off the
+ * pinned advanced image, not from documentation.
+ */
+export const ENRICHMENT_MODELS: Readonly<Record<string, string>> = {
+  code: 'docling-project/CodeFormulaV2',
+  formula: 'docling-project/CodeFormulaV2',
+  picture_classification: 'docling-project/DocumentFigureClassifier-v2.5',
+  chart: 'ibm-granite/granite-vision-4.1-4b',
+  picture_description: 'HuggingFaceTB/SmolVLM-256M-Instruct',
+};
+
+/** Enrichment that actually ran and was merged into the accepted document. */
+export interface AppliedEnrichment {
+  capabilities: readonly string[];
+}
+
+/**
  * Conversion profile identity that participates in chunk ids and cache keys.
  *
  * PDF heading inference changes the produced structure, so it cannot share an
- * identity with a conversion that ran without it.
+ * identity with a conversion that ran without it. Advanced enrichment is the
+ * same problem one level up: an enriched document carries a code language, a
+ * formula and chart series the baseline one does not, so reusing a baseline
+ * chunk id for it would let a cached baseline artifact answer a request for the
+ * enriched one — the exact failure the MCP cache key had in Stage A, where it
+ * hashed only the source and returned the previous profile's document.
+ *
+ * The model names, not just the capability names, are part of the identity.
  */
-export function resolveConversionProfile(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveConversionProfile(
+  env: NodeJS.ProcessEnv = process.env,
+  enrichment?: AppliedEnrichment
+): string {
   const headingInference = env.DOCLING_MCP_PDF_HEADING_HIERARCHY === 'true';
-  return headingInference ? 'baseline+pdf-heading-hierarchy' : 'baseline';
+  const base = headingInference ? 'baseline+pdf-heading-hierarchy' : 'baseline';
+
+  const capabilities = [...(enrichment?.capabilities ?? [])].sort();
+  if (capabilities.length === 0) return base;
+
+  const models = [...new Set(capabilities.map(name => ENRICHMENT_MODELS[name] ?? name))].sort();
+  return `${base}+enrich[${capabilities.join(',')}]@${models.join(',')}`;
 }
 
 export interface NativeChunkingInput {

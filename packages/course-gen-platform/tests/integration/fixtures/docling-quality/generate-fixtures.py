@@ -341,7 +341,133 @@ def make_vector_outline_pdf() -> None:
     pdf.save()
 
 
+CODE_LISTING = (
+    "def normalize_weight(raw_weight, minimum=0.0, maximum=1.0):",
+    '    """Clamp a document weight into the accepted range."""',
+    "    if raw_weight is None:",
+    "        raise ValueError('weight is required')",
+    "    return max(minimum, min(maximum, float(raw_weight)))",
+)
+
+# Values are deliberately unequal, three digits apart and not round, so a model
+# that invents plausible numbers cannot land on them by accident.
+CHART_SERIES = (("Альфа", 12), ("Бета", 34), ("Гамма", 56))
+
+
+def _draw_formula(path: Path) -> None:
+    """A quadratic formula as PIXELS, not as a text layer.
+
+    Formula enrichment has to read the image; if the characters were selectable
+    text the fixture would prove the PDF backend, not the model.
+    """
+    font = ImageFont.truetype(str(_font_path()), 44)
+    small = ImageFont.truetype(str(_font_path()), 26)
+    image = Image.new("RGB", (760, 190), "white")
+    draw = ImageDraw.Draw(image)
+    draw.text((30, 60), "x =", font=font, fill="black")
+    draw.text((130, 25), "-b ±", font=font, fill="black")
+    draw.text((250, 20), "√(b", font=font, fill="black")
+    draw.text((330, 8), "2", font=small, fill="black")
+    draw.text((355, 20), "- 4ac)", font=font, fill="black")
+    draw.line((130, 88, 560, 88), fill="black", width=4)
+    draw.text((300, 100), "2a", font=font, fill="black")
+    image.save(path, format="PNG")
+
+
+def _draw_bar_chart(path: Path) -> None:
+    """A bar chart as PIXELS: no embedded chart XML to read the values from.
+
+    The PPTX fixture already covers the native-chart path, where Docling
+    recovers series straight from the source file. This one is the case that
+    genuinely needs a vision model.
+    """
+    font = ImageFont.truetype(str(_font_path()), 22)
+    title_font = ImageFont.truetype(str(_font_path()), 26)
+    width, height = 720, 480
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    draw.text((150, 20), "Обработано документов", font=title_font, fill="black")
+
+    baseline = height - 70
+    draw.line((90, baseline, width - 40, baseline), fill="black", width=3)
+    draw.line((90, 70, 90, baseline), fill="black", width=3)
+
+    scale = (baseline - 110) / max(value for _, value in CHART_SERIES)
+    for index, (label, value) in enumerate(CHART_SERIES):
+        left = 150 + index * 170
+        top = baseline - value * scale
+        draw.rectangle((left, top, left + 110, baseline), fill="#4c6ef5")
+        draw.text((left + 30, top - 32), str(value), font=font, fill="black")
+        draw.text((left + 20, baseline + 14), label, font=font, fill="black")
+
+    image.save(path, format="PNG")
+
+
+def make_enrichment_pdf() -> None:
+    """One PDF carrying all three enrichment signals, each in its own section.
+
+    Code stays a real text layer in a monospace font, because that is the shape
+    the layout model classifies as code. The formula and the chart are raster
+    images on purpose: they are the cases the advanced pass exists for.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    font_path = _font_path()
+    bold_path = font_path.with_name(font_path.name.replace(".ttf", "-Bold.ttf"))
+    pdfmetrics.registerFont(TTFont("FixtureSans", str(font_path)))
+    pdfmetrics.registerFont(
+        TTFont("FixtureSans-Bold", str(bold_path if bold_path.exists() else font_path))
+    )
+
+    formula_path = ROOT / "_enrichment-formula.png"
+    chart_path = ROOT / "_enrichment-chart.png"
+    _draw_formula(formula_path)
+    _draw_bar_chart(chart_path)
+
+    pdf = canvas.Canvas(
+        str(ROOT / "enrichment-code-formula-chart.pdf"), pagesize=A4, pageCompression=1
+    )
+    page_width, page_height = A4
+    y = page_height - 80
+
+    pdf.setFont("FixtureSans-Bold", 20)
+    pdf.drawString(60, y, "Справочник обработки документов")
+    y -= 46
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "1. Листинг нормализации веса")
+    y -= 30
+    pdf.setFont("Courier", 10.5)
+    for line in CODE_LISTING:
+        pdf.drawString(72, y, line)
+        y -= 16
+    y -= 30
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "2. Формула корней квадратного уравнения")
+    y -= 24
+    pdf.drawImage(
+        ImageReader(str(formula_path)), 60, y - 100, width=340, height=95, mask=None
+    )
+    y -= 140
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "3. Диаграмма обработанных документов")
+    y -= 24
+    pdf.drawImage(
+        ImageReader(str(chart_path)), 60, y - 250, width=360, height=240, mask=None
+    )
+
+    pdf.showPage()
+    pdf.save()
+
+    formula_path.unlink()
+    chart_path.unlink()
+
+
 GENERATORS = {
+    "enrichment-pdf": make_enrichment_pdf,
     "structured-docx": make_docx,
     "hierarchy-docx": make_hierarchy_docx,
     "numbered-sections-pdf": make_numbered_sections_pdf,
