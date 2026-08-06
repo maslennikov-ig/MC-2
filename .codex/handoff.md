@@ -1,37 +1,37 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-06 — Docling Intelligence Stage A is OPEN: the dense A/B was withdrawn and no
-chunking candidate is selected. Production chunking unchanged; embedding cache identity fixed.
+Updated: 2026-08-06 — Docling Intelligence Stage A accepted on `develop`. `docling_hybrid` selected
+on a dense A/B that measures production; chunking behaviour unchanged, embedding cache fixed.
 
 Current stage id: `mc2-1sobq.1`
-Stage: structure-aware Docling RAG with provenance, in progress; AC-2 blocked on `mc2-j1axa`.
+Stage: structure-aware Docling RAG with provenance, accepted; epic continues at `mc2-1sobq.2`.
 
-## Docling Intelligence: Stage A structure is in, the A/B is not
+## Docling Intelligence: Stage A is in, and it is opt-in
 
 Native Docling structure now reaches chunking, enrichment and the Qdrant payload behind
 `DOCLING_CHUNK_STRATEGY` (`legacy_markdown` | `docling_hierarchical` | `docling_hybrid`). Native
-chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable cases; heading
-path coverage is in the stage summary. **No candidate is selected**, `legacy_markdown` is default.
+chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable cases.
+**`docling_hybrid` is selected, `legacy_markdown` is still the default** — selection is not
+activation; the flip is Stage E under separate authorization.
 
-**The `docling_hybrid` selection was withdrawn on 2026-08-06.** Its dense run split parents and
-children into two embedding calls with different `late_chunking` flags, while `phase-5-embedding.ts`
-makes ONE call with it on — and under late chunking the request input IS the context. Worse, all 36
-records billed 0 tokens: every vector came from a cache keyed `sha256(text:task)` — no
-`late_chunking`, model or batch — so children were served the non-contextual vectors the parents
-pass had just written. Re-running `--dense` corrected is paid and needs fresh authorization.
+**The A/B runs the production ranker**: ONE late-chunking call over every chunk, exactly as
+`phase-5-embedding.ts` makes it, real Jina v3 vectors, `searchChunks({enable_hybrid:true})` in a
+throwaway collection with the production schema AND payload indexes. 7/7 in both profiles. On the
+BASELINE profile hybrid regresses nothing and takes `sci-accuracy-drop` from unanswerable (legacy
+retrieves neither fact) to both facts at rank 3; with heading inference ON it wins nothing, so the
+improvement is specific to the default profile. `docling_hierarchical` rejected.
 
-**The cache fix is production-affecting.** Keys now cover model, width, task, `late_chunking` and —
-under late chunking — the whole ordered batch, and a partial late-chunking hit re-embeds the batch.
-Old keys expire on their 1-hour TTL, so a document's first re-processing after deploy re-embeds it.
+**Two production fixes came out of it.** The cache key now covers model, width, task,
+`late_chunking` and — under late chunking — the whole ordered batch; a partial late-chunking hit
+re-embeds the batch, and old keys expire on their 1-hour TTL, so a document's first re-processing
+after deploy re-embeds it. And a 429 is now retried by waiting out Jina's per-minute TOKEN window
+(`Retry-After` wins); it was fatal, so one large document could permanently fail its job.
 
-**The gate counts EVIDENCE ATOMS**, never chunks: coverage over the facts the manifest declares,
-plus `1/rank` and `1/log2(rank+1)` over that same fixed denominator, at a 1e-9 epsilon. Chunk-level
-Recall/MRR/nDCG are printed, not gated — a ratio penalises a finer cut, a count rewards one. Scored
-top-5s are written out as chunk ids, so ranking claims stay checkable.
+**The gate counts EVIDENCE ATOMS**, never chunks (rules in `docs/DOCLING-MCP-REFERENCE.md`): a
+ratio penalises a finer cut and a count rewards one. Scored top-5s are written out as chunk ids.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
-`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`, so chunks and the
-accepted document are one by construction. Unresolvable refs fail before upload.
+`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`. Bad refs fail early.
 
 **Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
 `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:**
@@ -180,16 +180,16 @@ and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.1` — still open; `mc2-1sobq.2` waits on it.
-Recommended action: `mc2-j1axa`, re-run the dense A/B corrected. Bills `api.jina.ai`, needs fresh authorization.
+Next stage id: `mc2-1sobq.2` — selective Docling enrichments; `mc2-1sobq.3` is also unblocked.
+Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-1sobq.1` under `specs/024-docling-intelligence/`. Treat the Docling
-split stack as live and Stage A as OPEN: chunking strategy and PDF heading inference are
-feature-flagged and off in production, and no chunking candidate is selected. Preserve the immutable
-production image references and the MCP 1.x rollback digest, publish no digests outside Stage E, and
-reindex nothing without a separate task and authority.
+Use $orchestrator-stage for `mc2-1sobq.2` under `specs/024-docling-intelligence/`. Treat the Docling
+split stack as live and Stage A as accepted: chunking strategy and PDF heading inference are
+feature-flagged and off in production; `docling_hybrid` is selected but not activated. Preserve the
+immutable production image references and the MCP 1.x rollback digest, publish no digests outside
+Stage E, and reindex nothing without a separate task and authority.
 
 ## Read First
 

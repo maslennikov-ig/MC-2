@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "label": "atoms-lexical-baseline",
+  "label": "dense-atoms-baseline",
   "serverUrl": "http://127.0.0.1:8000/mcp",
   "serveUrl": "http://127.0.0.1:5001",
   "conversionProfile": "baseline",
@@ -8,7 +8,8 @@
   "candidate": "docling_hybrid",
   "notes": [
     "- scientific-pdf · docling_hierarchical (не кандидат, lexical): sci-accuracy-drop/atom-coverage 0.500→0.000; sci-accuracy-drop/atom-mrr 0.125→0.000; sci-accuracy-drop/atom-dcg 0.215→0.000",
-    "- reading-order-pptx · docling_hierarchical (не кандидат, lexical): pptx-steps/atom-mrr 1.000→0.292; pptx-steps/atom-dcg 1.000→0.465"
+    "- reading-order-pptx · docling_hierarchical (не кандидат, lexical): pptx-steps/atom-mrr 1.000→0.292; pptx-steps/atom-dcg 1.000→0.465",
+    "- reading-order-pptx · docling_hierarchical (не кандидат, dense): pptx-steps/atom-mrr 1.000→0.417; pptx-steps/atom-dcg 1.000→0.565"
   ],
   "chunkingConfig": {
     "parent_chunk_size": 1500,
@@ -16,19 +17,19 @@
     "child_chunk_overlap": 50,
     "tiktoken_model": "gpt-3.5-turbo"
   },
-  "generatedAt": "2026-08-06T05:08:08.000Z",
+  "generatedAt": "2026-08-06T09:31:12.758Z",
   "runtime": {
     "serveContainer": "docling-mcp-docling-serve-1",
-    "serveMemory": "2.356GiB / 4GiB",
+    "serveMemory": "2.853GiB / 4GiB",
     "serveRestartCount": 0
   },
   "cases": [
     {
       "id": "scientific-pdf",
       "status": "passed",
-      "processingTimeMs": 214672,
-      "fromCache": false,
-      "documentKey": "70efc0ee566178a9942dd2b75e8cfeb3",
+      "processingTimeMs": 557,
+      "fromCache": true,
+      "documentKey": "42658440475025d471818a8224c54212",
       "markdownLength": 132019,
       "pages": 20,
       "textElements": 433,
@@ -81,7 +82,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -89,7 +90,85 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "atoms": [
+                  {
+                    "id": "arc-baseline",
+                    "rank": null,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "arc-after-junk",
+                    "rank": null,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 0,
+                "atomCoverageAtK": 0,
+                "atomMrrAtK": 0,
+                "atomDcgAtK": 0,
+                "rankedChunkIds": [
+                  "child_42_56268018",
+                  "child_77_162068484",
+                  "child_41_1032897306",
+                  "child_20_2015409819",
+                  "child_24_134831918"
+                ],
+                "firstRelevantRank": null,
+                "relevantInTopK": 0,
+                "relevantTotal": 8,
+                "recallAtK": 0,
+                "recallCeilingAtK": 0.625,
+                "reciprocalRank": 0,
+                "ndcgAtK": 0,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "atoms": [
+                  {
+                    "id": "brain-rot-hypothesis",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_75_633117010",
+                  "child_6_77573732",
+                  "child_154_526767590",
+                  "child_5_1949202796",
+                  "child_8_1187615324"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 3,
+                "relevantTotal": 8,
+                "recallAtK": 0.375,
+                "recallCeilingAtK": 0.625,
+                "reciprocalRank": 1,
+                "ndcgAtK": 0.6843515475204855,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 0.5,
+            "atomMrrAtK": 0.5,
+            "atomDcgAtK": 0.5,
+            "unreachableAtoms": [],
+            "recallAtK": 0.1875,
+            "recallCeilingAtK": 0.625,
+            "mrr": 0.5,
+            "ndcgAtK": 0.3421757737602428,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 155,
           "childChunks": 155,
@@ -98,7 +177,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 11462,
+          "durationMs": 13376,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -182,17 +261,7 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 31,
-          "childChunks": 139,
-          "avgChildTokens": 197,
-          "refCoverage": 1,
-          "locationCoverage": 1,
-          "locationEligible": true,
-          "headingPathCoverage": 1,
-          "durationMs": 2260,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -215,11 +284,11 @@
                 "atomMrrAtK": 0,
                 "atomDcgAtK": 0,
                 "rankedChunkIds": [
-                  "child_88_15cb50ff1f47999b",
-                  "child_89_3f89082036a8a407",
-                  "child_138_be90024cdc8ed07c",
-                  "child_60_b7244c38d770886f",
-                  "child_44_356bdffd1f066e72"
+                  "child_88_f2f3b95f65188a0c",
+                  "child_56_c104f1ab8adc3319",
+                  "child_89_78544d4f7c6c8bc8",
+                  "child_138_1abf39970ed314ee",
+                  "child_44_2e1ee58daa5319c6"
                 ],
                 "firstRelevantRank": null,
                 "relevantInTopK": 0,
@@ -245,11 +314,99 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_15_1fcbf01bf26dd6a9",
-                  "child_7_71dfcf78ae6faec0",
-                  "child_53_3302ab227a136b26",
-                  "child_59_e31481d433496552",
-                  "child_16_a15c903f76ba6ed8"
+                  "child_15_be2702d2e5767040",
+                  "child_7_b300b6cc5b70000e",
+                  "child_8_eab1116107e4c03f",
+                  "child_48_f610f6af2bac81a3",
+                  "child_59_f8befa88d65f1b47"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 3,
+                "relevantTotal": 9,
+                "recallAtK": 0.3333333333333333,
+                "recallCeilingAtK": 0.5555555555555556,
+                "reciprocalRank": 1,
+                "ndcgAtK": 0.6843515475204855,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 0.5,
+            "atomMrrAtK": 0.5,
+            "atomDcgAtK": 0.5,
+            "unreachableAtoms": [],
+            "recallAtK": 0.16666666666666666,
+            "recallCeilingAtK": 0.5902777777777778,
+            "mrr": 0.5,
+            "ndcgAtK": 0.3421757737602428,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
+          "parentChunks": 31,
+          "childChunks": 139,
+          "avgChildTokens": 197,
+          "refCoverage": 1,
+          "locationCoverage": 1,
+          "locationEligible": true,
+          "headingPathCoverage": 1,
+          "durationMs": 3626,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "atoms": [
+                  {
+                    "id": "arc-baseline",
+                    "rank": null,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "arc-after-junk",
+                    "rank": null,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 0,
+                "atomCoverageAtK": 0,
+                "atomMrrAtK": 0,
+                "atomDcgAtK": 0,
+                "rankedChunkIds": [
+                  "child_88_f2f3b95f65188a0c",
+                  "child_89_78544d4f7c6c8bc8",
+                  "child_138_1abf39970ed314ee",
+                  "child_60_0c03d452776e38b6",
+                  "child_44_2e1ee58daa5319c6"
+                ],
+                "firstRelevantRank": null,
+                "relevantInTopK": 0,
+                "relevantTotal": 8,
+                "recallAtK": 0,
+                "recallCeilingAtK": 0.625,
+                "reciprocalRank": 0,
+                "ndcgAtK": 0,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "atoms": [
+                  {
+                    "id": "brain-rot-hypothesis",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_15_be2702d2e5767040",
+                  "child_7_b300b6cc5b70000e",
+                  "child_53_1d62c4c44b39d178",
+                  "child_59_f8befa88d65f1b47",
+                  "child_16_b0d03d870eba92d1"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
@@ -275,17 +432,7 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 31,
-          "childChunks": 106,
-          "avgChildTokens": 254,
-          "refCoverage": 1,
-          "locationCoverage": 1,
-          "locationEligible": true,
-          "headingPathCoverage": 1,
-          "durationMs": 6206,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -308,11 +455,11 @@
                 "atomMrrAtK": 0.3333333333333333,
                 "atomDcgAtK": 0.5,
                 "rankedChunkIds": [
-                  "child_57_13bddecac1505b4c",
-                  "child_104_552097b796a81b33",
-                  "child_21_0b4ab16b0bdb90d7",
-                  "child_29_bc1fc2dc0c197495",
-                  "child_5_d8493a72995b0e71"
+                  "child_57_8dd2c760ce5522cf",
+                  "child_85_00d7c216374831c8",
+                  "child_21_b3c91e3356e7e968",
+                  "child_34_c2f335d8b6b5b935",
+                  "child_104_05f77e37adfa83d1"
                 ],
                 "firstRelevantRank": 3,
                 "relevantInTopK": 1,
@@ -338,11 +485,99 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_9_2e83709b82eeb76e",
-                  "child_36_236db8b2e90e092c",
-                  "child_34_55f587c37245da48",
-                  "child_10_a521dfe848d6efe1",
-                  "child_3_3d6dc6b0a9bda54f"
+                  "child_9_cbca945d422480c6",
+                  "child_6_afa6e5c17cac4475",
+                  "child_36_7de3516f5e0db815",
+                  "child_3_20a8134dd8932236",
+                  "child_10_24f34831a9d28d31"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 5,
+                "relevantTotal": 9,
+                "recallAtK": 0.5555555555555556,
+                "recallCeilingAtK": 0.5555555555555556,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 0.6666666666666666,
+            "atomDcgAtK": 0.75,
+            "unreachableAtoms": [],
+            "recallAtK": 0.3492063492063492,
+            "recallCeilingAtK": 0.6349206349206349,
+            "mrr": 0.6666666666666666,
+            "ndcgAtK": 0.584790051318404,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 2026,
+          "parentChunks": 31,
+          "childChunks": 106,
+          "avgChildTokens": 254,
+          "refCoverage": 1,
+          "locationCoverage": 1,
+          "locationEligible": true,
+          "headingPathCoverage": 1,
+          "durationMs": 4102,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "sci-accuracy-drop",
+                "atoms": [
+                  {
+                    "id": "arc-baseline",
+                    "rank": 3,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "arc-after-junk",
+                    "rank": 3,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 2,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 0.3333333333333333,
+                "atomDcgAtK": 0.5,
+                "rankedChunkIds": [
+                  "child_57_8dd2c760ce5522cf",
+                  "child_104_05f77e37adfa83d1",
+                  "child_21_b3c91e3356e7e968",
+                  "child_29_8f2b37fffd8478e3",
+                  "child_5_fc79d79f38084318"
+                ],
+                "firstRelevantRank": 3,
+                "relevantInTopK": 1,
+                "relevantTotal": 7,
+                "recallAtK": 0.14285714285714285,
+                "recallCeilingAtK": 0.7142857142857143,
+                "reciprocalRank": 0.3333333333333333,
+                "ndcgAtK": 0.16958010263680806,
+                "refMatched": null
+              },
+              {
+                "id": "sci-hypothesis",
+                "atoms": [
+                  {
+                    "id": "brain-rot-hypothesis",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_9_cbca945d422480c6",
+                  "child_36_7de3516f5e0db815",
+                  "child_34_c2f335d8b6b5b935",
+                  "child_10_24f34831a9d28d31",
+                  "child_3_20a8134dd8932236"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 4,
@@ -370,9 +605,9 @@
     {
       "id": "numbered-sections-pdf",
       "status": "passed",
-      "processingTimeMs": 1234,
-      "fromCache": false,
-      "documentKey": "8c3f6faee6e383d22c80fb463bb65e81",
+      "processingTimeMs": 146,
+      "fromCache": true,
+      "documentKey": "80e1b2e912067e4a3470a26a99698895",
       "markdownLength": 558,
       "pages": 1,
       "textElements": 16,
@@ -421,7 +656,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -429,7 +664,68 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "atoms": [
+                  {
+                    "id": "control-value-64",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_611842455"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "atoms": [
+                  {
+                    "id": "scope-incoming-documents",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_611842455"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -438,7 +734,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 69,
+          "durationMs": 1307,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -505,17 +801,7 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 7,
-          "childChunks": 7,
-          "avgChildTokens": 30,
-          "refCoverage": 1,
-          "locationCoverage": 1,
-          "locationEligible": true,
-          "headingPathCoverage": 1,
-          "durationMs": 2042,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -533,11 +819,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_5_d7bc8e29ad86a95c",
-                  "child_0_8a1a37020599502e",
-                  "child_1_6817b308e21c84b0",
-                  "child_2_4bae4f8677eb7867",
-                  "child_3_429718783b32932d"
+                  "child_5_c156babc36b5460f",
+                  "child_6_d95b09019b48500f",
+                  "child_4_48376d91031bed29",
+                  "child_3_609c01264dcd0eb7",
+                  "child_2_6c8fc768b5294898"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -563,11 +849,94 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_1_6817b308e21c84b0",
-                  "child_0_8a1a37020599502e",
-                  "child_2_4bae4f8677eb7867",
-                  "child_3_429718783b32932d",
-                  "child_4_49bd599bab56f1ee"
+                  "child_1_8d6ae793610456db",
+                  "child_0_6b3913d9d786a721",
+                  "child_2_6c8fc768b5294898",
+                  "child_4_48376d91031bed29",
+                  "child_3_609c01264dcd0eb7"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
+          "parentChunks": 7,
+          "childChunks": 7,
+          "avgChildTokens": 30,
+          "refCoverage": 1,
+          "locationCoverage": 1,
+          "locationEligible": true,
+          "headingPathCoverage": 1,
+          "durationMs": 3213,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "atoms": [
+                  {
+                    "id": "control-value-64",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_5_c156babc36b5460f",
+                  "child_0_6b3913d9d786a721",
+                  "child_1_8d6ae793610456db",
+                  "child_2_6c8fc768b5294898",
+                  "child_3_609c01264dcd0eb7"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "atoms": [
+                  {
+                    "id": "scope-incoming-documents",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_1_8d6ae793610456db",
+                  "child_0_6b3913d9d786a721",
+                  "child_2_6c8fc768b5294898",
+                  "child_3_609c01264dcd0eb7",
+                  "child_4_48376d91031bed29"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -593,17 +962,7 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 7,
-          "childChunks": 7,
-          "avgChildTokens": 30,
-          "refCoverage": 1,
-          "locationCoverage": 1,
-          "locationEligible": true,
-          "headingPathCoverage": 1,
-          "durationMs": 2042,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -621,11 +980,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_5_4aead67132d6786b",
-                  "child_0_c864690b2cfb341c",
-                  "child_1_aebe21f9d3ca70e6",
-                  "child_2_235573081a65232a",
-                  "child_3_d553f5a0add37d30"
+                  "child_5_8888791b9460e1b0",
+                  "child_6_e58a7210efb59779",
+                  "child_4_7664b829ae9e27db",
+                  "child_3_ab59ee351fbb6b72",
+                  "child_2_235f3939c900959c"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -651,11 +1010,94 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_1_aebe21f9d3ca70e6",
-                  "child_0_c864690b2cfb341c",
-                  "child_2_235573081a65232a",
-                  "child_3_d553f5a0add37d30",
-                  "child_4_e8278fc7f5cd20d4"
+                  "child_1_49a39d22a951a1a9",
+                  "child_0_bcffd7d8e4f42d7a",
+                  "child_2_235f3939c900959c",
+                  "child_4_7664b829ae9e27db",
+                  "child_3_ab59ee351fbb6b72"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
+          "parentChunks": 7,
+          "childChunks": 7,
+          "avgChildTokens": 30,
+          "refCoverage": 1,
+          "locationCoverage": 1,
+          "locationEligible": true,
+          "headingPathCoverage": 1,
+          "durationMs": 3169,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "numbered-control-value",
+                "atoms": [
+                  {
+                    "id": "control-value-64",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_5_8888791b9460e1b0",
+                  "child_0_bcffd7d8e4f42d7a",
+                  "child_1_49a39d22a951a1a9",
+                  "child_2_235f3939c900959c",
+                  "child_3_ab59ee351fbb6b72"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "numbered-scope",
+                "atoms": [
+                  {
+                    "id": "scope-incoming-documents",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_1_49a39d22a951a1a9",
+                  "child_0_bcffd7d8e4f42d7a",
+                  "child_2_235f3939c900959c",
+                  "child_3_ab59ee351fbb6b72",
+                  "child_4_7664b829ae9e27db"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -683,9 +1125,9 @@
     {
       "id": "hierarchy-docx",
       "status": "passed",
-      "processingTimeMs": 334,
-      "fromCache": false,
-      "documentKey": "80aef14980c406dd1e476b23a1f4a036",
+      "processingTimeMs": 105,
+      "fromCache": true,
+      "documentKey": "dae420b6eae8f54efcbd0f2113d4e632",
       "markdownLength": 572,
       "pages": 1,
       "textElements": 15,
@@ -732,7 +1174,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -740,7 +1182,92 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "atoms": [
+                  {
+                    "id": "alpha-42",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_41314917"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "atoms": [
+                  {
+                    "id": "beta-77",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_41314917"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "atoms": [
+                  {
+                    "id": "beta-30-minutes",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_41314917"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -749,7 +1276,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 66,
+          "durationMs": 1335,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -840,17 +1367,7 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 7,
-          "childChunks": 7,
-          "avgChildTokens": 48,
-          "refCoverage": 1,
-          "locationCoverage": 0,
-          "locationEligible": false,
-          "headingPathCoverage": 1,
-          "durationMs": 2039,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -868,11 +1385,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_2_a12d7077f7c6fc4a",
-                  "child_5_132e2fddf079b72a",
-                  "child_3_3fddfee7baebd969",
-                  "child_0_30218cbddc3fceec",
-                  "child_1_b29c9a2fe6887802"
+                  "child_2_ba8e34cddb338b29",
+                  "child_5_223ec10981a79259",
+                  "child_3_110b39f6852c6ff8",
+                  "child_1_fe79bedd10a65f83",
+                  "child_4_3c35597918c05776"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -898,11 +1415,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_5_132e2fddf079b72a",
-                  "child_2_a12d7077f7c6fc4a",
-                  "child_6_3c079316e5bd584b",
-                  "child_0_30218cbddc3fceec",
-                  "child_1_b29c9a2fe6887802"
+                  "child_5_223ec10981a79259",
+                  "child_2_ba8e34cddb338b29",
+                  "child_6_9d476fdb2fefd573",
+                  "child_4_3c35597918c05776",
+                  "child_1_fe79bedd10a65f83"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -928,11 +1445,124 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_6_3c079316e5bd584b",
-                  "child_3_3fddfee7baebd969",
-                  "child_5_132e2fddf079b72a",
-                  "child_0_30218cbddc3fceec",
-                  "child_1_b29c9a2fe6887802"
+                  "child_6_9d476fdb2fefd573",
+                  "child_5_223ec10981a79259",
+                  "child_3_110b39f6852c6ff8",
+                  "child_4_3c35597918c05776",
+                  "child_2_ba8e34cddb338b29"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
+          "parentChunks": 7,
+          "childChunks": 7,
+          "avgChildTokens": 48,
+          "refCoverage": 1,
+          "locationCoverage": 0,
+          "locationEligible": false,
+          "headingPathCoverage": 1,
+          "durationMs": 3268,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "atoms": [
+                  {
+                    "id": "alpha-42",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_2_ba8e34cddb338b29",
+                  "child_5_223ec10981a79259",
+                  "child_3_110b39f6852c6ff8",
+                  "child_0_3d1ba2223ea6623b",
+                  "child_1_fe79bedd10a65f83"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "atoms": [
+                  {
+                    "id": "beta-77",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_5_223ec10981a79259",
+                  "child_2_ba8e34cddb338b29",
+                  "child_6_9d476fdb2fefd573",
+                  "child_0_3d1ba2223ea6623b",
+                  "child_1_fe79bedd10a65f83"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "atoms": [
+                  {
+                    "id": "beta-30-minutes",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_6_9d476fdb2fefd573",
+                  "child_3_110b39f6852c6ff8",
+                  "child_5_223ec10981a79259",
+                  "child_0_3d1ba2223ea6623b",
+                  "child_1_fe79bedd10a65f83"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -958,17 +1588,7 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
-          "denseBilledTokens": 0,
-          "parentChunks": 7,
-          "childChunks": 7,
-          "avgChildTokens": 48,
-          "refCoverage": 1,
-          "locationCoverage": 0,
-          "locationEligible": false,
-          "headingPathCoverage": 1,
-          "durationMs": 2043,
-          "retrieval": {
+          "denseRetrieval": {
             "k": 5,
             "questions": [
               {
@@ -986,11 +1606,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_2_2e8b5e8b04ab7bb4",
-                  "child_5_aa7383688988a958",
-                  "child_3_2a6d38a9afcaec3b",
-                  "child_0_9d0cbc7e568e652a",
-                  "child_1_e1ed791a08602f19"
+                  "child_2_9b1933ce0f753feb",
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_3_4ebed46a7e4d5b0c",
+                  "child_1_9a851da4f8086acd",
+                  "child_4_cae036e805d21ba6"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -1016,11 +1636,11 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_5_aa7383688988a958",
-                  "child_2_2e8b5e8b04ab7bb4",
-                  "child_6_f26bd03e1dc893ee",
-                  "child_0_9d0cbc7e568e652a",
-                  "child_1_e1ed791a08602f19"
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_2_9b1933ce0f753feb",
+                  "child_6_388c8214d4acc210",
+                  "child_4_cae036e805d21ba6",
+                  "child_1_9a851da4f8086acd"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -1046,11 +1666,124 @@
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
                 "rankedChunkIds": [
-                  "child_6_f26bd03e1dc893ee",
-                  "child_3_2a6d38a9afcaec3b",
-                  "child_5_aa7383688988a958",
-                  "child_0_9d0cbc7e568e652a",
-                  "child_1_e1ed791a08602f19"
+                  "child_6_388c8214d4acc210",
+                  "child_3_4ebed46a7e4d5b0c",
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_4_cae036e805d21ba6",
+                  "child_2_9b1933ce0f753feb"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
+          "denseBilledTokens": 0,
+          "parentChunks": 7,
+          "childChunks": 7,
+          "avgChildTokens": 48,
+          "refCoverage": 1,
+          "locationCoverage": 0,
+          "locationEligible": false,
+          "headingPathCoverage": 1,
+          "durationMs": 3242,
+          "retrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "alpha-target",
+                "atoms": [
+                  {
+                    "id": "alpha-42",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_2_9b1933ce0f753feb",
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_3_4ebed46a7e4d5b0c",
+                  "child_0_23f7a12e68086d1e",
+                  "child_1_9a851da4f8086acd"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-target",
+                "atoms": [
+                  {
+                    "id": "beta-77",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_2_9b1933ce0f753feb",
+                  "child_6_388c8214d4acc210",
+                  "child_0_23f7a12e68086d1e",
+                  "child_1_9a851da4f8086acd"
+                ],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              },
+              {
+                "id": "beta-latency",
+                "atoms": [
+                  {
+                    "id": "beta-30-minutes",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": [
+                  "child_6_388c8214d4acc210",
+                  "child_3_4ebed46a7e4d5b0c",
+                  "child_5_2fb9ddee8f8b78b1",
+                  "child_0_23f7a12e68086d1e",
+                  "child_1_9a851da4f8086acd"
                 ],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
@@ -1078,9 +1811,9 @@
     {
       "id": "structured-docx",
       "status": "passed",
-      "processingTimeMs": 268,
-      "fromCache": false,
-      "documentKey": "4c18f12c2fc215e1eb2d69c7a3a21585",
+      "processingTimeMs": 144,
+      "fromCache": true,
+      "documentKey": "5c90707cf24f692125ca5acf8ab31091",
       "markdownLength": 500,
       "pages": 1,
       "textElements": 8,
@@ -1144,7 +1877,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -1152,7 +1885,44 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "atoms": [
+                  {
+                    "id": "accuracy-98-percent",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_787323027"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -1161,7 +1931,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 66,
+          "durationMs": 1271,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1204,7 +1974,44 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "atoms": [
+                  {
+                    "id": "accuracy-98-percent",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_1_6be443df953c058e", "child_0_140892d14034675a"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 2,
           "childChunks": 2,
@@ -1213,7 +2020,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2042,
+          "durationMs": 3235,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1231,7 +2038,7 @@
                 "atomCoverageAtK": 1,
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
-                "rankedChunkIds": ["child_1_eb5bf8dc52eab9f4", "child_0_3ece02ad5f180def"],
+                "rankedChunkIds": ["child_1_6be443df953c058e", "child_0_140892d14034675a"],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
@@ -1256,7 +2063,44 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "structured-table-value",
+                "atoms": [
+                  {
+                    "id": "accuracy-98-percent",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_1_f8c2d66bf0ff8762", "child_0_119d18501712389c"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 2,
           "childChunks": 2,
@@ -1265,7 +2109,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 1,
-          "durationMs": 2040,
+          "durationMs": 3323,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1283,7 +2127,7 @@
                 "atomCoverageAtK": 1,
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
-                "rankedChunkIds": ["child_1_960696cb420a51b5", "child_0_1431f471a4b01293"],
+                "rankedChunkIds": ["child_1_f8c2d66bf0ff8762", "child_0_119d18501712389c"],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
@@ -1310,9 +2154,9 @@
     {
       "id": "reading-order-pptx",
       "status": "passed",
-      "processingTimeMs": 249,
-      "fromCache": false,
-      "documentKey": "2e8c72af3876bd709b897389008b4ee5",
+      "processingTimeMs": 140,
+      "fromCache": true,
+      "documentKey": "5c48be4a85896cc65cdfc2c09e462f04",
       "markdownLength": 373,
       "pages": 1,
       "textElements": 7,
@@ -1370,7 +2214,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -1378,7 +2222,49 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "atoms": [
+                  {
+                    "id": "step-one",
+                    "rank": 1,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "step-two",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 2,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_401500867"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -1387,7 +2273,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 67,
+          "durationMs": 1295,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1435,7 +2321,55 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "atoms": [
+                  {
+                    "id": "step-one",
+                    "rank": 2,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "step-two",
+                    "rank": 3,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 2,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 0.41666666666666663,
+                "atomDcgAtK": 0.5654648767857288,
+                "rankedChunkIds": [
+                  "child_3_6df11fed8d100aa1",
+                  "child_1_f72485e97e16aa23",
+                  "child_2_0130c0500e979b91",
+                  "child_0_31a571a35ba66575",
+                  "child_4_4d59a7832d2aaf66"
+                ],
+                "firstRelevantRank": 2,
+                "relevantInTopK": 2,
+                "relevantTotal": 2,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 0.5,
+                "ndcgAtK": 0.6934264036172708,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 0.41666666666666663,
+            "atomDcgAtK": 0.5654648767857288,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 0.5,
+            "ndcgAtK": 0.6934264036172708,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 6,
@@ -1444,7 +2378,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2040,
+          "durationMs": 3235,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1468,11 +2402,11 @@
                 "atomMrrAtK": 0.29166666666666663,
                 "atomDcgAtK": 0.46533827903669656,
                 "rankedChunkIds": [
-                  "child_3_08b08fe1b24773cc",
-                  "child_0_bfb30875e5017c9b",
-                  "child_1_66929ec0d6eb2763",
-                  "child_2_bf76cc9516c667d8",
-                  "child_4_ca120a1036b5e74b"
+                  "child_3_6df11fed8d100aa1",
+                  "child_0_31a571a35ba66575",
+                  "child_1_f72485e97e16aa23",
+                  "child_2_0130c0500e979b91",
+                  "child_4_4d59a7832d2aaf66"
                 ],
                 "firstRelevantRank": 3,
                 "relevantInTopK": 2,
@@ -1498,7 +2432,49 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "pptx-steps",
+                "atoms": [
+                  {
+                    "id": "step-one",
+                    "rank": 1,
+                    "unreachable": false
+                  },
+                  {
+                    "id": "step-two",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 2,
+                "atomsCoveredInTopK": 2,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_a19ada711ea16c2d"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -1507,7 +2483,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 0,
-          "durationMs": 2040,
+          "durationMs": 3305,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1530,7 +2506,7 @@
                 "atomCoverageAtK": 1,
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
-                "rankedChunkIds": ["child_0_5d58a6df9d5f1727"],
+                "rankedChunkIds": ["child_0_a19ada711ea16c2d"],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
@@ -1557,9 +2533,9 @@
     {
       "id": "russian-raster-ocr",
       "status": "passed",
-      "processingTimeMs": 8349,
-      "fromCache": false,
-      "documentKey": "2fd1a1b337cc5d09313b7963af726b88",
+      "processingTimeMs": 102,
+      "fromCache": true,
+      "documentKey": "0de58beb1d920df353c9d7905f59b007",
       "markdownLength": 294,
       "pages": 1,
       "textElements": 3,
@@ -1611,7 +2587,7 @@
           "details": "100.0% >= 95.0%"
         },
         {
-          "name": "no-lexical-regression:docling_hybrid",
+          "name": "no-dense-regression:docling_hybrid",
           "passed": true
         }
       ],
@@ -1619,7 +2595,44 @@
         {
           "strategy": "legacy_markdown",
           "chunkingProfileId": "legacy_markdown;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "atoms": [
+                  {
+                    "id": "control-phrase",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_1298303415"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -1628,7 +2641,7 @@
           "locationCoverage": 0,
           "locationEligible": false,
           "headingPathCoverage": 0,
-          "durationMs": 65,
+          "durationMs": 1321,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1671,7 +2684,44 @@
         {
           "strategy": "docling_hierarchical",
           "chunkingProfileId": "docling_hierarchical;hierarchical;serve=unknown;tok=none;max=auto;merge=n/a;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "atoms": [
+                  {
+                    "id": "control-phrase",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_80a623237a8edb3a", "child_1_5d5d72bc2ed2898b"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 2,
@@ -1680,7 +2730,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2041,
+          "durationMs": 3276,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1698,7 +2748,7 @@
                 "atomCoverageAtK": 1,
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
-                "rankedChunkIds": ["child_0_5f86ee734f05478c", "child_1_2afaa5238bf47736"],
+                "rankedChunkIds": ["child_0_80a623237a8edb3a", "child_1_5d5d72bc2ed2898b"],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
@@ -1723,7 +2773,44 @@
         {
           "strategy": "docling_hybrid",
           "chunkingProfileId": "docling_hybrid;hybrid;serve=unknown;tok=sentence-transformers/all-MiniLM-L6-v2;max=400;merge=true;mdtables=true;parent=1500;child=400;overlap=50",
-          "denseRetrieval": null,
+          "denseRetrieval": {
+            "k": 5,
+            "questions": [
+              {
+                "id": "ocr-control-phrase",
+                "atoms": [
+                  {
+                    "id": "control-phrase",
+                    "rank": 1,
+                    "unreachable": false
+                  }
+                ],
+                "atomsTotal": 1,
+                "atomsCoveredInTopK": 1,
+                "atomCoverageAtK": 1,
+                "atomMrrAtK": 1,
+                "atomDcgAtK": 1,
+                "rankedChunkIds": ["child_0_d1691deabeb708a4"],
+                "firstRelevantRank": 1,
+                "relevantInTopK": 1,
+                "relevantTotal": 1,
+                "recallAtK": 1,
+                "recallCeilingAtK": 1,
+                "reciprocalRank": 1,
+                "ndcgAtK": 1,
+                "refMatched": null
+              }
+            ],
+            "atomCoverageAtK": 1,
+            "atomMrrAtK": 1,
+            "atomDcgAtK": 1,
+            "unreachableAtoms": [],
+            "recallAtK": 1,
+            "recallCeilingAtK": 1,
+            "mrr": 1,
+            "ndcgAtK": 1,
+            "unreachableQuestions": []
+          },
           "denseBilledTokens": 0,
           "parentChunks": 1,
           "childChunks": 1,
@@ -1732,7 +2819,7 @@
           "locationCoverage": 1,
           "locationEligible": true,
           "headingPathCoverage": 1,
-          "durationMs": 2038,
+          "durationMs": 3219,
           "retrieval": {
             "k": 5,
             "questions": [
@@ -1750,7 +2837,7 @@
                 "atomCoverageAtK": 1,
                 "atomMrrAtK": 1,
                 "atomDcgAtK": 1,
-                "rankedChunkIds": ["child_0_d44cbdaf37406fd9"],
+                "rankedChunkIds": ["child_0_d1691deabeb708a4"],
                 "firstRelevantRank": 1,
                 "relevantInTopK": 1,
                 "relevantTotal": 1,
@@ -1777,9 +2864,9 @@
     {
       "id": "vector-outlines-negative",
       "status": "passed",
-      "processingTimeMs": 3135,
-      "fromCache": false,
-      "documentKey": "56e9b4cfbbf58f1ecf682ba7422b72fc",
+      "processingTimeMs": 87,
+      "fromCache": true,
+      "documentKey": "347d2d9a9848a8d11faddafefdc54d9a",
       "markdownLength": 7,
       "pages": 1,
       "textElements": 2,
@@ -1789,11 +2876,11 @@
         {
           "name": "EmptyConversionError",
           "passed": true,
-          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/atoms-lexical-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+          "details": "Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/dense-atoms-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
         }
       ],
       "strategies": [],
-      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/atoms-lexical-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
+      "error": "EmptyConversionError: Conversion produced no usable text for /home/me/code/mc2/packages/course-gen-platform/uploads/docling-benchmark/dense-atoms-baseline/vector-outlines-no-text.pdf: 7 characters. It carries no extractable text layer: either a scan, or a diagram whose type was converted to curves. Only OCR can read it, and OCR did not find anything either."
     }
   ]
 }

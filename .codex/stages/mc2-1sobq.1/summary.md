@@ -1,7 +1,7 @@
 # Stage `mc2-1sobq.1` — structure-aware Docling RAG
 
 Epic: `mc2-1sobq` (`specs/024-docling-intelligence/spec.md`)
-Level: integration · Owner: root · Status: in progress — AC-2 open
+Level: integration · Owner: root · Status: accepted 2026-08-06
 
 ## What changed observably
 
@@ -65,10 +65,42 @@ resolved from the running Serve 1.29.0 `/openapi.json`, not from memory.
 Refs that do not resolve are a `DoclingChunkConsistencyError` before upload, not
 a chunk with less metadata.
 
-## A/B result: withdrawn, no candidate selected
+## A/B result: `docling_hybrid` selected, on a rerun that measures production
 
-The previous `docling_hybrid` selection is retracted. Its dense run did not
-measure the production ranker, for two independent reasons.
+Evidence: `evidence/stageA-{baseline,heading-inference}-*`, 7/7 in both
+conversion profiles with the dense channel blocking.
+
+On the **baseline** profile — the configuration production actually runs, since
+PDF heading inference is off by default — `docling_hybrid` regresses no control
+question and takes `sci-accuracy-drop` from unanswerable to answered: legacy
+retrieves NEITHER declared fact (`74.9` and `57.2`) in its top-5, hybrid
+retrieves both, at rank 3. That is the one structural improvement AC-2 asks
+for, so AC-2 is met.
+
+Stated as plainly: on the **heading-inference** profile hybrid retrieves neither
+fact either, exactly like legacy. It regresses nothing there, but it wins
+nothing, so the improvement is specific to the default profile — and heading
+inference makes hybrid strictly worse on that case than leaving it off. That is
+one more reason the flag stays off, not an argument for turning it on.
+
+`docling_hierarchical` is rejected on the same evidence: it never retrieves
+`sci-accuracy-drop` in either profile and pushes `pptx-steps` down the list
+(dense aMRR 1.000 → 0.417).
+
+**Selection is not activation.** `DOCLING_CHUNK_STRATEGY` stays
+`legacy_markdown` outside dev compose; the flip belongs to Stage E under
+separate authorization. Nothing was reindexed.
+
+Billed to `api.jina.ai` for this rerun: 277,747 embedding tokens across three
+attempts (110,548 on the attempt that hit the provider's per-minute token
+ceiling, 2,026 to finish the baseline profile from that run's warm namespace,
+165,173 for the heading-inference profile in its own cold namespace).
+
+### The first attempt was withdrawn, and why
+
+The earlier `docling_hybrid` selection did not measure the production ranker,
+for two independent reasons. Both are fixed above the line; the account of them
+stays here because the numbers it produced were published.
 
 **The evaluator did not make production's embedding call.** It split parents and
 children into two `generateEmbeddingsWithLateChunking` calls with
@@ -100,9 +132,14 @@ and it is fixed in `generate-utils.ts` and `generate.ts`:
   measurement can never be served production vectors, and its billed-token
   count is the real cost of that measurement.
 
-The corrected dense A/B is a paid run and has not been made. `mc2-j1axa` is
-reopened and stays a P1 hard blocker for Stage E. `DOCLING_CHUNK_STRATEGY`
-remains `legacy_markdown` outside dev compose, as it always has.
+**A 429 was fatal, and the rerun proved it.** Jina meters tokens per minute;
+the corrected run filled that window and `generate.ts` retried only on 5xx, so
+the whole embedding batch failed — and with it the single cell that decides the
+candidate. This is a production defect, not a benchmark one: one large document
+fills the window on its own and would permanently fail its job. A 429 is now
+retried, honouring `Retry-After` and otherwise waiting out the full minute,
+because exponential backoff from one second retries straight back into the same
+closed window.
 
 ## The gate counted chunks; now it counts facts
 
@@ -125,11 +162,12 @@ Every scored top-5 is now written out as chunk ids with per-atom ranks beside
 it, so "the same chunks in the same order" is checkable instead of remembered —
 it was not checkable in the previous evidence, and should not have been claimed.
 
-On the lexical channel the atom gate discriminates: `docling_hierarchical`
-regresses `sci-accuracy-drop` (coverage 0.500 → 0.000) and `pptx-steps`
-(aMRR 1.000 → 0.292), while `docling_hybrid` regresses nothing and lifts
-`scientific-pdf` coverage from 0.75 to 1.00. That is a lexical-reachability
-result and it does not select a default.
+The atom gate discriminates on both channels: `docling_hierarchical` regresses
+`sci-accuracy-drop` (lexical coverage 0.500 → 0.000) and `pptx-steps` (dense
+aMRR 1.000 → 0.417), while `docling_hybrid` regresses nothing anywhere. The two
+channels also disagree, and the report prints it: on `scientific-pdf` the
+lexical proxy has hybrid win in both profiles, the live ranker only in the
+baseline one. The dense channel is the verdict.
 
 ## What the metric said before, and why it was wrong twice
 
@@ -186,6 +224,8 @@ oversized parent that the Jina batcher would reject.
   with no batch context. `generate.test.ts` pins that a partial late-chunking
   hit re-embeds the whole batch while a plain batch still reuses per text.
   `dense-retrieval-eval.test.ts` pins the single production embedding call.
+  Three more pin the 429 path: retried, `Retry-After` preferred over the
+  default full-minute wait, and still fatal once the attempts are spent.
 - The dense evaluation never writes to the document catalog. It upserts through
   the production point builders but not through `uploadChunksToQdrant`, which
   also updates `vector_status` in Supabase — a benchmark over throwaway ids has

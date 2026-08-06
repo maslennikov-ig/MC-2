@@ -184,6 +184,11 @@ vectors. A fresh label is a cold cache and its billed-token count is the real
 cost of the measurement; re-running the same label reuses exactly the vectors
 that label produced.
 
+Jina meters TOKENS per minute, and the corpus fills that window. A 429 is
+retried by waiting the window out (`Retry-After` when the provider sends it),
+so a rate-limited run stalls instead of failing — which is also what production
+now does, where a fatal 429 used to lose a whole document's embedding job.
+
 When `--dense` runs it is the BLOCKING channel and the offline BM25 proxy
 becomes an observation: gating on pure BM25 while the real ranker is measured
 would gate on a configuration nobody runs. Both are always printed, including
@@ -223,14 +228,22 @@ retrieval: BM25 with the collection's own parameters, offline. Dense Jina v3
 ranking is not exercised, so a win reported there is a lexical-reachability win,
 not a full retrieval win.
 
-**No candidate is currently selected on dense evidence.** The earlier
-`docling_hybrid` selection was withdrawn: that run split parents and children
-into two embedding calls with different `late_chunking` flags, and its vectors
-came entirely from a cache keyed without `late_chunking` or batch context, so it
-did not measure the production ranker. Re-running `--dense` on the corrected
-path is a paid, separately authorized step.
+Accepted Stage A evidence lives in
+`.codex/stages/mc2-1sobq.1/evidence/stageA-{baseline,heading-inference}-*`: 7/7
+cases in both conversion profiles with `--candidate docling_hybrid --dense`.
+**`docling_hybrid` is the selected candidate.** On the baseline profile — the
+configuration production runs — it regresses no control question and takes
+`sci-accuracy-drop` from unanswerable (legacy retrieves neither declared fact)
+to both facts at rank 3. With PDF heading inference on it regresses nothing but
+wins nothing, so the improvement is specific to the default profile.
+`docling_hierarchical` is rejected on the same evidence.
 
-Selection is not activation either. `DOCLING_CHUNK_STRATEGY` defaults to
+An earlier `docling_hybrid` selection was withdrawn before this one: that run
+split parents and children into two embedding calls with different
+`late_chunking` flags, and its vectors came entirely from a cache keyed without
+`late_chunking` or batch context, so it did not measure the production ranker.
+
+Selection is not activation. `DOCLING_CHUNK_STRATEGY` defaults to
 `legacy_markdown` everywhere except dev compose; flipping it is Stage E work
 under separate authorization. The corpus is a release gate, not authorization to
 enable the production flag.
