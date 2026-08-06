@@ -224,14 +224,45 @@ function extractJinaErrorMessage(response: Response, errorData: JinaAPIErrorData
 }
 
 /**
- * Handles retry logic for server errors
+ * How long to wait out a 429 before retrying.
+ *
+ * Jina meters tokens per MINUTE, and its message says so
+ * ("101,079/100,000 tokens per minute"), so exponential backoff from one
+ * second retries straight back into the same closed window and burns the
+ * attempt budget. `Retry-After` wins when the provider sends it; otherwise
+ * wait for the window to roll over.
+ */
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function rateLimitDelayMs(retryAfterSeconds: number | null): number {
+  if (retryAfterSeconds !== null && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.min(retryAfterSeconds * 1000, 5 * RATE_LIMIT_WINDOW_MS);
+  }
+  return RATE_LIMIT_WINDOW_MS;
+}
+
+/**
+ * Handles retry logic for server errors and provider rate limits
  */
 async function handleServerErrorRetry(
-  response: Response,
+  response: { status: number; retryAfterSeconds?: number | null },
   errorMessage: string,
   attempt: number,
   maxRetries: number
 ): Promise<boolean> {
+  // A 429 is transient by definition. Treating it as fatal fails the whole
+  // embedding job for a document that merely arrived while the per-minute
+  // token window was full — and a large document fills that window on its own.
+  if (response.status === 429 && attempt < maxRetries) {
+    const delay = rateLimitDelayMs(response.retryAfterSeconds ?? null);
+    logger.warn(
+      { status: 429, attempt, maxRetries, delayMs: delay, err: errorMessage },
+      'Jina API rate limit reached, waiting for the window to roll over'
+    );
+    await sleep(delay);
+    return true;
+  }
+
   if (response.status >= 500 && attempt < maxRetries) {
     logger.warn(
       {
@@ -297,7 +328,13 @@ async function makeSingleJinaRequest(payload: JinaV3Request): Promise<JinaV3Resp
         errorMessage = response.statusText || errorMessage;
       }
 
-      return { error: true, status: response.status, message: errorMessage } as never;
+      const retryAfter = Number(response.headers.get('retry-after'));
+      return {
+        error: true,
+        status: response.status,
+        message: errorMessage,
+        retryAfterSeconds: Number.isFinite(retryAfter) ? retryAfter : null,
+      } as never;
     }
 
     const data = (await response.json()) as JinaV3Response;
@@ -338,9 +375,13 @@ async function makeJinaV3Request(payload: JinaV3Request): Promise<JinaV3Response
 
         // Check if response is an error (has our error flag from helper)
         if ((response as unknown as { error?: boolean }).error) {
-          const errorResp = response as unknown as { status: number; message: string };
+          const errorResp = response as unknown as {
+            status: number;
+            message: string;
+            retryAfterSeconds: number | null;
+          };
           const shouldRetry = await handleServerErrorRetry(
-            { status: errorResp.status } as Response,
+            { status: errorResp.status, retryAfterSeconds: errorResp.retryAfterSeconds },
             errorResp.message,
             attempt,
             MAX_RETRIES

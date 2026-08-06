@@ -2,15 +2,22 @@ import { randomUUID } from 'crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EnrichedChunk } from '@/shared/embeddings/metadata-enricher';
 
-const { mockCacheGet, mockCacheSet, mockLogger } = vi.hoisted(() => ({
+const { mockCacheGet, mockCacheSet, mockLogger, mockSleep } = vi.hoisted(() => ({
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockSleep: vi.fn().mockResolvedValue(undefined),
   mockLogger: {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Only `sleep` is replaced: the retry delays are asserted, never waited out.
+vi.mock('@/shared/embeddings/generate-utils', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/shared/embeddings/generate-utils')>()),
+  sleep: mockSleep,
 }));
 
 vi.mock('@/shared/cache/redis', () => ({
@@ -89,11 +96,23 @@ function createJinaLateChunkingWindowError() {
   return {
     ok: false,
     status: 422,
+    headers: new Headers(),
     json: vi.fn().mockResolvedValue({
       detail: {
         message:
           'Inputs at indices [2, 3] could not be tokenized for late_chunking (empty, whitespace-only, or beyond the truncation window). Remove them and retry, or split into smaller batches.',
       },
+    }),
+  };
+}
+
+function createJinaRateLimitError(retryAfter?: string) {
+  return {
+    ok: false,
+    status: 429,
+    headers: new Headers(retryAfter === undefined ? {} : { 'retry-after': retryAfter }),
+    json: vi.fn().mockResolvedValue({
+      detail: 'Token rate limit exceeded: 101,079/100,000 tokens per minute.',
     }),
   };
 }
@@ -192,6 +211,64 @@ describe('generateEmbeddingsWithLateChunking', () => {
     expect(thirdPayload.input).toHaveLength(2);
     expect(secondPayload).toMatchObject({ late_chunking: true, truncate: true });
     expect(thirdPayload).toMatchObject({ late_chunking: true, truncate: true });
+  });
+});
+
+describe('provider rate limits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.JINA_API_KEY = 'test-jina-key';
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+    mockSleep.mockResolvedValue(undefined);
+  });
+
+  it('waits out a 429 and retries instead of failing the document', async () => {
+    // Jina meters tokens per minute and a single large document fills that
+    // window on its own. Treating the 429 as fatal failed the whole embedding
+    // job for a purely transient condition.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJinaRateLimitError())
+      .mockResolvedValueOnce(createJinaResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    const result = await generateEmbeddingsWithLateChunking(
+      [createChunk('text', 10)],
+      'retrieval.passage',
+      true
+    );
+
+    expect(result.embeddings).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // A one-second exponential backoff would retry straight back into the same
+    // closed window, so the default wait is the window itself.
+    expect(mockSleep).toHaveBeenCalledWith(60_000);
+  });
+
+  it('prefers the provider Retry-After over the default window', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJinaRateLimitError('12'))
+      .mockResolvedValueOnce(createJinaResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    await generateEmbeddingsWithLateChunking([createChunk('text', 10)], 'retrieval.passage', true);
+
+    expect(mockSleep).toHaveBeenCalledWith(12_000);
+  });
+
+  it('still fails when the limit outlasts every retry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createJinaRateLimitError());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    await expect(
+      generateEmbeddingsWithLateChunking([createChunk('text', 10)], 'retrieval.passage', true)
+    ).rejects.toThrow(/rate limit/iu);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 
