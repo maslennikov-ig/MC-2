@@ -174,8 +174,8 @@ repository convention. See `verification:` above. Both Docker images were
 rebuilt locally and their `test_runtime.py` suites pass during the build, each
 asserting the upstream gap red before asserting the wrapper green.
 
-- graph-reviewed: updated — `graphify update .` rebuilt the local graph at the
-  delivered HEAD.
+- graph-reviewed: updated — `graphify update .` rebuilt the local graph at
+  `92f0a9270`: 60,708 nodes, 87,387 edges, 7,243 communities.
 
 # Delivery / Cleanup
 
