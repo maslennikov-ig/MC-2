@@ -184,8 +184,8 @@ per-atom ranks. Full per-strategy chunk dumps stay under
 `test_runtime.py` suites pass during the build, each asserting the upstream gap
 red before asserting the wrapper green.
 
-- graph-reviewed: updated — `graphify update .` rebuilt the local graph at the
-  delivered HEAD.
+- graph-reviewed: updated — `graphify update .` rebuilt the local graph at
+  `62fb9d169`: 60,713 nodes, 87,393 edges, 7,241 communities.
 
 # Delivery / Cleanup
 
