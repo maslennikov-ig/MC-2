@@ -44,15 +44,71 @@ export interface JinaV3Response {
 }
 
 /**
- * Generates a cache key for embedding
+ * Everything a Jina vector is a function of.
+ *
+ * A cache key built from the text alone is wrong twice over. It collides across
+ * request parameters — the same text embedded with a different model, a
+ * different output width or `late_chunking` toggled produces a DIFFERENT vector
+ * under the same key — and, worse, it ignores that a late-chunked vector is not
+ * a function of its own text at all: Jina concatenates the whole `input` array,
+ * embeds it as one long context and only then splits at the chunk boundaries.
+ * Move a text into a different batch and its vector changes.
+ */
+export interface EmbeddingCacheIdentity {
+  /** Task adapter: `retrieval.passage` or `retrieval.query`. */
+  task: string;
+  /** Whether the vector was produced inside a late-chunking context. */
+  lateChunking: boolean;
+  /** Output width requested from the provider. */
+  dimensions?: number;
+  model?: string;
+  /**
+   * The ordered `input` array the vector is computed inside. REQUIRED when
+   * `lateChunking` is on, because it is part of the vector's identity; ignored
+   * otherwise, where each text is embedded independently and is shareable.
+   */
+  batchContext?: readonly string[];
+}
+
+/** Namespace prefix, overridable so a benchmark never shares production keys. */
+function cacheNamespace(): string {
+  return process.env.EMBEDDING_CACHE_NAMESPACE ?? 'embedding';
+}
+
+/**
+ * Generates a cache key for one embedding.
  *
  * @param text - Text content to embed
- * @param task - Task type (retrieval.passage or retrieval.query)
- * @returns Cache key with embedding namespace
+ * @param identity - Every request parameter the vector depends on
+ * @returns Namespaced cache key
+ * @throws {Error} When late chunking is requested without its batch context
  */
-export function generateCacheKey(text: string, task: string): string {
-  const hash = createHash('sha256').update(`${text}:${task}`).digest('hex');
-  return `embedding:${hash}`;
+export function generateCacheKey(text: string, identity: EmbeddingCacheIdentity): string {
+  if (identity.lateChunking && identity.batchContext === undefined) {
+    throw new Error(
+      'Refusing to build a late-chunking cache key without its batch context: ' +
+        'the vector depends on the whole request input, not on this text alone.'
+    );
+  }
+
+  const contextHash = identity.lateChunking
+    ? createHash('sha256').update(JSON.stringify(identity.batchContext)).digest('hex')
+    : '';
+
+  const hash = createHash('sha256')
+    .update(
+      JSON.stringify([
+        identity.model ?? 'jina-embeddings-v3',
+        identity.dimensions ?? 768,
+        identity.task,
+        identity.lateChunking,
+        contextHash,
+        text,
+      ])
+    )
+    .digest('hex');
+
+  return `${cacheNamespace()}:${hash}`;
 }
 
 /**

@@ -13,6 +13,14 @@
  * - Zero additional cost for late chunking
  * - Redis caching with 1-hour TTL (T076 requirement)
  *
+ * The cache is keyed by everything the vector depends on, and under late
+ * chunking that includes the whole request input: Jina embeds the concatenated
+ * batch and splits afterwards, so a text's vector is a function of its
+ * neighbours. Reusing a per-text vector across batches, as the first version of
+ * this module did, silently mixes vectors from different contexts — and, since
+ * the key also ignored `late_chunking`, served a non-late-chunked vector for a
+ * late-chunked request whenever the same text had been embedded both ways.
+ *
  * @module shared/embeddings/generate
  * @see https://jina.ai/news/late-chunking-in-long-context-embedding-models/
  */
@@ -30,6 +38,7 @@ import {
   FETCH_TIMEOUT_MS,
   MAX_RETRIES,
   BASE_RETRY_DELAY_MS,
+  type EmbeddingCacheIdentity,
   type JinaV3Request,
   type JinaV3Response,
 } from './generate-utils';
@@ -503,7 +512,11 @@ export async function generateEmbeddingsWithLateChunking(
  * ```
  */
 export async function generateQueryEmbedding(queryText: string): Promise<number[]> {
-  const cacheKey = generateCacheKey(queryText, 'retrieval.query');
+  const cacheKey = generateCacheKey(queryText, {
+    task: 'retrieval.query',
+    lateChunking: false,
+    dimensions: 768,
+  });
 
   // Check cache first
   try {
@@ -611,117 +624,63 @@ export async function healthCheck(): Promise<boolean> {
 }
 
 /**
- * Processes cache lookups for a batch of chunks
+ * Reads whatever of `texts` is already cached under this exact identity.
+ *
+ * With late chunking the answer is deliberately all-or-nothing. A partial hit
+ * would shrink the request input, and the input IS the context every remaining
+ * vector is computed in: serving three cached vectors and re-embedding the
+ * other two produces five vectors that never coexisted in one context, mixed
+ * silently into one collection. Either the whole batch is reused as it was
+ * computed, or none of it is.
  */
-async function processBatchCacheHits(
-  batch: EnrichedChunk[],
-  task: 'retrieval.passage' | 'retrieval.query'
-): Promise<{
-  textsToEmbed: string[];
-  chunkIndexMap: number[];
-  cachedResults: Map<number, number[]>;
-}> {
-  const textsToEmbed: string[] = [];
-  const chunkIndexMap: number[] = []; // Maps API response index to batch index
-  const cachedResults: Map<number, number[]> = new Map(); // batch index -> cached embedding
+async function readCachedVectors(
+  texts: string[],
+  identity: EmbeddingCacheIdentity
+): Promise<Map<number, number[]>> {
+  const hits = new Map<number, number[]>();
 
-  // Check cache for each chunk in batch
-  for (let j = 0; j < batch.length; j++) {
-    const chunk = batch[j];
-    const cacheKey = generateCacheKey(chunk.content, task);
-
+  for (let index = 0; index < texts.length; index++) {
     try {
-      const cached = await cache.get<number[]>(cacheKey);
+      const cached = await cache.get<number[]>(generateCacheKey(texts[index], identity));
       if (cached && Array.isArray(cached) && cached.length === 768) {
-        cachedResults.set(j, cached);
-        logger.debug(
-          {
-            cacheKey,
-            chunkId: chunk.chunk_id,
-            task,
-          },
-          'Embedding cache hit'
-        );
-      } else {
-        // Not in cache or invalid, need to embed
-        textsToEmbed.push(chunk.content);
-        chunkIndexMap.push(j);
+        hits.set(index, cached);
+      } else if (identity.lateChunking) {
+        return new Map();
       }
     } catch (error) {
-      // Cache error - fall back to API call
       logger.warn(
-        {
-          err: error,
-          chunkId: chunk.chunk_id,
-        },
+        { err: error instanceof Error ? error.message : String(error), index },
         'Cache read error, falling back to API'
       );
-      textsToEmbed.push(chunk.content);
-      chunkIndexMap.push(j);
+      if (identity.lateChunking) return new Map();
     }
   }
 
-  return { textsToEmbed, chunkIndexMap, cachedResults };
+  return hits;
 }
 
-/**
- * Caches newly generated embeddings
- */
-async function cacheNewEmbeddings(
-  response: JinaV3Response,
-  chunkIndexMap: number[],
-  batch: EnrichedChunk[],
-  task: 'retrieval.passage' | 'retrieval.query',
-  cachedResults: Map<number, number[]>
+/** Writes vectors back under the identity they were actually computed with. */
+async function writeCachedVectors(
+  texts: string[],
+  vectors: number[][],
+  identity: EmbeddingCacheIdentity
 ): Promise<void> {
-  for (let apiIndex = 0; apiIndex < response.data.length; apiIndex++) {
-    const batchIndex = chunkIndexMap[apiIndex];
-    const chunk = batch[batchIndex];
-    const embeddingData = response.data[apiIndex];
-
-    // Validate embedding dimensions
-    if (embeddingData.embedding.length !== 768) {
-      throw new Error(
-        `Invalid embedding dimensions: expected 768, got ${embeddingData.embedding.length}`
-      );
-    }
-
-    // Cache the embedding with 1-hour TTL
-    const cacheKey = generateCacheKey(chunk.content, task);
+  for (let index = 0; index < texts.length; index++) {
+    const cacheKey = generateCacheKey(texts[index], identity);
     try {
-      const cacheResult = await cache.set(cacheKey, embeddingData.embedding, {
-        ttl: EMBEDDING_CACHE_TTL,
-      });
-      if (cacheResult) {
-        logger.debug(
-          {
-            cacheKey: cacheKey.substring(0, 30) + '...',
-            chunkId: chunk.chunk_id,
-            ttl: EMBEDDING_CACHE_TTL,
-          },
-          'Embedding cached successfully'
-        );
-      } else {
+      const written = await cache.set(cacheKey, vectors[index], { ttl: EMBEDDING_CACHE_TTL });
+      if (!written) {
         logger.warn(
-          {
-            cacheKey: cacheKey.substring(0, 30) + '...',
-            chunkId: chunk.chunk_id,
-          },
+          { cacheKey: `${cacheKey.substring(0, 30)}...` },
           'Cache write returned false - Redis may not be connected'
         );
       }
     } catch (error) {
-      // Log cache write error but continue
       logger.warn(
-        {
-          err: error instanceof Error ? error.message : String(error),
-          chunkId: chunk.chunk_id,
-        },
+        { err: error instanceof Error ? error.message : String(error) },
         'Cache write error, continuing without caching'
       );
     }
-
-    cachedResults.set(batchIndex, embeddingData.embedding);
   }
 }
 
@@ -737,50 +696,67 @@ function isLateChunkingTokenizationWindowError(error: unknown): boolean {
   );
 }
 
-async function requestAndCacheEmbeddingsWithAdaptiveSplit(input: {
-  textsToEmbed: string[];
-  chunkIndexMap: number[];
-  batch: EnrichedChunk[];
+/**
+ * Embeds one ordered text list, reusing the cache only where it is sound.
+ *
+ * Returns vectors aligned with `texts`. When the provider rejects a
+ * late-chunking batch for exceeding its truncation window, the list is halved
+ * and each half is embedded as its OWN context — so each half is looked up and
+ * cached under the identity it was really computed with, and a later run reuses
+ * the split instead of paying for the rejected attempt again.
+ */
+async function embedTexts(params: {
+  texts: string[];
   task: 'retrieval.passage' | 'retrieval.query';
-  late_chunking: boolean;
+  lateChunking: boolean;
   batchNumber: number;
-  cachedResults: Map<number, number[]>;
   splitDepth?: number;
-}): Promise<number> {
-  const {
-    textsToEmbed,
-    chunkIndexMap,
-    batch,
+}): Promise<{ vectors: number[][]; tokensUsed: number }> {
+  const { texts, task, lateChunking, batchNumber, splitDepth = 0 } = params;
+  const identity: EmbeddingCacheIdentity = {
     task,
-    late_chunking,
-    batchNumber,
-    cachedResults,
-    splitDepth = 0,
-  } = input;
+    lateChunking,
+    dimensions: 768,
+    model: 'jina-embeddings-v3',
+    batchContext: lateChunking ? texts : undefined,
+  };
 
+  const hits = await readCachedVectors(texts, identity);
+  if (hits.size === texts.length) {
+    logger.info(
+      { batchSize: texts.length, cacheHits: hits.size, cacheMisses: 0, task, lateChunking },
+      'Embedding batch cache status'
+    );
+    return { vectors: texts.map((_, index) => hits.get(index)!), tokensUsed: 0 };
+  }
+
+  const missIndexes = texts.map((_, index) => index).filter(index => !hits.has(index));
+  const textsToEmbed = missIndexes.map(index => texts[index]);
+
+  logger.info(
+    {
+      batchSize: texts.length,
+      cacheHits: hits.size,
+      cacheMisses: textsToEmbed.length,
+      task,
+      lateChunking,
+    },
+    'Embedding batch cache status'
+  );
+
+  let response: JinaV3Response;
   try {
-    const response = await makeJinaV3Request(
+    response = await makeJinaV3Request(
       withProviderTruncation({
         model: 'jina-embeddings-v3',
         input: textsToEmbed,
         task,
         dimensions: 768, // Match Qdrant collection
-        late_chunking, // Enable context-aware embeddings
+        late_chunking: lateChunking, // Enable context-aware embeddings
       })
     );
-
-    // Validate and extract embeddings
-    if (response.data.length !== textsToEmbed.length) {
-      throw new Error(
-        `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
-      );
-    }
-
-    await cacheNewEmbeddings(response, chunkIndexMap, batch, task, cachedResults);
-
-    return response.usage.total_tokens;
   } catch (error) {
-    if (late_chunking && textsToEmbed.length > 1 && isLateChunkingTokenizationWindowError(error)) {
+    if (lateChunking && textsToEmbed.length > 1 && isLateChunkingTokenizationWindowError(error)) {
       const midpoint = Math.ceil(textsToEmbed.length / 2);
       logger.warn(
         {
@@ -794,24 +770,49 @@ async function requestAndCacheEmbeddingsWithAdaptiveSplit(input: {
         'Jina late_chunking batch exceeded provider truncation window, retrying as split batches'
       );
 
-      const leftTokens = await requestAndCacheEmbeddingsWithAdaptiveSplit({
-        ...input,
-        textsToEmbed: textsToEmbed.slice(0, midpoint),
-        chunkIndexMap: chunkIndexMap.slice(0, midpoint),
+      const left = await embedTexts({
+        ...params,
+        texts: textsToEmbed.slice(0, midpoint),
         splitDepth: splitDepth + 1,
       });
-      const rightTokens = await requestAndCacheEmbeddingsWithAdaptiveSplit({
-        ...input,
-        textsToEmbed: textsToEmbed.slice(midpoint),
-        chunkIndexMap: chunkIndexMap.slice(midpoint),
+      const right = await embedTexts({
+        ...params,
+        texts: textsToEmbed.slice(midpoint),
         splitDepth: splitDepth + 1,
       });
 
-      return leftTokens + rightTokens;
+      return {
+        vectors: [...left.vectors, ...right.vectors],
+        tokensUsed: left.tokensUsed + right.tokensUsed,
+      };
     }
 
     throw error;
   }
+
+  if (response.data.length !== textsToEmbed.length) {
+    throw new Error(
+      `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
+    );
+  }
+
+  const fresh = response.data.map(entry => {
+    if (entry.embedding.length !== 768) {
+      throw new Error(`Invalid embedding dimensions: expected 768, got ${entry.embedding.length}`);
+    }
+    return entry.embedding;
+  });
+  await writeCachedVectors(textsToEmbed, fresh, identity);
+
+  // A late-chunking miss is total by construction, so `hits` is empty and the
+  // fresh vectors already cover every position in order.
+  const vectors = texts.map((_, index) => {
+    const cached = hits.get(index);
+    if (cached) return cached;
+    return fresh[missIndexes.indexOf(index)];
+  });
+
+  return { vectors, tokensUsed: response.usage.total_tokens };
 }
 
 /**
@@ -823,87 +824,34 @@ async function processSingleBatch(
   late_chunking: boolean,
   batchCount: number
 ): Promise<{ embeddings: EmbeddingResult[]; tokensUsed: number }> {
-  const { textsToEmbed, chunkIndexMap, cachedResults } = await processBatchCacheHits(batch, task);
-
-  logger.info(
-    {
-      batchSize: batch.length,
-      cacheHits: cachedResults.size,
-      cacheMisses: textsToEmbed.length,
+  let result: { vectors: number[][]; tokensUsed: number };
+  try {
+    result = await embedTexts({
+      texts: batch.map(chunk => chunk.content),
       task,
-    },
-    'Embedding batch cache status'
-  );
-
-  let tokensUsed = 0;
-
-  // If we have texts that need embedding, call API
-  if (textsToEmbed.length > 0) {
-    try {
-      tokensUsed = await requestAndCacheEmbeddingsWithAdaptiveSplit({
-        textsToEmbed,
-        chunkIndexMap,
-        batch,
-        task,
-        late_chunking,
-        batchNumber: batchCount + 1,
-        cachedResults,
-      });
-    } catch (error) {
-      // Content policy errors propagate as-is (user-facing, not technical)
-      if (error instanceof ContentPolicyError) {
-        throw error;
-      }
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(
-        {
-          batchNumber: batchCount + 1,
-          batchSize: textsToEmbed.length,
-          err: errorMessage,
-        },
-        'Embedding batch failed after all retries'
-      );
-      throw new Error(`Failed to generate embeddings for batch ${batchCount + 1}: ${errorMessage}`);
-    }
-  }
-
-  // Build final embeddings array from cached and newly generated embeddings
-  const embeddings: EmbeddingResult[] = [];
-  for (let j = 0; j < batch.length; j++) {
-    const chunk = batch[j];
-    const embedding = cachedResults.get(j);
-
-    if (!embedding) {
-      throw new Error(`Missing embedding for chunk ${chunk.chunk_id} at batch index ${j}`);
-    }
-
-    embeddings.push({
-      chunk,
-      dense_vector: embedding,
-      token_count: chunk.token_count,
+      lateChunking: late_chunking,
+      batchNumber: batchCount + 1,
     });
+  } catch (error) {
+    // Content policy errors propagate as-is (user-facing, not technical)
+    if (error instanceof ContentPolicyError) {
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { batchNumber: batchCount + 1, batchSize: batch.length, err: errorMessage },
+      'Embedding batch failed after all retries'
+    );
+    throw new Error(`Failed to generate embeddings for batch ${batchCount + 1}: ${errorMessage}`);
   }
 
-  return { embeddings, tokensUsed };
-}
-
-/**
- * Utility: Split chunks into parent and child for different embedding strategies
- *
- * Strategy:
- * - Parent chunks: Embed WITHOUT late chunking (standalone context)
- * - Child chunks: Embed WITH late chunking (context-aware)
- *
- * @param chunks - All enriched chunks
- * @returns Separated parent and child chunks
- */
-export function separateChunksByLevel(chunks: EnrichedChunk[]): {
-  parentChunks: EnrichedChunk[];
-  childChunks: EnrichedChunk[];
-} {
-  const parentChunks = chunks.filter(chunk => chunk.level === 'parent');
-  const childChunks = chunks.filter(chunk => chunk.level === 'child');
-
-  return { parentChunks, childChunks };
+  return {
+    embeddings: batch.map((chunk, index) => ({
+      chunk,
+      dense_vector: result.vectors[index],
+      token_count: chunk.token_count,
+    })),
+    tokensUsed: result.tokensUsed,
+  };
 }

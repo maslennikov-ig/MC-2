@@ -194,3 +194,80 @@ describe('generateEmbeddingsWithLateChunking', () => {
     expect(thirdPayload).toMatchObject({ late_chunking: true, truncate: true });
   });
 });
+
+describe('embedding cache identity', () => {
+  const vector = () => Array.from({ length: 768 }, () => 0.02);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.JINA_API_KEY = 'test-jina-key';
+    mockCacheSet.mockResolvedValue(true);
+  });
+
+  it('refuses a partial late-chunking cache hit and re-embeds the whole batch', async () => {
+    // Late chunking makes a vector a function of the WHOLE request input: Jina
+    // concatenates the batch, embeds it as one context and splits afterwards.
+    // Serving one cached vector and re-embedding the rest would build a
+    // collection out of vectors that never shared a context.
+    mockCacheGet.mockResolvedValueOnce(vector()).mockResolvedValue(null);
+    const fetchMock = vi.fn().mockResolvedValue(createJinaResponse(2));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    const chunks = [createChunk('first chunk text', 10), createChunk('second chunk text', 10)];
+
+    await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage', true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(payload.input).toEqual(['first chunk text', 'second chunk text']);
+  });
+
+  it('reuses a late-chunking batch only when the whole batch is cached', async () => {
+    mockCacheGet.mockResolvedValue(vector());
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    const chunks = [createChunk('first chunk text', 10), createChunk('second chunk text', 10)];
+
+    const result = await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage', true);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.total_tokens).toBe(0);
+    expect(result.embeddings).toHaveLength(2);
+  });
+
+  it('keeps per-text reuse when late chunking is off', async () => {
+    // Without late chunking each text is embedded independently, so a partial
+    // hit is sound and only the misses are sent.
+    mockCacheGet.mockResolvedValueOnce(vector()).mockResolvedValue(null);
+    const fetchMock = vi.fn().mockResolvedValue(createJinaResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    const chunks = [createChunk('first chunk text', 10), createChunk('second chunk text', 10)];
+
+    await generateEmbeddingsWithLateChunking(chunks, 'retrieval.passage', false);
+
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(payload.input).toEqual(['second chunk text']);
+    expect(payload.late_chunking).toBe(false);
+  });
+
+  it('does not read a late-chunking vector back for a plain request', async () => {
+    mockCacheGet.mockResolvedValue(null);
+    const fetchMock = vi.fn().mockResolvedValue(createJinaResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { generateEmbeddingsWithLateChunking } = await import('@/shared/embeddings/generate');
+    const chunk = createChunk('shared text', 10);
+
+    await generateEmbeddingsWithLateChunking([chunk], 'retrieval.passage', true);
+    await generateEmbeddingsWithLateChunking([chunk], 'retrieval.passage', false);
+
+    const [lateKey] = mockCacheSet.mock.calls[0];
+    const [plainKey] = mockCacheSet.mock.calls[1];
+    expect(lateKey).not.toBe(plainKey);
+  });
+});
