@@ -1,32 +1,33 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-05 — Docling Intelligence Stage A accepted on `develop` after two metric
-corrections and a real dense A/B. `docling_hybrid` is selected; production behaviour unchanged.
+Updated: 2026-08-06 — Docling Intelligence Stage A is OPEN: the dense A/B was withdrawn and no
+chunking candidate is selected. Production chunking unchanged; embedding cache identity fixed.
 
 Current stage id: `mc2-1sobq.1`
-Stage: structure-aware Docling RAG with provenance, accepted; epic continues at `mc2-1sobq.2`.
+Stage: structure-aware Docling RAG with provenance, in progress; AC-2 blocked on `mc2-j1axa`.
 
-## Docling Intelligence: Stage A is in, and it is opt-in
+## Docling Intelligence: Stage A structure is in, the A/B is not
 
-Native Docling structure now reaches chunking, metadata enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY` (`legacy_markdown` | `docling_hierarchical` | `docling_hybrid`). On the
-corpus, native chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable
-cases, and carry a real heading path for 100% in five of them; `reading-order-pptx` is 0% because
-Docling emits no headings for that deck. Legacy carried a heading path for 0% everywhere.
-**`docling_hybrid` is the selected candidate and `legacy_markdown` is still the default** —
-selection is not activation, and the flip is Stage E under separate authorization.
+Native Docling structure now reaches chunking, enrichment and the Qdrant payload behind
+`DOCLING_CHUNK_STRATEGY` (`legacy_markdown` | `docling_hierarchical` | `docling_hybrid`). Native
+chunks resolve 100% of children to Docling refs with page/bbox in all six chunkable cases; heading
+path coverage is in the stage summary. **No candidate is selected**, `legacy_markdown` is default.
 
-**The A/B runs the production ranker**, not a proxy: real `jina-embeddings-v3` vectors through
-`searchChunks({enable_hybrid:true})` in a throwaway Qdrant collection with the production schema AND
-payload indexes — without the indexes strict mode rejects the filter and hybrid silently degrades to
-dense-only. `--dense` bills `api.jina.ai`, is off by default, and never writes the document catalog.
-Hybrid regresses nothing in either profile and takes `sci-accuracy-drop` from never-retrieved to
-rank 1; `docling_hierarchical` is rejected (5 → 3 relevant on `sci-hypothesis`, `pptx-steps` off
-rank 1).
+**The `docling_hybrid` selection was withdrawn on 2026-08-06.** Its dense run split parents and
+children into two embedding calls with different `late_chunking` flags, while `phase-5-embedding.ts`
+makes ONE call with it on — and under late chunking the request input IS the context. Worse, all 36
+records billed 0 tokens: every vector came from a cache keyed `sha256(text:task)` — no
+`late_chunking`, model or batch — so children were served the non-contextual vectors the parents
+pass had just written. Re-running `--dense` corrected is paid and needs fresh authorization.
 
-**Two metric corrections got there** (full account in the stage summary): the gate guards the COUNT
-of relevant chunks in top-k plus MRR and nDCG, all corpus-independent, at a 1e-9 epsilon. The Recall
-RATIO is reported and never gated — its denominator moves with chunk granularity alone.
+**The cache fix is production-affecting.** Keys now cover model, width, task, `late_chunking` and —
+under late chunking — the whole ordered batch, and a partial late-chunking hit re-embeds the batch.
+Old keys expire on their 1-hour TTL, so a document's first re-processing after deploy re-embeds it.
+
+**The gate counts EVIDENCE ATOMS**, never chunks: coverage over the facts the manifest declares,
+plus `1/rank` and `1/log2(rank+1)` over that same fixed denominator, at a 1e-9 epsilon. Chunk-level
+Recall/MRR/nDCG are printed, not gated — a ratio penalises a finer cut, a count rewards one. Scored
+top-5s are written out as chunk ids, so ranking claims stay checkable.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
 `/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`, so chunks and the
@@ -37,8 +38,7 @@ accepted document are one by construction. Unresolvable refs fail before upload.
 `docling_jobkit._parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and
 `docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags, so a profile change returned
 the previous artifact. Remove at `mc2-ibzcc`. **Both images were rebuilt locally, so their digests
-differ from production**; publishing and pinning belongs to Stage E. Evidence:
-`.codex/stages/mc2-1sobq.1/{summary.md,evidence/}`.
+differ from production**; publishing and pinning is Stage E. Evidence: `.codex/stages/mc2-1sobq.1/`.
 
 ## Docling migration is live
 
@@ -180,16 +180,16 @@ and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.2` — selective Docling enrichments; `mc2-1sobq.3` is also unblocked.
-Recommended action: keep one active implementation stage; do not reindex existing data.
+Next stage id: `mc2-1sobq.1` — still open; `mc2-1sobq.2` waits on it.
+Recommended action: `mc2-j1axa`, re-run the dense A/B corrected. Bills `api.jina.ai`, needs fresh authorization.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-1sobq.2` under `specs/024-docling-intelligence/`. Treat the Docling
-split stack as live and Stage A as accepted: chunking strategy and PDF heading inference are
-feature-flagged and off in production; `docling_hybrid` is selected but not activated. Preserve the
-immutable production image references and the MCP 1.x rollback digest, publish no digests outside
-Stage E, and do not reindex existing documents without a separate task and authority.
+Use $orchestrator-stage for `mc2-1sobq.1` under `specs/024-docling-intelligence/`. Treat the Docling
+split stack as live and Stage A as OPEN: chunking strategy and PDF heading inference are
+feature-flagged and off in production, and no chunking candidate is selected. Preserve the immutable
+production image references and the MCP 1.x rollback digest, publish no digests outside Stage E, and
+reindex nothing without a separate task and authority.
 
 ## Read First
 

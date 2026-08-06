@@ -18,7 +18,7 @@ epic_id: mc2-1sobq
 stage_id: mc2-1sobq.1
 session_id: docling-intelligence
 milestone: structure-aware Docling RAG with provenance and an honest A/B
-milestone_status: accepted
+milestone_status: blocked
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -57,9 +57,9 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: accepted
+status: blocked
 delivery_method: merge
-accepted_by_orchestrator: yes
+accepted_by_orchestrator: no
 cleanup_status: cleaned
 cleanup_notes: local docling stack and the temporary test Qdrant container remain running for the next stage; no branch or worktree was created
 risk_level: medium
@@ -83,9 +83,12 @@ verification:
   - pnpm lint: passed
   - pnpm --filter @megacampus/course-gen-platform exec vitest run tests/unit/shared/embeddings tests/unit/stages/stage2-document-processing tests/unit/shared/cleanup: passed
   - docker compose build docling-serve docling-mcp-internal (runs both test_runtime.py suites): passed
-  - tsx scripts/docling-quality-benchmark.ts --conversion-profile baseline --candidate docling_hybrid --dense: passed
-  - tsx scripts/docling-quality-benchmark.ts --conversion-profile pdf-heading-hierarchy --candidate docling_hybrid --dense: passed
+  - tsx scripts/docling-quality-benchmark.ts --conversion-profile baseline --candidate docling_hybrid (lexical, atom gate): passed
+  - dense A/B on the corrected embedding path: NOT RUN - paid, awaiting fresh authorization (mc2-j1axa)
 changed_files:
+  - packages/course-gen-platform/src/shared/embeddings/generate.ts
+  - packages/course-gen-platform/src/shared/embeddings/generate-utils.ts
+  - packages/course-gen-platform/src/shared/embeddings/index.ts
   - packages/course-gen-platform/src/shared/embeddings/heading-hierarchy.ts
   - packages/course-gen-platform/src/shared/embeddings/native-chunk-adapter.ts
   - packages/course-gen-platform/src/shared/embeddings/chunking-strategy.ts
@@ -113,6 +116,9 @@ changed_files:
   - packages/course-gen-platform/tests/integration/fixtures/docling-quality/generate-fixtures.py
   - packages/course-gen-platform/tests/integration/fixtures/docling-quality/hierarchy-multilevel.docx
   - packages/course-gen-platform/tests/integration/fixtures/docling-quality/numbered-sections.pdf
+  - packages/course-gen-platform/tests/unit/shared/embeddings/dense-retrieval-eval.test.ts
+  - packages/course-gen-platform/tests/unit/shared/embeddings/generate.test.ts
+  - packages/course-gen-platform/tests/unit/shared/embeddings/generate-utils.test.ts
   - packages/course-gen-platform/tests/unit/shared/embeddings/heading-hierarchy.test.ts
   - packages/course-gen-platform/tests/unit/shared/embeddings/native-chunk-adapter.test.ts
   - packages/course-gen-platform/tests/unit/shared/embeddings/native-chunk-payload.test.ts
@@ -124,7 +130,7 @@ changed_files:
   - docs/DOCLING-MCP-REFERENCE.md
   - specs/024-docling-intelligence/
 explicit_defers:
-  - production activation of docling_hybrid - the candidate is selected on evidence, the default in code stays legacy_markdown, and the flip belongs to Stage E under separate authorization
+  - AC-2 - no candidate is selected; the dense A/B must be re-run on the corrected embedding path under fresh paid authorization, tracked in mc2-j1axa
   - mc2-ibzcc - remove both runtime wrappers once upstream wires the dropped fields
 ---
 
@@ -138,15 +144,15 @@ heading path for 100% of child chunks in five of them — `reading-order-pptx` i
 0%, because Docling emits no headings for that deck at all. The legacy Markdown
 splitter carried a heading path for 0% everywhere.
 
-**`docling_hybrid` is the selected candidate, chosen on production ranking.**
-The A/B now runs real `jina-embeddings-v3` vectors through the production
-hybrid search path in a throwaway Qdrant collection with the production schema
-and payload indexes. On that path hybrid regresses no control question in either
-conversion profile and takes `sci-accuracy-drop` from never-retrieved to rank 1;
-`docling_hierarchical` is rejected on the same evidence (5 → 3 relevant chunks
-on `sci-hypothesis`, `pptx-steps` from rank 1 to rank 2). The default in code
-stays `legacy_markdown`: selecting a candidate is not authorization to change
-production behaviour. Nothing was reindexed.
+**No candidate is selected, and the previous selection is withdrawn.** The
+`docling_hybrid` result was produced by a dense run that did not measure the
+production ranker: the evaluator embedded parents and children in two calls with
+different `late_chunking` flags where `phase-5-embedding.ts` makes one call with
+it on, and every vector in the accepted evidence came from a cache keyed without
+`late_chunking`, model, width or batch context (`denseBilledTokens: 0` in all 36
+records). All three defects are fixed here; the re-run is paid and needs fresh
+authorization. The default in code was and stays `legacy_markdown`, and nothing
+was reindexed.
 
 # Scope / Routing
 
@@ -158,45 +164,43 @@ upstream gaps were confirmed in the installed sources before being named.
 
 # Verification
 
-Tracked evidence copies live in `.codex/stages/mc2-1sobq.1/evidence/`
-(`stageA-baseline-*` and `stageA-heading-inference-*`), each carrying both the
-lexical proxy and the live dense+sparse run. Every earlier evidence pair was
-deleted rather than kept: they were produced by a Recall@K that divided by the
-capped top-k and by a gate that compared only MRR, so reusing them would
-reintroduce a result now known to be false. The full per-strategy chunk dumps
-stay under `.tmp/docling-benchmark/`, untracked by repository convention. See
-`verification:` above. The benchmark ran in both conversion profiles and passed
-7/7 in each; Serve peaked at 2.89 GiB of its 4 GiB limit with zero restarts. Both Docker images were rebuilt locally and their `test_runtime.py`
-suites pass during the build, each asserting the upstream gap red before
-asserting the wrapper green.
+Tracked evidence lives in `.codex/stages/mc2-1sobq.1/evidence/`. Every dense
+evidence file was deleted rather than kept: those runs embedded through a path
+production does not use and scored vectors served from a cache that ignored
+`late_chunking` and the batch context, so reusing them would carry a result now
+known to be unfounded. The lexical run under the atom gate is kept. The full
+per-strategy chunk dumps stay under `.tmp/docling-benchmark/`, untracked by
+repository convention. See `verification:` above. Both Docker images were
+rebuilt locally and their `test_runtime.py` suites pass during the build, each
+asserting the upstream gap red before asserting the wrapper green.
 
 - graph-reviewed: updated — `graphify update .` rebuilt the local graph at the
-  delivered HEAD: 60,697 nodes, 87,386 edges, 7,267 communities.
+  delivered HEAD.
 
 # Delivery / Cleanup
 
-Accepted by the root owner and committed on `develop` through the repository dev
-delivery path. No stage branch or worktree was created, so nothing needs
-removing. The local Docling stack and a temporary `qdrant/qdrant:v1.18.2`
-container on `127.0.0.1:6343` stay up for the next stage.
+Not accepted. Committed on `develop` through the repository dev delivery path so
+the corrected harness and the production cache fix are not stranded, but the
+stage stays open until the dense A/B decides AC-2. No stage branch or worktree
+was created, so nothing needs removing. The local Docling stack and a temporary
+`qdrant/qdrant:v1.18.2` container on `127.0.0.1:6343` stay up for the next run.
 
 # Risks / Follow-ups / Explicit Defers
 
+- **AC-2 is not met.** No chunking strategy is proposed as the default. The
+  corrected dense A/B is a paid run and is tracked in `mc2-j1axa`, which stays a
+  P1 hard blocker for Stage E.
+- The embedding cache fix changes PRODUCTION behaviour: keys now include the
+  model, width, task, `late_chunking` and, under late chunking, the whole batch.
+  Old keys are unreachable by construction and expire on their 1-hour TTL, so
+  the first re-processing of any document after deploy re-embeds it. That is the
+  cost of no longer mixing vectors computed in different contexts.
 - The A/B measures retrieval quality on a seven-document controlled corpus with
-  ten control questions, not on production traffic. It exercises the real
-  ranker, not a real workload.
-- `docling_hierarchical` is strictly worse than `docling_hybrid` on both
-  channels: same `sci-hypothesis` loss, no win, and `pptx-steps` drops from
-  rank 1. Both stay available as configuration and every regression is printed
-  in the report rather than suppressed.
-- The Recall@K RATIO is not comparable across strategies that cut a document
-  differently, so the gate guards the COUNT of relevant chunks in the top-k
-  alongside MRR and nDCG. The ratio and its ceiling stay in the report as
-  description. This is the change that let the candidate pass, and
-  `docling_hierarchical` still fails the same gate.
-- Embedding costs were billed to `api.jina.ai` (18 297 tokens) under
-  authorization recorded for this stage. Re-runs may bill less because the
-  embedding cache is warm.
+  ten control questions and sixteen declared evidence atoms, not on production
+  traffic.
+- Gated metrics count evidence atoms, never chunks. Both earlier gates were
+  corpus-dependent: the Recall RATIO penalised a finer cut and the relevant-chunk
+  COUNT rewarded one. Chunk-level Recall/MRR/nDCG stay printed as description.
 - Rebuilding the Serve and MCP images changes their digests. The production
   compose still points at the recorded immutable digests, so Stage E owns
   publishing and pinning the new ones.
