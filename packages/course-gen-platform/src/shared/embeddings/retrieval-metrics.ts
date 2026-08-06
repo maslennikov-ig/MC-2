@@ -9,29 +9,48 @@
  * query, and it cannot show what the dense half would do. Any report built on it
  * must say so.
  *
- * Recall@K here is the textbook definition — retrieved relevant divided by ALL
- * relevant chunks, never by `min(relevantTotal, k)`. Dividing by the capped
- * count reports a full score whenever the top-k happens to be saturated, which
- * turns "5 of 8 relevant chunks were retrieved" into 1.00 and hides the miss.
- * The consequence is that Recall@K is NOT comparable across strategies that cut
- * the same document into different numbers of chunks: a finer strategy raises
- * `relevantTotal` and mechanically lowers its own ceiling. `recallCeilingAtK`
- * reports that ceiling so a reader can see the effect instead of inferring it,
- * and cross-strategy conclusions belong to the rank-based metrics.
+ * Everything gated here is counted over EVIDENCE ATOMS — the declared facts an
+ * answer needs — and never over chunks. A chunk is an artefact of the strategy
+ * under test, so any metric whose numerator or denominator counts chunks
+ * measures the strategy's cutting, not its retrieval: dividing by
+ * `relevantTotal` penalises a finer cut, and counting `relevantInTopK` rewards
+ * one, because five fragments repeating one answer score five times the chunk
+ * that contains it whole. The atom set is identical for every strategy, so
+ * coverage, `atomMrrAtK` and `atomDcgAtK` are directly comparable.
+ *
+ * The chunk-level Recall@K, MRR and nDCG@K remain in every outcome, correctly
+ * computed (Recall divides by ALL relevant chunks and prints its reachable
+ * ceiling beside it), purely as description. They are not a verdict.
  *
  * @module shared/embeddings/retrieval-metrics
  */
 
 import { QDRANT_BM25_OPTIONS } from '../qdrant/config.js';
 
-/** One ground-truth question with the evidence it must retrieve. */
+/**
+ * One indivisible fact the answer needs, identified independently of chunking.
+ *
+ * This is the unit every gated metric counts, and the reason it exists: a chunk
+ * is not a unit of truth. Counting relevant CHUNKS rewards a strategy for
+ * duplicating one answer across five fragments and punishes one that keeps it
+ * whole, so "more relevant chunks retrieved" can mean strictly less information
+ * delivered. An atom is declared in the corpus manifest, is the same set for
+ * every strategy, and is either covered by the top-k or not — so it cannot be
+ * inflated by cutting the document differently.
+ */
+export interface EvidenceAtom {
+  id: string;
+  /** ALL of these must appear in one chunk for that chunk to carry the atom. */
+  tokens: string[];
+  /** Optional Docling refs a carrying chunk should be built from. */
+  refs?: string[];
+}
+
+/** One ground-truth question and the distinct facts its answer needs. */
 export interface GroundTruthQuestion {
   id: string;
   query: string;
-  /** Substrings that identify a chunk as carrying the expected evidence. */
-  expectedTokens: string[];
-  /** Optional Docling refs the retrieved chunk should be built from. */
-  expectedRefs?: string[];
+  evidence: EvidenceAtom[];
 }
 
 /** Minimal chunk shape the scorer needs. */
@@ -42,10 +61,35 @@ export interface ScorableChunk {
   provenance?: { self_refs: string[] } | undefined;
 }
 
+export interface AtomOutcome {
+  id: string;
+  /** 1-based rank of the first top-k chunk carrying this atom, else null. */
+  rank: number | null;
+  /**
+   * No chunk in the whole corpus carries it. That is a chunking defect — the
+   * fact was split across a boundary — and it is reported separately from a
+   * ranking miss, because the two have different fixes.
+   */
+  unreachable: boolean;
+}
+
 export interface QuestionOutcome {
   id: string;
-  /** 1-based rank of the first relevant chunk, or null when none was found. */
+  atoms: AtomOutcome[];
+  /** Declared atoms. Fixed per question, so every ratio below is comparable. */
+  atomsTotal: number;
+  atomsCoveredInTopK: number;
+  /** Covered / declared. The gated coverage metric. */
+  atomCoverageAtK: number;
+  /** Mean over DECLARED atoms of `1 / rank`, 0 for an uncovered atom. */
+  atomMrrAtK: number;
+  /** Mean over DECLARED atoms of `1 / log2(rank + 1)`, 0 for an uncovered atom. */
+  atomDcgAtK: number;
+  /** The scored top-k, best first, so a claim about ranking can be re-checked. */
+  rankedChunkIds: string[];
+  /** 1-based rank of the first chunk carrying any atom, or null. */
   firstRelevantRank: number | null;
+  /** DESCRIPTIVE chunk-level view below this line. None of it is gated. */
   relevantInTopK: number;
   relevantTotal: number;
   /** Retrieved relevant / ALL relevant. Bounded by `recallCeilingAtK`. */
@@ -61,6 +105,11 @@ export interface QuestionOutcome {
 export interface RetrievalReport {
   k: number;
   questions: QuestionOutcome[];
+  atomCoverageAtK: number;
+  atomMrrAtK: number;
+  atomDcgAtK: number;
+  /** `question/atom` pairs no chunk of this strategy can carry. */
+  unreachableAtoms: string[];
   recallAtK: number;
   /** Mean of the per-question ceilings; a Recall@K below it is a real miss. */
   recallCeilingAtK: number;
@@ -85,38 +134,40 @@ export const RETRIEVAL_REGRESSION_EPSILON = 1e-9;
 /** One per-question metric drop, or a question that vanished entirely. */
 export interface RetrievalRegression {
   questionId: string;
-  metric: 'relevant-in-top-k' | 'mrr' | 'ndcg@k' | 'question-missing';
+  metric: 'atom-coverage' | 'atom-mrr' | 'atom-dcg' | 'question-missing';
   before: number;
   after: number;
 }
 
 /**
- * The guarded metrics, all of them independent of how the corpus was cut.
+ * The guarded metrics, all counted over DECLARED evidence atoms.
  *
- * `relevantInTopK` — the COUNT of relevant chunks retrieved — is guarded rather
- * than the Recall@K RATIO, and this is a deliberate, load-bearing choice.
- * Recall@K divides by `relevantTotal`, which is a property of the chunking
- * strategy, not of the retrieval: cutting the same document finer produces more
- * chunks that match the same phrase, so the ratio falls even when the top-k is
- * byte-for-byte as useful. Measured case: on `sci-hypothesis` the legacy
- * splitter retrieved 5 relevant chunks out of 8 that existed (0.625) and the
- * hybrid chunker retrieved 5 out of 9 (0.556) — the same five answers, in the
- * same order, with identical MRR and nDCG, scored as a 7-point "regression".
+ * Two earlier versions of this gate were wrong in the same direction, and both
+ * failures were about the denominator. Gating the Recall@K RATIO compared
+ * `relevantInTopK / relevantTotal` across strategies whose `relevantTotal`
+ * differed only because they cut the document differently. Gating the COUNT
+ * `relevantInTopK` fixed the denominator but kept the numerator corrupt: five
+ * fragments repeating one answer scored five times a single chunk containing
+ * it, so duplication read as quality.
  *
- * Guarding the count keeps every real loss: retrieving fewer relevant chunks,
- * or the same ones lower down, still trips the gate. The user-facing scenario
- * that motivated a strict epsilon — losing 1 of 101 relevant chunks — is a
- * count of 5 falling to 4, and is caught. What it no longer reports is a
- * denominator that moved on its own. The ratio and its ceiling stay in every
- * report, so nothing is hidden; they are descriptive, not a verdict.
+ * Atoms remove both. The denominator is the number of facts DECLARED for the
+ * question — identical for every strategy, fixed before any run. The numerator
+ * counts distinct facts covered, so a fact retrieved five times counts once and
+ * a fact retrieved never is a loss no duplication can compensate for. Rank is
+ * kept by two discounted variants over the same fixed denominator.
+ *
+ * The scenario that motivated a strict epsilon — losing one item from a large
+ * evidence set — is a coverage drop, and a strategy that splits a fact across a
+ * chunk boundary until no chunk carries it whole shows up as an uncovered atom
+ * instead of hiding behind its siblings.
  */
 const GUARDED_METRICS: Array<{
   name: Exclude<RetrievalRegression['metric'], 'question-missing'>;
   read: (outcome: QuestionOutcome) => number;
 }> = [
-  { name: 'relevant-in-top-k', read: outcome => outcome.relevantInTopK },
-  { name: 'mrr', read: outcome => outcome.reciprocalRank },
-  { name: 'ndcg@k', read: outcome => outcome.ndcgAtK },
+  { name: 'atom-coverage', read: outcome => outcome.atomCoverageAtK },
+  { name: 'atom-mrr', read: outcome => outcome.atomMrrAtK },
+  { name: 'atom-dcg', read: outcome => outcome.atomDcgAtK },
 ];
 
 /**
@@ -154,8 +205,7 @@ export function formatRetrievalRegression(regression: RetrievalRegression): stri
   if (regression.metric === 'question-missing') {
     return `${regression.questionId}/отсутствует в прогоне`;
   }
-  const digits = regression.metric === 'relevant-in-top-k' ? 0 : 3;
-  return `${regression.questionId}/${regression.metric} ${regression.before.toFixed(digits)}→${regression.after.toFixed(digits)}`;
+  return `${regression.questionId}/${regression.metric} ${regression.before.toFixed(3)}→${regression.after.toFixed(3)}`;
 }
 
 function normalize(value: string): string {
@@ -229,9 +279,15 @@ function score(index: Bm25Index, query: string): Array<{ chunk: ScorableChunk; s
     );
 }
 
-function isRelevant(chunk: ScorableChunk, question: GroundTruthQuestion): boolean {
+/** A chunk carries an atom when it contains every token of that atom. */
+function carriesAtom(chunk: ScorableChunk, atom: EvidenceAtom): boolean {
   const haystack = normalize(`${chunk.heading_path ?? ''} ${chunk.content}`);
-  return question.expectedTokens.every(token => haystack.includes(normalize(token)));
+  return atom.tokens.every(token => haystack.includes(normalize(token)));
+}
+
+/** Chunk-level relevance, kept only for the descriptive half of the report. */
+function isRelevant(chunk: ScorableChunk, question: GroundTruthQuestion): boolean {
+  return question.evidence.some(atom => carriesAtom(chunk, atom));
 }
 
 /**
@@ -253,6 +309,19 @@ export function scoreQuestion(
   const relevantTotal = corpus.filter(chunk => isRelevant(chunk, question)).length;
   const topK = ranked.slice(0, k);
 
+  const atoms: AtomOutcome[] = question.evidence.map(atom => {
+    const position = topK.findIndex(chunk => carriesAtom(chunk, atom));
+    return {
+      id: atom.id,
+      rank: position >= 0 ? position + 1 : null,
+      unreachable: !corpus.some(chunk => carriesAtom(chunk, atom)),
+    };
+  });
+
+  const atomsTotal = atoms.length;
+  const mean = (values: number[]): number =>
+    atomsTotal > 0 ? values.reduce((sum, value) => sum + value, 0) / atomsTotal : 0;
+
   let firstRelevantRank: number | null = null;
   let relevantInTopK = 0;
   let discounted = 0;
@@ -269,14 +338,24 @@ export function scoreQuestion(
     ideal += 1 / Math.log2(position + 2);
   }
 
-  const refMatched = question.expectedRefs
-    ? topK.some(chunk =>
-        question.expectedRefs!.some(ref => chunk.provenance?.self_refs.includes(ref))
-      )
-    : null;
+  const expectedRefs = question.evidence.flatMap(atom => atom.refs ?? []);
+  const refMatched =
+    expectedRefs.length > 0
+      ? topK.some(chunk => expectedRefs.some(ref => chunk.provenance?.self_refs.includes(ref)))
+      : null;
 
   return {
     id: question.id,
+    atoms,
+    atomsTotal,
+    atomsCoveredInTopK: atoms.filter(atom => atom.rank !== null).length,
+    atomCoverageAtK: mean(atoms.map(atom => (atom.rank === null ? 0 : 1))),
+    atomMrrAtK: mean(atoms.map(atom => (atom.rank === null ? 0 : 1 / atom.rank))),
+    // `1 / log2(rank + 1)` is 1.0 at rank 1 and decays with depth, so the ideal
+    // needs no corpus-derived normaliser: every atom's best possible outcome is
+    // "carried by the top result", which is the same target for every strategy.
+    atomDcgAtK: mean(atoms.map(atom => (atom.rank === null ? 0 : 1 / Math.log2(atom.rank + 1)))),
+    rankedChunkIds: topK.map(chunk => chunk.chunk_id),
     firstRelevantRank,
     relevantInTopK,
     relevantTotal,
@@ -296,6 +375,12 @@ export function buildRetrievalReport(outcomes: QuestionOutcome[], k: number): Re
   return {
     k,
     questions: outcomes,
+    atomCoverageAtK: mean(outcomes.map(outcome => outcome.atomCoverageAtK)),
+    atomMrrAtK: mean(outcomes.map(outcome => outcome.atomMrrAtK)),
+    atomDcgAtK: mean(outcomes.map(outcome => outcome.atomDcgAtK)),
+    unreachableAtoms: outcomes.flatMap(outcome =>
+      outcome.atoms.filter(atom => atom.unreachable).map(atom => `${outcome.id}/${atom.id}`)
+    ),
     recallAtK: mean(outcomes.map(outcome => outcome.recallAtK)),
     recallCeilingAtK: mean(outcomes.map(outcome => outcome.recallCeilingAtK)),
     mrr: mean(outcomes.map(outcome => outcome.reciprocalRank)),

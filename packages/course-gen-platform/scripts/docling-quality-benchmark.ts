@@ -12,16 +12,18 @@
  * - Heading hierarchy is asserted on the DISTINCT levels present, not on the
  *   deepest `#` count. A document with only H2 does not prove two levels.
  * - Retrieval is scored on two channels. `--dense` runs the PRODUCTION path —
- *   real Jina v3 vectors, server-side BM25, RRF — and blocks; the offline BM25
- *   proxy always runs and is an observation whenever the dense one is present.
- *   Without `--dense` the proxy blocks, and a win is only lexical reachability.
- * - Recall@K is divided by all relevant chunks, and its reachable ceiling is
- *   printed next to it, so a saturated top-k cannot read as a perfect score.
- *   The RATIO is never gated: its denominator is how finely the strategy cut
- *   the document, not how good the answer was.
- * - A control question must not regress on the COUNT of relevant chunks in the
- *   top-k, on MRR, or on nDCG. Guarding the reciprocal rank alone passed
- *   strategies that kept the first hit first and lost the rest of the evidence.
+ *   real Jina v3 vectors, one late-chunking call for every chunk exactly as
+ *   `phase-5-embedding.ts` makes it, server-side BM25, RRF — and blocks; the
+ *   offline BM25 proxy always runs and is an observation whenever the dense one
+ *   is present. Without `--dense` the proxy blocks, and a win is only lexical
+ *   reachability.
+ * - The gate counts EVIDENCE ATOMS, never chunks: coverage of the facts the
+ *   manifest declares for a question, plus two rank-discounted variants over
+ *   the same fixed denominator. Chunk-level Recall/MRR/nDCG stay in the report
+ *   as description, because both of their halves are properties of how finely
+ *   the strategy cut the document rather than of the answer.
+ * - Every scored top-k is written out as chunk ids, so "the same chunks in the
+ *   same order" is a checkable claim rather than a recollection.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -355,9 +357,9 @@ function strategyAssertions(
   }
 
   // No control question may regress against the legacy strategy on ANY of the
-  // three metrics. Checking only the reciprocal rank passes a strategy that
-  // keeps the first hit first while losing the rest of the evidence, which is
-  // exactly how a Recall and nDCG regression stayed invisible. This blocks only
+  // three atom metrics. Checking only the reciprocal rank passes a strategy
+  // that keeps the first hit first while losing the rest of the evidence;
+  // checking chunk counts passes one that merely duplicates it. This blocks only
   // for the candidate default; the other strategies stay measured and reported,
   // because knowing that a non-selected strategy regresses is the evidence that
   // selected the candidate in the first place.
@@ -466,6 +468,14 @@ async function main(): Promise<void> {
     console.error('--dense требует JINA_API_KEY (реальные платные вызовы api.jina.ai)');
     process.exit(2);
   }
+  // The benchmark never shares Redis keys with production embeddings. A run
+  // under a fresh label is therefore cold and its billed-token count is the
+  // real cost of the measurement; re-running the same label reuses exactly the
+  // vectors that label produced. Sharing the production namespace is how the
+  // first dense evidence came out billing zero tokens and silently scored
+  // vectors that some earlier run had computed in another context.
+  process.env.EMBEDDING_CACHE_NAMESPACE =
+    argument('--embedding-cache-namespace') ?? `embedding-bench:${label}`;
   const manifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 
   await fs.mkdir(outputDirectory, { recursive: true });
@@ -639,10 +649,16 @@ async function main(): Promise<void> {
     `${JSON.stringify(metrics, null, 2)}\n`
   );
 
+  /** Gated atom metrics, then the descriptive chunk-level Recall. */
+  const retrievalCells = (report: RetrievalReport | null | undefined): string =>
+    report
+      ? `${report.atomCoverageAtK.toFixed(2)} | ${report.atomMrrAtK.toFixed(2)} | ${report.atomDcgAtK.toFixed(2)} | ${report.recallAtK.toFixed(2)} / ${report.recallCeilingAtK.toFixed(2)}`
+      : '— | — | — | —';
+
   const strategyRows = results.flatMap(result =>
     result.strategies.map(
       outcome =>
-        `| ${result.id} | ${outcome.strategy} | ${outcome.parentChunks} | ${outcome.childChunks} | ${outcome.avgChildTokens} | ${(outcome.headingPathCoverage * 100).toFixed(0)}% | ${(outcome.refCoverage * 100).toFixed(0)}% | ${outcome.locationEligible ? `${(outcome.locationCoverage * 100).toFixed(0)}%` : 'n/a'} | ${outcome.retrieval ? `${outcome.retrieval.recallAtK.toFixed(2)} / ${outcome.retrieval.recallCeilingAtK.toFixed(2)}` : '—'} | ${outcome.retrieval ? outcome.retrieval.mrr.toFixed(2) : '—'} | ${outcome.retrieval ? outcome.retrieval.ndcgAtK.toFixed(2) : '—'} | ${outcome.durationMs} |`
+        `| ${result.id} | ${outcome.strategy} | ${outcome.parentChunks} | ${outcome.childChunks} | ${outcome.avgChildTokens} | ${(outcome.headingPathCoverage * 100).toFixed(0)}% | ${(outcome.refCoverage * 100).toFixed(0)}% | ${outcome.locationEligible ? `${(outcome.locationCoverage * 100).toFixed(0)}%` : 'n/a'} | ${retrievalCells(outcome.retrieval)} | ${outcome.durationMs} |`
     )
   );
 
@@ -672,21 +688,29 @@ async function main(): Promise<void> {
     '',
     '## Стратегии чанкинга',
     '',
-    'Recall@5/MRR/nDCG@5 — лексический прокси (BM25 с параметрами коллекции), не dense-ранжирование Jina.',
+    'Метрики этой таблицы — лексический прокси (BM25 с параметрами коллекции), не dense-ранжирование Jina.',
     '',
-    'Колонка `R@5` — «факт / потолок». Потолок = `min(релевантных, 5) / релевантных`:',
-    'стратегия, которая режет тот же документ мельче, механически снижает свой',
-    'собственный потолок, поэтому Recall@5 между стратегиями напрямую не сравним,',
-    'и выбор кандидата опирается на ранговые метрики и на отсутствие регрессий.',
+    '`Atoms@5` — доля ОБЪЯВЛЕННЫХ фактов вопроса, покрытых top-5. `aMRR` и `aDCG` —',
+    'те же атомы со скидкой за ранг (`1/rank` и `1/log2(rank+1)`), усреднённые по тому',
+    'же фиксированному знаменателю. Знаменатель одинаков для всех стратегий, а',
+    'повторное попадание одного и того же факта в пять чанков считается один раз.',
     '',
-    `Регрессия — падение числа релевантных чанков в top-5, MRR или nDCG@5 на любом контрольном вопросе; допуск ${RETRIEVAL_REGRESSION_EPSILON} покрывает только погрешность представления чисел. Исчезнувший вопрос тоже регрессия. Отношение Recall@5 не входит в gate: его знаменатель зависит от того, насколько мелко стратегия режет документ, а не от качества выдачи.`,
+    'Колонка `R@5` — «факт / потолок» на уровне чанков. Оставлена как описание:',
+    'и числитель, и знаменатель зависят от того, насколько мелко стратегия режет',
+    'документ, поэтому она не входит в gate и не сравнима между стратегиями.',
+    '',
+    `Регрессия — падение atom-coverage, aMRR или aDCG на любом контрольном вопросе; допуск ${RETRIEVAL_REGRESSION_EPSILON} покрывает только погрешность представления чисел. Исчезнувший вопрос тоже регрессия. Атом, который не несёт ни один чанк стратегии (факт разрезан границей), попадает в \`unreachableAtoms\` и одновременно снижает coverage.`,
     dense
       ? 'Блокирует dense+sparse канал (это и есть production-ранжирование); лексический прокси — наблюдение.'
       : 'Блокирует лексический прокси: dense-прогон не запрашивался (`--dense`).',
     '',
-    '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | R@5 факт/потолок | MRR | nDCG@5 | ms |',
-    '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+    '| Case | Strategy | Parents | Children | Avg child tok | Heading path | Refs | Page/bbox | Atoms@5 | aMRR | aDCG | R@5 факт/потолок | ms |',
+    '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
     ...strategyRows,
+    '',
+    'Полные ранжированные списки chunk id и посписочный статус каждого атома —',
+    'в `metrics.json` (`strategies[].retrieval.questions[].rankedChunkIds` и',
+    '`.atoms`). Утверждение «те же чанки в том же порядке» проверяется по ним.',
     '',
     '## Проваленные проверки',
     '',
@@ -708,9 +732,11 @@ async function main(): Promise<void> {
           '',
           '## Dense+sparse retrieval (реальные jina-embeddings-v3)',
           '',
-          'Тот же production-путь: late chunking для children, server-side BM25 + dense prefetch,',
-          'RRF, поиск через `searchChunks({enable_hybrid:true})` во временной коллекции с',
-          `production-схемой (включая payload-индексы: без них strict mode отклоняет фильтр и hybrid молча падает в dense-only). Оплачено токенов в этом прогоне: ${results.reduce(
+          'Тот же production-путь: один вызов `generateEmbeddingsWithLateChunking(chunks,',
+          "'retrieval.passage', true)` на все чанки — ровно как в `phase-5-embedding.ts`,",
+          'server-side BM25 + dense prefetch, RRF, поиск через `searchChunks({enable_hybrid:true})`',
+          'во временной коллекции с',
+          `production-схемой (включая payload-индексы: без них strict mode отклоняет фильтр и hybrid молча падает в dense-only). Кэш эмбеддингов изолирован в namespace \`${process.env.EMBEDDING_CACHE_NAMESPACE}\`. Оплачено токенов в этом прогоне: ${results.reduce(
             (sum, result) =>
               sum +
               result.strategies.reduce(
@@ -720,14 +746,14 @@ async function main(): Promise<void> {
             0
           )}.`,
           '',
-          '| Case | Strategy | R@5 факт/потолок | MRR | nDCG@5 |',
-          '|---|---|---:|---:|---:|',
+          '| Case | Strategy | Atoms@5 | aMRR | aDCG | R@5 факт/потолок |',
+          '|---|---|---:|---:|---:|---:|',
           ...results.flatMap(result =>
             result.strategies
               .filter(outcome => outcome.denseRetrieval)
               .map(
                 outcome =>
-                  `| ${result.id} | ${outcome.strategy} | ${outcome.denseRetrieval!.recallAtK.toFixed(2)} / ${outcome.denseRetrieval!.recallCeilingAtK.toFixed(2)} | ${outcome.denseRetrieval!.mrr.toFixed(2)} | ${outcome.denseRetrieval!.ndcgAtK.toFixed(2)} |`
+                  `| ${result.id} | ${outcome.strategy} | ${retrievalCells(outcome.denseRetrieval)} |`
               )
           ),
         ]

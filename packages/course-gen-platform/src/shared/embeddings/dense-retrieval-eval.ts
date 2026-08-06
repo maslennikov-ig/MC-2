@@ -2,12 +2,19 @@
  * Live dense+sparse retrieval scoring for the chunking A/B.
  *
  * Where `retrieval-metrics.ts` reproduces only the lexical half offline, this
- * module measures what production actually does: real `jina-embeddings-v3`
- * vectors with late chunking for children and without it for parents, uploaded
- * into a throwaway Qdrant collection built from the SAME
- * `COLLECTION_CREATE_PARAMS` as the production one, then queried through the
+ * module measures what production actually does: it calls
+ * `generateEmbeddingsWithLateChunking` exactly as
+ * `phase-5-embedding.ts` does — ONE call, every chunk, `late_chunking: true` —
+ * and uploads the result into a throwaway Qdrant collection built from the SAME
+ * `COLLECTION_CREATE_PARAMS` as the production one, then queries through the
  * production `searchChunks` path with `enable_hybrid` — server-side BM25 and
  * dense prefetch fused by RRF.
+ *
+ * The first version split parents and children into two calls with different
+ * `late_chunking` flags, following a helper's docblock rather than the
+ * production call site. Under late chunking the request input IS the context,
+ * so two calls produce different vectors from the one production makes: the
+ * benchmark would have ranked an embedding policy nobody runs.
  *
  * It calls a PAID external API (`api.jina.ai`). Nothing here runs unless a
  * caller explicitly asks for it, and the temporary collection is always dropped.
@@ -23,7 +30,7 @@ import { QDRANT_COLLECTION_ALIAS } from '../qdrant/config.js';
 import { searchChunks } from '../qdrant/search.js';
 import { toQdrantPoint, toUpsertPoints } from '../qdrant/upload-helpers.js';
 import { logger } from '../logger/index.js';
-import { generateEmbeddingsWithLateChunking, separateChunksByLevel } from './generate.js';
+import { generateEmbeddingsWithLateChunking } from './generate.js';
 import type { EnrichedChunk } from './metadata-enricher.js';
 import {
   buildRetrievalReport,
@@ -64,9 +71,9 @@ function toScorable(chunk: EnrichedChunk): ScorableChunk {
  * Embeds a chunk set, indexes it, and scores the ground-truth questions
  * through the production hybrid search path.
  *
- * Parents are embedded without late chunking and children with it, matching
- * `stage2` exactly — measuring a different embedding policy than production
- * uses would answer a question nobody asked.
+ * The embedding call is byte-for-byte the one `phase-5-embedding.ts` makes.
+ * Measuring a different embedding policy than production uses would answer a
+ * question nobody asked.
  */
 export async function evaluateDenseRetrieval(
   chunks: readonly EnrichedChunk[],
@@ -82,35 +89,31 @@ export async function evaluateDenseRetrieval(
     );
   }
 
-  const { parentChunks, childChunks } = separateChunksByLevel([...chunks]);
   let billedTokens = 0;
 
   await qdrantClient.createCollection(collectionName, COLLECTION_CREATE_PARAMS);
-  // The production collection's payload indexes are not decoration: with
-  // `strict_mode_config.unindexed_filtering_retrieve: false`, a filtered query
-  // against an unindexed field is rejected outright, and hybrid search silently
-  // degrades to its dense-only fallback. An index-less copy would have measured
-  // a different engine than the one production runs.
-  for (const index of PAYLOAD_INDEXES) {
-    await qdrantClient.createPayloadIndex(collectionName, {
-      field_name: index.field_name,
-      field_schema: index.field_schema,
-      wait: true,
-    });
-  }
 
   try {
-    const parents = await generateEmbeddingsWithLateChunking(
-      parentChunks,
-      'retrieval.passage',
-      false
-    );
-    const children = await generateEmbeddingsWithLateChunking(
-      childChunks,
+    // The production collection's payload indexes are not decoration: with
+    // `strict_mode_config.unindexed_filtering_retrieve: false`, a filtered query
+    // against an unindexed field is rejected outright, and hybrid search
+    // silently degrades to its dense-only fallback. An index-less copy would
+    // have measured a different engine than the one production runs. Creating
+    // them inside the `try` keeps a failed index from leaking the collection.
+    for (const index of PAYLOAD_INDEXES) {
+      await qdrantClient.createPayloadIndex(collectionName, {
+        field_name: index.field_name,
+        field_schema: index.field_schema,
+        wait: true,
+      });
+    }
+
+    const embedded = await generateEmbeddingsWithLateChunking(
+      [...chunks],
       'retrieval.passage',
       true
     );
-    billedTokens = parents.total_tokens + children.total_tokens;
+    billedTokens = embedded.total_tokens;
     options.onTokens?.(billedTokens);
 
     // Upserted through the production point builders, but NOT through
@@ -118,7 +121,7 @@ export async function evaluateDenseRetrieval(
     // document catalog, and a benchmark over throwaway ids has no business
     // touching a real database. The vectors and payloads are identical.
     const points = toUpsertPoints(
-      [...parents.embeddings, ...children.embeddings].map(result => toQdrantPoint(result, true)),
+      embedded.embeddings.map(result => toQdrantPoint(result, true)),
       true
     );
     // Batched exactly like the production uploader: the collection's strict mode
@@ -134,7 +137,7 @@ export async function evaluateDenseRetrieval(
     // Only children are retrievable units in production RAG; parents are
     // fetched by id once a child matches. Scoring parents as if they competed
     // for the same slots would flatter whichever strategy makes fewer of them.
-    const corpus = childChunks.map(toScorable);
+    const corpus = chunks.filter(chunk => chunk.level === 'child').map(toScorable);
 
     const outcomes = [];
     for (const question of questions) {

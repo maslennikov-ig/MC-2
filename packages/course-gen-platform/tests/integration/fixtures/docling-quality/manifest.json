@@ -1,25 +1,46 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "cases": [
     {
       "id": "scientific-pdf",
       "source": "../common/2510.13928v1.pdf",
       "expectedTokens": ["LLM Brain Rot", "ABSTRACT", "74.9", "57.2"],
       "headingHierarchy": {
-        "baseline": { "expectedLevels": [2] },
-        "pdf-heading-hierarchy": { "minimumDistinctLevels": 2 }
+        "baseline": {
+          "expectedLevels": [2]
+        },
+        "pdf-heading-hierarchy": {
+          "minimumDistinctLevels": 2
+        }
       },
-      "provenance": { "minimumRefCoverage": 0.95, "minimumLocationCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "sci-accuracy-drop",
           "query": "ARC Challenge accuracy after junk intervention",
-          "expectedTokens": ["74.9", "57.2"]
+          "evidence": [
+            {
+              "id": "arc-baseline",
+              "tokens": ["74.9"]
+            },
+            {
+              "id": "arc-after-junk",
+              "tokens": ["57.2"]
+            }
+          ]
         },
         {
           "id": "sci-hypothesis",
           "query": "what does the LLM brain rot hypothesis claim",
-          "expectedTokens": ["brain rot", "hypothesis"]
+          "evidence": [
+            {
+              "id": "brain-rot-hypothesis",
+              "tokens": ["brain rot", "hypothesis"]
+            }
+          ]
         }
       ]
     },
@@ -32,20 +53,37 @@
         "1.1. Область применения"
       ],
       "headingHierarchy": {
-        "baseline": { "expectedLevels": [2] },
-        "pdf-heading-hierarchy": { "expectedLevels": [2, 3] }
+        "baseline": {
+          "expectedLevels": [2]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3]
+        }
       },
-      "provenance": { "minimumRefCoverage": 0.95, "minimumLocationCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "numbered-control-value",
           "query": "чему равно контрольное значение проверки",
-          "expectedTokens": ["64"]
+          "evidence": [
+            {
+              "id": "control-value-64",
+              "tokens": ["64"]
+            }
+          ]
         },
         {
           "id": "numbered-scope",
           "query": "к каким документам применяется регламент",
-          "expectedTokens": ["всем входящим документам"]
+          "evidence": [
+            {
+              "id": "scope-incoming-documents",
+              "tokens": ["всем входящим документам"]
+            }
+          ]
         }
       ]
     },
@@ -60,25 +98,46 @@
         "77 единиц"
       ],
       "headingHierarchy": {
-        "baseline": { "expectedLevels": [2, 3, 4] },
-        "pdf-heading-hierarchy": { "expectedLevels": [2, 3, 4] }
+        "baseline": {
+          "expectedLevels": [2, 3, 4]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3, 4]
+        }
       },
-      "provenance": { "minimumRefCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "alpha-target",
           "query": "целевые показатели Альфы значение",
-          "expectedTokens": ["Целевые показатели Альфы", "42"]
+          "evidence": [
+            {
+              "id": "alpha-42",
+              "tokens": ["Целевые показатели Альфы", "42"]
+            }
+          ]
         },
         {
           "id": "beta-target",
           "query": "целевые показатели Беты значение",
-          "expectedTokens": ["Целевые показатели Беты", "77"]
+          "evidence": [
+            {
+              "id": "beta-77",
+              "tokens": ["Целевые показатели Беты", "77"]
+            }
+          ]
         },
         {
           "id": "beta-latency",
           "query": "ограничения Беты максимальная задержка",
-          "expectedTokens": ["Ограничения Беты", "30 минут"]
+          "evidence": [
+            {
+              "id": "beta-30-minutes",
+              "tokens": ["Ограничения Беты", "30 минут"]
+            }
+          ]
         }
       ]
     },
@@ -95,17 +154,28 @@
         "процентов"
       ],
       "headingHierarchy": {
-        "baseline": { "expectedLevels": [2, 3] },
-        "pdf-heading-hierarchy": { "expectedLevels": [2, 3] }
+        "baseline": {
+          "expectedLevels": [2, 3]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3]
+        }
       },
       "requiresNestedList": true,
       "minimumColspan": 3,
-      "provenance": { "minimumRefCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "structured-table-value",
           "query": "сводные показатели точность процентов",
-          "expectedTokens": ["98", "процентов"]
+          "evidence": [
+            {
+              "id": "accuracy-98-percent",
+              "tokens": ["98", "процентов"]
+            }
+          ]
         }
       ]
     },
@@ -125,12 +195,23 @@
         "Шаг два: проверить результат",
         "Подпись схемы"
       ],
-      "provenance": { "minimumRefCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "pptx-steps",
           "query": "какие шаги обработки описаны на схеме",
-          "expectedTokens": ["Шаг один: собрать данные"]
+          "evidence": [
+            {
+              "id": "step-one",
+              "tokens": ["Шаг один: собрать данные"]
+            },
+            {
+              "id": "step-two",
+              "tokens": ["Шаг два: проверить результат"]
+            }
+          ]
         }
       ]
     },
@@ -144,12 +225,20 @@
         "98",
         "процентов"
       ],
-      "provenance": { "minimumRefCoverage": 0.95, "minimumLocationCoverage": 0.95 },
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
       "retrieval": [
         {
           "id": "ocr-control-phrase",
           "query": "контрольная фраза качество распознавания",
-          "expectedTokens": ["КОНТРОЛЬНАЯ ФРАЗА"]
+          "evidence": [
+            {
+              "id": "control-phrase",
+              "tokens": ["КОНТРОЛЬНАЯ ФРАЗА"]
+            }
+          ]
         }
       ]
     },
