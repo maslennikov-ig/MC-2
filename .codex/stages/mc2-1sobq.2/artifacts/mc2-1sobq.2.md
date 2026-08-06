@@ -157,7 +157,8 @@ its unchanged 4 GiB with zero restarts; the advanced profile peaked at 4.34 GiB
 of 12 GiB with zero restarts. Cost of the advanced pass on that fixture: 134s
 against 4s for baseline, which is the number the router exists to avoid paying.
 
-- graph-reviewed: pending
+- graph-reviewed: updated — `graphify update .` rebuilt the local graph at the
+  delivered HEAD: 60,784 nodes, 87,527 edges, 7,241 communities.
 
 # Risks / Follow-ups / Explicit Defers
 
