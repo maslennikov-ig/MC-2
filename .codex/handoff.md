@@ -78,52 +78,43 @@ must stay MCP **1.x**: the rollback path stops Serve, and MCP 3 cannot serve a r
 
 ## THE WINDOW IS GONE, and where the reindex stands
 
-On the owner's 2026-07-30/31 decision the Q12 live cutover became an ordinary release, and it
+The Q12 live cutover became an ordinary release on the owner's 2026-07-30/31 decision, and it
 succeeded: production moved off Qdrant Cloud. Do not reopen C1..C10 nor the beads retired
 2026-07-31/08-01 — each carries its reason, a REOPEN CONDITION and its unmade fix in
-`.codex/stages/mc2-jz6y0/summary.md`. Still OPEN, none window-dependent: `mc2-8m90f`, `mc2-qd12b`,
-`mc2-n6szm`. **Every piece of Q12 machinery is opt-in**: migrations, reindex, deploy and source
-recovery each have an ordinary path, reached by NOT passing the Q12 flags.
+`.codex/stages/mc2-jz6y0/summary.md`. Still OPEN: `mc2-8m90f`, `mc2-qd12b`, `mc2-n6szm`. **Every
+piece of Q12 machinery is opt-in**, reached by NOT passing the Q12 flags.
 
-**Source recovery is COMPLETE** (`mc2-jz6y0.13.4`): 42/42 published, 24/24 verified, 2026-08-01.
-**The reindex is 218/234**: `expected_points=13650 indexed_points=13712 gaps=21
-schema_mismatches=0 relevance_failures=0`. The 32 DOCX losses are back.
+**Source recovery is COMPLETE** (42/42, 24/24, 2026-08-01). **The reindex is 218/234**:
+`expected_points=13650 indexed_points=13712 gaps=21 schema_mismatches=0 relevance_failures=0`.
 
-**The 16 that remain are one family, and the diagnosis took three tries.** NOT scans, NO race:
-exported diagrams, one page, 4296pt tall, type converted to curves, so no text layer exists for any
-extractor. OCR returns nothing even at 3x, and Docling converts them to `<!-- image -->` and REPORTS
-SUCCESS (`mc2-3gz2m`).
+**The 16 that remain are one family.** NOT scans, NO race: exported diagrams, 4296pt tall, type
+converted to curves, no text layer for any extractor. OCR returns nothing even at 3x, and Docling
+converts them to `<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`).
 
-**How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`, idempotent:
-it only touches documents the catalog calls `failed`. Two flags are NOT optional —
-`-e BULLMQ_QUEUE_NAME=course-generation` and `-e DOCLING_UPLOADS_BASE_PATH=/app`. Do not re-enqueue
-while a previous round still retries: the old jobs' failure path overwrites what the new round
-fixed. `reindex execute` cannot repair its own run.
+**How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`, idempotent.
+Two flags are NOT optional — `-e BULLMQ_QUEUE_NAME=course-generation` and
+`-e DOCLING_UPLOADS_BASE_PATH=/app`. Do not re-enqueue while a previous round still retries.
 
 ## Backup guarantees
 
 All three timers ENABLED. Snapshot and Supabase backup have PROVEN THEMSELVES UNATTENDED
 (2026-08-02); the Qdrant restore drill is monthly, next 2026-09-01, so its scheduled path is still
-unproven. The drill PASSED 2026-07-31, all seven checks, evidence under
-`/var/lib/megacampus-qdrant-recovery/restore-evidence/`. Supabase stamps its success metric only
+unproven. The drill PASSED 2026-07-31, all seven checks. Supabase stamps its success metric only
 after pg_restore validation AND pointer publication succeed. Snapshots are `storage_mode local`.
 
-**`mc2-0tcyw`, 2026-08-03.** A failure past `pg_dump` was UNATTRIBUTABLE because psql's stderr was
-dropped; it now carries psql's words. The unit retries after 10min, bounded to 4 starts / 6h,
-excluding exit 64/75. Install ONLY via `install-supabase-backup-schedule.sh`, which clears the
-start-limit first — without that, the trap DISABLES the timer after repeated failures.
+**`mc2-0tcyw`.** A failure past `pg_dump` was UNATTRIBUTABLE because psql's stderr was dropped; it
+now carries psql's words. Retries after 10min, bounded 4 starts / 6h, excluding exit 64/75. Install
+ONLY via `install-supabase-backup-schedule.sh`, which clears the start-limit first — without that
+the trap DISABLES the timer after repeated failures.
 
-**`mc2-0rj7i` — FINISHED 2026-08-03; still NOT proven to be the cause of that night.** All four
-manifest transactions `SET LOCAL statement_timeout = '10min'`, and the hash digests each row, so
-nothing spills and `work_mem` stopped being a lever. Manifest schema is **v2**: an older generation
-drills to `source manifest schema mismatch` instead of reporting every relation as drifted.
-Idle-in-transaction FALSIFIED. Measurements: `.codex/stages/mc2-jz6y0/summary.md`.
+**`mc2-0rj7i` — FINISHED; still NOT proven to be the cause of that night.** All four manifest
+transactions `SET LOCAL statement_timeout = '10min'`, and the hash digests each row, so `work_mem`
+stopped being a lever. Manifest schema is **v2**. Idle-in-transaction FALSIFIED.
 
 **All 13 alerting rules are inactive**, every one cleared by making it true.
-**`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), from
-`deploy/qdrant/generate-recovery-probe.py`, NOT in the repository because it embeds real course
-content. **Regenerate it after anything that rewrites course
-`0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill** — it must match.
+**`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), NOT in the repository because it
+embeds real course content. **Regenerate it after anything that rewrites course
+`0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill.**
 
 ## What is delivered, and how this repository fails
 
@@ -174,6 +165,16 @@ explicit paths and never `git add -A`.
   GitHub runners. Same class as the psql-17 skip in `q12-source-manifest-psql-diagnostic.test.ts`.
 - `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
   Review P2 `mc2-af1ay`. HA, quantization, on-disk indexes, sharding, JWT RBAC: out of scope.
+- **`mc2-vih6r` (P1) — the Docling rollback does NOT work as executed.** It swaps only the image, so
+  MCP 1.x inherits the split service definition: 512M/0.5 CPU instead of 4G/2, no MCP_TRANSPORT, and
+  remote env pointing at the Serve the rollback just stopped. Never run in production since the
+  split. `docling_check_required_tools` now makes it FAIL honestly rather than report success over a
+  dead conversion; the real fix is a rollback service profile plus a dev rehearsal.
+- `mc2-ot0g1` — `DOCLING_PREVIOUS_MCP_IMAGE` is moved by hand and unchecked; forgetting once fails
+  the whole app deploy. `mc2-j7i3g` — a typo in `DOCLING_CHUNK_STRATEGY` gives a GREEN deploy that
+  switched nothing: verify the flip in the WORKER LOG, never in the pipeline.
+- `mc2-azq33`, `mc2-r910k` — the OCR scorer's homoglyph check cannot fire on a real phrase, and
+  `scoreTable` uses the substring match its own docstring rejects.
 - CLOSED 2026-07-31/08-01, so do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
   `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`, `mc2-oc83n`.
 
@@ -195,6 +196,4 @@ affects NEW documents only. Preserve the MCP 1.x rollback digest and move
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
 `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/024-docling-intelligence/`, stage
-summaries `mc2-1sobq.{1,2,3}`, `mc2-nxd3g`, `mc2-jz6y0`, and under `docs/superpowers/{specs,plans}/`:
-`2026-07-10-self-hosted-qdrant-platform`, `2026-07-11-advisory-document-evidence-rag`,
-`2026-07-12-q12-source-recovery-design`.
+summaries `mc2-1sobq.{1,2,3,4}`, `mc2-nxd3g`, `mc2-jz6y0`, and `docs/superpowers/{specs,plans}/`.
