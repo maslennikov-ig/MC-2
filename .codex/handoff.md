@@ -8,79 +8,82 @@ Stage: OCR/VLM evaluation — both candidates measured and REJECTED, defaults un
 
 ## Docling Stage D: both candidates lost, and that is the result
 
-**EasyOCR stays default.** Mean phrase similarity on a corpus built to be hard enough to separate
-two engines: EasyOCR `ru,en` **0.9496**, RapidOCR `cyrillic` **0.7168**. RapidOCR loses on large
-type (`СВОДКА ПО НАПРАВЛЕНИЯМ` → `# BO ПО НАПРАВЛЕ ЕНИЯМ`) and wins on table cells (1.000 vs 0.917)
-and the homoglyph line (0.744 vs 0.395). Three hard constraints on any retry: RapidOCR REJECTS `ru`
-and takes the script name `cyrillic`; it is SINGLE-LANGUAGE; and its Cyrillic checkpoint is NOT in
+**EasyOCR stays default**, 0.9496 mean phrase similarity against RapidOCR `cyrillic` 0.7168 on three
+deterministically degraded Russian scans. RapidOCR loses on large type and wins on table cells
+(1.000 vs 0.917) and the homoglyph line (0.744 vs 0.395). Constraints on any retry: it REJECTS `ru`
+and takes the script name `cyrillic`, it is SINGLE-LANGUAGE, and its Cyrillic checkpoint is NOT in
 the shipped image — Docling refuses to fetch it at request time, correctly. The A/B ran against a
-throwaway probe image; the shipped baseline was never modified and was restored and re-verified.
+throwaway probe image; the shipped baseline was never modified.
 
-**VLM stays off on measured grounds.** NEITHER image carries VLM weights — this corrects the Stage B
-note claiming SmolVLM stays in the image; it does not. A retry needs a build plus RAM the host does
-not have. `force_backend_text` is a PdfPipelineOptions field Serve does not expose, and it could not
-help the vector-outline PDFs anyway. `EmptyConversionError` re-verified after restore.
+**VLM stays off**: NEITHER image carries VLM weights and the host cannot hold one.
+`force_backend_text` is a PdfPipelineOptions field Serve does not expose, and it could not help the
+vector-outline PDFs anyway. `EmptyConversionError` re-verified. Account:
+`.codex/stages/mc2-1sobq.4/summary.md`.
 
-## Docling Stage C: seven Premium formats, and an upload contract that checks the extension
+## Docling Stage C: seven Premium formats, and an extension-checked upload
 
-All seven convert on the PINNED image with their own backends — no new model, no new service, no
-download — and are Premium-only (FR-016). One live case per family passed end to end: 100% ref
-coverage, atom coverage 1.00. Full account: `.codex/stages/mc2-1sobq.3/summary.md`.
+XLSX, CSV, ODT, ODS, ODP, EPUB and LaTeX convert on the PINNED image with their own backends,
+Premium-only: 7/7 live cases, 100% ref coverage, atom coverage 1.00.
 
 **Sheet, slide and chapter boundaries exist ONLY in the native document** — Markdown flattens a
 two-sheet workbook into two anonymous tables. `buildDoclingProvenanceIndex` walks parent chains and
-records `containers` (outermost first) on every native chunk; optional and additive. Only XLSX and
-ODS carry page/bbox, so location coverage is not an acceptance signal for the other five, as for
-DOCX. **An XLSX formula is its CACHED VALUE, never its expression**, and merged cells do NOT survive
-as spans; the generator patches a real cached value in and asserts merged TEXT.
+records `containers` on every native chunk, optional and additive. Only XLSX and ODS carry
+page/bbox. **An XLSX formula is its CACHED VALUE, never its expression**; merged cells do NOT
+survive as spans.
 
-**`file_catalog.mime_type` is no longer the client's word.** `validateFileExtension` requires the
-declared type to be one the extension permits, and the platform STORES the canonical type for that
-extension — that is what makes a `.csv` announced as `text/plain` reach Docling instead of the
-plain-text extractor. `SUPPORTED_FORMATS` stays narrower than Docling's own list on purpose: audio,
-video, email, boxnote and ebcdic remain non-goals.
+**`file_catalog.mime_type` is no longer the client's word.** The declared type must match the
+extension, and the CANONICAL type for that extension is stored — that is what makes a `.csv`
+announced as `text/plain` reach Docling. Aliases (`htm`→`html`, `markdown`→`md`, `jfif`→`jpeg`) keep
+the gate from refusing spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
 
 ## Docling Stages A and B, compressed
 
-**Stage A.** Native Docling structure reaches chunking, enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY`; 100% of children resolve to Docling refs with page/bbox in all six
-chunkable cases. **`docling_hybrid` is selected, `legacy_markdown` is still the default** — selection
-is not activation. Two production fixes came out of it: the embedding cache key now covers model,
-width, task, `late_chunking` and the whole ordered batch, so a document's first re-processing after
-deploy re-embeds it; and a Jina 429 is retried by waiting out the per-minute TOKEN window, where it
-used to be fatal. **Two upstream fields are accepted and dropped by the pinned stack**, both wrapped
-by `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:
-`_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and `get_cache_key` hashes only
-source+OCR flags. Remove at `mc2-ibzcc`.
+**Stage A.** Native structure reaches chunking, enrichment and the Qdrant payload behind
+`DOCLING_CHUNK_STRATEGY`; 100% ref coverage with page/bbox in all six chunkable cases.
+`docling_hybrid` is SELECTED, not activated. Two production fixes came from it: the embedding cache
+key now covers model, width, task, `late_chunking` and the whole ordered batch, so a document's
+first re-processing after deploy re-embeds it; and a Jina 429 is retried by waiting out the
+per-minute TOKEN window, where it used to be fatal. **Two upstream fields are accepted and dropped
+by the pinned stack**, wrapped by `docker/docling-{serve,mcp}/runtime.py` with a build-time test
+asserting the gap red first: `_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`,
+`get_cache_key` hashes only source+OCR flags. Remove at `mc2-ibzcc`.
 
-**Stage B.** Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`,
-10.5 GB) behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is
-untouched, both peak 1.82 GiB, zero restarts. **Chart extraction is built and NOT shipped**:
-`granite-vision-4.1-4b` makes the image 30.6 GB and the peak 4.34 GiB against a host at 11 GiB whose
-compose limits already sum to ~2x that (`mc2-x72bq`). The router is THREE-TIERED — baseline, then a
-cheap classification pass on the BASELINE service, then advanced only for what a concrete item asks
-for; a PPTX asks for nothing. **`picture_description` is REJECTED on evidence**: SmolVLM-256M
-described a chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title.
+**Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
+behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched, both
+peak 1.82 GiB. **Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` costs 30.6 GB
+and a 4.34 GiB peak against an 11 GiB host whose compose limits already sum to ~2x that
+(`mc2-x72bq`). The router is THREE-TIERED and a PPTX asks for nothing.
+**`picture_description` is REJECTED on evidence** and its model is NOT in the image — Stage D
+corrects the earlier note claiming it stays for a retry.
 
-**All images were rebuilt locally, so their digests differ from production**; publishing is Stage E.
+## Docling Stage E: images deployed, the chunk flip is NOT done
 
-**The Docling migration is live.** Production has `DOCLING_STACK_V2_ENABLED=true`; Serve and MCP 3 are healthy on immutable digests, the
-exact MCP 1.x rollback image remains pullable, and no reindex was run. Follow-up `mc2-vlskb` removes
-the upstream timeout wrapper. Evidence: `.codex/stages/mc2-nxd3g/summary.md`. The deploy gate accepts
-the running MCP image as either the rollback OR the candidate digest — demanding the rollback forever
-made one successful cutover block every later deploy (`mc2-h89lo`).
+Production runs images built from the CURRENT tree, 2026-08-07: `docling-serve@sha256:459f995d…`,
+`docling-mcp-v3@sha256:d6610a7c…`, digest-pinned, recreated and healthy, rollback not triggered. The
+digests before this were from 2026-08-05 10:53 and PREDATED Stage A, so production had been running
+without both runtime wrappers and without the baked `ru`/`en` EasyOCR and RapidOCR model sets.
 
-## THE WINDOW IS GONE
+**`DOCLING_CHUNK_STRATEGY` is still `legacy_markdown`.** It now reaches `.env.production` from a
+repository variable defaulting to the safe value, so the flip is one variable edit plus a redeploy
+and the rollback is the same edit backwards. It was deliberately NOT flipped in the same deploy as
+the images: two changes at once cannot be attributed. Flipping it changes NEW documents only; the
+collection becomes mixed by design, and making it uniform would need a reindex, which is a separate
+decision and a separate authorization.
 
-On the owner's 2026-07-30/31 decision the Q12 live cutover was replaced by an ordinary release, and
-the release succeeded: production moved off Qdrant Cloud. Do not reopen C1..C10, nor the beads
-retired 2026-07-31/08-01 — each carries its reason, a REOPEN CONDITION and its unmade fix verbatim in
-`.codex/stages/mc2-jz6y0/summary.md`. Q12 beads still OPEN, none window-dependent: `mc2-8m90f`,
-`mc2-qd12b`, `mc2-n6szm`. **The load-bearing rule:** every piece of Q12 machinery is opt-in —
-migrations, reindex, deploy and source recovery each have an ordinary path, reached by NOT passing
-the Q12 flags.
+**`DOCLING_PREVIOUS_MCP_IMAGE` is new and load-bearing.** The rollout gate proves it knows what the
+host runs before switching; after one cutover the host runs the previous candidate, which is neither
+the 1.x rollback nor the new one, so every image change after the first was blocked — `mc2-h89lo`
+one step out. Move it to the OLD `DOCLING_MCP_IMAGE` whenever that changes. `DOCLING_ROLLBACK_IMAGE`
+must stay MCP **1.x**: the rollback path stops Serve, and MCP 3 cannot serve a request without it.
 
-## Where the Qdrant reindex stands
+## THE WINDOW IS GONE, and where the reindex stands
+
+On the owner's 2026-07-30/31 decision the Q12 live cutover became an ordinary release, and it
+succeeded: production moved off Qdrant Cloud. Do not reopen C1..C10 nor the beads retired
+2026-07-31/08-01 — each carries its reason, a REOPEN CONDITION and its unmade fix in
+`.codex/stages/mc2-jz6y0/summary.md`. Still OPEN, none window-dependent: `mc2-8m90f`, `mc2-qd12b`,
+`mc2-n6szm`. **Every piece of Q12 machinery is opt-in**: migrations, reindex, deploy and source
+recovery each have an ordinary path, reached by NOT passing the Q12 flags.
 
 **Source recovery is COMPLETE** (`mc2-jz6y0.13.4`): 42/42 published, 24/24 verified, 2026-08-01.
 **The reindex is 218/234**: `expected_points=13650 indexed_points=13712 gaps=21
@@ -88,14 +91,14 @@ schema_mismatches=0 relevance_failures=0`. The 32 DOCX losses are back.
 
 **The 16 that remain are one family, and the diagnosis took three tries.** NOT scans, NO race:
 exported diagrams, one page, 4296pt tall, type converted to curves, so no text layer exists for any
-extractor. OCR returns nothing even with `force_full_page_ocr` at 3x, and Docling converts them to
-`<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`).
+extractor. OCR returns nothing even at 3x, and Docling converts them to `<!-- image -->` and REPORTS
+SUCCESS (`mc2-3gz2m`).
 
 **How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`, idempotent:
 it only touches documents the catalog calls `failed`. Two flags are NOT optional —
 `-e BULLMQ_QUEUE_NAME=course-generation` and `-e DOCLING_UPLOADS_BASE_PATH=/app`. Do not re-enqueue
-while a previous round still retries: the old jobs' failure path overwrites what the new round fixed.
-`reindex execute` cannot repair its own run.
+while a previous round still retries: the old jobs' failure path overwrites what the new round
+fixed. `reindex execute` cannot repair its own run.
 
 ## Backup guarantees
 
@@ -122,20 +125,18 @@ Idle-in-transaction FALSIFIED. Measurements: `.codex/stages/mc2-jz6y0/summary.md
 content. **Regenerate it after anything that rewrites course
 `0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill** — it must match.
 
-## What is delivered
+## What is delivered, and how this repository fails
 
-Q12 release: commits `a182df581`..`c85921084`, merged through `40b2a6b70`; list in
-`.codex/stages/mc2-jz6y0/summary.md`. Two changed how the HOST behaves and the repository does not
-show them: the digest-pinned operator image is held under `hold/qdrant-operator:pinned`, tagged
-BEFORE `docker image prune -f` (`mc2-2vtmk`); and Prometheus retention is 30d/20GB in
-`prometheus.yml` with the CLI flags REMOVED, because a flag silently overrides the config file.
+Q12 release: commits `a182df581`..`c85921084`, merged through `40b2a6b70`. Two changed how the HOST
+behaves and the repository does not show them: the digest-pinned operator image is held under
+`hold/qdrant-operator:pinned`, tagged BEFORE `docker image prune -f` (`mc2-2vtmk`); and Prometheus
+retention is 30d/20GB in `prometheus.yml` with the CLI flags REMOVED, because a flag silently
+overrides the config file.
 
-## How this repository fails, so you do not rediscover it
-
-**Moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU START.** Two traps
-repeated here because they cost the most time: host port 6333 is the DEV Qdrant and is empty,
-production answers on **6335**; and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths
-and never `git add -A`.
+**Failure modes moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU
+START.** Two traps repeated here because they cost the most time: host port 6333 is the DEV Qdrant
+and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by a `bd` hook, so stage
+explicit paths and never `git add -A`.
 
 ## Verification and Delivery
 
@@ -173,23 +174,22 @@ and never `git add -A`.
   GitHub runners. Same class as the psql-17 skip in `q12-source-manifest-psql-diagnostic.test.ts`.
 - `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
   Review P2 `mc2-af1ay`. HA, quantization, on-disk indexes, sharding, JWT RBAC: out of scope.
-- `mc2-gtooz` — `tests/file-validator.test.ts` uses a tier key `basic_plus` that no longer exists;
-  25/56 failed before Stage C, 24 after. Full-suite only, so it does not gate delivery.
 - CLOSED 2026-07-31/08-01, so do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
   `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`, `mc2-oc83n`.
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.5` — release candidate and controlled rollout. Owner authorized the
-digest publication and the `DOCLING_CHUNK_STRATEGY` flip on 2026-08-07.
-Recommended action: keep one active implementation stage; do not reindex existing data.
+Next stage id: `mc2-1sobq.5` — set `DOCLING_CHUNK_STRATEGY=docling_hybrid`, redeploy, then live-smoke
+ONE new control document. Owner authorized the flip and digest publication on 2026-08-07; reindex,
+migrations, secrets and force-push are NOT covered and need their own ask.
+Recommended action: flip and verify in one step by itself; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for `mc2-1sobq.5` under `specs/024-docling-intelligence/`. Stages A-D are
-accepted; every candidate default is still off in production. The owner authorized digest publication
-and the `DOCLING_CHUNK_STRATEGY` flip on 2026-08-07 — reindex, migrations, secrets and force-push are
-NOT covered and need their own ask. Preserve the MCP 1.x rollback digest.
+accepted and the images are deployed. The only remaining change is the chunk-strategy flip, which
+affects NEW documents only. Preserve the MCP 1.x rollback digest and move
+`DOCLING_PREVIOUS_MCP_IMAGE` whenever `DOCLING_MCP_IMAGE` changes.
 
 ## Read First
 
