@@ -22,7 +22,7 @@ item asks for. A PPTX asks for NOTHING: its series come from embedded XML in the
 
 **`picture_description` is REJECTED on evidence** and its model is out of the image: SmolVLM-256M
 described a chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title.
-Chart extraction needs granite-vision-**4.1-4b** — this build hardcodes V4, and shipping only the
+Chart extraction needs granite-vision-**4.1-4b**: this build hardcodes V4, and shipping only the
 3.3-2b model made it fetch V4 mid-request despite `artifacts_path`.
 
 ## Docling Intelligence: Stage A is in, and it is opt-in
@@ -43,8 +43,7 @@ re-embeds it. And a 429 is now retried by waiting out Jina's per-minute TOKEN wi
 wins); it was fatal, so one large document could permanently fail its job.
 
 Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
-`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`; bad refs fail early.
-**Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
+`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`; bad refs fail early.**Two upstream fields are accepted and dropped by the pinned stack, both measured, both wrapped by
 `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:**
 `docling_jobkit._parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and
 `docling_mcp.docling_cache.get_cache_key` hashes only source+OCR flags. Remove at `mc2-ibzcc`.
@@ -139,10 +138,11 @@ and `AGENTS.md` is rewritten by a `bd` hook, so stage explicit paths and never `
 ## Verification and Delivery
 
 - Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` green (0 errors).
-- Known and not a stop: `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*`,
-  `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred` and
-  `qdrant-source-recovery-runtime` time out under full-suite parallelism but pass alone; anything
-  else failing in isolation IS a stop.
+- Known and not a stop, all timing out under full-suite parallelism yet passing alone:
+  `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*`,
+  `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred`,
+  `qdrant-source-recovery-runtime`, `stage4-analysis/evidence/downstream-context` (30s, twice on
+  2026-08-06, alone 11/11). Re-run the failed jobs. Anything else failing in isolation IS a stop.
 - Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`: as a
   step it failed the deploy job and `rollback` triggers on exactly that — on 2026-08-01 a stale rule
   file rolled production back under a green pipeline for twenty minutes. Fix with `sudo
