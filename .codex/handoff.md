@@ -1,10 +1,25 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-07 — Stages A and B accepted; Stage C (Premium input formats) delivered on
-`develop`. Production conversion behaviour is unchanged by all three.
+Updated: 2026-08-07 — Stages A, B, C and D accepted on `develop`. Production conversion behaviour
+is unchanged by all four.
 
-Current stage id: `mc2-1sobq.3`
-Stage: Premium input formats — XLSX, CSV, ODT, ODS, ODP, EPUB, LaTeX, delivered.
+Current stage id: `mc2-1sobq.4`
+Stage: OCR/VLM evaluation — both candidates measured and REJECTED, defaults unchanged.
+
+## Docling Stage D: both candidates lost, and that is the result
+
+**EasyOCR stays default.** Mean phrase similarity on a corpus built to be hard enough to separate
+two engines: EasyOCR `ru,en` **0.9496**, RapidOCR `cyrillic` **0.7168**. RapidOCR loses on large
+type (`СВОДКА ПО НАПРАВЛЕНИЯМ` → `# BO ПО НАПРАВЛЕ ЕНИЯМ`) and wins on table cells (1.000 vs 0.917)
+and the homoglyph line (0.744 vs 0.395). Three hard constraints on any retry: RapidOCR REJECTS `ru`
+and takes the script name `cyrillic`; it is SINGLE-LANGUAGE; and its Cyrillic checkpoint is NOT in
+the shipped image — Docling refuses to fetch it at request time, correctly. The A/B ran against a
+throwaway probe image; the shipped baseline was never modified and was restored and re-verified.
+
+**VLM stays off on measured grounds.** NEITHER image carries VLM weights — this corrects the Stage B
+note claiming SmolVLM stays in the image; it does not. A retry needs a build plus RAM the host does
+not have. `force_backend_text` is a PdfPipelineOptions field Serve does not expose, and it could not
+help the vector-outline PDFs anyway. `EmptyConversionError` re-verified after restore.
 
 ## Docling Stage C: seven Premium formats, and an upload contract that checks the extension
 
@@ -25,43 +40,29 @@ extension — that is what makes a `.csv` announced as `text/plain` reach Doclin
 plain-text extractor. `SUPPORTED_FORMATS` stays narrower than Docling's own list on purpose: audio,
 video, email, boxnote and ebcdic remain non-goals.
 
-## Docling Stage B: enrichments are wired, and one candidate is rejected
+## Docling Stages A and B, compressed
 
-Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`, **10.5 GB**)
-behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
-MEASURED 2026-08-06: both peak 1.82 GiB, zero restarts, advanced pass 77s against 4s. **Chart
-extraction is built and NOT shipped**: `granite-vision-4.1-4b` makes the image 30.6 GB and the peak
-4.34 GiB, against a host at 11 GiB whose compose limits already sum to ~2x that. The model set is a
-build arg, `DOCLING_ENRICHMENT_CAPABILITIES` defaults to `code,formula,picture_classification`, and
-the router SUPPRESSES chart with a reason. Condition and command: `mc2-x72bq`.
+**Stage A.** Native Docling structure reaches chunking, enrichment and the Qdrant payload behind
+`DOCLING_CHUNK_STRATEGY`; 100% of children resolve to Docling refs with page/bbox in all six
+chunkable cases. **`docling_hybrid` is selected, `legacy_markdown` is still the default** — selection
+is not activation. Two production fixes came out of it: the embedding cache key now covers model,
+width, task, `late_chunking` and the whole ordered batch, so a document's first re-processing after
+deploy re-embeds it; and a Jina 429 is retried by waiting out the per-minute TOKEN window, where it
+used to be fatal. **Two upstream fields are accepted and dropped by the pinned stack**, both wrapped
+by `docker/docling-{serve,mcp}/runtime.py` with a build-time test that asserts the gap red first:
+`_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, and `get_cache_key` hashes only
+source+OCR flags. Remove at `mc2-ibzcc`.
 
-**The router is three-tiered.** Baseline (MCP) → a CHEAP classification pass on the BASELINE
-service → the advanced service, only for what a concrete item asks for. A PPTX asks for NOTHING: its
-series come from embedded XML in the baseline pass. **`picture_description` is REJECTED on
-evidence**, its model out of the image: SmolVLM-256M described a chart labelled Альфа/Бета/Гамма as
-"Bemma"/"BeTa"/"Rammma" under an invented title. Chart extraction needs granite-vision-**4.1-4b**:
-this build hardcodes V4, and shipping only the 3.3-2b model made it fetch V4 mid-request.
+**Stage B.** Advanced enrichments live in a SEPARATE Serve image (`mc2/docling-serve-advanced`,
+10.5 GB) behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is
+untouched, both peak 1.82 GiB, zero restarts. **Chart extraction is built and NOT shipped**:
+`granite-vision-4.1-4b` makes the image 30.6 GB and the peak 4.34 GiB against a host at 11 GiB whose
+compose limits already sum to ~2x that (`mc2-x72bq`). The router is THREE-TIERED — baseline, then a
+cheap classification pass on the BASELINE service, then advanced only for what a concrete item asks
+for; a PPTX asks for nothing. **`picture_description` is REJECTED on evidence**: SmolVLM-256M
+described a chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented title.
 
-## Docling Intelligence: Stage A is in, and it is opt-in
-
-Native Docling structure reaches chunking, enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY`; native chunks resolve 100% of children to Docling refs with page/bbox in
-all six chunkable cases. **`docling_hybrid` is selected, `legacy_markdown` is still the default** —
-selection is not activation; the flip is Stage E under separate authorization. The A/B ran the
-production ranker, 7/7 in both profiles; account and atom-gate rules in
-`.codex/stages/mc2-1sobq.1/summary.md` and `docs/DOCLING-MCP-REFERENCE.md`.
-
-**Two production fixes came out of it.** The embedding cache key now covers model, width, task,
-`late_chunking` and the whole ordered batch, so a document's first re-processing after deploy
-re-embeds it. And a Jina 429 is retried by waiting out the per-minute TOKEN window; it was fatal.
-
-Native chunking does NOT reconvert: it posts the accepted DoclingDocument JSON back to
-`/v1/chunk/{hierarchical|hybrid}/source` with `from_formats: [json_docling]`. **Two upstream fields
-are accepted and dropped by the pinned stack, both wrapped by `docker/docling-{serve,mcp}/runtime.py`
-with a build-time test that asserts the gap red first:** `_parse_standard_pdf_opts` never assigns
-`heading_hierarchy_options`, and `get_cache_key` hashes only source+OCR flags. Remove at
-`mc2-ibzcc`. **All images were rebuilt locally, so their digests differ from production**; publishing
-is Stage E.
+**All images were rebuilt locally, so their digests differ from production**; publishing is Stage E.
 
 **The Docling migration is live.** Production has `DOCLING_STACK_V2_ENABLED=true`; Serve and MCP 3 are healthy on immutable digests, the
 exact MCP 1.x rollback image remains pullable, and no reindex was run. Follow-up `mc2-vlskb` removes
@@ -179,16 +180,16 @@ and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.4` — OCR/VLM A/B on a harder Russian corpus. Unblocked by Stage B.
+Next stage id: `mc2-1sobq.5` — release candidate and controlled rollout. Owner authorized the
+digest publication and the `DOCLING_CHUNK_STRATEGY` flip on 2026-08-07.
 Recommended action: keep one active implementation stage; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-1sobq.4` under `specs/024-docling-intelligence/`. Stages A/B/C are
-accepted: chunking strategy, PDF heading inference and enrichment are feature-flagged and off in
-production; `docling_hybrid` is selected but not activated. A failed OCR or VLM candidate is a VALID
-result — record why and keep EasyOCR. Preserve the immutable production image references and the MCP
-1.x rollback digest, publish no digests outside Stage E, and reindex nothing without authority.
+Use $orchestrator-stage for `mc2-1sobq.5` under `specs/024-docling-intelligence/`. Stages A-D are
+accepted; every candidate default is still off in production. The owner authorized digest publication
+and the `DOCLING_CHUNK_STRATEGY` flip on 2026-08-07 — reindex, migrations, secrets and force-push are
+NOT covered and need their own ask. Preserve the MCP 1.x rollback digest.
 
 ## Read First
 

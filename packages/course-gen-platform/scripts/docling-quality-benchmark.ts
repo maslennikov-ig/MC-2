@@ -50,6 +50,12 @@ import {
   checkStructure,
   type StructureExpectation,
 } from '../src/stages/stage2-document-processing/docling/structure-assertions.js';
+import {
+  checkOcr,
+  scoreOcr,
+  type OcrExpectation,
+  type OcrScore,
+} from '../src/stages/stage2-document-processing/docling/ocr-assertions.js';
 import { chunkWithStrategy } from '../src/shared/embeddings/chunking-strategy.js';
 import {
   DEFAULT_CHUNKING_CONFIG,
@@ -78,6 +84,7 @@ interface BenchmarkCase {
   requiresNestedList?: boolean;
   minimumColspan?: number;
   structure?: StructureExpectation;
+  ocr?: OcrExpectation;
   expectedError?: 'EmptyConversionError';
   provenance?: { minimumRefCoverage?: number; minimumLocationCoverage?: number };
   retrieval?: GroundTruthQuestion[];
@@ -462,6 +469,12 @@ async function main(): Promise<void> {
       path.join(REPO_ROOT, '.tmp/docling-cache')
   );
   const outputDirectory = path.join(REPO_ROOT, '.tmp/docling-benchmark', label);
+  // The engine is a SERVICE-level setting on the MCP container, not a request
+  // parameter: the accepted `/mcp` conversion tool takes only a source. So the
+  // run records what the container reports rather than what the caller wished
+  // for, and an A/B is two runs against two container configurations.
+  const ocrPreset = process.env.DOCLING_MCP_OCR_PRESET ?? 'easyocr';
+  const ocrLang = process.env.DOCLING_MCP_OCR_LANG ?? 'ru,en';
   const stagingDirectory = path.join(PACKAGE_ROOT, 'uploads/docling-benchmark', label);
   const baselineDirectory = argument('--baseline');
   const onlyCase = argument('--case');
@@ -492,6 +505,7 @@ async function main(): Promise<void> {
   const client = new DoclingClient({ serverUrl, cachePath, timeout: 1_200_000, maxRetries: 1 });
   const chunker = new DoclingServeChunker({ baseUrl: serveUrl });
   const results: CaseResult[] = [];
+  const ocrScores = new Map<string, OcrScore>();
 
   try {
     for (const benchmarkCase of manifest.cases) {
@@ -580,6 +594,22 @@ async function main(): Promise<void> {
         if (benchmarkCase.structure) {
           const rawDocument: unknown = JSON.parse(await fs.readFile(bundle.rawJsonPath, 'utf8'));
           for (const check of checkStructure(rawDocument, benchmarkCase.structure)) {
+            assertions.push({
+              name: check.name,
+              passed: check.passed,
+              details: check.details,
+            });
+          }
+        }
+
+        // OCR is scored on the Markdown the pipeline accepted, because that is
+        // what every downstream consumer reads. The score is recorded whole —
+        // per-phrase similarity and the recovered text — so a comparison
+        // between engines can be re-checked instead of believed.
+        if (benchmarkCase.ocr) {
+          const score = scoreOcr(bundle.markdown, benchmarkCase.ocr);
+          ocrScores.set(benchmarkCase.id, score);
+          for (const check of checkOcr(score, benchmarkCase.ocr)) {
             assertions.push({
               name: check.name,
               passed: check.passed,
@@ -777,11 +807,43 @@ async function main(): Promise<void> {
           ),
         ]
       : []),
+    ...(ocrScores.size > 0
+      ? [
+          '',
+          '## OCR',
+          '',
+          `Движок этого прогона: \`${ocrPreset}\`, языки \`${ocrLang}\`. Движок — настройка`,
+          'КОНТЕЙНЕРА MCP, а не параметр запроса, поэтому A/B — это два прогона против двух',
+          'конфигураций, а не два запроса. Схожесть фраз — посимвольная, не «содержит»:',
+          'частично прочитанная фраза видна как 0.8, а не как ноль.',
+          '',
+          '`Гомоглифы` — сколько кириллических фраз вернулись латиницей, которая выглядит так же',
+          '(РОСТ → POCT). Это отдельная колонка, потому что нормализация спрятала бы ровно тот',
+          'провал, ради которого сравнение и делается.',
+          '',
+          '| Case | Кириллица | Схожесть фраз | Гомоглифы | Ячейки таблицы |',
+          '|---|---:|---:|---:|---:|',
+          ...[...ocrScores.entries()].map(
+            ([id, score]) =>
+              `| ${id} | ${score.cyrillicCharacters} | ${score.meanPhraseSimilarity.toFixed(3)} | ` +
+              `${score.homoglyphSubstitutions} | ` +
+              `${score.tableCellAccuracy === null ? 'n/a' : score.tableCellAccuracy.toFixed(3)} |`
+          ),
+          '',
+          'Пофразный разбор с восстановленным текстом — в `ocr-scores.json`.',
+        ]
+      : []),
     ...(notes.length > 0 ? ['', '## Наблюдения по не-кандидатам', '', ...notes] : []),
     ...(comparison.length > 0 ? ['', '## Было → стало', '', ...comparison] : []),
     '',
   ].join('\n');
   await fs.writeFile(path.join(outputDirectory, 'report.md'), report);
+  if (ocrScores.size > 0) {
+    await fs.writeFile(
+      path.join(outputDirectory, 'ocr-scores.json'),
+      `${JSON.stringify({ ocrPreset, ocrLang, cases: Object.fromEntries(ocrScores) }, null, 2)}\n`
+    );
+  }
 
   const failed = results.filter(result => result.status === 'failed');
   console.log(`Docling benchmark: ${results.length - failed.length}/${results.length} passed`);

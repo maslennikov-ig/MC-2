@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "cases": [
     {
       "id": "enrichment-pdf",
@@ -590,6 +590,83 @@
             {
               "id": "latex-equation-e",
               "tokens": ["\\frac{\\alpha t}", "1 + \\beta t"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-degraded",
+      "source": "russian-ocr-degraded.pdf",
+      "ocr": {
+        "phrases": [
+          "СНИЖЕННОЕ КАЧЕСТВО СКАНА",
+          "ПРОВЕРКА УСТОЙЧИВОСТИ РАСПОЗНАВАНИЯ",
+          "Третья строка набрана тонким шрифтом мелкого кегля."
+        ],
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-degraded-control",
+          "query": "проверка устойчивости распознавания скана",
+          "evidence": [
+            {
+              "id": "degraded-control-phrase",
+              "tokens": ["УСТОЙЧИВОСТИ"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-mixed-script",
+      "source": "russian-ocr-mixed-script.pdf",
+      "ocr": {
+        "phrases": [
+          "ОТЧЁТ ЗА III КВАРТАЛ",
+          "Идентификатор GUID-4821 присвоен",
+          "Версия 2.1.4 собрана 07.08.2026 инженером Петровым",
+          "Сравните: РОСТ и POCT, СОН и COH, ХОР и XOP"
+        ],
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-mixed-identifier",
+          "query": "какой идентификатор присвоен",
+          "evidence": [
+            {
+              "id": "mixed-guid",
+              "tokens": ["GUID-4821"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-table",
+      "source": "russian-ocr-table.pdf",
+      "ocr": {
+        "phrases": ["СВОДКА ПО НАПРАВЛЕНИЯМ"],
+        "table": {
+          "rows": [
+            ["Раздел", "План", "Факт"],
+            ["Аналитика", "120", "118"],
+            ["Разработка", "340", "351"],
+            ["Внедрение", "56", "56"]
+          ]
+        },
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-table-fact",
+          "query": "сколько фактически по разработке",
+          "evidence": [
+            {
+              "id": "table-dev-351",
+              "tokens": ["351"]
             }
           ]
         }

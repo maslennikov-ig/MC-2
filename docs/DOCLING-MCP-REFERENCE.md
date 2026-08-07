@@ -411,3 +411,70 @@ npx tsx scripts/docling-quality-benchmark.ts --case premium-spreadsheet-xlsx --l
 Fixtures are regenerated with `generate-fixtures.py <name>`; the seven Stage C
 generators need `openpyxl`, `odfpy` and `ebooklib` in addition to the existing
 `python-docx`, `python-pptx`, `reportlab` and `Pillow`.
+
+## OCR engine A/B (Stage D)
+
+**EasyOCR stays the default. RapidOCR lost the quality gate on the same inputs.**
+
+Measured 2026-08-07 on a corpus built to be hard enough to separate two engines:
+the previous control document is a clean 300 dpi render that both read
+perfectly, so it could not decide anything. The three new fixtures add
+deterministic damage — resample to 42-60%, JPEG quality 38-62, up to 1.4 degrees
+of skew — plus mixed Cyrillic/Latin lines and a ruled Cyrillic table.
+
+| case                     | EasyOCR `ru,en` | RapidOCR `cyrillic` |
+| ------------------------ | --------------: | ------------------: |
+| russian-ocr-degraded     |           1.000 |               0.778 |
+| russian-ocr-mixed-script |           0.849 |               0.736 |
+| russian-ocr-table        |           1.000 |               0.636 |
+| **mean**                 |      **0.9496** |          **0.7168** |
+
+Phrase similarity is per character against exact ground truth, not "contains":
+a phrase read with two wrong letters must score near 1, or the comparison
+measures nothing.
+
+**Where RapidOCR actually loses:** large type. It returned `# BO ПО НАПРАВЛЕ
+ЕНИЯМ` for `СВОДКА ПО НАПРАВЛЕНИЯМ` and `# O 3 BA A ИДЕНТ` for `ОТЧЁТ ЗА III
+КВАРТАЛ` — consistent with a mobile detection model tuned for body text.
+
+**Where RapidOCR wins, and it is worth saying:** table cells, 1.000 against
+0.917, and the deliberately adversarial homoglyph line, 0.744 against 0.395.
+A loss is not a rout.
+
+### Three facts that constrain any future retry
+
+1. **RapidOCR rejects `ru`.** It takes a SCRIPT name — `cyrillic` — and fails
+   closed with the supported list. `ru,en` is not merely wrong, it is refused.
+2. **RapidOCR is single-language.** Docling logs `RapidOCR uses a single
+language; using 'ru' and ignoring ['en']`. Our corpus is mixed by nature
+   (`GUID-4821`, `Версия 2.1.4`), so one script must lose.
+3. **The Cyrillic checkpoint is not in the shipped image.** `docling-tools
+models download rapidocr` without `--rapidocr-backend-lang onnxruntime:cyrillic`
+   fetches the Chinese set, and Docling then refuses to run rather than
+   downloading `cyrillic_PP-OCRv5_rec_mobile.onnx` at request time — correct
+   under NFR-007. The A/B therefore ran against a THROWAWAY image
+   (`mc2/docling-serve-rapidocr-probe:measurement`, baseline + 12.9 MB of
+   checkpoints). The shipped baseline was never modified for the experiment, and
+   the stack was restored and re-verified afterwards.
+
+### VLM: still disabled, on measured grounds
+
+`ProcessingPipeline.VLM` and the `vlm_pipeline_*` options exist in Serve 1.29.0,
+and no VLM weights are in either image — `docling-serve-advanced` carries
+CodeFormulaV2, layout-heron, DocumentFigureClassifier, EasyOcr and RapidOcr, and
+nothing else. Enabling one means a new image and RAM the host does not have:
+Stage B measured `granite-vision-4.1-4b` at 30.6 GB image and 4.34 GiB peak
+against a host recorded at 11 GiB whose compose limits already sum to about
+twice that. The one VLM previously measured, `SmolVLM-256M`, fabricated chart
+labels and was rejected on evidence.
+
+`force_backend_text` is a `PdfPipelineOptions` field that Serve does NOT expose
+in its request options — the same class of gap as `heading_hierarchy_options` in
+Stage A. Reaching it would need a third runtime wrapper, and it could not help
+the 16 vector-outline PDFs anyway: it substitutes the PDF backend's own text,
+and those documents have no text layer at all. `EmptyConversionError` semantics
+are unchanged and re-verified on `vector-outlines-no-text.pdf` after the stack
+was restored.
+
+Reversal condition for both candidates is the same as `mc2-x72bq`: a host with
+enough RAM, plus for RapidOCR a demonstrated win on this corpus.

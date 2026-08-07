@@ -1,0 +1,87 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1sobq.4",
+  "goal_id": "mc2-1sobq.4",
+  "epic_id": "mc2-1sobq",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 4,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "ocr-and-vlm-evaluation",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "docling-serve-runtime",
+      "docling-mcp-runtime",
+      "docling-quality-harness",
+      "stage2-docling-conversion"
+    ],
+    "risk_models": [
+      "engine-quality-regression",
+      "alphabet-loss",
+      "hallucinated-recognition",
+      "resource-envelope"
+    ],
+    "test_environments": ["vitest", "local-docling-stack"],
+    "rollback_boundary": "ocr-preset-and-vlm-remain-unchanged",
+    "acceptance_proofs": [
+      "ocr-scorer-unit-tests",
+      "two-engine-ab-on-degraded-russian-corpus",
+      "empty-conversion-semantics-reverified",
+      "pnpm-type-check-lint"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1sobq.4",
+    "source_digest": "013192879c63a756a34ca702fddbfce57edaf156baf455ad8558fe21712b705d",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "A/B отчёт воспроизводим: корпус детерминирован, оценка посимвольная против точного ground truth, скоры сохранены по кейсам.",
+        "text_digest": "895b6ac9ce64c88c06e50eb5d2263ce6e0643444414c12cfbe0423c211fd8435"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "EasyOCR остаётся default, потому что RapidOCR не выиграл quality gate на тех же входах.",
+        "text_digest": "8b30b7d32c0550d0022b66922a1a8e43207084171643f602861984af060bb6a3"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "VLM включается только для распознаваемого класса документов и проходит grounded controls; иначе остаётся выключенным с записанной причиной.",
+        "text_digest": "ed770c4a4a60cec62a5834bc2aa2bea4fa77fa6dc7bbc81757c2ad9fa7fd11ca"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Непрошедший кандидат явно отклонён без ослабления EmptyConversionError.",
+        "text_digest": "5df525caf6566e97f87dfe2ce5b85c76b5279a4d5d4a6c093ede629528505ef6"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Default Serve не получает глобальную VLM-нагрузку и не меняет свой ресурсный конверт.",
+        "text_digest": "478a1dad83e7256ae66449bd7ceab1064768a67c2843f53f8c1a8897aa0bdd05"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1sobq.4/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "013192879c63a756a34ca702fddbfce57edaf156baf455ad8558fe21712b705d",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1sobq.4/artifacts/mc2-1sobq.4.md",
+      "task_id": "mc2-1sobq.4",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

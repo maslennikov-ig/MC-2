@@ -700,6 +700,160 @@ def retention(alpha, beta, t):
     )
 
 
+# ---------------------------------------------------------------------------
+# Harder Russian OCR corpus (Stage D)
+#
+# The existing control document is a clean 300 dpi render, which every engine
+# reads. It cannot separate two candidates, so it cannot decide a default. These
+# three add the degradations real uploads carry — resampling, JPEG ringing,
+# skew, thin strokes, mixed script — while keeping the ground truth EXACT, so a
+# difference between engines is a difference in reading and not in the fixture.
+# ---------------------------------------------------------------------------
+
+OCR_HARD_PHRASES = {
+    "degraded": (
+        "СНИЖЕННОЕ КАЧЕСТВО СКАНА",
+        "ПРОВЕРКА УСТОЙЧИВОСТИ РАСПОЗНАВАНИЯ",
+    ),
+    "mixed": (
+        "ОТЧЁТ ЗА III КВАРТАЛ",
+        "Идентификатор GUID-4821 присвоен",
+    ),
+    "table": (
+        ("Раздел", "План", "Факт"),
+        ("Аналитика", "120", "118"),
+        ("Разработка", "340", "351"),
+        ("Внедрение", "56", "56"),
+    ),
+}
+
+
+def _degrade(image, *, downscale: float, quality: int, rotation: float):
+    """Resample down and back, re-encode as JPEG, then rotate slightly.
+
+    Deterministic on purpose: no noise generator, no random seed. The damage is
+    exactly reproducible, so a score change means the engine changed.
+    """
+    import io
+
+    from PIL import Image as PILImage
+
+    width, height = image.size
+    small = image.resize(
+        (int(width * downscale), int(height * downscale)), PILImage.LANCZOS
+    )
+    restored = small.resize((width, height), PILImage.LANCZOS)
+
+    buffer = io.BytesIO()
+    restored.convert("RGB").save(buffer, format="JPEG", quality=quality)
+    buffer.seek(0)
+    reopened = PILImage.open(buffer).convert("RGB")
+
+    if rotation:
+        reopened = reopened.rotate(
+            rotation, resample=PILImage.BICUBIC, expand=False, fillcolor="white"
+        )
+    return reopened
+
+
+def _render_pdf(image, target: Path) -> None:
+    png_path = ROOT / f".{target.stem}-source.png"
+    image.save(png_path, dpi=(300, 300))
+    page_width, page_height = A4
+    pdf = canvas.Canvas(str(target), pagesize=A4, pageCompression=1)
+    pdf.drawImage(ImageReader(str(png_path)), 0, 0, page_width, page_height)
+    pdf.showPage()
+    pdf.save()
+    png_path.unlink()
+
+
+def make_ocr_degraded_pdf() -> None:
+    """A scan that lost resolution, gained JPEG ringing and sits crooked."""
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 78)
+    body = ImageFont.truetype(str(font_path), 58)
+
+    first, second = OCR_HARD_PHRASES["degraded"]
+    draw.text((170, 200), first, font=heading, fill="black")
+    draw.text((170, 430), second, font=body, fill="black")
+    draw.text(
+        (170, 600),
+        "Третья строка набрана тонким шрифтом мелкого кегля.",
+        font=ImageFont.truetype(str(font_path), 40),
+        fill=(70, 70, 70),
+    )
+
+    damaged = _degrade(image, downscale=0.42, quality=38, rotation=-1.4)
+    _render_pdf(damaged, ROOT / "russian-ocr-degraded.pdf")
+
+
+def make_ocr_mixed_script_pdf() -> None:
+    """Cyrillic, Latin and Roman numerals on the same lines.
+
+    This is where a recognizer with a Chinese/Latin dictionary fails in the most
+    misleading way: it returns confident Latin lookalikes for Cyrillic glyphs.
+    """
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 76)
+    body = ImageFont.truetype(str(font_path), 54)
+
+    first, second = OCR_HARD_PHRASES["mixed"]
+    draw.text((170, 210), first, font=heading, fill="black")
+    draw.text((170, 430), second, font=body, fill="black")
+    draw.text(
+        (170, 580),
+        "Версия 2.1.4 собрана 07.08.2026 инженером Петровым",
+        font=body,
+        fill="black",
+    )
+    draw.text(
+        (170, 730),
+        "Сравните: РОСТ и POCT, СОН и COH, ХОР и XOP",
+        font=body,
+        fill="black",
+    )
+
+    damaged = _degrade(image, downscale=0.6, quality=62, rotation=0.0)
+    _render_pdf(damaged, ROOT / "russian-ocr-mixed-script.pdf")
+
+
+def make_ocr_table_pdf() -> None:
+    """A ruled Cyrillic table on a degraded scan: structure AND text at once."""
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 70)
+    cell = ImageFont.truetype(str(font_path), 52)
+
+    draw.text((170, 200), "СВОДКА ПО НАПРАВЛЕНИЯМ", font=heading, fill="black")
+
+    rows = OCR_HARD_PHRASES["table"]
+    x_positions = [170, 1180, 1780, 2320]
+    y_positions = [480 + index * 200 for index in range(len(rows) + 1)]
+    for x in x_positions:
+        draw.line((x, y_positions[0], x, y_positions[-1]), fill="black", width=5)
+    for y in y_positions:
+        draw.line((x_positions[0], y, x_positions[-1], y), fill="black", width=5)
+    for row, values in enumerate(rows):
+        for column, value in enumerate(values):
+            draw.text(
+                (x_positions[column] + 30, y_positions[row] + 60),
+                value,
+                font=cell,
+                fill="black",
+            )
+
+    damaged = _degrade(image, downscale=0.55, quality=48, rotation=0.7)
+    _render_pdf(damaged, ROOT / "russian-ocr-table.pdf")
+
+
 GENERATORS = {
     "enrichment-pdf": make_enrichment_pdf,
     "structured-docx": make_docx,
@@ -715,6 +869,9 @@ GENERATORS = {
     "premium-slides-odp": make_opendocument_slides,
     "premium-book-epub": make_epub,
     "premium-paper-latex": make_latex,
+    "russian-ocr-degraded": make_ocr_degraded_pdf,
+    "russian-ocr-mixed-script": make_ocr_mixed_script_pdf,
+    "russian-ocr-table": make_ocr_table_pdf,
 }
 
 

@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec tsc --noEmit -p tsconfig.json",
+      "duration_seconds": 2.387,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing tests/unit/shared/validation",
+      "duration_seconds": 3.58,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec tsc --noEmit -p tsconfig.json",
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing tests/unit/shared/validation"
+  ],
+  "completed_at": "2026-08-07T08:58:50.745317+00:00",
+  "diff_digest": "f860f05bff93cefdb63273f7e7c6ffe4f692dea8b99d9de333111634504dda15",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "0732e3bb66a337486e18e15ac40d4423f3a61bfb",
+  "idempotency_key": "8c0bbfc0fbd9fe79fcbaaa47b6897e2074cc270b3f3cec5b61b81fc60fd1b020",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1sobq.4",
+  "started_at": "2026-08-07T08:58:44.625419+00:00",
+  "verification_fingerprint": "8c0bbfc0fbd9fe79fcbaaa47b6897e2074cc270b3f3cec5b61b81fc60fd1b020"
+}
