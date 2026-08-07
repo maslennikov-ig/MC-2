@@ -43,14 +43,28 @@ inside the running `megacampus-worker` closed that gap.
 docling_hybrid`, 3 parents / 25 children, `refCoverage: 1.0`, 22 chunks
    carrying containers, and `provenance_containers` present in the Qdrant
    payload projection.
+3. The same path on a BRAND NEW document, to answer the criterion as written:
+   a small synthetic structured source converted through the production MCP
+   facade (`fromCache: false`, 3.8s) and chunked as `docling_hybrid`,
+   `refCoverage: 1.0`, containers in the payload.
 
-Nothing was written: no point, no embedding, no database row, no change to the
-cached document. Both probes were removed from the host afterwards.
+Nothing was written to any store: no point, no embedding, no database row. Probe
+3's source and the two cache files its conversion produced were deleted, and
+both probe scripts were removed from the host.
 
-Probe 2 is what makes Stage C's claim true in production rather than in tests —
-`containers` is the sheet/slide/chapter boundary that only exists in the native
-document, and it had been dropped at the payload projection until an independent
-review caught it.
+Probes 2 and 3 are what make Stage C's claim true in production rather than in
+tests — `containers` is the sheet/slide/chapter boundary that exists only in the
+native document, and it was dropped at the payload projection until an
+independent review caught it.
+
+The conversion in probe 3 went to `docling-mcp:8000`, which is the **nginx
+facade** in front of `docling-mcp-internal`; that is the designed path, and it
+confirms the digest-pinned MCP 3 image is the one actually serving conversions.
+
+**What none of them exercised: embedding and the Qdrant write.** Proving that
+half needs a paid Jina call and a real point written to the production
+collection, and neither is authorized here. The claim is conversion and chunking,
+not the whole ingest.
 
 ## The defect the probe found
 
