@@ -16,7 +16,7 @@ import {
   type FileInput,
 } from '../src/shared/validation/file-validator';
 import { ValidationError } from '../src/server/errors/typed-errors';
-import { MAX_FILE_SIZE_BYTES } from '@megacampus/shared-types';
+import { FILE_SIZE_LIMITS_BY_TIER, MAX_FILE_SIZE_BYTES } from '@megacampus/shared-types';
 
 // ============================================================================
 // Test Data
@@ -61,19 +61,22 @@ describe('validateFileSize', () => {
     const result = validateFileSize(validPdf.fileSize, 'free');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('not allowed for free tier');
-    expect(result.suggestedTier).toBe('basic_plus');
+    expect(result.suggestedTier).toBe('basic');
   });
 
   it('should accept valid file size for paid tiers', () => {
-    const result = validateFileSize(validPdf.fileSize, 'basic_plus');
+    const result = validateFileSize(validPdf.fileSize, 'basic');
     expect(result.valid).toBe(true);
     expect(result.error).toBeUndefined();
   });
 
   it('should reject files exceeding maximum size', () => {
+    // Premium's own limit IS the global maximum, so the TIER branch answers
+    // first and names the tier. This asserted the global-maximum wording from
+    // before per-tier limits existed, when the two were different checks.
     const result = validateFileSize(oversizedFile.fileSize, 'premium');
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('exceeds maximum allowed size');
+    expect(result.error).toContain('exceeds premium tier limit');
     expect(result.userMessage).toContain('100 MB');
   });
 
@@ -83,9 +86,12 @@ describe('validateFileSize', () => {
     expect(result.error).toContain('must be positive');
   });
 
-  it('should accept file at maximum size limit', () => {
-    const result = validateFileSize(MAX_FILE_SIZE_BYTES, 'standard');
-    expect(result.valid).toBe(true);
+  it('should accept a file at the tier limit and refuse the global maximum', () => {
+    // Standard is 30 MB, not 100. Asserting that the global maximum passes on
+    // Standard describes a platform that no longer exists.
+    expect(validateFileSize(FILE_SIZE_LIMITS_BY_TIER.standard, 'standard').valid).toBe(true);
+    expect(validateFileSize(MAX_FILE_SIZE_BYTES, 'standard').valid).toBe(false);
+    expect(validateFileSize(MAX_FILE_SIZE_BYTES, 'premium').valid).toBe(true);
   });
 });
 
@@ -98,30 +104,30 @@ describe('validateFileMimeType', () => {
     const result = validateFileMimeType('application/pdf', 'free');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('not allowed for free tier');
-    expect(result.suggestedTier).toBe('basic_plus');
+    expect(result.suggestedTier).toBe('basic');
   });
 
-  it('should reject PDF for basic_plus tier (requires STANDARD)', () => {
-    const result = validateFileMimeType('application/pdf', 'basic_plus');
+  it('should reject PDF for basic tier (requires STANDARD)', () => {
+    const result = validateFileMimeType('application/pdf', 'basic');
     expect(result.valid).toBe(false);
     expect(result.suggestedTier).toBe('standard');
     expect(result.userMessage).toContain('Standard');
   });
 
-  it('should accept TXT for basic_plus tier', () => {
-    const result = validateFileMimeType('text/plain', 'basic_plus');
+  it('should accept TXT for basic tier', () => {
+    const result = validateFileMimeType('text/plain', 'basic');
     expect(result.valid).toBe(true);
   });
 
-  it('should accept Markdown for basic_plus tier', () => {
-    const result = validateFileMimeType('text/markdown', 'basic_plus');
+  it('should accept Markdown for basic tier', () => {
+    const result = validateFileMimeType('text/markdown', 'basic');
     expect(result.valid).toBe(true);
   });
 
-  it('should reject DOCX for basic_plus tier', () => {
-    const result = validateFileMimeType(validDocx.mimeType, 'basic_plus');
+  it('should reject DOCX for basic tier', () => {
+    const result = validateFileMimeType(validDocx.mimeType, 'basic');
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('not allowed for basic_plus tier');
+    expect(result.error).toContain('not allowed for basic tier');
     expect(result.suggestedTier).toBe('standard');
   });
 
@@ -157,7 +163,7 @@ describe('validateFileMimeType', () => {
   });
 
   it('should provide helpful error message with allowed formats', () => {
-    const result = validateFileMimeType(validDocx.mimeType, 'basic_plus');
+    const result = validateFileMimeType(validDocx.mimeType, 'basic');
     expect(result.valid).toBe(false);
     expect(result.userMessage).toContain('TXT, MD');
   });
@@ -171,16 +177,16 @@ describe('validateFileCount', () => {
   it('should reject files for free tier', () => {
     const result = validateFileCount(0, 'free');
     expect(result.valid).toBe(false);
-    expect(result.suggestedTier).toBe('basic_plus');
+    expect(result.suggestedTier).toBe('basic');
   });
 
-  it('should accept 0 files for basic_plus tier (limit 1)', () => {
-    const result = validateFileCount(0, 'basic_plus');
+  it('should accept 0 files for basic tier (limit 1)', () => {
+    const result = validateFileCount(0, 'basic');
     expect(result.valid).toBe(true);
   });
 
-  it('should reject 1 file when limit is reached for basic_plus', () => {
-    const result = validateFileCount(1, 'basic_plus');
+  it('should reject 1 file when limit is reached for basic', () => {
+    const result = validateFileCount(1, 'basic');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('limit reached');
     expect(result.suggestedTier).toBe('standard');
@@ -209,7 +215,7 @@ describe('validateFileCount', () => {
   });
 
   it('should provide helpful error message with upgrade prompt', () => {
-    const result = validateFileCount(1, 'basic_plus');
+    const result = validateFileCount(1, 'basic');
     expect(result.valid).toBe(false);
     expect(result.userMessage).toContain('1 file per course');
     expect(result.userMessage).toContain('Upgrade to Standard');
@@ -222,13 +228,13 @@ describe('validateFileCount', () => {
 
 describe('validateFile', () => {
   it('should validate all checks for valid file', () => {
-    // Use TXT file which is valid for basic_plus tier
+    // Use TXT file which is valid for basic tier
     const txtFile: FileInput = {
       filename: 'document.txt',
       fileSize: 1024,
       mimeType: 'text/plain',
     };
-    const result = validateFile(txtFile, 'basic_plus', 0);
+    const result = validateFile(txtFile, 'basic', 0);
     expect(result.valid).toBe(true);
     expect(result.checks.size.valid).toBe(true);
     expect(result.checks.mimeType.valid).toBe(true);
@@ -238,7 +244,7 @@ describe('validateFile', () => {
   it('should fail validation for free tier', () => {
     const result = validateFile(validPdf, 'free', 0);
     expect(result.valid).toBe(false);
-    expect(result.suggestedTier).toBe('basic_plus');
+    expect(result.suggestedTier).toBe('basic');
   });
 
   it('should fail validation for oversized file', () => {
@@ -250,8 +256,8 @@ describe('validateFile', () => {
   });
 
   it('should fail validation for invalid MIME type', () => {
-    // PDF not allowed on basic_plus, requires standard tier
-    const result = validateFile(validPdf, 'basic_plus', 0);
+    // PDF not allowed on basic, requires standard tier
+    const result = validateFile(validPdf, 'basic', 0);
     expect(result.valid).toBe(false);
     expect(result.checks.size.valid).toBe(true);
     expect(result.checks.mimeType.valid).toBe(false);
@@ -259,13 +265,13 @@ describe('validateFile', () => {
   });
 
   it('should fail validation when file count limit reached', () => {
-    // Use TXT which is valid on basic_plus
+    // Use TXT which is valid on basic
     const txtFile: FileInput = {
       filename: 'notes.txt',
       fileSize: 1024,
       mimeType: 'text/plain',
     };
-    const result = validateFile(txtFile, 'basic_plus', 1);
+    const result = validateFile(txtFile, 'basic', 1);
     expect(result.valid).toBe(false);
     expect(result.checks.size.valid).toBe(true);
     expect(result.checks.mimeType.valid).toBe(true);
@@ -274,7 +280,7 @@ describe('validateFile', () => {
 
   it('should prioritize count error over other errors', () => {
     // Use invalid file type with count limit reached
-    const result = validateFile(validPdf, 'basic_plus', 1);
+    const result = validateFile(validPdf, 'basic', 1);
     expect(result.valid).toBe(false);
     // Count error should be reported first
     expect(result.error).toContain('limit reached');
@@ -310,14 +316,14 @@ describe('validateFile', () => {
 
 describe('validateFileOrThrow', () => {
   it('should not throw for valid file', () => {
-    // Use TXT file which is valid for basic_plus tier
+    // Use TXT file which is valid for basic tier
     const txtFile: FileInput = {
       filename: 'document.txt',
       fileSize: 1024,
       mimeType: 'text/plain',
     };
     expect(() => {
-      validateFileOrThrow(txtFile, 'basic_plus', 0);
+      validateFileOrThrow(txtFile, 'basic', 0);
     }).not.toThrow();
   });
 
@@ -335,7 +341,7 @@ describe('validateFileOrThrow', () => {
 
   it('should throw ValidationError for count limit', () => {
     expect(() => {
-      validateFileOrThrow(validPdf, 'basic_plus', 1);
+      validateFileOrThrow(validPdf, 'basic', 1);
     }).toThrow(ValidationError);
   });
 });
@@ -352,8 +358,8 @@ describe('getFileUploadLimits', () => {
     expect(limits.uploadsEnabled).toBe(false);
   });
 
-  it('should return correct limits for basic_plus tier', () => {
-    const limits = getFileUploadLimits('basic_plus');
+  it('should return correct limits for basic tier', () => {
+    const limits = getFileUploadLimits('basic');
     expect(limits.maxFiles).toBe(1);
     expect(limits.allowedExtensions).toEqual(['txt', 'md']);
     expect(limits.uploadsEnabled).toBe(true);
@@ -373,10 +379,14 @@ describe('getFileUploadLimits', () => {
     expect(limits.uploadsEnabled).toBe(true);
   });
 
-  it('should include max file size information', () => {
-    const limits = getFileUploadLimits('standard');
-    expect(limits.maxFileSize).toBe(MAX_FILE_SIZE_BYTES);
-    expect(limits.maxFileSizeMB).toBe(100);
+  it('should include max file size information for the tier asked about', () => {
+    const standard = getFileUploadLimits('standard');
+    expect(standard.maxFileSize).toBe(FILE_SIZE_LIMITS_BY_TIER.standard);
+    expect(standard.maxFileSizeMB).toBe(30);
+
+    const premium = getFileUploadLimits('premium');
+    expect(premium.maxFileSize).toBe(MAX_FILE_SIZE_BYTES);
+    expect(premium.maxFileSizeMB).toBe(100);
   });
 });
 
@@ -404,7 +414,7 @@ describe('getMinimumTierForFileType', () => {
   });
 
   it('should return basic_plus for TXT', () => {
-    expect(getMinimumTierForFileType('text/plain')).toBe('basic_plus');
+    expect(getMinimumTierForFileType('text/plain')).toBe('basic');
   });
 
   it('should return standard for DOCX', () => {
@@ -443,11 +453,11 @@ describe('Integration: File upload workflow', () => {
       fileSize: 1024,
       mimeType: 'text/plain',
     };
-    const result1 = validateFile(txtFile, 'basic_plus', 0);
+    const result1 = validateFile(txtFile, 'basic', 0);
     expect(result1.valid).toBe(true);
 
     // Second file - should fail due to count limit
-    const result2 = validateFile(txtFile, 'basic_plus', 1);
+    const result2 = validateFile(txtFile, 'basic', 1);
     expect(result2.valid).toBe(false);
     expect(result2.checks.count.valid).toBe(false);
   });

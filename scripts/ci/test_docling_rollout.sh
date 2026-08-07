@@ -63,8 +63,12 @@ docker() {
         "image inspect -f {{.Id}} $CANDIDATE_REF")
             printf '%s\n' 'sha256:already-switched-mcp-image'
             ;;
+        "image inspect -f {{.Id}} $PREVIOUS_REF")
+            printf '%s\n' 'sha256:previous-release-mcp-image'
+            ;;
     esac
 }
+PREVIOUS_REF='example/docling-mcp@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
 
 cat > "$TEST_DIR/invalid-candidate.env" <<EOF
 DOCLING_STACK_V2_ENABLED=true
@@ -116,6 +120,45 @@ EOF
 if SWITCHED_RUNNING_ID='sha256:some-unrelated-image' \
     docling_prepare_rollout "$TEST_DIR/unknown-running.env"; then
     echo 'rollout gate accepted a host running neither the rollback nor the candidate' >&2
+    exit 1
+fi
+
+# A SECOND upgrade: the host runs the image the previous release pinned, which
+# is neither the 1.x rollback nor the new candidate. Naming it in
+# DOCLING_PREVIOUS_MCP_IMAGE is what lets the deploy proceed; without that the
+# gate blocks every image change after the first, one step further out than the
+# failure mc2-h89lo fixed.
+cat > "$TEST_DIR/second-upgrade.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_SERVE_IMAGE=$SERVE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+DOCLING_PREVIOUS_MCP_IMAGE=$PREVIOUS_REF
+EOF
+SWITCHED_RUNNING_ID='sha256:previous-release-mcp-image' \
+    docling_prepare_rollout "$TEST_DIR/second-upgrade.env" || {
+    echo 'rollout gate refused a host running the previous recorded release' >&2
+    exit 1
+}
+
+# The same host WITHOUT the recorded previous release is still refused: the
+# escape hatch has to be named, not inferred.
+if SWITCHED_RUNNING_ID='sha256:previous-release-mcp-image' \
+    docling_prepare_rollout "$TEST_DIR/unknown-running.env"; then
+    echo 'rollout gate accepted an unrecorded previous release' >&2
+    exit 1
+fi
+
+# And a malformed previous reference must fail loudly rather than be ignored.
+cat > "$TEST_DIR/bad-previous.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_SERVE_IMAGE=$SERVE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+DOCLING_PREVIOUS_MCP_IMAGE=example/docling-mcp:3.0.0
+EOF
+if docling_prepare_rollout "$TEST_DIR/bad-previous.env"; then
+    echo 'rollout gate ignored a mutable DOCLING_PREVIOUS_MCP_IMAGE tag' >&2
     exit 1
 fi
 

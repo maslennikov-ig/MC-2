@@ -22,6 +22,7 @@ import {
   FILE_SIZE_LIMITS_BY_TIER,
   MAX_FILE_SIZE_BYTES,
   MIME_TYPES_BY_EXTENSION,
+  TIER_ORDER,
   canonicalMimeTypeForExtension,
   fileExtensionOf,
   mimeTypeMatchesExtension,
@@ -86,6 +87,18 @@ export interface FileValidationResult extends ValidationResult {
  * Maximum file size in megabytes (for display)
  */
 const MAX_FILE_SIZE_MB = MAX_FILE_SIZE_BYTES / (1024 * 1024);
+
+/**
+ * Tiers a customer can actually be told to move TO.
+ *
+ * `free` is not a destination and `trial` is a seven-day evaluation, not a
+ * plan. `TIER_ORDER` places trial between basic and standard, so a naive walk
+ * of the hierarchy answers "PDF requires Trial" — true by the ordering and
+ * useless as advice, because the customer cannot buy it and it expires.
+ */
+const UPGRADE_TIERS: readonly Tier[] = TIER_ORDER.filter(
+  (tier): tier is Tier => tier !== 'free' && tier !== 'trial'
+);
 
 /**
  * Tier upgrade paths
@@ -292,14 +305,13 @@ export function validateFileMimeType(
 
   // Check if MIME type is in allowed list
   if (!allowedMimeTypes.includes(mimeType)) {
-    // Determine which tier supports this MIME type
-    let suggestedTier: Tier | undefined;
-    for (const [tierKey, mimeTypes] of Object.entries(MIME_TYPES_BY_TIER)) {
-      if ((mimeTypes as readonly string[]).includes(mimeType)) {
-        suggestedTier = tierKey as Tier;
-        break;
-      }
-    }
+    // Walk the DECLARED hierarchy, not the object's key order. `MIME_TYPES_BY_TIER`
+    // happens to list `trial` first, so iterating its entries recommended Trial
+    // for a PDF when Basic-to-Standard is the honest upgrade — a suggestion that
+    // is both wrong and unhelpful, since Trial expires in seven days.
+    const suggestedTier = UPGRADE_TIERS.find(tierKey =>
+      (MIME_TYPES_BY_TIER[tierKey] as readonly string[]).includes(mimeType)
+    );
 
     const upgradeMsg = suggestedTier
       ? ` Upgrade to ${tierName(suggestedTier)} to upload this file type.`
@@ -366,13 +378,9 @@ export function validateFileExtension(
 
   const allowedExtensions = allowedExtensionsFor(effectiveTier);
   if (!allowedExtensions.includes(extension)) {
-    let suggestedTier: Tier | undefined;
-    for (const [tierKey, extensions] of Object.entries(FILE_EXTENSIONS_BY_TIER)) {
-      if ((extensions as readonly string[]).includes(extension)) {
-        suggestedTier = tierKey as Tier;
-        break;
-      }
-    }
+    const suggestedTier = UPGRADE_TIERS.find(tierKey =>
+      (FILE_EXTENSIONS_BY_TIER[tierKey] as readonly string[]).includes(extension)
+    );
 
     const upgradeMsg = suggestedTier
       ? ` Upgrade to ${tierName(suggestedTier)} to upload this file type.`
@@ -440,14 +448,11 @@ export function validateFileCount(
 
   // Check if current count exceeds limit
   if (currentCount >= limit) {
-    // Find next tier with higher limit
-    let suggestedTier: Tier | undefined;
-    for (const [tierKey, tierLimit] of Object.entries(FILE_COUNT_LIMITS_BY_TIER)) {
-      if (tierLimit > limit) {
-        suggestedTier = tierKey as Tier;
-        break;
-      }
-    }
+    // First tier ABOVE this one in the declared hierarchy that allows more
+    // files. Iterating object keys recommended Trial to a Basic customer.
+    const suggestedTier = UPGRADE_TIERS.slice(UPGRADE_TIERS.indexOf(effectiveTier) + 1).find(
+      tierKey => FILE_COUNT_LIMITS_BY_TIER[tierKey] > limit
+    );
 
     const upgradeMsg = suggestedTier
       ? ` Upgrade to ${tierName(suggestedTier)} to upload more files (up to ${FILE_COUNT_LIMITS_BY_TIER[suggestedTier]} per course).`
@@ -669,13 +674,11 @@ export function isFileTypeSupported(mimeType: string): boolean {
  * ```
  */
 export function getMinimumTierForFileType(mimeType: string): Tier | null {
-  const tierOrder: Tier[] = ['trial', 'free', 'basic', 'standard', 'premium'];
-
-  for (const tier of tierOrder) {
-    if ((MIME_TYPES_BY_TIER[tier] as readonly string[]).includes(mimeType)) {
-      return tier === 'free' ? null : tier;
-    }
-  }
-
-  return null;
+  // `TIER_ORDER` is the hierarchy; the local array this used to carry put
+  // `trial` first and therefore answered "TXT requires Trial" when Basic has it.
+  return (
+    UPGRADE_TIERS.find(tier =>
+      (MIME_TYPES_BY_TIER[tier] as readonly string[]).includes(mimeType)
+    ) ?? null
+  );
 }

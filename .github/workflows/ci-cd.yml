@@ -853,6 +853,16 @@ jobs:
           DOCLING_MCP_IMAGE=${{ vars.DOCLING_MCP_IMAGE }}
           DOCLING_SERVE_IMAGE=${{ vars.DOCLING_SERVE_IMAGE }}
           DOCLING_ROLLBACK_IMAGE=${{ vars.DOCLING_ROLLBACK_IMAGE }}
+          # The release currently running in production. The rollout gate needs
+          # it to recognise the host on the SECOND and every later image change,
+          # when what is running is neither the 1.x rollback nor the new
+          # candidate. Move it to the old DOCLING_MCP_IMAGE whenever that changes.
+          DOCLING_PREVIOUS_MCP_IMAGE=${{ vars.DOCLING_PREVIOUS_MCP_IMAGE }}
+          # Chunking strategy is a REPOSITORY VARIABLE, not a code default, so the
+          # rollback is one variable edit and a redeploy rather than a revert. The
+          # fallback here stays `legacy_markdown`: an unset variable must never
+          # silently change how documents are cut.
+          DOCLING_CHUNK_STRATEGY=${{ vars.DOCLING_CHUNK_STRATEGY || 'legacy_markdown' }}
           NOTEBOOKLM_BRIDGE_TOKEN=${{ secrets.NOTEBOOKLM_BRIDGE_TOKEN }}
           NOTEBOOKLM_STORAGE_STATE_DIR=./secrets/notebooklm
           NOTEBOOKLM_STORAGE_PATH=/app/secrets/notebooklm/storage_state.json

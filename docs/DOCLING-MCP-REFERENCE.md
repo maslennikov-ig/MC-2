@@ -128,6 +128,7 @@ digest references:
 DOCLING_MCP_IMAGE=ghcr.io/.../docling-mcp@sha256:<digest>
 DOCLING_SERVE_IMAGE=ghcr.io/.../docling-serve@sha256:<digest>
 DOCLING_ROLLBACK_IMAGE=ghcr.io/.../old-docling-mcp@sha256:<digest>
+DOCLING_PREVIOUS_MCP_IMAGE=ghcr.io/.../docling-mcp@sha256:<digest>
 DOCLING_STACK_V2_ENABLED=true
 ```
 
@@ -478,3 +479,49 @@ was restored.
 
 Reversal condition for both candidates is the same as `mc2-x72bq`: a host with
 enough RAM, plus for RapidOCR a demonstrated win on this corpus.
+
+## Release and rollout (Stage E)
+
+Everything that decides production behaviour is a GitHub repository variable, so
+a rollback is a variable edit and a redeploy, never a revert:
+
+| variable                     | meaning                                           |
+| ---------------------------- | ------------------------------------------------- |
+| `DOCLING_MCP_IMAGE`          | the MCP 3 release to run, digest-pinned           |
+| `DOCLING_SERVE_IMAGE`        | the Serve release to run, digest-pinned           |
+| `DOCLING_ROLLBACK_IMAGE`     | the MCP **1.x** image the rollback path recreates |
+| `DOCLING_PREVIOUS_MCP_IMAGE` | the MCP 3 release currently in production         |
+| `DOCLING_STACK_V2_ENABLED`   | whether the split stack runs at all               |
+| `DOCLING_CHUNK_STRATEGY`     | `legacy_markdown` (default) or `docling_hybrid`   |
+
+**`DOCLING_ROLLBACK_IMAGE` must stay an MCP 1.x image.** The rollback path stops
+`docling-serve` and recreates MCP standalone, and MCP 3 in remote mode cannot
+work without Serve. Pointing it at an MCP 3 digest would produce a "rollback"
+that cannot serve a request.
+
+**`DOCLING_PREVIOUS_MCP_IMAGE` is why a second upgrade is possible at all.** The
+gate proves it knows what the host is running before switching. Before the first
+cutover that is the rollback image; straight after it, the candidate. On the
+NEXT image change it is neither — it is the release the previous deploy pinned,
+and without a name for that the gate refuses every deploy after the first. That
+is the same failure as `mc2-h89lo`, one step further out. Move this variable to
+the OLD `DOCLING_MCP_IMAGE` whenever that changes; an unrecorded image is still
+refused, so the escape hatch has to be named rather than inferred.
+
+### Order of operations
+
+One change at a time, because two at once cannot be attributed:
+
+1. Publish images (`Build immutable Docling images`, `workflow_dispatch`), copy
+   the digests from the run artifacts — never hand-typed.
+2. Move `DOCLING_PREVIOUS_MCP_IMAGE` to the current `DOCLING_MCP_IMAGE`, then
+   set the new digests. Deploy. Behaviour is unchanged at this point.
+3. Only then set `DOCLING_CHUNK_STRATEGY=docling_hybrid` and deploy again.
+
+**The flip changes new documents only.** Chunk identity is a function of the
+chunking profile, so documents processed after it are cut natively while
+existing Qdrant points keep the shape they were written with. The collection is
+mixed by design: the payload fields are additive and optional, so an old reader
+handles a new point and a new reader handles an old one. Making the collection
+uniform would require a reindex, which is a SEPARATE decision and a separate
+authorization.
