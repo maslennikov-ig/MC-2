@@ -20,7 +20,7 @@ jobs:
             registry_image: docling-serve
             dockerfile: packages/course-gen-platform/docker/docling-serve/Dockerfile
             context: packages/course-gen-platform/docker/docling-serve
-            version: 1.29.0-docling-2.118.0
+            version: 1.30.0-docling-2.118.0
           - image: docling-mcp
             registry_image: docling-mcp-v3
             dockerfile: packages/course-gen-platform/docker/docling-mcp/Dockerfile

@@ -33,7 +33,7 @@ Images are stored in GitHub Container Registry (ghcr.io):
 - `ghcr.io/maslennikov-ig/mc-2/web:latest` - Web application
 - `ghcr.io/maslennikov-ig/mc-2/api:latest` - API server and worker
 - `docling-mcp@sha256:<digest>` - MCP 3 protocol image (versioned tag `3.0.0-docling-2.118.0`)
-- `docling-serve@sha256:<digest>` - Serve CPU image (versioned tag `1.29.0-docling-2.118.0`)
+- `docling-serve@sha256:<digest>` - Serve CPU image (versioned tag `1.30.0-docling-2.118.0`)
 
 ## Deployment Methods
 

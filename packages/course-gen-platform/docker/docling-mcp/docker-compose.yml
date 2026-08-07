@@ -3,7 +3,7 @@ services:
     build:
       context: ../docling-serve
       dockerfile: Dockerfile
-    image: mc2/docling-serve:1.29.0-docling-2.118.0
+    image: mc2/docling-serve:1.30.0-docling-2.118.0
     environment:
       UVICORN_HOST: 0.0.0.0
       UVICORN_PORT: '5001'
@@ -11,7 +11,6 @@ services:
       DOCLING_SERVE_MAX_SYNC_WAIT: '1200'
       DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT: '1200'
       DOCLING_SERVE_LOAD_MODELS_AT_BOOT: 'true'
-      DOCLING_SERVE_PDF_HEADING_HIERARCHY: '${DOCLING_SERVE_PDF_HEADING_HIERARCHY:-false}'
       DOCLING_SERVE_ARTIFACTS_PATH: /opt/app-root/src/.cache/docling/models
     ports:
       - '127.0.0.1:5001:5001'
@@ -40,7 +39,7 @@ services:
     build:
       context: ../docling-serve-advanced
       dockerfile: Dockerfile
-    image: mc2/docling-serve-advanced:1.29.0-docling-2.118.0
+    image: mc2/docling-serve-advanced:1.30.0-docling-2.118.0
     environment:
       UVICORN_HOST: 0.0.0.0
       UVICORN_PORT: '5001'
@@ -50,7 +49,6 @@ services:
       # Advanced models load lazily: booting all of them would hold several GB
       # for a service that is idle whenever the router finds no signal.
       DOCLING_SERVE_LOAD_MODELS_AT_BOOT: 'false'
-      DOCLING_SERVE_PDF_HEADING_HIERARCHY: '${DOCLING_SERVE_PDF_HEADING_HIERARCHY:-false}'
       DOCLING_SERVE_ARTIFACTS_PATH: /opt/app-root/src/.cache/docling/models
     ports:
       - '127.0.0.1:5002:5001'

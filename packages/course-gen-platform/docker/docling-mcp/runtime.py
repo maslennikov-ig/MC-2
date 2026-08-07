@@ -64,8 +64,9 @@ def apply_service_client_settings() -> None:
         raise ValueError("DOCLING_MCP_OCR_PRESET must not be empty")
     ocr_languages = _csv("DOCLING_MCP_OCR_LANG", "ru,en")
     # Feature-flagged PDF section-header level inference. Off by default, so the
-    # production conversion profile is unchanged until the flag is set. Docling
-    # Serve only honours it with the wrapper in docker/docling-serve/runtime.py.
+    # production conversion profile is unchanged until the flag is set. Serve
+    # honours the request field natively since jobkit 3.3.0; the wrapper that
+    # used to be needed on that side is gone.
     pdf_heading_hierarchy = _flag("DOCLING_MCP_PDF_HEADING_HIERARCHY", False)
 
     @wraps(original_init)
