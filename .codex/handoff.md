@@ -46,7 +46,7 @@ source+OCR flags. Remove at `mc2-ibzcc`.
 **Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
 behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
 **Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` costs 30.6 GB and a 4.34 GiB
-peak against an 11 GiB host (`mc2-x72bq`). The router is THREE-TIERED and a PPTX asks for nothing.
+peak against an 11 GiB host — `mc2-x72bq`, deferred long-term. The router is THREE-TIERED.
 **`picture_description` is REJECTED on evidence** and its model is NOT in the image.
 
 ## Docling Stage E: images deployed, the chunk flip is live and PROVEN
@@ -81,9 +81,8 @@ file, written only after health passes; that is what the rollout gate recognises
 `DOCLING_PREVIOUS_MCP_IMAGE` still bootstraps a host that has recorded nothing, but nobody has to
 move it in lockstep any more.
 
-**A typo in `DOCLING_CHUNK_STRATEGY` is now caught in CI**, because the application would otherwise
-warn once and fall back to `legacy_markdown` under a green deploy. Verify a flip in the WORKER, never
-in the pipeline — the probe above, or `chunkStrategy` in the worker log once a document goes through.
+**A typo in `DOCLING_CHUNK_STRATEGY` is caught in CI**; the app would otherwise warn once and fall
+back to `legacy_markdown` under a green deploy. Verify a flip in the WORKER, never in the pipeline.
 
 **The chunking profile never recorded a Serve version** until `1befdb5ac`: `GET /version` answers a
 map keyed by package name and has no `version` key, so every profile id ended `serve=unknown` and an
@@ -183,15 +182,16 @@ explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-x72bq` — epic `mc2-1sobq` is delivered, the flip is live and runtime-proven.
-Recommended action: nothing is pending — take the P3 follow-ups when their preconditions hold.
-Reindex, migrations, secrets and force-push are NOT authorized.
+Next stage id: `mc2-ibzcc` — epic `mc2-1sobq` is delivered, the flip is live and runtime-proven.
+Recommended action: nothing is pending; `mc2-ibzcc` becomes work only when upstream ships, and its
+own build-time tests announce that. Reindex, migrations, secrets and force-push are NOT authorized.
+**`mc2-x72bq` is DEFERRED LONG-TERM** by the owner 2026-08-07 — not before the production launch and
+a bigger server. P4, `deferred-long-term`, `owner-gated`. Do not propose it.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-x72bq` (chart extraction; needs ≥8 GiB free RAM and ≥40 GB disk) or
-`mc2-ibzcc` (drop both runtime wrappers once upstream fixes land). `mc2-1sobq` is closed. Preserve
-the MCP 1.x rollback digest.
+Use $orchestrator-stage for `mc2-ibzcc` (drop both runtime wrappers) once its build-time gap tests
+start failing. `mc2-1sobq` is closed, `mc2-x72bq` is owner-deferred. Keep the rollback on MCP 1.x.
 
 ## Read First
 
