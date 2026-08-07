@@ -1,7 +1,7 @@
 # Stage `mc2-1sobq.3` — Premium input formats
 
 Epic: `mc2-1sobq` (`specs/024-docling-intelligence/spec.md`)
-Level: integration · Owner: root · Status: delivered, pending acceptance
+Level: integration · Owner: root · Status: accepted 2026-08-07
 
 ## What changed observably
 
@@ -73,12 +73,27 @@ document changes route.
 `SUPPORTED_FORMATS` stays narrower than Docling's own list on purpose: Serve
 also accepts audio, video, email, boxnote and ebcdic, all explicit non-goals.
 
+## Review markers
+
+project-index: reviewed-no-change — the only structural edit is `.codex/orchestrator.toml`
+pointing `current_stage_id` and the three stage state files at `mc2-1sobq.3`. No file, module or
+subsystem was added, moved or renamed that `.codex/project-index.md` describes.
+
+graph-reviewed: updated — `graphify update .` re-extracted the repository after the code and docs
+changes.
+
+docs-reviewed: updated - `docs/DOCLING-MCP-REFERENCE.md` gained the Premium format contract: the
+per-family table of what actually survives conversion, the cached-formula and merged-cell
+limitations, the extension/MIME agreement rule, and the command that runs the format corpus.
+`.codex/handoff.md` carries the same facts as current state.
+
 ## Verification
 
-- `pnpm type-check` green across all five packages.
+- `pnpm type-check`, `pnpm lint` (0 errors) and `pnpm build` green across all
+  five packages.
+- Unit suite under `vitest.config.unit.ts`: 400 files, 6773 passed, 0 failed.
 - New focused tests: 17 for the format contract and the extension gate, 14 for
-  containers and structure assertions — all green. Existing `tests/unit/shared`
-  and `tests/unit/stages/stage2-document-processing`: 60 files, 971 tests green.
+  containers and structure assertions.
 - Live benchmark, one run per family against the running MCP + Serve, results in
   the table above; artifacts under `.tmp/docling-benchmark/stagec-*/`.
 
