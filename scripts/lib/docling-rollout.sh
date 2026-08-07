@@ -22,6 +22,30 @@ docling_validate_digest_ref() {
     }
 }
 
+# Where the host remembers which MCP image it is actually running.
+#
+# Kept beside the env file because CI REGENERATES that file from repository
+# variables on every deploy: anything the host learns must live outside it or be
+# forgotten. This is what removes the manual step — `DOCLING_PREVIOUS_MCP_IMAGE`
+# still works and still bootstraps a host that has never recorded anything, but
+# nobody has to remember to move it in lockstep with `DOCLING_MCP_IMAGE`, and
+# forgetting no longer fails the deploy of the entire application.
+docling_deployed_image_state() {
+    printf '%s/.docling-deployed-mcp-image\n' "${1%/*}"
+}
+
+# Records the MCP image this host now runs. Called only AFTER health passes, so
+# a failed switch never overwrites the last image known to work.
+docling_record_deployed_image() {
+    local env_file="$1"
+    local state mcp_image
+    state="$(docling_deployed_image_state "$env_file")"
+    mcp_image="$(docling_env_value "$env_file" DOCLING_MCP_IMAGE)"
+    [ -n "$mcp_image" ] || return 0
+    printf '%s\n' "$mcp_image" > "$state" 2>/dev/null ||
+        echo "WARNING: could not record the deployed Docling MCP image at $state" >&2
+}
+
 docling_prepare_rollout() {
     local env_file="$1"
     local enabled mcp_image serve_image rollback_image previous_image
@@ -43,6 +67,14 @@ docling_prepare_rollout() {
     serve_image="$(docling_env_value "$env_file" DOCLING_SERVE_IMAGE)"
     rollback_image="$(docling_env_value "$env_file" DOCLING_ROLLBACK_IMAGE)"
     previous_image="$(docling_env_value "$env_file" DOCLING_PREVIOUS_MCP_IMAGE)"
+    # The host's own record wins over the declared one: it is written by a
+    # successful switch and therefore cannot drift from reality.
+    local recorded_state recorded_image
+    recorded_state="$(docling_deployed_image_state "$env_file")"
+    if [ -r "$recorded_state" ]; then
+        recorded_image="$(tr -d '[:space:]' < "$recorded_state")"
+        [ -z "$recorded_image" ] || previous_image="$recorded_image"
+    fi
     docling_validate_digest_ref DOCLING_MCP_IMAGE "$mcp_image" || return 1
     docling_validate_digest_ref DOCLING_SERVE_IMAGE "$serve_image" || return 1
     docling_validate_digest_ref DOCLING_ROLLBACK_IMAGE "$rollback_image" || return 1
@@ -84,6 +116,13 @@ docling_prepare_rollout() {
     previous_id=""
     if [ -n "$previous_image" ]; then
         previous_id="$(docker image inspect -f '{{.Id}}' "$previous_image" 2>/dev/null || true)"
+        if [ -z "$previous_id" ]; then
+            # Absent locally is not the same as wrong: `docker image prune -a`
+            # removes the previous release the moment nothing runs it. Fetch it
+            # once rather than block a correct deploy on a housekeeping job.
+            docker pull "$previous_image" > /dev/null 2>&1 || true
+            previous_id="$(docker image inspect -f '{{.Id}}' "$previous_image" 2>/dev/null || true)"
+        fi
     fi
     [ "$current_id" = "$rollback_id" ] ||
         [ "$current_id" = "$candidate_id" ] ||
@@ -165,8 +204,29 @@ docling_rollback_rollout() {
     echo "Docling v2 health failed; restoring the recorded MCP 1.x image..." >&2
     docling_set_env_value "$env_file" DOCLING_MCP_IMAGE "$rollback_image" || return 1
     docling_set_env_value "$env_file" DOCLING_STACK_V2_ENABLED false || return 1
-    docker compose -f "$compose_file" --env-file "$env_file" \
+
+    # The image alone is not the rollback. MCP 1.x converts LOCALLY, and the
+    # split left the service sized and wired for a proxy: 512 MiB, half a CPU,
+    # remote mode aimed at the Serve stopped below, and no models volume at all.
+    # The override restores what a local converter actually needs. It sits next
+    # to the infra file, so a caller that passes a compose file from elsewhere
+    # still finds it.
+    local rollback_override="${compose_file%/*}/docker-compose.docling-rollback.yml"
+    local compose_files=(-f "$compose_file")
+    if [ -r "$rollback_override" ]; then
+        compose_files+=(-f "$rollback_override")
+    else
+        echo "WARNING: $rollback_override is missing; MCP 1.x will run with the split stack's limits and no models volume" >&2
+    fi
+
+    docker compose "${compose_files[@]}" --env-file "$env_file" \
         up -d --no-deps --force-recreate docling-mcp-internal docling-mcp || return 1
-    docker compose -f "$compose_file" --env-file "$env_file" stop docling-serve || return 1
-    docling_check_facade
+    docker compose "${compose_files[@]}" --env-file "$env_file" stop docling-serve || return 1
+
+    # The facade answering is NOT proof the rollback worked: nginx keeps serving
+    # whether or not the MCP behind it can convert anything. Without the tool
+    # check this function printed "MCP 1.x was restored" over a dead conversion
+    # path, which is the worst possible moment to be optimistic.
+    docling_check_facade || return 1
+    docling_check_required_tools
 }

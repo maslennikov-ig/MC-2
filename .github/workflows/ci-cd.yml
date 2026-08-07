@@ -735,6 +735,7 @@ jobs:
             docker-compose.infra.yml \
             docker-compose.app.yml \
             docker-compose.production.yml \
+            docker-compose.docling-rollback.yml \
             nginx-docling-proxy.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
@@ -881,6 +882,25 @@ jobs:
       # It is not a secret at all — it is the numeric id of the host's dedicated metrics group, so
       # it is read from the host that owns it and cannot drift from the group it names. Fails closed
       # if the group is absent, rather than writing an empty value over a good one again.
+      # A typo here is invisible everywhere else. `resolveChunkingStrategy` warns
+      # and falls back to `legacy_markdown` on an unrecognised value, so
+      # `docling-hybrid` or `Docling_Hybrid` produces a GREEN deploy that
+      # switched nothing, with one line in a worker log as the only trace.
+      # Checked against the three values the code accepts, at the moment the
+      # value is chosen rather than hours later when someone reads a log.
+      - name: Validate the Docling chunking strategy
+        env:
+          DOCLING_CHUNK_STRATEGY: ${{ vars.DOCLING_CHUNK_STRATEGY || 'legacy_markdown' }}
+        run: |
+          case "$DOCLING_CHUNK_STRATEGY" in
+            legacy_markdown|docling_hierarchical|docling_hybrid) ;;
+            *)
+              echo "::error::DOCLING_CHUNK_STRATEGY is '$DOCLING_CHUNK_STRATEGY'; expected legacy_markdown, docling_hierarchical or docling_hybrid. The application would silently fall back to legacy_markdown and the deploy would look green."
+              exit 1
+              ;;
+          esac
+          echo "Docling chunking strategy: $DOCLING_CHUNK_STRATEGY"
+
       - name: Resolve host-derived environment values
         run: |
           ssh -i ~/.ssh/deploy_key \

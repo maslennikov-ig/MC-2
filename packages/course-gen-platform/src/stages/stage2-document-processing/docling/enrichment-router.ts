@@ -68,8 +68,10 @@ export const CHART_CLASSIFICATION_MIN_CONFIDENCE = 0.5;
  * titled "Bemma" with the categories "Bemma", "BeTa" and "Rammma" — an invented
  * title and three mangled labels. FR-014 makes invented labels a blocking
  * failure, so the capability stays off and the finding is recorded rather than
- * quietly dropped. The model stays in the advanced image so a larger VLM
- * candidate can be measured against the same fixture later.
+ * quietly dropped. This comment used to add that the model stays in the
+ * advanced image for a later retry; it does NOT — the shipped model set is
+ * `code_formula`, and Stage D confirmed no VLM weights are in either image.
+ * Measuring a larger candidate against the same fixture needs a build first.
  */
 export const REJECTED_CAPABILITIES: ReadonlyMap<EnrichmentCapability, string> = new Map([
   [

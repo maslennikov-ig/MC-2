@@ -28,6 +28,8 @@ export interface OcrExpectation {
   phrases?: string[];
   /** A ruled table whose cells must survive both OCR and structure. */
   table?: OcrTableExpectation;
+  /** Minimum mean cell similarity for the table to count as read. Default 0.8. */
+  minimumTableCellAccuracy?: number;
   /**
    * Minimum mean phrase similarity for this case to count as read.
    * Absent means the case is measured but does not gate.
@@ -144,37 +146,95 @@ function bestWindow(haystack: string, needle: string): { text: string; score: nu
   return best.score < 0 ? { text: '', score: 0 } : best;
 }
 
-/** True when `candidate` is `expected` with Cyrillic letters read as Latin. */
+/**
+ * True when `candidate` is `expected` with Cyrillic letters read as Latin.
+ *
+ * Scored on the POSITIONS folding can explain, not on overall similarity. The
+ * first version demanded `similarity(expected, folded) >= 0.8`, which no real
+ * phrase can reach: only twelve letters have a Latin twin, so a sentence is at
+ * most ~75% foldable and the threshold was unreachable by construction. It
+ * never fired once across six benchmark runs — including on the one genuine
+ * inversion in the corpus, `POCT И РOCT` for `РОСТ и POCT` — while its unit
+ * test passed because a four-letter word IS 100% foldable.
+ *
+ * The question that actually matters is narrower: of the characters that
+ * DIFFER, how many are explained by a Latin twin? A recognizer with no Cyrillic
+ * dictionary produces a candidate where nearly all of them are.
+ */
 function isHomoglyphSubstitution(expected: string, candidate: string): boolean {
   if (!CYRILLIC.test(expected)) return false;
   if (candidate.length === 0) return false;
 
   const folded = [...candidate].map(character => HOMOGLYPHS[character] ?? character).join('');
-  // Folding must make it materially better, and the candidate must have lost
-  // the alphabet in the first place, or this is just a normal misread.
   const before = similarity(expected, candidate);
   const after = similarity(expected, folded);
-  return after > before && after >= 0.8;
-}
+  // Folding has to help at all, or this is an ordinary misread.
+  if (after <= before) return false;
 
-function scoreTable(output: string, expectation: OcrTableExpectation): number {
-  const lines = output.split('\n');
-  let found = 0;
-  let total = 0;
-
-  for (const row of expectation.rows) {
-    total += row.length;
-    // A Markdown table row is the only place cells stay adjacent, so the row is
-    // scored as a unit rather than cell by cell across the whole document.
-    const best = lines.reduce((winner, line) => {
-      const normalizedLine = normalize(line);
-      const hits = row.filter(cell => normalizedLine.includes(normalize(cell))).length;
-      return hits > winner ? hits : winner;
-    }, 0);
-    found += best;
+  // Compare position by position over the overlap: a substitution keeps length,
+  // so alignment is meaningful here in a way it would not be for a dropped run.
+  const length = Math.min(expected.length, candidate.length);
+  let mismatched = 0;
+  let explained = 0;
+  for (let index = 0; index < length; index += 1) {
+    if (expected[index] === candidate[index]) continue;
+    mismatched += 1;
+    if (folded[index] === expected[index]) explained += 1;
   }
 
-  return total === 0 ? 1 : found / total;
+  // At least a third of the phrase must be Latin-for-Cyrillic, and most of what
+  // went wrong must be exactly that. Both halves are needed: the first stops a
+  // single coincidental letter from firing it, the second stops a badly mangled
+  // read that happens to contain one `O` from counting as a substitution.
+  if (mismatched === 0) return false;
+  return explained >= Math.max(2, Math.ceil(length / 3)) && explained / mismatched >= 0.6;
+}
+
+/** Cells of one Markdown table row, pipes and padding removed. */
+function markdownRowCells(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|')) return [];
+  return trimmed
+    .replace(/^\||\|$/gu, '')
+    .split('|')
+    .map(cell => normalize(cell));
+}
+
+/**
+ * Table accuracy, scored per character like the phrases are.
+ *
+ * This used to ask whether the row's text CONTAINED each cell — the exact
+ * "substring presence" this module's own docstring rejects for phrases, applied
+ * to cells. A cell read as `l18` instead of `118` scored zero, the same as a
+ * cell that never arrived, so the metric could not tell a near-miss from a
+ * total loss. That inconsistency mattered: table accuracy is the half of the
+ * comparison where the CANDIDATE engine wins, so the weaker metric was working
+ * against it.
+ */
+function scoreTable(output: string, expectation: OcrTableExpectation): number {
+  const rows = output
+    .split('\n')
+    .map(markdownRowCells)
+    .filter(cells => cells.length > 0);
+  let score = 0;
+  let total = 0;
+
+  for (const expectedRow of expectation.rows) {
+    total += expectedRow.length;
+    // Best-matching row, then cell against cell in position: a row is the only
+    // place cells stay adjacent, and position is what distinguishes a plan from
+    // a fact in the same table.
+    const best = rows.reduce((winner, cells) => {
+      const rowScore = expectedRow.reduce(
+        (sum, expectedCell, index) => sum + similarity(normalize(expectedCell), cells[index] ?? ''),
+        0
+      );
+      return rowScore > winner ? rowScore : winner;
+    }, 0);
+    score += best;
+  }
+
+  return total === 0 ? 1 : score / total;
 }
 
 /** Scores one conversion output against a fixture's OCR ground truth. */
@@ -255,10 +315,13 @@ export function checkOcr(score: OcrScore, expectation: OcrExpectation): OcrCheck
   }
 
   if (score.tableCellAccuracy !== null) {
+    // `> 0` passed on one cell out of twelve. A table that lost most of itself
+    // is not a table that was read.
+    const minimum = expectation.minimumTableCellAccuracy ?? 0.8;
     checks.push({
       name: 'ocr-table-cells',
-      passed: score.tableCellAccuracy > 0,
-      details: `${score.tableCellAccuracy} of the expected cells`,
+      passed: score.tableCellAccuracy >= minimum,
+      details: `${score.tableCellAccuracy} of at least ${minimum}`,
     });
   }
 

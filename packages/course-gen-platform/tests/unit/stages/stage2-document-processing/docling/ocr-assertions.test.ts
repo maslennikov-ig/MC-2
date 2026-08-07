@@ -49,6 +49,28 @@ describe('scoreOcr phrases', () => {
 });
 
 describe('scoreOcr homoglyphs', () => {
+  it('flags a WHOLE PHRASE returned as identical-looking Latin', () => {
+    // The case the check exists for, and the one it could not detect before:
+    // the original threshold demanded 80% overall similarity after folding,
+    // which no real sentence can reach because only twelve letters have a Latin
+    // twin. It passed its own unit test only because a four-letter word is
+    // 100% foldable, and it never fired once across six benchmark runs.
+    const expected = 'ПРОВЕРКА УСТОЙЧИВОСТИ РАСПОЗНАВАНИЯ';
+    const latinOnly = 'ПPOBEPKA УCTOЙЧИBOCTИ PACПOЗНABAНИЯ';
+    const score = scoreOcr(latinOnly, { phrases: [expected] });
+    expect(score.phrases[0].homoglyphSubstitution).toBe(true);
+  });
+
+  it('does not flag a badly mangled read that merely contains a Latin letter', () => {
+    const score = scoreOcr('# BO ПО НАПРАВЛЕ ЕНИЯМ', { phrases: ['СВОДКА ПО НАПРАВЛЕНИЯМ'] });
+    expect(score.phrases[0].homoglyphSubstitution).toBe(false);
+  });
+
+  it('does not flag a clean read', () => {
+    const score = scoreOcr('СВОДКА ПО НАПРАВЛЕНИЯМ', { phrases: ['СВОДКА ПО НАПРАВЛЕНИЯМ'] });
+    expect(score.phrases[0].homoglyphSubstitution).toBe(false);
+  });
+
   it('flags a Cyrillic phrase returned as identical-looking Latin', () => {
     // POCT is four Latin letters; РОСТ is four Cyrillic ones. They render the
     // same and share no bytes, so a naive similarity would call this a miss and
@@ -92,6 +114,37 @@ describe('scoreOcr tables', () => {
     const accuracy = scoreOcr(markdown, { table }).tableCellAccuracy!;
     expect(accuracy).toBeGreaterThan(0);
     expect(accuracy).toBeLessThan(1);
+  });
+
+  it('scores a near-miss cell above a missing one', () => {
+    // `l18` for `118` is one wrong character. The substring test this replaced
+    // gave it the same zero as a cell that never arrived, which made the metric
+    // blind to exactly the difference between two engines it exists to compare.
+    const rows = { rows: [['Аналитика', '118']] };
+    const nearMiss = ['| Аналитика | l18 |'].join('\n');
+    const missing = ['| Аналитика |  |'].join('\n');
+
+    const near = scoreOcr(nearMiss, { table: rows }).tableCellAccuracy!;
+    const gone = scoreOcr(missing, { table: rows }).tableCellAccuracy!;
+    expect(near).toBeGreaterThan(gone);
+    expect(near).toBeLessThan(1);
+  });
+
+  it('fails a table that lost most of its cells', () => {
+    const expectation = {
+      table: {
+        rows: [
+          ['Раздел', 'План', 'Факт'],
+          ['Аналитика', '120', '118'],
+          ['Разработка', '340', '351'],
+          ['Внедрение', '56', '56'],
+        ],
+      },
+    };
+    // One row out of four recovered. `> 0` used to call this a pass.
+    const checks = checkOcr(scoreOcr('| Раздел | План | Факт |', expectation), expectation);
+    const cells = checks.find(check => check.name === 'ocr-table-cells');
+    expect(cells?.passed).toBe(false);
   });
 
   it('reports null when the fixture declares no table', () => {

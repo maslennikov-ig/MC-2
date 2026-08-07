@@ -141,6 +141,30 @@ SWITCHED_RUNNING_ID='sha256:previous-release-mcp-image' \
     exit 1
 }
 
+# The host's OWN record removes the manual step entirely: a successful switch
+# writes it, and the next deploy recognises the running image without anyone
+# moving a repository variable in lockstep.
+cat > "$TEST_DIR/recorded.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_SERVE_IMAGE=$SERVE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+EOF
+printf '%s\n' "$PREVIOUS_REF" > "$TEST_DIR/.docling-deployed-mcp-image"
+SWITCHED_RUNNING_ID='sha256:previous-release-mcp-image' \
+    docling_prepare_rollout "$TEST_DIR/recorded.env" || {
+    echo 'rollout gate ignored the image the host recorded for itself' >&2
+    exit 1
+}
+
+# And that record is written only by a successful switch.
+docling_record_deployed_image "$TEST_DIR/recorded.env"
+grep -qx "$CANDIDATE_REF" "$TEST_DIR/.docling-deployed-mcp-image" || {
+    echo 'a healthy switch did not record the image it deployed' >&2
+    exit 1
+}
+rm "$TEST_DIR/.docling-deployed-mcp-image"
+
 # The same host WITHOUT the recorded previous release is still refused: the
 # escape hatch has to be named, not inferred.
 if SWITCHED_RUNNING_ID='sha256:previous-release-mcp-image' \
@@ -170,11 +194,52 @@ EOF
 docling_check_facade() {
     return 0
 }
+# The rollback now also proves the restored MCP exposes the conversion tools;
+# the harness has no container to exec into, so it stands in for that check.
+docling_check_required_tools() {
+    printf '%s\n' 'check_required_tools' >> "$DOCKER_LOG"
+    return 0
+}
+# The rollback must apply the override that restores MCP 1.x's own resources,
+# transport variables and — the one the split deleted outright — its models
+# volume. Without it the "rollback" boots a local converter with no models.
+cp "$ROOT_DIR/docker-compose.docling-rollback.yml" "$TEST_DIR/docker-compose.docling-rollback.yml"
 docling_rollback_rollout "$TEST_DIR/rollback.env" "$TEST_DIR/compose.yml"
 grep -qx "DOCLING_STACK_V2_ENABLED=false" "$TEST_DIR/rollback.env"
 grep -qx "DOCLING_MCP_IMAGE=$ROLLBACK_REF" "$TEST_DIR/rollback.env"
 grep -q 'force-recreate docling-mcp-internal docling-mcp' "$DOCKER_LOG"
 grep -q 'stop docling-serve' "$DOCKER_LOG"
+grep -q 'check_required_tools' "$DOCKER_LOG" || {
+    echo 'rollback did not verify that the restored MCP can actually convert' >&2
+    exit 1
+}
+grep -q 'docker-compose.docling-rollback.yml' "$DOCKER_LOG" || {
+    echo 'rollback did not apply the MCP 1.x service override' >&2
+    exit 1
+}
+for required in 'docling-models:/app/models' 'MCP_TRANSPORT' "memory: 4G"; do
+    grep -q "$required" "$ROOT_DIR/docker-compose.docling-rollback.yml" || {
+        echo "rollback override lost $required" >&2
+        exit 1
+    }
+done
+
+# And with the override absent it must WARN rather than pretend, because a
+# silent fallback to the proxy-sized service is the failure this file exists for.
+rm "$TEST_DIR/docker-compose.docling-rollback.yml"
+cat > "$TEST_DIR/no-override.env" <<EOF
+DOCLING_STACK_V2_ENABLED=true
+DOCLING_MCP_IMAGE=$CANDIDATE_REF
+DOCLING_ROLLBACK_IMAGE=$ROLLBACK_REF
+EOF
+if ! docling_rollback_rollout "$TEST_DIR/no-override.env" "$TEST_DIR/compose.yml" 2> "$TEST_DIR/warn.log"; then
+    echo 'rollback failed when the override was merely missing' >&2
+    exit 1
+fi
+grep -q 'will run with the split stack' "$TEST_DIR/warn.log" || {
+    echo 'rollback silently skipped the missing MCP 1.x override' >&2
+    exit 1
+}
 grep -q 'convert_document_into_docling_document' "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 grep -q 'export_docling_document_to_markdown' "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 grep -q 'save_docling_document' "$ROOT_DIR/scripts/lib/docling-rollout.sh"

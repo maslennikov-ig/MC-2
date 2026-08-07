@@ -490,7 +490,12 @@ export async function uploadCareerPlaybookBusinessContextSource(
       sourceId: data.id,
       fileId: storage.fileId,
       filePath: resolveUploadStoragePath(storage.storagePath),
-      mimeType: input.mimeType,
+      // The CANONICAL type, matching what went into `file_catalog`. Sending the
+      // client's declaration here made one file take two different pipelines: a
+      // `.csv` announced as `text/plain` went to the plain-text extractor on the
+      // first attempt, while a retry — which reads `file_catalog.mime_type` —
+      // sent the same file to Docling.
+      mimeType: validation.canonicalMimeType ?? input.mimeType,
       userId: user.id,
       organizationId: playbook.organization_id,
       language: playbook.language,

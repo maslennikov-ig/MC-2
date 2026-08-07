@@ -462,6 +462,27 @@ export function toQdrantPayload(chunk: EnrichedChunk): Record<string, unknown> {
           provenance_bboxes: chunk.provenance.bboxes,
           provenance_labels: chunk.provenance.labels,
           native_token_count: chunk.provenance.native_token_count,
+          // The worksheet, slide or chapter this chunk sits in. This projection
+          // enumerates provenance fields by NAME, so a field added upstream is
+          // silently dropped here — `containers` was, which left the whole
+          // point of resolving them unreachable: retrieval reads the payload,
+          // so "which sheet is this rate from" stayed unanswerable in
+          // production while the fixture harness, which reads the raw document,
+          // passed.
+          ...(chunk.provenance.containers && chunk.provenance.containers.length > 0
+            ? {
+                provenance_containers: chunk.provenance.containers.map(container => ({
+                  label: container.label,
+                  name: container.name,
+                  index: container.index,
+                })),
+                // Flattened for filtering: Qdrant indexes a keyword array far
+                // more cheaply than it filters into an array of objects.
+                provenance_container_names: chunk.provenance.containers
+                  .map(container => container.name)
+                  .filter((name): name is string => name !== null),
+              }
+            : {}),
         }
       : {}),
   };

@@ -1,0 +1,54 @@
+# Service definition the Docling rollback needs, and only the rollback.
+#
+# `docling_rollback_rollout` used to swap the IMAGE and nothing else, which left
+# MCP 1.x wearing the split stack's clothes: 512 MiB and half a CPU sized for a
+# thin proxy, `DOCLING_MCP_CONVERSION_MODE=remote` pointing at the Serve the
+# rollback stops one line later, no `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`, and —
+# worst of the four — no `docling-models` volume at all, because the split
+# deleted it from the file entirely along with `docling-cache`.
+#
+# MCP 1.x converts LOCALLY. It needs those models, that memory and its own
+# transport variables. Applied as an override only while rolling back, so the
+# steady-state file keeps describing the steady state.
+#
+# The volumes are declared without options on purpose: Compose reuses an
+# existing project volume of the same name, so a host that ran the pre-split
+# stack still has its models. A host that never did will start empty, and the
+# rollback's `docling_check_required_tools` is what turns that into a loud
+# failure instead of a silent one.
+#
+# Not overridden here: `depends_on`. The rollback runs `up -d --no-deps`, which
+# already bypasses it — the dependency on a healthy `docling-serve` would
+# otherwise be unsatisfiable by construction, since stopping Serve is the point.
+
+services:
+  docling-mcp-internal:
+    volumes:
+      - docling-models:/app/models
+      - docling-cache:/app/cache
+    environment:
+      DOCLING_CACHE_DIR: /app/cache
+      DOCLING_MODELS_PATH: /app/models
+      DOCLING_LOG_LEVEL: INFO
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      # MCP 1.x ignores these, but leaving the split stack's values in place
+      # would point a local converter at a stopped service if it ever read them.
+      DOCLING_MCP_CONVERSION_MODE: local
+      DOCLING_MCP_FALLBACK_TO_LOCAL: 'true'
+    healthcheck:
+      # Local model loading is not a 30-second job; the split shortened this
+      # when the container became a proxy.
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          memory: 2G
+
+volumes:
+  docling-models:
+  docling-cache:
