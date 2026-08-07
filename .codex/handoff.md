@@ -7,12 +7,10 @@ Accepted stage id: `mc2-1sobq.5`
 ## Docling Stage D: both candidates lost, and that is the result
 
 **EasyOCR stays default**, 0.9496 against RapidOCR `cyrillic` 0.7168 on three deterministically
-degraded Russian scans. Caveats: n=3, 8 phrases, 4 exact ties, and the whole gap is three headings.
-RapidOCR WINS table cells (1.000 vs 0.917). On any retry: it REJECTS `ru` and takes the script name
-`cyrillic`, it is SINGLE-LANGUAGE, and its Cyrillic checkpoint is not in the shipped image.
-
-**VLM stays off** because no VLM weights ship in either image — a BUILD cost, not a measured RAM
-limit. Account: `.codex/stages/mc2-1sobq.4/summary.md`.
+degraded Russian scans. Caveats: n=3, 8 phrases, 4 exact ties, the whole gap is three headings, and
+RapidOCR WINS table cells (1.000 vs 0.917). On any retry: it REJECTS `ru` for the script name
+`cyrillic`, is SINGLE-LANGUAGE, and its Cyrillic checkpoint is not in the shipped image. **VLM stays
+off** — no VLM weights ship in either image, a BUILD cost. See `mc2-1sobq.4/summary.md`.
 
 ## Docling Stage C: seven Premium formats, and an extension-checked upload
 
@@ -36,12 +34,14 @@ spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
 **Stage A.** Native structure reaches chunking, enrichment and the Qdrant payload behind
 `DOCLING_CHUNK_STRATEGY`; 100% ref coverage with page/bbox in all six chunkable cases. Two
 production fixes came from it: the embedding cache key now covers model, width, task,
-`late_chunking` and the whole ordered batch, so a document's first re-processing after deploy
-re-embeds it; and a Jina 429 waits out the per-minute TOKEN window instead of being fatal.
+`late_chunking` and the ordered batch, so a document re-embeds on its first re-processing after a
+deploy; and a Jina 429 waits out the per-minute TOKEN window instead of being fatal.
 **Two upstream fields are accepted and dropped by the pinned stack**, wrapped by
-`docker/docling-{serve,mcp}/runtime.py` with a build-time test asserting the gap red first:
-`_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, `get_cache_key` hashes only
-source+OCR flags. Remove at `mc2-ibzcc`.
+`docker/docling-{serve,mcp}/runtime.py`: `_parse_standard_pdf_opts` never assigns
+`heading_hierarchy_options`, `get_cache_key` hashes only source+OCR flags. **jobkit 3.3.1 FIXED the
+first**, we pin 3.2.0 via the base-image digest; docling-mcp has no fix (`mc2-ibzcc`). Their
+build-time tests do NOT announce an upstream fix — they test what we pin, so they fire only on a
+pin bump: the fix shipped 2026-08-06 and the 08-07 rebuild was green.
 
 **Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
 behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
@@ -98,7 +98,7 @@ succeeded: production moved off Qdrant Cloud. Do not reopen C1..C10 nor the bead
 `.codex/stages/mc2-jz6y0/summary.md`. Still OPEN: `mc2-8m90f`, `mc2-qd12b`, `mc2-n6szm`. **Every
 piece of Q12 machinery is opt-in**, reached by NOT passing the Q12 flags.
 
-**Source recovery is COMPLETE** (42/42, 24/24, 2026-08-01). **The reindex is 218/234**:
+**Source recovery COMPLETE** (42/42, 24/24, 2026-08-01); **reindex 218/234**, last measured
 `expected_points=13650 indexed_points=13712 gaps=21 schema_mismatches=0 relevance_failures=0`.
 
 **The 16 that remain are one family.** NOT scans, NO race: exported diagrams, 4296pt tall, type
@@ -183,8 +183,8 @@ explicit paths and never `git add -A`.
 ## Next recommended
 
 Next stage id: `mc2-ibzcc` — epic `mc2-1sobq` is delivered, the flip is live and runtime-proven.
-Recommended action: nothing is pending; `mc2-ibzcc` becomes work only when upstream ships, and its
-own build-time tests announce that. Reindex, migrations, secrets and force-push are NOT authorized.
+Recommended action: `mc2-ibzcc` is half actionable — bump the Serve base image to v1.30.0 (pulls
+jobkit >=3.3.0) and delete that wrapper. Reindex, migrations, secrets, force-push NOT authorized.
 **`mc2-x72bq` is DEFERRED LONG-TERM** by the owner 2026-08-07 — not before the production launch and
 a bigger server. P4, `deferred-long-term`, `owner-gated`. Do not propose it.
 
