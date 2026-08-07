@@ -153,7 +153,23 @@ export const MIME_TYPES_BY_EXTENSION: Readonly<Record<string, readonly string[]>
 } as const;
 
 /**
- * Lowercased extension of a filename, without the dot.
+ * Spellings of an accepted extension that mean the same format.
+ *
+ * These are not new formats and they do not widen any tier: each one resolves
+ * to an extension the tier already lists. Without this map the extension gate
+ * would refuse `notes.markdown`, which uploaded and processed perfectly well
+ * before the gate existed, purely because the tier list spells it `md`.
+ */
+const EXTENSION_ALIASES: Readonly<Record<string, string>> = {
+  htm: 'html',
+  xhtml: 'html',
+  markdown: 'md',
+  jfif: 'jpeg',
+};
+
+/**
+ * Lowercased extension of a filename, without the dot, resolved through the
+ * alias map.
  *
  * Returns null when there is no extension to speak of, including the
  * dotfile case (`.gitignore` has no extension, it has a name).
@@ -162,7 +178,8 @@ export function fileExtensionOf(filename: string): string | null {
   const base = filename.split(/[\\/]/u).pop() ?? '';
   const dot = base.lastIndexOf('.');
   if (dot <= 0 || dot === base.length - 1) return null;
-  return base.slice(dot + 1).toLowerCase();
+  const extension = base.slice(dot + 1).toLowerCase();
+  return EXTENSION_ALIASES[extension] ?? extension;
 }
 
 /**

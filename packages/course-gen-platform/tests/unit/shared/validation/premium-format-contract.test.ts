@@ -62,6 +62,40 @@ describe('premium format contract', () => {
     }
   });
 
+  it('keeps accepting the spellings that worked before the gate existed', () => {
+    // `notes.markdown` uploaded and processed fine when the server checked only
+    // the declared MIME type. The tier list spells the format `md`, so without
+    // an alias the new extension gate would have refused a file the platform
+    // had always accepted.
+    expect(fileExtensionOf('notes.markdown')).toBe('md');
+    expect(fileExtensionOf('page.htm')).toBe('html');
+    expect(fileExtensionOf('page.XHTML')).toBe('html');
+    expect(fileExtensionOf('photo.jfif')).toBe('jpeg');
+
+    for (const [filename, mimeType] of [
+      ['notes.markdown', 'text/markdown'],
+      ['notes.markdown', 'text/plain'],
+      ['page.htm', 'text/html'],
+      ['photo.jfif', 'image/jpeg'],
+    ] as const) {
+      const result = validateFileExtension(filename, mimeType, 'premium');
+      expect(result.valid, `${filename} as ${mimeType} was rejected: ${result.error}`).toBe(true);
+    }
+  });
+
+  it('does not let an alias smuggle in a format no tier accepts', () => {
+    // Aliases resolve to an extension the tier ALREADY lists; they never add one.
+    expect(validateFileExtension('archive.tgz', 'application/pdf', 'premium').valid).toBe(false);
+    expect(validateFileExtension('page.htm', 'text/html', 'standard').valid).toBe(true);
+    expect(
+      validateFileExtension(
+        'sheet.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'standard'
+      ).valid
+    ).toBe(false);
+  });
+
   it('reads an extension only when there is one to read', () => {
     expect(fileExtensionOf('report.PDF')).toBe('pdf');
     expect(fileExtensionOf('archive.tar.gz')).toBe('gz');

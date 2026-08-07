@@ -419,6 +419,11 @@ export const SUPPORTED_FORMATS = [
   'pptx',
   'xlsx',
   'html',
+  // Docling's own html backend accepts all three spellings. Without them a
+  // `.htm` passed upload validation and then failed conversion as an
+  // "unsupported format", which is a worse place to learn it.
+  'htm',
+  'xhtml',
   'md',
   'markdown',
   'png',
