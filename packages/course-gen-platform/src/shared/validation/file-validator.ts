@@ -21,6 +21,11 @@ import {
   FILE_COUNT_LIMITS_BY_TIER,
   FILE_SIZE_LIMITS_BY_TIER,
   MAX_FILE_SIZE_BYTES,
+  MIME_TYPES_BY_EXTENSION,
+  TIER_ORDER,
+  canonicalMimeTypeForExtension,
+  fileExtensionOf,
+  mimeTypeMatchesExtension,
 } from '@megacampus/shared-types';
 import { ValidationError } from '../../server/errors/typed-errors';
 import { getEffectiveTier, type Role } from '../tier/superadmin-bypass';
@@ -65,7 +70,13 @@ export interface FileValidationResult extends ValidationResult {
     size: ValidationResult;
     mimeType: ValidationResult;
     count: ValidationResult;
+    extension: ValidationResult;
   };
+  /**
+   * MIME type the platform should store, derived from the extension rather than
+   * from the client. Present only when validation passed.
+   */
+  canonicalMimeType?: string;
 }
 
 // ============================================================================
@@ -76,6 +87,18 @@ export interface FileValidationResult extends ValidationResult {
  * Maximum file size in megabytes (for display)
  */
 const MAX_FILE_SIZE_MB = MAX_FILE_SIZE_BYTES / (1024 * 1024);
+
+/**
+ * Tiers a customer can actually be told to move TO.
+ *
+ * `free` is not a destination and `trial` is a seven-day evaluation, not a
+ * plan. `TIER_ORDER` places trial between basic and standard, so a naive walk
+ * of the hierarchy answers "PDF requires Trial" — true by the ordering and
+ * useless as advice, because the customer cannot buy it and it expires.
+ */
+const UPGRADE_TIERS: readonly Tier[] = TIER_ORDER.filter(
+  (tier): tier is Tier => tier !== 'free' && tier !== 'trial'
+);
 
 /**
  * Tier upgrade paths
@@ -91,13 +114,23 @@ const TIER_UPGRADE_PATH: Record<Tier, Tier | null> = {
 /**
  * Tier display names
  */
-const TIER_DISPLAY_NAMES: Record<Tier, string> = {
+const TIER_NAMES: Record<Tier, string> = {
   trial: 'Trial',
   free: 'Free',
   basic: 'Basic',
   standard: 'Standard',
   premium: 'Premium',
 };
+
+/**
+ * Display name for a tier, total over unknown values.
+ *
+ * An organization row can carry a tier string the constants no longer define.
+ * Rendering that verbatim is better than rendering `undefined` at the user.
+ */
+function tierName(tier: Tier): string {
+  return TIER_NAMES[tier] ?? String(tier);
+}
 
 // ============================================================================
 // Helper Functions
@@ -114,7 +147,7 @@ function getUpgradeMessage(currentTier: Tier, suggestedTier?: Tier): string {
   if (!suggested) {
     return '';
   }
-  return ` Upgrade to ${TIER_DISPLAY_NAMES[suggested]} to unlock this feature.`;
+  return ` Upgrade to ${tierName(suggested)} to unlock this feature.`;
 }
 
 /**
@@ -122,8 +155,16 @@ function getUpgradeMessage(currentTier: Tier, suggestedTier?: Tier): string {
  * @param tier - Organization tier
  * @returns Formatted list of allowed file extensions
  */
+function allowedExtensionsFor(tier: Tier): readonly string[] {
+  // A tier the constants do not know about allows nothing. It used to throw a
+  // TypeError here instead, which reached the API as a 500 on what is really a
+  // configuration problem — an organization row carrying a tier value that no
+  // longer exists.
+  return (FILE_EXTENSIONS_BY_TIER[tier] as readonly string[] | undefined) ?? [];
+}
+
 function getAllowedExtensionsDisplay(tier: Tier): string {
-  const extensions = FILE_EXTENSIONS_BY_TIER[tier];
+  const extensions = allowedExtensionsFor(tier);
   if (extensions.length === 0) {
     return 'none';
   }
@@ -195,13 +236,13 @@ export function validateFileSize(fileSize: number, tier: Tier, userRole?: Role):
     }
 
     const upgradeMsg = suggestedTier
-      ? ` Upgrade to ${TIER_DISPLAY_NAMES[suggestedTier]} to upload files up to ${FILE_SIZE_LIMITS_BY_TIER[suggestedTier] / (1024 * 1024)} MB.`
+      ? ` Upgrade to ${tierName(suggestedTier)} to upload files up to ${FILE_SIZE_LIMITS_BY_TIER[suggestedTier] / (1024 * 1024)} MB.`
       : '';
 
     return {
       valid: false,
       error: `File size (${formatFileSize(fileSize)}) exceeds ${tier} tier limit (${tierLimitMB} MB)`,
-      userMessage: `File is too large. Your ${TIER_DISPLAY_NAMES[tier]} plan allows files up to ${tierLimitMB} MB (your file: ${formatFileSize(fileSize)}).${upgradeMsg}`,
+      userMessage: `File is too large. Your ${tierName(tier)} plan allows files up to ${tierLimitMB} MB (your file: ${formatFileSize(fileSize)}).${upgradeMsg}`,
       suggestedTier,
     };
   }
@@ -248,7 +289,8 @@ export function validateFileMimeType(
   // Apply superadmin bypass - use effective tier
   const effectiveTier = getEffectiveTier(userRole, tier);
 
-  const allowedMimeTypes = MIME_TYPES_BY_TIER[effectiveTier];
+  const allowedMimeTypes =
+    (MIME_TYPES_BY_TIER[effectiveTier] as readonly string[] | undefined) ?? [];
   const allowedExtensions = getAllowedExtensionsDisplay(effectiveTier);
 
   // Free tier doesn't allow uploads
@@ -262,24 +304,23 @@ export function validateFileMimeType(
   }
 
   // Check if MIME type is in allowed list
-  if (!(allowedMimeTypes as readonly string[]).includes(mimeType)) {
-    // Determine which tier supports this MIME type
-    let suggestedTier: Tier | undefined;
-    for (const [tierKey, mimeTypes] of Object.entries(MIME_TYPES_BY_TIER)) {
-      if ((mimeTypes as readonly string[]).includes(mimeType)) {
-        suggestedTier = tierKey as Tier;
-        break;
-      }
-    }
+  if (!allowedMimeTypes.includes(mimeType)) {
+    // Walk the DECLARED hierarchy, not the object's key order. `MIME_TYPES_BY_TIER`
+    // happens to list `trial` first, so iterating its entries recommended Trial
+    // for a PDF when Basic-to-Standard is the honest upgrade — a suggestion that
+    // is both wrong and unhelpful, since Trial expires in seven days.
+    const suggestedTier = UPGRADE_TIERS.find(tierKey =>
+      (MIME_TYPES_BY_TIER[tierKey] as readonly string[]).includes(mimeType)
+    );
 
     const upgradeMsg = suggestedTier
-      ? ` Upgrade to ${TIER_DISPLAY_NAMES[suggestedTier]} to upload this file type.`
+      ? ` Upgrade to ${tierName(suggestedTier)} to upload this file type.`
       : ' This file type is not supported on any tier.';
 
     return {
       valid: false,
       error: `File type '${mimeType}' not allowed for ${tier} tier`,
-      userMessage: `File type not supported. Your ${TIER_DISPLAY_NAMES[tier]} plan allows: ${allowedExtensions}.${upgradeMsg}`,
+      userMessage: `File type not supported. Your ${tierName(tier)} plan allows: ${allowedExtensions}.${upgradeMsg}`,
       suggestedTier,
     };
   }
@@ -287,6 +328,82 @@ export function validateFileMimeType(
   return {
     valid: true,
   };
+}
+
+/**
+ * Validate that the filename's extension is allowed and that the declared MIME
+ * type agrees with it (FR-017).
+ *
+ * Two distinct failures live here, and they are worth keeping distinct:
+ *
+ * - an extension no tier accepts, or one this tier does not accept yet;
+ * - an extension this tier accepts, announced as a type it cannot be.
+ *
+ * The second is the spoof case. Without it the server trusted whatever MIME the
+ * client sent: a file could be called `report.pdf`, declared `text/plain` and
+ * routed to the plain-text extractor, or called `notes.txt`, declared
+ * `application/pdf` and sent to Docling. Nothing downstream re-checked, because
+ * `mime_type` from `file_catalog` is what the processing stage routes on.
+ *
+ * @param filename - Original filename, extension included
+ * @param mimeType - MIME type declared by the client
+ * @param tier - Organization tier
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
+ */
+export function validateFileExtension(
+  filename: string,
+  mimeType: string,
+  tier: Tier,
+  userRole?: Role
+): ValidationResult {
+  const effectiveTier = getEffectiveTier(userRole, tier);
+
+  if (effectiveTier === 'free') {
+    return {
+      valid: false,
+      error: 'File uploads not allowed for free tier',
+      userMessage: `Your Free tier plan does not support file uploads.${getUpgradeMessage(tier)}`,
+      suggestedTier: 'basic',
+    };
+  }
+
+  const extension = fileExtensionOf(filename);
+  if (!extension) {
+    return {
+      valid: false,
+      error: `Filename '${filename}' has no extension`,
+      userMessage: `File "${filename}" has no extension, so its format cannot be determined. Rename it with the correct extension and upload again.`,
+    };
+  }
+
+  const allowedExtensions = allowedExtensionsFor(effectiveTier);
+  if (!allowedExtensions.includes(extension)) {
+    const suggestedTier = UPGRADE_TIERS.find(tierKey =>
+      (FILE_EXTENSIONS_BY_TIER[tierKey] as readonly string[]).includes(extension)
+    );
+
+    const upgradeMsg = suggestedTier
+      ? ` Upgrade to ${tierName(suggestedTier)} to upload this file type.`
+      : ' This file type is not supported on any tier.';
+
+    return {
+      valid: false,
+      error: `File extension '.${extension}' not allowed for ${tier} tier`,
+      userMessage: `File type not supported. Your ${tierName(tier)} plan allows: ${getAllowedExtensionsDisplay(effectiveTier)}.${upgradeMsg}`,
+      suggestedTier,
+    };
+  }
+
+  if (!mimeTypeMatchesExtension(extension, mimeType)) {
+    const expected = MIME_TYPES_BY_EXTENSION[extension]?.join(', ') ?? 'none';
+    return {
+      valid: false,
+      error: `Declared MIME type '${mimeType}' does not match extension '.${extension}' (expected one of: ${expected})`,
+      userMessage: `File "${filename}" declares a type that does not match its .${extension.toUpperCase()} extension. Upload the original file without renaming it.`,
+    };
+  }
+
+  return { valid: true };
 }
 
 /**
@@ -317,7 +434,7 @@ export function validateFileCount(
   // Apply superadmin bypass - use effective tier
   const effectiveTier = getEffectiveTier(userRole, tier);
 
-  const limit = FILE_COUNT_LIMITS_BY_TIER[effectiveTier];
+  const limit = FILE_COUNT_LIMITS_BY_TIER[effectiveTier] ?? 0;
 
   // Free tier doesn't allow uploads
   if (effectiveTier === 'free') {
@@ -331,23 +448,20 @@ export function validateFileCount(
 
   // Check if current count exceeds limit
   if (currentCount >= limit) {
-    // Find next tier with higher limit
-    let suggestedTier: Tier | undefined;
-    for (const [tierKey, tierLimit] of Object.entries(FILE_COUNT_LIMITS_BY_TIER)) {
-      if (tierLimit > limit) {
-        suggestedTier = tierKey as Tier;
-        break;
-      }
-    }
+    // First tier ABOVE this one in the declared hierarchy that allows more
+    // files. Iterating object keys recommended Trial to a Basic customer.
+    const suggestedTier = UPGRADE_TIERS.slice(UPGRADE_TIERS.indexOf(effectiveTier) + 1).find(
+      tierKey => FILE_COUNT_LIMITS_BY_TIER[tierKey] > limit
+    );
 
     const upgradeMsg = suggestedTier
-      ? ` Upgrade to ${TIER_DISPLAY_NAMES[suggestedTier]} to upload more files (up to ${FILE_COUNT_LIMITS_BY_TIER[suggestedTier]} per course).`
+      ? ` Upgrade to ${tierName(suggestedTier)} to upload more files (up to ${FILE_COUNT_LIMITS_BY_TIER[suggestedTier]} per course).`
       : '';
 
     return {
       valid: false,
       error: `File count limit reached for ${tier} tier (${limit} files)`,
-      userMessage: `File upload limit reached. Your ${TIER_DISPLAY_NAMES[tier]} plan allows ${limit} file${limit === 1 ? '' : 's'} per course.${upgradeMsg}`,
+      userMessage: `File upload limit reached. Your ${tierName(tier)} plan allows ${limit} file${limit === 1 ? '' : 's'} per course.${upgradeMsg}`,
       suggestedTier,
     };
   }
@@ -401,11 +515,21 @@ export function validateFile(
 ): FileValidationResult {
   // Perform individual validation checks (userRole is passed to each for superadmin bypass)
   const sizeCheck = validateFileSize(file.fileSize, tier, userRole);
-  const mimeTypeCheck = validateFileMimeType(file.mimeType, tier, userRole);
   const countCheck = validateFileCount(currentFileCount, tier, userRole);
+  const extensionCheck = validateFileExtension(file.filename, file.mimeType, tier, userRole);
+
+  // Once the extension is known good and the declared type agrees with it, the
+  // TIER gate is about the format, not about which of that format's accepted
+  // spellings the browser happened to send. Checking the canonical type is what
+  // lets `.tex` announced as `application/x-tex` through while keeping the tier
+  // list itself down to one entry per format.
+  const extension = fileExtensionOf(file.filename);
+  const canonicalMimeType =
+    extensionCheck.valid && extension ? canonicalMimeTypeForExtension(extension) : null;
+  const mimeTypeCheck = validateFileMimeType(canonicalMimeType ?? file.mimeType, tier, userRole);
 
   // Determine overall validity
-  const valid = sizeCheck.valid && mimeTypeCheck.valid && countCheck.valid;
+  const valid = sizeCheck.valid && mimeTypeCheck.valid && countCheck.valid && extensionCheck.valid;
 
   // Collect error messages (prioritize count, then MIME type, then size)
   let error: string | undefined;
@@ -416,6 +540,10 @@ export function validateFile(
     error = countCheck.error;
     userMessage = countCheck.userMessage;
     suggestedTier = countCheck.suggestedTier;
+  } else if (!extensionCheck.valid) {
+    error = extensionCheck.error;
+    userMessage = extensionCheck.userMessage;
+    suggestedTier = extensionCheck.suggestedTier;
   } else if (!mimeTypeCheck.valid) {
     error = mimeTypeCheck.error;
     userMessage = mimeTypeCheck.userMessage;
@@ -431,10 +559,12 @@ export function validateFile(
     error,
     userMessage,
     suggestedTier,
+    ...(valid && canonicalMimeType ? { canonicalMimeType } : {}),
     checks: {
       size: sizeCheck,
       mimeType: mimeTypeCheck,
       count: countCheck,
+      extension: extensionCheck,
     },
   };
 }
@@ -544,13 +674,11 @@ export function isFileTypeSupported(mimeType: string): boolean {
  * ```
  */
 export function getMinimumTierForFileType(mimeType: string): Tier | null {
-  const tierOrder: Tier[] = ['trial', 'free', 'basic', 'standard', 'premium'];
-
-  for (const tier of tierOrder) {
-    if ((MIME_TYPES_BY_TIER[tier] as readonly string[]).includes(mimeType)) {
-      return tier === 'free' ? null : tier;
-    }
-  }
-
-  return null;
+  // `TIER_ORDER` is the hierarchy; the local array this used to carry put
+  // `trial` first and therefore answered "TXT requires Trial" when Basic has it.
+  return (
+    UPGRADE_TIERS.find(tier =>
+      (MIME_TYPES_BY_TIER[tier] as readonly string[]).includes(mimeType)
+    ) ?? null
+  );
 }

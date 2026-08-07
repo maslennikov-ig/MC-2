@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec tsc --noEmit -p tsconfig.json",
+      "duration_seconds": 2.427,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/shared/validation/premium-format-contract.test.ts tests/unit/stages/stage2-document-processing tests/unit/shared/embeddings tests/unit/shared/validation",
+      "duration_seconds": 4.962,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec tsc --noEmit -p tsconfig.json",
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/shared/validation/premium-format-contract.test.ts tests/unit/stages/stage2-document-processing tests/unit/shared/embeddings tests/unit/shared/validation"
+  ],
+  "completed_at": "2026-08-07T08:25:02.100328+00:00",
+  "diff_digest": "616a7eae5719cab445e4c54a89c144c1acd2d9633ed2d277df8c1249f3d4d202",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "50d398c835c5c8f90fab973368119ec928fc637d",
+  "idempotency_key": "3ffbfb7a6e81c09454a0ea4d5e6e6882151889a213eafb9716768f7ec7a4c3e8",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1sobq.3",
+  "started_at": "2026-08-07T08:24:54.576545+00:00",
+  "verification_fingerprint": "3ffbfb7a6e81c09454a0ea4d5e6e6882151889a213eafb9716768f7ec7a4c3e8"
+}

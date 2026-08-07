@@ -59,6 +59,15 @@ export const MIME_TYPES_BY_TIER = {
     'image/gif',
     'image/svg+xml',
     'image/webp',
+    // Premium-only structured formats (FR-016). Every one of these is converted
+    // by the pinned Docling stack with its own backend; none is Standard/Trial.
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
+    'text/csv', // CSV
+    'application/vnd.oasis.opendocument.text', // ODT
+    'application/vnd.oasis.opendocument.spreadsheet', // ODS
+    'application/vnd.oasis.opendocument.presentation', // ODP
+    'application/epub+zip', // EPUB
+    'text/x-tex', // LaTeX
   ],
 } as const;
 
@@ -74,8 +83,125 @@ export const FILE_EXTENSIONS_BY_TIER = {
   free: [],
   basic: ['txt', 'md'],
   standard: ['pdf', 'docx', 'pptx', 'html', 'txt', 'md'], // All formats WITHOUT images
-  premium: ['pdf', 'docx', 'pptx', 'html', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'], // All formats WITH images
+  premium: [
+    'pdf',
+    'docx',
+    'pptx',
+    'html',
+    'txt',
+    'md',
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'svg',
+    'webp',
+    // Premium-only structured formats
+    'xlsx',
+    'csv',
+    'odt',
+    'ods',
+    'odp',
+    'epub',
+    'tex',
+  ],
 } as const;
+
+// ============================================================================
+// Extension <-> MIME Agreement
+// ============================================================================
+
+/**
+ * MIME types each extension is allowed to be declared as.
+ *
+ * The FIRST entry is canonical: it is what the platform stores and what every
+ * downstream routing decision reads. The rest are the types real browsers and
+ * operating systems actually send for that extension, which is why the list
+ * exists at all — a `.md` picked in Chrome arrives as `text/plain`, and a `.csv`
+ * on a machine with Excel installed arrives as `application/vnd.ms-excel`.
+ *
+ * Tolerating those variants is not the same as trusting the client. The rule is
+ * that a declared type must belong to the extension the file actually carries,
+ * so a `.pdf` announced as `text/plain` — or an executable renamed `.pdf` and
+ * announced as `application/pdf` — is refused, while an honest file whose
+ * browser guessed differently is not (FR-017).
+ *
+ * `application/vnd.ms-excel` appears only as a CSV alias. It is also the
+ * canonical type of `.xls`, but `.xls` is not an accepted extension on any tier,
+ * so the extension gate refuses it before this map is consulted.
+ */
+export const MIME_TYPES_BY_EXTENSION: Readonly<Record<string, readonly string[]>> = {
+  pdf: ['application/pdf'],
+  docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  html: ['text/html'],
+  txt: ['text/plain'],
+  md: ['text/markdown', 'text/x-markdown', 'text/plain'],
+  png: ['image/png'],
+  jpg: ['image/jpeg'],
+  jpeg: ['image/jpeg'],
+  gif: ['image/gif'],
+  svg: ['image/svg+xml'],
+  webp: ['image/webp'],
+  xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  csv: ['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain'],
+  odt: ['application/vnd.oasis.opendocument.text'],
+  ods: ['application/vnd.oasis.opendocument.spreadsheet'],
+  odp: ['application/vnd.oasis.opendocument.presentation'],
+  epub: ['application/epub+zip'],
+  tex: ['text/x-tex', 'application/x-tex', 'text/x-latex', 'text/plain'],
+} as const;
+
+/**
+ * Spellings of an accepted extension that mean the same format.
+ *
+ * These are not new formats and they do not widen any tier: each one resolves
+ * to an extension the tier already lists. Without this map the extension gate
+ * would refuse `notes.markdown`, which uploaded and processed perfectly well
+ * before the gate existed, purely because the tier list spells it `md`.
+ */
+const EXTENSION_ALIASES: Readonly<Record<string, string>> = {
+  htm: 'html',
+  xhtml: 'html',
+  markdown: 'md',
+  jfif: 'jpeg',
+};
+
+/**
+ * Lowercased extension of a filename, without the dot, resolved through the
+ * alias map.
+ *
+ * Returns null when there is no extension to speak of, including the
+ * dotfile case (`.gitignore` has no extension, it has a name).
+ */
+export function fileExtensionOf(filename: string): string | null {
+  const base = filename.split(/[\\/]/u).pop() ?? '';
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0 || dot === base.length - 1) return null;
+  const extension = base.slice(dot + 1).toLowerCase();
+  return EXTENSION_ALIASES[extension] ?? extension;
+}
+
+/**
+ * The MIME type the platform stores for an extension, ignoring what the client
+ * declared. Routing reads this, so a browser's guess can never decide whether a
+ * document goes to Docling or to the plain-text path.
+ */
+export function canonicalMimeTypeForExtension(extension: string): string | null {
+  return MIME_TYPES_BY_EXTENSION[extension.toLowerCase()]?.[0] ?? null;
+}
+
+/**
+ * Whether a declared MIME type is one this extension is allowed to carry.
+ *
+ * An unknown extension agrees with nothing: the tier extension list is the
+ * allowlist, and anything outside it has already failed.
+ */
+export function mimeTypeMatchesExtension(extension: string, mimeType: string): boolean {
+  const allowed = MIME_TYPES_BY_EXTENSION[extension.toLowerCase()];
+  if (!allowed) return false;
+  return allowed.includes(mimeType.trim().toLowerCase());
+}
 
 // ============================================================================
 // File Count Limits by Tier

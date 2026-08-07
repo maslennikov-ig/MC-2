@@ -24,7 +24,8 @@ docling_validate_digest_ref() {
 
 docling_prepare_rollout() {
     local env_file="$1"
-    local enabled mcp_image serve_image rollback_image current_id rollback_id candidate_id
+    local enabled mcp_image serve_image rollback_image previous_image
+    local current_id rollback_id candidate_id previous_id
 
     DOCLING_ROLLOUT_SERVICES=()
     [ -r "$env_file" ] || {
@@ -41,9 +42,15 @@ docling_prepare_rollout() {
     mcp_image="$(docling_env_value "$env_file" DOCLING_MCP_IMAGE)"
     serve_image="$(docling_env_value "$env_file" DOCLING_SERVE_IMAGE)"
     rollback_image="$(docling_env_value "$env_file" DOCLING_ROLLBACK_IMAGE)"
+    previous_image="$(docling_env_value "$env_file" DOCLING_PREVIOUS_MCP_IMAGE)"
     docling_validate_digest_ref DOCLING_MCP_IMAGE "$mcp_image" || return 1
     docling_validate_digest_ref DOCLING_SERVE_IMAGE "$serve_image" || return 1
     docling_validate_digest_ref DOCLING_ROLLBACK_IMAGE "$rollback_image" || return 1
+    # Optional, and validated only when present: an empty value means "no
+    # previous release recorded", which is the correct state for a first switch.
+    if [ -n "$previous_image" ]; then
+        docling_validate_digest_ref DOCLING_PREVIOUS_MCP_IMAGE "$previous_image" || return 1
+    fi
 
     # Before the first v3 switch the rollback digest must resolve to the image
     # the MCP container is actually running: that is what makes the rollback
@@ -57,8 +64,15 @@ docling_prepare_rollout() {
     # and pull, and the rollback digest is still validated and pulled above —
     # while letting the steady state deploy.
     #
-    # A host running NEITHER is still refused: nobody can prove a rollback for
-    # an image this configuration does not know about.
+    # And a SECOND upgrade runs into the same wall one step further out: the host
+    # is then running the PREVIOUS candidate, which is neither the rollback nor
+    # the new one. `DOCLING_PREVIOUS_MCP_IMAGE` is how that release is named. It
+    # is not a second rollback target — the rollback path stops Serve and
+    # recreates MCP standalone, so only an MCP 1.x image can serve it — it is
+    # only an assertion that the operator knows what is running.
+    #
+    # A host running NONE of the three is still refused: nobody can prove a
+    # rollback for an image this configuration does not know about.
     docker pull "$rollback_image" > /dev/null || return 1
     current_id="$(docker inspect -f '{{.Image}}' megacampus-docling-mcp-internal 2>/dev/null || true)"
     [ -n "$current_id" ] || {
@@ -67,8 +81,14 @@ docling_prepare_rollout() {
     }
     rollback_id="$(docker image inspect -f '{{.Id}}' "$rollback_image")" || return 1
     candidate_id="$(docker image inspect -f '{{.Id}}' "$mcp_image" 2>/dev/null || true)"
-    [ "$current_id" = "$rollback_id" ] || [ "$current_id" = "$candidate_id" ] || {
-        echo "ERROR: the running MCP image is neither DOCLING_ROLLBACK_IMAGE nor DOCLING_MCP_IMAGE" >&2
+    previous_id=""
+    if [ -n "$previous_image" ]; then
+        previous_id="$(docker image inspect -f '{{.Id}}' "$previous_image" 2>/dev/null || true)"
+    fi
+    [ "$current_id" = "$rollback_id" ] ||
+        [ "$current_id" = "$candidate_id" ] ||
+        { [ -n "$previous_id" ] && [ "$current_id" = "$previous_id" ]; } || {
+        echo "ERROR: the running MCP image is none of DOCLING_ROLLBACK_IMAGE, DOCLING_MCP_IMAGE or DOCLING_PREVIOUS_MCP_IMAGE" >&2
         return 1
     }
 

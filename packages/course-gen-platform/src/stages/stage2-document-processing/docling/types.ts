@@ -404,7 +404,14 @@ export class DoclingError extends Error {
 }
 
 /**
- * Supported document formats
+ * Extensions this client will hand to Docling.
+ *
+ * Deliberately NARROWER than what the pinned Docling stack can parse. Serve
+ * 1.29.0 also accepts `audio`, `video`, `email`, `boxnote` and `ebcdic`, and
+ * those are explicit non-goals: the image carries no ffmpeg, and an unbounded
+ * format surface is a security question, not a feature. Anything absent here is
+ * refused before a byte is sent, so widening the platform's format contract is
+ * a decision made in this list rather than a side effect of upgrading Docling.
  */
 export const SUPPORTED_FORMATS = [
   'pdf',
@@ -412,6 +419,11 @@ export const SUPPORTED_FORMATS = [
   'pptx',
   'xlsx',
   'html',
+  // Docling's own html backend accepts all three spellings. Without them a
+  // `.htm` passed upload validation and then failed conversion as an
+  // "unsupported format", which is a worse place to learn it.
+  'htm',
+  'xhtml',
   'md',
   'markdown',
   'png',
@@ -420,6 +432,14 @@ export const SUPPORTED_FORMATS = [
   'gif',
   'xml',
   'jats',
+  // Premium format families (Stage C). Each is converted by its own Docling
+  // backend in the pinned image; none needs a model the baseline lacks.
+  'csv',
+  'odt',
+  'ods',
+  'odp',
+  'epub',
+  'tex',
 ] as const;
 
 export type SupportedFormat = (typeof SUPPORTED_FORMATS)[number];

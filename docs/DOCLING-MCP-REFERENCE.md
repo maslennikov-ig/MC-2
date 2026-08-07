@@ -128,6 +128,7 @@ digest references:
 DOCLING_MCP_IMAGE=ghcr.io/.../docling-mcp@sha256:<digest>
 DOCLING_SERVE_IMAGE=ghcr.io/.../docling-serve@sha256:<digest>
 DOCLING_ROLLBACK_IMAGE=ghcr.io/.../old-docling-mcp@sha256:<digest>
+DOCLING_PREVIOUS_MCP_IMAGE=ghcr.io/.../docling-mcp@sha256:<digest>
 DOCLING_STACK_V2_ENABLED=true
 ```
 
@@ -331,3 +332,196 @@ Cache identity carries all of this: `resolveConversionProfile` folds the applied
 capabilities and their exact models into the string that chunk ids and cache
 keys are built from, so `baseline+enrich[code,formula]@docling-project/CodeFormulaV2`
 can never be answered from a `baseline` entry.
+
+## Premium input formats (Stage C)
+
+Seven families are Premium-only: XLSX, CSV, ODT, ODS, ODP, EPUB and LaTeX. Each
+is converted by its own backend in the PINNED image — no new model, no new
+service, no download — and each is refused outright on Standard, Trial and
+Basic (FR-016).
+
+`SUPPORTED_FORMATS` in `docling/types.ts` stays deliberately NARROWER than what
+Docling can parse. Serve 1.29.0 also accepts `audio`, `video`, `email`,
+`boxnote` and `ebcdic`; those are explicit non-goals, so the format surface
+widens by editing that list and not by upgrading Docling.
+
+### What each family actually keeps
+
+Measured 2026-08-07 against Docling 2.118.0 / Serve 1.29.0, not read from
+documentation:
+
+| family | structure that survives                                                          | provenance     |
+| ------ | -------------------------------------------------------------------------------- | -------------- |
+| XLSX   | one `groups[].label=sheet` per worksheet, carrying its NAME; one table per sheet | page_no + bbox |
+| CSV    | one table, no containers                                                         | none           |
+| ODT    | headings, `list` group, tables                                                   | none           |
+| ODS    | one `section` group named `sheet: <name>`                                        | page_no + bbox |
+| ODP    | one `chapter` group per slide, in slide order                                    | none           |
+| EPUB   | `section` + `list` groups; chapter titles as `title` items in spine order        | none           |
+| LaTeX  | `formula` and `code` items, typed, not prose                                     | none           |
+
+Two consequences worth stating plainly.
+
+**Sheet, slide and chapter boundaries exist ONLY in the native document.** The
+Markdown rendering flattens a two-sheet workbook into two anonymous tables, so
+under `legacy_markdown` there is no way to tell which sheet a number came from.
+`buildDoclingProvenanceIndex` now walks each element's parent chain and records
+the enclosing groups as `containers`, outermost first, and `aggregateProvenance`
+carries them onto every native chunk. The field is optional and additive, so old
+Qdrant points and the legacy chunker are unaffected (NFR-002, NFR-006).
+
+**Only XLSX and ODS carry page/bbox.** The other five report `prov: []`, so
+`locationEligible` is false for them and location coverage is not an acceptance
+signal — exactly as it already was for DOCX. Ref coverage is 100% on all seven.
+
+### An XLSX formula is its cached value
+
+Docling reads the CACHED RESULT of a formula cell and never the expression. A
+file saved by Excel or LibreOffice carries that value; a file written by a
+library that does not evaluate anything carries `<v></v>` and the cell comes back
+EMPTY. The fixture generator therefore patches a real cached value into the
+total cell, and `_patch_xlsx_cached_formula` fails loudly rather than silently
+producing a fixture that proves the opposite of its intent.
+
+Merged cells are also NOT preserved as spans: a merged header becomes a separate
+text item next to the table, and every table cell reports `1x1`. The fixture
+asserts the merged text is present, not that a span survived.
+
+### The upload contract now checks the extension
+
+`file_catalog.mime_type` is what Stage 2 routes on, and until Stage C it was
+whatever the client declared. `validateFileExtension` closes that (FR-017):
+
+- the extension must be on the tier's list;
+- the declared type must be one `MIME_TYPES_BY_EXTENSION` allows for it.
+
+`MIME_TYPES_BY_EXTENSION` lists the types browsers really send — `text/plain`
+for `.md` and `.tex`, `application/vnd.ms-excel` for `.csv` — with the canonical
+type FIRST. What gets STORED is that canonical type, not the declaration, so a
+`.csv` announced as `text/plain` reaches Docling instead of the plain-text
+extractor, and a `report.pdf` announced as `text/plain` is refused. The web
+picker validates through the same map so client and server agree.
+
+### Running the format corpus
+
+```bash
+cd packages/course-gen-platform
+npx tsx scripts/docling-quality-benchmark.ts --case premium-spreadsheet-xlsx --label stagec-xlsx
+```
+
+Fixtures are regenerated with `generate-fixtures.py <name>`; the seven Stage C
+generators need `openpyxl`, `odfpy` and `ebooklib` in addition to the existing
+`python-docx`, `python-pptx`, `reportlab` and `Pillow`.
+
+## OCR engine A/B (Stage D)
+
+**EasyOCR stays the default. RapidOCR lost the quality gate on the same inputs.**
+
+Measured 2026-08-07 on a corpus built to be hard enough to separate two engines:
+the previous control document is a clean 300 dpi render that both read
+perfectly, so it could not decide anything. The three new fixtures add
+deterministic damage — resample to 42-60%, JPEG quality 38-62, up to 1.4 degrees
+of skew — plus mixed Cyrillic/Latin lines and a ruled Cyrillic table.
+
+| case                     | EasyOCR `ru,en` | RapidOCR `cyrillic` |
+| ------------------------ | --------------: | ------------------: |
+| russian-ocr-degraded     |           1.000 |               0.778 |
+| russian-ocr-mixed-script |           0.849 |               0.736 |
+| russian-ocr-table        |           1.000 |               0.636 |
+| **mean**                 |      **0.9496** |          **0.7168** |
+
+Phrase similarity is per character against exact ground truth, not "contains":
+a phrase read with two wrong letters must score near 1, or the comparison
+measures nothing.
+
+**Where RapidOCR actually loses:** large type. It returned `# BO ПО НАПРАВЛЕ
+ЕНИЯМ` for `СВОДКА ПО НАПРАВЛЕНИЯМ` and `# O 3 BA A ИДЕНТ` for `ОТЧЁТ ЗА III
+КВАРТАЛ` — consistent with a mobile detection model tuned for body text.
+
+**Where RapidOCR wins, and it is worth saying:** table cells, 1.000 against
+0.917, and the deliberately adversarial homoglyph line, 0.744 against 0.395.
+A loss is not a rout.
+
+### Three facts that constrain any future retry
+
+1. **RapidOCR rejects `ru`.** It takes a SCRIPT name — `cyrillic` — and fails
+   closed with the supported list. `ru,en` is not merely wrong, it is refused.
+2. **RapidOCR is single-language.** Docling logs `RapidOCR uses a single
+language; using 'ru' and ignoring ['en']`. Our corpus is mixed by nature
+   (`GUID-4821`, `Версия 2.1.4`), so one script must lose.
+3. **The Cyrillic checkpoint is not in the shipped image.** `docling-tools
+models download rapidocr` without `--rapidocr-backend-lang onnxruntime:cyrillic`
+   fetches the Chinese set, and Docling then refuses to run rather than
+   downloading `cyrillic_PP-OCRv5_rec_mobile.onnx` at request time — correct
+   under NFR-007. The A/B therefore ran against a THROWAWAY image
+   (`mc2/docling-serve-rapidocr-probe:measurement`, baseline + 12.9 MB of
+   checkpoints). The shipped baseline was never modified for the experiment, and
+   the stack was restored and re-verified afterwards.
+
+### VLM: still disabled, on measured grounds
+
+`ProcessingPipeline.VLM` and the `vlm_pipeline_*` options exist in Serve 1.29.0,
+and no VLM weights are in either image — `docling-serve-advanced` carries
+CodeFormulaV2, layout-heron, DocumentFigureClassifier, EasyOcr and RapidOcr, and
+nothing else. Enabling one means a new image and RAM the host does not have:
+Stage B measured `granite-vision-4.1-4b` at 30.6 GB image and 4.34 GiB peak
+against a host recorded at 11 GiB whose compose limits already sum to about
+twice that. The one VLM previously measured, `SmolVLM-256M`, fabricated chart
+labels and was rejected on evidence.
+
+`force_backend_text` is a `PdfPipelineOptions` field that Serve does NOT expose
+in its request options — the same class of gap as `heading_hierarchy_options` in
+Stage A. Reaching it would need a third runtime wrapper, and it could not help
+the 16 vector-outline PDFs anyway: it substitutes the PDF backend's own text,
+and those documents have no text layer at all. `EmptyConversionError` semantics
+are unchanged and re-verified on `vector-outlines-no-text.pdf` after the stack
+was restored.
+
+Reversal condition for both candidates is the same as `mc2-x72bq`: a host with
+enough RAM, plus for RapidOCR a demonstrated win on this corpus.
+
+## Release and rollout (Stage E)
+
+Everything that decides production behaviour is a GitHub repository variable, so
+a rollback is a variable edit and a redeploy, never a revert:
+
+| variable                     | meaning                                           |
+| ---------------------------- | ------------------------------------------------- |
+| `DOCLING_MCP_IMAGE`          | the MCP 3 release to run, digest-pinned           |
+| `DOCLING_SERVE_IMAGE`        | the Serve release to run, digest-pinned           |
+| `DOCLING_ROLLBACK_IMAGE`     | the MCP **1.x** image the rollback path recreates |
+| `DOCLING_PREVIOUS_MCP_IMAGE` | the MCP 3 release currently in production         |
+| `DOCLING_STACK_V2_ENABLED`   | whether the split stack runs at all               |
+| `DOCLING_CHUNK_STRATEGY`     | `legacy_markdown` (default) or `docling_hybrid`   |
+
+**`DOCLING_ROLLBACK_IMAGE` must stay an MCP 1.x image.** The rollback path stops
+`docling-serve` and recreates MCP standalone, and MCP 3 in remote mode cannot
+work without Serve. Pointing it at an MCP 3 digest would produce a "rollback"
+that cannot serve a request.
+
+**`DOCLING_PREVIOUS_MCP_IMAGE` is why a second upgrade is possible at all.** The
+gate proves it knows what the host is running before switching. Before the first
+cutover that is the rollback image; straight after it, the candidate. On the
+NEXT image change it is neither — it is the release the previous deploy pinned,
+and without a name for that the gate refuses every deploy after the first. That
+is the same failure as `mc2-h89lo`, one step further out. Move this variable to
+the OLD `DOCLING_MCP_IMAGE` whenever that changes; an unrecorded image is still
+refused, so the escape hatch has to be named rather than inferred.
+
+### Order of operations
+
+One change at a time, because two at once cannot be attributed:
+
+1. Publish images (`Build immutable Docling images`, `workflow_dispatch`), copy
+   the digests from the run artifacts — never hand-typed.
+2. Move `DOCLING_PREVIOUS_MCP_IMAGE` to the current `DOCLING_MCP_IMAGE`, then
+   set the new digests. Deploy. Behaviour is unchanged at this point.
+3. Only then set `DOCLING_CHUNK_STRATEGY=docling_hybrid` and deploy again.
+
+**The flip changes new documents only.** Chunk identity is a function of the
+chunking profile, so documents processed after it are cut natively while
+existing Qdrant points keep the shape they were written with. The collection is
+mixed by design: the payload fields are additive and optional, so an old reader
+handles a new point and a new reader handles an old one. Making the collection
+uniform would require a reindex, which is a SEPARATE decision and a separate
+authorization.

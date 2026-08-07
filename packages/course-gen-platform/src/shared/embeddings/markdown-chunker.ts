@@ -13,7 +13,10 @@
 import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { encoding_for_model } from 'tiktoken';
 import type { TiktokenModel } from 'tiktoken';
-import type { DoclingBoundingBox } from '../../stages/stage2-document-processing/docling/provenance.js';
+import type {
+  DoclingBoundingBox,
+  DoclingContainer,
+} from '../../stages/stage2-document-processing/docling/provenance.js';
 
 /**
  * Chunk hierarchy level
@@ -46,6 +49,11 @@ export interface ChunkProvenance {
   labels: string[];
   /** Token count reported by the native chunker's own tokenizer, if any. */
   native_token_count: number | null;
+  /**
+   * Structural containers this chunk sits in — worksheet, slide, chapter —
+   * outermost first. Optional, and empty for formats that declare none.
+   */
+  containers?: DoclingContainer[];
 }
 
 /**

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 6,
   "cases": [
     {
       "id": "enrichment-pdf",
@@ -307,6 +307,370 @@
       "id": "vector-outlines-negative",
       "source": "vector-outlines-no-text.pdf",
       "expectedError": "EmptyConversionError"
+    },
+    {
+      "id": "premium-spreadsheet-xlsx",
+      "source": "premium-spreadsheet.xlsx",
+      "expectedTokens": ["Смета расходов на запуск", "Лицензии", "Ассистент"],
+      "structure": {
+        "containers": [
+          {
+            "label": "sheet",
+            "name": "Бюджет курса",
+            "index": 0
+          },
+          {
+            "label": "sheet",
+            "name": "Преподаватели",
+            "index": 1
+          }
+        ],
+        "containedText": [
+          {
+            "text": "Смета расходов на запуск",
+            "container": "Бюджет курса"
+          },
+          {
+            "text": "Ассистент",
+            "container": "Преподаватели"
+          }
+        ],
+        "tableRows": [
+          ["Итого", "1350"],
+          ["Методист", "5600"]
+        ],
+        "minimumTables": 2
+      },
+      "retrieval": [
+        {
+          "id": "xlsx-total",
+          "query": "итоговая сумма сметы расходов",
+          "evidence": [
+            {
+              "id": "xlsx-total-1350",
+              "tokens": ["Итого", "1350"]
+            }
+          ]
+        },
+        {
+          "id": "xlsx-assistant-rate",
+          "query": "ставка ассистента преподавателя",
+          "evidence": [
+            {
+              "id": "xlsx-assistant-3100",
+              "tokens": ["Ассистент", "3100"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-table-csv",
+      "source": "premium-table.csv",
+      "expectedTokens": ["Северный", "Завершили"],
+      "structure": {
+        "tableRows": [["Южный", "340", "201"]],
+        "minimumTables": 1
+      },
+      "retrieval": [
+        {
+          "id": "csv-south-completion",
+          "query": "сколько слушателей завершили в южном регионе",
+          "evidence": [
+            {
+              "id": "csv-south-201",
+              "tokens": ["Южный", "201"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-opendocument-odt",
+      "source": "premium-opendocument.odt",
+      "expectedTokens": ["Регламент обучения", "Итоговая аттестация"],
+      "structure": {
+        "containers": [
+          {
+            "label": "list",
+            "index": 0
+          }
+        ],
+        "containedText": [
+          {
+            "text": "Проведение занятий",
+            "container": "list"
+          }
+        ],
+        "itemLabels": {
+          "section_header": 3,
+          "list_item": 3
+        },
+        "tableRows": [["Явка", "92"]],
+        "minimumTables": 1
+      },
+      "retrieval": [
+        {
+          "id": "odt-stages",
+          "query": "какие этапы проведения курса",
+          "evidence": [
+            {
+              "id": "odt-stage-list",
+              "tokens": ["Подготовка материалов", "Итоговая аттестация"]
+            }
+          ]
+        },
+        {
+          "id": "odt-attendance",
+          "query": "показатель явки слушателей",
+          "evidence": [
+            {
+              "id": "odt-attendance-92",
+              "tokens": ["Явка", "92"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-opendocument-ods",
+      "source": "premium-opendocument.ods",
+      "expectedTokens": ["Практика", "Часы"],
+      "structure": {
+        "containers": [
+          {
+            "label": "section",
+            "name": "sheet: Нагрузка",
+            "index": 0
+          }
+        ],
+        "containedText": [
+          {
+            "text": "Практика",
+            "container": "Нагрузка"
+          }
+        ],
+        "tableRows": [["Практика", "12"]],
+        "minimumTables": 1
+      },
+      "retrieval": [
+        {
+          "id": "ods-practice-hours",
+          "query": "сколько часов отведено на практику",
+          "evidence": [
+            {
+              "id": "ods-practice-12",
+              "tokens": ["Практика", "12"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-slides-odp",
+      "source": "premium-slides.odp",
+      "expectedOrder": [
+        "Первый слайд: цели программы",
+        "Второй слайд: методика оценки",
+        "Третий слайд: итоговые результаты"
+      ],
+      "structure": {
+        "containers": [
+          {
+            "label": "chapter",
+            "name": "slide-0",
+            "index": 0
+          },
+          {
+            "label": "chapter",
+            "name": "slide-1",
+            "index": 1
+          },
+          {
+            "label": "chapter",
+            "name": "slide-2",
+            "index": 2
+          }
+        ],
+        "containedText": [
+          {
+            "text": "Первый слайд: цели программы",
+            "container": "slide-0"
+          },
+          {
+            "text": "Третий слайд: итоговые результаты",
+            "container": "slide-2"
+          }
+        ]
+      },
+      "retrieval": [
+        {
+          "id": "odp-methodology",
+          "query": "методика оценки на слайде",
+          "evidence": [
+            {
+              "id": "odp-slide-2",
+              "tokens": ["Второй слайд", "методика оценки"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-book-epub",
+      "source": "premium-book.epub",
+      "expectedOrder": [
+        "Глава первая. Введение",
+        "Глава вторая. Практика",
+        "Глава третья. Аттестация"
+      ],
+      "structure": {
+        "containers": [
+          {
+            "label": "section",
+            "name": "header-1",
+            "index": 0
+          },
+          {
+            "label": "list",
+            "name": "ordered list",
+            "index": 0
+          }
+        ],
+        "containedText": [
+          {
+            "text": "Глава вторая. Практика",
+            "container": "ordered list"
+          }
+        ],
+        "itemLabels": {
+          "title": 3,
+          "list_item": 3
+        }
+      },
+      "retrieval": [
+        {
+          "id": "epub-assessment-chapter",
+          "query": "критерии оценки в книге",
+          "evidence": [
+            {
+              "id": "epub-chapter-3",
+              "tokens": ["Глава третья", "критерии оценки"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "premium-paper-latex",
+      "source": "premium-paper.tex",
+      "expectedTokens": ["Модель усвоения", "retention"],
+      "structure": {
+        "itemLabels": {
+          "formula": 1,
+          "code": 1,
+          "section_header": 2
+        }
+      },
+      "retrieval": [
+        {
+          "id": "latex-retention-code",
+          "query": "функция расчета усвоения материала",
+          "evidence": [
+            {
+              "id": "latex-retention-fn",
+              "tokens": ["def retention", "alpha * t"]
+            }
+          ]
+        },
+        {
+          "id": "latex-equation",
+          "query": "формула скорости усвоения",
+          "evidence": [
+            {
+              "id": "latex-equation-e",
+              "tokens": ["\\frac{\\alpha t}", "1 + \\beta t"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-degraded",
+      "source": "russian-ocr-degraded.pdf",
+      "ocr": {
+        "phrases": [
+          "СНИЖЕННОЕ КАЧЕСТВО СКАНА",
+          "ПРОВЕРКА УСТОЙЧИВОСТИ РАСПОЗНАВАНИЯ",
+          "Третья строка набрана тонким шрифтом мелкого кегля."
+        ],
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-degraded-control",
+          "query": "проверка устойчивости распознавания скана",
+          "evidence": [
+            {
+              "id": "degraded-control-phrase",
+              "tokens": ["УСТОЙЧИВОСТИ"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-mixed-script",
+      "source": "russian-ocr-mixed-script.pdf",
+      "ocr": {
+        "phrases": [
+          "ОТЧЁТ ЗА III КВАРТАЛ",
+          "Идентификатор GUID-4821 присвоен",
+          "Версия 2.1.4 собрана 07.08.2026 инженером Петровым",
+          "Сравните: РОСТ и POCT, СОН и COH, ХОР и XOP"
+        ],
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-mixed-identifier",
+          "query": "какой идентификатор присвоен",
+          "evidence": [
+            {
+              "id": "mixed-guid",
+              "tokens": ["GUID-4821"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "russian-ocr-table",
+      "source": "russian-ocr-table.pdf",
+      "ocr": {
+        "phrases": ["СВОДКА ПО НАПРАВЛЕНИЯМ"],
+        "table": {
+          "rows": [
+            ["Раздел", "План", "Факт"],
+            ["Аналитика", "120", "118"],
+            ["Разработка", "340", "351"],
+            ["Внедрение", "56", "56"]
+          ]
+        },
+        "minimumPhraseSimilarity": 0.8
+      },
+      "retrieval": [
+        {
+          "id": "ocr-table-fact",
+          "query": "сколько фактически по разработке",
+          "evidence": [
+            {
+              "id": "table-dev-351",
+              "tokens": ["351"]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

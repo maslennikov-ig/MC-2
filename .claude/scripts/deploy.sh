@@ -69,18 +69,22 @@ main() {
         fi
     fi
 
-    # Ensure master branch exists
-    if ! git rev-parse --verify master >/dev/null 2>&1; then
-        log_error "Branch 'master' does not exist"
-        exit 1
-    fi
-
-    # Fetch latest from remote
+    # Fetch latest from remote FIRST: everything below compares against
+    # `origin/master`, never the local `master` ref. The deploy pushes
+    # `HEAD:master` from a detached worktree and never moves the local branch,
+    # so that ref can be arbitrarily stale — it was three days and several
+    # deploys behind on 2026-08-06 — and counting commits against it would
+    # report a deploy size that does not exist.
     log_info "Fetching latest from remote..."
     git fetch origin master "$source_branch" 2>/dev/null || true
 
+    if ! git rev-parse --verify origin/master >/dev/null 2>&1; then
+        log_error "origin/master does not exist or could not be fetched"
+        exit 1
+    fi
+
     # Check if source branch has changes not in master
-    local commits_ahead=$(git rev-list master.."$source_branch" --count 2>/dev/null || echo "0")
+    local commits_ahead=$(git rev-list origin/master.."$source_branch" --count 2>/dev/null || echo "0")
     if [ "$commits_ahead" -eq 0 ]; then
         log_warning "No new commits in $source_branch to deploy"
         echo "$source_branch is already merged into master"
@@ -91,7 +95,7 @@ main() {
     # Show what will be deployed
     echo ""
     log_info "Commits to deploy ($source_branch → master):"
-    git log master.."$source_branch" --oneline -20
+    git log origin/master.."$source_branch" --oneline -20
     if [ "$commits_ahead" -gt 20 ]; then
         echo "  ... and $((commits_ahead - 20)) more commits"
     fi
@@ -158,13 +162,29 @@ main() {
         bd sync 2>/dev/null || true
     fi
 
-    # Switch to master
-    log_info "Switching to master..."
-    git checkout master --quiet
+    # Merge in a THROWAWAY DETACHED WORKTREE, never by checking master out here.
+    #
+    # `git checkout master` fails outright when any other worktree holds that
+    # branch, and on 2026-08-06 that is exactly what blocked a production
+    # deploy: an abandoned worktree from another session had `master` checked
+    # out, three days stale. A deploy must not depend on which branch some other
+    # directory happens to be sitting on.
+    #
+    # Detached also means this never moves the local `master` ref, so a stale
+    # local branch cannot be silently fast-forwarded under someone's feet, and
+    # the caller's own working tree is never switched away and back.
+    log_info "Fetching latest master..."
+    git fetch origin master --quiet 2>/dev/null || true
 
-    # Pull latest master
-    log_info "Pulling latest master..."
-    git pull origin master --quiet 2>/dev/null || true
+    local merge_dir
+    merge_dir="$(mktemp -d "${TMPDIR:-/tmp}/mc2-deploy-merge-XXXXXX")"
+    rmdir "$merge_dir"
+
+    log_info "Preparing merge worktree at origin/master..."
+    if ! git worktree add --detach --quiet "$merge_dir" origin/master; then
+        log_error "Could not create the merge worktree"
+        exit 1
+    fi
 
     # Merge source branch into master
     log_info "Merging $source_branch into master..."
@@ -176,28 +196,29 @@ Deploying $commits_ahead commit(s) to production from $source_branch.
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
-    if ! git merge "$source_branch" --no-ff -m "$merge_msg"; then
+    if ! git -C "$merge_dir" merge "$source_branch" --no-ff -m "$merge_msg"; then
         log_error "Merge conflict! Resolve manually:"
-        echo "  1. Fix conflicts"
-        echo "  2. git add ."
-        echo "  3. git commit"
-        echo "  4. git push origin master"
+        echo "  1. cd $merge_dir"
+        echo "  2. Fix conflicts, then: git add . && git commit"
+        echo "  3. git push origin HEAD:master"
+        echo "  4. git worktree remove --force $merge_dir"
+        # Left in place ON PURPOSE: the half-done merge is in there, and
+        # deleting it would throw away the conflict the operator has to resolve.
         exit 1
     fi
     log_success "Merge successful"
 
     # Push to master (triggers deploy)
     log_info "Pushing to master (triggering deploy)..."
-    if ! git push origin master; then
+    if ! git -C "$merge_dir" push origin HEAD:master; then
         log_error "Push failed!"
-        echo "To retry: git push origin master"
+        echo "To retry: git -C $merge_dir push origin HEAD:master"
+        echo "Then clean up:  git worktree remove --force $merge_dir"
         exit 1
     fi
     log_success "Pushed to master"
 
-    # Switch back to source branch
-    log_info "Switching back to $source_branch..."
-    git checkout "$source_branch" --quiet
+    git worktree remove --force "$merge_dir" >/dev/null 2>&1 || rm -rf "$merge_dir"
 
     echo ""
     echo "╔═══════════════════════════════════════════════════════════╗"
@@ -212,10 +233,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     # Sync develop with master if deployed from feature branch
     if [ "$source_branch" != "develop" ]; then
         if [ "$auto_sync" = "true" ]; then
-            # Auto-sync develop with master
+            # Auto-sync develop with master.
+            # `origin/master` and NOT `master`: the deploy pushes HEAD:master
+            # from a detached worktree and deliberately never moves the local
+            # `master` ref, so that ref can be arbitrarily stale. The push above
+            # did update `origin/master`.
             log_info "Syncing develop with master (--sync flag)..."
             git checkout develop --quiet
-            if git merge master --no-edit; then
+            if git merge origin/master --no-edit; then
                 git push origin develop --quiet 2>/dev/null || true
                 log_success "develop synced with master"
                 git checkout "$source_branch" --quiet
@@ -233,7 +258,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
             echo "│  To keep develop up-to-date, run:                           │"
             echo "│                                                             │"
             echo "│    git checkout develop                                     │"
-            echo "│    git merge master                                         │"
+            echo "│    git merge origin/master                                  │"
             echo "│    git push origin develop                                  │"
             echo "│                                                             │"
             echo "│  Or use: /deploy --sync  (auto-sync after deploy)           │"

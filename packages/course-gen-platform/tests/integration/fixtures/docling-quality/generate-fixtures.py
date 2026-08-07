@@ -466,6 +466,394 @@ def make_enrichment_pdf() -> None:
     chart_path.unlink()
 
 
+# ---------------------------------------------------------------------------
+# Premium format families (Stage C)
+#
+# One fixture per family, each built around the structure that family exists to
+# express, so a regression shows up as a missing FACT rather than as a diff in
+# how much text survived. Every fixture is Russian, because that is what the
+# platform ingests and because Cyrillic is where encoding regressions surface.
+# ---------------------------------------------------------------------------
+
+
+def _patch_xlsx_cached_formula(path: Path, cell: str, value: str) -> None:
+    """Give a formula cell the cached result a real spreadsheet editor stores.
+
+    MEASURED 2026-08-07: Docling reads the CACHED VALUE of a formula cell and
+    never the expression. openpyxl writes `<f>SUM(B2:B3)</f><v></v>` because it
+    does not evaluate anything, so a fixture saved straight from openpyxl proves
+    the opposite of what it intends: the total column comes back empty. Excel
+    and LibreOffice both write the value alongside the formula, so patching it
+    in is what makes this fixture resemble a file a user would actually upload.
+    """
+    import re
+    import zipfile
+
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        blobs = {name: archive.read(name) for name in names}
+
+    sheet = next(name for name in names if name.endswith("sheet1.xml"))
+    xml = blobs[sheet].decode("utf-8")
+    xml, applied = re.subn(
+        rf'(<c r="{cell}"[^>]*><f>[^<]+</f>)<v></v>',
+        rf"\g<1><v>{value}</v>",
+        xml,
+    )
+    if applied != 1:
+        raise RuntimeError(
+            f"Could not attach a cached value to {cell}; openpyxl's cell XML changed shape"
+        )
+    blobs[sheet] = xml.encode("utf-8")
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name in names:
+            archive.writestr(name, blobs[name])
+
+
+def make_spreadsheet_xlsx() -> None:
+    """Two named worksheets, a merged header, and a formula with its result."""
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    budget = workbook.active
+    budget.title = "Бюджет курса"
+    budget["A1"] = "Смета расходов на запуск"
+    budget.merge_cells("A1:B1")
+    budget["A2"] = "Статья"
+    budget["B2"] = "Сумма"
+    for row, (article, amount) in enumerate(
+        (("Хостинг", 120), ("Лицензии", 340), ("Съёмка", 890)), start=3
+    ):
+        budget[f"A{row}"] = article
+        budget[f"B{row}"] = amount
+    budget["A6"] = "Итого"
+    budget["B6"] = "=SUM(B3:B5)"
+
+    staff = workbook.create_sheet("Преподаватели")
+    staff["A1"] = "Роль"
+    staff["B1"] = "Ставка"
+    for row, (role, rate) in enumerate(
+        (("Методист", 5600), ("Ассистент", 3100)), start=2
+    ):
+        staff[f"A{row}"] = role
+        staff[f"B{row}"] = rate
+
+    path = ROOT / "premium-spreadsheet.xlsx"
+    workbook.save(path)
+    _patch_xlsx_cached_formula(path, "B6", "1350")
+
+
+def make_table_csv() -> None:
+    """A plain delimited table; the family's whole structure is its columns."""
+    (ROOT / "premium-table.csv").write_text(
+        "Регион,Слушателей,Завершили\n"
+        "Северный,120,84\n"
+        "Южный,340,201\n"
+        "Восточный,56,50\n",
+        encoding="utf-8",
+    )
+
+
+def _odf_paragraph(text: str):
+    from odf.text import P
+
+    return P(text=text)
+
+
+def make_opendocument_text() -> None:
+    """ODT: headings, a nested-free list, and a table — ODF's defining shape."""
+    from odf.opendocument import OpenDocumentText
+    from odf.table import Table, TableCell, TableColumn, TableRow
+    from odf.text import H, List, ListItem, P
+
+    document = OpenDocumentText()
+    document.text.addElement(H(outlinelevel=1, text="Регламент обучения"))
+    document.text.addElement(
+        P(text="Документ описывает порядок проведения корпоративного курса.")
+    )
+    document.text.addElement(H(outlinelevel=2, text="Этапы"))
+    items = List()
+    for item in (
+        "Подготовка материалов",
+        "Проведение занятий",
+        "Итоговая аттестация",
+    ):
+        entry = ListItem()
+        entry.addElement(_odf_paragraph(item))
+        items.addElement(entry)
+    document.text.addElement(items)
+    document.text.addElement(H(outlinelevel=2, text="Контрольные показатели"))
+    table = Table(name="Показатели")
+    table.addElement(TableColumn(numbercolumnsrepeated=2))
+    for row in (("Показатель", "Значение"), ("Явка", "92"), ("Аттестация", "78")):
+        table_row = TableRow()
+        for value in row:
+            cell = TableCell(valuetype="string")
+            cell.addElement(_odf_paragraph(value))
+            table_row.addElement(cell)
+        table.addElement(table_row)
+    document.text.addElement(table)
+    document.save(str(ROOT / "premium-opendocument.odt"))
+
+
+def make_opendocument_sheet() -> None:
+    """ODS: a named sheet whose name is the only thing tying rows to a subject."""
+    from odf.opendocument import OpenDocumentSpreadsheet
+    from odf.table import Table, TableCell, TableColumn, TableRow
+
+    document = OpenDocumentSpreadsheet()
+    table = Table(name="Нагрузка")
+    table.addElement(TableColumn(numbercolumnsrepeated=2))
+    for row in (("Модуль", "Часы"), ("Введение", "4"), ("Практика", "12")):
+        table_row = TableRow()
+        for value in row:
+            cell = TableCell(valuetype="string")
+            cell.addElement(_odf_paragraph(value))
+            table_row.addElement(cell)
+        table.addElement(table_row)
+    document.spreadsheet.addElement(table)
+    document.save(str(ROOT / "premium-opendocument.ods"))
+
+
+def make_opendocument_slides() -> None:
+    """ODP: three slides whose ORDER is the fact under test."""
+    from odf.draw import Frame, Page, TextBox
+    from odf.opendocument import OpenDocumentPresentation
+    from odf.style import MasterPage, PageLayout, PageLayoutProperties
+
+    document = OpenDocumentPresentation()
+    layout = PageLayout(name="FixtureLayout")
+    layout.addElement(
+        PageLayoutProperties(margin="0cm", pagewidth="28cm", pageheight="21cm")
+    )
+    document.automaticstyles.addElement(layout)
+    master = MasterPage(name="FixtureMaster", pagelayoutname=layout)
+    document.masterstyles.addElement(master)
+
+    slides = (
+        "Первый слайд: цели программы",
+        "Второй слайд: методика оценки",
+        "Третий слайд: итоговые результаты",
+    )
+    for position, title in enumerate(slides):
+        page = Page(masterpagename=master)
+        document.presentation.addElement(page)
+        frame = Frame(width="20cm", height="3cm", x="2cm", y=f"{2 + position}cm")
+        box = TextBox()
+        box.addElement(_odf_paragraph(title))
+        frame.addElement(box)
+        page.addElement(frame)
+    document.save(str(ROOT / "premium-slides.odp"))
+
+
+def make_epub() -> None:
+    """EPUB: three chapters in spine order, each with a distinctive sentence."""
+    from ebooklib import epub
+
+    book = epub.EpubBook()
+    book.set_identifier("mc2-premium-epub-fixture")
+    book.set_title("Основы построения курса")
+    book.set_language("ru")
+
+    chapters = []
+    for index, (title, body) in enumerate(
+        (
+            ("Глава первая. Введение", "Первая глава объясняет структуру программы."),
+            ("Глава вторая. Практика", "Вторая глава содержит практические задания."),
+            ("Глава третья. Аттестация", "Третья глава описывает критерии оценки."),
+        ),
+        start=1,
+    ):
+        chapter = epub.EpubHtml(title=title, file_name=f"chapter-{index}.xhtml", lang="ru")
+        chapter.content = f"<h1>{title}</h1><p>{body}</p>"
+        book.add_item(chapter)
+        chapters.append(chapter)
+
+    book.toc = tuple(chapters)
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    book.spine = ["nav", *chapters]
+    epub.write_epub(str(ROOT / "premium-book.epub"), book)
+
+
+def make_latex() -> None:
+    """LaTeX: a displayed equation and a verbatim listing, which is why the
+    family is in scope at all — both arrive as typed items, not as prose."""
+    (ROOT / "premium-paper.tex").write_text(
+        r"""\documentclass{article}
+\usepackage[utf8]{inputenc}
+\begin{document}
+\section{Модель усвоения}
+Скорость усвоения материала описывается выражением
+\begin{equation}
+E = \frac{\alpha t}{1 + \beta t}
+\end{equation}
+\subsection{Реализация}
+\begin{verbatim}
+def retention(alpha, beta, t):
+    return alpha * t / (1 + beta * t)
+\end{verbatim}
+\end{document}
+""",
+        encoding="utf-8",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Harder Russian OCR corpus (Stage D)
+#
+# The existing control document is a clean 300 dpi render, which every engine
+# reads. It cannot separate two candidates, so it cannot decide a default. These
+# three add the degradations real uploads carry — resampling, JPEG ringing,
+# skew, thin strokes, mixed script — while keeping the ground truth EXACT, so a
+# difference between engines is a difference in reading and not in the fixture.
+# ---------------------------------------------------------------------------
+
+OCR_HARD_PHRASES = {
+    "degraded": (
+        "СНИЖЕННОЕ КАЧЕСТВО СКАНА",
+        "ПРОВЕРКА УСТОЙЧИВОСТИ РАСПОЗНАВАНИЯ",
+    ),
+    "mixed": (
+        "ОТЧЁТ ЗА III КВАРТАЛ",
+        "Идентификатор GUID-4821 присвоен",
+    ),
+    "table": (
+        ("Раздел", "План", "Факт"),
+        ("Аналитика", "120", "118"),
+        ("Разработка", "340", "351"),
+        ("Внедрение", "56", "56"),
+    ),
+}
+
+
+def _degrade(image, *, downscale: float, quality: int, rotation: float):
+    """Resample down and back, re-encode as JPEG, then rotate slightly.
+
+    Deterministic on purpose: no noise generator, no random seed. The damage is
+    exactly reproducible, so a score change means the engine changed.
+    """
+    import io
+
+    from PIL import Image as PILImage
+
+    width, height = image.size
+    small = image.resize(
+        (int(width * downscale), int(height * downscale)), PILImage.LANCZOS
+    )
+    restored = small.resize((width, height), PILImage.LANCZOS)
+
+    buffer = io.BytesIO()
+    restored.convert("RGB").save(buffer, format="JPEG", quality=quality)
+    buffer.seek(0)
+    reopened = PILImage.open(buffer).convert("RGB")
+
+    if rotation:
+        reopened = reopened.rotate(
+            rotation, resample=PILImage.BICUBIC, expand=False, fillcolor="white"
+        )
+    return reopened
+
+
+def _render_pdf(image, target: Path) -> None:
+    png_path = ROOT / f".{target.stem}-source.png"
+    image.save(png_path, dpi=(300, 300))
+    page_width, page_height = A4
+    pdf = canvas.Canvas(str(target), pagesize=A4, pageCompression=1)
+    pdf.drawImage(ImageReader(str(png_path)), 0, 0, page_width, page_height)
+    pdf.showPage()
+    pdf.save()
+    png_path.unlink()
+
+
+def make_ocr_degraded_pdf() -> None:
+    """A scan that lost resolution, gained JPEG ringing and sits crooked."""
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 78)
+    body = ImageFont.truetype(str(font_path), 58)
+
+    first, second = OCR_HARD_PHRASES["degraded"]
+    draw.text((170, 200), first, font=heading, fill="black")
+    draw.text((170, 430), second, font=body, fill="black")
+    draw.text(
+        (170, 600),
+        "Третья строка набрана тонким шрифтом мелкого кегля.",
+        font=ImageFont.truetype(str(font_path), 40),
+        fill=(70, 70, 70),
+    )
+
+    damaged = _degrade(image, downscale=0.42, quality=38, rotation=-1.4)
+    _render_pdf(damaged, ROOT / "russian-ocr-degraded.pdf")
+
+
+def make_ocr_mixed_script_pdf() -> None:
+    """Cyrillic, Latin and Roman numerals on the same lines.
+
+    This is where a recognizer with a Chinese/Latin dictionary fails in the most
+    misleading way: it returns confident Latin lookalikes for Cyrillic glyphs.
+    """
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 76)
+    body = ImageFont.truetype(str(font_path), 54)
+
+    first, second = OCR_HARD_PHRASES["mixed"]
+    draw.text((170, 210), first, font=heading, fill="black")
+    draw.text((170, 430), second, font=body, fill="black")
+    draw.text(
+        (170, 580),
+        "Версия 2.1.4 собрана 07.08.2026 инженером Петровым",
+        font=body,
+        fill="black",
+    )
+    draw.text(
+        (170, 730),
+        "Сравните: РОСТ и POCT, СОН и COH, ХОР и XOP",
+        font=body,
+        fill="black",
+    )
+
+    damaged = _degrade(image, downscale=0.6, quality=62, rotation=0.0)
+    _render_pdf(damaged, ROOT / "russian-ocr-mixed-script.pdf")
+
+
+def make_ocr_table_pdf() -> None:
+    """A ruled Cyrillic table on a degraded scan: structure AND text at once."""
+    width, height = 2480, 3508
+    font_path = _font_path()
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    heading = ImageFont.truetype(str(font_path), 70)
+    cell = ImageFont.truetype(str(font_path), 52)
+
+    draw.text((170, 200), "СВОДКА ПО НАПРАВЛЕНИЯМ", font=heading, fill="black")
+
+    rows = OCR_HARD_PHRASES["table"]
+    x_positions = [170, 1180, 1780, 2320]
+    y_positions = [480 + index * 200 for index in range(len(rows) + 1)]
+    for x in x_positions:
+        draw.line((x, y_positions[0], x, y_positions[-1]), fill="black", width=5)
+    for y in y_positions:
+        draw.line((x_positions[0], y, x_positions[-1], y), fill="black", width=5)
+    for row, values in enumerate(rows):
+        for column, value in enumerate(values):
+            draw.text(
+                (x_positions[column] + 30, y_positions[row] + 60),
+                value,
+                font=cell,
+                fill="black",
+            )
+
+    damaged = _degrade(image, downscale=0.55, quality=48, rotation=0.7)
+    _render_pdf(damaged, ROOT / "russian-ocr-table.pdf")
+
+
 GENERATORS = {
     "enrichment-pdf": make_enrichment_pdf,
     "structured-docx": make_docx,
@@ -474,6 +862,16 @@ GENERATORS = {
     "reading-order-pptx": make_pptx,
     "raster-ocr-pdf": make_raster_ocr_pdf,
     "vector-outline-pdf": make_vector_outline_pdf,
+    "premium-spreadsheet-xlsx": make_spreadsheet_xlsx,
+    "premium-table-csv": make_table_csv,
+    "premium-opendocument-odt": make_opendocument_text,
+    "premium-opendocument-ods": make_opendocument_sheet,
+    "premium-slides-odp": make_opendocument_slides,
+    "premium-book-epub": make_epub,
+    "premium-paper-latex": make_latex,
+    "russian-ocr-degraded": make_ocr_degraded_pdf,
+    "russian-ocr-mixed-script": make_ocr_mixed_script_pdf,
+    "russian-ocr-table": make_ocr_table_pdf,
 }
 
 

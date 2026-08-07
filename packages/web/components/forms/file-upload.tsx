@@ -18,9 +18,9 @@ import {
   FILE_SIZE_LIMITS_BY_TIER,
   FILE_EXTENSIONS_BY_TIER,
   FILE_COUNT_LIMITS_BY_TIER,
-  MIME_TYPES_BY_TIER,
   TIER_ORDER,
   TIER_DISPLAY_NAMES,
+  mimeTypeMatchesExtension,
   type TierKey,
 } from '@megacampus/shared-types'
 
@@ -147,7 +147,6 @@ export function FileUpload({
   const maxFileSize = FILE_SIZE_LIMITS_BY_TIER[effectiveTier]
   const maxFileSizeMB = Math.round(maxFileSize / (1024 * 1024))
   const maxFiles = maxFilesProp ?? FILE_COUNT_LIMITS_BY_TIER[effectiveTier]
-  const allowedMimeTypes = MIME_TYPES_BY_TIER[effectiveTier]
   const allowedExtensions = FILE_EXTENSIONS_BY_TIER[effectiveTier]
 
   // Format file size for display
@@ -199,18 +198,19 @@ export function FileUpload({
         }
       }
 
-      // Check MIME type (with fallback for some browsers)
-      if (
-        file.type &&
-        !(allowedMimeTypes as readonly string[]).includes(file.type) &&
-        file.type !== ''
-      ) {
-        // Some browsers report generic MIME types, allow if extension is valid
-        const genericTypes = ['application/octet-stream', '']
-        if (!genericTypes.includes(file.type)) {
+      // Check that the browser's reported type agrees with the extension.
+      //
+      // Tested against the extension map rather than the tier's MIME list so the
+      // client and the server reach the same verdict: the server accepts every
+      // spelling an extension is allowed to carry (a .tex announced as
+      // application/x-tex, a .csv announced as text/plain), and rejecting those
+      // here would block uploads the API would have taken.
+      const genericTypes = ['application/octet-stream', '']
+      if (file.type && !genericTypes.includes(file.type)) {
+        if (!mimeTypeMatchesExtension(extension, file.type)) {
           return {
             valid: false,
-            error: `Тип файла "${file.name}" не поддерживается`,
+            error: `Тип файла "${file.name}" не соответствует расширению .${extension.toUpperCase()}`,
           }
         }
       }
@@ -252,15 +252,7 @@ export function FileUpload({
 
       return { valid: true }
     },
-    [
-      maxFiles,
-      maxFileSize,
-      maxFileSizeMB,
-      effectiveTier,
-      allowedExtensions,
-      allowedMimeTypes,
-      formatSize,
-    ]
+    [maxFiles, maxFileSize, maxFileSizeMB, effectiveTier, allowedExtensions, formatSize]
   )
 
   // Handle file selection

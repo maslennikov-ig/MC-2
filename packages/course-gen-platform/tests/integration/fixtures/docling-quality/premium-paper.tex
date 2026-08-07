@@ -1,0 +1,14 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\begin{document}
+\section{Модель усвоения}
+Скорость усвоения материала описывается выражением
+\begin{equation}
+E = \frac{\alpha t}{1 + \beta t}
+\end{equation}
+\subsection{Реализация}
+\begin{verbatim}
+def retention(alpha, beta, t):
+    return alpha * t / (1 + beta * t)
+\end{verbatim}
+\end{document}
