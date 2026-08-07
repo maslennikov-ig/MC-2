@@ -8,53 +8,49 @@ Stage: OCR/VLM evaluation — both candidates measured and REJECTED, defaults un
 
 ## Docling Stage D: both candidates lost, and that is the result
 
-**EasyOCR stays default**, 0.9496 mean phrase similarity against RapidOCR `cyrillic` 0.7168 on three
-deterministically degraded Russian scans. RapidOCR loses on large type and wins on table cells
-(1.000 vs 0.917) and the homoglyph line (0.744 vs 0.395). Constraints on any retry: it REJECTS `ru`
-and takes the script name `cyrillic`, it is SINGLE-LANGUAGE, and its Cyrillic checkpoint is NOT in
-the shipped image — Docling refuses to fetch it at request time, correctly. The A/B ran against a
-throwaway probe image; the shipped baseline was never modified.
+**EasyOCR stays default**, 0.9496 against RapidOCR `cyrillic` 0.7168 on three deterministically
+degraded Russian scans. Read the number with its caveats: n=3, 8 phrases, 4 exact ties, and the whole
+gap is three headings. RapidOCR WINS table cells (1.000 vs 0.917). Constraints on any retry: it
+REJECTS `ru` and takes the script name `cyrillic`, it is SINGLE-LANGUAGE, and its Cyrillic checkpoint
+is not in the shipped image.
 
-**VLM stays off**: NEITHER image carries VLM weights and the host cannot hold one.
-`force_backend_text` is a PdfPipelineOptions field Serve does not expose, and it could not help the
-vector-outline PDFs anyway. `EmptyConversionError` re-verified. Account:
-`.codex/stages/mc2-1sobq.4/summary.md`.
+**VLM stays off** because no VLM weights ship in either image — a BUILD cost, not a measured RAM
+limit. Account: `.codex/stages/mc2-1sobq.4/summary.md`.
 
 ## Docling Stage C: seven Premium formats, and an extension-checked upload
 
 XLSX, CSV, ODT, ODS, ODP, EPUB and LaTeX convert on the PINNED image with their own backends,
-Premium-only: 7/7 live cases, 100% ref coverage, atom coverage 1.00.
+Premium-only: 7/7 live cases, 100% ref coverage.
 
 **Sheet, slide and chapter boundaries exist ONLY in the native document** — Markdown flattens a
-two-sheet workbook into two anonymous tables. `buildDoclingProvenanceIndex` walks parent chains and
-records `containers` on every native chunk, optional and additive. Only XLSX and ODS carry
-page/bbox. **An XLSX formula is its CACHED VALUE, never its expression**; merged cells do NOT
+two-sheet workbook into two anonymous tables. `containers` is resolved from the parent chain and
+carried to the Qdrant payload as `provenance_containers`/`provenance_container_names`; it was
+dropped at the payload projection until an independent review caught it. Only XLSX and ODS carry
+page/bbox. **An XLSX formula is its CACHED VALUE, never its expression**; merged cells do not
 survive as spans.
 
 **`file_catalog.mime_type` is no longer the client's word.** The declared type must match the
-extension, and the CANONICAL type for that extension is stored — that is what makes a `.csv`
-announced as `text/plain` reach Docling. Aliases (`htm`→`html`, `markdown`→`md`, `jfif`→`jpeg`) keep
-the gate from refusing spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
+extension, and the CANONICAL type is stored — that is what makes a `.csv` announced as `text/plain`
+reach Docling. Aliases (`htm`→`html`, `markdown`→`md`, `jfif`→`jpeg`) keep the gate from refusing
+spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
 
 ## Docling Stages A and B, compressed
 
 **Stage A.** Native structure reaches chunking, enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY`; 100% ref coverage with page/bbox in all six chunkable cases.
-`docling_hybrid` is SELECTED, not activated. Two production fixes came from it: the embedding cache
-key now covers model, width, task, `late_chunking` and the whole ordered batch, so a document's
-first re-processing after deploy re-embeds it; and a Jina 429 is retried by waiting out the
-per-minute TOKEN window, where it used to be fatal. **Two upstream fields are accepted and dropped
-by the pinned stack**, wrapped by `docker/docling-{serve,mcp}/runtime.py` with a build-time test
-asserting the gap red first: `_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`,
-`get_cache_key` hashes only source+OCR flags. Remove at `mc2-ibzcc`.
+`DOCLING_CHUNK_STRATEGY`; 100% ref coverage with page/bbox in all six chunkable cases. Two
+production fixes came from it: the embedding cache key now covers model, width, task,
+`late_chunking` and the whole ordered batch, so a document's first re-processing after deploy
+re-embeds it; and a Jina 429 is retried by waiting out the per-minute TOKEN window, where it used to
+be fatal. **Two upstream fields are accepted and dropped by the pinned stack**, wrapped by
+`docker/docling-{serve,mcp}/runtime.py` with a build-time test asserting the gap red first:
+`_parse_standard_pdf_opts` never assigns `heading_hierarchy_options`, `get_cache_key` hashes only
+source+OCR flags. Remove at `mc2-ibzcc`.
 
 **Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
-behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched, both
-peak 1.82 GiB. **Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` costs 30.6 GB
-and a 4.34 GiB peak against an 11 GiB host whose compose limits already sum to ~2x that
-(`mc2-x72bq`). The router is THREE-TIERED and a PPTX asks for nothing.
-**`picture_description` is REJECTED on evidence** and its model is NOT in the image — Stage D
-corrects the earlier note claiming it stays for a retry.
+behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
+**Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` costs 30.6 GB and a 4.34 GiB
+peak against an 11 GiB host (`mc2-x72bq`). The router is THREE-TIERED and a PPTX asks for nothing.
+**`picture_description` is REJECTED on evidence** and its model is NOT in the image.
 
 ## Docling Stage E: images deployed, the chunk flip is NOT done
 
@@ -63,12 +59,19 @@ Production runs images built from the CURRENT tree, 2026-08-07: `docling-serve@s
 digests before this were from 2026-08-05 10:53 and PREDATED Stage A, so production had been running
 without both runtime wrappers and without the baked `ru`/`en` EasyOCR and RapidOCR model sets.
 
-**`DOCLING_CHUNK_STRATEGY` is still `legacy_markdown`.** It now reaches `.env.production` from a
-repository variable defaulting to the safe value, so the flip is one variable edit plus a redeploy
-and the rollback is the same edit backwards. It was deliberately NOT flipped in the same deploy as
-the images: two changes at once cannot be attributed. Flipping it changes NEW documents only; the
-collection becomes mixed by design, and making it uniform would need a reindex, which is a separate
-decision and a separate authorization.
+**`DOCLING_CHUNK_STRATEGY=docling_hybrid` SHIPPED 2026-08-07** (run 31181424941, force_deploy).
+`.env.production` carries it, the CI validation step confirmed the value, and `megacampus-worker`
+and `worker-stage7` were recreated against it. It is a repository variable, so the rollback is one
+edit backwards plus a redeploy.
+**Not yet confirmed at RUNTIME.** The value being in the env is not the same as the worker resolving
+it: `resolveChunkingStrategy` warns and falls back to `legacy_markdown` on anything unrecognised.
+The proof is the worker log on the next processed document — `chunkStrategy: docling_hybrid`
+present and `Unknown DOCLING_CHUNK_STRATEGY` absent. Until a document goes through, the flip is
+deployed but unproven.
+
+**It changes NEW documents only.** Existing points keep the shape they were written with, so the
+collection is mixed by design — the payload fields are additive. Making it uniform needs a reindex,
+a SEPARATE decision and a separate authorization.
 
 **The host now records which MCP image it runs**, in `.docling-deployed-mcp-image` beside the env
 file, written only after health passes. That is what the rollout gate recognises on the next deploy.
@@ -179,17 +182,16 @@ explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-1sobq.5` — set `DOCLING_CHUNK_STRATEGY=docling_hybrid`, redeploy, then live-smoke
-ONE new control document. Owner authorized the flip and digest publication on 2026-08-07; reindex,
-migrations, secrets and force-push are NOT covered and need their own ask.
-Recommended action: flip and verify in one step by itself; do not reindex existing data.
+Next stage id: `mc2-1sobq.5` — the flip SHIPPED; what remains is one live smoke. Process any new
+document and check the worker log for `chunkStrategy: docling_hybrid` and no
+`Unknown DOCLING_CHUNK_STRATEGY`. Reindex, migrations, secrets and force-push are NOT authorized.
+Recommended action: smoke one document, then close the epic; do not reindex existing data.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for `mc2-1sobq.5` under `specs/024-docling-intelligence/`. Stages A-D are
-accepted and the images are deployed. The only remaining change is the chunk-strategy flip, which
-affects NEW documents only. Preserve the MCP 1.x rollback digest and move
-`DOCLING_PREVIOUS_MCP_IMAGE` whenever `DOCLING_MCP_IMAGE` changes.
+accepted, the images are deployed and the chunk-strategy flip has shipped; only the live smoke
+remains. Preserve the MCP 1.x rollback digest.
 
 ## Read First
 
