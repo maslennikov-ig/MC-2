@@ -27,6 +27,11 @@ node_modules/
 !.codex/stranded-commit-allowlist.txt
 !.codex/stages/
 !.codex/stages/**
+# Closeout run state, not stage evidence. `.codex/stages/**` un-ignores the whole
+# subtree, so these have to be named back out or a closeout leaves its locks in
+# the commit — which is how they reached `master` once on 2026-08-07.
+.codex/stages/**/.closeout.lock
+.codex/stages/**/.review-state.json.lock
 
 # --- Build Outputs & Cache ---
 dist/
