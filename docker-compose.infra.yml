@@ -500,7 +500,6 @@ services:
       - DOCLING_SERVE_MAX_SYNC_WAIT=1200
       - DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT=1200
       - DOCLING_SERVE_LOAD_MODELS_AT_BOOT=true
-      - DOCLING_SERVE_PDF_HEADING_HIERARCHY=${DOCLING_SERVE_PDF_HEADING_HIERARCHY:-false}
       - DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
     healthcheck:
       test:

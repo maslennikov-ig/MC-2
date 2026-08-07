@@ -21,7 +21,7 @@ services:
     build:
       context: ./packages/course-gen-platform/docker/docling-serve
       dockerfile: Dockerfile
-    image: mc2/docling-serve:1.29.0-docling-2.118.0
+    image: mc2/docling-serve:1.30.0-docling-2.118.0
     container_name: docling-serve
     restart: unless-stopped
     environment:

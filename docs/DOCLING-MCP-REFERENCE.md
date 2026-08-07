@@ -93,26 +93,30 @@ document fails before upload rather than degrading into unrelated chunks.
 
 ## PDF heading-level inference
 
-Off by default. Enable on BOTH services, because each closes a different gap:
+Off by default, and enabled on ONE flag since the Serve base moved to 1.30.0:
 
 ```dotenv
-DOCLING_MCP_PDF_HEADING_HIERARCHY=true    # MCP asks for it
-DOCLING_SERVE_PDF_HEADING_HIERARCHY=true  # optional service-wide default
+DOCLING_MCP_PDF_HEADING_HIERARCHY=true    # MCP asks for it, Serve honours it
 ```
 
-Two upstream gaps are worked around by thin runtime wrappers, both measured on
-this pinned stack on 2026-08-05 and both removable when upstream closes them:
+Until `docling-jobkit` 3.3.0 there was a second flag,
+`DOCLING_SERVE_PDF_HEADING_HIERARCHY`, and a wrapper behind it:
+`_parse_standard_pdf_opts` built `PdfPipelineOptions` field by field and never
+assigned `heading_hierarchy_options`, so Serve accepted `do_pdf_heading_hierarchy`
+and silently dropped it. 3.3.0 wires the request field and additionally sets
+`generate_parsed_pages` for style-based inference, which the wrapper never did —
+so the upstream fix is strictly better and the wrapper is gone. The Dockerfile
+now asserts at build time that the passthrough is still there; a base image that
+regressed would fail the build rather than quietly ignore the request again.
 
-- `docling_jobkit`'s `_parse_standard_pdf_opts` builds `PdfPipelineOptions`
-  field by field and never assigns `heading_hierarchy_options`, so Serve accepts
-  `do_pdf_heading_hierarchy` and silently drops it.
-  `docker/docling-serve/runtime.py` passes it through; its build-time test
-  asserts the upstream gap red first.
-- `docling_mcp.docling_cache.get_cache_key` hashes only the source string and
-  the OCR flags, so two conversions of the same source with different pipeline
-  options share a cache entry. `docker/docling-mcp/runtime.py` folds the
-  conversion profile into the key. Changing any profile field is a cache miss
-  and a reconversion, never a stale artifact.
+One wrapper remains, and it is NOT removable yet:
+`docling_mcp.docling_cache.get_cache_key` hashes only the source string and the
+OCR flags, so two conversions of the same source with different pipeline options
+share a cache entry. `docker/docling-mcp/runtime.py` folds the conversion
+profile into the key, which makes any profile change a cache miss and a
+reconversion rather than a stale artifact. `docling-mcp` has published nothing
+since 3.0.0; the same wrapper also supplies `service_timeout` and
+`service_max_retries`, which MCP 3.0.0 declares and never passes on.
 
 Measured effect on `numbered-sections.pdf`: without inference the Markdown has
 one distinct heading level (`##` only); with it, two (`##` and `###`), and

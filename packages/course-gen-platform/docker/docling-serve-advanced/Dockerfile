@@ -13,11 +13,11 @@
 # base: the pinned dependency lock, the heading-hierarchy runtime glue and the
 # entrypoint are inherited, so the two profiles can only differ by models and
 # configuration.
-ARG BASE_IMAGE=mc2/docling-serve:1.29.0-docling-2.118.0
+ARG BASE_IMAGE=mc2/docling-serve:1.30.0-docling-2.118.0
 FROM ${BASE_IMAGE}
 
 LABEL org.opencontainers.image.title="MegaCampus Docling Serve (advanced enrichments)"
-LABEL org.opencontainers.image.version="1.29.0-docling-2.118.0-advanced"
+LABEL org.opencontainers.image.version="1.30.0-docling-2.118.0-advanced"
 
 USER 1001
 
