@@ -209,13 +209,31 @@ export class DoclingServeChunker {
 
   private cachedVersion: string | null | undefined;
 
-  /** Serve version, cached; part of the chunking profile identity. */
+  /**
+   * Serve version, cached; part of the chunking profile identity.
+   *
+   * Serve answers `/version` with a map of component versions keyed by package
+   * name — `{"docling-serve": "1.29.0", "docling": "2.118.0", ...}` — and has no
+   * `version` key at all. Reading one was a silent no-op: every profile recorded
+   * `serve=unknown`, so upgrading Serve would have left the chunking profile id
+   * byte-identical while chunk boundaries moved underneath it, which is the one
+   * thing that id exists to prevent.
+   *
+   * `docling` is included because the chunkers live in that package: Serve can
+   * stay at 1.29.0 across a Docling bump that changes serialization.
+   */
   async serveVersion(): Promise<string | null> {
     if (this.cachedVersion !== undefined) return this.cachedVersion;
     try {
-      const response = await this.request('GET', '/version');
-      const version = (response as { version?: unknown }).version;
-      this.cachedVersion = typeof version === 'string' ? version : null;
+      const response = (await this.request('GET', '/version')) as Record<string, unknown>;
+      const serve = response['docling-serve'] ?? response.version;
+      const docling = response.docling;
+      this.cachedVersion =
+        typeof serve === 'string'
+          ? typeof docling === 'string'
+            ? `${serve}/docling-${docling}`
+            : serve
+          : null;
     } catch {
       this.cachedVersion = null;
     }
