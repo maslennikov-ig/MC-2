@@ -7,8 +7,11 @@
  * @module stages/stage2-document-processing/phases/phase-1-docling-conversion
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData } from '@megacampus/shared-types';
+import { logger } from '../../../shared/logger/index.js';
 import {
   convertDocumentToMarkdown,
   processImages,
@@ -16,6 +19,53 @@ import {
   calculateSectionStatistics,
 } from '../../../shared/embeddings/index.js';
 import { DocumentProcessingResult } from '../types';
+import {
+  applyEnrichment,
+  DoclingServeEnricher,
+  enrichmentEnabled,
+} from '../docling/enrichment-router.js';
+import type { DoclingDocument } from '../docling/types.js';
+
+/**
+ * Runs the enrichment router over an accepted conversion, if it is enabled.
+ *
+ * Returns the input document on every path that is not a clean success, so
+ * turning enrichment on can add metadata and can never cost a conversion the
+ * pipeline already accepted.
+ */
+async function enrichAcceptedDocument(
+  document: DoclingDocument,
+  filePath: string
+): Promise<DoclingDocument> {
+  if (!enrichmentEnabled()) return document;
+
+  const baseUrl = process.env.DOCLING_SERVE_URL;
+  const advancedUrl = process.env.DOCLING_SERVE_ADVANCED_URL;
+  if (!baseUrl || !advancedUrl) {
+    logger.warn(
+      { hasBaseUrl: Boolean(baseUrl), hasAdvancedUrl: Boolean(advancedUrl) },
+      'DOCLING_ENRICHMENT_ENABLED is set but a Serve URL is missing; skipping enrichment'
+    );
+    return document;
+  }
+
+  try {
+    const bytes = await fs.readFile(filePath);
+    const result = await applyEnrichment(
+      document,
+      { name: path.basename(filePath), bytes },
+      new DoclingServeEnricher({ baseUrl, advancedUrl }),
+      { documentKey: document.name }
+    );
+    return result.document;
+  } catch (error) {
+    logger.warn(
+      { err: error instanceof Error ? error.message : String(error), filePath },
+      'Docling enrichment could not run; keeping the accepted document'
+    );
+    return document;
+  }
+}
 
 /**
  * Shortest conversion this pipeline will treat as a document.
@@ -86,6 +136,12 @@ export async function executeDoclingConversion(
   // Throwing here is what lets the fallback extractor run at all.
   assertConversionProducedText(conversionResult.markdown, filePath);
 
+  // Phase 1a': selective enrichment. Off unless DOCLING_ENRICHMENT_ENABLED is
+  // set, and additive when on: the accepted document above is what everything
+  // downstream uses either way, and a failed pass returns it untouched.
+  const enriched = await enrichAcceptedDocument(conversionResult.json, filePath);
+  conversionResult.json = enriched;
+
   await job.updateProgress(40);
 
   // Phase 1b: Image processing (40-60% progress)
@@ -112,6 +168,7 @@ export async function executeDoclingConversion(
     markdown: conversionResult.markdown,
     json: conversionResult.json,
     images: conversionResult.images,
+    docling_source: conversionResult.docling_source,
     stats: {
       markdown_length: conversionResult.markdown.length,
       pages: conversionResult.metadata.pages_processed,

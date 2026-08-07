@@ -24,7 +24,7 @@ docling_validate_digest_ref() {
 
 docling_prepare_rollout() {
     local env_file="$1"
-    local enabled mcp_image serve_image rollback_image current_id rollback_id
+    local enabled mcp_image serve_image rollback_image current_id rollback_id candidate_id
 
     DOCLING_ROLLOUT_SERVICES=()
     [ -r "$env_file" ] || {
@@ -45,8 +45,20 @@ docling_prepare_rollout() {
     docling_validate_digest_ref DOCLING_SERVE_IMAGE "$serve_image" || return 1
     docling_validate_digest_ref DOCLING_ROLLBACK_IMAGE "$rollback_image" || return 1
 
-    # The rollback digest must resolve to the image used by the currently
-    # running MCP 1.x container before the first v3 switch is allowed.
+    # Before the first v3 switch the rollback digest must resolve to the image
+    # the MCP container is actually running: that is what makes the rollback
+    # provable rather than declared.
+    #
+    # AFTER a successful switch the host runs the CANDIDATE, so demanding the
+    # rollback image forever would make one successful cutover block every
+    # later deploy. It did: from the moment production went to MCP 3, every
+    # `Deploy to Dev` failed here (mc2-h89lo). Accepting the candidate as well
+    # keeps the safety property — the host is on an image this deploy can name
+    # and pull, and the rollback digest is still validated and pulled above —
+    # while letting the steady state deploy.
+    #
+    # A host running NEITHER is still refused: nobody can prove a rollback for
+    # an image this configuration does not know about.
     docker pull "$rollback_image" > /dev/null || return 1
     current_id="$(docker inspect -f '{{.Image}}' megacampus-docling-mcp-internal 2>/dev/null || true)"
     [ -n "$current_id" ] || {
@@ -54,8 +66,9 @@ docling_prepare_rollout() {
         return 1
     }
     rollback_id="$(docker image inspect -f '{{.Id}}' "$rollback_image")" || return 1
-    [ "$current_id" = "$rollback_id" ] || {
-        echo "ERROR: DOCLING_ROLLBACK_IMAGE does not match the running MCP image" >&2
+    candidate_id="$(docker image inspect -f '{{.Id}}' "$mcp_image" 2>/dev/null || true)"
+    [ "$current_id" = "$rollback_id" ] || [ "$current_id" = "$candidate_id" ] || {
+        echo "ERROR: the running MCP image is neither DOCLING_ROLLBACK_IMAGE nor DOCLING_MCP_IMAGE" >&2
         return 1
     }
 

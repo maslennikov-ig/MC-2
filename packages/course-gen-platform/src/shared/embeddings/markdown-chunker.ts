@@ -13,11 +13,40 @@
 import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { encoding_for_model } from 'tiktoken';
 import type { TiktokenModel } from 'tiktoken';
+import type { DoclingBoundingBox } from '../../stages/stage2-document-processing/docling/provenance.js';
 
 /**
  * Chunk hierarchy level
  */
 export type ChunkLevel = 'parent' | 'child';
+
+/**
+ * Chunking strategy that produced a chunk.
+ *
+ * `hierarchical_markdown` is the legacy Markdown splitter and stays the value
+ * every existing Qdrant point carries. The Docling values are produced by the
+ * native Serve chunkers.
+ */
+export type ChunkStrategyName = 'hierarchical_markdown' | 'docling_hierarchical' | 'docling_hybrid';
+
+/**
+ * Source provenance carried by a chunk built from native Docling structure.
+ *
+ * Optional throughout: legacy Markdown chunks have none, and old Qdrant points
+ * predate the field entirely.
+ */
+export interface ChunkProvenance {
+  /** Docling self_refs this chunk was built from, e.g. `#/texts/12`. */
+  self_refs: string[];
+  /** Source pages the chunk spans. Empty for page-less formats such as DOCX. */
+  page_numbers: number[];
+  /** Bounding boxes with their coordinate origin and page geometry. */
+  bboxes: DoclingBoundingBox[];
+  /** Docling element labels behind this chunk, e.g. `text`, `table`. */
+  labels: string[];
+  /** Token count reported by the native chunker's own tokenizer, if any. */
+  native_token_count: number | null;
+}
 
 /**
  * Individual text chunk with metadata
@@ -48,9 +77,11 @@ export interface TextChunk {
   /** Subsection (H2 heading) */
   section: string | null;
   /** Chunking strategy used */
-  chunk_strategy: 'hierarchical_markdown';
+  chunk_strategy: ChunkStrategyName;
   /** Overlap tokens with previous chunk */
   overlap_tokens: number;
+  /** Native Docling provenance, present only for Docling chunking strategies */
+  provenance?: ChunkProvenance;
 }
 
 /**
@@ -157,7 +188,7 @@ function buildHeadingPath(metadata: MarkdownDocument['metadata']): string {
  * @param model - Tiktoken model
  * @returns Token count
  */
-function countTokens(text: string, model: TiktokenModel): number {
+export function countTokens(text: string, model: TiktokenModel): number {
   const encoder = encoding_for_model(model);
   try {
     const tokens = encoder.encode(text);
@@ -165,6 +196,24 @@ function countTokens(text: string, model: TiktokenModel): number {
   } finally {
     encoder.free(); // Important: free encoder to prevent memory leaks
   }
+}
+
+/**
+ * Reusable token counter.
+ *
+ * `countTokens` allocates and frees a tiktoken encoder per call, which is fine
+ * for a handful of measurements and far too slow when a splitter measures every
+ * candidate boundary. Callers must `free()` when done.
+ */
+export function createTokenCounter(model: TiktokenModel): {
+  count: (text: string) => number;
+  free: () => void;
+} {
+  const encoder = encoding_for_model(model);
+  return {
+    count: (text: string) => encoder.encode(text).length,
+    free: () => encoder.free(),
+  };
 }
 
 /**

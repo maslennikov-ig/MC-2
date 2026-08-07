@@ -6,6 +6,7 @@
 
 import { DoclingDocument } from './docling/types.js';
 import { ImageMetadata } from '../../shared/embeddings/index.js';
+import type { DoclingSourceReference } from '../../shared/embeddings/markdown-converter.js';
 import type { DocumentPriorityLevel } from '@megacampus/shared-types';
 
 /**
@@ -47,6 +48,13 @@ export interface DocumentProcessingResult {
   json: DoclingDocument;
   images: ImageMetadata[];
   stats: ProcessingStats;
+  /**
+   * Accepted Docling conversion identity.
+   *
+   * Absent for the plain-text and fallback extraction paths, which never went
+   * through Docling and therefore cannot be chunked natively.
+   */
+  docling_source?: DoclingSourceReference;
   /** Optional document summarization result (Phase 7) */
   summarization?: {
     success: boolean;

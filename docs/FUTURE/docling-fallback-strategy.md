@@ -1,5 +1,28 @@
 # Docling Fallback Strategy: Two-Tier Approach
 
+> **SUPERSEDED on 2026-08-06 by `specs/024-docling-intelligence/` (epic `mc2-1sobq`).**
+> Kept for the Task 008 investigation it records; do not implement from it.
+>
+> The two-tier fallback described below is now an EXPLICIT NON-GOAL: "AnyDoc or
+> a broad external/local fallback that masks Serve failures"
+> (`specs/024-docling-intelligence/spec.md`, section 4).
+>
+> The reasoning changed with the evidence. A fallback that silently answers when
+> Docling fails produces a document nobody can attribute to a converter, which
+> is precisely what made the original failures hard to diagnose. The delivered
+> behaviour is fail-closed instead:
+>
+> - a conversion that extracts no meaningful text raises `EmptyConversionError`
+>   rather than succeeding emptily;
+> - native chunks whose refs do not resolve against the accepted document fail
+>   before Qdrant upload instead of degrading to unrelated Markdown chunks;
+> - an advanced enrichment pass that fails is classified and leaves the accepted
+>   baseline artifact untouched.
+>
+> Reliability work that IS live: pinned image digests with a recorded rollback
+> digest, feature-flag rollback for every new default, and a controlled corpus
+> that fails red before a fix.
+
 **Task ID**: FUTURE-INFRA-002
 **Priority**: P1 (High - Reliability)
 **Tier**: All tiers (Infrastructure)

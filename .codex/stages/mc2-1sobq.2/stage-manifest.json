@@ -1,0 +1,91 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1sobq.2",
+  "goal_id": "mc2-1sobq.2",
+  "epic_id": "mc2-1sobq",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 2,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "selective-docling-enrichments",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "stage2-docling-conversion",
+      "docling-enrichment-router",
+      "docling-serve-advanced-runtime",
+      "docling-quality-harness",
+      "qdrant-payload"
+    ],
+    "risk_models": [
+      "model-identity",
+      "resource-envelope",
+      "fabricated-enrichment",
+      "cache-cross-contamination",
+      "feature-flag-rollback"
+    ],
+    "test_environments": ["vitest", "local-docling-stack"],
+    "rollback_boundary": "chunking-strategy-and-heading-inference-flags",
+    "acceptance_proofs": [
+      "focused-chunking-provenance-and-payload-tests",
+      "docling-quality-corpus-both-conversion-profiles",
+      "offline-retrieval-evidence-ab",
+      "pnpm-type-check-build-lint"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1sobq.2",
+    "source_digest": "dde4b92525b6f222a75a47070f7b9c342b305ff3bcd1b1c2bd01e16263ef434a",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Профильный двухпроходный router запускает advanced pass только по объяснимому сигналу конкретного элемента документа и записывает причину.",
+        "text_digest": "e41fc040bad04fe65bb976733905c7ebc2d1bdb8017cbd0617e8ac781e1a41ab"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Ground-truth фикстуры доказывают точные формулы, язык кода и chart series/labels; выдуманные значения блокируют приёмку.",
+        "text_digest": "bac7e13dd7124a31d85111a02d2f43dd40bb00c85012bf78606d3bd2ae3cecc8"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Cache identity включает conversion profile и точный набор моделей, поэтому advanced-артефакт не может быть подменён baseline-артефактом.",
+        "text_digest": "25de82bea588f07abe9ab41ec1d9ba1a1d3657a0f8808389b6ed0ed9c5642c11"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Baseline Serve сохраняет текущий 4 GiB envelope; advanced-профиль измерен без OOM и рестартов.",
+        "text_digest": "c68c6a6ba1c3649fec90d4216df1cf373950391a91e15dd55c2fd9cf9e1f7238"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Сбой advanced pass классифицируется, не портит принятый baseline-артефакт и откатывается флагом.",
+        "text_digest": "7a06e992d449f91ad8d707fca95c4f4d6a4019192e65bf5727e640f63aa7380f"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1sobq.2/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "dde4b92525b6f222a75a47070f7b9c342b305ff3bcd1b1c2bd01e16263ef434a",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1sobq.2/artifacts/mc2-1sobq.2.md",
+      "task_id": "mc2-1sobq.2",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

@@ -10,11 +10,16 @@
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
 import {
-  chunkMarkdown,
   getAllChunks,
   DEFAULT_CHUNKING_CONFIG,
 } from '../../../shared/embeddings/markdown-chunker.js';
+import {
+  chunkWithStrategy,
+  type NativeChunkingInput,
+  type StrategyChunkingResult,
+} from '../../../shared/embeddings/chunking-strategy.js';
 import { enrichChunks } from '../../../shared/embeddings/metadata-enricher.js';
+import type { DoclingDocument } from '../docling/types.js';
 import { logger } from '../../../shared/logger/index.js';
 
 /**
@@ -42,8 +47,16 @@ export interface ChunkMetadata {
  * Chunking result
  */
 export interface ChunkingResult {
-  chunks: Awaited<ReturnType<typeof chunkMarkdown>>;
+  chunks: StrategyChunkingResult;
   enrichedChunks: ReturnType<typeof enrichChunks>;
+}
+
+/** Optional Docling inputs that enable structure-aware chunking. */
+export interface ChunkingSource {
+  /** Accepted conversion identity; absent for plain-text/fallback paths. */
+  docling?: NativeChunkingInput;
+  /** Normalized Docling document, used to enrich chunk metadata. */
+  docling_json?: DoclingDocument;
 }
 
 /**
@@ -59,20 +72,29 @@ export interface ChunkingResult {
 export async function executeChunking(
   markdown: string,
   metadata: ChunkMetadata,
-  job: Job<DocumentProcessingJobData>
+  job: Job<DocumentProcessingJobData>,
+  source: ChunkingSource = {}
 ): Promise<ChunkingResult> {
   // Step 1: Chunk markdown content (50-55% progress)
-  const chunkingResult = await chunkMarkdown(markdown, DEFAULT_CHUNKING_CONFIG);
+  const chunkingResult = await chunkWithStrategy(markdown, {
+    source: source.docling,
+    config: DEFAULT_CHUNKING_CONFIG,
+  });
 
   // Get all chunks (parent + child) for embedding
   const allChunks = getAllChunks(chunkingResult);
 
-  logger.debug(
+  logger.info(
     {
       jobId: job.id,
+      strategy: chunkingResult.strategy,
+      chunkingProfileId: chunkingResult.chunkingProfileId,
       parentChunks: chunkingResult.parent_chunks.length,
       childChunks: chunkingResult.child_chunks.length,
       totalChunks: allChunks.length,
+      refCoverage: Number(chunkingResult.coverage.refCoverage.toFixed(4)),
+      locationCoverage: Number(chunkingResult.coverage.locationCoverage.toFixed(4)),
+      locationEligible: chunkingResult.coverage.locationEligible,
     },
     'Document chunked'
   );
@@ -87,6 +109,9 @@ export async function executeChunking(
     course_id: metadata.course_id,
     document_priority: metadata.document_priority,
     document_weight: metadata.document_weight,
+    // The normalized Docling document never reached enrichment before, so page
+    // metadata was silently null for every chunk of every document.
+    ...(source.docling_json ? { docling_json: source.docling_json } : {}),
   });
 
   await job.updateProgress(60);

@@ -35,7 +35,65 @@ class RuntimeSettingsTest(unittest.TestCase):
         self.assertEqual(options.ocr_preset, "easyocr")
         self.assertEqual(options.ocr_lang, ["ru", "en"])
         self.assertFalse(options.force_ocr)
+        self.assertFalse(options.do_pdf_heading_hierarchy)
         client.close()
+
+    def test_pdf_heading_hierarchy_is_opt_in(self) -> None:
+        with patch.dict(
+            os.environ, {"DOCLING_MCP_PDF_HEADING_HIERARCHY": "true"}, clear=False
+        ):
+            runtime.apply_service_client_settings()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                options = ConvertDocumentsOptions(do_ocr=True)
+
+        self.assertTrue(options.do_pdf_heading_hierarchy)
+
+    def test_rejects_a_non_boolean_heading_hierarchy_flag(self) -> None:
+        with patch.dict(
+            os.environ, {"DOCLING_MCP_PDF_HEADING_HIERARCHY": "maybe"}, clear=False
+        ):
+            with self.assertRaises(ValueError):
+                runtime.apply_service_client_settings()
+
+
+class CacheKeyTest(unittest.TestCase):
+    def setUp(self) -> None:
+        from docling_mcp import docling_cache
+
+        self.docling_cache = docling_cache
+        self._original = docling_cache.get_cache_key
+        self.addCleanup(setattr, docling_cache, "get_cache_key", self._original)
+
+    def test_upstream_key_ignores_the_conversion_profile(self) -> None:
+        """The gap this wrapper narrows, asserted against the real upstream."""
+        self.assertEqual(
+            self._original("/app/uploads/a.pdf"), self._original("/app/uploads/a.pdf")
+        )
+
+    def test_profile_change_produces_a_different_key(self) -> None:
+        with patch.dict(
+            os.environ, {"DOCLING_MCP_PDF_HEADING_HIERARCHY": "false"}, clear=False
+        ):
+            runtime.apply_cache_key_settings()
+            without = self.docling_cache.get_cache_key("/app/uploads/a.pdf")
+
+        setattr(self.docling_cache, "get_cache_key", self._original)
+        with patch.dict(
+            os.environ, {"DOCLING_MCP_PDF_HEADING_HIERARCHY": "true"}, clear=False
+        ):
+            runtime.apply_cache_key_settings()
+            with_inference = self.docling_cache.get_cache_key("/app/uploads/a.pdf")
+
+        self.assertNotEqual(without, with_inference)
+        self.assertEqual(len(with_inference), 32)
+
+    def test_same_profile_and_source_stay_stable(self) -> None:
+        runtime.apply_cache_key_settings()
+        first = self.docling_cache.get_cache_key("/app/uploads/a.pdf")
+        second = self.docling_cache.get_cache_key("/app/uploads/a.pdf")
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, self.docling_cache.get_cache_key("/app/uploads/b.pdf"))
 
 
 if __name__ == "__main__":

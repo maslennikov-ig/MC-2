@@ -175,12 +175,24 @@ export async function executeVectorIndexing(
       document_priority: priority,
       document_weight: priorityWeight,
     },
-    job
+    job,
+    {
+      ...(processingResult.docling_source
+        ? {
+            docling: {
+              documentKey: processingResult.docling_source.document_key,
+              rawJsonPath: processingResult.docling_source.raw_json_path,
+            },
+          }
+        : {}),
+      docling_json: processingResult.json,
+    }
   );
 
   logger.info(
     {
       fileId,
+      chunkStrategy: chunkingResult.chunks.strategy,
       parentChunks: chunkingResult.chunks.parent_chunks.length,
       childChunks: chunkingResult.chunks.child_chunks.length,
       totalChunks: chunkingResult.enrichedChunks.length,

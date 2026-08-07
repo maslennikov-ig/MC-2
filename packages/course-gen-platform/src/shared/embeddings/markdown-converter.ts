@@ -40,6 +40,21 @@ export interface ConversionResult {
 
   /** Conversion metadata */
   metadata: ConversionMetadata;
+
+  /** Identity of the accepted Docling conversion, for native chunking */
+  docling_source: DoclingSourceReference;
+}
+
+/**
+ * Identity of one accepted Docling conversion.
+ *
+ * `document_key` is Docling MCP's content-addressed key for the source, so it
+ * doubles as the source digest in deterministic chunk ids.
+ */
+export interface DoclingSourceReference {
+  document_key: string;
+  raw_json_path: string;
+  from_cache: boolean;
 }
 
 /**
@@ -240,6 +255,11 @@ export async function convertDocumentToMarkdown(
       json: doclingDoc,
       images,
       structure,
+      docling_source: {
+        document_key: bundle.documentKey,
+        raw_json_path: bundle.rawJsonPath,
+        from_cache: bundle.fromCache,
+      },
       metadata: {
         processing_time_ms: processingTime,
         pages_processed: Object.keys(doclingDoc.pages || {}).length,

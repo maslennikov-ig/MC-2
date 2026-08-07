@@ -1,11 +1,206 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "cases": [
+    {
+      "id": "enrichment-pdf",
+      "source": "enrichment-code-formula-chart.pdf",
+      "expectedTokens": [
+        "Листинг нормализации веса",
+        "normalize_weight",
+        "Диаграмма обработанных документов"
+      ],
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
+      "enrichment": {
+        "code": {
+          "language": "Python",
+          "mustContain": [
+            "def normalize_weight",
+            "raise ValueError",
+            "min(maximum, float(raw_weight))"
+          ]
+        },
+        "formula": {
+          "groundTruth": "x = \\frac { -b \\pm \\sqrt { ( b ^ { 2 } - 4ac ) } } { 2a }",
+          "mustContain": ["\\frac", "\\sqrt", "b ^ { 2 }", "2 a"],
+          "forbiddenSymbols": ["\\int", "\\sum", "\\lim", "\\partial"]
+        },
+        "classification": {
+          "className": "bar_chart",
+          "minimumConfidence": 0.5
+        },
+        "chart": {
+          "rows": [
+            ["Альфа", "12"],
+            ["Бета", "34"],
+            ["Гамма", "56"]
+          ]
+        }
+      },
+      "retrieval": [
+        {
+          "id": "enrich-code-language",
+          "query": "нормализация веса документа функция",
+          "evidence": [
+            {
+              "id": "normalize-weight-code",
+              "tokens": ["normalize_weight"]
+            }
+          ]
+        },
+        {
+          "id": "enrich-chart-values",
+          "query": "сколько документов обработано Гамма",
+          "evidence": [
+            {
+              "id": "gamma-56",
+              "tokens": ["Гамма", "56"]
+            }
+          ]
+        }
+      ]
+    },
     {
       "id": "scientific-pdf",
       "source": "../common/2510.13928v1.pdf",
       "expectedTokens": ["LLM Brain Rot", "ABSTRACT", "74.9", "57.2"],
-      "minimumHeadingDepth": 2
+      "headingHierarchy": {
+        "baseline": {
+          "expectedLevels": [2]
+        },
+        "pdf-heading-hierarchy": {
+          "minimumDistinctLevels": 2
+        }
+      },
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "sci-accuracy-drop",
+          "query": "ARC Challenge accuracy after junk intervention",
+          "evidence": [
+            {
+              "id": "arc-baseline",
+              "tokens": ["74.9"]
+            },
+            {
+              "id": "arc-after-junk",
+              "tokens": ["57.2"]
+            }
+          ]
+        },
+        {
+          "id": "sci-hypothesis",
+          "query": "what does the LLM brain rot hypothesis claim",
+          "evidence": [
+            {
+              "id": "brain-rot-hypothesis",
+              "tokens": ["brain rot", "hypothesis"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "numbered-sections-pdf",
+      "source": "numbered-sections.pdf",
+      "expectedTokens": [
+        "Введение объясняет цель регламента",
+        "Контрольное значение проверки равно 64",
+        "1.1. Область применения"
+      ],
+      "headingHierarchy": {
+        "baseline": {
+          "expectedLevels": [2]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3]
+        }
+      },
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "numbered-control-value",
+          "query": "чему равно контрольное значение проверки",
+          "evidence": [
+            {
+              "id": "control-value-64",
+              "tokens": ["64"]
+            }
+          ]
+        },
+        {
+          "id": "numbered-scope",
+          "query": "к каким документам применяется регламент",
+          "evidence": [
+            {
+              "id": "scope-incoming-documents",
+              "tokens": ["всем входящим документам"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hierarchy-docx",
+      "source": "hierarchy-multilevel.docx",
+      "expectedTokens": [
+        "Регламент обработки документов",
+        "Линия Альфа",
+        "Линия Бета",
+        "42 единицы",
+        "77 единиц"
+      ],
+      "headingHierarchy": {
+        "baseline": {
+          "expectedLevels": [2, 3, 4]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3, 4]
+        }
+      },
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "alpha-target",
+          "query": "целевые показатели Альфы значение",
+          "evidence": [
+            {
+              "id": "alpha-42",
+              "tokens": ["Целевые показатели Альфы", "42"]
+            }
+          ]
+        },
+        {
+          "id": "beta-target",
+          "query": "целевые показатели Беты значение",
+          "evidence": [
+            {
+              "id": "beta-77",
+              "tokens": ["Целевые показатели Беты", "77"]
+            }
+          ]
+        },
+        {
+          "id": "beta-latency",
+          "query": "ограничения Беты максимальная задержка",
+          "evidence": [
+            {
+              "id": "beta-30-minutes",
+              "tokens": ["Ограничения Беты", "30 минут"]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "structured-docx",
@@ -19,9 +214,31 @@
         "98",
         "процентов"
       ],
-      "minimumHeadingDepth": 2,
+      "headingHierarchy": {
+        "baseline": {
+          "expectedLevels": [2, 3]
+        },
+        "pdf-heading-hierarchy": {
+          "expectedLevels": [2, 3]
+        }
+      },
       "requiresNestedList": true,
-      "minimumColspan": 3
+      "minimumColspan": 3,
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "structured-table-value",
+          "query": "сводные показатели точность процентов",
+          "evidence": [
+            {
+              "id": "accuracy-98-percent",
+              "tokens": ["98", "процентов"]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "reading-order-pptx",
@@ -34,7 +251,30 @@
         "20",
         "30"
       ],
-      "expectedOrder": ["Шаг один: собрать данные", "Шаг два: проверить результат", "Подпись схемы"]
+      "expectedOrder": [
+        "Шаг один: собрать данные",
+        "Шаг два: проверить результат",
+        "Подпись схемы"
+      ],
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "pptx-steps",
+          "query": "какие шаги обработки описаны на схеме",
+          "evidence": [
+            {
+              "id": "step-one",
+              "tokens": ["Шаг один: собрать данные"]
+            },
+            {
+              "id": "step-two",
+              "tokens": ["Шаг два: проверить результат"]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "russian-raster-ocr",
@@ -45,6 +285,22 @@
         "Точность",
         "98",
         "процентов"
+      ],
+      "provenance": {
+        "minimumRefCoverage": 0.95,
+        "minimumLocationCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "ocr-control-phrase",
+          "query": "контрольная фраза качество распознавания",
+          "evidence": [
+            {
+              "id": "control-phrase",
+              "tokens": ["КОНТРОЛЬНАЯ ФРАЗА"]
+            }
+          ]
+        }
       ]
     },
     {

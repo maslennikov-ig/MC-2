@@ -88,7 +88,6 @@ export {
 export {
   generateEmbeddingsWithLateChunking,
   generateQueryEmbedding,
-  separateChunksByLevel,
   type EmbeddingResult,
   type BatchEmbeddingResult,
 } from './generate';

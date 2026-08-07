@@ -20,7 +20,24 @@ from reportlab.pdfgen import canvas
 
 
 ROOT = Path(__file__).resolve().parent
-FONT_PATH = Path("C:/Windows/Fonts/arial.ttf")
+
+# Any Cyrillic-capable TTF. The first existing candidate wins so the generator
+# runs on both the Windows and the WSL/Linux checkout without editing.
+FONT_CANDIDATES = (
+    Path("C:/Windows/Fonts/arial.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+)
+
+
+def _font_path() -> Path:
+    for candidate in FONT_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "No Cyrillic-capable TTF found; add one to FONT_CANDIDATES: "
+        + ", ".join(str(path) for path in FONT_CANDIDATES)
+    )
 
 
 def _append_value(parent, tag: str, value: str):
@@ -117,6 +134,94 @@ def make_docx() -> None:
     document.save(ROOT / "structured-lists-and-table.docx")
 
 
+def make_hierarchy_docx() -> None:
+    """Three real heading levels, with values that are ambiguous without them.
+
+    Both subsections state a "Целевое значение", and only the heading path says
+    which product each belongs to. A chunking strategy that loses headings can
+    still retrieve the number and cannot answer the question.
+    """
+    document = Document()
+    document.add_heading("Регламент обработки документов", level=1)
+    document.add_paragraph(
+        "Документ описывает требования к двум продуктовым линиям и порядок их проверки."
+    )
+
+    document.add_heading("Линия Альфа", level=2)
+    document.add_paragraph("Линия Альфа обслуживает корпоративных клиентов.")
+    document.add_heading("Целевые показатели Альфы", level=3)
+    document.add_paragraph("Целевое значение: 42 единицы в сутки при полной загрузке.")
+    document.add_heading("Ограничения Альфы", level=3)
+    document.add_paragraph("Максимальная задержка обработки составляет 15 минут.")
+
+    document.add_heading("Линия Бета", level=2)
+    document.add_paragraph("Линия Бета обслуживает розничных клиентов.")
+    document.add_heading("Целевые показатели Беты", level=3)
+    document.add_paragraph("Целевое значение: 77 единиц в сутки при полной загрузке.")
+    document.add_heading("Ограничения Беты", level=3)
+    document.add_paragraph("Максимальная задержка обработки составляет 30 минут.")
+
+    document.save(ROOT / "hierarchy-multilevel.docx")
+
+
+# Markers carry the hierarchy: Docling's numbering inference recognises `1.` as
+# an arabic marker of depth 1 and `1.1.` as a dotted marker of depth 2, and the
+# two distinct families are what it compresses into two heading levels.
+NUMBERED_SECTIONS = (
+    (1, "1. Введение", "Введение объясняет цель регламента и область его применения."),
+    (2, "1.1. Область применения", "Регламент применяется ко всем входящим документам."),
+    (2, "1.2. Термины", "Термин «партия» означает набор документов одной загрузки."),
+    (1, "2. Порядок обработки", "Обработка выполняется в три последовательных этапа."),
+    (2, "2.1. Приём", "На приёме проверяется формат и целостность файла."),
+    (2, "2.2. Проверка", "Контрольное значение проверки равно 64 пунктам."),
+    (1, "3. Заключение", "Заключение фиксирует ответственных и сроки пересмотра."),
+)
+
+
+def make_numbered_sections_pdf() -> None:
+    """A text-layer PDF whose outline numbering encodes a two-level hierarchy.
+
+    Docling reports every section header at level 1 unless heading-hierarchy
+    inference is enabled, so this fixture is what proves the feature flag does
+    something, and proves it on structure rather than on heading count.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    font_path = _font_path()
+    bold_path = font_path.with_name(font_path.name.replace(".ttf", "-Bold.ttf"))
+    pdfmetrics.registerFont(TTFont("FixtureSans", str(font_path)))
+    pdfmetrics.registerFont(
+        TTFont("FixtureSans-Bold", str(bold_path if bold_path.exists() else font_path))
+    )
+
+    pdf = canvas.Canvas(
+        str(ROOT / "numbered-sections.pdf"), pagesize=A4, pageCompression=1
+    )
+    page_width, page_height = A4
+    y = page_height - 80
+
+    # Headings are bold and clearly larger than body text: the layout model has
+    # to classify them as section headers before numbering can order them.
+    pdf.setFont("FixtureSans-Bold", 22)
+    pdf.drawString(70, y, "Регламент обработки: нумерованные разделы")
+    y -= 60
+
+    for level, heading, body in NUMBERED_SECTIONS:
+        if y < 140:
+            pdf.showPage()
+            y = page_height - 80
+        pdf.setFont("FixtureSans-Bold", 18 if level == 1 else 15)
+        pdf.drawString(70, y, heading)
+        y -= 30
+        pdf.setFont("FixtureSans", 11)
+        pdf.drawString(70, y, body)
+        y -= 46
+
+    pdf.showPage()
+    pdf.save()
+
+
 def add_textbox(slide, left, top, width, height, text, size=20, bold=False):
     shape = slide.shapes.add_textbox(Cm(left), Cm(top), Cm(width), Cm(height))
     paragraph = shape.text_frame.paragraphs[0]
@@ -159,11 +264,12 @@ def make_pptx() -> None:
 
 def make_raster_ocr_pdf() -> None:
     width, height = 2480, 3508
+    font_path = _font_path()
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype(str(FONT_PATH), 62)
-    heading = ImageFont.truetype(str(FONT_PATH), 74)
-    small = ImageFont.truetype(str(FONT_PATH), 48)
+    font = ImageFont.truetype(str(font_path), 62)
+    heading = ImageFont.truetype(str(font_path), 74)
+    small = ImageFont.truetype(str(font_path), 48)
 
     draw.text((160, 180), "РУССКИЙ OCR: КОНТРОЛЬНЫЙ ДОКУМЕНТ", font=heading, fill="black")
     draw.text(
@@ -235,9 +341,148 @@ def make_vector_outline_pdf() -> None:
     pdf.save()
 
 
+CODE_LISTING = (
+    "def normalize_weight(raw_weight, minimum=0.0, maximum=1.0):",
+    '    """Clamp a document weight into the accepted range."""',
+    "    if raw_weight is None:",
+    "        raise ValueError('weight is required')",
+    "    return max(minimum, min(maximum, float(raw_weight)))",
+)
+
+# Values are deliberately unequal, three digits apart and not round, so a model
+# that invents plausible numbers cannot land on them by accident.
+CHART_SERIES = (("Альфа", 12), ("Бета", 34), ("Гамма", 56))
+
+
+def _draw_formula(path: Path) -> None:
+    """A quadratic formula as PIXELS, not as a text layer.
+
+    Formula enrichment has to read the image; if the characters were selectable
+    text the fixture would prove the PDF backend, not the model.
+    """
+    font = ImageFont.truetype(str(_font_path()), 44)
+    small = ImageFont.truetype(str(_font_path()), 26)
+    image = Image.new("RGB", (760, 190), "white")
+    draw = ImageDraw.Draw(image)
+    draw.text((30, 60), "x =", font=font, fill="black")
+    draw.text((130, 25), "-b ±", font=font, fill="black")
+    draw.text((250, 20), "√(b", font=font, fill="black")
+    draw.text((330, 8), "2", font=small, fill="black")
+    draw.text((355, 20), "- 4ac)", font=font, fill="black")
+    draw.line((130, 88, 560, 88), fill="black", width=4)
+    draw.text((300, 100), "2a", font=font, fill="black")
+    image.save(path, format="PNG")
+
+
+def _draw_bar_chart(path: Path) -> None:
+    """A bar chart as PIXELS: no embedded chart XML to read the values from.
+
+    The PPTX fixture already covers the native-chart path, where Docling
+    recovers series straight from the source file. This one is the case that
+    genuinely needs a vision model.
+    """
+    font = ImageFont.truetype(str(_font_path()), 22)
+    title_font = ImageFont.truetype(str(_font_path()), 26)
+    width, height = 720, 480
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    draw.text((150, 20), "Обработано документов", font=title_font, fill="black")
+
+    baseline = height - 70
+    draw.line((90, baseline, width - 40, baseline), fill="black", width=3)
+    draw.line((90, 70, 90, baseline), fill="black", width=3)
+
+    scale = (baseline - 110) / max(value for _, value in CHART_SERIES)
+    for index, (label, value) in enumerate(CHART_SERIES):
+        left = 150 + index * 170
+        top = baseline - value * scale
+        draw.rectangle((left, top, left + 110, baseline), fill="#4c6ef5")
+        draw.text((left + 30, top - 32), str(value), font=font, fill="black")
+        draw.text((left + 20, baseline + 14), label, font=font, fill="black")
+
+    image.save(path, format="PNG")
+
+
+def make_enrichment_pdf() -> None:
+    """One PDF carrying all three enrichment signals, each in its own section.
+
+    Code stays a real text layer in a monospace font, because that is the shape
+    the layout model classifies as code. The formula and the chart are raster
+    images on purpose: they are the cases the advanced pass exists for.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    font_path = _font_path()
+    bold_path = font_path.with_name(font_path.name.replace(".ttf", "-Bold.ttf"))
+    pdfmetrics.registerFont(TTFont("FixtureSans", str(font_path)))
+    pdfmetrics.registerFont(
+        TTFont("FixtureSans-Bold", str(bold_path if bold_path.exists() else font_path))
+    )
+
+    formula_path = ROOT / "_enrichment-formula.png"
+    chart_path = ROOT / "_enrichment-chart.png"
+    _draw_formula(formula_path)
+    _draw_bar_chart(chart_path)
+
+    pdf = canvas.Canvas(
+        str(ROOT / "enrichment-code-formula-chart.pdf"), pagesize=A4, pageCompression=1
+    )
+    page_width, page_height = A4
+    y = page_height - 80
+
+    pdf.setFont("FixtureSans-Bold", 20)
+    pdf.drawString(60, y, "Справочник обработки документов")
+    y -= 46
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "1. Листинг нормализации веса")
+    y -= 30
+    pdf.setFont("Courier", 10.5)
+    for line in CODE_LISTING:
+        pdf.drawString(72, y, line)
+        y -= 16
+    y -= 30
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "2. Формула корней квадратного уравнения")
+    y -= 24
+    pdf.drawImage(
+        ImageReader(str(formula_path)), 60, y - 100, width=340, height=95, mask=None
+    )
+    y -= 140
+
+    pdf.setFont("FixtureSans-Bold", 15)
+    pdf.drawString(60, y, "3. Диаграмма обработанных документов")
+    y -= 24
+    pdf.drawImage(
+        ImageReader(str(chart_path)), 60, y - 250, width=360, height=240, mask=None
+    )
+
+    pdf.showPage()
+    pdf.save()
+
+    formula_path.unlink()
+    chart_path.unlink()
+
+
+GENERATORS = {
+    "enrichment-pdf": make_enrichment_pdf,
+    "structured-docx": make_docx,
+    "hierarchy-docx": make_hierarchy_docx,
+    "numbered-sections-pdf": make_numbered_sections_pdf,
+    "reading-order-pptx": make_pptx,
+    "raster-ocr-pdf": make_raster_ocr_pdf,
+    "vector-outline-pdf": make_vector_outline_pdf,
+}
+
+
 if __name__ == "__main__":
+    import sys
+
     ROOT.mkdir(parents=True, exist_ok=True)
-    make_docx()
-    make_pptx()
-    make_raster_ocr_pdf()
-    make_vector_outline_pdf()
+    selected = sys.argv[1:] or list(GENERATORS)
+    for name in selected:
+        if name not in GENERATORS:
+            raise SystemExit(f"Unknown fixture {name}; known: {', '.join(GENERATORS)}")
+        GENERATORS[name]()

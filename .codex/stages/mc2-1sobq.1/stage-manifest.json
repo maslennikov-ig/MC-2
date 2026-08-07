@@ -1,0 +1,91 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1sobq.1",
+  "goal_id": "mc2-1sobq.1",
+  "epic_id": "mc2-1sobq",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "structure-aware-docling-rag",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "stage2-docling-conversion",
+      "stage2-chunking",
+      "embeddings-metadata-enrichment",
+      "qdrant-payload",
+      "docling-quality-harness",
+      "docling-mcp-runtime"
+    ],
+    "risk_models": [
+      "payload-compatibility",
+      "retrieval-regression",
+      "provenance-integrity",
+      "feature-flag-rollback"
+    ],
+    "test_environments": ["vitest", "local-docling-stack"],
+    "rollback_boundary": "chunking-strategy-and-heading-inference-flags",
+    "acceptance_proofs": [
+      "focused-chunking-provenance-and-payload-tests",
+      "docling-quality-corpus-both-conversion-profiles",
+      "offline-retrieval-evidence-ab",
+      "pnpm-type-check-build-lint"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1sobq.1",
+    "source_digest": "e094d6175466337d9df5584dfd11d135b908259e487dfdad5d446bd7256f64ea",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Distinct heading levels проверяются корректно на известной фикстуре: документ только с одним уровнем заголовков не доказывает двухуровневую иерархию.",
+        "text_digest": "906ae782eda6f912cc30ea7deefbc682830e008f534e9fd2fd8160857b59297d"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Native chunking candidate (docling_hierarchical/docling_hybrid) проходит контрольный корпус и retrieval/evidence benchmark, не регрессирует контрольные запросы и улучшает минимум один structural case против legacy_markdown.",
+        "text_digest": "81b7a94c99ee429ffbfba04951adefdc9fa3a179e146d6df908cf8e61f8275e2"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Не менее 95% применимых текстовых child chunks несут self_ref и page/bbox provenance до Qdrant payload; исключения классифицированы и отражены в отчёте.",
+        "text_digest": "9e64979a2172ae4c6049a7b51d8c86f49faf63aadaa54128c4ce2dc644fee07b"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Parent/child, siblings, priority boost и late chunking сохраняют контракт; rollback на legacy_markdown восстанавливает текущее поведение payload.",
+        "text_digest": "a7f9bd0203dd624773baebe92dbc1fc46c2cdd4052f215d0cb547e8677775917"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "PDF heading inference включается только под feature flag и подтверждается на многоуровневой фикстуре; существующие документы не переиндексируются.",
+        "text_digest": "733d00f249b539b9da9afa9667238e3f8cac58e21420129c1a7f027b21883a4a"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1sobq.1/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "e094d6175466337d9df5584dfd11d135b908259e487dfdad5d446bd7256f64ea",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1sobq.1/artifacts/mc2-1sobq.1.md",
+      "task_id": "mc2-1sobq.1",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}
