@@ -1,0 +1,94 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1sobq.5",
+  "goal_id": "mc2-1sobq.5",
+  "epic_id": "mc2-1sobq",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 5,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "release-candidate-and-controlled-rollout",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "docling-serve-runtime",
+      "docling-mcp-runtime",
+      "deploy-blue-green",
+      "shared-embeddings-chunking"
+    ],
+    "risk_models": [
+      "silent-strategy-fallback",
+      "chunking-identity-collision",
+      "unrehearsed-rollback",
+      "image-digest-drift"
+    ],
+    "test_environments": ["vitest", "github-actions", "production-readonly-probe"],
+    "rollback_boundary": "chunk-strategy-variable-and-mcp-image-digest",
+    "acceptance_proofs": [
+      "runtime-strategy-resolution-probe",
+      "conversion-to-chunking-smoke-on-new-document",
+      "serve-version-identity-unit-tests",
+      "rollback-rehearsal-on-real-images",
+      "pnpm-type-check-build",
+      "ops-asset-manifest-suite"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1sobq.5",
+    "source_digest": "cd53576d055524caa7fe6629a2afbc65f202a6ac2e633b501ee1c83c8665b70f",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Все дочерние acceptance evidence связаны.",
+        "text_digest": "5ae6fd5b7905aa018df97b3f9277d52b0ad6d15a1db865ad14da816b84baca90"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "pnpm type-check/build/test и релевантные Docker/contract/integration/quality gates green.",
+        "text_digest": "c04d46112f954bbbf1f7ab4e0e02919e6bded3a441b4879dca19ba5b06339ec5"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Exact images/models/config digest-pinned.",
+        "text_digest": "06afbbd4cc8c88da928ad8f56efd05039b718ed66e359041f3f277cf0af9f01a"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Rollback flags/images проверены.",
+        "text_digest": "88dcba55ef6adb6f75d358862b0faf341ceb0015f0cd072313bb0593b6056339"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "После отдельной deploy-authority один новый control document проходит live smoke.",
+        "text_digest": "bcd7987fdfc0879bac48a9c4d5374efa7e32210163d5f1f95cc11da7404172c0"
+      },
+      {
+        "criterion_id": "AC-6",
+        "text": "Существующие документы не reindex.",
+        "text_digest": "7c24a27126743170dfea97c87ebaddcd6a84e52ca98f7112f5ea909ca3109491"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1sobq.5/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "cd53576d055524caa7fe6629a2afbc65f202a6ac2e633b501ee1c83c8665b70f",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1sobq.5/artifacts/mc2-1sobq.5.md",
+      "task_id": "mc2-1sobq.5",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}
