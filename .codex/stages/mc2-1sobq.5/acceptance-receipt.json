@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/shared/embeddings tests/unit/stages/stage2-document-processing",
+      "duration_seconds": 4.642,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/shared/embeddings tests/unit/stages/stage2-document-processing"
+  ],
+  "completed_at": "2026-08-07T14:04:38.698153+00:00",
+  "diff_digest": "96f4643d2ea3b1552109b890ad87f06421f771afccb0d007912789a76308b4d3",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "1befdb5ac80270faf1595091aee1fbb5319f5c82",
+  "idempotency_key": "83f4a7cecfc3658e81f1f030edd250734dfe5842e8cd8b78f431d9cf33fa659c",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1sobq.5",
+  "started_at": "2026-08-07T14:04:33.916562+00:00",
+  "verification_fingerprint": "83f4a7cecfc3658e81f1f030edd250734dfe5842e8cd8b78f431d9cf33fa659c"
+}
