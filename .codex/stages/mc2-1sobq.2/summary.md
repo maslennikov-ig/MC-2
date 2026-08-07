@@ -87,7 +87,8 @@ invented title and three mangled labels.
 
 FR-014 makes invented labels a blocking failure, so the capability sits in
 `REJECTED_CAPABILITIES` with that reason and the router refuses it unless a
-caller explicitly passes `allowRejected`. The model stays in the advanced image
+caller explicitly passes `allowRejected`. CORRECTED IN STAGE D: the model does
+NOT stay in the advanced image
 so Stage D can measure a larger VLM against the same fixture rather than
 starting from nothing. A failed candidate is a valid result; hiding it would
 not be.

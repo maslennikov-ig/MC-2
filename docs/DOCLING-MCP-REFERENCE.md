@@ -325,8 +325,10 @@ relaxed to whatever the current model happens to produce.
 chart labelled Альфа/Бета/Гамма as "Bemma"/"BeTa"/"Rammma" under an invented
 title. FR-014 makes invented labels blocking, so the capability sits in
 `REJECTED_CAPABILITIES` and the router refuses it unless a caller explicitly
-passes `allowRejected`. The model stays in the image so Stage D can measure a
-larger VLM against the same fixture.
+passes `allowRejected`. An earlier sentence here said the model stays in the
+image for a Stage D retry; it does NOT — the model set was cut to
+`code_formula`, and Stage D confirmed no VLM weights ship in either image. A
+retry needs a build.
 
 Cache identity carries all of this: `resolveConversionProfile` folds the applied
 capabilities and their exact models into the string that chunk ids and cache
@@ -418,25 +420,47 @@ generators need `openpyxl`, `odfpy` and `ebooklib` in addition to the existing
 **EasyOCR stays the default. RapidOCR lost the quality gate on the same inputs.**
 
 Measured 2026-08-07 on a corpus built to be hard enough to separate two engines:
-the previous control document is a clean 300 dpi render that both read
-perfectly, so it could not decide anything. The three new fixtures add
+the previous control document is a clean 300 dpi render. EasyOCR reads it
+perfectly; RapidOCR was NEVER RUN on it, so "both read it perfectly" — which an
+earlier draft of this section claimed — was never measured. The three new fixtures add
 deterministic damage — resample to 42-60%, JPEG quality 38-62, up to 1.4 degrees
 of skew — plus mixed Cyrillic/Latin lines and a ruled Cyrillic table.
 
-| case                     | EasyOCR `ru,en` | RapidOCR `cyrillic` |
-| ------------------------ | --------------: | ------------------: |
-| russian-ocr-degraded     |           1.000 |               0.778 |
-| russian-ocr-mixed-script |           0.849 |               0.736 |
-| russian-ocr-table        |           1.000 |               0.636 |
-| **mean**                 |      **0.9496** |          **0.7168** |
+| case                     | EasyOCR `ru,en` | RapidOCR `cyrillic` | table cells E / R |
+| ------------------------ | --------------: | ------------------: | ----------------: |
+| russian-ocr-degraded     |           1.000 |               0.778 |               n/a |
+| russian-ocr-mixed-script |           0.849 |               0.736 |               n/a |
+| russian-ocr-table        |           1.000 |               0.636 | 0.917 / **1.000** |
+| **mean**                 |      **0.9496** |          **0.7168** |                   |
+
+**Read the last row carefully, because the first two columns invert it.** The
+`russian-ocr-table` phrase score is ONE heading. On the cells — the thing the
+case is named for — RapidOCR is the one that read the table correctly:
+
+```
+easy : | Аналитика | 120 |     |   <- 118 lost
+rapid: | Аналитика | 120 | 118 |   <- complete
+```
+
+**n = 3 documents, 8 phrases, and 4 of those are exact ties at 1.000.** The whole
+macro gap is three headings: table +0.121, degraded +0.074, mixed +0.067, and the
+homoglyph line goes the other way at -0.029. The aggregate also decides the
+size of the gap: macro-mean 0.233, pooled 0.185, length-weighted 0.090, corpus
+CER 0.065 — and under CER the mixed-script case flips to RapidOCR. Every
+aggregate keeps EasyOCR ahead, so the DIRECTION is safe. The magnitude is not,
+and a sample this small does not establish a permanent default; it establishes
+that there is no reason to change one.
 
 Phrase similarity is per character against exact ground truth, not "contains":
 a phrase read with two wrong letters must score near 1, or the comparison
 measures nothing.
 
-**Where RapidOCR actually loses:** large type. It returned `# BO ПО НАПРАВЛЕ
-ЕНИЯМ` for `СВОДКА ПО НАПРАВЛЕНИЯМ` and `# O 3 BA A ИДЕНТ` for `ОТЧЁТ ЗА III
-КВАРТАЛ` — consistent with a mobile detection model tuned for body text.
+**Where RapidOCR loses, as a HYPOTHESIS rather than a measurement:** all three
+damaged phrases are headings, and every body line scores 1.000. But heading size
+is fully confounded here — each is also the largest, the only all-caps, the
+topmost, and labelled a heading. Nothing varied size while holding the rest
+fixed, so "loses on large type" is the pattern the data suggests, not a fact it
+establishes.
 
 **Where RapidOCR wins, and it is worth saying:** table cells, 1.000 against
 0.917, and the deliberately adversarial homoglyph line, 0.744 against 0.395.
@@ -463,11 +487,16 @@ models download rapidocr` without `--rapidocr-backend-lang onnxruntime:cyrillic`
 `ProcessingPipeline.VLM` and the `vlm_pipeline_*` options exist in Serve 1.29.0,
 and no VLM weights are in either image — `docling-serve-advanced` carries
 CodeFormulaV2, layout-heron, DocumentFigureClassifier, EasyOcr and RapidOcr, and
-nothing else. Enabling one means a new image and RAM the host does not have:
-Stage B measured `granite-vision-4.1-4b` at 30.6 GB image and 4.34 GiB peak
-against a host recorded at 11 GiB whose compose limits already sum to about
-twice that. The one VLM previously measured, `SmolVLM-256M`, fabricated chart
-labels and was rejected on evidence.
+nothing else. What that PROVES is a build cost: a retry needs an image change, not a flag.
+
+The RAM argument is weaker than an earlier draft of this section implied, and
+the distinction matters. Stage B's 30.6 GB / 4.34 GiB figures are for
+`granite_chart_extraction_v4`, a chart ENRICHMENT model, and `SmolVLM-256M` was
+measured as `picture_description` on a single image. Neither is a conversion
+pipeline. Docling's own VLM pipeline models — SmolDocling-256M,
+granite-docling-258M — are hundreds of megabytes, and no measurement here shows
+the host cannot hold one. What IS established: no VLM weights ship in either
+image, and the one VLM measured on this corpus fabricated chart labels.
 
 `force_backend_text` is a `PdfPipelineOptions` field that Serve does NOT expose
 in its request options — the same class of gap as `heading_hierarchy_options` in

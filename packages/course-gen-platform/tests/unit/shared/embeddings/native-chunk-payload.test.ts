@@ -87,6 +87,49 @@ describe('native chunk Qdrant payload', () => {
     expect(bbox).toMatchObject({ coordOrigin: 'BOTTOMLEFT', pageWidth: 595, pageHeight: 842 });
   });
 
+  it('carries the container a chunk came from into the payload', async () => {
+    // Retrieval reads the PAYLOAD. Resolving the worksheet in the provenance
+    // index and stopping there left the motivating case — telling a rate in the
+    // staff sheet from one in the budget sheet — exactly as unanswerable as
+    // before, while the fixture harness passed because it reads the raw
+    // document instead.
+    const chunk = {
+      ...getAllChunks(await chunkMarkdown('Текст листа. '.repeat(60)))[0],
+      provenance: {
+        self_refs: ['#/tables/1'],
+        page_numbers: [],
+        bboxes: [],
+        labels: ['table'],
+        native_token_count: null,
+        containers: [{ label: 'sheet', name: 'Преподаватели', index: 1, selfRef: '#/groups/1' }],
+      },
+    };
+
+    const [payload] = enrichChunks([chunk], ENRICHMENT).map(toQdrantPayload);
+    expect(payload.provenance_container_names).toEqual(['Преподаватели']);
+    expect(payload.provenance_containers).toEqual([
+      { label: 'sheet', name: 'Преподаватели', index: 1 },
+    ]);
+  });
+
+  it('omits the container keys entirely when the format declares none', async () => {
+    const chunk = {
+      ...getAllChunks(await chunkMarkdown('Текст без листов. '.repeat(60)))[0],
+      provenance: {
+        self_refs: ['#/texts/0'],
+        page_numbers: [],
+        bboxes: [],
+        labels: ['text'],
+        native_token_count: null,
+        containers: [],
+      },
+    };
+
+    const [payload] = enrichChunks([chunk], ENRICHMENT).map(toQdrantPayload);
+    expect('provenance_containers' in payload).toBe(false);
+    expect('provenance_container_names' in payload).toBe(false);
+  });
+
   it('leaves the legacy payload shape untouched when the strategy is off', async () => {
     const legacy = await chunkMarkdown(
       ['# Раздел', '', 'Тело раздела с достаточным объёмом текста для чанка. '.repeat(40)].join(

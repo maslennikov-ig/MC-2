@@ -118,10 +118,10 @@ const tier = getEffectiveTier('instructor', 'basic'); // Returns 'basic'
 
 | Tier         | Target Audience           | Monthly Price | Storage Quota | Max File Size | Files/Course | Concurrent Jobs |
 | ------------ | ------------------------- | ------------- | ------------- | ------------- | ------------ | --------------- |
-| **TRIAL**    | Evaluation users          | $0            | 1 GB          | 10 MB         | 3            | 5               |
+| **TRIAL**    | Evaluation users          | $0            | 1 GB          | 30 MB         | 3            | 5               |
 | **FREE**     | Individual exploration    | $0            | 10 MB         | 5 MB          | 0            | 1               |
 | **BASIC**    | Hobbyists, educators      | $19           | 100 MB        | 10 MB         | 1            | 2               |
-| **STANDARD** | Small teams, businesses   | $49           | 1 GB          | 10 MB         | 3            | 5               |
+| **STANDARD** | Small teams, businesses   | $49           | 1 GB          | 30 MB         | 3            | 5               |
 | **PREMIUM**  | Institutions, enterprises | $149          | 10 GB         | 100 MB        | 10           | 10              |
 
 ---
@@ -130,13 +130,13 @@ const tier = getEffectiveTier('instructor', 'basic'); // Returns 'basic'
 
 ### Allowed MIME Types by Tier
 
-| Tier         | Allowed MIME Types                         |
-| ------------ | ------------------------------------------ |
-| **TRIAL**    | PDF, DOCX, PPTX, HTML, TXT, MD             |
-| **FREE**     | None (no file uploads)                     |
-| **BASIC**    | TXT, MD only                               |
-| **STANDARD** | PDF, DOCX, PPTX, HTML, TXT, MD             |
-| **PREMIUM**  | All above + PNG, JPG, JPEG, GIF, SVG, WEBP |
+| Tier         | Allowed MIME Types                                                              |
+| ------------ | ------------------------------------------------------------------------------- |
+| **TRIAL**    | PDF, DOCX, PPTX, HTML, TXT, MD                                                  |
+| **FREE**     | None (no file uploads)                                                          |
+| **BASIC**    | TXT, MD only                                                                    |
+| **STANDARD** | PDF, DOCX, PPTX, HTML, TXT, MD                                                  |
+| **PREMIUM**  | All above + PNG, JPG, JPEG, GIF, SVG, WEBP, XLSX, CSV, ODT, ODS, ODP, EPUB, TEX |
 
 ### Detailed MIME Type Mapping
 
@@ -153,6 +153,19 @@ const tier = getEffectiveTier('instructor', 'basic'); // Returns 'basic'
 | GIF    | `image/gif`                                                                 | -     | -    | -     | -        | Y       |
 | SVG    | `image/svg+xml`                                                             | -     | -    | -     | -        | Y       |
 | WEBP   | `image/webp`                                                                | -     | -    | -     | -        | Y       |
+| XLSX   | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`         | -     | -    | -     | -        | Y       |
+| CSV    | `text/csv`                                                                  | -     | -    | -     | -        | Y       |
+| ODT    | `application/vnd.oasis.opendocument.text`                                   | -     | -    | -     | -        | Y       |
+| ODS    | `application/vnd.oasis.opendocument.spreadsheet`                            | -     | -    | -     | -        | Y       |
+| ODP    | `application/vnd.oasis.opendocument.presentation`                           | -     | -    | -     | -        | Y       |
+| EPUB   | `application/epub+zip`                                                      | -     | -    | -     | -        | Y       |
+| TEX    | `text/x-tex`                                                                | -     | -    | -     | -        | Y       |
+
+The MIME column is the CANONICAL type, which is what the platform stores. A file
+may be DECLARED as any spelling `MIME_TYPES_BY_EXTENSION` allows for its
+extension — browsers send `text/plain` for `.md` and `.tex`, and
+`application/vnd.ms-excel` for `.csv` — but the declared type must match the
+extension or the upload is refused.
 
 ---
 

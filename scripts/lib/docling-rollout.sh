@@ -168,5 +168,11 @@ docling_rollback_rollout() {
     docker compose -f "$compose_file" --env-file "$env_file" \
         up -d --no-deps --force-recreate docling-mcp-internal docling-mcp || return 1
     docker compose -f "$compose_file" --env-file "$env_file" stop docling-serve || return 1
-    docling_check_facade
+
+    # The facade answering is NOT proof the rollback worked: nginx keeps serving
+    # whether or not the MCP behind it can convert anything. Without the tool
+    # check this function printed "MCP 1.x was restored" over a dead conversion
+    # path, which is the worst possible moment to be optimistic.
+    docling_check_facade || return 1
+    docling_check_required_tools
 }

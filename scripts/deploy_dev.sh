@@ -177,9 +177,17 @@ echo "   Directories ready."
 echo "Ensuring infrastructure is running..."
 INFRA_SERVICES=(redis notebooklm-bridge worker-stage7)
 INFRA_SERVICES+=("${DOCLING_ROLLOUT_SERVICES[@]}")
+# NOT a bare `up -d`: `docling-mcp-internal` declares `depends_on: docling-serve:
+# service_healthy`, so compose WAITS on the new Serve and exits non-zero when it
+# never gets there — up to ~330s of start_period plus retries. Under `set -e` a
+# bare command would kill this script at that point, which is precisely BEFORE
+# the rollback below. The single most likely Docling failure would therefore
+# have left production with a stopped Serve, a crash-looping MCP and no
+# automatic recovery, having never reached the recovery code written for it.
+infra_up_failed=false
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" --env-file "$BASE_PATH/.env.production" \
-    up -d "${INFRA_SERVICES[@]}"
-if ! docling_check_facade || \
+    up -d "${INFRA_SERVICES[@]}" || infra_up_failed=true
+if [ "$infra_up_failed" = true ] || ! docling_check_facade || \
     { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
     docling_rollback_rollout "$BASE_PATH/.env.production" "$BASE_PATH/docker-compose.infra.yml" \
         || { echo "ERROR: Docling MCP health failed and rollback failed" >&2; exit 1; }

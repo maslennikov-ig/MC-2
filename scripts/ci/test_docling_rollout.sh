@@ -170,11 +170,21 @@ EOF
 docling_check_facade() {
     return 0
 }
+# The rollback now also proves the restored MCP exposes the conversion tools;
+# the harness has no container to exec into, so it stands in for that check.
+docling_check_required_tools() {
+    printf '%s\n' 'check_required_tools' >> "$DOCKER_LOG"
+    return 0
+}
 docling_rollback_rollout "$TEST_DIR/rollback.env" "$TEST_DIR/compose.yml"
 grep -qx "DOCLING_STACK_V2_ENABLED=false" "$TEST_DIR/rollback.env"
 grep -qx "DOCLING_MCP_IMAGE=$ROLLBACK_REF" "$TEST_DIR/rollback.env"
 grep -q 'force-recreate docling-mcp-internal docling-mcp' "$DOCKER_LOG"
 grep -q 'stop docling-serve' "$DOCKER_LOG"
+grep -q 'check_required_tools' "$DOCKER_LOG" || {
+    echo 'rollback did not verify that the restored MCP can actually convert' >&2
+    exit 1
+}
 grep -q 'convert_document_into_docling_document' "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 grep -q 'export_docling_document_to_markdown' "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 grep -q 'save_docling_document' "$ROOT_DIR/scripts/lib/docling-rollout.sh"

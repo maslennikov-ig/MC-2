@@ -470,9 +470,15 @@ async function main(): Promise<void> {
   );
   const outputDirectory = path.join(REPO_ROOT, '.tmp/docling-benchmark', label);
   // The engine is a SERVICE-level setting on the MCP container, not a request
-  // parameter: the accepted `/mcp` conversion tool takes only a source. So the
-  // run records what the container reports rather than what the caller wished
-  // for, and an A/B is two runs against two container configurations.
+  // parameter: the accepted `/mcp` conversion tool takes only a source. An A/B
+  // is therefore two runs against two container configurations.
+  //
+  // These variables are what the CALLER declared, and the harness cannot see
+  // inside the container to check. The comment here used to claim the opposite
+  // — "records what the container reports" — which would have labelled a
+  // RapidOCR run `easyocr` whenever the operator forgot to export the variable,
+  // in the very artifact the engine decision rests on. So the label is written
+  // as a declaration and the report says so.
   const ocrPreset = process.env.DOCLING_MCP_OCR_PRESET ?? 'easyocr';
   const ocrLang = process.env.DOCLING_MCP_OCR_LANG ?? 'ru,en';
   const stagingDirectory = path.join(PACKAGE_ROOT, 'uploads/docling-benchmark', label);
@@ -812,7 +818,9 @@ async function main(): Promise<void> {
           '',
           '## OCR',
           '',
-          `Движок этого прогона: \`${ocrPreset}\`, языки \`${ocrLang}\`. Движок — настройка`,
+          `Движок этого прогона, ПО ЗАЯВЛЕНИЮ ЗАПУСКАВШЕГО: \`${ocrPreset}\`, языки \`${ocrLang}\`.`,
+          'Харнесс не заглядывает в контейнер и проверить это не может — сверяйте с env сервиса.',
+          'Движок — настройка',
           'КОНТЕЙНЕРА MCP, а не параметр запроса, поэтому A/B — это два прогона против двух',
           'конфигураций, а не два запроса. Схожесть фраз — посимвольная, не «содержит»:',
           'частично прочитанная фраза видна как 0.8, а не как ноль.',
