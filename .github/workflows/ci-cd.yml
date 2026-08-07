@@ -735,6 +735,7 @@ jobs:
             docker-compose.infra.yml \
             docker-compose.app.yml \
             docker-compose.production.yml \
+            docker-compose.docling-rollback.yml \
             nginx-docling-proxy.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
