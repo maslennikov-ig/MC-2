@@ -77,10 +77,9 @@ unpacking `streamable_http_client` as 2 values where MCP 1.x yields 3 — every 
 failed, and the docker-stub tests could not see it. Keep `DOCLING_ROLLBACK_IMAGE` on MCP 1.x.
 
 **The host now records which MCP image it runs**, in `.docling-deployed-mcp-image` beside the env
-file, written only after health passes. That is what the rollout gate recognises on the next deploy.
-`DOCLING_PREVIOUS_MCP_IMAGE` still works and bootstraps a host that has recorded nothing, but nobody
-has to move it in lockstep any more. `DOCLING_ROLLBACK_IMAGE` must stay MCP **1.x**: the rollback
-stops Serve, and MCP 3 cannot serve a request without it.
+file, written only after health passes; that is what the rollout gate recognises on the next deploy.
+`DOCLING_PREVIOUS_MCP_IMAGE` still bootstraps a host that has recorded nothing, but nobody has to
+move it in lockstep any more.
 
 **A typo in `DOCLING_CHUNK_STRATEGY` is now caught in CI**, because the application would otherwise
 warn once and fall back to `legacy_markdown` under a green deploy. Verify a flip in the WORKER, never
@@ -89,7 +88,8 @@ in the pipeline — the probe above, or `chunkStrategy` in the worker log once a
 **The chunking profile never recorded a Serve version** until `1befdb5ac`: `GET /version` answers a
 map keyed by package name and has no `version` key, so every profile id ended `serve=unknown` and an
 upgrade could never have been identifiable. Found by the production probe — the tests fed a body
-Serve never sends. Nothing is indexed under the broken id.
+Serve never sends. Nothing was indexed under the broken id. DEPLOYED and verified live in run
+31186229533: the profile now reads `serve=1.29.0/docling-2.118.0`.
 
 ## THE WINDOW IS GONE, and where the reindex stands
 
@@ -184,8 +184,8 @@ explicit paths and never `git add -A`.
 ## Next recommended
 
 Next stage id: `mc2-x72bq` — epic `mc2-1sobq` is delivered, the flip is live and runtime-proven.
-Recommended action: deploy `1befdb5ac` so production stops writing `serve=unknown`, then take the P3
-follow-ups. Reindex, migrations, secrets and force-push are NOT authorized.
+Recommended action: nothing is pending — take the P3 follow-ups when their preconditions hold.
+Reindex, migrations, secrets and force-push are NOT authorized.
 
 ## Starter prompt for next orchestrator
 
