@@ -36,12 +36,12 @@ spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
 production fixes came from it: the embedding cache key now covers model, width, task,
 `late_chunking` and the ordered batch, so a document re-embeds on its first re-processing after a
 deploy; and a Jina 429 waits out the per-minute TOKEN window instead of being fatal.
-**Two upstream fields are accepted and dropped by the pinned stack**, wrapped by
-`docker/docling-{serve,mcp}/runtime.py`: `_parse_standard_pdf_opts` never assigns
-`heading_hierarchy_options`, `get_cache_key` hashes only source+OCR flags. **jobkit 3.3.1 FIXED the
-first**, we pin 3.2.0 via the base-image digest; docling-mcp has no fix (`mc2-ibzcc`). Their
-build-time tests do NOT announce an upstream fix — they test what we pin, so they fire only on a
-pin bump: the fix shipped 2026-08-06 and the 08-07 rebuild was green.
+**ONE runtime wrapper is left**, `docker/docling-mcp/runtime.py`: `get_cache_key` hashes only
+source+OCR flags, and MCP 3.0.0 also drops its own declared timeouts (`mc2-ibzcc`, `mc2-vlskb`).
+The Serve wrapper is GONE — jobkit 3.3.0 assigns `heading_hierarchy_options` itself and, unlike
+ours, sets `generate_parsed_pages` for `use_style`. Its build-time gap test went with it, so the
+Dockerfile now asserts the passthrough EXISTS; a base image that regressed fails the build.
+A wrapper's gap test never announces an upstream fix — it tests what we pin.
 
 **Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
 behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
@@ -51,21 +51,18 @@ peak against an 11 GiB host — `mc2-x72bq`, deferred long-term. The router is T
 
 ## Docling Stage E: images deployed, the chunk flip is live and PROVEN
 
-Production runs images built from the CURRENT tree, 2026-08-07: `docling-serve@sha256:459f995d…`,
-`docling-mcp-v3@sha256:d6610a7c…`, digest-pinned, recreated and healthy, rollback not triggered. The
-digests before this were from 2026-08-05 10:53 and PREDATED Stage A, so production had been running
-without both runtime wrappers and without the baked `ru`/`en` EasyOCR and RapidOCR model sets.
+Production runs `docling-serve@sha256:91d06a5d…` (Serve 1.30.0, jobkit 3.3.0, docling 2.118.0, core
+2.90.0, parse 7.10.0) and `docling-mcp-v3@sha256:d6610a7c…`, digest-pinned and healthy. That Serve
+bump was verified on an isolated stand BEFORE deploy — 18/18 quality cases, OCR identical to the
+Stage D baseline to four places. Rollback is one variable edit back to `sha256:459f995d…`.
 
-**`DOCLING_CHUNK_STRATEGY=docling_hybrid` SHIPPED 2026-08-07** (run 31181424941, force_deploy).
-`.env.production` carries it, the CI validation step confirmed the value, and `megacampus-worker`
-and `worker-stage7` were recreated against it. It is a repository variable, so the rollback is one
-edit backwards plus a redeploy.
-**CONFIRMED AT RUNTIME 2026-08-07** without processing a user document, by two read-only probes in
-the running `megacampus-worker`: the compiled `resolveChunkingStrategy` returns `docling_hybrid` and
-does NOT fall back, and `chunkWithStrategy` — strategy from the process env, not overridden — ran
-end to end on a real cached production document, returning `applied_strategy: docling_hybrid`,
-3 parents / 25 children, `refCoverage: 1`, 22 chunks with containers, and `provenance_containers` in
-the payload. Nothing written. Repeat it from a JSON in `/app/docling-json-cache`.
+**`DOCLING_CHUNK_STRATEGY=docling_hybrid` SHIPPED 2026-08-07** (run 31181424941). It is a repository
+variable, so the rollback is one edit backwards plus a redeploy.
+**CONFIRMED AT RUNTIME 2026-08-07** without processing a user document, by read-only probes in the
+running `megacampus-worker`: the compiled `resolveChunkingStrategy` returns `docling_hybrid` and does
+NOT fall back, and `chunkWithStrategy` ran end to end on a NEW document through the MCP facade —
+`refCoverage: 1`, containers in the payload, profile `serve=1.30.0/docling-2.118.0`. Nothing was
+written; repeat it from a JSON in `/app/docling-json-cache`.
 
 **It changes NEW documents only.** Existing points keep their shape; the collection is mixed BY
 DESIGN (payload fields are additive). Making it uniform needs a reindex, separately authorized.
@@ -182,16 +179,19 @@ explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-ibzcc` — epic `mc2-1sobq` is delivered, the flip is live and runtime-proven.
-Recommended action: `mc2-ibzcc` is half actionable — bump the Serve base image to v1.30.0 (pulls
-jobkit >=3.3.0) and delete that wrapper. Reindex, migrations, secrets, force-push NOT authorized.
+Next stage id: `mc2-bygu1` — the Docling work is finished and deployed; nothing there is pending.
+Recommended action: the uploads on `megacampus-prod` are the only irreplaceable data on that host
+and have no copy anywhere. Reindex, migrations, secrets and force-push are NOT authorized.
 **`mc2-x72bq` is DEFERRED LONG-TERM** by the owner 2026-08-07 — not before the production launch and
 a bigger server. P4, `deferred-long-term`, `owner-gated`. Do not propose it.
+**`mc2-q1ggs`**: two independent processes hold `claude-deploy` on the production host; one rebooted
+it mid-deploy on 2026-08-07. Structurally unchanged.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-ibzcc` (drop both runtime wrappers) once its build-time gap tests
-start failing. `mc2-1sobq` is closed, `mc2-x72bq` is owner-deferred. Keep the rollback on MCP 1.x.
+Use $orchestrator-stage for `mc2-bygu1`. `mc2-1sobq` is closed and the Serve wrapper is gone;
+`mc2-ibzcc`/`mc2-vlskb` wait on a docling-mcp release that has not happened since 3.0.0. Keep
+`DOCLING_ROLLBACK_IMAGE` on MCP 1.x.
 
 ## Read First
 
