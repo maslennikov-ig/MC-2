@@ -1,5 +1,21 @@
 # The official Serve image digest pins the full transitive runtime. These are
-# the only overlay packages required to move it from Docling 2.117/Core 2.88.
+# the overlay packages applied on top of it.
+#
+# The overlay used to RAISE the base (v1.29.0 shipped Docling 2.117 / Core
+# 2.88). Since the base moved to v1.30.0 it does the opposite for one package:
+# that image ships docling-core 2.91.0 and this pins it back to 2.90.0.
+#
+# On purpose. The point of the v1.30.0 bump was to take the jobkit
+# heading-hierarchy fix, and holding docling-core still keeps that the only
+# library change to attribute a behaviour difference to. Nothing is violated by
+# doing so: docling-slim 2.118.0 asks for >=2.90.0 and docling-parse 7.10.0 for
+# >=2.85.0, so `pip check` is satisfied. 2.91.0 carries one feature — uniform
+# `source` on the `add_<...>` constructors — that this service does not call.
+#
+# Revisit when there is a reason to move Core, and re-measure the Stage A-D
+# structure evidence when you do: docling-core is what defines DoclingDocument,
+# and `groups[]`/`label`/`name`/parent chains are read directly by our
+# provenance and container extraction.
 docling-slim[standard,service-client,models-remote,format-opendocument]==2.118.0
 docling-core==2.90.0
 grpcio==1.67.1
