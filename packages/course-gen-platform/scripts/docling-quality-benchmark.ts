@@ -46,6 +46,10 @@ import {
   evaluateHeadingHierarchy,
   type HeadingHierarchyExpectation,
 } from '../src/shared/embeddings/heading-hierarchy.js';
+import {
+  checkStructure,
+  type StructureExpectation,
+} from '../src/stages/stage2-document-processing/docling/structure-assertions.js';
 import { chunkWithStrategy } from '../src/shared/embeddings/chunking-strategy.js';
 import {
   DEFAULT_CHUNKING_CONFIG,
@@ -73,6 +77,7 @@ interface BenchmarkCase {
   headingHierarchy?: Partial<Record<ConversionProfile, HeadingHierarchyExpectation>>;
   requiresNestedList?: boolean;
   minimumColspan?: number;
+  structure?: StructureExpectation;
   expectedError?: 'EmptyConversionError';
   provenance?: { minimumRefCoverage?: number; minimumLocationCoverage?: number };
   retrieval?: GroundTruthQuestion[];
@@ -569,6 +574,20 @@ async function main(): Promise<void> {
             details: `${maximumColspan}`,
           });
         }
+        // Structure is asserted on the RAW document: the sheet a cell belongs
+        // to, the order of the slides and the fact that an equation arrived as
+        // an equation exist nowhere in the Markdown rendering.
+        if (benchmarkCase.structure) {
+          const rawDocument: unknown = JSON.parse(await fs.readFile(bundle.rawJsonPath, 'utf8'));
+          for (const check of checkStructure(rawDocument, benchmarkCase.structure)) {
+            assertions.push({
+              name: check.name,
+              passed: check.passed,
+              details: check.details,
+            });
+          }
+        }
+
         const stableFailures = validateStableDocument(bundle.document);
         assertions.push({
           name: 'stable-normalized-json',

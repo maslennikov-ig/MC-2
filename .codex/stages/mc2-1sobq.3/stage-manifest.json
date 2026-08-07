@@ -1,0 +1,92 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1sobq.3",
+  "goal_id": "mc2-1sobq.3",
+  "epic_id": "mc2-1sobq",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 3,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "premium-input-formats",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "shared-types-file-upload-contract",
+      "stage1-upload-validation",
+      "stage2-docling-conversion",
+      "docling-provenance-containers",
+      "docling-quality-harness",
+      "web-upload-picker"
+    ],
+    "risk_models": [
+      "format-contract-drift",
+      "mime-spoofing",
+      "tier-scope-creep",
+      "structure-loss",
+      "existing-format-regression"
+    ],
+    "test_environments": ["vitest", "local-docling-stack"],
+    "rollback_boundary": "premium-tier-format-lists",
+    "acceptance_proofs": [
+      "premium-format-contract-and-extension-gate-tests",
+      "container-and-structure-assertion-tests",
+      "docling-quality-corpus-seven-format-families",
+      "pnpm-type-check-build-lint"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1sobq.3",
+    "source_digest": "e14d7ade563616bb2a92c295484924629744e255aac1eadb64a5c4307bf7aab1",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Каждый новый формат проходит upload -> Docling -> chunks -> retrieval smoke на живом стеке и сохраняет заявленную структуру своего семейства.",
+        "text_digest": "c8d16f325f86b7f1ecd70debbe25998cc29172dc863856ce33057b60e34cb246"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Ground-truth фикстуры проверяют структурные факты: листы и их имена, порядок слайдов, главы, ячейки и результат формулы, типизированные formula/code.",
+        "text_digest": "cf17c26d41abb309072c387efaf9be1f363204fa6a39245eb46bae4cfdbcbd4b"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Spoofed MIME/extension отклоняются, а хранимый mime_type выводится из расширения, а не из заявления клиента.",
+        "text_digest": "dc02a780fa412f2a25d921145e98d29ace903d06208f64e56574e487c9b4fe45"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Standard/Trial contract не расширен: новые семейства доступны только на Premium.",
+        "text_digest": "5140b6faf62f2d51295526f78007491103726139ae54cb625b4ed3792718d932"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Существующие форматы не регрессируют: прежние пары (расширение, тип) валидируются, chunk-поле containers необязательно и аддитивно.",
+        "text_digest": "57c86f580086e02f579e551fec9b5c2d39c910f19aab54bdf147665c02c4bea5"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1sobq.3/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "e14d7ade563616bb2a92c295484924629744e255aac1eadb64a5c4307bf7aab1",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1sobq.3/artifacts/mc2-1sobq.3.md",
+      "task_id": "mc2-1sobq.3",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

@@ -193,6 +193,10 @@ export async function runPhase1Validation(input: Stage1Input): Promise<Phase1Val
     tier,
     courseTitle: course.title || 'Untitled Course',
     currentFileCount: currentFileCount || 0,
+    // Validation just proved the declared type agrees with the extension, so
+    // the canonical one is always present here. The fallback keeps the type
+    // total rather than describing a state this branch can reach.
+    canonicalMimeType: validationResult.canonicalMimeType ?? input.mimeType,
     durationMs,
   };
 }

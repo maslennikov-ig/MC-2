@@ -79,6 +79,12 @@ export interface Phase1ValidationOutput {
   courseTitle: string;
   /** Current file count for course */
   currentFileCount: number;
+  /**
+   * MIME type resolved from the filename's extension, which is what gets stored
+   * and what every later routing decision reads. The client's declaration was
+   * only ever a claim; it has been checked against the extension by this point.
+   */
+  canonicalMimeType: string;
   /** Duration of phase execution in milliseconds */
   durationMs: number;
 }

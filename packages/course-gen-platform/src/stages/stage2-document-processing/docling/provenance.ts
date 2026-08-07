@@ -41,12 +41,35 @@ export interface DoclingBoundingBox {
   pageHeight?: number;
 }
 
+/**
+ * A structural container an element sits inside: a spreadsheet sheet, a slide,
+ * an EPUB chapter, a list.
+ *
+ * MEASURED against the pinned stack (2026-08-07): this is the ONLY place the
+ * defining structure of the non-paginated formats survives. An XLSX yields one
+ * `sheet` group per worksheet carrying its name, an ODP yields a `chapter`
+ * group per slide, an EPUB yields `section` and `list` groups — and none of it
+ * reaches the Markdown rendering, which flattens every sheet into consecutive
+ * tables with no way to tell which sheet a number came from.
+ */
+export interface DoclingContainer {
+  /** Group label, e.g. `sheet`, `chapter`, `section`, `list`. */
+  label: string;
+  /** Group name when the format supplies one, e.g. the worksheet name. */
+  name: string | null;
+  /** Position among its siblings under the same parent, zero-based. */
+  index: number;
+  selfRef: string;
+}
+
 /** Resolved provenance for one Docling element. */
 export interface DoclingRefProvenance {
   selfRef: string;
   label: string;
   pageNumbers: number[];
   bboxes: DoclingBoundingBox[];
+  /** Enclosing groups, outermost first. Empty when the element sits in the body. */
+  containers: DoclingContainer[];
 }
 
 /** Page geometry keyed by page number. */
@@ -61,6 +84,15 @@ export interface DoclingProvenanceIndex {
   /** Page sizes keyed by page number. */
   pages: Map<number, DoclingPageSize>;
 }
+
+/**
+ * How deep a parent chain is followed before it is treated as malformed.
+ *
+ * A well-formed Docling document nests a handful of levels. A document that
+ * exceeds this either has a cycle or is not a document, and either way walking
+ * it forever is the wrong answer.
+ */
+const MAX_CONTAINER_DEPTH = 32;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -127,6 +159,53 @@ function readProvenance(
   return { pageNumbers: pageNumbers.sort((left, right) => left - right), bboxes };
 }
 
+function parentRef(item: UnknownRecord): string | undefined {
+  const parent = item.parent;
+  if (!isRecord(parent)) return undefined;
+  const ref = parent.$ref ?? parent.cref;
+  return typeof ref === 'string' ? ref : undefined;
+}
+
+/**
+ * Walks an element's parent chain and returns the groups enclosing it,
+ * outermost first.
+ *
+ * Only groups are containers. `#/body` terminates the walk, and a parent that
+ * does not resolve ends it too rather than throwing: a missing ancestor costs
+ * this element its container path, it does not invalidate the document.
+ */
+function readContainers(
+  selfRef: string,
+  records: Map<string, UnknownRecord>,
+  siblingIndex: Map<string, number>
+): DoclingContainer[] {
+  const chain: DoclingContainer[] = [];
+  const seen = new Set<string>([selfRef]);
+
+  let current = records.get(selfRef);
+  for (let depth = 0; depth < MAX_CONTAINER_DEPTH && current; depth += 1) {
+    const ref = parentRef(current);
+    if (!ref || ref === '#/body' || seen.has(ref)) break;
+    seen.add(ref);
+
+    const parent = records.get(ref);
+    if (!parent) break;
+
+    if (ref.startsWith('#/groups/')) {
+      chain.push({
+        label: typeof parent.label === 'string' ? parent.label : 'group',
+        name: typeof parent.name === 'string' ? parent.name : null,
+        index: siblingIndex.get(ref) ?? 0,
+        selfRef: ref,
+      });
+    }
+
+    current = parent;
+  }
+
+  return chain.reverse();
+}
+
 /**
  * Builds the self_ref -> provenance index for a raw Docling document.
  *
@@ -140,22 +219,44 @@ export function buildDoclingProvenanceIndex(raw: unknown): DoclingProvenanceInde
 
   const pages = readPages(raw);
   const refs = new Map<string, DoclingRefProvenance>();
+  const records = new Map<string, UnknownRecord>();
 
   for (const collection of REFERENCED_COLLECTIONS) {
     const items = raw[collection];
     if (!Array.isArray(items)) continue;
-
     items.forEach((value, index) => {
       if (!isRecord(value)) return;
       const selfRef =
         typeof value.self_ref === 'string' ? value.self_ref : `#/${collection}/${index}`;
-      const { pageNumbers, bboxes } = readProvenance(value, pages);
-      refs.set(selfRef, {
-        selfRef,
-        label: typeof value.label === 'string' ? value.label : collection,
-        pageNumbers,
-        bboxes,
-      });
+      records.set(selfRef, value);
+    });
+  }
+
+  // Position among siblings, resolved once from each parent's declared child
+  // order. This is what makes "the third slide" a fact rather than an inference
+  // from a group name that only some backends fill in: ODP names its groups
+  // `slide-0` while numbering the titles from one, so the name is not an index.
+  const siblingIndex = new Map<string, number>();
+  const assignSiblings = (container: UnknownRecord): void => {
+    const children = Array.isArray(container.children) ? container.children : [];
+    children.forEach((child, position) => {
+      if (!isRecord(child)) return;
+      const ref = child.$ref ?? child.cref;
+      if (typeof ref === 'string') siblingIndex.set(ref, position);
+    });
+  };
+  if (isRecord(raw.body)) assignSiblings(raw.body);
+  for (const record of records.values()) assignSiblings(record);
+
+  for (const [selfRef, value] of records) {
+    const { pageNumbers, bboxes } = readProvenance(value, pages);
+    const collection = selfRef.split('/')[1] ?? 'texts';
+    refs.set(selfRef, {
+      selfRef,
+      label: typeof value.label === 'string' ? value.label : collection,
+      pageNumbers,
+      bboxes,
+      containers: readContainers(selfRef, records, siblingIndex),
     });
   }
 
@@ -169,6 +270,8 @@ export interface AggregatedProvenance {
   pageNumbers: number[];
   bboxes: DoclingBoundingBox[];
   labels: string[];
+  /** Distinct enclosing containers, in first-seen order. */
+  containers: DoclingContainer[];
 }
 
 /**
@@ -186,6 +289,8 @@ export function aggregateProvenance(
   const bboxes: DoclingBoundingBox[] = [];
   const labels: string[] = [];
   const unresolvedRefs: string[] = [];
+  const containers: DoclingContainer[] = [];
+  const seenContainers = new Set<string>();
 
   for (const selfRef of selfRefs) {
     const resolved = index.refs.get(selfRef);
@@ -198,6 +303,11 @@ export function aggregateProvenance(
     }
     bboxes.push(...resolved.bboxes);
     if (!labels.includes(resolved.label)) labels.push(resolved.label);
+    for (const container of resolved.containers) {
+      if (seenContainers.has(container.selfRef)) continue;
+      seenContainers.add(container.selfRef);
+      containers.push(container);
+    }
   }
 
   return {
@@ -206,5 +316,6 @@ export function aggregateProvenance(
     pageNumbers: pageNumbers.sort((left, right) => left - right),
     bboxes,
     labels,
+    containers,
   };
 }

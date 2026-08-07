@@ -454,7 +454,9 @@ export async function uploadCareerPlaybookBusinessContextSource(
       userId: user.id,
       filename: input.filename,
       fileSize: input.fileSize,
-      mimeType: input.mimeType,
+      // Same rule as the course upload path: store the type the extension
+      // implies, not the one the client claimed.
+      mimeType: validation.canonicalMimeType ?? input.mimeType,
       fileContent: input.fileContent,
     });
 

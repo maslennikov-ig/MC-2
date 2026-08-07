@@ -325,6 +325,7 @@ async function buildAdaptation(
         page_numbers: parentProvenance.pageNumbers,
         bboxes: parentProvenance.bboxes,
         labels: parentProvenance.labels,
+        containers: parentProvenance.containers,
         native_token_count: [...new Set(group.units.map(unit => unit.member))].reduce(
           (total, member) => total + (member.numTokens ?? 0),
           0
@@ -367,6 +368,7 @@ async function buildAdaptation(
           page_numbers: memberProvenance.pageNumbers,
           bboxes: memberProvenance.bboxes,
           labels: memberProvenance.labels,
+          containers: memberProvenance.containers,
           native_token_count: unit.member.numTokens,
         },
       });

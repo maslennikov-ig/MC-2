@@ -331,3 +331,83 @@ Cache identity carries all of this: `resolveConversionProfile` folds the applied
 capabilities and their exact models into the string that chunk ids and cache
 keys are built from, so `baseline+enrich[code,formula]@docling-project/CodeFormulaV2`
 can never be answered from a `baseline` entry.
+
+## Premium input formats (Stage C)
+
+Seven families are Premium-only: XLSX, CSV, ODT, ODS, ODP, EPUB and LaTeX. Each
+is converted by its own backend in the PINNED image — no new model, no new
+service, no download — and each is refused outright on Standard, Trial and
+Basic (FR-016).
+
+`SUPPORTED_FORMATS` in `docling/types.ts` stays deliberately NARROWER than what
+Docling can parse. Serve 1.29.0 also accepts `audio`, `video`, `email`,
+`boxnote` and `ebcdic`; those are explicit non-goals, so the format surface
+widens by editing that list and not by upgrading Docling.
+
+### What each family actually keeps
+
+Measured 2026-08-07 against Docling 2.118.0 / Serve 1.29.0, not read from
+documentation:
+
+| family | structure that survives                                                          | provenance     |
+| ------ | -------------------------------------------------------------------------------- | -------------- |
+| XLSX   | one `groups[].label=sheet` per worksheet, carrying its NAME; one table per sheet | page_no + bbox |
+| CSV    | one table, no containers                                                         | none           |
+| ODT    | headings, `list` group, tables                                                   | none           |
+| ODS    | one `section` group named `sheet: <name>`                                        | page_no + bbox |
+| ODP    | one `chapter` group per slide, in slide order                                    | none           |
+| EPUB   | `section` + `list` groups; chapter titles as `title` items in spine order        | none           |
+| LaTeX  | `formula` and `code` items, typed, not prose                                     | none           |
+
+Two consequences worth stating plainly.
+
+**Sheet, slide and chapter boundaries exist ONLY in the native document.** The
+Markdown rendering flattens a two-sheet workbook into two anonymous tables, so
+under `legacy_markdown` there is no way to tell which sheet a number came from.
+`buildDoclingProvenanceIndex` now walks each element's parent chain and records
+the enclosing groups as `containers`, outermost first, and `aggregateProvenance`
+carries them onto every native chunk. The field is optional and additive, so old
+Qdrant points and the legacy chunker are unaffected (NFR-002, NFR-006).
+
+**Only XLSX and ODS carry page/bbox.** The other five report `prov: []`, so
+`locationEligible` is false for them and location coverage is not an acceptance
+signal — exactly as it already was for DOCX. Ref coverage is 100% on all seven.
+
+### An XLSX formula is its cached value
+
+Docling reads the CACHED RESULT of a formula cell and never the expression. A
+file saved by Excel or LibreOffice carries that value; a file written by a
+library that does not evaluate anything carries `<v></v>` and the cell comes back
+EMPTY. The fixture generator therefore patches a real cached value into the
+total cell, and `_patch_xlsx_cached_formula` fails loudly rather than silently
+producing a fixture that proves the opposite of its intent.
+
+Merged cells are also NOT preserved as spans: a merged header becomes a separate
+text item next to the table, and every table cell reports `1x1`. The fixture
+asserts the merged text is present, not that a span survived.
+
+### The upload contract now checks the extension
+
+`file_catalog.mime_type` is what Stage 2 routes on, and until Stage C it was
+whatever the client declared. `validateFileExtension` closes that (FR-017):
+
+- the extension must be on the tier's list;
+- the declared type must be one `MIME_TYPES_BY_EXTENSION` allows for it.
+
+`MIME_TYPES_BY_EXTENSION` lists the types browsers really send — `text/plain`
+for `.md` and `.tex`, `application/vnd.ms-excel` for `.csv` — with the canonical
+type FIRST. What gets STORED is that canonical type, not the declaration, so a
+`.csv` announced as `text/plain` reaches Docling instead of the plain-text
+extractor, and a `report.pdf` announced as `text/plain` is refused. The web
+picker validates through the same map so client and server agree.
+
+### Running the format corpus
+
+```bash
+cd packages/course-gen-platform
+npx tsx scripts/docling-quality-benchmark.ts --case premium-spreadsheet-xlsx --label stagec-xlsx
+```
+
+Fixtures are regenerated with `generate-fixtures.py <name>`; the seven Stage C
+generators need `openpyxl`, `odfpy` and `ebooklib` in addition to the existing
+`python-docx`, `python-pptx`, `reportlab` and `Pillow`.

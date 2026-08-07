@@ -135,8 +135,14 @@ export class Stage1Orchestrator {
         durationMs: validationResult.durationMs,
       });
 
-      // Phase 2: Storage
-      const storageResult = await runPhase2Storage(input);
+      // Phase 2: Storage. The stored MIME type is the one derived from the
+      // extension, not the one the client sent, so `file_catalog.mime_type` —
+      // which is what Stage 2 routes on — cannot be steered by a browser's
+      // guess or by a deliberately mislabelled upload.
+      const storageResult = await runPhase2Storage({
+        ...input,
+        mimeType: validationResult.canonicalMimeType,
+      });
 
       logger.debug(
         {
