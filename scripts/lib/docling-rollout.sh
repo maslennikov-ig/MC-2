@@ -164,7 +164,14 @@ REQUIRED_TOOLS = {
 
 
 async def main() -> None:
-    async with streamable_http_client("http://docling-mcp:8000/mcp") as (read, write):
+    # Unpacked by INDEX, not by shape. `streamable_http_client` yields two values
+    # in the MCP 3 SDK and three in the 1.x one, and this check runs against
+    # BOTH: against MCP 3 on every deploy, and against MCP 1.x on every rollback.
+    # Destructuring `as (read, write)` raised "too many values to unpack" inside
+    # the rollback container, which would have made the rollback — the thing this
+    # check was added to verify — fail every single time.
+    async with streamable_http_client("http://docling-mcp:8000/mcp") as streams:
+        read, write = streams[0], streams[1]
         async with ClientSession(read, write) as session:
             await session.initialize()
             response = await session.list_tools()

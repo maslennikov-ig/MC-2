@@ -70,11 +70,15 @@ the images: two changes at once cannot be attributed. Flipping it changes NEW do
 collection becomes mixed by design, and making it uniform would need a reindex, which is a separate
 decision and a separate authorization.
 
-**`DOCLING_PREVIOUS_MCP_IMAGE` is new and load-bearing.** The rollout gate proves it knows what the
-host runs before switching; after one cutover the host runs the previous candidate, which is neither
-the 1.x rollback nor the new one, so every image change after the first was blocked — `mc2-h89lo`
-one step out. Move it to the OLD `DOCLING_MCP_IMAGE` whenever that changes. `DOCLING_ROLLBACK_IMAGE`
-must stay MCP **1.x**: the rollback path stops Serve, and MCP 3 cannot serve a request without it.
+**The host now records which MCP image it runs**, in `.docling-deployed-mcp-image` beside the env
+file, written only after health passes. That is what the rollout gate recognises on the next deploy.
+`DOCLING_PREVIOUS_MCP_IMAGE` still works and bootstraps a host that has recorded nothing, but nobody
+has to move it in lockstep any more. `DOCLING_ROLLBACK_IMAGE` must stay MCP **1.x**: the rollback
+stops Serve, and MCP 3 cannot serve a request without it.
+
+**A typo in `DOCLING_CHUNK_STRATEGY` is now caught in CI**, because the application would otherwise
+warn once and fall back to `legacy_markdown` under a green deploy. Still verify the flip in the
+WORKER LOG (`chunkStrategy: docling_hybrid`), never in the pipeline.
 
 ## THE WINDOW IS GONE, and where the reindex stands
 
@@ -165,16 +169,11 @@ explicit paths and never `git add -A`.
   GitHub runners. Same class as the psql-17 skip in `q12-source-manifest-psql-diagnostic.test.ts`.
 - `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
   Review P2 `mc2-af1ay`. HA, quantization, on-disk indexes, sharding, JWT RBAC: out of scope.
-- **`mc2-vih6r` (P1) — the Docling rollback does NOT work as executed.** It swaps only the image, so
-  MCP 1.x inherits the split service definition: 512M/0.5 CPU instead of 4G/2, no MCP_TRANSPORT, and
-  remote env pointing at the Serve the rollback just stopped. Never run in production since the
-  split. `docling_check_required_tools` now makes it FAIL honestly rather than report success over a
-  dead conversion; the real fix is a rollback service profile plus a dev rehearsal.
-- `mc2-ot0g1` — `DOCLING_PREVIOUS_MCP_IMAGE` is moved by hand and unchecked; forgetting once fails
-  the whole app deploy. `mc2-j7i3g` — a typo in `DOCLING_CHUNK_STRATEGY` gives a GREEN deploy that
-  switched nothing: verify the flip in the WORKER LOG, never in the pipeline.
-- `mc2-azq33`, `mc2-r910k` — the OCR scorer's homoglyph check cannot fire on a real phrase, and
-  `scoreTable` uses the substring match its own docstring rejects.
+- **`mc2-4zx0r` — the Docling rollback has still never RUN.** `mc2-vih6r` fixed what it restores
+  (`docker-compose.docling-rollback.yml`: the models volume the split deleted, 4G/2 CPU,
+  MCP_TRANSPORT, local mode) and made it verify conversion instead of just nginx. The tests drive a
+  docker stub; they do not prove MCP 1.x boots. Rehearse on dev before depending on it — and note
+  dev and prod SHARE the Docling stack, so a rehearsal touches production containers.
 - CLOSED 2026-07-31/08-01, so do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
   `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`, `mc2-oc83n`.
 
