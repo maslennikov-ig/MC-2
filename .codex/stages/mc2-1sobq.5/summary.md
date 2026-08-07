@@ -33,8 +33,8 @@ deploy: the embedding cache key includes the chunking profile, which changed.
 
 Stating that the value reached `.env.production` would have proven nothing:
 `resolveChunkingStrategy` warns once and falls back to `legacy_markdown` on
-anything it does not recognise, under a fully green deploy. Two read-only probes
-inside the running `megacampus-worker` closed that gap.
+anything it does not recognise, under a fully green deploy. Three read-only
+probes inside the running `megacampus-worker` closed that gap.
 
 1. The compiled `resolveChunkingStrategy` returns `docling_hybrid` against the
    real process env and does NOT fall back.
