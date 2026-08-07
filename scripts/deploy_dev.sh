@@ -194,6 +194,10 @@ if [ "$infra_up_failed" = true ] || ! docling_check_facade || \
     echo "ERROR: Docling MCP health failed; MCP 1.x was restored and Docling Serve stopped" >&2
     exit 1
 fi
+# Health passed, so this image is now the one to recognise on the NEXT deploy.
+# Recorded here rather than declared in a repository variable nobody remembers
+# to move.
+[ "${#DOCLING_ROLLOUT_SERVICES[@]}" -eq 0 ] || docling_record_deployed_image "$BASE_PATH/.env.production"
 echo "   Infrastructure ready."
 echo ""
 

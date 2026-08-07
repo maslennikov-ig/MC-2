@@ -111,11 +111,31 @@ the code: the headline table inverted its own `table` case, "both engines read
 the control perfectly" was never measured for RapidOCR, and the VLM rejection
 borrowed resource numbers from chart extraction. All three are corrected above.
 
-Two findings are real defects in the scorer, now tracked rather than quietly
-left: the homoglyph check cannot fire on any phrase in this corpus (`mc2-azq33`),
-and `scoreTable` uses the substring matching its own docstring rejects
-(`mc2-r910k`). Neither changes the direction of the result — EasyOCR leads under
-every aggregate tried — but both mean the gate is weaker than it reads.
+Two findings were real defects in the scorer, and both are now FIXED.
+
+The homoglyph check could not fire on any real phrase: it demanded 80% overall
+similarity after folding Latin to Cyrillic, and only twelve letters have a twin,
+so a sentence is at most ~75% foldable. It passed its own unit test because a
+four-letter word IS 100% foldable, and it fired zero times across six benchmark
+runs. It now scores the POSITIONS folding explains rather than overall
+similarity, and a whole phrase read as Latin trips it.
+
+`scoreTable` used the substring matching this module's docstring rejects for
+phrases, so a cell read as `l18` scored the same zero as a cell that never
+arrived — on the half of the comparison where the CANDIDATE wins. It is now
+per-character like the phrases, with a real threshold instead of `> 0`, which
+used to pass one cell in twelve.
+
+**The A/B was recomputed against the saved conversions after both fixes and did
+not move**: 0.9496 against 0.7168, table cells 0.917 against 1.000. The
+conclusion is stable under the repaired metric.
+
+One thing the detector still cannot catch, stated rather than hidden: alphabet
+INVERSION inside a mixed line. RapidOCR returned `POCT И РOCT` where the source
+has `РОСТ и POCT`, and folding cannot help because the expectation itself
+contains Latin. That fixture line is also poor ground truth — both halves render
+identically in DejaVuSans, so no engine can recover the alphabet from pixels. It
+is noise carrying a quarter of one case's weight.
 
 ## Review markers
 
