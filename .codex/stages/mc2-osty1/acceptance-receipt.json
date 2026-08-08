@@ -1,0 +1,22 @@
+{
+  "command_results": [
+    {
+      "command": "scripts/orchestration/run_process_verification.sh",
+      "duration_seconds": 0.056,
+      "result": "passed"
+    }
+  ],
+  "commands": ["scripts/orchestration/run_process_verification.sh"],
+  "completed_at": "2026-08-08T07:12:36.374490+00:00",
+  "diff_digest": "524378d888a75ef6ad9564b3f9644b32715fe404a88590622d7143481e8cdac6",
+  "environment_marker": "Linux-x86_64-python-3.14",
+  "git_head": "ad80c7c95c3eba7e744b99a780cb3a54cfaf48b1",
+  "idempotency_key": "8c76556f4f9d73d9ddb47e2ff0d8a4f667bf7e8916b7a73d49d8d7f96098cc42",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "not-needed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-osty1",
+  "started_at": "2026-08-08T07:12:36.317791+00:00",
+  "verification_fingerprint": "8c76556f4f9d73d9ddb47e2ff0d8a4f667bf7e8916b7a73d49d8d7f96098cc42"
+}

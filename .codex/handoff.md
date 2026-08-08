@@ -1,200 +1,181 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-07 — epic `mc2-1sobq` DELIVERED, `DOCLING_CHUNK_STRATEGY=docling_hybrid` live in
-production and runtime-proven. Stages A-D accepted on `develop`.
-Accepted stage id: `mc2-1sobq.5`
+Updated: 2026-08-08 — epic `mc2-p2908` (`specs/025-remaining-debt/`) opened; Stage 1 triage
+ACCEPTED. Epic `mc2-1sobq` (Docling) is DELIVERED and closed; its detail lives in
+`.codex/stages/mc2-1sobq.{1,2,3,4,5}/summary.md` and is not repeated here.
+Accepted stage id: `mc2-osty1`
 
-## Docling Stage D: both candidates lost, and that is the result
+## Backlog truth: 89 → 62, established by evidence not by reading titles
 
-**EasyOCR stays default**, 0.9496 against RapidOCR `cyrillic` 0.7168 on three deterministically
-degraded Russian scans. Caveats: n=3, 8 phrases, 4 exact ties, the whole gap is three headings, and
-RapidOCR WINS table cells (1.000 vs 0.917). On any retry: it REJECTS `ru` for the script name
-`cyrillic`, is SINGLE-LANGUAGE, and its Cyrillic checkpoint is not in the shipped image. **VLM stays
-off** — no VLM weights ship in either image, a BUILD cost. See `mc2-1sobq.4/summary.md`.
+`mc2-osty1` checked all 89 open records against the code. **19 closed, every one citing a
+commit sha or a measurement**; 10 `REF:` documentation records deferred out of `bd ready`
+(closing them would make them targets of `bd admin compact`, which summarises closed
+issues — these exist to be read verbatim). `bd ready` went 80 → 52.
 
-## Docling Stage C: seven Premium formats, and an extension-checked upload
+What is left: 62 open, of which 5 are epics and 1 is the triage stage itself → **56 real
+work items** (P1 13, P2 27, P3 21, P4 1). Eleven need an OWNER DECISION before any
+engineering; eight are `not_ours` with a recorded reopen condition. Full table:
+`.codex/stages/mc2-osty1/summary.md`.
 
-XLSX, CSV, ODT, ODS, ODP, EPUB and LaTeX convert on the PINNED image with their own backends,
-Premium-only: 7/7 live cases, 100% ref coverage.
+**Do not re-open the 19 by habit.** Each close names its sha. All 13 cited shas were
+verified as ancestors of `develop` with `git merge-base --is-ancestor` before acceptance.
 
-**Sheet, slide and chapter boundaries exist ONLY in the native document** — Markdown flattens a
-two-sheet workbook into two anonymous tables. `containers` is resolved from the parent chain and
-carried to the Qdrant payload as `provenance_containers`/`provenance_container_names`; it was
-dropped at the payload projection until an independent review caught it. Only XLSX and ODS carry
-page/bbox. **An XLSX formula is its CACHED VALUE, never its expression**; merged cells do not
-survive as spans.
+## What the triage corrected, and what it found that nobody had filed
 
-**`file_catalog.mime_type` is no longer the client's word.** The declared type must match the
-extension, and the CANONICAL type is stored — that is what makes a `.csv` announced as `text/plain`
-reach Docling. Aliases (`htm`→`html`, `markdown`→`md`, `jfif`→`jpeg`) keep the gate from refusing
-spellings that always worked. See `.codex/stages/mc2-1sobq.3/summary.md`.
+- **`format:check` fails on 138 files plus 11 unparseable, not 11.** The "11" in prettier's
+  footer counts only PARSE failures. All 11 are raw LLM output captures saved as `.json`
+  under `docs/llm-testing/` and `specs/008-*/quality-tests/` — experiment records that can
+  never be valid JSON. The fix is `.prettierignore`, and repairing them destroys the record.
+- **`mc2-jsamu`'s children miss 28 of the 138 files.** `.codex` 16, `.claude` 6, `.beads` 4,
+  `.pytest_cache` 1, `test.js` 1 fall outside `docs/**`, `specs/**` and `packages/**`, so
+  `mc2-jsamu.6` would fail as written.
+- **`mc2-gbctb` was fixed 2026-06-28 (`e381f5dd0`) and is NOT a deploy hazard.** The plan
+  allowed promoting it to Stage 2; it does not move.
+- **`mc2-raw1i` (P1): the guard exists and is DEAD CODE.** `orchestrator.ts:243` raises
+  `emptySections` when `sectionCount === 0`, but `basic-checks.ts:271` splits on a header
+  regex — a split with no match returns the whole string, so a non-empty lesson always
+  yields ≥1. Re-run in node: intro-only → 1, no headers → 1, empty string → 0 only. The
+  exact W2-3 case still passes. Fix by counting header matches, not by restoring a clamp.
+- **`mc2-5dzld` REPRODUCED.** Removing one emitted `.d.ts` while keeping
+  `tsconfig.tsbuildinfo` makes `pnpm build:types` exit 0 without restoring it. `--force` is
+  rejected with `-p` (TS5093), so the fix must use `--build`.
+- **`mc2-iioip` has a second victim.** `.codex/subagent-spawn-template.md` was rewritten in
+  `e40c3dd18` from `## Goal` to `Goal:` — the template was bent to fit a broken linter
+  (`orchestration_panel.py:707-741`, outside this repo) instead of the linter being fixed.
 
-## Docling Stages A and B, compressed
+Two verdicts are deliberately `real (unverified)`: `mc2-5e4ek.1` and `mc2-1nots`. Both had
+their filed hypotheses disproved by code; settling them needs a live run (a backend on
+:3456, or a mutation smoke with real LLM spend). A guess would have been worse than the gap.
+`mc2-1ugj1`'s verdict reads repository migrations only — this project does not auto-apply
+migrations in CI, so confirm the live publication before fixing.
 
-**Stage A.** Native structure reaches chunking, enrichment and the Qdrant payload behind
-`DOCLING_CHUNK_STRATEGY`; 100% ref coverage with page/bbox in all six chunkable cases. Two
-production fixes came from it: the embedding cache key now covers model, width, task,
-`late_chunking` and the ordered batch, so a document re-embeds on its first re-processing after a
-deploy; and a Jina 429 waits out the per-minute TOKEN window instead of being fatal.
-**ONE runtime wrapper is left**, `docker/docling-mcp/runtime.py`: `get_cache_key` hashes only
-source+OCR flags, and MCP 3.0.0 also drops its own declared timeouts (`mc2-ibzcc`, `mc2-vlskb`).
-The Serve wrapper is GONE — jobkit 3.3.0 assigns `heading_hierarchy_options` itself and, unlike
-ours, sets `generate_parsed_pages` for `use_style`. Its build-time gap test went with it, so the
-Dockerfile now asserts the passthrough EXISTS; a base image that regressed fails the build.
-A wrapper's gap test never announces an upstream fix — it tests what we pin.
+## Next: Stage 2, ordered by irreversibility not by tracker priority
 
-**Stage B.** Advanced enrichments live in a SEPARATE image (`mc2/docling-serve-advanced`, 10.5 GB)
-behind compose `--profile advanced` on loopback 5002; the baseline 4 GiB service is untouched.
-**Chart extraction is built and NOT shipped**: `granite-vision-4.1-4b` costs 30.6 GB and a 4.34 GiB
-peak against an 11 GiB host — `mc2-x72bq`, deferred long-term. The router is THREE-TIERED.
-**`picture_description` is REJECTED on evidence** and its model is NOT in the image.
+1. **`mc2-bygu1` — the only irreversible item in the whole backlog.** 206 MB / 117 files
+   under `/opt/megacampus/data/uploads`, NO second copy anywhere.
+   `file_catalog.storage_path` is a RELATIVE FILESYSTEM PATH, not a Storage key (261 rows,
+   128 distinct paths). Vectors and courses rebuild only from these; six documents already
+   lost their sources. Acceptance must RESTORE one file and check its hash against
+   `file_catalog.hash` — a copy never restored is a belief, not a backup.
+2. **`mc2-q1ggs`** — two processes hold `claude-deploy` on production with no shared lock;
+   one rebooted the host mid-deploy 2026-08-07. Owner picks: separate accounts, a shared
+   lock, or narrower sudoers. Structurally unchanged.
+3. **`mc2-2vtmk`** — host `claude-deploy` GHCR token dead; only root pulls.
 
-## Docling Stage E: images deployed, the chunk flip is live and PROVEN
+Then Stage 3 (tell the uploader why a document failed), Stage 4 (content bugs), Stage 5
+(vector diagrams, GATED on research), Stage 6 (repo health). See `specs/025-remaining-debt/`.
 
-Production runs `docling-serve@sha256:91d06a5d…` (Serve 1.30.0, jobkit 3.3.0, docling 2.118.0, core
-2.90.0, parse 7.10.0) and `docling-mcp-v3@sha256:d6610a7c…`, digest-pinned and healthy. That Serve
-bump was verified on an isolated stand BEFORE deploy — 18/18 quality cases, OCR identical to the
-Stage D baseline to four places. Rollback is one variable edit back to `sha256:459f995d…`.
+**Stage 5 must not start before the research findings are in hand.** Prompt:
+`specs/025-remaining-debt/research-prompt.md`. `mc2-3gz2m` is ONE family, not sixteen
+problems: 4 unique flowcharts, 4296 pt tall, type converted to curves, no text layer; OCR
+returns nothing even at 3× with full-page OCR forced. Telling the user WHY is Stage 3 and
+is cheap; READING the file is Stage 5 and is not.
 
-**`DOCLING_CHUNK_STRATEGY=docling_hybrid` SHIPPED 2026-08-07** (run 31181424941). It is a repository
-variable, so the rollback is one edit backwards plus a redeploy.
-**CONFIRMED AT RUNTIME 2026-08-07** without processing a user document, by read-only probes in the
-running `megacampus-worker`: the compiled `resolveChunkingStrategy` returns `docling_hybrid` and does
-NOT fall back, and `chunkWithStrategy` ran end to end on a NEW document through the MCP facade —
-`refCoverage: 1`, containers in the payload, profile `serve=1.30.0/docling-2.118.0`. Nothing was
-written; repeat it from a JSON in `/app/docling-json-cache`.
+## Awaiting an owner decision — none of these blocks other work
 
-**It changes NEW documents only.** Existing points keep their shape; the collection is mixed BY
-DESIGN (payload fields are additive). Making it uniform needs a reindex, separately authorized.
+- **LanguageTool (`mc2-z6er` + 7 children): eight items, zero lines ever written.**
+  `grep -ril languagetool` finds nothing. Filed 2026-02-16; the repository has since grown
+  an LLM judge and a self-reviewer with its own grammar pass. Still wanted at all?
+- `mc2-q1ggs` — the three options above.
+- `mc2-db696.61` — now UNBLOCKED (`mc2-t5auh` closed); needs one live run then a cost /
+  quality call.
+- `mc2-db696.11.6` — needs disposable staging resources and an approved LLM spend budget.
 
-**The rollback has been REHEARSED** (`mc2-4zx0r`) on real images in an isolated local compose
-project, production untouched: image swaps, override applies (models/cache volumes, 4G/2 CPU), MCP
-1.x reaches healthy and serves all three tools. It is what found `docling_check_required_tools`
-unpacking `streamable_http_client` as 2 values where MCP 1.x yields 3 — every rollback would have
-failed, and the docker-stub tests could not see it. Keep `DOCLING_ROLLBACK_IMAGE` on MCP 1.x.
+## Production and delivery facts that are still live
 
-**The host now records which MCP image it runs**, in `.docling-deployed-mcp-image` beside the env
-file, written only after health passes; that is what the rollout gate recognises on the next deploy.
-`DOCLING_PREVIOUS_MCP_IMAGE` still bootstraps a host that has recorded nothing, but nobody has to
-move it in lockstep any more.
+Production runs `docling-serve@sha256:91d06a5d…` (Serve 1.30.0, jobkit 3.3.0, docling
+2.118.0, core 2.90.0, parse 7.10.0) and `docling-mcp-v3@sha256:d6610a7c…`, digest-pinned.
+`DOCLING_CHUNK_STRATEGY=docling_hybrid` is live and runtime-proven; it changes NEW documents
+only and the collection is mixed BY DESIGN. Rollback is one variable edit back to
+`sha256:459f995d…`; keep `DOCLING_ROLLBACK_IMAGE` on MCP 1.x. Verify a strategy flip in the
+WORKER, never in the pipeline. `mc2-ibzcc`/`mc2-vlskb` wait on a `docling-mcp` release above
+3.0.0 — PyPI still shows 3.0.0 (2026-07-31), checked 2026-08-08.
 
-**A typo in `DOCLING_CHUNK_STRATEGY` is caught in CI**; the app would otherwise warn once and fall
-back to `legacy_markdown` under a green deploy. Verify a flip in the WORKER, never in the pipeline.
+**Reindex, schema migrations, secrets/access changes and force-push are NOT authorized.**
+Deploy is covered by the standing 2026-08-06 authorization on a green pipeline only.
+`mc2-x72bq` is DEFERRED LONG-TERM by the owner — do not propose it.
 
-**The chunking profile never recorded a Serve version** until `1befdb5ac`: `GET /version` answers a
-map keyed by package name and has no `version` key, so every profile id ended `serve=unknown` and an
-upgrade could never have been identifiable. Found by the production probe — the tests fed a body
-Serve never sends. Nothing was indexed under the broken id. DEPLOYED and verified live in run
-31186229533: the profile now reads `serve=1.29.0/docling-2.118.0`.
-
-## THE WINDOW IS GONE, and where the reindex stands
-
-The Q12 live cutover became an ordinary release on the owner's 2026-07-30/31 decision, and it
-succeeded: production moved off Qdrant Cloud. Do not reopen C1..C10 nor the beads retired
-2026-07-31/08-01 — each carries its reason, a REOPEN CONDITION and its unmade fix in
-`.codex/stages/mc2-jz6y0/summary.md`. Still OPEN: `mc2-8m90f`, `mc2-qd12b`, `mc2-n6szm`. **Every
-piece of Q12 machinery is opt-in**, reached by NOT passing the Q12 flags.
-
-**Source recovery COMPLETE** (42/42, 24/24, 2026-08-01); **reindex 218/234**, last measured
-`expected_points=13650 indexed_points=13712 gaps=21 schema_mismatches=0 relevance_failures=0`.
-
-**The 16 that remain are one family.** NOT scans, NO race: exported diagrams, 4296pt tall, type
-converted to curves, no text layer for any extractor. OCR returns nothing even at 3x, and Docling
-converts them to `<!-- image -->` and REPORTS SUCCESS (`mc2-3gz2m`).
-
-**How the repair runs.** `qdrant-operator retry-documents --file-ids <path> --confirm`, idempotent.
-Two flags are NOT optional — `-e BULLMQ_QUEUE_NAME=course-generation` and
-`-e DOCLING_UPLOADS_BASE_PATH=/app`. Do not re-enqueue while a previous round still retries.
+Reindex repair, when it is ever authorized: `qdrant-operator retry-documents --file-ids
+<path> --confirm`, idempotent. Two flags are NOT optional — `-e
+BULLMQ_QUEUE_NAME=course-generation` and `-e DOCLING_UPLOADS_BASE_PATH=/app`. Source
+recovery COMPLETE (42/42, 24/24); reindex 218/234, `gaps=21 schema_mismatches=0`.
 
 ## Backup guarantees
 
 All three timers ENABLED. Snapshot and Supabase backup have PROVEN THEMSELVES UNATTENDED
-(2026-08-02); the Qdrant restore drill is monthly, next 2026-09-01, so its scheduled path is still
-unproven. The drill PASSED 2026-07-31, all seven checks. Supabase stamps its success metric only
-after pg_restore validation AND pointer publication succeed. Snapshots are `storage_mode local`.
+(2026-08-02); the Qdrant restore drill is monthly, next **2026-09-01**, so its scheduled
+path is still unproven — the drill itself PASSED 2026-07-31, all seven checks. Snapshots are
+`storage_mode local`. Install the Supabase backup ONLY via
+`install-supabase-backup-schedule.sh`, which clears the start-limit first; without that the
+trap DISABLES the timer after repeated failures. All 13 alerting rules are inactive, each
+cleared by being made true. `/opt/megacampus/recovery/probe.json` exists (root:root 0444)
+and is NOT in the repository — it embeds real course content; regenerate it after anything
+that rewrites course `0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill.
 
-**`mc2-0tcyw`.** A failure past `pg_dump` was UNATTRIBUTABLE because psql's stderr was dropped; it
-now carries psql's words. Retries after 10min, bounded 4 starts / 6h, excluding exit 64/75. Install
-ONLY via `install-supabase-backup-schedule.sh`, which clears the start-limit first — without that
-the trap DISABLES the timer after repeated failures.
-
-**`mc2-0rj7i` — FINISHED; still NOT proven to be the cause of that night.** All four manifest
-transactions `SET LOCAL statement_timeout = '10min'`, and the hash digests each row, so `work_mem`
-stopped being a lever. Manifest schema is **v2**. Idle-in-transaction FALSIFIED.
-
-**All 13 alerting rules are inactive**, every one cleared by making it true.
-**`/opt/megacampus/recovery/probe.json` exists** (root:root 0444), NOT in the repository — it embeds
-real course content. **Regenerate after anything that rewrites course
-`0b3af59d-eeb7-4be6-89fb-5d2abac302bd`, then snapshot before the drill.**
-
-## What is delivered, and how this repository fails
-
-Q12 release: commits `a182df581`..`c85921084`, merged through `40b2a6b70`. Two changed how the HOST
-behaves and the repository does not show them: the digest-pinned operator image is held under
-`hold/qdrant-operator:pinned`, tagged BEFORE `docker image prune -f` (`mc2-2vtmk`); and Prometheus
-retention is 30d/20GB in `prometheus.yml` with the CLI flags REMOVED — a flag silently overrides it.
-
-**Failure modes moved to `.codex/repository-failure-modes.md` on 2026-08-03. READ IT BEFORE YOU
-START.** Two traps repeated here because they cost the most time: host port 6333 is the DEV Qdrant
-and is empty, production answers on **6335**; and `AGENTS.md` is rewritten by a `bd` hook, so stage
-explicit paths and never `git add -A`.
+Off-host backup (`mc2-jz6y0.13.6`) is an owner defer: local snapshots stay, Qdrant gets its
+own server later. Do NOT go shopping for object storage. Local snapshots cover a dropped
+collection, a bad reindex or a corrupting upgrade — never losing the machine.
 
 ## Verification and Delivery
 
-- Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` green (0 errors);
-  unit suite 400 files / 6773 tests green.
+- Gates at the delivered HEAD: `pnpm type-check`, `pnpm build`, `pnpm lint` green;
+  unit suite 400 files / 6773 tests green. `pnpm format:check` is RED by design — see above.
+- **Backend vitest cannot start locally right now**: `tests/global-setup.ts:20` aborts with
+  "Unable to verify required Qdrant server 1.18.2 for @qdrant/js-client-rest 1.18.0: Not
+  Found", then reports "No test files found, exiting with code 0" — a red suite that looks
+  green. Web tests do run (7 files / 202 tests).
 - Known and not a stop, all timing out under full-suite parallelism yet passing alone:
   `q12-live-controller`, `q12-live-cutover`, `q12-retained-barrier-*`,
   `q12-barrier-input-checkpoint-publication`, `q12-live-quiesce-deferred`,
-  `qdrant-source-recovery-runtime`, `stage4-analysis/evidence/downstream-context`. Re-run the failed
-  jobs. Anything else failing in isolation IS a stop.
-- Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`: as a
-  step it failed the deploy job and `rollback` triggers on exactly that — on 2026-08-01 a stale rule
-  file rolled production back under a green pipeline for twenty minutes. Fix with `sudo
-/opt/megacampus/deploy/qdrant/install-monitoring-config.sh`, EXCEPT
-  `megacampus-supabase-backup.{service,timer}` which uses `install-supabase-backup-schedule.sh`.
-- Regenerate `deploy/qdrant/q12-deployed-asset-manifest.json` whenever a tracked asset changes.
+  `qdrant-source-recovery-runtime`, `stage4-analysis/evidence/downstream-context`. Re-run
+  the failed jobs. Anything else failing in isolation IS a stop.
+- Monitoring config drift is a SEPARATE JOB (`monitoring-drift`), never a step of `deploy`:
+  as a step it failed the deploy job and `rollback` triggers on exactly that — on
+  2026-08-01 a stale rule file rolled production back under a green pipeline for twenty
+  minutes. Fix with `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh`,
+  EXCEPT `megacampus-supabase-backup.{service,timer}`.
+- Regenerate `deploy/qdrant/q12-deployed-asset-manifest.json` whenever a tracked asset
+  changes.
+- Run `scripts/orchestration/check_stranded_commits.py` before claiming work is delivered.
+  Clean 2026-08-08: nothing missing from `develop`, 87 refs scanned.
+
+**Failure modes live in `.codex/repository-failure-modes.md`. READ IT BEFORE YOU START.**
+Two traps repeated because they cost the most time: host port 6333 is the DEV Qdrant and is
+empty, production answers on **6335**; and `AGENTS.md` is rewritten by a `bd` hook, so stage
+explicit paths and never `git add -A`.
 
 ## Explicit defers
 
-- Off-host backup (`mc2-jz6y0.13.6`) — owner decided 2026-08-02 to stay local and give it its OWN
-  DEDICATED SERVER later. Do NOT go shopping for an S3 bucket. Local snapshots cover a dropped
-  collection, a bad reindex or a corrupting upgrade — never losing the machine.
-- **`mc2-bygu1` — the uploads are the only irreplaceable thing on that host, and the smallest.**
-  `file_catalog.storage_path` is a RELATIVE FILESYSTEM PATH, not a Supabase Storage key: 261 rows,
-  128 distinct paths. 206MB / 117 files under `/opt/megacampus/data/uploads`, NO second copy
-  anywhere. Qdrant vectors regenerate only from these, six documents already lost their sources.
-- `mc2-3gz2m` — the 16 remaining PDFs, ONE cause, stated above; ignore older notes claiming two.
-  Reading them is feature work (tile before OCR, or rasterise per region at high DPI), not a fix.
-  Stage D measured OCR candidates on fixed controls and did not make these readable.
-- `mc2-8m90f` — coverage ledger for the 6 unrecoverable sources. Precondition MEASURED as not yet
-  fired: `document_evidence_runs`/`document_evidence_items` are empty. The join column is
-  `document_id`, NOT `file_catalog_id`.
-- `mc2-qd12b` — host-gated fixtures rot: `RUN_REAL_CONTROLLER` auto-enables at uid 1000, off on
-  GitHub runners. Same class as the psql-17 skip in `q12-source-manifest-psql-diagnostic.test.ts`.
-- `mc2-n6szm` — 328 pre-existing findings in the test tree; `tools/` is outside every lint script.
-  Review P2 `mc2-af1ay`. HA, quantization, on-disk indexes, sharding, JWT RBAC: out of scope.
-- CLOSED 2026-07-31/08-01, so do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
-  `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`, `mc2-oc83n`.
+- `mc2-3gz2m` — gated on research; see above.
+- `mc2-8m90f` — precondition MEASURED as not fired: `document_evidence_runs` and
+  `document_evidence_items` are empty. Join column is `document_id`, NOT `file_catalog_id`.
+- `mc2-qd12b` — host-gated fixtures rot: `RUN_REAL_CONTROLLER` auto-enables at uid 1000,
+  off on GitHub runners.
+- `mc2-n6szm` — measured 2026-08-08 at 16 errors + 4 warnings (issue says 17); two warnings
+  need a file split. `tools/` is outside every lint script.
+- `mc2-hqfc3`, `mc2-jz6y0.13.6`, `mc2-x72bq`, `mc2-uv7n7` — owner-gated, each with its
+  reopen condition recorded on the bead.
+- CLOSED 2026-07-31/08-01, do not re-open by habit: `mc2-82bt2`, `mc2-lkkcv`, `mc2-ugl5g`,
+  `mc2-2i78i`, `mc2-1cxna`, `mc2-y5tgw`, `mc2-x6en2`, `mc2-jz6y0.25`, `mc2-6l2yz`,
+  `mc2-oc83n`. Q12 C1..C10 and the beads retired then each carry their reason and reopen
+  condition in `.codex/stages/mc2-jz6y0/summary.md`.
 
 ## Next recommended
 
-Next stage id: `mc2-bygu1` — the Docling work is finished and deployed; nothing there is pending.
-Recommended action: the uploads on `megacampus-prod` are the only irreplaceable data on that host
-and have no copy anywhere. Reindex, migrations, secrets and force-push are NOT authorized.
-**`mc2-x72bq` is DEFERRED LONG-TERM** by the owner 2026-08-07 — not before the production launch and
-a bigger server. P4, `deferred-long-term`, `owner-gated`. Do not propose it.
-**`mc2-q1ggs`**: two independent processes hold `claude-deploy` on the production host; one rebooted
-it mid-deploy on 2026-08-07. Structurally unchanged.
+Next stage id: `mc2-bygu1`
+Recommended action: start Stage 2 of `specs/025-remaining-debt/` with `mc2-bygu1` — the
+uploaded sources on `megacampus-prod` are the only irreversible item the triage found, and
+the smallest. Acceptance must include restoring one file and checking its hash against
+`file_catalog.hash`. Reindex, migrations, secrets and force-push are NOT authorized.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-bygu1`. `mc2-1sobq` is closed and the Serve wrapper is gone;
-`mc2-ibzcc`/`mc2-vlskb` wait on a docling-mcp release that has not happened since 3.0.0. Keep
-`DOCLING_ROLLBACK_IMAGE` on MCP 1.x.
+Use $orchestrator-stage for Stage 2 of `specs/025-remaining-debt/`, starting with
+`mc2-bygu1`. Triage is done — do not re-triage. Subagent reports are not evidence: check
+the cited sha or file:line yourself, and expect subagents to go idle without reporting.
 
 ## Read First
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/024-docling-intelligence/`, stage
-summaries `mc2-1sobq.{1,2,3,4}`, `mc2-nxd3g`, `mc2-jz6y0`, and `docs/superpowers/{specs,plans}/`.
+`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/025-remaining-debt/`,
+stage summaries `mc2-osty1` and `mc2-1sobq.{1,2,3,4,5}`, `mc2-nxd3g`, `mc2-jz6y0`.
