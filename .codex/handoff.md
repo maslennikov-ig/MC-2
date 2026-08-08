@@ -1,17 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-sznhi`
+Current stage id: `mc2-3sz3d`
 
 ## Current stage
 
-`mc2-sznhi` is accepted locally. Product commit `bcb197989` makes the Stage 6 intro guard select an
-exhaustive pattern set for every `CONTENT_LABELS` locale, while ordinary transitions, exact
-next-lesson-title matching, and English fallback remain covered.
-
-Focused TDD passed 40/40 after 18 localized teaser cases failed against the old behavior. `pnpm run
-type-check`, `pnpm run build`, and canonical process verification passed. No live generation or
-paid call was used.
+`mc2-3sz3d` is claimed and scoped on local `develop`. The default backend Vitest path can print a
+no-tests success after global setup fails, and its teardown contains an explicit `process.exit(0)`
+failure path. The stage will make empty/bootstrap/cleanup failures nonzero and add an exact,
+documented Qdrant opt-out without changing pinned Qdrant behavior.
 
 ## Backlog truth and order
 
@@ -19,8 +16,9 @@ paid call was used.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-Tier 1 is complete through `mc2-sznhi`. Tier 2 now starts with `mc2-3sz3d`, the false-green backend
-test bootstrap, in exact spec order.
+Tier 1 is complete through `mc2-sznhi`. Tier 2 is active at `mc2-3sz3d`, the false-green backend
+test bootstrap, in exact spec order. The next item, `mc2-q1ggs`, is an owner decision and a stop
+boundary.
 
 ## Verification facts
 
@@ -73,7 +71,7 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 Next stage id: `mc2-3sz3d`
 Recommended action: make the default backend test bootstrap fail nonzero and clearly when its
-required Qdrant check fails, then prove it cannot report a false green without running tests.
+required Qdrant or cleanup precondition fails, and provide only an exact explicit opt-out.
 
 ## Starter prompt for next orchestrator
 
