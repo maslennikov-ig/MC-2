@@ -1,3 +1,5 @@
+import { CONTENT_LABELS, validateLanguageCode } from '@megacampus/shared-types';
+
 type IntroGuardIssueCode =
   | 'MISSING_INTRO_HEADER'
   | 'INTRO_NOT_FIRST_SECTION'
@@ -22,14 +24,36 @@ const INTRO_GUARD_INSTRUCTIONS: Record<IntroGuardIssueCode, string> = {
     'Remove teaser language about future lessons/sections and keep focus on this lesson only.',
 };
 
-const NEXT_LESSON_TEASER_PATTERNS = [
-  /\bnext\s+lesson\b/i,
-  /\bin\s+the\s+next\s+(lesson|section|chapter)\b/i,
-  /\bcoming\s+up\b/i,
-  /\bstay\s+tuned\b/i,
-  /\bв\s+следующ(?:ем|ей)\s+(уроке|разделе|главе)\b/i,
-  /\bна\s+следующ(?:ем|ей)\s+(уроке|разделе|главе)\b/i,
-];
+type ContentLanguage = keyof typeof CONTENT_LABELS;
+
+const NEXT_LESSON_TEASER_PATTERNS = {
+  ru: [/(?:в|на)\s+следующ(?:ем|ей)\s+(?:уроке|разделе|главе)/iu],
+  en: [
+    /\bnext\s+lesson\b/iu,
+    /\bin\s+the\s+next\s+(?:lesson|section|chapter)\b/iu,
+    /\bcoming\s+up\b/iu,
+    /\bstay\s+tuned\b/iu,
+  ],
+  zh: [/(?:在)?下(?:一|个)(?:课|节|章)(?:中|里)?/u],
+  es: [/\ben\s+(?:la\s+próxima|el\s+próximo)\s+(?:lección|sección|capítulo)\b/iu],
+  fr: [/\bdans\s+(?:la\s+prochaine\s+(?:leçon|section)|le\s+prochain\s+chapitre)\b/iu],
+  de: [
+    /\b(?:in\s+der\s+nächsten\s+(?:lektion|unterrichtseinheit)|im\s+nächsten\s+(?:abschnitt|kapitel))\b/iu,
+  ],
+  ja: [/次の?(?:レッスン|セクション|章)(?:で|では|に|には)/u],
+  ko: [/다음\s*(?:수업|레슨|섹션|장)(?:에서|에서는|에|에는)/u],
+  ar: [/في\s+(?:الدرس|القسم|الفصل)\s+(?:التالي|القادم)/u],
+  pt: [/\b(?:na\s+próxima\s+(?:lição|seção)|no\s+próximo\s+capítulo)\b/iu],
+  it: [/\b(?:nella\s+prossima\s+(?:lezione|sezione)|nel\s+prossimo\s+capitolo)\b/iu],
+  tr: [/\b(?:bir\s+)?sonraki\s+(?:derste|bölümde|kısımda)\b/iu],
+  vi: [/trong\s+(?:bài\s+học|phần|chương)\s+(?:tiếp\s+theo|sau)/iu],
+  th: [/ใน(?:บทเรียน|ส่วน|บท)(?:ถัดไป|ต่อไป)/u],
+  id: [/\bdi\s+(?:pelajaran|bagian|bab)\s+berikutnya\b/iu],
+  ms: [/\bdalam\s+(?:pelajaran|bahagian|bab)\s+seterusnya\b/iu],
+  hi: [/अगले\s+(?:पाठ|भाग|अध्याय)\s+में/u],
+  bn: [/পরবর্তী\s+(?:পাঠ|অংশ|অধ্যায়)/u],
+  pl: [/\bw\s+(?:następnej\s+lekcji|następnym\s+(?:rozdziale|dziale))\b/iu],
+} satisfies Record<ContentLanguage, readonly RegExp[]>;
 
 function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
@@ -48,7 +72,11 @@ function extractSectionBodyByHeader(markdown: string, header: string): string | 
   return (nextHeaderIndex === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIndex)).trim();
 }
 
-function containsNextLessonTeaser(introBody: string, nextLessonTitle?: string | null): boolean {
+function containsNextLessonTeaser(
+  introBody: string,
+  nextLessonTitle: string | null | undefined,
+  language: string
+): boolean {
   const normalizedIntro = introBody.toLowerCase();
 
   if (nextLessonTitle) {
@@ -61,7 +89,8 @@ function containsNextLessonTeaser(introBody: string, nextLessonTitle?: string | 
     }
   }
 
-  return NEXT_LESSON_TEASER_PATTERNS.some(pattern => pattern.test(introBody));
+  const normalizedLanguage = validateLanguageCode(language);
+  return NEXT_LESSON_TEASER_PATTERNS[normalizedLanguage].some(pattern => pattern.test(introBody));
 }
 
 function normalizeHeaderTitle(value: string): string {
@@ -100,7 +129,8 @@ function escapeRegex(str: string): string {
 export function validateIntroStructure(
   markdown: string,
   introductionHeader: string,
-  nextLessonTitle?: string | null
+  nextLessonTitle?: string | null,
+  language = 'en'
 ): {
   issues: IntroGuardIssueCode[];
   introWordCount: number;
@@ -134,7 +164,7 @@ export function validateIntroStructure(
   if (introWordCount > INTRO_SECTION_MAX_WORDS) {
     issues.push('OVERSIZE_INTRO');
   }
-  if (containsNextLessonTeaser(introBody, nextLessonTitle)) {
+  if (containsNextLessonTeaser(introBody, nextLessonTitle, language)) {
     issues.push('NEXT_LESSON_TEASER');
   }
 
