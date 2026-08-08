@@ -10,7 +10,7 @@ manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
-current_stage_id = "mc2-osty1"
+current_stage_id = "mc2-ekaup"
 
 [baseline]
 profile = "balanced-v2.19"
@@ -49,13 +49,13 @@ hard_limit_lines = 200
 tracked_in_git = true
 format = "frontmatter_plus_short_note"
 sensitivity = "internal_no_secrets"
-current_stage_summary = ".codex/stages/mc2-osty1/summary.md"
+current_stage_summary = ".codex/stages/mc2-ekaup/summary.md"
 
 [completion_inbox]
 scope = "repo_root"
 transport = "local_ndjson"
-events_file = ".codex/stages/mc2-osty1/completions.ndjson"
-review_state_file = ".codex/stages/mc2-osty1/review-state.json"
+events_file = ".codex/stages/mc2-ekaup/completions.ndjson"
+review_state_file = ".codex/stages/mc2-ekaup/review-state.json"
 report_entrypoint = "scripts/orchestration/report_child_completion.py"
 review_entrypoint = "scripts/orchestration/review_completion_inbox.py"
 
@@ -237,7 +237,6 @@ allowed_split_reasons = ["unresolved_public_ownership_or_public_contract", "hard
 scope_preservation_ledger_required_on_replan = true
 accepted_history_immutable = true
 migration_scope = "future_work_only"
-legacy_active_stage_id = "mc2-nxd3g"
 
 [evidence]
 schema = "verification-evidence/v1"
