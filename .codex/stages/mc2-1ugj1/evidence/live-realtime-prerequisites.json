@@ -1,0 +1,23 @@
+{
+  "schema_version": "measurement-evidence/v1",
+  "stage_id": "mc2-1ugj1",
+  "measured_at": "2026-08-08T15:54:54Z",
+  "target": "configured live Supabase project",
+  "operation": "read-only system catalog query",
+  "query_scope": ["pg_publication_tables", "pg_class", "pg_namespace"],
+  "result": {
+    "lesson_enrichments_published": true,
+    "replica_identity": "full",
+    "published_tables": [
+      "public.course_nodes",
+      "public.courses",
+      "public.error_logs",
+      "public.file_catalog",
+      "public.generation_trace",
+      "public.lesson_contents",
+      "public.lesson_enrichments"
+    ]
+  },
+  "interpretation": "The only remaining C-1 premise is false in the live project: lesson_enrichments is published and uses REPLICA IDENTITY FULL. No migration or client fallback change is justified by this issue.",
+  "mutations_performed": false
+}

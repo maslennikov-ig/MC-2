@@ -1,17 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Active stage id: `mc2-1ugj1`
+Accepted stage id: `mc2-1ugj1`
 
 ## Current stage
 
-`mc2-1ugj1` is in progress on local `develop`. Its first gate is a read-only query of the live
-Supabase catalogs for `public.lesson_enrichments`: membership in `supabase_realtime` and the table's
-`REPLICA IDENTITY` must be measured before any code conclusion is accepted.
+`mc2-1ugj1` is accepted by the required live measurement. A read-only system-catalog query proved
+that `public.lesson_enrichments` belongs to `supabase_realtime` and uses `REPLICA IDENTITY FULL`.
+The only remaining C-1 premise is therefore false in the live project.
 
-If live delivery is not configured, the authorized fix boundary is client-side fallback polling;
-the active spec prohibits schema migrations and live database mutations. If it is configured, the
-task must be reclassified from the measurement instead of patched on repository assumptions.
+No product code, migration, live mutation, client workaround, merge, push, or deploy was performed.
+The product source diff is empty and canonical process verification passed. The measurement is
+stored in `.codex/stages/mc2-1ugj1/evidence/live-realtime-prerequisites.json`.
 
 ## Backlog truth and order
 
@@ -75,16 +75,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-1ugj1`
-Recommended action: first query the live Supabase `supabase_realtime` publication read-only. Do not
-infer live state from repository migrations, and do not change schema or publication membership
-without a separately accepted implementation boundary.
+Next stage id: `mc2-dqbw1`
+Recommended action: reproduce the auth-resolved-without-session path in Lesson Inspector, then
+clear `isLoading` without claiming that this proves the historical superadmin report.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-1ugj1`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and begin with the required read-only live publication check. Do not create or
-apply a migration until the live state is known; do not start `mc2-3gz2m` or any §9 work.
+Use $orchestrator-stage for `mc2-dqbw1`. Read `specs/026-post-triage-priorities/spec.md` first,
+preserve its order, and limit the claim to the proved no-session loading path. Do not claim that it
+settles the historical valid-superadmin report; do not start `mc2-3gz2m` or any §9 work.
 
 ## Read first
 

@@ -13,13 +13,14 @@ non_goals:
   - redesigning media UX or reopening already-fixed review findings
   - deploy, merge, push, reindex, secrets, access changes, or paid/live generation
 evidence:
-  - none
+  - live-realtime-prerequisites
+  - acceptance-receipt
 task_id: mc2-1ugj1
 epic_id: mc2-p2908
 stage_id: mc2-1ugj1
 session_id: mc2-1ugj1
 milestone: cohesive-vertical-slice
-milestone_status: in_progress
+milestone_status: accepted
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -52,11 +53,11 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
-cleanup_status: not_applicable
-cleanup_notes: root owner uses the primary develop worktree; no child branch or worktree exists
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: root owner used the primary develop worktree; no child branch or runtime resource existed to clean
 risk_level: medium
 risk_tags:
   - realtime
@@ -71,18 +72,23 @@ invariants:
   - test-matrix
 docs_impact: behavior
 docs_reviewed: no-change-needed
-docs_review_notes: pending live measurement and implementation review
+docs_review_notes: live state resolves the remaining C-1 premise; no stable product or operator documentation changed
 verification:
-  - none: pending
+  - live Supabase system catalog query: passed, lesson_enrichments is published with REPLICA IDENTITY FULL
+  - TDD no-new-test lane: no product code changed because the live measurement disproved the remaining defect premise
+  - product source diff from stage base: empty
+  - scripts/orchestration/run_process_verification.sh via canonical stage closeout: passed
 changed_files:
-  - none
+  - .codex/stages/mc2-1ugj1/evidence/live-realtime-prerequisites.json
 explicit_defers:
   - mc2-dqbw1 - next Tier 1 task after this stage
 ---
 
 # Summary
 
-In progress.
+The required read-only live measurement disproved the only remaining C-1 premise. In the configured
+Supabase project, `public.lesson_enrichments` belongs to `supabase_realtime` and uses `REPLICA
+IDENTITY FULL`. No product code or database state was changed.
 
 # Scope / Routing
 
@@ -91,14 +97,17 @@ live database change is explicitly outside the authorized boundary.
 
 # Verification
 
-Pending live catalog measurement, focused red-green if code changes, and one root-owned final
-acceptance.
+The live catalog measurement passed and is recorded in the stage evidence. No focused test is
+applicable because no behavior changed. The product source diff is empty and canonical process
+verification passed; the acceptance receipt is stored with this stage.
 
 # Delivery / Cleanup
 
-Pending.
+No product delivery or cleanup is required. The root used the primary worktree and created no child
+branch or runtime resource.
 
 # Risks / Follow-ups / Explicit Defers
 
-A successful Realtime subscription handshake proves only that the channel connected. It does not
-prove that `lesson_enrichments` belongs to the publication or can emit the events the UI expects.
+Repository migrations still do not explain when the live configuration was added, but the measured
+live state is authoritative for this issue. No migration, live mutation, client workaround, or
+speculative fix is justified.

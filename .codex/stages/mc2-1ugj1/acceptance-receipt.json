@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "git diff --exit-code da60d5bb6 -- packages/web packages/course-gen-platform packages/shared-types",
+      "duration_seconds": 0.009,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "git diff --exit-code da60d5bb6 -- packages/web packages/course-gen-platform packages/shared-types"
+  ],
+  "completed_at": "2026-08-08T15:55:04.208039+00:00",
+  "diff_digest": "c313311e07330685fc63a552333c5ca20ef2d4b566b8802057670b197528b025",
+  "environment_marker": "Linux-x86_64-python-3.14",
+  "git_head": "da60d5bb6fdb1e5c78c995dfe6ea9c804cff4289",
+  "idempotency_key": "26c0168645141f1d3e34c9586eee82c068f21027f100a9a0a2ea504e2c7883fb",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1ugj1",
+  "started_at": "2026-08-08T15:55:04.031266+00:00",
+  "verification_fingerprint": "26c0168645141f1d3e34c9586eee82c068f21027f100a9a0a2ea504e2c7883fb"
+}
