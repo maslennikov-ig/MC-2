@@ -1,7 +1,7 @@
 # Stage mc2-osty1 — Triage of the open backlog
 
 Epic: `mc2-p2908` (spec `specs/025-remaining-debt/`)
-Status: in_progress
+Status: accepted
 Level: slice_acceptance
 Started: 2026-08-08
 
