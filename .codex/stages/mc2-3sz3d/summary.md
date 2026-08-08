@@ -1,7 +1,7 @@
 # Stage `mc2-3sz3d` — backend Vitest exit integrity
 
 Active stage id: `mc2-3sz3d`
-Status: in progress.
+Status: accepted locally; remote delivery was not requested.
 
 ## Scope
 
@@ -27,6 +27,18 @@ Medium root-owned backend test-infrastructure slice. Acceptance covers the defau
 config, global setup/teardown exit behavior, one explicit opt-out, focused unit tests, and a safe
 loopback child-process proof.
 
+## Implementation evidence
+
+- `f2eab74db` overrides `passWithNoTests` to false in the default backend config.
+- Global setup keeps Qdrant strict by default and accepts only the exact value
+  `SKIP_QDRANT_TEST_SETUP=1` as a visible opt-out; worker startup remains mandatory.
+- Global teardown now forces exit 1, never exit 0, when either worker or Redis cleanup fails.
+- The opt-out is documented beside Qdrant settings in the package env example.
+- Focused TDD: 8/20 checks failed against the old behavior, then 21/21 passed after both cleanup
+  owners were covered.
+- Safe child process: an unreachable loopback Qdrant produced the expected bootstrap error,
+  reported no-tests code 1, and exited 1 without a code-0 message.
+
 ## Reviews
 
 Documentation: docs-resolve - installed Vitest 4.1.8 runtime and types were inspected because
@@ -37,10 +49,29 @@ example.
 
 project-index: reviewed-no-change - no stable product entrypoint or ownership boundary changes.
 
-graph-reviewed: used - focused local Graphify query confirmed global setup ownership of worker,
-Redis, and Qdrant bootstrap; refresh waits for accepted changes.
+graph-reviewed: updated - focused local Graphify query confirmed global setup ownership of worker,
+Redis, and Qdrant bootstrap; after `f2eab74db`, the graph was rebuilt without semantic/API
+extraction to 61,117 nodes and 88,027 edges, then reclustered to 7,267 communities.
+
+## Acceptance
+
+- Focused backend unit tests through `vitest.config.unit.ts` — 21/21 passed after 8 checks failed
+  against the old behavior.
+- Safe child-process bootstrap — unavailable loopback Qdrant reported no-tests code 1 and exited 1
+  without a code-0 message.
+- `pnpm run type-check` — passed.
+- `pnpm run build` — passed; the pre-existing Node `DEP0169` warning remains tracked by
+  `mc2-p2908.1`.
+- Canonical process verification — passed; receipt:
+  `.codex/stages/mc2-3sz3d/acceptance-receipt.json`.
+- Beads issue `mc2-3sz3d` — closed with product commit `f2eab74db`.
+
+## Delivery / Cleanup
+
+The accepted change is committed on local `develop`. No child worktree or branch existed to clean.
+No merge, push, deploy, live integration suite, Qdrant mutation, reindex, migration, paid call,
+secrets, or access change was performed.
 
 ## Next action
 
-Add failing config/setup/teardown tests, implement the minimal exit and opt-out changes, then run
-the bounded acceptance set.
+Stop at `mc2-q1ggs` and obtain the owner decision required by §8 before implementation continues.

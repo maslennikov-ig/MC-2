@@ -13,13 +13,13 @@ non_goals:
   - running the live integration suite, live Qdrant mutations, reindex, migrations, or paid calls
   - deploy, merge, push, secrets, or access changes
 evidence:
-  - none
+  - acceptance-receipt
 task_id: mc2-3sz3d
 epic_id: mc2-p2908
 stage_id: mc2-3sz3d
 session_id: mc2-3sz3d
 milestone: cohesive-vertical-slice
-milestone_status: in_progress
+milestone_status: accepted
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -54,10 +54,10 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
-cleanup_status: not_applicable
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
 cleanup_notes: root owner uses the primary develop worktree; no child branch or worktree exists
 risk_level: medium
 risk_tags:
@@ -75,17 +75,26 @@ docs_reviewed: updated
 docs_review_notes: the explicit test-only opt-out will be documented beside Qdrant variables in the package env example
 verification:
   - safe loopback reproduction before changes: setup failed and printed the misleading no-tests code-0 message, but final child status was 1; the historical configured-environment exit 0 was not rerun because collection bootstrap can mutate live Qdrant
-  - focused backend unit red-green via vitest.config.unit.ts: pending
-  - final safe child-process, type-check, build, and process acceptance: pending
+  - focused backend unit red-green via vitest.config.unit.ts: passed, 21 tests after 8 checks failed against the old behavior
+  - safe loopback child process after implementation: passed, Qdrant bootstrap failure reported code 1 and child exited 1 with no code-0 message
+  - pnpm run type-check: passed
+  - pnpm run build: passed with pre-existing DEP0169 warning tracked by mc2-p2908.1
+  - scripts/orchestration/run_process_verification.sh via canonical stage closeout: passed
 changed_files:
-  - pending
+  - packages/course-gen-platform/vitest.config.ts
+  - packages/course-gen-platform/tests/global-setup.ts
+  - packages/course-gen-platform/tests/unit/global-setup.test.ts
+  - packages/course-gen-platform/tests/unit/vitest-config.test.ts
+  - packages/course-gen-platform/.env.example
 explicit_defers:
   - mc2-q1ggs - next item is an owner decision and stop boundary
 ---
 
 # Summary
 
-Stage scoped after root-cause investigation. Implementation and TDD are pending.
+The implementation is committed at `f2eab74db`. The default backend config rejects zero collected
+tests, setup/teardown logic is directly testable, cleanup failures force exit 1, and only
+`SKIP_QDRANT_TEST_SETUP=1` skips the Qdrant precondition while retaining worker startup.
 
 # Scope / Routing
 
@@ -94,16 +103,18 @@ versioned runner behavior; live services are outside the proof.
 
 # Verification
 
-The safe loopback reproduction showed the same setup failure and misleading code-0 message, but
-its final process status was 1. The historical live-config exit 0 was not repeated because the
-bootstrap may mutate Qdrant if its precondition starts passing.
+The focused tests failed 8 checks against the old behavior and now pass 21/21 through
+`vitest.config.unit.ts`. A safe loopback child process reports no-tests code 1 and exits 1 without
+a code-0 message. `pnpm run type-check`, `pnpm run build`, and canonical process verification
+passed. The receipt is stored at `.codex/stages/mc2-3sz3d/acceptance-receipt.json`.
 
 # Delivery / Cleanup
 
-No implementation or product delivery yet. No child branch or worktree exists.
+Root-owned implementation is accepted on local `develop`; no merge, push, or deploy was requested
+at this boundary. No child branch or worktree exists.
 
 # Risks / Follow-ups / Explicit Defers
 
-The existing teardown calls `process.exit(0)` when cleanup fails, which can overwrite any prior
-test failure. The shared `passWithNoTests` setting independently treats an empty run as success.
-Both must be fixed; changing Qdrant compatibility or live state is out of scope.
+The exact historical live-config exit 0 remains accepted measured evidence but was not rerun. The
+safe loopback baseline ended 1, so this stage does not claim the current live-config incident was
+reproduced locally. Changing Qdrant compatibility or live state remains out of scope.

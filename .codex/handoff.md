@@ -5,10 +5,14 @@ Current stage id: `mc2-3sz3d`
 
 ## Current stage
 
-`mc2-3sz3d` is claimed and scoped on local `develop`. The default backend Vitest path can print a
-no-tests success after global setup fails, and its teardown contains an explicit `process.exit(0)`
-failure path. The stage will make empty/bootstrap/cleanup failures nonzero and add an exact,
-documented Qdrant opt-out without changing pinned Qdrant behavior.
+`mc2-3sz3d` is accepted locally. Product commit `f2eab74db` makes the default backend Vitest config
+reject empty runs, makes cleanup failures force exit 1, and allows only
+`SKIP_QDRANT_TEST_SETUP=1` to skip the Qdrant precondition while retaining worker startup.
+
+Focused TDD passed 21/21 after 8 checks failed against the old behavior. The safe loopback child
+process, `pnpm run type-check`, `pnpm run build`, and canonical process verification passed. The
+historical configured-environment exit 0 was not rerun because Qdrant bootstrap may mutate live
+state if its precondition starts passing.
 
 ## Backlog truth and order
 
@@ -22,9 +26,9 @@ boundary.
 
 ## Verification facts
 
-- The default backend Vitest command is not evidence: `tests/global-setup.ts:20` fails the Qdrant
-  version check and then reports “No test files found, exiting with code 0”. Until `mc2-3sz3d` is
-  fixed, use `vitest.config.unit.ts` for focused backend unit tests and state that distinction.
+- The default backend Vitest command is now fail-closed: an unmet Qdrant precondition and an empty
+  run exit nonzero. It still requires the pinned Qdrant 1.18.2 precondition unless the operator
+  explicitly sets `SKIP_QDRANT_TEST_SETUP=1`; use `vitest.config.unit.ts` for focused unit tests.
 - Web tests work.
 - Typical code gates are `pnpm type-check` and `pnpm build`.
 - `pnpm format:check` currently fails on 138 files plus 11 unparseable raw LLM captures; this is
@@ -69,15 +73,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-3sz3d`
-Recommended action: make the default backend test bootstrap fail nonzero and clearly when its
-required Qdrant or cleanup precondition fails, and provide only an exact explicit opt-out.
+Next stage id: `mc2-q1ggs`
+Recommended action: stop for the owner to choose between separate deploy accounts, a shared
+cross-process lock, or narrower sudoers before any implementation or production-facing action.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-3sz3d`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and repair the false-green backend test bootstrap without treating the current
-exit-zero result as evidence. Do not start `mc2-3gz2m` or any §9 work.
+Do not start implementation for `mc2-q1ggs` until the owner chooses the operating model required by
+§8. Preserve the exact order in `specs/026-post-triage-priorities/spec.md`; do not start
+`mc2-3gz2m` or any §9 work.
 
 ## Read first
 
