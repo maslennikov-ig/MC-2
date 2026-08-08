@@ -1,17 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-dqbw1`
+Current stage id: `mc2-sznhi`
 
 ## Current stage
 
-`mc2-dqbw1` is accepted locally. Product commit `7b29f9d29` makes Lesson Inspector clear loading
-when auth resolves without a session while preserving the existing authenticated fetch. Focused
-web TDD passed 1/1 after failing against the old behavior; `pnpm run type-check`, `pnpm run build`,
-and canonical process verification passed.
-
-This does not reproduce or settle the historical report from a valid superadmin session. That
-separate cause requires a running application and Network trace.
+`mc2-sznhi` is claimed and scoped on local `develop`. The accepted boundary is an exhaustive
+locale-keyed teaser detector for every `CONTENT_LABELS` language, preserving exact next-lesson
+title matching and avoiding ordinary transition phrases. No live generation or paid call is in
+scope.
 
 ## Backlog truth and order
 
@@ -19,11 +16,12 @@ separate cause requires a running application and Network trace.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-After `mc2-dqbw1`, continue Tier 1 in exact spec order:
+Continue Tier 1 in exact spec order:
 
 1. `mc2-sznhi` — make the teaser guard work outside ru/en.
 
-Tier 2 then starts with `mc2-3sz3d`, the false-green backend test bootstrap.
+After `mc2-sznhi`, Tier 1 is complete. Tier 2 then starts with `mc2-3sz3d`, the false-green backend
+test bootstrap.
 
 ## Verification facts
 
