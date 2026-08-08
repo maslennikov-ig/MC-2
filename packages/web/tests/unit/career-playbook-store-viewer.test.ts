@@ -247,18 +247,29 @@ describe('useCareerPlaybookStore viewer state', () => {
     removeChild.mockRestore()
   })
 
-  it('keeps viewer edit and regenerate usable as explicit local fallbacks', async () => {
+  it('does not claim an unavailable viewer edit was saved', async () => {
     setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
     hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001004', 'Operations Lead')
 
     await expect(
       useCareerPlaybookStore.getState().editCareerPlaybookViewerBlock('block_1', 'Local edit')
-    ).resolves.toEqual({ ok: true })
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Block editing is unavailable. Your changes were not saved.',
+      backendPending: true,
+    })
 
-    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe('Local edit')
-    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
-      'Block edit saved locally until the backend action is connected'
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Original mission'
     )
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
+      'Block editing is unavailable. Your changes were not saved.'
+    )
+  })
+
+  it('keeps viewer regeneration usable as an explicit local fallback', async () => {
+    setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001004', 'Operations Lead')
 
     await expect(
       useCareerPlaybookStore

@@ -1600,29 +1600,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: false, error: 'Career Playbook viewer is not loaded' }
         }
 
-        const applyLocalEdit = () => {
-          const previousBlock = snapshot.viewer?.blocks[blockId]
-          const localBlock: CareerPlaybookBlockState = {
-            ...previousBlock,
-            content,
-            status: 'generated',
-            attempt: previousBlock?.attempt ?? 0,
-            generated_at: nowIso(),
-          }
+        const rejectUnavailableEdit = (): CareerPlaybookAutosaveResult => {
+          const message = 'Block editing is unavailable. Your changes were not saved.'
           set((state) => {
-            if (!state.viewer) return
-            state.viewer = normalizeViewerSnapshot({
-              ...state.viewer,
-              blocks: {
-                ...state.viewer.blocks,
-                [blockId]: localBlock,
-              },
-            })
-            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
             state.isUpdatingViewerBlock = false
-            state.viewerActionMessage =
-              'Block edit saved locally until the backend action is connected'
+            state.viewerActionMessage = message
           })
+          return { ok: false, error: message, backendPending: true }
         }
 
         set((state) => {
@@ -1633,8 +1617,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         try {
           const client = getClient()
           if (!client.editBlock) {
-            applyLocalEdit()
-            return { ok: true }
+            return rejectUnavailableEdit()
           }
 
           const updatedBlock = await client.editBlock({
@@ -1668,8 +1651,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: true }
         } catch (error) {
           if (isCareerPlaybookBackendPending(error)) {
-            applyLocalEdit()
-            return { ok: true }
+            return rejectUnavailableEdit()
           }
 
           const message = error instanceof Error ? error.message : 'Block editing failed'
