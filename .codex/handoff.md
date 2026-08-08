@@ -5,17 +5,17 @@ ACCEPTED. Epic `mc2-1sobq` (Docling) is DELIVERED and closed; its detail lives i
 `.codex/stages/mc2-1sobq.{1,2,3,4,5}/summary.md` and is not repeated here.
 Accepted stage id: `mc2-osty1`
 
-## Backlog truth: 89 → 62, established by evidence not by reading titles
+## Backlog truth: 89 → 53, established by evidence not by reading titles
 
 `mc2-osty1` checked all 89 open records against the code. **19 closed, every one citing a
 commit sha or a measurement**; 10 `REF:` documentation records deferred out of `bd ready`
 (closing them would make them targets of `bd admin compact`, which summarises closed
 issues — these exist to be read verbatim). `bd ready` went 80 → 52.
 
-What is left: 62 open, of which 5 are epics and 1 is the triage stage itself → **56 real
-work items** (P1 13, P2 27, P3 21, P4 1). Eleven need an OWNER DECISION before any
-engineering; eight are `not_ours` with a recorded reopen condition. Full table:
-`.codex/stages/mc2-osty1/summary.md`.
+Then the owner retired the LanguageTool track (8 more), so the delivered state is **53
+open, of which 5 are epics → 48 real work items** (P1 12, P2 27, P3 13, P4 1) and
+`bd ready` is 44. Three still need an OWNER DECISION before any engineering; eight are
+`not_ours` with a recorded reopen condition. Full table: `.codex/stages/mc2-osty1/summary.md`.
 
 **Do not re-open the 19 by habit.** Each close names its sha. All 13 cited shas were
 verified as ancestors of `develop` with `git merge-base --is-ancestor` before acceptance.
@@ -71,11 +71,15 @@ problems: 4 unique flowcharts, 4296 pt tall, type converted to curves, no text l
 returns nothing even at 3× with full-page OCR forced. Telling the user WHY is Stage 3 and
 is cheap; READING the file is Stage 5 and is not.
 
+## Settled by the owner 2026-08-08
+
+**LanguageTool is retired** (`mc2-z6er` + 7 children, all closed). Eight items filed
+2026-02-16 with zero lines ever written; the LLM judge and self-reviewer now carry grammar
+handling. Reopen condition: a deterministic rule-based checker is wanted alongside the LLM
+path. Do not re-file it as debt.
+
 ## Awaiting an owner decision — none of these blocks other work
 
-- **LanguageTool (`mc2-z6er` + 7 children): eight items, zero lines ever written.**
-  `grep -ril languagetool` finds nothing. Filed 2026-02-16; the repository has since grown
-  an LLM judge and a self-reviewer with its own grammar pass. Still wanted at all?
 - `mc2-q1ggs` — the three options above.
 - `mc2-db696.61` — now UNBLOCKED (`mc2-t5auh` closed); needs one live run then a cost /
   quality call.
