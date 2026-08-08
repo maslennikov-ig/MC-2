@@ -1,16 +1,19 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Active stage id: `mc2-bswhl`
+Accepted stage id: `mc2-bswhl`
 
 ## Current stage
 
-`mc2-bswhl` is in progress on `develop`. The accepted boundary is the Stage 2 document dashboard:
-when `file_catalog.error_message` contains a processing failure, the uploader must see a safe,
-localized, actionable explanation even when the client store already marks the document failed.
+`mc2-bswhl` is accepted on local `develop` in `13efe27d6` and `b06f7ff2b`. Persisted
+`file_catalog.error_message` now survives the primary client-store status path. The Stage 2 row
+shows localized recovery guidance for an empty text layer and a safe generic explanation for
+unknown failures without exposing paths or counters.
 
-Repository evidence shows the stored error is selected today but is discarded on that primary
-status path. Reading image-only or outlined-text documents remains out of scope under `mc2-3gz2m`.
+Focused web tests passed 3/3 after failing against the old behavior. `pnpm run type-check`,
+`pnpm run build`, local Playwright rendering, Graphify refresh, and canonical process verification
+passed. No push, deploy, preflight extraction, reindex, migration, or live paid processing ran.
+Reading image-only or outlined-text documents remains out of scope under `mc2-3gz2m`.
 
 ## Backlog truth and order
 
@@ -77,15 +80,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-bswhl`
-Recommended action: after accepting and closing `mc2-ekaup`, expose the existing stored document
-processing failure reason to the uploader; do not attempt the gated vector-diagram extraction work.
+Next stage id: `mc2-raw1i`
+Recommended action: count actual lesson headers so the intro-only lesson guard can fire. Preserve
+the exact Tier 1 order above; do not start the live-state check `mc2-1ugj1` first.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-bswhl`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and limit the slice to showing the already-stored document-processing failure
-reason to the uploader. Do not start `mc2-3gz2m` or any §9 work.
+Use $orchestrator-stage for `mc2-raw1i`. Read `specs/026-post-triage-priorities/spec.md` first,
+preserve its order, and limit the slice to making the intro-only lesson guard use the actual header
+count. Do not start `mc2-3gz2m` or any §9 work.
 
 ## Read first
 

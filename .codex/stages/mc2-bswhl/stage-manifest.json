@@ -4,7 +4,7 @@
   "goal_id": "mc2-bswhl",
   "epic_id": "mc2-p2908",
   "profile_at_creation": "balanced-v2.19",
-  "status": "in_progress",
+  "status": "accepted",
   "sequence": 1,
   "orchestration_level": "slice_acceptance",
   "acceptance_boundary_id": "actionable-document-processing-failure",
@@ -70,7 +70,7 @@
       "task_id": "mc2-bswhl",
       "stream_owner": "root-owner",
       "artifact_path": ".codex/stages/mc2-bswhl/artifacts/mc2-bswhl.md",
-      "status": "in_progress"
+      "status": "accepted"
     }
   ]
 }
