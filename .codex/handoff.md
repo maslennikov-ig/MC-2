@@ -1,17 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Accepted stage id: `mc2-1ugj1`
+Active stage id: `mc2-dqbw1`
 
 ## Current stage
 
-`mc2-1ugj1` is accepted by the required live measurement. A read-only system-catalog query proved
-that `public.lesson_enrichments` belongs to `supabase_realtime` and uses `REPLICA IDENTITY FULL`.
-The only remaining C-1 premise is therefore false in the live project.
+`mc2-dqbw1` is in progress on local `develop`. The proved boundary is the no-session auth path in
+`useLessonInspectorData`: while auth is loading the spinner stays, but once auth resolves without a
+session the hook must clear `isLoading` instead of spinning forever.
 
-No product code, migration, live mutation, client workaround, merge, push, or deploy was performed.
-The product source diff is empty and canonical process verification passed. The measurement is
-stored in `.codex/stages/mc2-1ugj1/evidence/live-realtime-prerequisites.json`.
+This does not reproduce or settle the historical report from a valid superadmin session. That
+separate cause would require a running application and Network trace; this stage changes only the
+reachable path proved by source and a focused hook test.
 
 ## Backlog truth and order
 
@@ -19,10 +19,9 @@ stored in `.codex/stages/mc2-1ugj1/evidence/live-realtime-prerequisites.json`.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-After `mc2-1ugj1`, continue Tier 1 in exact spec order:
+After `mc2-dqbw1`, continue Tier 1 in exact spec order:
 
-1. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
-2. `mc2-sznhi` — make the teaser guard work outside ru/en.
+1. `mc2-sznhi` — make the teaser guard work outside ru/en.
 
 Tier 2 then starts with `mc2-3sz3d`, the false-green backend test bootstrap.
 
