@@ -5,10 +5,13 @@ Current stage id: `mc2-sznhi`
 
 ## Current stage
 
-`mc2-sznhi` is claimed and scoped on local `develop`. The accepted boundary is an exhaustive
-locale-keyed teaser detector for every `CONTENT_LABELS` language, preserving exact next-lesson
-title matching and avoiding ordinary transition phrases. No live generation or paid call is in
-scope.
+`mc2-sznhi` is accepted locally. Product commit `bcb197989` makes the Stage 6 intro guard select an
+exhaustive pattern set for every `CONTENT_LABELS` locale, while ordinary transitions, exact
+next-lesson-title matching, and English fallback remain covered.
+
+Focused TDD passed 40/40 after 18 localized teaser cases failed against the old behavior. `pnpm run
+type-check`, `pnpm run build`, and canonical process verification passed. No live generation or
+paid call was used.
 
 ## Backlog truth and order
 
@@ -16,12 +19,8 @@ scope.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-Continue Tier 1 in exact spec order:
-
-1. `mc2-sznhi` — make the teaser guard work outside ru/en.
-
-After `mc2-sznhi`, Tier 1 is complete. Tier 2 then starts with `mc2-3sz3d`, the false-green backend
-test bootstrap.
+Tier 1 is complete through `mc2-sznhi`. Tier 2 now starts with `mc2-3sz3d`, the false-green backend
+test bootstrap, in exact spec order.
 
 ## Verification facts
 
@@ -72,15 +71,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-sznhi`
-Recommended action: make the teaser guard enforce the intended behavior outside `ru` and `en`,
-using repository-owned locale handling and focused tests before the standard code gates.
+Next stage id: `mc2-3sz3d`
+Recommended action: make the default backend test bootstrap fail nonzero and clearly when its
+required Qdrant check fails, then prove it cannot report a false green without running tests.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-sznhi`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and make the teaser guard work outside `ru` and `en`. Do not start
-`mc2-3gz2m` or any §9 work.
+Use $orchestrator-stage for `mc2-3sz3d`. Read `specs/026-post-triage-priorities/spec.md` first,
+preserve its order, and repair the false-green backend test bootstrap without treating the current
+exit-zero result as evidence. Do not start `mc2-3gz2m` or any §9 work.
 
 ## Read first
 
