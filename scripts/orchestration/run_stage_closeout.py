@@ -28,6 +28,35 @@ DEBT_POLICY_REFERENCE_PATTERNS = (
 )
 PROJECT_INDEX_REVIEW_MARKER = "project-index: reviewed-no-change"
 DOCS_REVIEW_MARKER = "docs-reviewed:"
+# Accepts the kernel's own `Documentation:` spelling as well as the explicit
+# label, so an agent that recorded the decision in kernel form is not failed for
+# using a different word. Requires real content after the colon: a bare marker
+# or `n/a` would make the gate decorative. `check_project_index_review` accepts
+# DOCS_REVIEW_MARKER, so neither spelling may share that prefix.
+DOCUMENTATION_DECISION_RE = re.compile(
+    r"(?:^|;)\s*documentation(?:-decision)?:\s*(?P<value>[^;\n]*\S)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Trigger on dependency lockfiles only. `documentation_impact` classifies impact
+# on *project documentation*, and its `structural` prefixes (`app/`, `packages/`,
+# `frontend/`) match nearly every diff in a Next.js app or a monorepo, so reusing
+# it here would turn this into the blanket default it is meant to avoid. A
+# dependency bump is the one diff that reliably depends on external versioned
+# behavior.
+DEPENDENCY_LOCKFILES = {
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lockb",
+    "poetry.lock",
+    "uv.lock",
+    "Pipfile.lock",
+    "requirements.txt",
+    "go.sum",
+    "Cargo.lock",
+    "Gemfile.lock",
+    "composer.lock",
+}
 PLACEHOLDERS = {"", "n/a", "<short cleanup result or blocker>"}
 STRUCTURAL_CHANGE_PREFIXES = (
     "app/",
@@ -991,6 +1020,49 @@ def check_documentation_review(repo_root: pathlib.Path, stage_id: str) -> None:
     raise SystemExit(1)
 
 
+def check_documentation_decision(
+    repo_root: pathlib.Path, stage_id: str, artifacts: list[dict[str, object]]
+) -> None:
+    """Close the docs preflight loop where the diff can actually depend on it.
+
+    The preflight has an entry obligation and no exit check, so a skipped
+    decision leaves no trace. Requiring the marker on every stage would just
+    produce a ritual line on local-only work, so this gates on the same impact
+    categories the documentation review already computes.
+    """
+
+    # `git_changed_files` only sees the working tree, so a stage whose work is
+    # already committed would report nothing and pass silently. Stage artifacts
+    # record their own changed files and survive the commit.
+    changed = set(git_changed_files(repo_root))
+    for artifact in artifacts:
+        recorded = artifact.get("changed_files")
+        if isinstance(recorded, list):
+            changed.update(str(raw).strip().replace("\\", "/") for raw in recorded)
+    touched_lockfiles = sorted(
+        path for path in changed if pathlib.PurePath(path).name in DEPENDENCY_LOCKFILES
+    )
+    if not touched_lockfiles:
+        print("documentation decision not required (no dependency lockfile changed)")
+        return
+
+    match = DOCUMENTATION_DECISION_RE.search(stage_summary_text(repo_root, stage_id))
+    value = match.group("value").strip().lower() if match else ""
+    if value and value not in PLACEHOLDERS:
+        print(f"documentation decision OK ({', '.join(touched_lockfiles)})")
+        return
+
+    print("Stage close requires a documentation decision marker:", file=sys.stderr)
+    print(f"- changed lockfiles: {', '.join(touched_lockfiles)}", file=sys.stderr)
+    print(
+        "- add `documentation-decision: docs-resolve - <package@version, status>` or "
+        "`documentation-decision: no external/versioned boundary - <reason>` "
+        "to the stage summary",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
 def has_tracked_defer(body: str) -> bool:
     normalized = body.strip().lower()
     if not normalized or normalized in {"none", "- none"}:
@@ -1139,6 +1211,7 @@ def main(argv: list[str]) -> int:
         check_child_acceptance_cleanup(artifacts)
         check_project_index_review(repo_root, contract, stage_id)
         check_documentation_review(repo_root, stage_id)
+        check_documentation_decision(repo_root, stage_id, artifacts)
         check_debt_markers(repo_root, contract)
         started_at = datetime.now(timezone.utc)
         results = run_selected_commands()
