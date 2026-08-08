@@ -9,6 +9,12 @@ set -e
 #   Blue:  web:3001, api:4001
 #   Green: web:3002, api:4002
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+source "$SCRIPT_DIR/lib/host-operation-lock.sh"
+host_operation_lock_acquire blue-green-rollback \
+    "$BASE_PATH/.host-operation.lock"
+
 # ============================================================================
 # Q12 phase-aware rollback (fail-closed).
 #
@@ -222,7 +228,6 @@ fi
 
 ENV=${1:-production}
 EXPECTED_COMMIT=${2:-}
-BASE_PATH=${BASE_PATH:-/opt/megacampus}
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
 DEPLOY_STATE="$BASE_PATH/deploy_state"
 

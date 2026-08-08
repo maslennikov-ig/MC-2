@@ -84,7 +84,7 @@ classify_path() {
   fi
 
   case "$path" in
-    docker-compose*.yml|nginx-docling-proxy.conf|deploy/*|ops/qdrant/*|scripts/deploy*.sh|scripts/rollback_blue_green.sh)
+    docker-compose*.yml|nginx-docling-proxy.conf|deploy/*|ops/qdrant/*|scripts/deploy*.sh|scripts/rollback_blue_green.sh|scripts/lib/host-operation-lock.sh|scripts/with_host_operation_lock.sh)
       deploy_config_changed=true
       return
       ;;

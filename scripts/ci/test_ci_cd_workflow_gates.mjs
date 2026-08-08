@@ -40,6 +40,7 @@ for (const contractCommand of [
   'node scripts/ci/test_ci_cd_workflow_gates.mjs',
   'bash scripts/ci/test_detect_deploy_changes.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
+  'bash scripts/ci/test_host_operation_lock.sh',
   'bash scripts/ci/test_docling_rollout.sh',
 ]) {
   assert(
@@ -85,6 +86,9 @@ const verifyDeployment = stagingDeploy?.steps?.find(
   step => step?.name === 'Verify deployment'
 )?.run;
 const rollbackCommand = jobs.rollback?.steps?.find(step => step?.name === 'Execute rollback')?.run;
+const copyDevDeploymentFiles = jobs['deploy-dev']?.steps?.find(
+  step => step?.name === 'Copy deployment files'
+)?.run;
 
 assert(copyDeploymentFiles, 'staging deploy must copy deployment files');
 for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
@@ -93,6 +97,16 @@ for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
     `staging deploy package must include ${requiredPath}`
   );
 }
+assert(
+  copyDeploymentFiles.includes('scripts/lib/host-operation-lock.sh') &&
+    copyDeploymentFiles.includes('scripts/with_host_operation_lock.sh'),
+  'staging deploy must ship the shared host-operation lock entrypoints'
+);
+assert(
+  copyDevDeploymentFiles?.includes('scripts/lib/host-operation-lock.sh') &&
+    copyDevDeploymentFiles.includes('scripts/with_host_operation_lock.sh'),
+  'development deploy must ship the shared host-operation lock entrypoints'
+);
 
 assert(createProductionEnv, 'staging deploy must create .env.production');
 for (const requiredLine of [

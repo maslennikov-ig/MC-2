@@ -11,6 +11,10 @@ COMPOSE_FILE="docker-compose.production.yml"
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+source "$SCRIPT_DIR/lib/host-operation-lock.sh"
+host_operation_lock_acquire legacy-production-deploy \
+    "$BASE_PATH/.host-operation.lock"
 source "$SCRIPT_DIR/lib/docling-rollout.sh"
 
 # Colors for output

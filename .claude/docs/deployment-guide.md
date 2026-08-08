@@ -9,6 +9,28 @@
 
 Server: `95.81.98.230`, user: `claude-deploy`, path: `/opt/megacampus`
 
+## Shared host-operation lock
+
+All repository deploy and rollback entrypoints acquire
+`/opt/megacampus/.host-operation.lock` before changing containers, services, or
+Nginx. If another operation holds it, the new command exits with code 75 before
+performing work.
+
+Run any cooperating manual infrastructure operation through the same wrapper:
+
+```bash
+cd /opt/megacampus
+bash scripts/with_host_operation_lock.sh infrastructure-maintenance -- <reviewed-command> [args...]
+```
+
+The operation name is logged on rejection; do not put credentials in it. The
+wrapper holds the kernel lock for the complete child-command lifetime. Do not
+delete or replace `.host-operation.lock`: replacing the inode while it is held
+would let a second process acquire a different lock file.
+
+This is a cooperative safety boundary, not an access-control mechanism. Direct
+root commands can bypass it and remain outside the supported operating path.
+
 ## Architecture Overview
 
 ### Docker Compose Files

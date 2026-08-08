@@ -5,7 +5,11 @@ set -e
 # Simple rolling deployment for develop branch
 # Usage: ./deploy_dev.sh
 
-BASE_PATH="/opt/megacampus"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/host-operation-lock.sh"
+host_operation_lock_acquire development-deploy \
+    "$BASE_PATH/.host-operation.lock"
 source "$BASE_PATH/scripts/lib/docling-rollout.sh"
 DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
 DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}

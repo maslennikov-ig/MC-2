@@ -29,6 +29,10 @@ fi
 #   Green: web:3002, api:4002
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+source "$SCRIPT_DIR/lib/host-operation-lock.sh"
+host_operation_lock_acquire blue-green-deploy \
+    "$BASE_PATH/.host-operation.lock"
 source "$SCRIPT_DIR/lib/docling-rollout.sh"
 
 # ============================================================================
@@ -417,7 +421,6 @@ fi
 
 ENV=${1:-production}
 TAG=${2:-}
-BASE_PATH=${BASE_PATH:-/opt/megacampus}
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
 DEPLOY_STATE="$BASE_PATH/deploy_state"
 WEB_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/web"

@@ -108,6 +108,13 @@ assert_value "$deploy_script" deploy_config_changed true
 assert_value "$deploy_script" api_changed false
 assert_contains "$deploy_script" '"image":"qdrant-operator"'
 
+host_lock="$(run_case "host-lock" scripts/lib/host-operation-lock.sh scripts/with_host_operation_lock.sh)"
+assert_value "$host_lock" should_deploy true
+assert_value "$host_lock" should_build_docker true
+assert_value "$host_lock" deploy_config_changed true
+assert_value "$host_lock" api_changed false
+assert_contains "$host_lock" '"image":"qdrant-operator"'
+
 ci_only="$(run_case "ci-only" .github/workflows/ci-cd.yml scripts/ci/detect_deploy_changes.sh)"
 assert_value "$ci_only" should_deploy true
 assert_value "$ci_only" should_build_docker true
