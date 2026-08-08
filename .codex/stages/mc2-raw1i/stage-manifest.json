@@ -1,0 +1,60 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-raw1i",
+  "goal_id": "mc2-raw1i",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "in_progress",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "reachable-empty-lesson-sections-guard",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage6-heuristic-basic-checks", "stage6-heuristic-orchestrator"],
+    "risk_models": ["dead-empty-section-guard", "section-count-regression"],
+    "test_environments": ["vitest-backend-unit", "pnpm-monorepo-build"],
+    "rollback_boundary": "stage6-content-density-section-count",
+    "acceptance_proofs": [
+      "intro-only-section-count-zero",
+      "empty-sections-critical-failure-reachable",
+      "h2-section-count-exact",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": ["implementation", "consumer_adoption", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-raw1i",
+    "source_digest": "78e81448711876f48a5136f87d4d97226a19424a28a4e8f9a55452a633aded35",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Проверка плотности считает только реальные секции урока с Markdown-заголовком второго уровня; заголовок урока и текст вступления секциями не считаются.",
+        "text_digest": "baa6d9b3eb46c61356fd0969e170380f078d51577d38dd3b63d2829e82749ac2"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Урок без единого H2-заголовка получает sectionCount=0 и критическую ошибку emptySections, а урок с H2-секциями возвращает их точное количество без этой ошибки.",
+        "text_digest": "550bd47e66587491a0499461e016227943c214a13b215bfb83c466a2b2b815b2"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Изменение подтверждено красно-зелёным фокусным unit-тестом через vitest.config.unit.ts, pnpm type-check и pnpm build; живой запуск генерации и платные вызовы не выполняются.",
+        "text_digest": "55731ce965fffe562e97bedf00f2792f53b57ed7108c98142b4e09c4baa28721"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-raw1i/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "78e81448711876f48a5136f87d4d97226a19424a28a4e8f9a55452a633aded35",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-raw1i",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-raw1i/artifacts/mc2-raw1i.md",
+      "status": "in_progress"
+    }
+  ]
+}

@@ -1,19 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Accepted stage id: `mc2-bswhl`
+Active stage id: `mc2-raw1i`
 
 ## Current stage
 
-`mc2-bswhl` is accepted on local `develop` in `13efe27d6` and `b06f7ff2b`. Persisted
-`file_catalog.error_message` now survives the primary client-store status path. The Stage 2 row
-shows localized recovery guidance for an empty text layer and a safe generic explanation for
-unknown failures without exposing paths or counters.
+`mc2-raw1i` is in progress on local `develop`. The cohesive boundary is the existing Stage 6
+heuristic guard: count real H2 content sections so an intro-only lesson produces `sectionCount=0`
+and the existing critical `emptySections` failure can fire. H1 lesson titles and introduction text
+must not inflate the count; real H2 sections must retain their exact count.
 
-Focused web tests passed 3/3 after failing against the old behavior. `pnpm run type-check`,
-`pnpm run build`, local Playwright rendering, Graphify refresh, and canonical process verification
-passed. No push, deploy, preflight extraction, reindex, migration, or live paid processing ran.
-Reading image-only or outlined-text documents remains out of scope under `mc2-3gz2m`.
+The task is local-only and root-owned. No database, public contract, live generation, provider
+call, reindex, migration, deploy, or remote delivery is needed.
 
 ## Backlog truth and order
 
@@ -21,13 +19,12 @@ Reading image-only or outlined-text documents remains out of scope under `mc2-3g
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-After `mc2-bswhl`, continue Tier 1 in exact spec order:
+After `mc2-raw1i`, continue Tier 1 in exact spec order:
 
-1. `mc2-raw1i` — count actual headers so the intro-only lesson guard can fire.
-2. `mc2-1ugj1` — first confirm the live Supabase realtime publication; repository migrations are
+1. `mc2-1ugj1` — first confirm the live Supabase realtime publication; repository migrations are
    not proof of live state.
-3. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
-4. `mc2-sznhi` — make the teaser guard work outside ru/en.
+2. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
+3. `mc2-sznhi` — make the teaser guard work outside ru/en.
 
 Tier 2 then starts with `mc2-3sz3d`, the false-green backend test bootstrap.
 
@@ -81,8 +78,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 ## Next recommended
 
 Next stage id: `mc2-raw1i`
-Recommended action: count actual lesson headers so the intro-only lesson guard can fire. Preserve
-the exact Tier 1 order above; do not start the live-state check `mc2-1ugj1` first.
+Recommended action: write the focused regression test first, then make `checkContentDensity` count
+actual H2 content sections so the existing `emptySections` guard becomes reachable.
 
 ## Starter prompt for next orchestrator
 
