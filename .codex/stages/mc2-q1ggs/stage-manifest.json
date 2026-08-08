@@ -3,7 +3,7 @@
   "stage_id": "mc2-q1ggs",
   "goal_id": "mc2-q1ggs",
   "profile_at_creation": "balanced-v2.19",
-  "status": "in_progress",
+  "status": "accepted",
   "sequence": 1,
   "orchestration_level": "slice_acceptance",
   "acceptance_boundary_id": "shared-host-operation-lock",
@@ -70,7 +70,7 @@
       "task_id": "mc2-q1ggs",
       "stream_owner": "root-owner",
       "artifact_path": ".codex/stages/mc2-q1ggs/artifacts/mc2-q1ggs.md",
-      "status": "returned"
+      "status": "accepted"
     }
   ]
 }
