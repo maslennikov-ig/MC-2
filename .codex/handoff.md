@@ -1,19 +1,16 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Accepted stage id: `mc2-ekaup`
+Active stage id: `mc2-bswhl`
 
 ## Current stage
 
-`mc2-ekaup` is implemented locally on `develop` in two product commits:
+`mc2-bswhl` is in progress on `develop`. The accepted boundary is the Stage 2 document dashboard:
+when `file_catalog.error_message` contains a processing failure, the uploader must see a safe,
+localized, actionable explanation even when the client store already marks the document failed.
 
-- `26123e324` — unsupported block edit no longer mutates viewer state or claims it was saved.
-- `e0572c25b` — owner-only edit/regeneration transport, durable block and `final_markdown`
-  persistence, queue rollback, stored-result polling, and stale-viewer protection.
-
-Canonical closeout passed: backend 72/72, web 24/24, `pnpm run type-check`, `pnpm run build`, and
-process verification. No live mutable E2E or paid regeneration was run. Remote delivery was not
-requested.
+Repository evidence shows the stored error is selected today but is discarded on that primary
+status path. Reading image-only or outlined-text documents remains out of scope under `mc2-3gz2m`.
 
 ## Backlog truth and order
 
@@ -21,14 +18,13 @@ requested.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-After `mc2-ekaup`, continue Tier 1 in exact spec order:
+After `mc2-bswhl`, continue Tier 1 in exact spec order:
 
-1. `mc2-bswhl` — show the uploader the stored document-processing failure reason.
-2. `mc2-raw1i` — count actual headers so the intro-only lesson guard can fire.
-3. `mc2-1ugj1` — first confirm the live Supabase realtime publication; repository migrations are
+1. `mc2-raw1i` — count actual headers so the intro-only lesson guard can fire.
+2. `mc2-1ugj1` — first confirm the live Supabase realtime publication; repository migrations are
    not proof of live state.
-4. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
-5. `mc2-sznhi` — make the teaser guard work outside ru/en.
+3. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
+4. `mc2-sznhi` — make the teaser guard work outside ru/en.
 
 Tier 2 then starts with `mc2-3sz3d`, the false-green backend test bootstrap.
 
