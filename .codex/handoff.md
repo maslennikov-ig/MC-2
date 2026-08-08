@@ -51,12 +51,15 @@ migrations in CI, so confirm the live publication before fixing.
 
 ## Next: Stage 2, ordered by irreversibility not by tracker priority
 
-1. **`mc2-bygu1` — the only irreversible item in the whole backlog.** 206 MB / 117 files
-   under `/opt/megacampus/data/uploads`, NO second copy anywhere.
-   `file_catalog.storage_path` is a RELATIVE FILESYSTEM PATH, not a Storage key (261 rows,
-   128 distinct paths). Vectors and courses rebuild only from these; six documents already
-   lost their sources. Acceptance must RESTORE one file and check its hash against
-   `file_catalog.hash` — a copy never restored is a belief, not a backup.
+1. ~~`mc2-bygu1`~~ **DONE 2026-08-08.** `helixa-new` (82.26.152.8) now PULLS the uploads
+   from `megacampus-prod` daily into 14 dated snapshots. Pull not push, so production holds
+   no credential to the backup host. The key carries `restrict` + a forced `tar` command and
+   was verified unable to do anything else. Neither host has `rsync`, so it is tar over ssh
+   and nothing was installed. Restore PROVEN: one file extracted, its sha256 equals
+   `file_catalog.hash` exactly. NOT disaster recovery — `helixa-new` is a single VPS with
+   server-local backups of its own. See `deploy/uploads-backup/README.md`.
+   **The lost-source count is NINE, not six** (126 catalog paths under `uploads/` vs 117
+   files on disk) — `mc2-mrhuw`.
 2. **`mc2-q1ggs`** — two processes hold `claude-deploy` on production with no shared lock;
    one rebooted the host mid-deploy 2026-08-07. Owner picks: separate accounts, a shared
    lock, or narrower sudoers. Structurally unchanged.
