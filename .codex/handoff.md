@@ -169,11 +169,17 @@ explicit paths and never `git add -A`.
 
 ## Next recommended
 
-Next stage id: `mc2-bygu1`
-Recommended action: start Stage 2 of `specs/025-remaining-debt/` with `mc2-bygu1` — the
-uploaded sources on `megacampus-prod` are the only irreversible item the triage found, and
-the smallest. Acceptance must include restoring one file and checking its hash against
-`file_catalog.hash`. Reindex, migrations, secrets and force-push are NOT authorized.
+Next stage id: `mc2-ekaup`
+Recommended action: work `specs/026-post-triage-priorities/spec.md`, which SUPERSEDES the
+stage order in `specs/025-remaining-debt/plan.md` — that plan was written before the
+backlog had been checked and three of its assumptions turned out false. Start at Tier 1,
+head item `mc2-ekaup`: a Career Playbook block edit does not survive a reload, and the UI
+tells the user it was saved. The message is fixable in minutes and separately from the
+transport. Two problems that had no bead at all were filed during the re-ranking:
+`mc2-bswhl` (an uploader is never told why a document could not be read) and `mc2-3sz3d`
+(the backend suite cannot start and exits 0). Reindex, migrations, secrets and force-push
+are NOT authorized. The owner will run this in Codex with ChatGPT 5.6 —
+`specs/026-post-triage-priorities/codex-prompt.md`, prompt-check pass (one size warning).
 
 ## Starter prompt for next orchestrator
 
