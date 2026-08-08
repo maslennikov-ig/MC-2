@@ -1,17 +1,18 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Active stage id: `mc2-raw1i`
+Accepted stage id: `mc2-raw1i`
 
 ## Current stage
 
-`mc2-raw1i` is in progress on local `develop`. The cohesive boundary is the existing Stage 6
-heuristic guard: count real H2 content sections so an intro-only lesson produces `sectionCount=0`
-and the existing critical `emptySections` failure can fire. H1 lesson titles and introduction text
-must not inflate the count; real H2 sections must retain their exact count.
+`mc2-raw1i` is accepted on local `develop` in `0d551f046`. The existing Stage 6 heuristic now
+counts real H2 content sections, so an intro-only lesson produces `sectionCount=0` and the existing
+critical `emptySections` failure fires. H1 lesson titles and nested H3 headings do not inflate the
+count; real H2 sections retain their exact count.
 
-The task is local-only and root-owned. No database, public contract, live generation, provider
-call, reindex, migration, deploy, or remote delivery is needed.
+Focused unit TDD passed 3/3 after all three cases failed against the old behavior. `pnpm run
+type-check`, `pnpm run build`, Graphify refresh, and canonical process verification passed. No live
+generation, provider call, reindex, migration, merge, push, or deploy ran.
 
 ## Backlog truth and order
 
@@ -77,15 +78,16 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-raw1i`
-Recommended action: write the focused regression test first, then make `checkContentDensity` count
-actual H2 content sections so the existing `emptySections` guard becomes reachable.
+Next stage id: `mc2-1ugj1`
+Recommended action: first query the live Supabase `supabase_realtime` publication read-only. Do not
+infer live state from repository migrations, and do not change schema or publication membership
+without a separately accepted implementation boundary.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-raw1i`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and limit the slice to making the intro-only lesson guard use the actual header
-count. Do not start `mc2-3gz2m` or any §9 work.
+Use $orchestrator-stage for `mc2-1ugj1`. Read `specs/026-post-triage-priorities/spec.md` first,
+preserve its order, and begin with the required read-only live publication check. Do not create or
+apply a migration until the live state is known; do not start `mc2-3gz2m` or any §9 work.
 
 ## Read first
 
