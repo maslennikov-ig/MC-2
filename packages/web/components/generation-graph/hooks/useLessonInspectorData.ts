@@ -1105,10 +1105,15 @@ export function useLessonInspectorData({
   // Uses a stable boolean to avoid re-triggering on session object changes
   const isAuthenticated = !!session && !authLoading
   useEffect(() => {
+    if (authLoading) return
+
     if (isAuthenticated) {
       void fetchLessonData()
+      return
     }
-  }, [fetchLessonData, isAuthenticated])
+
+    setIsLoading(false)
+  }, [authLoading, fetchLessonData, isAuthenticated])
 
   // Store debouncedFetch in a ref to avoid re-subscribing on every callback recreation
   const debouncedFetchRef = useRef(debouncedFetch)
