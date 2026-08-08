@@ -257,7 +257,7 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
 
 function getDocumentFailureMessage(
   errorMessage: string | undefined,
-  t: (key: string) => string
+  t: (key: 'stage2.unreadableTextLayer' | 'stage2.genericProcessingFailure') => string
 ): string | undefined {
   if (!errorMessage?.trim()) return undefined
 
