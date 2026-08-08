@@ -57,6 +57,25 @@ DEPENDENCY_LOCKFILES = {
     "Gemfile.lock",
     "composer.lock",
 }
+# Acceptance commands already run the typecheckers and linters that know an API
+# was removed or deprecated, but their output only ever reached the terminal:
+# the exit code cannot carry a warning. Surfacing those lines is the one signal
+# here that needs no guessing — a deprecation warning is a fact the toolchain
+# reports, not an inference from the diff. Kept deliberately small; widen only
+# after a real miss, because every added pattern is a chance to report noise.
+DEPRECATION_PATTERNS = (
+    re.compile(r"\bDeprecationWarning\b"),
+    re.compile(r"\bPendingDeprecationWarning\b"),
+    re.compile(r"\bis deprecated\b", re.IGNORECASE),
+    re.compile(r"\bdeprecated:", re.IGNORECASE),
+    re.compile(r"\bnpm warn deprecated\b", re.IGNORECASE),
+    # TS6385/TS6387: symbol and signature deprecation reported by tsc.
+    re.compile(r"\bTS638[57]\b"),
+)
+# One command can repeat the same warning per file it compiles. Report the
+# distinct lines and stop: this is a pointer to work, not a log.
+DEPRECATION_REPORT_LIMIT = 20
+DEPRECATION_LINE_LIMIT = 300
 PLACEHOLDERS = {"", "n/a", "<short cleanup result or blocker>"}
 STRUCTURAL_CHANGE_PREFIXES = (
     "app/",
@@ -781,11 +800,78 @@ def check_blocking_review_findings(
     raise SystemExit(1)
 
 
-def run_shell(command: str, cwd: pathlib.Path, dry_run: bool) -> None:
+def collect_deprecations(output: str) -> list[str]:
+    """Distinct deprecation lines from one command's output, in order."""
+
+    found: list[str] = []
+    seen: set[str] = set()
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or not any(pattern.search(line) for pattern in DEPRECATION_PATTERNS):
+            continue
+        line = line[:DEPRECATION_LINE_LIMIT]
+        if line in seen:
+            continue
+        seen.add(line)
+        found.append(line)
+        if len(found) >= DEPRECATION_REPORT_LIMIT:
+            break
+    return found
+
+
+def report_deprecations(results: list[dict[str, object]]) -> None:
+    """Print what the toolchain said about deprecated APIs.
+
+    Reporting only. Failing closeout on a warning would make the check fire on
+    ordinary work, which is exactly how two earlier attempts at this boundary
+    were reverted; the value is that the agent reads the lines and fixes them,
+    not that a gate refuses to close.
+    """
+
+    flagged = [entry for entry in results if entry.get("deprecations")]
+    if not flagged:
+        return
+    print("\ndeprecations reported by acceptance commands:")
+    for entry in flagged:
+        print(f"  $ {entry['command']}")
+        for line in entry["deprecations"]:  # type: ignore[index]
+            print(f"    {line}")
+
+
+def run_shell(command: str, cwd: pathlib.Path, dry_run: bool) -> str:
+    """Run one acceptance command, streaming its output and returning it.
+
+    The output has to stay live — waiting in silence for a long test run is a
+    real regression — so this reads the merged stream line by line instead of
+    buffering it. Merging stderr into stdout is deliberate: deprecation
+    warnings mostly arrive there, and interleaving keeps them next to the step
+    that produced them. Exit-code behavior is unchanged.
+    """
+
     print(f"$ {command}")
     if dry_run:
-        return
-    subprocess.run(command, shell=True, cwd=cwd, executable="/bin/bash", check=True)
+        return ""
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        cwd=cwd,
+        executable="/bin/bash",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        bufsize=1,
+    )
+    captured: list[str] = []
+    assert process.stdout is not None
+    with process.stdout:
+        for line in process.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            captured.append(line)
+    if process.wait() != 0:
+        raise subprocess.CalledProcessError(process.returncode, command)
+    return "".join(captured)
 
 
 def git_available(repo_root: pathlib.Path) -> bool:
@@ -1140,14 +1226,17 @@ def main(argv: list[str]) -> int:
         results: list[dict[str, object]] = []
         for command in commands:
             started = time.monotonic()
-            run_shell(command, repo_root, args.dry_run)
-            results.append(
-                {
-                    "command": command,
-                    "result": "dry-run" if args.dry_run else "passed",
-                    "duration_seconds": round(time.monotonic() - started, 3),
-                }
-            )
+            output = run_shell(command, repo_root, args.dry_run)
+            entry: dict[str, object] = {
+                "command": command,
+                "result": "dry-run" if args.dry_run else "passed",
+                "duration_seconds": round(time.monotonic() - started, 3),
+            }
+            deprecations = collect_deprecations(output)
+            if deprecations:
+                entry["deprecations"] = deprecations
+            results.append(entry)
+        report_deprecations(results)
         return results
 
     if level == "inner_loop":
