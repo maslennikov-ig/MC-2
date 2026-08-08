@@ -785,7 +785,9 @@
     "clickToCollapse": "Click: collapse, double click: open details",
     "statusReady": "Ready",
     "statusProcessing": "Processing",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "unreadableTextLayer": "This file has no selectable text to read. Upload a version with a text layer, or run text recognition on the scan or image first.",
+    "genericProcessingFailure": "This file could not be processed. Check that it opens correctly, or upload another version."
   },
   "stage3": {
     "inputTab": "Context",

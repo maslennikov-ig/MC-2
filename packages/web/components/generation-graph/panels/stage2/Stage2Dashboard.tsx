@@ -255,6 +255,23 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
   )
 }
 
+function getDocumentFailureMessage(
+  errorMessage: string | undefined,
+  t: (key: string) => string
+): string | undefined {
+  if (!errorMessage?.trim()) return undefined
+
+  const isUnreadableTextLayer = [
+    'conversion produced no usable text',
+    'no extractable text layer',
+    'only ocr can read it',
+  ].some((marker) => errorMessage.toLowerCase().includes(marker))
+
+  return isUnreadableTextLayer
+    ? t('stage2.unreadableTextLayer')
+    : t('stage2.genericProcessingFailure')
+}
+
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
@@ -505,6 +522,7 @@ function DocumentMatrix({ documents, onDocumentClick, className, isLoading }: Do
               <TableCell className="font-medium">
                 {(() => {
                   const displayName = getDocumentDisplayName(doc)
+                  const failureMessage = getDocumentFailureMessage(doc.errorMessage, t)
                   const showOriginal =
                     doc.generatedTitle &&
                     (doc.originalName || doc.filename) &&
@@ -528,12 +546,9 @@ function DocumentMatrix({ documents, onDocumentClick, className, isLoading }: Do
                           ({truncateDisplayName(originalFilename, 40)})
                         </span>
                       )}
-                      {doc.errorMessage && (
-                        <p
-                          className="mt-1 ml-6 truncate text-xs text-red-500"
-                          title={doc.errorMessage}
-                        >
-                          {doc.errorMessage}
+                      {failureMessage && (
+                        <p className="mt-1 ml-6 max-w-lg text-xs leading-5 whitespace-normal text-red-600 dark:text-red-400">
+                          {failureMessage}
                         </p>
                       )}
                     </div>
