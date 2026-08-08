@@ -13,13 +13,13 @@ non_goals:
   - changing Supabase auth, Lesson Inspector queries, or layout
   - deploy, merge, push, live mutation, reindex, migration, secrets, access, or paid calls
 evidence:
-  - none
+  - acceptance-receipt
 task_id: mc2-dqbw1
 epic_id: mc2-p2908
 stage_id: mc2-dqbw1
 session_id: mc2-dqbw1
 milestone: cohesive-vertical-slice
-milestone_status: in_progress
+milestone_status: accepted
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -51,10 +51,10 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
-cleanup_status: not_applicable
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
 cleanup_notes: root owner uses the primary develop worktree; no child branch or worktree exists
 risk_level: medium
 risk_tags:
@@ -69,18 +69,23 @@ invariants:
   - test-matrix
 docs_impact: behavior
 docs_reviewed: no-change-needed
-docs_review_notes: pending implementation and closeout review
+docs_review_notes: the existing Lesson Inspector hook remains the owner; no stable entrypoint, public contract, or operator procedure changed
 verification:
-  - none: pending
+  - focused web red-green: passed, 1 test after failing against the old behavior
+  - pnpm run type-check: passed
+  - pnpm run build: passed with pre-existing DEP0169 warning tracked by mc2-p2908.1
+  - scripts/orchestration/run_process_verification.sh via canonical stage closeout: passed
 changed_files:
-  - none
+  - packages/web/components/generation-graph/hooks/useLessonInspectorData.ts
+  - packages/web/components/generation-graph/hooks/__tests__/useLessonInspectorData.auth.test.tsx
 explicit_defers:
   - historical valid-superadmin spinner - requires a running-app Network trace and is not proved by this code path
 ---
 
 # Summary
 
-In progress.
+The product implementation is committed at `7b29f9d29`. The initial-fetch effect now waits for auth
+resolution, preserves the existing authenticated fetch, and clears loading when no session exists.
 
 # Scope / Routing
 
@@ -89,11 +94,14 @@ session; the historical valid-session report remains unproven.
 
 # Verification
 
-Pending focused red-green and one root-owned final acceptance.
+The focused hook test failed against the old behavior and now passes 1/1. `pnpm run type-check`,
+`pnpm run build`, and canonical process verification passed. The receipt is stored at
+`.codex/stages/mc2-dqbw1/acceptance-receipt.json`.
 
 # Delivery / Cleanup
 
-Pending.
+Root-owned implementation is accepted on local `develop`; no merge, push, or deploy was requested
+at this boundary. No child branch or worktree exists.
 
 # Risks / Follow-ups / Explicit Defers
 

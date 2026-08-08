@@ -1,17 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Active stage id: `mc2-dqbw1`
+Current stage id: `mc2-dqbw1`
 
 ## Current stage
 
-`mc2-dqbw1` is in progress on local `develop`. The proved boundary is the no-session auth path in
-`useLessonInspectorData`: while auth is loading the spinner stays, but once auth resolves without a
-session the hook must clear `isLoading` instead of spinning forever.
+`mc2-dqbw1` is accepted locally. Product commit `7b29f9d29` makes Lesson Inspector clear loading
+when auth resolves without a session while preserving the existing authenticated fetch. Focused
+web TDD passed 1/1 after failing against the old behavior; `pnpm run type-check`, `pnpm run build`,
+and canonical process verification passed.
 
 This does not reproduce or settle the historical report from a valid superadmin session. That
-separate cause would require a running application and Network trace; this stage changes only the
-reachable path proved by source and a focused hook test.
+separate cause requires a running application and Network trace.
 
 ## Backlog truth and order
 
@@ -74,15 +74,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-dqbw1`
-Recommended action: reproduce the auth-resolved-without-session path in Lesson Inspector, then
-clear `isLoading` without claiming that this proves the historical superadmin report.
+Next stage id: `mc2-sznhi`
+Recommended action: make the teaser guard enforce the intended behavior outside `ru` and `en`,
+using repository-owned locale handling and focused tests before the standard code gates.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-dqbw1`. Read `specs/026-post-triage-priorities/spec.md` first,
-preserve its order, and limit the claim to the proved no-session loading path. Do not claim that it
-settles the historical valid-superadmin report; do not start `mc2-3gz2m` or any §9 work.
+Use $orchestrator-stage for `mc2-sznhi`. Read `specs/026-post-triage-priorities/spec.md` first,
+preserve its order, and make the teaser guard work outside `ru` and `en`. Do not start
+`mc2-3gz2m` or any §9 work.
 
 ## Read first
 
