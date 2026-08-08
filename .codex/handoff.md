@@ -1,18 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Accepted stage id: `mc2-raw1i`
+Active stage id: `mc2-1ugj1`
 
 ## Current stage
 
-`mc2-raw1i` is accepted on local `develop` in `0d551f046`. The existing Stage 6 heuristic now
-counts real H2 content sections, so an intro-only lesson produces `sectionCount=0` and the existing
-critical `emptySections` failure fires. H1 lesson titles and nested H3 headings do not inflate the
-count; real H2 sections retain their exact count.
+`mc2-1ugj1` is in progress on local `develop`. Its first gate is a read-only query of the live
+Supabase catalogs for `public.lesson_enrichments`: membership in `supabase_realtime` and the table's
+`REPLICA IDENTITY` must be measured before any code conclusion is accepted.
 
-Focused unit TDD passed 3/3 after all three cases failed against the old behavior. `pnpm run
-type-check`, `pnpm run build`, Graphify refresh, and canonical process verification passed. No live
-generation, provider call, reindex, migration, merge, push, or deploy ran.
+If live delivery is not configured, the authorized fix boundary is client-side fallback polling;
+the active spec prohibits schema migrations and live database mutations. If it is configured, the
+task must be reclassified from the measurement instead of patched on repository assumptions.
 
 ## Backlog truth and order
 
@@ -20,12 +19,10 @@ generation, provider call, reindex, migration, merge, push, or deploy ran.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-After `mc2-raw1i`, continue Tier 1 in exact spec order:
+After `mc2-1ugj1`, continue Tier 1 in exact spec order:
 
-1. `mc2-1ugj1` — first confirm the live Supabase realtime publication; repository migrations are
-   not proof of live state.
-2. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
-3. `mc2-sznhi` — make the teaser guard work outside ru/en.
+1. `mc2-dqbw1` — clear Lesson Inspector loading when auth resolves without a session.
+2. `mc2-sznhi` — make the teaser guard work outside ru/en.
 
 Tier 2 then starts with `mc2-3sz3d`, the false-green backend test bootstrap.
 
