@@ -162,6 +162,10 @@ export interface CareerPlaybookClient {
     blockId: CareerPlaybookBlockId
     instruction: string
   }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
+  getBlock?: (input: {
+    playbookId: string
+    blockId: CareerPlaybookBlockId
+  }) => Promise<CareerPlaybookBlockState>
   requestPdf?: (input: { playbookId: string }) => Promise<CareerPlaybookPdfExportResponse>
   requestFollowups?: (input: {
     playbookId: string
@@ -1209,6 +1213,34 @@ function isCareerPlaybookBackendPending(error: unknown) {
   return message.includes('METHOD_NOT_SUPPORTED') || message.includes('not implemented')
 }
 
+const CAREER_PLAYBOOK_BLOCK_POLL_INTERVAL_MS = 1_000
+const CAREER_PLAYBOOK_BLOCK_POLL_ATTEMPTS = 180
+
+function isCareerPlaybookBlockRegenerationPending(block: CareerPlaybookBlockState): boolean {
+  return (
+    block.status === 'pending' || block.status === 'generating' || block.status === 'regenerating'
+  )
+}
+
+async function pollCareerPlaybookBlock(
+  client: CareerPlaybookClient,
+  input: { playbookId: string; blockId: CareerPlaybookBlockId }
+): Promise<CareerPlaybookBlockState> {
+  if (!client.getBlock) {
+    throw new Error('Block regeneration status is unavailable')
+  }
+
+  for (let attempt = 0; attempt < CAREER_PLAYBOOK_BLOCK_POLL_ATTEMPTS; attempt += 1) {
+    const block = await client.getBlock(input)
+    if (!isCareerPlaybookBlockRegenerationPending(block)) return block
+    if (attempt + 1 < CAREER_PLAYBOOK_BLOCK_POLL_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, CAREER_PLAYBOOK_BLOCK_POLL_INTERVAL_MS))
+    }
+  }
+
+  throw new Error('Block regeneration timed out')
+}
+
 function isPdfExportResponse(value: unknown): value is CareerPlaybookPdfExportResponse {
   if (!value || typeof value !== 'object') return false
   const record = value as Record<string, unknown>
@@ -1265,6 +1297,10 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.library.regenerateBlock.mutate(
         input
       )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
+    getBlock: async (input) =>
+      (await client.careerPlaybook.generation.getBlock.query(
+        input
+      )) as unknown as CareerPlaybookBlockState,
     requestPdf: async (input) =>
       (await client.careerPlaybook.exportPdf.query(
         input
@@ -1599,6 +1635,11 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         if (!snapshot.viewer?.playbookId) {
           return { ok: false, error: 'Career Playbook viewer is not loaded' }
         }
+        const requestedPlaybookId = snapshot.viewer.playbookId
+        const supersededResult = (): CareerPlaybookAutosaveResult => ({
+          ok: false,
+          error: 'Career Playbook viewer request was superseded',
+        })
 
         const rejectUnavailableEdit = (): CareerPlaybookAutosaveResult => {
           const message = 'Block editing is unavailable. Your changes were not saved.'
@@ -1621,10 +1662,11 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           }
 
           const updatedBlock = await client.editBlock({
-            playbookId: snapshot.viewer.playbookId,
+            playbookId: requestedPlaybookId,
             blockId,
             content,
           })
+          if (get().viewer?.playbookId !== requestedPlaybookId) return supersededResult()
 
           set((state) => {
             if (!state.viewer) return
@@ -1650,6 +1692,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
           return { ok: true }
         } catch (error) {
+          if (get().viewer?.playbookId !== requestedPlaybookId) return supersededResult()
           if (isCareerPlaybookBackendPending(error)) {
             return rejectUnavailableEdit()
           }
@@ -1668,31 +1711,19 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         if (!snapshot.viewer?.playbookId) {
           return { ok: false, error: 'Career Playbook viewer is not loaded' }
         }
+        const requestedPlaybookId = snapshot.viewer.playbookId
+        const supersededResult = (): CareerPlaybookAutosaveResult => ({
+          ok: false,
+          error: 'Career Playbook viewer request was superseded',
+        })
 
-        const applyLocalRegeneration = () => {
-          const previousBlock = snapshot.viewer?.blocks[blockId] ?? emptyViewerBlockState()
-          const baseContent = previousBlock.content.trim() || '## Draft block'
-          const localBlock: CareerPlaybookBlockState = {
-            ...previousBlock,
-            content: `${baseContent}\n\n> Regeneration instruction: ${instruction}`,
-            status: 'generated',
-            attempt: (previousBlock.attempt ?? 0) + 1,
-            generated_at: nowIso(),
-          }
+        const rejectUnavailableRegeneration = (): CareerPlaybookAutosaveResult => {
+          const message = 'Block regeneration is unavailable. The block was not changed.'
           set((state) => {
-            if (!state.viewer) return
-            state.viewer = normalizeViewerSnapshot({
-              ...state.viewer,
-              blocks: {
-                ...state.viewer.blocks,
-                [blockId]: localBlock,
-              },
-            })
-            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
             state.isUpdatingViewerBlock = false
-            state.viewerActionMessage =
-              'Block regenerated locally until the backend action is connected'
+            state.viewerActionMessage = message
           })
+          return { ok: false, error: message, backendPending: true }
         }
 
         set((state) => {
@@ -1703,15 +1734,21 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         try {
           const client = getClient()
           if (!client.regenerateBlock) {
-            applyLocalRegeneration()
-            return { ok: true }
+            return rejectUnavailableRegeneration()
           }
 
-          const updatedBlock = await client.regenerateBlock({
-            playbookId: snapshot.viewer.playbookId,
+          let updatedBlock = await client.regenerateBlock({
+            playbookId: requestedPlaybookId,
             blockId,
             instruction,
           })
+          if (isCareerPlaybookBlockRegenerationPending(updatedBlock)) {
+            updatedBlock = await pollCareerPlaybookBlock(client, {
+              playbookId: requestedPlaybookId,
+              blockId,
+            })
+          }
+          if (get().viewer?.playbookId !== requestedPlaybookId) return supersededResult()
 
           set((state) => {
             if (!state.viewer) return
@@ -1732,14 +1769,17 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             })
             state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
             state.isUpdatingViewerBlock = false
-            state.viewerActionMessage = null
+            state.viewerActionMessage =
+              updatedBlock.status === 'failed' ? 'Block regeneration failed' : null
           })
 
-          return { ok: true }
+          return updatedBlock.status === 'failed'
+            ? { ok: false, error: 'Block regeneration failed' }
+            : { ok: true }
         } catch (error) {
+          if (get().viewer?.playbookId !== requestedPlaybookId) return supersededResult()
           if (isCareerPlaybookBackendPending(error)) {
-            applyLocalRegeneration()
-            return { ok: true }
+            return rejectUnavailableRegeneration()
           }
 
           const message = error instanceof Error ? error.message : 'Block regeneration failed'

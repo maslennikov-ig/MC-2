@@ -5,14 +5,15 @@ import {
   listInputSchema,
   playbookIdInputSchema,
   regenerateBlockInputSchema,
-  throwCareerPlaybookNotImplemented,
   visibilityInputSchema,
 } from './_shared';
 import {
   deleteCareerPlaybookFromLibrary,
+  editCareerPlaybookBlock,
   getCareerPlaybookFromLibrary,
   listCareerPlaybooks,
   regenerateCareerPlaybookImage,
+  regenerateCareerPlaybookBlockFromLibrary,
   updateCareerPlaybookVisibility,
 } from './library-service';
 
@@ -37,12 +38,14 @@ export const careerPlaybookLibraryRouter = router({
     return regenerateCareerPlaybookImage(ctx, input);
   }),
 
-  regenerateBlock: protectedProcedure.input(regenerateBlockInputSchema).mutation(() => {
-    throwCareerPlaybookNotImplemented('library.regenerateBlock');
-  }),
+  regenerateBlock: protectedProcedure
+    .input(regenerateBlockInputSchema)
+    .mutation(({ ctx, input }) => {
+      return regenerateCareerPlaybookBlockFromLibrary(ctx, input);
+    }),
 
-  edit: protectedProcedure.input(editBlockInputSchema).mutation(() => {
-    throwCareerPlaybookNotImplemented('library.edit');
+  edit: protectedProcedure.input(editBlockInputSchema).mutation(({ ctx, input }) => {
+    return editCareerPlaybookBlock(ctx, input);
   }),
 });
 

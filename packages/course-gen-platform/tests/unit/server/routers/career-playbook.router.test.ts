@@ -105,6 +105,31 @@ const otherUserContext: Context = {
 
 const playbookId = '33333333-3333-4333-8333-333333333333';
 
+const roleProfileSpec = {
+  position: {
+    title: 'Product Lead',
+    slug: 'product-lead',
+    department: 'product',
+    level: 'lead',
+  },
+  context: {
+    company_stage: 'growth',
+    team_size: '51-200',
+    reports_to: 'CPO',
+    has_subordinates: true,
+  },
+  focus_areas: {
+    primary_kpis: ['Activation'],
+    key_tools: ['Analytics'],
+    critical_competencies: ['Discovery'],
+    anti_goals: ['Own every delivery detail'],
+    failure_patterns: ['Shipping without validation'],
+  },
+  research: null,
+  block_boundaries: {},
+  content_language: 'en',
+};
+
 function playbookRow(overrides: Record<string, unknown> = {}) {
   const isPublic = typeof overrides.is_public === 'boolean' ? overrides.is_public : false;
   const visibility = overrides.visibility ?? (isPublic ? 'public' : 'private');
@@ -1142,6 +1167,248 @@ describe('careerPlaybookRouter transport', () => {
       finalMarkdown: '# Product Lead',
       isPublic: false,
     });
+  });
+
+  it('persists an owned block edit and rebuilds the stored final markdown', async () => {
+    const originalBlocks = {
+      header: {
+        content: '# Product Lead',
+        status: 'generated' as const,
+        attempt: 1,
+      },
+      block_1: {
+        content: '## 1. Mission\n\nOriginal mission',
+        status: 'generated' as const,
+        attempt: 1,
+      },
+    };
+    const editedBlock = {
+      ...originalBlocks.block_1,
+      content: '## 1. Mission\n\nEdited mission',
+      generated_at: '2026-08-08T08:00:00.000Z',
+    };
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'completed',
+          generated_blocks: originalBlocks,
+          final_markdown: '# Product Lead\n\n## 1. Mission\n\nOriginal mission',
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          status: 'completed',
+          generated_blocks: { ...originalBlocks, block_1: editedBlock },
+          final_markdown: '# Product Lead\n\n## 1. Mission\n\nEdited mission',
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          status: 'completed',
+          generated_blocks: { ...originalBlocks, block_1: editedBlock },
+          final_markdown: '# Product Lead\n\n## 1. Mission\n\nEdited mission',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.edit({
+      playbookId,
+      blockId: 'block_1',
+      content: '## 1. Mission\n\nEdited mission',
+    });
+
+    expect(builder.update).toHaveBeenCalledWith({
+      generated_blocks: {
+        ...originalBlocks,
+        block_1: {
+          ...originalBlocks.block_1,
+          content: '## 1. Mission\n\nEdited mission',
+          generated_at: expect.any(String),
+        },
+      },
+      final_markdown: '# Product Lead\n\n## 1. Mission\n\nEdited mission',
+    });
+    expect(result).toEqual({
+      blockId: 'block_1',
+      ...editedBlock,
+      generated_at: expect.any(String),
+    });
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
+
+    const reloaded = await caller.library.get({ playbookId });
+    expect(reloaded.generatedBlocks.block_1?.content).toBe('## 1. Mission\n\nEdited mission');
+    expect(reloaded.finalMarkdown).toBe('# Product Lead\n\n## 1. Mission\n\nEdited mission');
+  });
+
+  it('queues owned block regeneration and persists its regenerating state', async () => {
+    const originalBlocks = {
+      header: {
+        content: '# Product Lead',
+        status: 'generated' as const,
+        attempt: 1,
+      },
+      block_1: {
+        content: '## 1. Mission\n\nOriginal mission',
+        status: 'generated' as const,
+        attempt: 1,
+      },
+    };
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'completed',
+          role_profile_spec: roleProfileSpec,
+          generated_blocks: originalBlocks,
+          final_markdown: '# Product Lead\n\n## 1. Mission\n\nOriginal mission',
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          status: 'completed',
+          role_profile_spec: roleProfileSpec,
+          generated_blocks: {
+            ...originalBlocks,
+            block_1: { ...originalBlocks.block_1, status: 'regenerating' },
+          },
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    mocks.addJob.mockResolvedValue({ id: 'career-playbook-regeneration-1' });
+    mocks.removeTerminalJobById.mockResolvedValue(false);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.regenerateBlock({
+      playbookId,
+      blockId: 'block_1',
+      instruction: 'Make the mission measurable',
+    });
+
+    expect(builder.update).toHaveBeenCalledWith({
+      generated_blocks: {
+        ...originalBlocks,
+        block_1: { ...originalBlocks.block_1, status: 'regenerating' },
+      },
+    });
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(
+      `career-playbook-regenerate-${playbookId}-block_1`
+    );
+    expect(mocks.addJob).toHaveBeenCalledWith(
+      JobType.CAREER_PLAYBOOK,
+      expect.objectContaining({
+        operation: 'REGENERATE_BLOCK',
+        playbookId,
+        blockId: 'block_1',
+        instruction: 'Make the mission measurable',
+        roleProfileSpec,
+        originalBlock: originalBlocks.block_1,
+        generatedBlocks: originalBlocks,
+      }),
+      expect.objectContaining({
+        jobId: `career-playbook-regenerate-${playbookId}-block_1`,
+      })
+    );
+    expect(result).toEqual({
+      blockId: 'block_1',
+      ...originalBlocks.block_1,
+      status: 'regenerating',
+    });
+  });
+
+  it('restores the block when regeneration queue preparation fails', async () => {
+    const originalBlocks = {
+      block_1: {
+        content: '## 1. Mission\n\nOriginal mission',
+        status: 'generated' as const,
+        attempt: 1,
+      },
+    };
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'completed',
+          role_profile_spec: roleProfileSpec,
+          generated_blocks: originalBlocks,
+          final_markdown: '## 1. Mission\n\nOriginal mission',
+        }),
+        error: null,
+      },
+      { data: { id: playbookId }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    mocks.removeTerminalJobById.mockRejectedValue(new Error('Redis unavailable'));
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.library.regenerateBlock({
+        playbookId,
+        blockId: 'block_1',
+        instruction: 'Make the mission measurable',
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to enqueue Career Playbook block regeneration',
+    });
+
+    expect(builder.update).toHaveBeenNthCalledWith(1, {
+      generated_blocks: {
+        block_1: { ...originalBlocks.block_1, status: 'regenerating' },
+      },
+    });
+    expect(builder.update).toHaveBeenNthCalledWith(2, {
+      generated_blocks: originalBlocks,
+    });
+    expect(mocks.addJob).not.toHaveBeenCalled();
+  });
+
+  it('refuses block mutations for another owner in the same organization', async () => {
+    const foreignOwnedPlaybook = playbookRow({
+      user_id: '77777777-7777-4777-8777-777777777777',
+      organization_id: authenticatedContext.user!.organizationId,
+      status: 'completed',
+      role_profile_spec: roleProfileSpec,
+      generated_blocks: {
+        block_1: {
+          content: '## 1. Mission\n\nOriginal mission',
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+    });
+    const builder = createBuilder([
+      { data: foreignOwnedPlaybook, error: null },
+      { data: foreignOwnedPlaybook, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.library.edit({
+        playbookId,
+        blockId: 'block_1',
+        content: 'Unauthorized edit',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.library.regenerateBlock({
+        playbookId,
+        blockId: 'block_1',
+        instruction: 'Unauthorized regeneration',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(builder.update).not.toHaveBeenCalled();
+    expect(mocks.addJob).not.toHaveBeenCalled();
   });
 
   it('refuses same-organization playbooks in the personal library get endpoint', async () => {

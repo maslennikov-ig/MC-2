@@ -1,4 +1,3 @@
-import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
   CareerPlaybookAnswerSubmissionSchema,
@@ -131,10 +130,3 @@ export const visibilityInputSchema = playbookIdInputSchema.extend({
 export const publicShareInputSchema = z.object({
   shareSlug: z.string().min(3).max(120),
 });
-
-export function throwCareerPlaybookNotImplemented(procedure: string): never {
-  throw new TRPCError({
-    code: 'METHOD_NOT_SUPPORTED',
-    message: `careerPlaybook.${procedure} is not implemented in Phase 1`,
-  });
-}

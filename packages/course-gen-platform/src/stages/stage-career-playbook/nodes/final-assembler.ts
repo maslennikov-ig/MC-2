@@ -344,12 +344,12 @@ export async function prepareCareerPlaybookFinalBlocksWithQuality(
   return remediateCareerPlaybookMermaidBlocks(blocksWithDiagrams);
 }
 
-function joinCareerPlaybookFinalBlocks(
+export function joinCareerPlaybookFinalBlocks(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): string {
-  return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId =>
-    generatedBlocks[blockId]?.content.trim()
-  ).join('\n\n');
+  return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId => generatedBlocks[blockId]?.content.trim())
+    .filter((content): content is string => Boolean(content))
+    .join('\n\n');
 }
 
 export function assembleCareerPlaybookFinalMarkdown(

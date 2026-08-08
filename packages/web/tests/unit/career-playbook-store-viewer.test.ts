@@ -198,6 +198,122 @@ describe('useCareerPlaybookStore viewer state', () => {
     )
   })
 
+  it('polls the persisted block after queued regeneration', async () => {
+    const regenerateBlock = vi
+      .fn<NonNullable<CareerPlaybookClient['regenerateBlock']>>()
+      .mockResolvedValue({
+        blockId: 'block_1',
+        content: 'Original mission',
+        status: 'regenerating',
+        attempt: 0,
+      })
+    const getBlock = vi.fn().mockResolvedValue({
+      content: 'Regenerated persisted mission',
+      status: 'generated',
+      attempt: 1,
+    })
+    const client = {
+      regenerateBlock,
+      getBlock,
+      submitAnswer: vi.fn(),
+    }
+    setCareerPlaybookClientForTests(client)
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001003', 'Revenue Lead')
+
+    await expect(
+      useCareerPlaybookStore
+        .getState()
+        .regenerateCareerPlaybookViewerBlock('block_1', 'Make it measurable')
+    ).resolves.toEqual({ ok: true })
+
+    expect(getBlock).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001003',
+      blockId: 'block_1',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Regenerated persisted mission'
+    )
+  })
+
+  it('does not apply a delayed edit response to a different viewer', async () => {
+    let resolveEdit!: (block: {
+      blockId: CareerPlaybookBlockId
+      content: string
+      status: 'generated'
+      attempt: number
+    }) => void
+    const editBlock = vi.fn<NonNullable<CareerPlaybookClient['editBlock']>>().mockReturnValue(
+      new Promise((resolve) => {
+        resolveEdit = resolve
+      })
+    )
+    setCareerPlaybookClientForTests({ editBlock, submitAnswer: vi.fn() })
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001031', 'First')
+
+    const edit = useCareerPlaybookStore
+      .getState()
+      .editCareerPlaybookViewerBlock('block_1', 'Edited first mission')
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001032', 'Second')
+    resolveEdit({
+      blockId: 'block_1',
+      content: 'Edited first mission',
+      status: 'generated',
+      attempt: 1,
+    })
+
+    await expect(edit).resolves.toEqual({
+      ok: false,
+      error: 'Career Playbook viewer request was superseded',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.playbookId).toBe(
+      '00000000-0000-4000-8000-000000001032'
+    )
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Original mission'
+    )
+  })
+
+  it('does not apply delayed regeneration to a different viewer', async () => {
+    let resolveBlock!: (block: { content: string; status: 'generated'; attempt: number }) => void
+    const regenerateBlock = vi
+      .fn<NonNullable<CareerPlaybookClient['regenerateBlock']>>()
+      .mockResolvedValue({
+        blockId: 'block_1',
+        content: 'Original mission',
+        status: 'regenerating',
+        attempt: 0,
+      })
+    const getBlock = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveBlock = resolve
+      })
+    )
+    setCareerPlaybookClientForTests({ regenerateBlock, getBlock, submitAnswer: vi.fn() })
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001033', 'First')
+
+    const regeneration = useCareerPlaybookStore
+      .getState()
+      .regenerateCareerPlaybookViewerBlock('block_1', 'Make it measurable')
+    await vi.waitFor(() => expect(getBlock).toHaveBeenCalledTimes(1))
+    hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001034', 'Second')
+    resolveBlock({
+      content: 'Regenerated first mission',
+      status: 'generated',
+      attempt: 1,
+    })
+
+    await expect(regeneration).resolves.toEqual({
+      ok: false,
+      error: 'Career Playbook viewer request was superseded',
+    })
+    expect(useCareerPlaybookStore.getState().viewer?.playbookId).toBe(
+      '00000000-0000-4000-8000-000000001034'
+    )
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Original mission'
+    )
+  })
+
   it('surfaces missing viewer status for PDF export without mutating data', async () => {
     setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
 
@@ -267,7 +383,7 @@ describe('useCareerPlaybookStore viewer state', () => {
     )
   })
 
-  it('keeps viewer regeneration usable as an explicit local fallback', async () => {
+  it('does not claim unavailable viewer regeneration changed the block', async () => {
     setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
     hydrateSingleBlockViewer('00000000-0000-4000-8000-000000001004', 'Operations Lead')
 
@@ -275,14 +391,18 @@ describe('useCareerPlaybookStore viewer state', () => {
       useCareerPlaybookStore
         .getState()
         .regenerateCareerPlaybookViewerBlock('block_1', 'Make it measurable')
-    ).resolves.toEqual({ ok: true })
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Block regeneration is unavailable. The block was not changed.',
+      backendPending: true,
+    })
 
-    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toContain(
-      'Make it measurable'
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
+      'Original mission'
     )
-    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.attempt).toBe(1)
+    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.attempt).toBe(0)
     expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
-      'Block regenerated locally until the backend action is connected'
+      'Block regeneration is unavailable. The block was not changed.'
     )
   })
 })

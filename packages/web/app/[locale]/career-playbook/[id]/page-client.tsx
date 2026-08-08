@@ -527,9 +527,6 @@ export default function CareerPlaybookViewerPageClient({
           .getState()
           .editCareerPlaybookViewerBlock(blockId, content)
         if (result.ok) {
-          if (useCareerPlaybookStore.getState().viewerActionMessage) {
-            useCareerPlaybookStore.setState({ viewerActionMessage: t('editLocal') })
-          }
           setSelectedBlockId(null)
         }
       }}
@@ -538,9 +535,6 @@ export default function CareerPlaybookViewerPageClient({
           .getState()
           .regenerateCareerPlaybookViewerBlock(blockId, instruction)
         if (result.ok) {
-          if (useCareerPlaybookStore.getState().viewerActionMessage) {
-            useCareerPlaybookStore.setState({ viewerActionMessage: t('regenerateLocal') })
-          }
           setSelectedBlockId(null)
         }
       }}

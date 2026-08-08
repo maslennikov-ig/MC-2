@@ -27,6 +27,7 @@ import type {
   CareerPlaybookRow,
   CareerPlaybookSupabase,
 } from '../../server/routers/career-playbook/service-mappers';
+import { normalizeGeneratedBlocks } from '../../server/routers/career-playbook/service-mappers';
 import { sumCareerPlaybookNodeCosts } from '../../server/routers/career-playbook/cost-breakdown';
 import {
   getCareerPlaybookGraph,
@@ -38,6 +39,7 @@ import {
 } from '@/stages/stage-career-playbook/nodes/mermaid-quality';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
+import { joinCareerPlaybookFinalBlocks } from '@/stages/stage-career-playbook/nodes/final-assembler';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
 import { generateCareerPlaybookImage } from '@/stages/stage-career-playbook/image-generation';
 import { addJob } from '@/orchestrator/queue';
@@ -362,24 +364,76 @@ export class CareerPlaybookHandler {
   }
 
   private async regenerateBlock(jobData: CareerPlaybookRegenerateBlockJobData): Promise<JobResult> {
-    const result = await regenerateCareerPlaybookBlock({
-      blockId: jobData.blockId,
-      roleProfileSpec: jobData.roleProfileSpec,
-      language: jobData.language,
-      originalBlock: jobData.originalBlock,
-      issue: {
-        description: jobData.instruction,
-        suggestion: 'Apply the user instruction while preserving the block format contract.',
-      },
-      userInstruction: jobData.instruction,
-      otherBlocks: jobData.generatedBlocks,
-    });
+    let result;
+    try {
+      result = await regenerateCareerPlaybookBlock({
+        blockId: jobData.blockId,
+        roleProfileSpec: jobData.roleProfileSpec,
+        language: jobData.language,
+        originalBlock: jobData.originalBlock,
+        issue: {
+          description: jobData.instruction,
+          suggestion: 'Apply the user instruction while preserving the block format contract.',
+        },
+        userInstruction: jobData.instruction,
+        otherBlocks: jobData.generatedBlocks,
+      });
+    } catch (error) {
+      try {
+        await this.persistCareerPlaybookBlock(
+          jobData,
+          { ...jobData.originalBlock, status: 'failed' },
+          false
+        );
+      } catch (persistenceError) {
+        logger.error(
+          {
+            playbookId: jobData.playbookId,
+            blockId: jobData.blockId,
+            error: errorMessageFrom(persistenceError),
+          },
+          'Failed to persist Career Playbook block regeneration failure'
+        );
+      }
+      throw error;
+    }
+
+    await this.persistCareerPlaybookBlock(jobData, result.block, true);
 
     return {
       success: true,
       message: `Regenerated Career Playbook block ${jobData.blockId}`,
       data: result,
     };
+  }
+
+  private async persistCareerPlaybookBlock(
+    jobData: CareerPlaybookRegenerateBlockJobData,
+    block: CareerPlaybookBlockState,
+    rebuildFinalMarkdown: boolean
+  ): Promise<void> {
+    const supabase = this.getCareerPlaybookSupabase();
+    const { data, error } = await supabase
+      .from('career_playbooks')
+      .select('generated_blocks')
+      .eq('id', jobData.playbookId)
+      .single();
+    if (error || !data) {
+      throw new Error(
+        `Failed to load Career Playbook before block persistence: ${errorMessageFrom(error)}`
+      );
+    }
+
+    const generatedBlocks = {
+      ...normalizeGeneratedBlocks(data.generated_blocks),
+      [jobData.blockId]: block,
+    };
+    await this.updatePlaybook(jobData.playbookId, {
+      generated_blocks: toJson(generatedBlocks) as CareerPlaybookRow['generated_blocks'],
+      ...(rebuildFinalMarkdown
+        ? { final_markdown: joinCareerPlaybookFinalBlocks(generatedBlocks) }
+        : {}),
+    });
   }
 
   private async processSource(
