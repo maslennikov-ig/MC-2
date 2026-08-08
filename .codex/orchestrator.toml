@@ -10,7 +10,7 @@ manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
-current_stage_id = "mc2-3sz3d"
+current_stage_id = "mc2-q1ggs"
 
 [baseline]
 profile = "balanced-v2.19"
@@ -49,13 +49,13 @@ hard_limit_lines = 200
 tracked_in_git = true
 format = "frontmatter_plus_short_note"
 sensitivity = "internal_no_secrets"
-current_stage_summary = ".codex/stages/mc2-3sz3d/summary.md"
+current_stage_summary = ".codex/stages/mc2-q1ggs/summary.md"
 
 [completion_inbox]
 scope = "repo_root"
 transport = "local_ndjson"
-events_file = ".codex/stages/mc2-3sz3d/completions.ndjson"
-review_state_file = ".codex/stages/mc2-3sz3d/review-state.json"
+events_file = ".codex/stages/mc2-q1ggs/completions.ndjson"
+review_state_file = ".codex/stages/mc2-q1ggs/review-state.json"
 report_entrypoint = "scripts/orchestration/report_child_completion.py"
 review_entrypoint = "scripts/orchestration/review_completion_inbox.py"
 

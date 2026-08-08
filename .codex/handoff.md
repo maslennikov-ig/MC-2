@@ -1,18 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3sz3d`
+Current stage id: `mc2-q1ggs`
 
 ## Current stage
 
-`mc2-3sz3d` is accepted locally. Product commit `f2eab74db` makes the default backend Vitest config
-reject empty runs, makes cleanup failures force exit 1, and allows only
-`SKIP_QDRANT_TEST_SETUP=1` to skip the Qdrant precondition while retaining worker startup.
+`mc2-q1ggs` is claimed and scoped on local `develop`. The owner selected the minimum operating
+model: keep the shared account and add one cooperative non-blocking host lock to deploy, rollback,
+and infrastructure entrypoints. Separate accounts and narrower sudoers are deferred until another
+regular operator exists.
 
-Focused TDD passed 21/21 after 8 checks failed against the old behavior. The safe loopback child
-process, `pnpm run type-check`, `pnpm run build`, and canonical process verification passed. The
-historical configured-environment exit 0 was not rerun because Qdrant bootstrap may mutate live
-state if its precondition starts passing.
+Implementation must remain repository-local. No account, sudoers, SSH, secret, deploy, migration,
+reindex, or live production action is authorized.
 
 ## Backlog truth and order
 
@@ -20,9 +19,8 @@ state if its precondition starts passing.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-Tier 1 is complete through `mc2-sznhi`. Tier 2 is active at `mc2-3sz3d`, the false-green backend
-test bootstrap, in exact spec order. The next item, `mc2-q1ggs`, is an owner decision and a stop
-boundary.
+Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`. Tier 3 is active at
+`mc2-q1ggs` in exact spec order.
 
 ## Verification facts
 
@@ -47,7 +45,6 @@ boundary.
 
 ## Owner decisions
 
-- `mc2-q1ggs` — separate deploy accounts, shared lock, or narrower sudoers.
 - `mc2-jz6y0.13.6` — re-decide off-host Qdrant snapshots now that a second host exists.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
 - `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
@@ -65,7 +62,7 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 - `mc2-3gz2m` — unreadable vector diagrams; gated on
   `specs/025-remaining-debt/research-prompt.md`.
-- `mc2-q1ggs`, `mc2-jz6y0.13.6`, `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
+- `mc2-jz6y0.13.6`, `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
 - `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
   page-data workers during an otherwise successful production build.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -74,14 +71,13 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 ## Next recommended
 
 Next stage id: `mc2-q1ggs`
-Recommended action: stop for the owner to choose between separate deploy accounts, a shared
-cross-process lock, or narrower sudoers before any implementation or production-facing action.
+Recommended action: implement and locally prove the selected shared-lock option without changing
+access or touching production.
 
 ## Starter prompt for next orchestrator
 
-Do not start implementation for `mc2-q1ggs` until the owner chooses the operating model required by
-§8. Preserve the exact order in `specs/026-post-triage-priorities/spec.md`; do not start
-`mc2-3gz2m` or any §9 work.
+Implement only the repository-local shared-lock option selected for `mc2-q1ggs`. Preserve the exact
+order in `specs/026-post-triage-priorities/spec.md`; do not start `mc2-3gz2m` or any §9 work.
 
 ## Read first
 
