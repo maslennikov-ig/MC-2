@@ -440,7 +440,7 @@ The main content goes here.
     it('should check content density per section', () => {
       // Create content with enough words per section to pass density check (>50 words/section)
       const denseContent = `
-# Section 1
+## Section 1
 This is a section with many words. It contains detailed information about the topic.
 The content is comprehensive and covers multiple aspects. Each paragraph builds on
 the previous one to create a cohesive narrative. Students will benefit from this
@@ -450,7 +450,7 @@ is fifty words per section on average. This section now has more than enough wor
 to demonstrate good content density. Machine learning algorithms process data to
 find patterns and make predictions without explicit programming instructions.
 
-# Section 2
+## Section 2
 Another section with substantial content. This section explores different aspects
 of the subject matter. The explanations are clear and the examples are relevant.
 We need to ensure this section also has enough words to meet the density threshold.
