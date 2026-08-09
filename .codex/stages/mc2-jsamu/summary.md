@@ -1,6 +1,6 @@
 # Stage `mc2-jsamu` — monorepo formatting baseline
 
-Status: accepted locally; repository delivery pending.
+Status: delivered to `develop`; exact CI and automatic dev deploy green.
 
 ## Classification and boundary
 
@@ -26,8 +26,7 @@ packages, and final global verification.
 
 ## Next action
 
-Commit the explicit task-owned paths, deliver through `develop`, and wait for the exact CI result.
-The next ordered backlog item after delivery is `mc2-5dzld`.
+Start the next ordered backlog item, `mc2-5dzld`.
 
 project-index: reviewed-no-change — all detected source-file changes are Prettier-only; paths,
 exports, runtime behavior, and ownership boundaries are unchanged.
@@ -55,3 +54,4 @@ architectural edges; the ignore boundary affects tooling ownership, not the appl
 - acceptance receipt: `.codex/stages/mc2-jsamu/acceptance-receipt.json`.
 - post-hook reconciliation: all 102 delivered docs/specs/packages files equal canonical
   `Prettier(HEAD)` output; two transient ESLint auto-fixes were detected and discarded.
+- delivery: commit `9916d22c9`; CI run `31309127007` passed every required job and deployed dev.

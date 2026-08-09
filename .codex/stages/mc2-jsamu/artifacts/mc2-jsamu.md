@@ -67,6 +67,7 @@ verification:
   - scoped docs, specs, and packages checks passed after formatting
   - pnpm format:check, pnpm type-check, and pnpm build passed globally
   - canonical process verification and stage readiness passed
+  - commit 9916d22c9 passed CI run 31309127007 and the automatic dev deploy
 changed_files:
   - .prettierignore
   - docs formatting batch

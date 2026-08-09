@@ -5,11 +5,12 @@ Current stage id: `mc2-jsamu`
 
 ## Current stage
 
-`mc2-jsamu` is accepted locally as a root-owned repo-health stage. It was restructured before formatting:
+`mc2-jsamu` is delivered to `develop` as commit `9916d22c9` through green CI run `31309127007`,
+including a successful automatic dev deploy. It was restructured before formatting:
 `.2` preserves and excludes the 11 raw LLM captures, and new child `.7` owns repository metadata,
 caches, installed agent assets, immutable stage evidence, generated outputs, and the 28 paths that
-previously belonged to no child. The remaining measured batches are docs 29, specs 1, and packages 74. All scoped checks, global format-check, type-check, build, process verification, and stage
-readiness pass. Repository delivery is pending.
+previously belonged to no child. The remaining measured batches are docs 29, specs 1, and packages 74. All scoped checks, global format-check, type-check, build, process verification, stage readiness,
+CI, and dev deployment pass.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -22,8 +23,7 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. Tier 4 is active at `mc2-jsamu`; after it closes, the next exact item is
-`mc2-5dzld`.
+through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-jsamu`; the next exact item is `mc2-5dzld`.
 
 ## Verification facts
 
@@ -94,16 +94,15 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 Accepted stage id: `mc2-jsamu`
 Next stage id: `mc2-5dzld`
-Recommended action: deliver accepted `mc2-jsamu` through `develop`, wait for exact green CI, then
-start `mc2-5dzld`.
+Recommended action: start `mc2-5dzld` in the specification's fixed order.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The current item `mc2-jsamu` is accepted locally and pending normal develop delivery. After exact
-green CI, the next ordered item is `mc2-5dzld`. Do not reindex, migrate, force-push, perform paid
-work, or deploy before a green pipeline.
+The item `mc2-jsamu` is delivered to `develop` through green CI and dev deployment. The next ordered
+item is `mc2-5dzld`. Do not reindex, migrate, force-push, perform paid work, or deploy before a green
+pipeline.
 
 ## Read first
 
