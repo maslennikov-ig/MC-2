@@ -96,7 +96,7 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     expect(exporter).not.toMatch(/\/proc|\/sys|rootfs|network_mode:|pid:|privileged:|cap_add:/);
   });
 
-  it('preserves the exact eight Qdrant alert sources, severities and durations', () => {
+  it('preserves the exact ten Qdrant alert sources, severities and durations', () => {
     const alerts = source('ops/qdrant/prometheus/alerts.yml');
     const contracts = [
       ['QdrantDown', '2m', 'critical', 'absent(up{job="qdrant"})'],
@@ -120,6 +120,18 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
         '0m',
         'warning',
         'megacampus_qdrant_last_successful_restore_drill_unixtime_seconds',
+      ],
+      [
+        'QdrantOffHostSnapshotStale',
+        '0m',
+        'critical',
+        'megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds',
+      ],
+      [
+        'QdrantOffHostRestoreDrillStale',
+        '0m',
+        'warning',
+        'megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds',
       ],
       ['QdrantHybridFallbackHigh', '15m', 'warning', 'megacampus_qdrant_hybrid_fallback_total'],
     ] as const;
@@ -290,8 +302,8 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
     expect(runbook).toMatch(/read-only|только для чтения/i);
     expect(runbook).toMatch(/never\s+publish[\s\S]{0,100}public|никогда[\s\S]{0,100}публич/i);
     expect(runbook).toContain('megacampus-metrics');
-    expect(runbook).toContain('megacampus:megacampus-metrics');
-    expect(runbook).toContain('2775');
+    expect(runbook).toContain('root:megacampus-metrics');
+    expect(runbook).toContain('3775');
     expect(runbook).toContain('QDRANT_METRICS_GID');
     expect(runbook).toMatch(/\[\[.*QDRANT_METRICS_GID.*\^\[0-9\]\+\$/s);
   });

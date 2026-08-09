@@ -73,7 +73,7 @@ const PROBE: RecoveryProbe = {
 async function createSharedMetricsDirectory(root: string): Promise<string> {
   const directory = join(root, 'qdrant-metrics');
   await mkdir(directory, { mode: 0o700 });
-  await chmod(directory, 0o2775);
+  await chmod(directory, 0o3775);
   return directory;
 }
 

@@ -139,11 +139,11 @@ fi
   exit 1
 }
 
-sudo install -d -o megacampus -g megacampus-metrics -m 2775 \
+sudo install -d -o root -g megacampus-metrics -m 3775 \
   "$QDRANT_METRICS_TEXTFILE_HOST_DIR"
 [[ $(stat -c '%U:%G' "$QDRANT_METRICS_TEXTFILE_HOST_DIR") == \
-  megacampus:megacampus-metrics ]]
-[[ $(stat -c '%a' "$QDRANT_METRICS_TEXTFILE_HOST_DIR") == 2775 ]]
+  root:megacampus-metrics ]]
+[[ $(stat -c '%a' "$QDRANT_METRICS_TEXTFILE_HOST_DIR") == 3775 ]]
 ```
 
 Do not start Compose unless the entire block exits zero. Compose runs only API,
@@ -157,6 +157,9 @@ and restore jobs publish their gauges the same way. Only `*.prom` final files
 belong there; samples must not carry explicit timestamps, and writers must use a
 same-directory temporary file plus atomic `mv`. Temporary files must never be
 observed after a successful write.
+
+Mode `3775` combines setgid with the sticky bit: application writers can create and replace their
+own group-readable metric files, but cannot unlink root-owned off-host backup/restore evidence.
 
 The previously documented example GID conflicts on the target. `900` is only a
 candidate: immediately before mutation, require both `getent group 900` and
@@ -590,25 +593,30 @@ preserved. This exact path corrects review finding Q12-LR1 from the immutable
 review of commit `ac494372`; the pinned-image default `/qdrant/snapshots` is in
 the disposable container layer and must never be used for staging recovery.
 
-The manifest records `storage_mode: local` and intentionally contains no remote
-object or URI. No S3 credential is required, mounted, read, or copied in this
-mode. This protects against collection/operator mistakes and proves recoverable
-Qdrant 1.18.2 snapshots, but it does **not** protect against deletion of the
-named volume or loss of the host, disk, volume, or datacenter and therefore does
-not satisfy off-host RPO/DR. Before a production launch, complete
-`mc2-jz6y0.13.6`, provision the reviewed HTTPS S3-compatible backend and
-lifecycle, switch both Qdrant and the recovery operator explicitly to `s3`, and
-repeat the checksum/restore/alert evidence.
+The source manifest records `storage_mode: local` and intentionally contains no
+remote object or URI. No S3 credential is required, mounted, read, or copied in
+this mode. The local snapshot protects against collection/operator mistakes but
+not loss of the Docker volume or production host.
 
-`QDRANT_SNAPSHOT_STORAGE_MODE` is mandatory and accepts only `local` or `s3`.
-The local staging environment sets it to `local`; the S3 path additionally
-requires a sanitized object prefix plus the existing mode-0400 credentials and
-bucket/region configuration. An absent or unknown mode and an incomplete S3
-configuration fail before a successful manifest can be emitted.
+Production closes that host-loss gap with the owner-selected pull described in
+[`deploy/qdrant-offhost-backup/README.md`](../../deploy/qdrant-offhost-backup/README.md).
+`helixa-new` receives no Qdrant API key; its restricted SSH key can only stream
+the latest manifest/snapshot or publish a success timestamp. A daily copy is
+made visible only after exact size and SHA-256 validation, retained for at most
+14 days and 14 generations, and restored monthly into the exact digest-pinned
+Qdrant 1.18.2 image. This is an off-host second copy, not multi-provider
+disaster recovery.
+
+`QDRANT_SNAPSHOT_STORAGE_MODE` remains mandatory and accepts only `local` or
+`s3`. This deployment deliberately keeps Qdrant and the recovery operator in
+`local`; the separate restricted pull copies the already verified bytes without
+giving production access to the backup host. The unused native S3 path still
+requires its complete reviewed credential and object-prefix configuration and
+fails closed when incomplete.
 
 Recovery tools never use a raw-key host environment. Both run inside the pinned
 operator with Docker-local `QDRANT_URL=http://qdrant:6333`, the exact file-backed
-API key, precreated recovery state, and the mode-2775 shared metrics directory.
+API key, precreated recovery state, and the root-owned mode-3775 shared metrics directory.
 Restore additionally mounts the latest manifest and deterministic recovery
 probe as file secrets. A direct Compose oneshot keeps
 `QDRANT_RECOVERY_LOCK_HELD=0` and acquires the internal lock in shared recovery
@@ -727,10 +735,15 @@ share a nonblocking `flock`; a collision must fail visibly, not overlap.
 - `QdrantPointCountUnexpectedDrop`: check reindex/alias activity. Maintenance
   suppression requires an audited Alertmanager silence.
 - `QdrantSnapshotStale`: in staging, check the last durable manifest and local
-  Qdrant volume snapshot; do not claim off-host protection or delete the last
-  known-good snapshot. In production, also require the off-host object.
+  Qdrant volume snapshot; do not delete the last known-good snapshot. This
+  alert proves only the source-local four-hour schedule.
 - `QdrantRestoreDrillStale`: inspect the monthly drill evidence and cleanup
   state before retrying.
+- `QdrantOffHostSnapshotStale`: check the restricted SSH path, the newest
+  owner-only generation on `helixa-new`, its 10 GiB free-space floor, and the
+  backup service journal. A local production snapshot does not satisfy it.
+- `QdrantOffHostRestoreDrillStale`: inspect the newest off-host restore evidence,
+  the pinned 1.18.2 image digest, and temporary-container cleanup before retrying.
 - `QdrantHybridFallbackHigh`: group by application service/instance, inspect
   Qdrant errors and native BM25/Formula compatibility, and retain dense fallback
   for availability.

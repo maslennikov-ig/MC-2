@@ -1,0 +1,26 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:66602) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:67214) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 145.376,
+      "result": "passed"
+    }
+  ],
+  "commands": ["pnpm type-check && pnpm build"],
+  "completed_at": "2026-08-09T09:10:45.801979+00:00",
+  "diff_digest": "02f47fa4deeb9461b5aaf2fba7da599226f26743040e8ab73364dd6328c61773",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "dfb9f4503cc6340b8a17daaede736fee128eff0a",
+  "idempotency_key": "719481a66dd3227b8963f2e8abf33aa082883889bced13aa927d95c7389ce044",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-jz6y0.13.6",
+  "started_at": "2026-08-09T09:08:20.230968+00:00",
+  "verification_fingerprint": "719481a66dd3227b8963f2e8abf33aa082883889bced13aa927d95c7389ce044"
+}

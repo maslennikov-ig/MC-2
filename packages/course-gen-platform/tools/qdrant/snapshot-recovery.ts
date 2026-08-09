@@ -88,9 +88,7 @@ export function buildSnapshotManifest(input: {
 }): SnapshotManifest {
   const snapshotName = requireSafeName(input.snapshot.name, 'snapshot name');
   const remotePrefix =
-    input.storageMode === 's3'
-      ? normalizeRemotePrefix(input.remotePrefix ?? '')
-      : undefined;
+    input.storageMode === 's3' ? normalizeRemotePrefix(input.remotePrefix ?? '') : undefined;
   if (!Number.isSafeInteger(input.pointCount) || input.pointCount < 0) {
     throw new Error('pointCount must be a non-negative safe integer');
   }
@@ -255,8 +253,8 @@ export async function assertSharedMetricsDirectory(directory: string): Promise<v
     if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
       throw new Error('must be a real directory');
     }
-    if ((metadata.mode & 0o7777) !== 0o2775) {
-      throw new Error('must have mode 2775');
+    if ((metadata.mode & 0o7777) !== 0o3775) {
+      throw new Error('must have mode 3775');
     }
 
     const probePath = `${directory}/.megacampus-qdrant-metrics.${process.pid}.${randomUUID()}.tmp`;
@@ -275,7 +273,7 @@ export async function assertSharedMetricsDirectory(directory: string): Promise<v
     }
   } catch (error) {
     throw new Error(
-      `Shared metrics directory ${directory} must be precreated, writable, and mode 2775`,
+      `Shared metrics directory ${directory} must be precreated, writable, and mode 3775`,
       { cause: error }
     );
   }

@@ -528,7 +528,7 @@ case "$command_name" in
     exec_as_node /usr/bin/bash -eu -c '
       path="$1"
       [[ -d "$path" && ! -L "$path" && -w "$path" ]]
-      [[ $(/usr/bin/stat -c %a -- "$path") == 2775 ]]
+      [[ $(/usr/bin/stat -c %a -- "$path") == 3775 ]]
     ' -- "$REQUIRED_METRICS_DIR"
     ;;
   *)

@@ -72,23 +72,10 @@ groups:
         labels:
           severity: critical
         annotations:
-          # This metric proves a snapshot was created, downloaded and checksum-verified. It says
-          # NOTHING about where the bytes ended up: snapshot.ts stamps
-          # lastSuccessfulSnapshotEpochSeconds on every successful run regardless of
-          # QDRANT_SNAPSHOT_STORAGE_MODE, and production is still `local` with no bucket configured
-          # (mc2-jz6y0.13.6). The old wording promised off-host, so the first successful LOCAL
-          # snapshot would have silenced a critical alert without making that promise true.
-          # Off-host needs its own metric before it can have its own alert; until then it is a
-          # tracked gate, not a firing alert.
-          #
-          # Keep this comment free of the words the E7 privacy contract forbids anywhere in this
-          # file — it scans the whole document, comments included, and the first draft of this note
-          # tripped it.
           summary: Qdrant snapshot is stale or missing
           description: >-
-            No successful verified Qdrant snapshot has been recorded within eight hours. This does
-            not prove off-host retention: production runs QDRANT_SNAPSHOT_STORAGE_MODE=local and
-            off-host storage remains the open gate mc2-jz6y0.13.6.
+            No successful verified source-local Qdrant snapshot has been recorded within eight
+            hours. Off-host freshness is monitored by QdrantOffHostSnapshotStale.
 
       - alert: QdrantRestoreDrillStale
         expr: |
@@ -100,6 +87,28 @@ groups:
         annotations:
           summary: Qdrant restore drill is stale or missing
           description: No successful isolated restore drill has been recorded within 35 days.
+
+      - alert: QdrantOffHostSnapshotStale
+        expr: |
+          (time() - megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds > 36 * 60 * 60)
+          or absent(megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Off-host Qdrant snapshot is stale or missing
+          description: No checksum-verified Qdrant copy has reached the second host within 36 hours.
+
+      - alert: QdrantOffHostRestoreDrillStale
+        expr: |
+          (time() - megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds > 35 * 24 * 60 * 60)
+          or absent(megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Off-host Qdrant restore drill is stale or missing
+          description: No exact-version restore from the second-host copy has succeeded within 35 days.
 
       - alert: QdrantHybridFallbackHigh
         expr: |

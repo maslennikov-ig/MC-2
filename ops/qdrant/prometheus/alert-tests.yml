@@ -102,6 +102,10 @@ tests:
         values: '0x700'
       - series: 'megacampus_qdrant_last_successful_restore_drill_unixtime_seconds'
         values: '0x52000'
+      - series: 'megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds'
+        values: '0x52000'
+      - series: 'megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds'
+        values: '0x52000'
     alert_rule_test:
       - eval_time: 9h
         alertname: QdrantSnapshotStale
@@ -111,10 +115,8 @@ tests:
             exp_annotations:
               summary: Qdrant snapshot is stale or missing
               description: >-
-                No successful verified Qdrant snapshot has been recorded within eight hours. This
-                does not prove off-host retention: production runs
-                QDRANT_SNAPSHOT_STORAGE_MODE=local and off-host storage remains the open gate
-                mc2-jz6y0.13.6.
+                No successful verified source-local Qdrant snapshot has been recorded within eight
+                hours. Off-host freshness is monitored by QdrantOffHostSnapshotStale.
       - eval_time: 36d
         alertname: QdrantRestoreDrillStale
         exp_alerts:
@@ -123,6 +125,22 @@ tests:
             exp_annotations:
               summary: Qdrant restore drill is stale or missing
               description: No successful isolated restore drill has been recorded within 35 days.
+      - eval_time: 37h
+        alertname: QdrantOffHostSnapshotStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Off-host Qdrant snapshot is stale or missing
+              description: No checksum-verified Qdrant copy has reached the second host within 36 hours.
+      - eval_time: 36d
+        alertname: QdrantOffHostRestoreDrillStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Off-host Qdrant restore drill is stale or missing
+              description: No exact-version restore from the second-host copy has succeeded within 35 days.
 
   - interval: 1m
     alert_rule_test:
@@ -143,10 +161,8 @@ tests:
             exp_annotations:
               summary: Qdrant snapshot is stale or missing
               description: >-
-                No successful verified Qdrant snapshot has been recorded within eight hours. This
-                does not prove off-host retention: production runs
-                QDRANT_SNAPSHOT_STORAGE_MODE=local and off-host storage remains the open gate
-                mc2-jz6y0.13.6.
+                No successful verified source-local Qdrant snapshot has been recorded within eight
+                hours. Off-host freshness is monitored by QdrantOffHostSnapshotStale.
       - eval_time: 1m
         alertname: QdrantRestoreDrillStale
         exp_alerts:
@@ -155,6 +171,22 @@ tests:
             exp_annotations:
               summary: Qdrant restore drill is stale or missing
               description: No successful isolated restore drill has been recorded within 35 days.
+      - eval_time: 1m
+        alertname: QdrantOffHostSnapshotStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Off-host Qdrant snapshot is stale or missing
+              description: No checksum-verified Qdrant copy has reached the second host within 36 hours.
+      - eval_time: 1m
+        alertname: QdrantOffHostRestoreDrillStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Off-host Qdrant restore drill is stale or missing
+              description: No exact-version restore from the second-host copy has succeeded within 35 days.
 
   # evidence-counter-reset
   - interval: 1m
