@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "node scripts/ci/test_ci_cd_workflow_gates.mjs && python3 -m unittest scripts/orchestration/test_cleanup_stage_workspace.py && python3 -m py_compile scripts/orchestration/cleanup_stage_workspace.py scripts/orchestration/test_cleanup_stage_workspace.py && pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:37633) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:37639) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:37692) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:37979) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 169.057,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "node scripts/ci/test_ci_cd_workflow_gates.mjs && python3 -m unittest scripts/orchestration/test_cleanup_stage_workspace.py && python3 -m py_compile scripts/orchestration/cleanup_stage_workspace.py scripts/orchestration/test_cleanup_stage_workspace.py && pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-09T12:21:32.061114+00:00",
+  "diff_digest": "1b7ec114ed7837ab8079e788c5e04493338becb37d3143422ba41bea12f0e728",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "e1857fadc027fbc5d532454fa6a98e08608859d9",
+  "idempotency_key": "2124fa538de8a696f93a93c1f1e695d59bee897f4ef87b00e6b8d71c72faa723",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1mmop",
+  "started_at": "2026-08-09T12:18:42.833070+00:00",
+  "verification_fingerprint": "2124fa538de8a696f93a93c1f1e695d59bee897f4ef87b00e6b8d71c72faa723"
+}

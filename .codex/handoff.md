@@ -1,14 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-n6szm`
+Current stage id: `mc2-1mmop`
 
 ## Current stage
 
-`mc2-5dzld` and `mc2-zt4ju` are delivered locally in commits `858e4a707` and `05d7fc7e7` and closed
-in Beads. `mc2-n6szm` is accepted locally: its reindex unit test surface is split into shared
-fixtures, command/recovery tests, and CLI tests. ESLint reports zero problems, all 67 focused tests,
-workspace type-check, production build, and process verification pass; commit delivery is pending.
+`mc2-5dzld`, `mc2-zt4ju`, and `mc2-n6szm` are delivered locally in commits `858e4a707`,
+`05d7fc7e7`, and `e1857fadc` and closed in Beads. `mc2-1mmop` is accepted locally: stage cleanup now
+reports and removes the exact Next cache only for clean child worktrees already merged into a
+delivery target, while dirty and unmerged worktrees and their caches remain untouched. Commit
+delivery is pending.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -21,8 +22,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-zt4ju`; the active exact item is
-`mc2-n6szm`.
+through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-n6szm`; the active exact item is
+`mc2-1mmop`.
 
 ## Verification facts
 
@@ -38,6 +39,9 @@ through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-zt4ju`; the active exa
   removed all blockers; the 104 owned formatting files and global format/type/build acceptance are
   green.
 - Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
+- Accepted child-workspace cleanup is dry-run first: `cleanup_stage_workspace.py` prunes the exact
+  Next cache only for clean, merged child worktrees and preserves dirty, unmerged, protected, and
+  primary worktrees.
 
 ## Live operational facts
 
@@ -91,17 +95,17 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-n6szm`
-Current stage id: `mc2-n6szm`
-Next stage id: `mc2-1mmop`
-Recommended action: commit `mc2-n6szm`, then continue Tier 4 with `mc2-1mmop`.
+Accepted stage id: `mc2-1mmop`
+Current stage id: `mc2-1mmop`
+Next stage id: `mc2-iioip`
+Recommended action: commit `mc2-1mmop`, then continue Tier 4 with `mc2-iioip`.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-n6szm` is accepted locally and awaits its explicit-path commit. After committing and
-closing it, continue with `mc2-1mmop`. Do not reindex, migrate, force-push, perform paid work, or
+The item `mc2-1mmop` is accepted locally and awaits its explicit-path commit. After committing and
+closing it, continue with `mc2-iioip`. Do not reindex, migrate, force-push, perform paid work, or
 deploy before a green pipeline.
 
 ## Read first
