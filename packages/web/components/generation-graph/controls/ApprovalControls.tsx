@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import { useRestartStage } from '../hooks/useRestartStage'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { deriveStage5StructuralQualityState } from '@megacampus/shared-types'
 
 interface ApprovalControlsProps {
   courseId: string
@@ -35,23 +36,6 @@ interface ApprovalControlsProps {
    * Additional CSS class for container
    */
   className?: string
-}
-
-function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
-  if (!generationMetadata || typeof generationMetadata !== 'object') return false
-  const metadata = generationMetadata as {
-    quality_scores?: {
-      structure?: {
-        hasCriticalIssues?: unknown
-        criticalIssues?: unknown
-      }
-    }
-  }
-  const structure = metadata.quality_scores?.structure
-  return (
-    structure?.hasCriticalIssues === true ||
-    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
-  )
 }
 
 export const ApprovalControls = ({
@@ -97,7 +81,9 @@ export const ApprovalControls = ({
         .single()
 
       if (cancelled) return
-      setIsStage5StructurallyBlocked(hasCriticalStructureIssues(data?.generation_metadata))
+      setIsStage5StructurallyBlocked(
+        deriveStage5StructuralQualityState(data?.generation_metadata)?.status === 'critical'
+      )
     }
 
     void fetchQualityState()

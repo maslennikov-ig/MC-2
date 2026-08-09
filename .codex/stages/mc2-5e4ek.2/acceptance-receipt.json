@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/shared-types build && pnpm --dir packages/web exec vitest run tests/unit/components/generation-graph/stage5-structural-quality.test.ts && pnpm exec eslint packages/shared-types/src/stage5-structural-quality.ts packages/shared-types/src/index.ts packages/web/components/generation-graph/controls/ApprovalControls.tsx packages/web/components/generation-graph/panels/stage5/Stage5OutputTab.tsx packages/web/components/generation-graph/panels/stage5/types.ts packages/course-gen-platform/src/server/routers/generation/status-helpers.ts packages/web/tests/unit/components/generation-graph/stage5-structural-quality.test.ts && git diff --check",
+      "duration_seconds": 24.816,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/shared-types build && pnpm --dir packages/web exec vitest run tests/unit/components/generation-graph/stage5-structural-quality.test.ts && pnpm exec eslint packages/shared-types/src/stage5-structural-quality.ts packages/shared-types/src/index.ts packages/web/components/generation-graph/controls/ApprovalControls.tsx packages/web/components/generation-graph/panels/stage5/Stage5OutputTab.tsx packages/web/components/generation-graph/panels/stage5/types.ts packages/course-gen-platform/src/server/routers/generation/status-helpers.ts packages/web/tests/unit/components/generation-graph/stage5-structural-quality.test.ts && git diff --check"
+  ],
+  "completed_at": "2026-08-09T13:58:45.476680+00:00",
+  "diff_digest": "ad3bca8cc72f723c6843ee3afd420faa08ca2c29a957d78335e5e04ea84904b6",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "f527191376c012d954607af9d0b76953be36089a",
+  "idempotency_key": "f9bbfab4a0da6be677c171742f84a143d065397eeadbc174e625174636f618cc",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-5e4ek.2",
+  "started_at": "2026-08-09T13:58:20.488052+00:00",
+  "verification_fingerprint": "f9bbfab4a0da6be677c171742f84a143d065397eeadbc174e625174636f618cc"
+}

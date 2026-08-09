@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, GenerationMetadata, JobData } from '@megacampus/shared-types';
-import { JobType } from '@megacampus/shared-types';
+import { deriveStage5StructuralQualityState, JobType } from '@megacampus/shared-types';
 import { TRPCError } from '@trpc/server';
 import { addJob } from '../../../orchestrator/queue';
 import { logger } from '../../../shared/logger/index.js';
@@ -14,23 +14,6 @@ type GenerationMetadataWithError = GenerationMetadata & {
   last_phase?: string;
   error_message?: string;
 };
-
-function hasCriticalStructureIssues(generationMetadata: unknown): boolean {
-  if (!generationMetadata || typeof generationMetadata !== 'object') return false;
-  const metadata = generationMetadata as {
-    quality_scores?: {
-      structure?: {
-        hasCriticalIssues?: unknown;
-        criticalIssues?: unknown;
-      };
-    };
-  };
-  const structure = metadata.quality_scores?.structure;
-  return (
-    structure?.hasCriticalIssues === true ||
-    (Array.isArray(structure?.criticalIssues) && structure.criticalIssues.length > 0)
-  );
-}
 
 interface PhaseWeights {
   validate_input: number;
@@ -461,7 +444,7 @@ async function handleStage5Approval(
 
   throwOnSupabaseError(error, 'Stage 5 quality metadata', { courseId });
 
-  if (hasCriticalStructureIssues(course?.generation_metadata)) {
+  if (deriveStage5StructuralQualityState(course?.generation_metadata)?.status === 'critical') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message:

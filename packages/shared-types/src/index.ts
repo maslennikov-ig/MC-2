@@ -19,6 +19,7 @@ export * from './generation-result';
 export * from './style-prompts';
 export * from './generation-job';
 export * from './generation-metadata';
+export * from './stage5-structural-quality';
 export * from './generation-progress.types';
 export * from './transactional-outbox';
 

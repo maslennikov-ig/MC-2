@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-5e4ek.2",
+  "source_kind": "beads",
+  "source_id": "mc2-5e4ek.2",
+  "source_digest": "01aacbb7a652055ce42554be9a63c86e0cf06f31ee932b1016dadf485fc443e3",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "One shared runtime contract derives normalized Stage 5 structural quality state from persisted generation metadata.",
+      "text_digest": "7ec362d95b64deda869d6af1191371de88624cd4ca0f6ef9fe4cb64c4bb99e88"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "ApprovalControls, Stage5OutputTab, and backend Stage 5 approval use the shared critical, warning, and pass interpretation.",
+      "text_digest": "be6cb799ffee0252b3623e0b5403cc025901ca59b32cf696e8c66940bb5f2c16"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "A frontend behavioral test covers critical, warning, and pass states, and focused lint, pnpm type-check, and pnpm build pass.",
+      "text_digest": "9c1c304595c82d0a3e5f39c12bd425e3da9c2fab40132c095a571793fa4c772d"
+    }
+  ]
+}

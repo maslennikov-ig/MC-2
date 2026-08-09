@@ -12,23 +12,6 @@ import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types'
 // Re-export for convenience
 export type { CourseStructure, Section, Lesson }
 
-export interface StructuralQualityIssue {
-  code: string
-  severity: 'critical' | 'warning'
-  message: string
-  details?: Record<string, unknown>
-}
-
-export interface StructuralQualityResult {
-  passed: boolean
-  hasCriticalIssues: boolean
-  profileId: string
-  totalLessons: number
-  computedDurationHours: number
-  criticalIssues: StructuralQualityIssue[]
-  warnings: StructuralQualityIssue[]
-}
-
 // ============================================================================
 // INPUT DATA
 // ============================================================================
