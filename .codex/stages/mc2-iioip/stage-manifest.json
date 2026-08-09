@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-iioip",
+  "goal_id": "mc2-iioip",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "prompt-check-section-syntax-compatibility",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["prompt-check-parser", "prompt-authoring-regression", "operator-documentation"],
+    "risk_models": ["false-rejection", "false-acceptance", "cross-runtime-compatibility"],
+    "test_environments": ["codex-gpt56", "claude-fable5", "console-validation"],
+    "rollback_boundary": "revert-the-heading-recognizer-and-its-regression-fixture",
+    "acceptance_proofs": [
+      "five-missing-sections-red-before-fix",
+      "colon-and-markdown-heading-forms-green",
+      "shared-console-validation-green"
+    ]
+  },
+  "work_areas": ["contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-iioip",
+    "source_digest": "50d743ee02c4755714091e183176e950e7dff0f90aab148f5d65c150e59781d7",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Prompt-check accepts each required section as either an existing Label: field or an equivalent Markdown heading without weakening the required-section set.",
+        "text_digest": "415c9777ad0c57a282b0377654076060c4633f10412d1fbc7612e5f5379d1324"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Focused Codex and Claude prompt checks preserve existing colon-form behavior and pass the Markdown-heading regression.",
+        "text_digest": "1cf1d2e1c9fbabb43088e7ec76ea493abbac907f16d5a99b4d373daf25338646"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The shared orchestration-console fix is committed with documentation and passes Python compilation plus console validation.",
+        "text_digest": "07d948361f0fd804b875daf6bff424c67e561c2a860e416ba8a7e69a08c6bd2d"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-iioip/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "50d743ee02c4755714091e183176e950e7dff0f90aab148f5d65c150e59781d7",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-iioip/artifacts/mc2-iioip.md",
+      "task_id": "mc2-iioip",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

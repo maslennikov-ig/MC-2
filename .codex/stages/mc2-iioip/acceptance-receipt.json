@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "git -C /home/me/.agents/orchestration-console rev-parse --verify --quiet \"fada910^{commit}\" >/dev/null && git -C /home/me/.agents/orchestration-console diff --check && (cd /home/me/.agents/orchestration-console && python3 -m py_compile scripts/orchestration_panel.py && python3 -m unittest tests.test_prompt_authoring_guardrail tests.test_gpt56_prompt_profile tests.test_claude_prompt_profiles && python3 scripts/validate_console.py)",
+      "duration_seconds": 6.963,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "git -C /home/me/.agents/orchestration-console rev-parse --verify --quiet \"fada910^{commit}\" >/dev/null && git -C /home/me/.agents/orchestration-console diff --check && (cd /home/me/.agents/orchestration-console && python3 -m py_compile scripts/orchestration_panel.py && python3 -m unittest tests.test_prompt_authoring_guardrail tests.test_gpt56_prompt_profile tests.test_claude_prompt_profiles && python3 scripts/validate_console.py)"
+  ],
+  "completed_at": "2026-08-09T12:28:22.598288+00:00",
+  "diff_digest": "49c67eee423ace7a91742783a51e5eaa6b80a22751cf72abb62a857a7b571147",
+  "environment_marker": "Linux-x86_64-python-3.14",
+  "git_head": "9d48cbfcc3fc75c7eb1f49ac0cde483ed075f1df",
+  "idempotency_key": "ee1e2f5bb5ef53d655e18756533a9def52fdd264e3965368026dda9d76f59cff",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-iioip",
+  "started_at": "2026-08-09T12:28:15.455723+00:00",
+  "verification_fingerprint": "ee1e2f5bb5ef53d655e18756533a9def52fdd264e3965368026dda9d76f59cff"
+}

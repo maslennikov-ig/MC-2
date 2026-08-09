@@ -1,15 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-1mmop`
+Current stage id: `mc2-iioip`
 
 ## Current stage
 
-`mc2-5dzld`, `mc2-zt4ju`, and `mc2-n6szm` are delivered locally in commits `858e4a707`,
-`05d7fc7e7`, and `e1857fadc` and closed in Beads. `mc2-1mmop` is accepted locally: stage cleanup now
-reports and removes the exact Next cache only for clean child worktrees already merged into a
-delivery target, while dirty and unmerged worktrees and their caches remain untouched. Commit
-delivery is pending.
+`mc2-5dzld`, `mc2-zt4ju`, `mc2-n6szm`, and `mc2-1mmop` are delivered locally in commits
+`858e4a707`, `05d7fc7e7`, `e1857fadc`, and `9d48cbfcc` and closed in Beads. `mc2-iioip` is accepted
+in the shared orchestration-console branch `codex/prompt-check-markdown-headings` at `fada910`:
+`prompt-check` accepts both `Label:` fields and equivalent Markdown headings. External branch
+integration is intentionally pending until the remaining accessible backlog is complete.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -22,8 +22,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-n6szm`; the active exact item is
-`mc2-1mmop`.
+through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-1mmop`; the active exact item is
+`mc2-iioip`.
 
 ## Verification facts
 
@@ -95,18 +95,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-1mmop`
-Current stage id: `mc2-1mmop`
-Next stage id: `mc2-iioip`
-Recommended action: commit `mc2-1mmop`, then continue Tier 4 with `mc2-iioip`.
+Accepted stage id: `mc2-iioip`
+Current stage id: `mc2-iioip`
+Next stage id: `mc2-3gz2m`
+Recommended action: record `mc2-iioip` in `mc2`, then confirm the research gate blocks
+`mc2-3gz2m` and continue with the next accessible Tier 5 item.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-1mmop` is accepted locally and awaits its explicit-path commit. After committing and
-closing it, continue with `mc2-iioip`. Do not reindex, migrate, force-push, perform paid work, or
-deploy before a green pipeline.
+The item `mc2-iioip` is accepted in orchestration-console commit `fada910` and awaits its `mc2`
+stage-state commit. After recording and closing it, continue with the Tier 5 research gate. Do not
+reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 
