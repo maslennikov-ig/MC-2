@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-db696.57",
+  "goal_id": "mc2-db696.57",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "current-web-e2e-operator-guide",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["web-e2e-documentation", "playwright-discovery"],
+    "risk_models": ["stale-operator-guidance", "missing-prerequisites"],
+    "test_environments": ["playwright-chromium-list", "markdown-contract"],
+    "rollback_boundary": "revert-the-e2e-readme-rewrite",
+    "acceptance_proofs": [
+      "eighteen-spec-inventory",
+      "one-hundred-forty-eight-tests-discovered",
+      "current-auth-and-server-contract-documented"
+    ]
+  },
+  "work_areas": ["contract", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-db696.57",
+    "source_digest": "df59ccea8a77a94c5194cce2a614df70dd4822e83da5d78ecba692d3f3486fea",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The README maps the current 18 Playwright spec files to the Career Playbook, enrichment inspector, header dropdown, draft-session, document-conflict, visual, and screenshot suites.",
+        "text_digest": "4dfbba8924a1fcac417b816c6b99b6e7237c1ef5712f8695abdc176c19b79db6"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "The README documents the actual authentication, server-selection, environment, and service prerequisite contracts without referring to a nonexistent environment example.",
+        "text_digest": "517139b32fde50197dc96a139c6a5cf36b63180e59e018fed5b35caccdc7424a"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Markdown formatting, the focused README contract, and Playwright test discovery pass for 148 tests in 18 files.",
+        "text_digest": "dc94392ccd51c1c38de749f28f3aa91d60dc039462f59502005745e5d5e0eba9"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-db696.57/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "df59ccea8a77a94c5194cce2a614df70dd4822e83da5d78ecba692d3f3486fea",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-db696.57/artifacts/mc2-db696.57.md",
+      "task_id": "mc2-db696.57",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

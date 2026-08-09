@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm exec prettier --check packages/web/tests/e2e/README.md && git diff --check && python3 -c \"from pathlib import Path; r=Path('packages/web/tests/e2e'); t=(r/'README.md').read_text(); s=list(r.rglob('*.spec.ts')); assert len(s)==18; required=['career-playbook','header-dropdown','enrichment-inspector','visual-assessment','PLAYWRIGHT_PORT','PLAYWRIGHT_BASE_URL','TOKEN','SUPABASE_SERVICE_ROLE_KEY','COURSEGEN_BACKEND_URL']; assert all(x in t for x in required); assert '.env.e2e.example' not in t\" && pnpm --dir packages/web exec playwright test tests/e2e --project=chromium --list >/dev/null",
+      "duration_seconds": 3.053,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm exec prettier --check packages/web/tests/e2e/README.md && git diff --check && python3 -c \"from pathlib import Path; r=Path('packages/web/tests/e2e'); t=(r/'README.md').read_text(); s=list(r.rglob('*.spec.ts')); assert len(s)==18; required=['career-playbook','header-dropdown','enrichment-inspector','visual-assessment','PLAYWRIGHT_PORT','PLAYWRIGHT_BASE_URL','TOKEN','SUPABASE_SERVICE_ROLE_KEY','COURSEGEN_BACKEND_URL']; assert all(x in t for x in required); assert '.env.e2e.example' not in t\" && pnpm --dir packages/web exec playwright test tests/e2e --project=chromium --list >/dev/null"
+  ],
+  "completed_at": "2026-08-09T12:39:11.527490+00:00",
+  "diff_digest": "ebf4c8e8256682cc2e162ec05e4715059bee78a8120f98d785dbbc37ff731b77",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "7d8e4b8ebec37d6fb77a8556517bee718ab76b44",
+  "idempotency_key": "0995d87defc37047aa946628969484f29d18fac2740f339b64a0ec4846c8bd78",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.57",
+  "started_at": "2026-08-09T12:39:08.254876+00:00",
+  "verification_fingerprint": "0995d87defc37047aa946628969484f29d18fac2740f339b64a0ec4846c8bd78"
+}

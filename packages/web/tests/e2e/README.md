@@ -1,403 +1,153 @@
-# E2E Tests for Draft Session Workflow
+# Web E2E tests
 
-This directory contains end-to-end tests for the Redis-based draft session management system.
+The Playwright suite covers 18 browser specs. Some suites are fully mocked and need only the web
+app; others use local Supabase, Redis, or seeded authenticated data. Run commands from the
+repository root unless noted otherwise.
 
-## Overview
+## Suite map
 
-The draft session workflow prevents database pollution by storing form data in Redis with a 24-hour TTL, only materializing to PostgreSQL when necessary (file upload or form submission).
+| Suite                  | Files                                                                 | What it covers                                                               | Extra prerequisites                                                                                          |
+| ---------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Career Playbook        | `career-playbook/*.spec.ts`                                           | Public landing, authenticated Phase A draft persistence, viewer editing      | Auth state; local Supabase and Redis for authenticated flows; service-role key for the seeded viewer fixture |
+| Enrichment inspector   | `enrichment-inspector/*.spec.ts`                                      | Navigation, creation forms, progress, errors, drag/drop, i18n, accessibility | API calls are intercepted by suite fixtures; no generation worker is used                                    |
+| Header dropdown        | `header-dropdown-position.spec.ts`                                    | Sticky-header geometry, profile menu, no horizontal layout shift             | Auth state for the profile-menu cases                                                                        |
+| Draft sessions         | `draft-session-flow.spec.ts`                                          | Redis autosave, database materialization, validation, cleanup, tab isolation | Local Supabase, Redis, and `TOKEN` for authenticated assertions                                              |
+| Document conflicts     | `document-conflicts-e4.spec.ts`                                       | Real ClarifyingPanel behavior with intercepted authenticated tRPC            | Auth state; backend requests are intercepted                                                                 |
+| Visual and screenshots | `screenshot.spec.ts`, `visual-assessment.spec.ts`, `visual/*.spec.ts` | Screenshot capture, responsive states, Markdown snapshots, visual regression | Stable fonts/browser; committed snapshots where `toHaveScreenshot` is used                                   |
 
-## Test Scenarios
-
-### 1. Form Submission Without DB Pollution (`draft-session-flow.spec.ts`)
-
-- **Scenario 1**: Complete form submission - verifies no DB record until submit
-- **Scenario 2**: Auto-save to Redis - verifies form data saves after blur with debounce
-- **Scenario 3**: File upload materialization - verifies DB creation on file upload
-- **Scenario 4**: Page refresh - verifies new session creation without DB pollution
-- **Scenario 5**: Abandoned session cleanup - verifies TTL cleanup works
-- **Scenario 6**: Form validation - verifies validation errors don't create DB records
-- **Bonus**: Multiple tabs isolation - verifies separate sessions per tab
-
-## Prerequisites
-
-### 1. Environment Setup
-
-Copy `.env.e2e.example` to `.env.e2e` and configure:
+The authoritative inventory is the filesystem:
 
 ```bash
-cp .env.e2e.example .env.e2e
+find packages/web/tests/e2e -name '*.spec.ts' -print | sort
 ```
 
-Required variables:
+## Authentication
 
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for DB operations
-- `REDIS_URL` - Redis connection URL (default: redis://localhost:6379)
-- `TOKEN` - Test user auth token
-- `TEST_USER_ID` - Test user ID
-- `TEST_ORG_ID` - Test organization ID
+Playwright always runs [`tests/global-setup.ts`](../global-setup.ts). It writes
+`tests/.auth/user.json` for specs that declare an authenticated storage state.
 
-### 2. Services Running
+Choose one authentication source:
 
-Ensure these services are running:
+- set `TOKEN` to an existing Supabase access token; or
+- set `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`) and
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `SUPABASE_ANON_KEY`) so setup can sign in with
+  `E2E_AUTH_EMAIL` / `E2E_AUTH_PASSWORD` (the local seeded test account is the default).
+
+`SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SERVICE_KEY`) is required to seed the Career Playbook
+viewer fixture. Without it, setup continues but the authenticated viewer scenario has no guaranteed
+fixture. Never commit tokens, passwords, service-role keys, or generated auth state.
+
+`TEST_USER_ID` and `TEST_USER_EMAIL` only customize mocked enrichment-inspector fixtures. They do
+not replace Playwright authentication.
+
+## Web server selection
+
+[`playwright-web-server.ts`](../../playwright-web-server.ts) owns the server decision:
+
+- no override: Playwright starts `pnpm run dev` at `http://localhost:3000`;
+- `PLAYWRIGHT_PORT=3104`: Playwright starts and manages the app on that local port;
+- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3104`: Playwright manages a local server at that URL;
+- `PLAYWRIGHT_BASE_URL=https://example.test`: Playwright uses that external server and does not
+  start Next.js.
+
+For a managed server, the config forwards `COURSEGEN_BACKEND_URL` and
+`NEXT_PUBLIC_COURSEGEN_BACKEND_URL` when set. It also supplies local Supabase fallbacks, but those
+placeholder values are not enough for authenticated or database-backed suites.
+
+Useful optional variables:
+
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` — use a specific Chromium binary;
+- `PLAYWRIGHT_DISABLE_VIDEO=1` — disable retained failure videos;
+- `PORT` — fallback local port when `PLAYWRIGHT_PORT` is absent.
+
+`visual-assessment.spec.ts` currently navigates directly to `http://localhost:3001`; start a server
+there before running that legacy capture file. The other specs use Playwright's configured
+`baseURL`.
+
+## Service prerequisites
+
+For mocked UI suites, the managed Next.js server and authentication setup are sufficient. For
+database-backed flows, start the local services used by the app:
 
 ```bash
-# Redis
-docker-compose up -d redis
-
-# Next.js dev server
-pnpm dev
-
-# Or use Playwright's built-in server (configured in playwright.config.ts)
+docker compose up -d redis
 ```
 
-### 3. Database State
+Also provide a reachable Supabase instance with the expected test user and schema. Career Playbook
+draft persistence needs Redis and Supabase. Tests that exercise real course-generation or source
+processing additionally require the course-gen API, worker, and their Redis/DB dependencies; the
+current enrichment-inspector suite does not call those services because it intercepts its APIs.
 
-Tests automatically clean up before/after each run, but for initial setup:
+## Running the suites
+
+Install the browser once:
 
 ```bash
-# Ensure test user exists in database
-# User ID: 5a6f0557-613f-45bc-b591-059ffc7c7960
-# Email: tester@megacampus.ai
+pnpm --dir packages/web exec playwright install chromium
 ```
 
-## Running Tests
-
-### Run All E2E Tests
+Run all E2E files once in Chromium:
 
 ```bash
-pnpm test:e2e
+pnpm --dir packages/web exec playwright test tests/e2e --project=chromium
 ```
 
-### Run Specific Test File
+Run focused suites:
 
 ```bash
-pnpm test:e2e e2e/draft-session-flow.spec.ts
+pnpm --filter @megacampus/web test:e2e:career-playbook
+pnpm --dir packages/web exec playwright test tests/e2e/enrichment-inspector --project=chromium
+pnpm --dir packages/web exec playwright test tests/e2e/header-dropdown-position.spec.ts --project=chromium
+pnpm --dir packages/web exec playwright test tests/e2e/draft-session-flow.spec.ts --project=chromium
+pnpm --dir packages/web exec playwright test tests/e2e/visual/markdown-visual.spec.ts --project=markdown-visual
 ```
 
-### Run in UI Mode (Debug)
+Use a separate port when another dev server is already running:
 
 ```bash
-pnpm test:e2e:ui
+PLAYWRIGHT_PORT=3104 pnpm --dir packages/web exec playwright test \
+  tests/e2e/career-playbook/wizard-phase-a.spec.ts --project=chromium
 ```
 
-### Run Specific Scenario
+Use an already running remote or local app:
 
 ```bash
-# Run only Scenario 1
-pnpm test:e2e --grep "should NOT create DB record until form submit"
-
-# Run all scenarios in describe block
-pnpm test:e2e --grep "Auto-Save to Redis"
+PLAYWRIGHT_BASE_URL=https://dev.example.test \
+  pnpm --dir packages/web exec playwright test tests/e2e/header-dropdown-position.spec.ts \
+  --project=chromium
 ```
 
-### Run with Different Browsers
+Interactive and debugging modes:
 
 ```bash
-# Chromium only
-pnpm test:e2e --project=chromium
-
-# Firefox only
-pnpm test:e2e --project=firefox
-
-# All browsers
-pnpm test:e2e --project=chromium --project=firefox --project=webkit
+pnpm --filter @megacampus/web test:e2e:ui
+pnpm --dir packages/web exec playwright test tests/e2e/career-playbook --project=chromium --headed
+PWDEBUG=1 pnpm --dir packages/web exec playwright test tests/e2e/career-playbook --project=chromium
+DEBUG=pw:api pnpm --dir packages/web exec playwright test tests/e2e/header-dropdown-position.spec.ts --project=chromium
 ```
 
-### Run in Headed Mode (See Browser)
+## Artifacts and snapshots
+
+Playwright writes reports and traces under `packages/web/playwright-report/` and
+`packages/web/test-results/`. Failure screenshots and videos follow the settings in
+`playwright.config.ts`.
+
+Only update committed visual snapshots after reviewing the rendered change:
 
 ```bash
-pnpm test:e2e --headed
+pnpm --filter @megacampus/web test:visual:markdown:update
 ```
 
-### Run in Debug Mode
-
-```bash
-pnpm test:e2e --debug
-```
-
-## Test Architecture
-
-```
-courseai-next/
-├── e2e/
-│   ├── draft-session-flow.spec.ts    # Main test scenarios
-│   └── README.md                      # This file
-├── tests/
-│   ├── fixtures/
-│   │   ├── auth.ts                   # Authentication fixtures
-│   │   └── test-helpers.ts           # Helper functions
-│   ├── global-setup.ts               # Global setup (auth)
-│   ├── global-teardown.ts            # Global teardown
-│   └── .auth/                        # Auth state (generated)
-│       └── user.json
-└── playwright.config.ts              # Playwright configuration
-```
-
-## Helper Functions
-
-### Redis Operations
-
-```typescript
-import {
-  getRedisSession,
-  getAllRedisSessions,
-  clearRedisSessions,
-  setRedisSessionTimestamp,
-} from '../tests/fixtures/test-helpers'
-
-// Get specific session
-const session = await getRedisSession(userId, sessionId)
-
-// Get all sessions for user
-const sessions = await getAllRedisSessions(userId)
-
-// Clean up all sessions
-await clearRedisSessions(userId)
-
-// Set session timestamp (for TTL testing)
-await setRedisSessionTimestamp(userId, sessionId, 25) // 25 hours ago
-```
-
-### Database Operations
-
-```typescript
-import { getDraftCourses, clearDraftCourses } from '../tests/fixtures/test-helpers'
-
-// Get draft courses for user
-const drafts = await getDraftCourses(userId)
-
-// Clean up draft courses
-await clearDraftCourses(userId)
-```
-
-### Page Interactions
-
-```typescript
-import { fillFormFields, waitForAutoSave, getCurrentUserId } from '../tests/fixtures/test-helpers'
-
-// Fill form without submit
-await fillFormFields(page, {
-  topic: 'Test Course',
-  description: 'Description',
-  email: 'test@example.com',
-  language: 'ru',
-})
-
-// Wait for auto-save debounce (3s + buffer)
-await waitForAutoSave(page, 4000)
-
-// Get current user ID
-const userId = await getCurrentUserId(page)
-```
-
-## Troubleshooting
-
-### Tests Failing with "Session not found"
-
-**Cause**: Redis not running or connection refused
-
-**Fix**:
-
-```bash
-docker-compose up -d redis
-# Or check REDIS_URL in .env.e2e
-```
-
-### Tests Failing with "User not authenticated"
-
-**Cause**: Invalid or expired TOKEN in .env.e2e
-
-**Fix**:
-
-1. Get fresh token from .env.test
-2. Update TOKEN in .env.e2e
-3. Re-run tests
-
-### Auto-save Tests Failing
-
-**Cause**: Debounce timeout too short or network delay
-
-**Fix**: Increase timeout in `waitForAutoSave()` calls:
-
-```typescript
-await waitForAutoSave(page, 5000) // Increase from 4000 to 5000
-```
-
-### DB Record Not Created on Submit
-
-**Cause**: Form validation failing or submit handler not triggered
-
-**Fix**: Check browser console in headed mode:
-
-```bash
-pnpm test:e2e --headed --debug
-```
-
-### Cleanup Job Not Available
-
-**Cause**: Supabase Edge Function not deployed
-
-**Fix**: Tests will skip cleanup job test or use Redis TTL fallback:
-
-```bash
-# Deploy Edge Function
-supabase functions deploy cleanup-old-drafts
-```
-
-## CI/CD Integration
-
-### GitHub Actions Example
-
-```yaml
-name: E2E Tests
-
-on: [push, pull_request]
-
-jobs:
-  e2e:
-    runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
-
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          REDIS_URL: redis://localhost:6379
-          TOKEN: ${{ secrets.TEST_TOKEN }}
-          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
-          TEST_ORG_ID: ${{ secrets.TEST_ORG_ID }}
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
-```
-
-## Performance Benchmarks
-
-Expected test execution times (on modern hardware):
-
-- **Scenario 1** (Form Submission): ~8-10s
-- **Scenario 2** (Auto-Save): ~12-15s (includes debounce waits)
-- **Scenario 3** (File Upload): ~10-12s
-- **Scenario 4** (Page Refresh): ~10-12s
-- **Scenario 5** (Cleanup): ~5-8s
-- **Scenario 6** (Validation): ~5-7s
-- **Bonus** (Multiple Tabs): ~10-12s
-
-**Total**: ~60-75 seconds for all scenarios
-
-## Debugging Tips
-
-### 1. Enable Verbose Logging
-
-```bash
-DEBUG=pw:api pnpm test:e2e
-```
-
-### 2. Slow Down Execution
-
-```bash
-pnpm test:e2e --headed --slow-mo=1000
-```
-
-### 3. Pause on Failure
-
-```typescript
-test('my test', async ({ page }) => {
-  await page.pause() // Pause execution
-  // ... test code ...
-})
-```
-
-### 4. Screenshot on Each Step
-
-```typescript
-await page.screenshot({ path: 'step1-before-fill.png' })
-await fillFormFields(page, { topic: 'Test' })
-await page.screenshot({ path: 'step2-after-fill.png' })
-```
-
-### 5. Inspect Network Requests
-
-```typescript
-page.on('request', (request) => {
-  console.log('>>', request.method(), request.url())
-})
-
-page.on('response', (response) => {
-  console.log('<<', response.status(), response.url())
-})
-```
-
-## Coverage Report
-
-After running tests, view the HTML report:
-
-```bash
-pnpm exec playwright show-report
-```
-
-## Related Documentation
-
-- [Technical Spec: Draft Course Cleanup](../docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md)
-- [Draft Session Manager](../lib/draft-session.ts)
-- [Playwright Documentation](https://playwright.dev/docs/intro)
-- [Test Fixtures Guide](https://playwright.dev/docs/test-fixtures)
-
-## Maintenance
-
-### Updating Tests
-
-When the form changes:
-
-1. Update selectors in `test-helpers.ts` → `fillFormFields()`
-2. Update validation scenarios in Scenario 6
-3. Run tests in UI mode to verify selectors
-
-### Adding New Scenarios
-
-1. Create new `test.describe()` block
-2. Add setup/teardown if needed
-3. Use existing helper functions
-4. Update this README
-
-### Deprecating Tests
-
-Mark as `.skip` instead of deleting:
-
-```typescript
-test.skip('deprecated test', async ({ page }) => {
-  // ... old test ...
-})
-```
-
-## Support
-
-For questions or issues:
-
-1. Check this README
-2. Check [Technical Spec](../docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md)
-3. Run tests in debug mode: `pnpm test:e2e --debug`
-4. Review Playwright traces in test results
+## Common failures
+
+- **Global setup says authentication is missing:** provide `TOKEN`, or a Supabase URL, anon key,
+  and valid test credentials.
+- **Authenticated viewer data is absent:** provide a service-role key so global setup can seed its
+  fixed Career Playbook fixture.
+- **Draft state does not persist:** verify Redis and Supabase are reachable and that the managed web
+  server received their environment values.
+- **A local port is busy:** set `PLAYWRIGHT_PORT` to an unused port. Local URLs are still managed by
+  Playwright; non-local `PLAYWRIGHT_BASE_URL` values are treated as external.
+- **Visual diffs vary by machine:** use the same browser build, fonts, viewport, and color scheme;
+  inspect the generated report before accepting new snapshots.
+- **`visual-assessment.spec.ts` cannot connect:** it is the one legacy file hardcoded to port 3001.
