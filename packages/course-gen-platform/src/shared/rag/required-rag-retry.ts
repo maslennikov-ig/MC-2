@@ -12,7 +12,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getRetryDelayMs(error: RequiredRagUnavailableError, attempt: number): number {
-  const baseDelayMs = REQUIRED_RAG_RETRY_DELAYS_MS[attempt] ?? REQUIRED_RAG_RETRY_DELAYS_MS.at(-1) ?? 0;
+  const baseDelayMs =
+    REQUIRED_RAG_RETRY_DELAYS_MS[attempt] ?? REQUIRED_RAG_RETRY_DELAYS_MS.at(-1) ?? 0;
 
   if (error.reason !== 'qdrant_rate_limited') {
     return baseDelayMs;

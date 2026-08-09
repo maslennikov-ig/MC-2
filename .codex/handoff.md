@@ -1,19 +1,19 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-jz6y0.13.6`
+Current stage id: `mc2-jsamu`
 
 ## Current stage
 
-`mc2-jz6y0.13.6` is accepted locally. The owner selected a pull-based off-host Qdrant copy on
-`helixa-new` instead of provisioning S3, with explicit low-load scheduling and bounded retention.
-The acceptance boundary retains the original checksum, exact-version isolated restore, alerting,
-owner-only credential, and rollback requirements. Default retention is 14 days and at most 14 daily
-generations, with a 10 GiB free-space floor on the backup host.
+`mc2-jsamu` is accepted locally as a root-owned repo-health stage. It was restructured before formatting:
+`.2` preserves and excludes the 11 raw LLM captures, and new child `.7` owns repository metadata,
+caches, installed agent assets, immutable stage evidence, generated outputs, and the 28 paths that
+previously belonged to no child. The remaining measured batches are docs 29, specs 1, and packages 74. All scoped checks, global format-check, type-check, build, process verification, and stage
+readiness pass. Repository delivery is pending.
 
-The previous `mc2-2vtmk` live credential repair and `mc2-c2p8z` CI contract remain accepted locally.
-The owner-authorized delivery must include `63b4e2efd` so CI cannot overwrite the persistent GHCR
-credential, and deploy only after the relevant pipelines are green.
+The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
+health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
+and both backup and restore timers remain enabled.
 
 ## Backlog truth and order
 
@@ -22,8 +22,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. After delivery, the next exact item is Tier 4 restructuring of
-`mc2-jsamu` before any formatting batch is worked.
+through `mc2-jz6y0.13.6`. Tier 4 is active at `mc2-jsamu`; after it closes, the next exact item is
+`mc2-5dzld`.
 
 ## Verification facts
 
@@ -35,8 +35,9 @@ through `mc2-jz6y0.13.6`. After delivery, the next exact item is Tier 4 restruct
 - Repository deploy/rollback entrypoints now fail with exit 75 when
   `/opt/megacampus/.host-operation.lock` is held; manual infrastructure work must use
   `scripts/with_host_operation_lock.sh` to participate.
-- `pnpm format:check` currently fails on 138 files plus 11 unparseable raw LLM captures; this is
-  tracked repo-health work, not a reason to rewrite the captures.
+- `mc2-jsamu` reproduced 138 format mismatches plus 11 raw-capture parse blockers. Narrow ignores
+  removed all blockers; the 104 owned formatting files and global format/type/build acceptance are
+  green.
 - Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 
 ## Live operational facts
@@ -73,6 +74,12 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Explicit defers
 
+- Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
+  `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
+  validator fixtures unchanged in meaning.
+- Beads task `mc2-vr7ic` — make the pre-commit hook handle formatting-only legacy batches and
+  deliberately tracked `.codex/goals` snapshots without requiring unrelated lint cleanup or a
+  manual hook bypass.
 - `mc2-3gz2m` — unreadable vector diagrams; gated on
   `specs/025-remaining-debt/research-prompt.md`.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
@@ -85,18 +92,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-jz6y0.13.6`
-Next stage id: `mc2-jsamu`
-Recommended action: perform the owner-authorized delivery and deploy only through green pipelines;
-then restructure `mc2-jsamu` before working any Tier 4 formatting batch.
+Accepted stage id: `mc2-jsamu`
+Next stage id: `mc2-5dzld`
+Recommended action: deliver accepted `mc2-jsamu` through `develop`, wait for exact green CI, then
+start `mc2-5dzld`.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The current item is `mc2-jz6y0.13.6`. The owner selected `helixa-new` with low-load scheduling and
-bounded retention, and authorized correct merge, push, and deploy after acceptance. Do not reindex,
-migrate, force-push, perform paid work, or deploy before the relevant pipeline is green.
+The current item `mc2-jsamu` is accepted locally and pending normal develop delivery. After exact
+green CI, the next ordered item is `mc2-5dzld`. Do not reindex, migrate, force-push, perform paid
+work, or deploy before a green pipeline.
 
 ## Read first
 

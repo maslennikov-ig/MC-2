@@ -26,9 +26,11 @@ This code review covers three commits that upgrade Stage 6's mermaid handling fr
 ## Bugs Found
 
 ### Critical (0)
+
 None found.
 
 ### High Priority (0)
+
 None found.
 
 ### Medium Priority (1)
@@ -74,14 +76,19 @@ try {
   const mermaidResult = await runMermaidFixPipeline(patchedContent);
   if (mermaidResult.modified) {
     patchedContent = mermaidResult.content;
-    logger.debug({ sectionId: task.sectionId, metrics: mermaidResult.metrics },
-      'Patcher: Mermaid fix pipeline applied to patched content');
+    logger.debug(
+      { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+      'Patcher: Mermaid fix pipeline applied to patched content'
+    );
   }
 } catch (error) {
-  logger.warn({
-    sectionId: task.sectionId,
-    error: error instanceof Error ? error.message : String(error),
-  }, 'Patcher: Mermaid fix pipeline failed, using content as-is');
+  logger.warn(
+    {
+      sectionId: task.sectionId,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    'Patcher: Mermaid fix pipeline failed, using content as-is'
+  );
 }
 
 // Same pattern for executeExpanderTask() around line 443
@@ -101,8 +108,9 @@ try {
 **Issue**: The log message says "REJECTED" but this is inside the coherence patcher helper, not the main patcher. The message should specify "coherence patcher" for clarity.
 
 **Current**:
+
 ```typescript
-'Coherence patcher: REJECTED - response contains prompt template markers'
+'Coherence patcher: REJECTED - response contains prompt template markers';
 ```
 
 **Actual behavior**: This is correct! The message already says "Coherence patcher". False alarm — no issue here.
@@ -117,6 +125,7 @@ try {
 **Issue**: Minor typo in comment.
 
 **Current**:
+
 ```typescript
 // Pattern: log-only — don't reject, let judge make final decision
 ```
@@ -134,6 +143,7 @@ try {
 **Status**: CLEAN
 
 **Analysis**:
+
 - `task-executor.ts` correctly replaced `sanitizeMermaidBlocks` with `runMermaidFixPipeline` in both patcher and expander paths (lines 18, 195-202, 443-451)
 - `section-regenerator.ts` already uses `runMermaidFixPipeline` (not changed in these commits)
 - `mermaid-sanitizer.ts` is still correctly used internally by `mermaid-fix-pipeline.ts` (Stage 1 of pipeline)
@@ -147,6 +157,7 @@ try {
 **Line**: 10
 
 **Current usage**:
+
 ```typescript
 import { sanitizeMermaidBlocks } from './mermaid-sanitizer';
 // ...
@@ -156,13 +167,14 @@ const result = sanitizeMermaidBlocks(testCase.diagram);
 **Question**: Should the health check test the full pipeline instead of just the sanitizer?
 
 **Analysis**:
+
 - The health check currently tests sanitizer in isolation (line 95-106)
 - This is useful for unit-testing the sanitizer stage
 - However, it doesn't validate the full pipeline (validation, LLM fix, etc.)
 
 **Recommendation**: Add a separate health check for the full pipeline:
 
-```typescript
+````typescript
 // Add new test case
 {
   name: 'pipeline_full_flow',
@@ -170,7 +182,7 @@ const result = sanitizeMermaidBlocks(testCase.diagram);
   shouldRunPipeline: true,
   expectedModified: true,
 }
-```
+````
 
 **Priority**: Low — Current health check is functional, but pipeline coverage would be better.
 
@@ -182,6 +194,7 @@ const result = sanitizeMermaidBlocks(testCase.diagram);
 **Status**: CORRECT — No issues
 
 **Analysis**:
+
 ```typescript
 import { MERMAID_BLOCK_REGEX } from '../../utils/mermaid-sanitizer';
 ```
@@ -195,7 +208,7 @@ This is the correct source for `MERMAID_BLOCK_REGEX`. The constant is correctly 
 
 **Issue**: The README still documents the old 3-layer defense with "Layer 2: Auto-Fix (Sanitizer)" as a direct usage pattern:
 
-```markdown
+````markdown
 ### Layer 2: Auto-Fix (Sanitizer)
 
 Location: `utils/mermaid-sanitizer.ts`
@@ -210,7 +223,9 @@ const result = sanitizeMermaidBlocks(content);
 // result.modified - whether changes were made
 // result.fixes - details of fixes applied
 ```
-```
+````
+
+````
 
 **Problem**: This usage pattern is now **outdated**. All code should use `runMermaidFixPipeline()` instead of calling `sanitizeMermaidBlocks()` directly.
 
@@ -232,10 +247,11 @@ const result = await runMermaidFixPipeline(content);
 // result.metrics.diagramsFixedRegex - diagrams fixed by regex
 // result.metrics.diagramsFixedLLM - diagrams fixed by LLM
 // result.metrics.diagramsFallback - diagrams that failed all fixes
-```
+````
 
 Note: `sanitizeMermaidBlocks()` is now internal to the pipeline (Stage 1).
-```
+
+````
 
 **Recommendation**: Update README.md Layer 2 section with the correct pipeline usage pattern.
 
@@ -264,9 +280,10 @@ Note: `sanitizeMermaidBlocks()` is now internal to the pipeline (Stage 1).
 ```typescript
 // Synchronous, regex-only
 const { content: sanitized } = sanitizeMermaidBlocks(`\`\`\`mermaid\n${code}\n\`\`\``);
-```
+````
 
 **After (commit d582272b)**:
+
 ```typescript
 // Asynchronous, full 5-stage pipeline
 const mermaidResult = await runMermaidFixPipeline(patchedContent);
@@ -276,6 +293,7 @@ if (mermaidResult.modified) {
 ```
 
 **Files updated**:
+
 - ✅ `task-executor.ts` line 195 (patcher path)
 - ✅ `task-executor.ts` line 443 (expander path)
 
@@ -309,13 +327,14 @@ All validation calls (`validateGeneratedContent()`, `validateExpanderContent()`)
 
 **Coverage breakdown**:
 
-| Function                      | Tests | Edge Cases Covered                            |
-| ----------------------------- | ----- | --------------------------------------------- |
-| `validateGeneratedContent`    | 8     | Valid content, 4 marker types, case-insen... |
-| `validateExpanderContent`     | 5     | Valid content, 3 marker types, case-insen... |
-| Marker constants              | 3     | Array length, marker presence                 |
+| Function                   | Tests | Edge Cases Covered                           |
+| -------------------------- | ----- | -------------------------------------------- |
+| `validateGeneratedContent` | 8     | Valid content, 4 marker types, case-insen... |
+| `validateExpanderContent`  | 5     | Valid content, 3 marker types, case-insen... |
+| Marker constants           | 3     | Array length, marker presence                |
 
 **Strengths**:
+
 - ✅ Tests cover all marker types from both validation functions
 - ✅ Case-insensitive matching tested
 - ✅ Multiple markers detected in single content
@@ -329,6 +348,7 @@ All validation calls (`validateGeneratedContent()`, `validateExpanderContent()`)
 The coherence patcher in `task-executor-helpers.ts` (lines 189-206) returns original content when markers detected, but there's no test for this specific behavior.
 
 **Recommended test**:
+
 ```typescript
 describe('applyCoherencePreservingPatch - marker rejection', () => {
   it('should return original content when LLM hallucinates markers', async () => {
@@ -358,7 +378,8 @@ describe('applyCoherencePreservingPatch - marker rejection', () => {
 The task-executor now uses `runMermaidFixPipeline()` instead of `sanitizeMermaidBlocks()`, but there are no tests validating the async pipeline call succeeds.
 
 **Recommended test**:
-```typescript
+
+````typescript
 describe('executePatcherTask - mermaid pipeline integration', () => {
   it('should apply mermaid fix pipeline to patched content', async () => {
     const contentWithBrokenMermaid = 'Section text\n```mermaid\ngraph TD\n  A[\\"bad\\"]```';
@@ -375,7 +396,7 @@ describe('executePatcherTask - mermaid pipeline integration', () => {
     expect(result.patchedContent).not.toContain('\\"');
   });
 });
-```
+````
 
 **Priority**: Low — Pipeline is tested independently in `mermaid-fix-pipeline.e2e.test.ts` (27 tests). Integration test would be nice-to-have.
 
@@ -420,15 +441,15 @@ None — code is production-ready.
 
 ## Code Quality Metrics
 
-| Metric                  | Score | Notes                                        |
-| ----------------------- | ----- | -------------------------------------------- |
-| Correctness             | 10/10 | All logic is correct, no functional bugs     |
-| Consistency             | 9/10  | Minor error handling inconsistency           |
-| Test Coverage           | 9/10  | 17 new tests, 2 small gaps identified        |
-| Documentation           | 8/10  | README needs update for pipeline usage       |
-| Error Handling          | 8/10  | Missing try/catch in 2 locations             |
-| Type Safety             | 10/10 | Full TypeScript compliance, passes type-check|
-| Async/Await Correctness | 10/10 | Proper async upgrade throughout              |
+| Metric                  | Score | Notes                                         |
+| ----------------------- | ----- | --------------------------------------------- |
+| Correctness             | 10/10 | All logic is correct, no functional bugs      |
+| Consistency             | 9/10  | Minor error handling inconsistency            |
+| Test Coverage           | 9/10  | 17 new tests, 2 small gaps identified         |
+| Documentation           | 8/10  | README needs update for pipeline usage        |
+| Error Handling          | 8/10  | Missing try/catch in 2 locations              |
+| Type Safety             | 10/10 | Full TypeScript compliance, passes type-check |
+| Async/Await Correctness | 10/10 | Proper async upgrade throughout               |
 
 **Overall Score**: 9.5/10
 
@@ -443,6 +464,7 @@ None — code is production-ready.
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 Scope: 5 of 6 workspace projects
 packages/shared-logger type-check: Done
@@ -487,6 +509,7 @@ packages/web type-check: Done
 **Title**: `fix(stage6): upgrade targeted refinement to full mermaid fix pipeline`
 
 **Changes**:
+
 - Replaced `sanitizeMermaidBlocks` with `runMermaidFixPipeline` in `task-executor.ts`
 - Upgraded from sync regex-only to async 5-stage pipeline in both patcher and expander paths
 - Added proper logging for pipeline metrics

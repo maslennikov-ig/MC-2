@@ -191,9 +191,7 @@ describe('QualityValidator.detectOverlapFromTexts() - core unified method', () =
     const labels = ['Section 1', 'Section 2'];
 
     // Mock API failure
-    vi.mocked(jinaClient.generateEmbeddings).mockRejectedValueOnce(
-      new Error('Jina API failed')
-    );
+    vi.mocked(jinaClient.generateEmbeddings).mockRejectedValueOnce(new Error('Jina API failed'));
 
     const result = await validator.detectOverlapFromTexts(texts, labels, 'en', 0.8);
 
@@ -247,8 +245,7 @@ describe('QualityValidator.detectOverlapFromTexts() - core unified method', () =
     // Module 2 and Module 7 should be in overlappingPairs
     const hasModule2And7Overlap = result.overlappingPairs.some(
       pair =>
-        (pair.sectionA === 2 && pair.sectionB === 7) ||
-        (pair.sectionA === 7 && pair.sectionB === 2)
+        (pair.sectionA === 2 && pair.sectionB === 7) || (pair.sectionA === 7 && pair.sectionB === 2)
     );
     expect(hasModule2And7Overlap).toBe(true);
   });

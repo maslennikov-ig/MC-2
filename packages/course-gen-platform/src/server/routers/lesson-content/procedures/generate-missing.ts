@@ -35,15 +35,13 @@ import { getLatestUsableLessonContent } from './latest-usable-lesson-content';
 type LessonWithContentRow = {
   id?: string;
   order_index: number;
-  lesson_contents:
-    | Array<{
-        id: string;
-        status?: string | null;
-        created_at?: string | null;
-        content?: Record<string, unknown> | string | null;
-        metadata?: Record<string, unknown> | null;
-      }>
-    | null;
+  lesson_contents: Array<{
+    id: string;
+    status?: string | null;
+    created_at?: string | null;
+    content?: Record<string, unknown> | string | null;
+    metadata?: Record<string, unknown> | null;
+  }> | null;
   sections: { order_index: number } | Array<{ order_index: number }> | null;
 };
 

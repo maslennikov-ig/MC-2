@@ -34,9 +34,14 @@ import { persist } from 'zustand/middleware';
 
 type WizardPhase = 'fixed' | 'followups' | 'completion';
 type SessionStatus =
-  | 'draft' | 'answering_fixed' | 'awaiting_followups'
-  | 'answering_followups' | 'ready_to_generate'
-  | 'generating' | 'completed' | 'failed';
+  | 'draft'
+  | 'answering_fixed'
+  | 'awaiting_followups'
+  | 'answering_followups'
+  | 'ready_to_generate'
+  | 'generating'
+  | 'completed'
+  | 'failed';
 
 interface CareerPlaybookState {
   // Session
@@ -58,7 +63,7 @@ interface CareerPlaybookState {
   freeformDrafts: FreeformDraft[];
 
   // Generation state
-  generatedBlocks: Record<string, BlockState>;  // streaming-friendly
+  generatedBlocks: Record<string, BlockState>; // streaming-friendly
   thinkingStream: string;
   showThinking: boolean;
   finalMarkdown: string | null;
@@ -68,7 +73,11 @@ interface CareerPlaybookState {
   initSession: (lang: string) => Promise<void>;
   resumeSession: (id: string) => Promise<void>;
   submitFixedAnswer: (key: string, value: FixedAnswerValue) => Promise<void>;
-  submitFollowupAnswer: (id: string, value: FollowupAnswerValue, skipped?: boolean) => Promise<void>;
+  submitFollowupAnswer: (
+    id: string,
+    value: FollowupAnswerValue,
+    skipped?: boolean
+  ) => Promise<void>;
   submitFreeform: (text: string) => Promise<void>;
   forceGenerate: () => Promise<void>;
   triggerGeneration: () => Promise<void>;
@@ -76,9 +85,9 @@ interface CareerPlaybookState {
   // Viewer actions
   editBlock: (blockId: string, content: string) => Promise<void>;
   regenerateBlock: (blockId: string, instruction?: string) => Promise<void>;
-  toggleShare: () => Promise<{share_slug: string} | null>;
-  exportPDF: () => Promise<{url: string}>;
-  createCourse: (uploadedDocs?: string[]) => Promise<{courseId: string}>;
+  toggleShare: () => Promise<{ share_slug: string } | null>;
+  exportPDF: () => Promise<{ url: string }>;
+  createCourse: (uploadedDocs?: string[]) => Promise<{ courseId: string }>;
 }
 
 export const useCareerPlaybookStore = create<CareerPlaybookState>()(
@@ -90,13 +99,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookState>()(
     {
       name: 'career-playbook-store',
       // persist только wizard state (для resume даже при offline)
-      partialize: (s) => ({
+      partialize: s => ({
         playbookId: s.playbookId,
         phase: s.phase,
         fixedAnswers: s.fixedAnswers,
         followupAnswers: s.followupAnswers,
-        freeformDrafts: s.freeformDrafts
-      })
+        freeformDrafts: s.freeformDrafts,
+      }),
     }
   )
 );
@@ -280,9 +289,15 @@ SharePageClient
 
 ```typescript
 export const namespaces = [
-  'common', 'admin', 'generation', 'auth',
-  'enrichments', 'course', 'organizations', 'profile',
-  'career-playbook',  // NEW
+  'common',
+  'admin',
+  'generation',
+  'auth',
+  'enrichments',
+  'course',
+  'organizations',
+  'profile',
+  'career-playbook', // NEW
 ] as const;
 ```
 
@@ -300,7 +315,7 @@ const sub = trpc.careerPlaybook.subscribeToFollowupGeneration.useSubscription(
     },
     onError(err) {
       toast.error(err.message);
-    }
+    },
   }
 );
 ```
@@ -313,15 +328,29 @@ const sub = trpc.careerPlaybook.subscribeToGenerationProgress.useSubscription(
   {
     onData(event) {
       switch (event.type) {
-        case 'block_started': addBlockSkeleton(event.blockId); break;
-        case 'block_chunk': appendToBlock(event.blockId, event.chunk); break;
-        case 'block_completed': finalizeBlock(event.blockId); break;
-        case 'thinking_chunk': appendThinking(event.text); break;
-        case 'group_completed': updateGroupProgress(event.groupId); break;
-        case 'completed': setStatus('completed'); break;
-        case 'failed': setStatus('failed'); break;
+        case 'block_started':
+          addBlockSkeleton(event.blockId);
+          break;
+        case 'block_chunk':
+          appendToBlock(event.blockId, event.chunk);
+          break;
+        case 'block_completed':
+          finalizeBlock(event.blockId);
+          break;
+        case 'thinking_chunk':
+          appendThinking(event.text);
+          break;
+        case 'group_completed':
+          updateGroupProgress(event.groupId);
+          break;
+        case 'completed':
+          setStatus('completed');
+          break;
+        case 'failed':
+          setStatus('failed');
+          break;
       }
-    }
+    },
   }
 );
 ```
@@ -329,6 +358,7 @@ const sub = trpc.careerPlaybook.subscribeToGenerationProgress.useSubscription(
 ## Design system
 
 Используем:
+
 - Существующие violet/pink цвета из `app/globals.css`
 - shadcn компоненты (Button, Card, Dialog, Sheet, RadioGroup, Checkbox, Textarea, Tooltip)
 - Framer Motion для transitions между шагами wizard (slide left/right)

@@ -176,9 +176,7 @@ function getRawMarkdown(contentRow: LessonContentLike | null | undefined): strin
     return null
   }
 
-  const nestedContent = isRecord(contentRow.content.content)
-    ? (contentRow.content.content)
-    : null
+  const nestedContent = isRecord(contentRow.content.content) ? contentRow.content.content : null
 
   const markdown = buildMarkdownFromContent(nestedContent ?? contentRow.content)
   return markdown.trim().length > 0 ? markdown : null

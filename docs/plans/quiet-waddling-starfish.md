@@ -11,6 +11,7 @@ Status: Draft (awaiting approval)
 Прежнее решение от 22.03.2026 (memory `project_jd_catalog.md`) предполагало catalog pre-generated JDs как lead magnet. Это решение пересматривается: Role Guide получился слишком персонализированным под конкретную компанию для catalog-модели, а более ценная стратегия — дать пользователю интерактивный конструктор. Сгенерированные пользователями Role Guide опционально образуют public catalog через шеринг.
 
 Цель этого плана — спроектировать новый продуктовый трек "Career Playbook":
+
 1. Интерактивный конструктор Q&A с adaptive-логикой (часть вопросов фиксированы, часть генерируется LLM)
 2. Поэтапная согласованная генерация 26 блоков (по модели Stage 6 lessons)
 3. Marketing-лендинг с методологией и interactive demo
@@ -20,18 +21,18 @@ Status: Draft (awaiting approval)
 
 ## Product Decisions
 
-| # | Решение | Источник |
-|---|---|---|
-| 1 | **Каталога нет.** Только конструктор. User-generated. Опциональный шеринг = зародыш будущего catalog | brainstorm 2026-05-12 |
-| 2 | **26 блоков** в MVP, поэтапная генерация ради качества и согласованности | brainstorm 2026-05-12 |
-| 3 | **Languages:** UI ru+en, content генерируется на всех языках, поддерживаемых Stage 6 (тот же `language` параметр) | brainstorm 2026-05-12 |
-| 4 | **Authorized only.** Lead magnet — 1 бесплатный пробный (в MVP — безлимитно для авторизованных) | brainstorm 2026-05-12 |
-| 5 | **Adaptive Q&A:** 5-7 fixed start вопросов + 3-7 LLM follow-ups + "Я расскажу свободно" опция | brainstorm 2026-05-12 |
-| 6 | **Block generation:** RoleProfileSpec → 6 групп блоков последовательно, judge между группами | brainstorm 2026-05-12 |
-| 7 | **Methodology page:** marketing landing + interactive demo (показ sample sales-manager-b2b) | brainstorm 2026-05-12 |
-| 8 | **Post-generation:** view, edit, регенерация блоков, PDF (HTML→PDF stylish), личная библиотека, шеринг по ссылке, кнопка "Создать курс" | brainstorm 2026-05-12 |
-| 9 | **JD→Course:** Role Guide + auto WebSearch (~5-10 статей по competencies/trends) → synthetic source corpus → существующий Stage 3-6 pipeline | brainstorm 2026-05-12 |
-| 10 | **Routing:** `/career-playbook` (брендирование) | brainstorm 2026-05-12 |
+| #   | Решение                                                                                                                                      | Источник              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| 1   | **Каталога нет.** Только конструктор. User-generated. Опциональный шеринг = зародыш будущего catalog                                         | brainstorm 2026-05-12 |
+| 2   | **26 блоков** в MVP, поэтапная генерация ради качества и согласованности                                                                     | brainstorm 2026-05-12 |
+| 3   | **Languages:** UI ru+en, content генерируется на всех языках, поддерживаемых Stage 6 (тот же `language` параметр)                            | brainstorm 2026-05-12 |
+| 4   | **Authorized only.** Lead magnet — 1 бесплатный пробный (в MVP — безлимитно для авторизованных)                                              | brainstorm 2026-05-12 |
+| 5   | **Adaptive Q&A:** 5-7 fixed start вопросов + 3-7 LLM follow-ups + "Я расскажу свободно" опция                                                | brainstorm 2026-05-12 |
+| 6   | **Block generation:** RoleProfileSpec → 6 групп блоков последовательно, judge между группами                                                 | brainstorm 2026-05-12 |
+| 7   | **Methodology page:** marketing landing + interactive demo (показ sample sales-manager-b2b)                                                  | brainstorm 2026-05-12 |
+| 8   | **Post-generation:** view, edit, регенерация блоков, PDF (HTML→PDF stylish), личная библиотека, шеринг по ссылке, кнопка "Создать курс"      | brainstorm 2026-05-12 |
+| 9   | **JD→Course:** Role Guide + auto WebSearch (~5-10 статей по competencies/trends) → synthetic source corpus → существующий Stage 3-6 pipeline | brainstorm 2026-05-12 |
+| 10  | **Routing:** `/career-playbook` (брендирование)                                                                                              | brainstorm 2026-05-12 |
 
 ## Architecture Overview
 
@@ -60,52 +61,52 @@ Frontend                       Backend (course-gen-platform)
 
 ### New backend files
 
-| Файл | Назначение | Базируется на |
-|---|---|---|
-| `packages/shared-types/src/career-playbook.ts` | Zod schemas + TS types (Question, Answer, RoleProfileSpec, BlockState) | `packages/shared-types/src/clarifying-questions.ts` |
-| `packages/course-gen-platform/src/server/routers/career-playbook/index.ts` | tRPC root router | `routers/clarifying.router.ts` |
-| `.../career-playbook/session.router.ts` | start/get/submitAnswer/getDraft | `clarifying.router.ts` |
-| `.../career-playbook/generation.router.ts` | approveAndGenerate, getStatus (SSE), getBlock | `routers/generation/index.ts` |
-| `.../career-playbook/library.router.ts` | list, get, delete, regenerateBlock, edit | `routers/lessonContent.router.ts` |
-| `.../career-playbook/share.router.ts` | shareToggle, getPublicBySlug | новый паттерн (RLS-based) |
-| `.../career-playbook/course-bridge.router.ts` | createCourseFromPlaybook | использует существующий `generation.start` |
-| `packages/course-gen-platform/src/stages/stage-career-playbook/state.ts` | LangGraph `Annotation.Root` state | `stage6-lesson-content/state.ts` |
-| `.../stage-career-playbook/graph.ts` | StateGraph wiring (start → spec → groups → judge → END) | `stage6-lesson-content/graph.ts` |
-| `.../stage-career-playbook/nodes/spec-builder.ts` | LLM собирает RoleProfileSpec из Q&A + WebSearch | новый |
-| `.../stage-career-playbook/nodes/group-generator.ts` | Универсальная нода генерации группы блоков | `stage6-lesson-content/nodes/generator-node.ts` |
-| `.../stage-career-playbook/nodes/cross-block-judge.ts` | Проверка согласованности между группами | `stage6-lesson-content/nodes/judge-node.ts` |
-| `.../stage-career-playbook/nodes/block-regenerator.ts` | Targeted регенерация отдельного блока | `stage6-lesson-content/nodes/section-regenerator-node.ts` |
-| `.../stage-career-playbook/nodes/followup-questions.ts` | LLM генерирует 3-7 adaptive follow-up вопросов после fixed-фазы | новый |
-| `.../stage-career-playbook/rag/web-research.ts` | WebSearch по KPI/trends/onboarding (3 запроса, 5с timeout, fallback) | паттерн из skill SKILL.md:70-76 |
-| `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts` | BullMQ job processor (job types: GENERATE_FOLLOWUPS, GENERATE_PLAYBOOK, REGENERATE_BLOCK) | `orchestrator/handlers/stage6-handler.ts` |
-| `packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts` | Промпты для 6 групп + spec builder + judge + followup + course brief (RU+EN+...) | `shared/prompts/stage6-prompts.ts`, использует `prompt-service.ts` |
-| `packages/course-gen-platform/src/services/career-playbook-pdf.ts` | HTML→PDF через Playwright (stylish layout, Mermaid render) | новый, но Playwright уже в depndencies |
-| `packages/course-gen-platform/src/services/course-from-playbook.ts` | Логика создания course с synthetic source corpus из WebSearch | использует существующий `generation.start` flow |
+| Файл                                                                                | Назначение                                                                                | Базируется на                                                      |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `packages/shared-types/src/career-playbook.ts`                                      | Zod schemas + TS types (Question, Answer, RoleProfileSpec, BlockState)                    | `packages/shared-types/src/clarifying-questions.ts`                |
+| `packages/course-gen-platform/src/server/routers/career-playbook/index.ts`          | tRPC root router                                                                          | `routers/clarifying.router.ts`                                     |
+| `.../career-playbook/session.router.ts`                                             | start/get/submitAnswer/getDraft                                                           | `clarifying.router.ts`                                             |
+| `.../career-playbook/generation.router.ts`                                          | approveAndGenerate, getStatus (SSE), getBlock                                             | `routers/generation/index.ts`                                      |
+| `.../career-playbook/library.router.ts`                                             | list, get, delete, regenerateBlock, edit                                                  | `routers/lessonContent.router.ts`                                  |
+| `.../career-playbook/share.router.ts`                                               | shareToggle, getPublicBySlug                                                              | новый паттерн (RLS-based)                                          |
+| `.../career-playbook/course-bridge.router.ts`                                       | createCourseFromPlaybook                                                                  | использует существующий `generation.start`                         |
+| `packages/course-gen-platform/src/stages/stage-career-playbook/state.ts`            | LangGraph `Annotation.Root` state                                                         | `stage6-lesson-content/state.ts`                                   |
+| `.../stage-career-playbook/graph.ts`                                                | StateGraph wiring (start → spec → groups → judge → END)                                   | `stage6-lesson-content/graph.ts`                                   |
+| `.../stage-career-playbook/nodes/spec-builder.ts`                                   | LLM собирает RoleProfileSpec из Q&A + WebSearch                                           | новый                                                              |
+| `.../stage-career-playbook/nodes/group-generator.ts`                                | Универсальная нода генерации группы блоков                                                | `stage6-lesson-content/nodes/generator-node.ts`                    |
+| `.../stage-career-playbook/nodes/cross-block-judge.ts`                              | Проверка согласованности между группами                                                   | `stage6-lesson-content/nodes/judge-node.ts`                        |
+| `.../stage-career-playbook/nodes/block-regenerator.ts`                              | Targeted регенерация отдельного блока                                                     | `stage6-lesson-content/nodes/section-regenerator-node.ts`          |
+| `.../stage-career-playbook/nodes/followup-questions.ts`                             | LLM генерирует 3-7 adaptive follow-up вопросов после fixed-фазы                           | новый                                                              |
+| `.../stage-career-playbook/rag/web-research.ts`                                     | WebSearch по KPI/trends/onboarding (3 запроса, 5с timeout, fallback)                      | паттерн из skill SKILL.md:70-76                                    |
+| `packages/course-gen-platform/src/orchestrator/handlers/career-playbook-handler.ts` | BullMQ job processor (job types: GENERATE_FOLLOWUPS, GENERATE_PLAYBOOK, REGENERATE_BLOCK) | `orchestrator/handlers/stage6-handler.ts`                          |
+| `packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts`        | Промпты для 6 групп + spec builder + judge + followup + course brief (RU+EN+...)          | `shared/prompts/stage6-prompts.ts`, использует `prompt-service.ts` |
+| `packages/course-gen-platform/src/services/career-playbook-pdf.ts`                  | HTML→PDF через Playwright (stylish layout, Mermaid render)                                | новый, но Playwright уже в depndencies                             |
+| `packages/course-gen-platform/src/services/course-from-playbook.ts`                 | Логика создания course с synthetic source corpus из WebSearch                             | использует существующий `generation.start` flow                    |
 
 ### New frontend files
 
-| Файл | Назначение | Базируется на |
-|---|---|---|
-| `packages/web/app/[locale]/career-playbook/page.tsx` | Marketing landing (server) | `app/[locale]/about/page.tsx` |
-| `packages/web/app/[locale]/career-playbook/page-client.tsx` | Hero + methodology sections + interactive demo (preview sales-manager-b2b sample) | `app/[locale]/create/page-client.tsx` |
-| `packages/web/app/[locale]/career-playbook/new/page.tsx` + `page-client.tsx` | Q&A wizard route | новый |
-| `packages/web/app/[locale]/career-playbook/[id]/page.tsx` + `page-client.tsx` | Просмотр + edit + actions | `app/[locale]/courses/[courseId]/page.tsx` |
-| `packages/web/app/[locale]/career-playbook/library/page.tsx` | Личная библиотека | `app/[locale]/courses/page.tsx` |
-| `packages/web/app/[locale]/share/career-playbook/[slug]/page.tsx` | Публичный шеринг (read-only, no-auth) | новый паттерн |
-| `packages/web/components/career-playbook/methodology/MethodologySection.tsx` | Объяснение 26 блоков, references (Netflix/Amazon/Toyota/Spotify/Bridgewater) | новый, draws on `docs/research/` |
-| `packages/web/components/career-playbook/methodology/InteractiveDemo.tsx` | Live preview sample Role Guide с tooltip-объяснениями | новый |
-| `packages/web/components/career-playbook/wizard/Wizard.tsx` | Главный wizard | `components/mocks/clarifying/MockVariant3Wizard.tsx` |
-| `packages/web/components/career-playbook/wizard/QuestionRenderer.tsx` | open / single_choice / multi_choice / free_form | паттерн из mock variants |
-| `packages/web/components/career-playbook/wizard/FollowupPhase.tsx` | LLM follow-ups + skip + completeness indicator | новый, использует SSE |
-| `packages/web/components/career-playbook/wizard/FreeFormInput.tsx` | "Я расскажу свободно" — большая textarea | новый |
-| `packages/web/components/career-playbook/wizard/ProgressIndicator.tsx` | Hybrid progress: "Шаг 3 из 5 → анализ → 60% полнота" | новый |
-| `packages/web/components/career-playbook/generation/StreamingView.tsx` | Live "thinking" + блоки появляются по мере готовности | паттерн из `MarkdownRendererClient` + Stage 6 progress |
-| `packages/web/components/career-playbook/viewer/PlaybookViewer.tsx` | Просмотр со sticky TOC, Mermaid рендер | паттерн из course viewer |
-| `packages/web/components/career-playbook/viewer/BlockEditor.tsx` | Inline edit или regenerate-with-instruction | паттерн из Stage 6 regeneration UI |
-| `packages/web/components/career-playbook/viewer/ActionsBar.tsx` | PDF / Share / Create Course / Delete | новый |
-| `packages/web/stores/use-career-playbook-store.ts` | Zustand store (drafts, wizard state, streaming) | `components/generation-graph/stores/batch-enrichment-store.ts` |
-| `packages/web/messages/{ru,en}/career-playbook.json` | i18n namespace | `messages/{ru,en}/generation.json` |
-| `packages/web/src/i18n/config.ts` | Добавить namespace `'career-playbook'` | сущ. файл |
+| Файл                                                                          | Назначение                                                                        | Базируется на                                                  |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `packages/web/app/[locale]/career-playbook/page.tsx`                          | Marketing landing (server)                                                        | `app/[locale]/about/page.tsx`                                  |
+| `packages/web/app/[locale]/career-playbook/page-client.tsx`                   | Hero + methodology sections + interactive demo (preview sales-manager-b2b sample) | `app/[locale]/create/page-client.tsx`                          |
+| `packages/web/app/[locale]/career-playbook/new/page.tsx` + `page-client.tsx`  | Q&A wizard route                                                                  | новый                                                          |
+| `packages/web/app/[locale]/career-playbook/[id]/page.tsx` + `page-client.tsx` | Просмотр + edit + actions                                                         | `app/[locale]/courses/[courseId]/page.tsx`                     |
+| `packages/web/app/[locale]/career-playbook/library/page.tsx`                  | Личная библиотека                                                                 | `app/[locale]/courses/page.tsx`                                |
+| `packages/web/app/[locale]/share/career-playbook/[slug]/page.tsx`             | Публичный шеринг (read-only, no-auth)                                             | новый паттерн                                                  |
+| `packages/web/components/career-playbook/methodology/MethodologySection.tsx`  | Объяснение 26 блоков, references (Netflix/Amazon/Toyota/Spotify/Bridgewater)      | новый, draws on `docs/research/`                               |
+| `packages/web/components/career-playbook/methodology/InteractiveDemo.tsx`     | Live preview sample Role Guide с tooltip-объяснениями                             | новый                                                          |
+| `packages/web/components/career-playbook/wizard/Wizard.tsx`                   | Главный wizard                                                                    | `components/mocks/clarifying/MockVariant3Wizard.tsx`           |
+| `packages/web/components/career-playbook/wizard/QuestionRenderer.tsx`         | open / single_choice / multi_choice / free_form                                   | паттерн из mock variants                                       |
+| `packages/web/components/career-playbook/wizard/FollowupPhase.tsx`            | LLM follow-ups + skip + completeness indicator                                    | новый, использует SSE                                          |
+| `packages/web/components/career-playbook/wizard/FreeFormInput.tsx`            | "Я расскажу свободно" — большая textarea                                          | новый                                                          |
+| `packages/web/components/career-playbook/wizard/ProgressIndicator.tsx`        | Hybrid progress: "Шаг 3 из 5 → анализ → 60% полнота"                              | новый                                                          |
+| `packages/web/components/career-playbook/generation/StreamingView.tsx`        | Live "thinking" + блоки появляются по мере готовности                             | паттерн из `MarkdownRendererClient` + Stage 6 progress         |
+| `packages/web/components/career-playbook/viewer/PlaybookViewer.tsx`           | Просмотр со sticky TOC, Mermaid рендер                                            | паттерн из course viewer                                       |
+| `packages/web/components/career-playbook/viewer/BlockEditor.tsx`              | Inline edit или regenerate-with-instruction                                       | паттерн из Stage 6 regeneration UI                             |
+| `packages/web/components/career-playbook/viewer/ActionsBar.tsx`               | PDF / Share / Create Course / Delete                                              | новый                                                          |
+| `packages/web/stores/use-career-playbook-store.ts`                            | Zustand store (drafts, wizard state, streaming)                                   | `components/generation-graph/stores/batch-enrichment-store.ts` |
+| `packages/web/messages/{ru,en}/career-playbook.json`                          | i18n namespace                                                                    | `messages/{ru,en}/generation.json`                             |
+| `packages/web/src/i18n/config.ts`                                             | Добавить namespace `'career-playbook'`                                            | сущ. файл                                                      |
 
 ### Database (Supabase migration)
 
@@ -166,23 +167,24 @@ CREATE TABLE career_playbook_fixed_questions (
 
 ### Reusable existing utilities (no new code needed)
 
-| Утилита | Путь | Назначение |
-|---|---|---|
-| `PromptService.getPrompt()` | `packages/course-gen-platform/src/shared/prompts/prompt-service.ts` | Загрузка/кеш промптов |
-| `ModelConfigService` | `packages/course-gen-platform/src/shared/llm/model-config-service.ts` | Выбор модели по stage |
-| `LLM service` | `packages/course-gen-platform/src/shared/llm/` | OpenRouter SDK wrapper |
-| BullMQ queue/worker/processor | `packages/course-gen-platform/src/orchestrator/` | Job orchestration |
-| `tRPC protectedProcedure` | `packages/course-gen-platform/src/server/trpc.ts` | Auth middleware |
-| `MarkdownRendererClient` | `packages/web/components/markdown/MarkdownRendererClient.tsx` | Streaming markdown render |
-| `ShaderBackground` | `packages/web/components/layouts/shader-background.tsx` | Hero фон |
-| `FormField`, `RadioGroup`, `Checkbox` | `packages/web/components/ui/` | UI building blocks |
-| WebSearch tool integration | проверить наличие — либо OpenRouter web tool, либо tavily/serper через axios | Auto-research для course brief |
+| Утилита                               | Путь                                                                         | Назначение                     |
+| ------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| `PromptService.getPrompt()`           | `packages/course-gen-platform/src/shared/prompts/prompt-service.ts`          | Загрузка/кеш промптов          |
+| `ModelConfigService`                  | `packages/course-gen-platform/src/shared/llm/model-config-service.ts`        | Выбор модели по stage          |
+| `LLM service`                         | `packages/course-gen-platform/src/shared/llm/`                               | OpenRouter SDK wrapper         |
+| BullMQ queue/worker/processor         | `packages/course-gen-platform/src/orchestrator/`                             | Job orchestration              |
+| `tRPC protectedProcedure`             | `packages/course-gen-platform/src/server/trpc.ts`                            | Auth middleware                |
+| `MarkdownRendererClient`              | `packages/web/components/markdown/MarkdownRendererClient.tsx`                | Streaming markdown render      |
+| `ShaderBackground`                    | `packages/web/components/layouts/shader-background.tsx`                      | Hero фон                       |
+| `FormField`, `RadioGroup`, `Checkbox` | `packages/web/components/ui/`                                                | UI building blocks             |
+| WebSearch tool integration            | проверить наличие — либо OpenRouter web tool, либо tavily/serper через axios | Auto-research для course brief |
 
 ## Adaptive Q&A Logic
 
 ### Phase A — Fixed start questions (5-7)
 
 Жёстко зашиты в БД (`career_playbook_fixed_questions`), показываются wizard-стилем:
+
 1. **Должность** (open text + autocomplete по top-50 распространённым ролям)
 2. **Отдел** (single_choice: Sales, IT, Ops, HR, Finance, Marketing, Product, Other)
 3. **Уровень** (single_choice: Junior, Middle, Senior, Lead, Director, C-level)
@@ -196,6 +198,7 @@ Branching: например, при отделе "Sales" — доп. вопро�
 ### Phase B — LLM follow-ups (3-7)
 
 После завершения fixed-фазы — BullMQ job `GENERATE_FOLLOWUPS`:
+
 - LLM получает все fixed answers и системный промпт "ты помогаешь HR-эксперту собрать данные для Role Guide"
 - Возвращает JSON: 3-7 вопросов (mix open/single_choice/multi_choice) + completeness_score
 - Frontend показывает их по одному, c "Пропустить" кнопкой
@@ -208,6 +211,7 @@ Branching: например, при отделе "Sales" — доп. вопро�
 ### Stop condition
 
 Phase B завершается когда:
+
 - LLM возвращает `completeness_score >= 0.75` ИЛИ
 - Достигнут лимит follow-ups (≤ 7) ИЛИ
 - Пользователь нажал "Достаточно, сгенерируй"
@@ -221,23 +225,23 @@ const CareerPlaybookState = Annotation.Root({
   playbookId: Annotation<string>,
   userId: Annotation<string>,
   organizationId: Annotation<string>,
-  language: Annotation<string>,  // совпадает с языками Stage 6
+  language: Annotation<string>, // совпадает с языками Stage 6
   qaData: Annotation<QAData>,
   roleProfileSpec: Annotation<RoleProfileSpec | null>,
   webResearch: Annotation<WebResearchResult | null>,
   generatedGroups: Annotation<Record<GroupKey, GroupResult>>({
-    reducer: (acc, update) => ({ ...acc, ...update })
+    reducer: (acc, update) => ({ ...acc, ...update }),
   }),
   judgeVerdicts: Annotation<JudgeVerdict[]>({
-    reducer: (acc, v) => [...acc, ...v]
+    reducer: (acc, v) => [...acc, ...v],
   }),
   finalMarkdown: Annotation<string | null>,
   nodeCosts: Annotation<NodeCost[]>({
-    reducer: (acc, c) => [...acc, ...c]
+    reducer: (acc, c) => [...acc, ...c],
   }),
   errors: Annotation<PlaybookError[]>({
-    reducer: (acc, e) => [...acc, ...e]
-  })
+    reducer: (acc, e) => [...acc, ...e],
+  }),
 });
 ```
 
@@ -263,14 +267,14 @@ END
 
 ### Groups
 
-| Group | Blocks | Цель |
-|---|---|---|
-| 1: Foundation | Header + 1 Mission/KR + 2 Anti-goals + 5 Decision Matrix | Wow-elements первыми, задают тон |
-| 2: Operations | 3 Responsibility zones + 4 Duties + 6 KPI + 8 Tools | Что делается и как измеряется |
-| 3: People | 7 Competencies + 9 Human-AI + 12 Candidate profile + 13 Day | Кто и как работает |
-| 4: Growth | 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags | Развитие и удержание |
-| 5: System | 10 Dependencies + 16 Processes + 19 Industry + 20 Business goals + 21 Failure modes | Контекст |
-| 6: Wrap | 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer | Итог |
+| Group         | Blocks                                                                              | Цель                             |
+| ------------- | ----------------------------------------------------------------------------------- | -------------------------------- |
+| 1: Foundation | Header + 1 Mission/KR + 2 Anti-goals + 5 Decision Matrix                            | Wow-elements первыми, задают тон |
+| 2: Operations | 3 Responsibility zones + 4 Duties + 6 KPI + 8 Tools                                 | Что делается и как измеряется    |
+| 3: People     | 7 Competencies + 9 Human-AI + 12 Candidate profile + 13 Day                         | Кто и как работает               |
+| 4: Growth     | 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags                            | Развитие и удержание             |
+| 5: System     | 10 Dependencies + 16 Processes + 19 Industry + 20 Business goals + 21 Failure modes | Контекст                         |
+| 6: Wrap       | 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer                          | Итог                             |
 
 ### Consistency mechanism (как в Stage 6)
 
@@ -343,20 +347,21 @@ END
 
 ## Error Handling
 
-| Сценарий | Поведение |
-|---|---|
-| LLM timeout при followup generation | Fallback на дефолтные follow-ups (по department) + warning toast |
-| WebSearch fail в spec-builder | Continue без research, fix into final markdown (note "ограниченный контекст") |
-| Judge нашёл проблему в группе | Block-level regeneration, max 2 попытки, потом — оставить с warning |
-| Generation полностью провалился | Status `failed`, кнопка "Попробовать снова" с сохранёнными Q&A |
-| Course generation из Role Guide fail | Откат: статус "failed" для course, Role Guide intact |
-| Draft конфликт (открыт в двух вкладках) | Last-write-wins + warning + show diff |
-| User закрыл вкладку во время Q&A | Draft auto-resume при возврате |
-| RLS: чужой share_slug | 404 если is_public = false |
+| Сценарий                                | Поведение                                                                     |
+| --------------------------------------- | ----------------------------------------------------------------------------- |
+| LLM timeout при followup generation     | Fallback на дефолтные follow-ups (по department) + warning toast              |
+| WebSearch fail в spec-builder           | Continue без research, fix into final markdown (note "ограниченный контекст") |
+| Judge нашёл проблему в группе           | Block-level regeneration, max 2 попытки, потом — оставить с warning           |
+| Generation полностью провалился         | Status `failed`, кнопка "Попробовать снова" с сохранёнными Q&A                |
+| Course generation из Role Guide fail    | Откат: статус "failed" для course, Role Guide intact                          |
+| Draft конфликт (открыт в двух вкладках) | Last-write-wins + warning + show diff                                         |
+| User закрыл вкладку во время Q&A        | Draft auto-resume при возврате                                                |
+| RLS: чужой share_slug                   | 404 если is_public = false                                                    |
 
 ## Testing Strategy
 
 ### Unit
+
 - Schemas validation (`career-playbook.ts`)
 - RoleProfileSpec extraction из mock Q&A
 - Prompt rendering для каждой группы
@@ -364,17 +369,20 @@ END
 - Block regenerator targeting logic
 
 ### Integration
+
 - Full Q&A → spec → groups → final markdown с mock LLM (паттерн `stage6-lesson-content/__tests__/`)
 - WebSearch fallback (mock timeout)
 - Course bridge: создание course с synthetic corpus
 
 ### E2E (Playwright)
+
 - Landing → click CTA → login flow → wizard → answer all → see generated playbook
 - Edit block → save → re-render
 - Share toggle → public link открывается без auth
 - Create Course button → course generation starts
 
 ### Smoke
+
 - Один реальный прогон через staging (sales-manager-b2b roles) ежедневно через cron
 - Сравнение output structure с эталонным `docs/job-descriptions/sales-manager-b2b.md` (block count, mermaid count)
 
@@ -418,20 +426,20 @@ END
 
 ## Phased Delivery (suggested)
 
-| Phase | Deliverable | Estimate |
-|---|---|---|
-| 1 | DB schema + types + tRPC router skeleton + fixed questions seed | 2-3 дня |
-| 2 | Backend: LangGraph stage + spec builder + first 2 groups + handler | 4-5 дней |
-| 3 | Backend: остальные 4 groups + judge + regenerator + final assembler | 3-4 дня |
-| 4 | Frontend: wizard (Phase A only) + draft persistence | 2-3 дня |
-| 5 | Frontend: follow-ups (Phase B) + free-form + completion screen | 2-3 дня |
-| 6 | Frontend: viewer + edit + regenerate + actions | 3-4 дня |
-| 7 | Frontend: landing + interactive demo + methodology | 2-3 дня |
-| 8 | PDF service (HTML→PDF stylish) | 2 дня |
-| 9 | Course bridge (WebSearch + synthetic corpus + Stage 2-6 trigger) | 3-4 дня |
-| 10 | Share + library + RLS | 1-2 дня |
-| 11 | Tests + smoke + verification | 3 дня |
-| **Total** | | **~30-37 дней** (~6-7 недель) |
+| Phase     | Deliverable                                                         | Estimate                      |
+| --------- | ------------------------------------------------------------------- | ----------------------------- |
+| 1         | DB schema + types + tRPC router skeleton + fixed questions seed     | 2-3 дня                       |
+| 2         | Backend: LangGraph stage + spec builder + first 2 groups + handler  | 4-5 дней                      |
+| 3         | Backend: остальные 4 groups + judge + regenerator + final assembler | 3-4 дня                       |
+| 4         | Frontend: wizard (Phase A only) + draft persistence                 | 2-3 дня                       |
+| 5         | Frontend: follow-ups (Phase B) + free-form + completion screen      | 2-3 дня                       |
+| 6         | Frontend: viewer + edit + regenerate + actions                      | 3-4 дня                       |
+| 7         | Frontend: landing + interactive demo + methodology                  | 2-3 дня                       |
+| 8         | PDF service (HTML→PDF stylish)                                      | 2 дня                         |
+| 9         | Course bridge (WebSearch + synthetic corpus + Stage 2-6 trigger)    | 3-4 дня                       |
+| 10        | Share + library + RLS                                               | 1-2 дня                       |
+| 11        | Tests + smoke + verification                                        | 3 дня                         |
+| **Total** |                                                                     | **~30-37 дней** (~6-7 недель) |
 
 ## Out of Scope (для будущих итераций)
 

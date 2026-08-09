@@ -115,7 +115,7 @@ function calculateDuration(
 }
 
 // Status keys for type-safe translations
-type StatusKey = 
+type StatusKey =
   | 'pending'
   | 'stage_2_processing'
   | 'stage_3_summarizing'

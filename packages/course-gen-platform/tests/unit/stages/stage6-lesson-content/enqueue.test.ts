@@ -16,14 +16,12 @@ const mockAdd = vi.fn();
 const mockOn = vi.fn();
 
 vi.mock('bullmq', () => ({
-  Queue: vi.fn().mockImplementation(
-    function MockQueue() {
-      return {
-        add: mockAdd,
-        on: mockOn,
-      };
-    }
-  ),
+  Queue: vi.fn().mockImplementation(function MockQueue() {
+    return {
+      add: mockAdd,
+      on: mockOn,
+    };
+  }),
   Worker: vi.fn(),
 }));
 

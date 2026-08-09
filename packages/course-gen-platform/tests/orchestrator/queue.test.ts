@@ -46,5 +46,4 @@ describe('BullMQ Queue', () => {
     expect(job.data).toEqual(jobData);
     expect(job.name).toBe(JobType.TEST_JOB);
   });
-
 });

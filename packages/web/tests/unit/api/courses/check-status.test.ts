@@ -29,30 +29,27 @@ type MockLessonContent = {
   created_at: string
 }
 
-const {
-  mockSupabaseClient,
-  mockAdminClient,
-  createClientMock,
-  createAdminClientMock,
-} = vi.hoisted(() => {
-  const supabaseClient = {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(),
-  }
+const { mockSupabaseClient, mockAdminClient, createClientMock, createAdminClientMock } = vi.hoisted(
+  () => {
+    const supabaseClient = {
+      auth: {
+        getUser: vi.fn(),
+      },
+      from: vi.fn(),
+    }
 
-  const adminClient = {
-    from: vi.fn(),
-  }
+    const adminClient = {
+      from: vi.fn(),
+    }
 
-  return {
-    mockSupabaseClient: supabaseClient,
-    mockAdminClient: adminClient,
-    createClientMock: vi.fn(() => supabaseClient),
-    createAdminClientMock: vi.fn(() => adminClient),
+    return {
+      mockSupabaseClient: supabaseClient,
+      mockAdminClient: adminClient,
+      createClientMock: vi.fn(() => supabaseClient),
+      createAdminClientMock: vi.fn(() => adminClient),
+    }
   }
-})
+)
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,

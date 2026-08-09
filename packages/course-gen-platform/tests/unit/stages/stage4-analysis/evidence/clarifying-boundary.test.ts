@@ -88,8 +88,9 @@ describe('document evidence Phase 0.5 boundary', () => {
         generation_status: 'stage_4_clarifying',
         generation_progress: expect.objectContaining({ percentage: 27 }),
       });
-      expect(String((testContext.updates[0].generation_progress as Record<string, unknown>).message))
-        .toMatch(/answer|ответ/iu);
+      expect(
+        String((testContext.updates[0].generation_progress as Record<string, unknown>).message)
+      ).toMatch(/answer|ответ/iu);
     }
   );
 

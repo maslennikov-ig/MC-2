@@ -85,7 +85,9 @@ describe('validateWebhookUrl', () => {
     }, 10000) // Allow time for DNS resolution
 
     it('should reject hostnames that fail DNS resolution', async () => {
-      const result = await validateWebhookUrl('https://this-domain-definitely-does-not-exist-12345.com/webhook')
+      const result = await validateWebhookUrl(
+        'https://this-domain-definitely-does-not-exist-12345.com/webhook'
+      )
       expect(result.valid).toBe(false)
       expect(result.error).toContain('could not be resolved')
     }, 10000)

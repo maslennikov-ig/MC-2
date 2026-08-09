@@ -61,7 +61,10 @@ vi.mock('@/stages/stage5-generation/utils/analysis-formatters', () => ({
 // ============================================================================
 
 import * as jinaClient from '@/shared/embeddings/jina-client';
-import { detectOverlap, buildSectionOverlapFeedback } from '@/stages/stage5-generation/orchestrator-helpers';
+import {
+  detectOverlap,
+  buildSectionOverlapFeedback,
+} from '@/stages/stage5-generation/orchestrator-helpers';
 import type { CrossSectionOverlapResult } from '@/shared/validation/quality-validator';
 import { OVERLAP_THRESHOLDS } from '@/shared/validation/quality-validator';
 import {
@@ -156,16 +159,61 @@ function createMinimalInput(): GenerationJobInput {
 
 function createJAM6506SectionsBreakdown() {
   return [
-    { area: 'Введение в когнитивную нейронауку', key_topics: ['нейронаука', 'когнитивные функции'], estimated_lessons: 4 },
-    { area: 'Хронотипы и биоритмы', key_topics: ['циркадные ритмы', 'сон', 'продуктивность', 'хронотипы'], estimated_lessons: 4 },
-    { area: 'Наука о памяти и забывании', key_topics: ['кратковременная память', 'долговременная память', 'забывание'], estimated_lessons: 4 },
-    { area: 'Потоковое состояние (Flow)', key_topics: ['поток', 'концентрация', 'вовлечённость'], estimated_lessons: 4 },
-    { area: 'Эмоциональный интеллект', key_topics: ['эмоции', 'саморегуляция', 'эмпатия'], estimated_lessons: 4 },
-    { area: 'Принятие решений', key_topics: ['когнитивные искажения', 'рациональность', 'интуиция'], estimated_lessons: 4 },
-    { area: 'Нейро-лидерство: управление биоритмами', key_topics: ['циркадные ритмы', 'оптимизация сна', 'повышение продуктивности', 'нейро-лидерство'], estimated_lessons: 4 },
-    { area: 'Когнитивная эргономика', key_topics: ['рабочее пространство', 'многозадачность', 'усталость'], estimated_lessons: 4 },
-    { area: 'Мастерство концентрации и потока', key_topics: ['медитация', 'внимание', 'поток'], estimated_lessons: 4 },
-    { area: 'Нейро-коучинг', key_topics: ['коучинг', 'нейропластичность', 'привычки'], estimated_lessons: 4 },
+    {
+      area: 'Введение в когнитивную нейронауку',
+      key_topics: ['нейронаука', 'когнитивные функции'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Хронотипы и биоритмы',
+      key_topics: ['циркадные ритмы', 'сон', 'продуктивность', 'хронотипы'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Наука о памяти и забывании',
+      key_topics: ['кратковременная память', 'долговременная память', 'забывание'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Потоковое состояние (Flow)',
+      key_topics: ['поток', 'концентрация', 'вовлечённость'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Эмоциональный интеллект',
+      key_topics: ['эмоции', 'саморегуляция', 'эмпатия'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Принятие решений',
+      key_topics: ['когнитивные искажения', 'рациональность', 'интуиция'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Нейро-лидерство: управление биоритмами',
+      key_topics: [
+        'циркадные ритмы',
+        'оптимизация сна',
+        'повышение продуктивности',
+        'нейро-лидерство',
+      ],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Когнитивная эргономика',
+      key_topics: ['рабочее пространство', 'многозадачность', 'усталость'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Мастерство концентрации и потока',
+      key_topics: ['медитация', 'внимание', 'поток'],
+      estimated_lessons: 4,
+    },
+    {
+      area: 'Нейро-коучинг',
+      key_topics: ['коучинг', 'нейропластичность', 'привычки'],
+      estimated_lessons: 4,
+    },
   ];
 }
 
@@ -329,7 +377,9 @@ describe('Stage 4: Full Overlap Detection → Feedback → Fix Flow (JAM-6506)',
     console.log('\n=== Stage 4: BEFORE FIX ===');
     console.log(`Overlap detected: ${overlapResult.overlappingPairs.length} pair(s)`);
     for (const p of overlapResult.overlappingPairs) {
-      console.log(`  S${p.sectionIndexA} "${p.areaA}" <> S${p.sectionIndexB} "${p.areaB}": ${(p.similarity * 100).toFixed(1)}%`);
+      console.log(
+        `  S${p.sectionIndexA} "${p.areaA}" <> S${p.sectionIndexB} "${p.areaB}": ${(p.similarity * 100).toFixed(1)}%`
+      );
     }
 
     // ─── STEP 2: Build feedback for LLM ───
@@ -349,12 +399,22 @@ describe('Stage 4: Full Overlap Detection → Feedback → Fix Flow (JAM-6506)',
     const fixedBreakdown = [...sectionsBreakdown];
     fixedBreakdown[1] = {
       area: 'Хронотипы: генетика и индивидуальный подход',
-      key_topics: ['PER/CRY гены', 'определение хронотипа', 'социальный джетлаг', 'адаптация расписания'],
+      key_topics: [
+        'PER/CRY гены',
+        'определение хронотипа',
+        'социальный джетлаг',
+        'адаптация расписания',
+      ],
       estimated_lessons: 4,
     };
     fixedBreakdown[6] = {
       area: 'Нейро-лидерство: стратегии влияния и мотивации',
-      key_topics: ['нейронаука лидерства', 'когнитивные искажения руководителя', 'мотивация команды', 'эмоциональная регуляция'],
+      key_topics: [
+        'нейронаука лидерства',
+        'когнитивные искажения руководителя',
+        'мотивация команды',
+        'эмоциональная регуляция',
+      ],
       estimated_lessons: 4,
     };
 
@@ -386,31 +446,33 @@ describe('Stage 5: Full Overlap Retry Flow via GenerationPhases (JAM-6506)', () 
 
     // Mock SectionBatchGenerator.generateBatch — captures overlapFeedback
     mockSBG = {
-      generateBatch: vi.fn().mockImplementation(
-        async (
-          batchNum: number,
-          startSection: number,
-          _endSection: number,
-          _input: GenerationJobInput,
-          _qdrantClient: unknown,
-          overlapFeedback?: string
-        ): Promise<SectionBatchResult> => {
-          if (overlapFeedback) {
-            capturedOverlapFeedback.set(startSection, overlapFeedback);
+      generateBatch: vi
+        .fn()
+        .mockImplementation(
+          async (
+            batchNum: number,
+            startSection: number,
+            _endSection: number,
+            _input: GenerationJobInput,
+            _qdrantClient: unknown,
+            overlapFeedback?: string
+          ): Promise<SectionBatchResult> => {
+            if (overlapFeedback) {
+              capturedOverlapFeedback.set(startSection, overlapFeedback);
+            }
+
+            // Return FIXED section based on which one is being regenerated
+            const fixedSection = startSection === 1 ? createFixedSection2() : createFixedSection7();
+
+            return {
+              sections: [fixedSection],
+              modelUsed: 'test-model/overlap-retry',
+              tier: 'normal',
+              tokensUsed: 500,
+              retryCount: 0,
+            };
           }
-
-          // Return FIXED section based on which one is being regenerated
-          const fixedSection = startSection === 1 ? createFixedSection2() : createFixedSection7();
-
-          return {
-            sections: [fixedSection],
-            modelUsed: 'test-model/overlap-retry',
-            tier: 'normal',
-            tokensUsed: 500,
-            retryCount: 0,
-          };
-        }
-      ),
+        ),
       generateBatchV2: vi.fn(),
     } as unknown as SectionBatchGenerator;
   });
@@ -454,8 +516,12 @@ describe('Stage 5: Full Overlap Retry Flow via GenerationPhases (JAM-6506)', () 
     expect(pair27).toBeDefined();
     expect(pair27!.similarity).toBeGreaterThanOrEqual(OVERLAP_THRESHOLDS.stage5 - 0.05); // adjusted for ru
 
-    console.log(`Overlap found: S${pair27!.sectionA} "${pair27!.sectionATitle}" <> S${pair27!.sectionB} "${pair27!.sectionBTitle}"`);
-    console.log(`Similarity: ${(pair27!.similarity * 100).toFixed(1)}% (threshold: ${(overlapResult!.overlapThreshold * 100).toFixed(0)}%)`);
+    console.log(
+      `Overlap found: S${pair27!.sectionA} "${pair27!.sectionATitle}" <> S${pair27!.sectionB} "${pair27!.sectionBTitle}"`
+    );
+    console.log(
+      `Similarity: ${(pair27!.similarity * 100).toFixed(1)}% (threshold: ${(overlapResult!.overlapThreshold * 100).toFixed(0)}%)`
+    );
 
     // ─── STEP 2: Build per-section feedback ───
     console.log('\n=== Stage 5: STEP 2 — Build Per-Section Feedback ===');
@@ -559,17 +625,27 @@ describe('Stage 5: Full Overlap Retry Flow via GenerationPhases (JAM-6506)', () 
     expect(redetectResult!.hasOverlap).toBe(false);
     expect(redetectResult!.overlappingPairs).toHaveLength(0);
 
-    console.log(`Overlap after regeneration: ${redetectResult!.hasOverlap ? 'STILL PRESENT' : 'RESOLVED'}`);
+    console.log(
+      `Overlap after regeneration: ${redetectResult!.hasOverlap ? 'STILL PRESENT' : 'RESOLVED'}`
+    );
 
     // ─── ANALYSIS: Compare before/after ───
     console.log('\n=== ANALYSIS: Before vs After ===');
     console.log('BEFORE:');
-    console.log(`  Section 2: "${sections[1].section_title}" → lessons: ${sections[1].lessons?.map(l => l.lesson_title).join(', ')}`);
-    console.log(`  Section 7: "${sections[6].section_title}" → lessons: ${sections[6].lessons?.map(l => l.lesson_title).join(', ')}`);
+    console.log(
+      `  Section 2: "${sections[1].section_title}" → lessons: ${sections[1].lessons?.map(l => l.lesson_title).join(', ')}`
+    );
+    console.log(
+      `  Section 7: "${sections[6].section_title}" → lessons: ${sections[6].lessons?.map(l => l.lesson_title).join(', ')}`
+    );
     console.log(`  Overlap: ${(pair27!.similarity * 100).toFixed(1)}%`);
     console.log('AFTER:');
-    console.log(`  Section 2: "${updatedSections[1].section_title}" → lessons: ${updatedSections[1].lessons?.map(l => l.lesson_title).join(', ')}`);
-    console.log(`  Section 7: "${updatedSections[6].section_title}" → lessons: ${updatedSections[6].lessons?.map(l => l.lesson_title).join(', ')}`);
+    console.log(
+      `  Section 2: "${updatedSections[1].section_title}" → lessons: ${updatedSections[1].lessons?.map(l => l.lesson_title).join(', ')}`
+    );
+    console.log(
+      `  Section 7: "${updatedSections[6].section_title}" → lessons: ${updatedSections[6].lessons?.map(l => l.lesson_title).join(', ')}`
+    );
     console.log(`  Overlap: NONE`);
     console.log('\nRESULT: Stage 5 full overlap retry flow PASSED');
   });
@@ -655,7 +731,9 @@ describe('Stage 5: Full Overlap Retry Flow via GenerationPhases (JAM-6506)', () 
       expect(feedback).toContain(`${expectedPercentage}% content overlap`);
     }
 
-    console.log(`\nSimilarity: ${(pair.similarity * 100).toFixed(1)}% → Feedback shows: "${expectedPercentage}% content overlap"`);
+    console.log(
+      `\nSimilarity: ${(pair.similarity * 100).toFixed(1)}% → Feedback shows: "${expectedPercentage}% content overlap"`
+    );
   });
 });
 
@@ -700,10 +778,10 @@ describe('Cross-Stage: Stage 4 and Stage 5 detect same overlap', () => {
 
     // Both should find the same pair (indices 2↔7 / sectionNumbers 2↔7)
     const stage4Pair = stage4Result.overlappingPairs.find(
-      p => (p.sectionIndexA === 2 && p.sectionIndexB === 7)
+      p => p.sectionIndexA === 2 && p.sectionIndexB === 7
     );
     const stage5Pair = stage5Result!.overlappingPairs.find(
-      p => (p.sectionA === 2 && p.sectionB === 7)
+      p => p.sectionA === 2 && p.sectionB === 7
     );
 
     expect(stage4Pair).toBeDefined();
@@ -712,12 +790,16 @@ describe('Cross-Stage: Stage 4 and Stage 5 detect same overlap', () => {
     // Both similarities should be above their respective thresholds
     // Stage 4 threshold: 0.80 - 0.05 (ru) = 0.75
     // Stage 5 threshold: 0.75 - 0.05 (ru) = 0.70
-    expect(stage4Pair!.similarity).toBeGreaterThanOrEqual(0.70);
-    expect(stage5Pair!.similarity).toBeGreaterThanOrEqual(0.70);
+    expect(stage4Pair!.similarity).toBeGreaterThanOrEqual(0.7);
+    expect(stage5Pair!.similarity).toBeGreaterThanOrEqual(0.7);
 
     console.log('\n=== Cross-Stage Consistency ===');
-    console.log(`Stage 4 (abstract): S2↔S7 similarity = ${(stage4Pair!.similarity * 100).toFixed(1)}% (threshold: ${(stage4Result.threshold * 100).toFixed(0)}%)`);
-    console.log(`Stage 5 (detailed): S2↔S7 similarity = ${(stage5Pair!.similarity * 100).toFixed(1)}% (threshold: ${(stage5Result!.overlapThreshold * 100).toFixed(0)}%)`);
+    console.log(
+      `Stage 4 (abstract): S2↔S7 similarity = ${(stage4Pair!.similarity * 100).toFixed(1)}% (threshold: ${(stage4Result.threshold * 100).toFixed(0)}%)`
+    );
+    console.log(
+      `Stage 5 (detailed): S2↔S7 similarity = ${(stage5Pair!.similarity * 100).toFixed(1)}% (threshold: ${(stage5Result!.overlapThreshold * 100).toFixed(0)}%)`
+    );
     console.log('RESULT: Both stages consistently detect the same overlap');
   });
 });

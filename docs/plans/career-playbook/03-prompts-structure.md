@@ -9,27 +9,49 @@
 
 export const CAREER_PLAYBOOK_PROMPTS = {
   // Phase A → Phase B bridge: генерация follow-up вопросов
-  'career_playbook_followup_generator': { /* ... */ },
+  career_playbook_followup_generator: {
+    /* ... */
+  },
 
   // Phase Q&A → spec
-  'career_playbook_spec_builder': { /* ... */ },
+  career_playbook_spec_builder: {
+    /* ... */
+  },
 
   // Generation groups (1 промпт на группу × N языков; 26 блоков встроены в structured output spec)
-  'career_playbook_group_1_foundation': { /* Header + 1 Mission + 2 Anti-goals + 5 Decision Matrix */ },
-  'career_playbook_group_2_operations': { /* 3 Responsibility + 4 Duties + 6 KPI + 8 Tools */ },
-  'career_playbook_group_3_people': { /* 7 Competencies + 9 Human-AI + 12 Candidate + 13 Day */ },
-  'career_playbook_group_4_growth': { /* 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags */ },
-  'career_playbook_group_5_system': { /* 10 Dependencies + 16 Processes + 19 Industry + 20 Business + 21 Failure */ },
-  'career_playbook_group_6_wrap': { /* 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer */ },
+  career_playbook_group_1_foundation: {
+    /* Header + 1 Mission + 2 Anti-goals + 5 Decision Matrix */
+  },
+  career_playbook_group_2_operations: {
+    /* 3 Responsibility + 4 Duties + 6 KPI + 8 Tools */
+  },
+  career_playbook_group_3_people: {
+    /* 7 Competencies + 9 Human-AI + 12 Candidate + 13 Day */
+  },
+  career_playbook_group_4_growth: {
+    /* 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags */
+  },
+  career_playbook_group_5_system: {
+    /* 10 Dependencies + 16 Processes + 19 Industry + 20 Business + 21 Failure */
+  },
+  career_playbook_group_6_wrap: {
+    /* 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer */
+  },
 
   // Cross-block judge
-  'career_playbook_cross_block_judge': { /* ... */ },
+  career_playbook_cross_block_judge: {
+    /* ... */
+  },
 
   // Block regenerator (с targeted instruction)
-  'career_playbook_block_regenerator': { /* ... */ },
+  career_playbook_block_regenerator: {
+    /* ... */
+  },
 
   // Course bridge (для генерации course_brief из Role Guide)
-  'career_playbook_course_brief_extractor': { /* ... */ },
+  career_playbook_course_brief_extractor: {
+    /* ... */
+  },
 } satisfies HardcodedPromptRegistry;
 ```
 
@@ -41,10 +63,10 @@ export const CAREER_PLAYBOOK_PROMPTS = {
 interface RoleProfileSpec {
   // Identity (из fixed answers)
   position: {
-    title: string;             // "Менеджер по продажам B2B"
-    slug: string;              // "sales-manager-b2b"
-    department: string;        // 'sales'
-    specialization?: string;   // "Enterprise sales" (опционально, из LLM или fixed Q)
+    title: string; // "Менеджер по продажам B2B"
+    slug: string; // "sales-manager-b2b"
+    department: string; // 'sales'
+    specialization?: string; // "Enterprise sales" (опционально, из LLM или fixed Q)
     level: 'junior' | 'middle' | 'senior' | 'lead' | 'director' | 'c-level';
   };
 
@@ -52,41 +74,41 @@ interface RoleProfileSpec {
   context: {
     company_stage?: 'pre-pmf' | 'growth' | 'scale' | 'mature';
     team_size: '1-10' | '11-50' | '51-200' | '201-1000' | '1000+';
-    reports_to: string;        // "CRO"
+    reports_to: string; // "CRO"
     has_subordinates: boolean;
     subordinates_description?: string;
-    industry?: string;         // выводится LLM из department + context
-    region?: string;           // если в Q&A был указан
+    industry?: string; // выводится LLM из department + context
+    region?: string; // если в Q&A был указан
   };
 
   // Focus (LLM из всех ответов извлекает)
   focus_areas: {
-    primary_kpis: string[];          // 3-5 ключевых метрик роли
-    key_tools: string[];             // top 5-8 инструментов
+    primary_kpis: string[]; // 3-5 ключевых метрик роли
+    key_tools: string[]; // top 5-8 инструментов
     critical_competencies: string[]; // 4-6 must-have навыков
-    anti_goals: string[];            // 4-6 чего эта роль НЕ делает (важно для блока 2)
-    failure_patterns: string[];      // 3-5 typical failure modes (для блока 21)
+    anti_goals: string[]; // 4-6 чего эта роль НЕ делает (важно для блока 2)
+    failure_patterns: string[]; // 3-5 typical failure modes (для блока 21)
   };
 
   // Research (от web-research ноды)
   research: {
-    kpis_insights: string[];      // факты из web search про KPI
-    trends_insights: string[];    // trends + AI impact
-    onboarding_insights: string[];// onboarding best practices
-    sources: string[];            // URLs (для аудита)
+    kpis_insights: string[]; // факты из web search про KPI
+    trends_insights: string[]; // trends + AI impact
+    onboarding_insights: string[]; // onboarding best practices
+    sources: string[]; // URLs (для аудита)
   } | null;
 
   // Boundaries (anti-repetition contract)
   block_boundaries: {
     // Какие темы упоминаются в каком блоке (чтобы другие не повторяли)
     [blockId: string]: {
-      primary_topics: string[];       // основные темы
-      do_not_repeat: string[];        // что уже сказано в других блоках
+      primary_topics: string[]; // основные темы
+      do_not_repeat: string[]; // что уже сказано в других блоках
     };
   };
 
   // Language (для контента)
-  content_language: string;  // 'ru' | 'en' | 'es' | ...
+  content_language: string; // 'ru' | 'en' | 'es' | ...
 }
 ```
 
@@ -152,15 +174,20 @@ Output validation (Zod):
 
 ```typescript
 const FollowupResponseSchema = z.object({
-  questions: z.array(z.object({
-    question_id: z.string(),
-    question_text: z.string(),
-    question_type: z.enum(['open', 'single_choice', 'multi_choice']),
-    options: z.array(z.object({value: z.string(), label: z.string()})).nullable(),
-    rationale: z.string()
-  })).min(0).max(7),
+  questions: z
+    .array(
+      z.object({
+        question_id: z.string(),
+        question_text: z.string(),
+        question_type: z.enum(['open', 'single_choice', 'multi_choice']),
+        options: z.array(z.object({ value: z.string(), label: z.string() })).nullable(),
+        rationale: z.string(),
+      })
+    )
+    .min(0)
+    .max(7),
   completeness_score: z.number().min(0).max(1),
-  stop_recommendation: z.enum(['ask_more', 'ready_to_generate'])
+  stop_recommendation: z.enum(['ask_more', 'ready_to_generate']),
 });
 ```
 
@@ -349,6 +376,7 @@ Content language: {{content_language}}
 ## Model selection
 
 Через `ModelConfigService`. Новые stage keys:
+
 - `stage_career_playbook_followup` — fast model (Sonnet/Haiku)
 - `stage_career_playbook_spec` — quality model (Sonnet/Opus)
 - `stage_career_playbook_group_1` ... `group_6` — quality model

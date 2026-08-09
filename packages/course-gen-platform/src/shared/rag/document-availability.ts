@@ -43,10 +43,7 @@ let qdrantHealthCache:
     }
   | null = null;
 
-export type CourseRagAvailability =
-  | 'optional_no_documents'
-  | 'ready'
-  | 'required_unavailable';
+export type CourseRagAvailability = 'optional_no_documents' | 'ready' | 'required_unavailable';
 
 export type CourseRagAvailabilityReason =
   | 'no_uploaded_documents'
@@ -87,8 +84,7 @@ export class RequiredRagUnavailableError extends PipelineError {
     public readonly reason: CourseRagAvailabilityReason,
     options: string | RequiredRagUnavailableErrorOptions = {}
   ) {
-    const resolvedOptions =
-      typeof options === 'string' ? { originalError: options } : options;
+    const resolvedOptions = typeof options === 'string' ? { originalError: options } : options;
     const retryable = isRetryableRequiredRagReason(reason);
     const apiErrorCode = retryable ? 'SERVICE_UNAVAILABLE' : 'PRECONDITION_FAILED';
     super(getRequiredRagUnavailableMessage(reason), {

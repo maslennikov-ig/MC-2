@@ -892,6 +892,7 @@ $$;
    - **Expected**: Should read from `NEW.raw_app_meta_data->>'role'`
 
 2. **Auth Users Metadata**:
+
    ```sql
    SELECT id, email,
           (raw_app_meta_data->>'role') as app_role,

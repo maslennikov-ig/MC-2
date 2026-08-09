@@ -78,44 +78,45 @@ All security vulnerabilities have been addressed with proper authentication, inp
 
 ```typescript
 // Current code (problematic)
-const addresses = await resolve4(parsed.hostname)
+const addresses = await resolve4(parsed.hostname);
 for (const addr of addresses) {
   if (isPrivateIP(addr)) {
-    return { valid: false, error: `Webhook hostname resolves to private IP: ${addr}` }
+    return { valid: false, error: `Webhook hostname resolves to private IP: ${addr}` };
   }
 }
 
 // Recommended fix
-import { resolve4, resolve6 } from 'node:dns/promises'
+import { resolve4, resolve6 } from 'node:dns/promises';
 
 // Check both IPv4 and IPv6 addresses
 const [ipv4Addresses, ipv6Addresses] = await Promise.allSettled([
   resolve4(parsed.hostname),
-  resolve6(parsed.hostname)
-])
+  resolve6(parsed.hostname),
+]);
 
 const allAddresses = [
   ...(ipv4Addresses.status === 'fulfilled' ? ipv4Addresses.value : []),
-  ...(ipv6Addresses.status === 'fulfilled' ? ipv6Addresses.value : [])
-]
+  ...(ipv6Addresses.status === 'fulfilled' ? ipv6Addresses.value : []),
+];
 
 if (allAddresses.length === 0) {
-  return { valid: false, error: 'Hostname does not resolve to any IP address' }
+  return { valid: false, error: 'Hostname does not resolve to any IP address' };
 }
 
 for (const addr of allAddresses) {
   if (isPrivateIP(addr)) {
-    return { valid: false, error: `Webhook hostname resolves to private IP: ${addr}` }
+    return { valid: false, error: `Webhook hostname resolves to private IP: ${addr}` };
   }
 }
 ```
 
 **Test Coverage**: Add test cases for IPv6 resolution:
+
 ```typescript
 it('should reject hostnames that resolve to IPv6 private addresses', async () => {
   // This would require mocking DNS or using a test hostname
   // that resolves to fc00::1 or similar
-})
+});
 ```
 
 **Context7 Reference**: Node.js DNS module supports both `resolve4()` and `resolve6()` for dual-stack validation.
@@ -134,9 +135,10 @@ it('should reject hostnames that resolve to IPv6 private addresses', async () =>
 - **Recommendation**: Implement cleanup retry mechanism or dead-letter queue:
 
 **Option A: Best-effort with audit trail**
+
 ```typescript
 // Add to cleanup result
-const cleanupResult = await cleanupCourseResources(id, accessToken)
+const cleanupResult = await cleanupCourseResources(id, accessToken);
 
 if (!cleanupResult.success) {
   // Log to error_logs for admin follow-up
@@ -151,28 +153,30 @@ if (!cleanupResult.success) {
       filesDeleted: cleanupResult.filesDeleted,
       errors: cleanupResult.errors,
     },
-  })
+  });
 }
 ```
 
 **Option B: Async cleanup queue (better for production)**
+
 ```typescript
 // Queue cleanup job BEFORE deletion
 await bullQueue.add('cleanup-course', {
   courseId: id,
   retries: 3,
-  backoff: { type: 'exponential', delay: 60000 }
-})
+  backoff: { type: 'exponential', delay: 60000 },
+});
 
 // Proceed with deletion
 // Cleanup happens asynchronously with retries
 ```
 
 **Current Behavior**: Line 172 logs warning but proceeds:
+
 ```typescript
 logger.warn('No access token available for cleanup, skipping external resource cleanup', {
   courseId: id,
-})
+});
 ```
 
 This means if the user's session expires mid-request, cleanup is skipped entirely.
@@ -195,23 +199,23 @@ if (TELEGRAM_WEBHOOK_SECRET) {
   // ... existing validation ...
 } else {
   // Current: logs warning and continues
-  logger.warn('TELEGRAM_WEBHOOK_SECRET not configured - webhook requests are not authenticated')
+  logger.warn('TELEGRAM_WEBHOOK_SECRET not configured - webhook requests are not authenticated');
 
   // Recommended: fail in production
   const isProduction =
-    process.env.VERCEL_ENV === 'production' ||
-    process.env.RAILWAY_ENVIRONMENT === 'production'
+    process.env.VERCEL_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
 
   if (isProduction) {
-    logger.error('TELEGRAM_WEBHOOK_SECRET required in production')
-    return NextResponse.json({ ok: false }, { status: 503 })
+    logger.error('TELEGRAM_WEBHOOK_SECRET required in production');
+    return NextResponse.json({ ok: false }, { status: 503 });
   } else {
-    logger.warn('TELEGRAM_WEBHOOK_SECRET not configured - webhook requests are not authenticated')
+    logger.warn('TELEGRAM_WEBHOOK_SECRET not configured - webhook requests are not authenticated');
   }
 }
 ```
 
 **Severity Rationale**: Medium (not High) because:
+
 - Attack requires knowledge of webhook URL
 - Limited impact (bot command processing only)
 - Mitigated by Telegram's own rate limiting
@@ -251,6 +255,7 @@ if (!TEST_USER.email || !TEST_USER.password) {
 ```
 
 **Additional Protection**: Add environment check:
+
 ```typescript
 if (process.env.VERCEL_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production') {
   console.error('ERROR: This script cannot be run in production');
@@ -276,36 +281,37 @@ if (process.env.VERCEL_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT =
 ```typescript
 // Current pattern (example from generation-progress.tsx:180)
 // @ts-expect-error: API returns error codes not in translation files
-const errorMessage = t(`errors.${error.code}` as any)
+const errorMessage = t(`errors.${error.code}` as any);
 
 // Recommended: Add fallback
-const errorKey = `errors.${error.code}` as const
+const errorKey = `errors.${error.code}` as const;
 // @ts-expect-error: Dynamic error codes from API response
 const errorMessage = t(errorKey, {
-  default: `An error occurred: ${error.code}`
-})
+  default: `An error occurred: ${error.code}`,
+});
 
 // Or use try-catch for i18n errors
 try {
   // @ts-expect-error: Dynamic key
-  return t(`benchmarks.tier.${tier}`)
+  return t(`benchmarks.tier.${tier}`);
 } catch {
-  return tier // Fallback to raw value
+  return tier; // Fallback to raw value
 }
 ```
 
 **Better Pattern**: Create typed enum for known error codes:
+
 ```typescript
 // types/api-errors.ts
 export const API_ERROR_CODES = {
   NETWORK_ERROR: 'errors.network_error',
   AUTH_FAILED: 'errors.auth_failed',
   // ... other known codes
-} as const
+} as const;
 
 // In component
-const errorKey = API_ERROR_CODES[error.code] ?? 'errors.unknown'
-const errorMessage = t(errorKey)
+const errorKey = API_ERROR_CODES[error.code] ?? 'errors.unknown';
+const errorMessage = t(errorKey);
 ```
 
 ---
@@ -374,6 +380,7 @@ $$;
 ```
 
 **Severity Rationale**: Medium because:
+
 - API route already performs authorization check (defense in depth)
 - PostgREST access is typically restricted
 - However, RLS policies should never rely solely on application code
@@ -423,43 +430,45 @@ new_values: (entry.newValues as Json) || null,
 - **Recommendation**: Add explicit validation:
 
 ```typescript
-import { isJsonSerializable } from '@/lib/utils/json'
+import { isJsonSerializable } from '@/lib/utils/json';
 
 // In logAudit function
 const safeOldValues = entry.oldValues
-  ? (isJsonSerializable(entry.oldValues)
-      ? (entry.oldValues as Json)
-      : null)
-  : null
+  ? isJsonSerializable(entry.oldValues)
+    ? (entry.oldValues as Json)
+    : null
+  : null;
 
 const safeNewValues = entry.newValues
-  ? (isJsonSerializable(entry.newValues)
-      ? (entry.newValues as Json)
-      : null)
-  : null
+  ? isJsonSerializable(entry.newValues)
+    ? (entry.newValues as Json)
+    : null
+  : null;
 
 const { error } = await adminClient.from('audit_log').insert({
   // ...
   old_values: safeOldValues,
   new_values: safeNewValues,
   // ...
-})
+});
 ```
 
 **Helper function**:
+
 ```typescript
 // lib/utils/json.ts
 export function isJsonSerializable(obj: unknown): boolean {
   try {
-    JSON.stringify(obj)
-    return true
+    JSON.stringify(obj);
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 ```
 
 **Severity Rationale**: Low because:
+
 - Audit logging is non-critical (errors don't break main flow)
 - Most audit values are simple objects
 - Current error handling already catches database errors
@@ -526,6 +535,7 @@ export function isJsonSerializable(obj: unknown): boolean {
 ### Files Modified: 20
 
 **Security Files** (7):
+
 ```
 packages/web/app/api/telegram/webhook/route.ts (+26)
 packages/web/lib/validate-webhook-url.ts (+73 new file)
@@ -537,12 +547,14 @@ packages/web/app/api/coursegen/lesson-content/route.ts (+22 -12)
 ```
 
 **Database Files** (2):
+
 ```
 packages/course-gen-platform/supabase/migrations/20260210120000_atomic_course_deletion.sql (+88 new file)
 packages/web/app/api/courses/[orgSlug]/[courseSlug]/delete/route.ts (+71 -123)
 ```
 
 **Type Files** (3):
+
 ```
 packages/shared-types/src/database.types.ts (+20)
 packages/web/types/database.generated.ts (+4102 new - regenerated)
@@ -550,6 +562,7 @@ packages/web/lib/audit-log.ts (+2 -2)
 ```
 
 **i18n Files** (5):
+
 ```
 packages/web/app/[locale]/benchmarks/components/models-ranking-table.tsx (20 annotations)
 packages/web/app/[locale]/benchmarks/components/top-models-cards.tsx (3 annotations)
@@ -559,6 +572,7 @@ packages/web/components/course/viewer/components/UnifiedEnrichmentCard.tsx (16 a
 ```
 
 **Other Files** (3):
+
 ```
 packages/web/components/ui/sheet.tsx (+5 annotations)
 packages/course-gen-platform/tools/auth/configure-auth.ts (+6 -6)
@@ -568,29 +582,34 @@ packages/course-gen-platform/tools/auth/setup-test-auth-users.ts (+8 -8)
 ### Notable Changes
 
 **1. Telegram Webhook Authentication (d7fcd587)**
+
 - Added `TELEGRAM_WEBHOOK_SECRET` validation
 - Timing-safe comparison with `crypto.timingSafeEqual()`
 - 403 response for missing/invalid tokens
 - Backwards compatible (warns if not configured)
 
 **2. SSRF Protection (1d489750)**
+
 - New `validate-webhook-url.ts` utility
 - Private IP validation for all RFC1918 ranges
 - DNS resolution check before HTTP requests
 - Comprehensive test coverage (16 tests)
 
 **3. Auth Pattern (54e55885)**
+
 - Consistent `getUser()` + `getSession()` pattern
 - Follows Supabase official security guidance
 - Proper error handling for expired sessions
 
 **4. Atomic Deletion (54e55885)**
+
 - Single RPC function: `delete_course_cascade()`
 - Transactional guarantees (all-or-nothing)
 - Only 2 DELETEs needed (lesson_progress + courses)
 - CASCADE handles 20+ child tables automatically
 
 **5. Type Safety (1d489750, 54e55885)**
+
 - Replaced `as any` with `@ts-expect-error` + documentation
 - Regenerated Supabase types for both packages
 - Proper `Json` type imports from generated types
@@ -606,6 +625,7 @@ packages/course-gen-platform/tools/auth/setup-test-auth-users.ts (+8 -8)
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 Scope: 5 of 6 workspace projects
 packages/shared-logger type-check: Done
@@ -636,6 +656,7 @@ packages/web type-check: Done
 **Status**: ✅ PASSED
 
 **Coverage**:
+
 - 16 test cases for SSRF protection
 - IPv4 private ranges: 7 tests
 - IPv6 private ranges: 3 tests
@@ -701,6 +722,7 @@ All blocking issues have been resolved in the commits reviewed.
    - Estimated effort: 1 hour
 
 3. **Run Full Test Suite**: Verify no regressions
+
    ```bash
    pnpm test:full
    ```
@@ -870,6 +892,7 @@ The healthcheck cycle addresses critical security concerns with proper authentic
 **Recommendation**: APPROVE with requested changes (IPv6 SSRF + cleanup logging)
 
 **Deployment Readiness**:
+
 - Develop branch: ✅ READY (after fixes)
 - Production: ⚠️ READY (address high-priority issues first)
 

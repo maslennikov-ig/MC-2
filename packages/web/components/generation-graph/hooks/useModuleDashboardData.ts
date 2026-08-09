@@ -57,10 +57,7 @@ function parseMetadata(
   return metadata as LessonMetadata
 }
 
-function getMetadataNumber(
-  metadata: LessonMetadata | null,
-  ...keys: string[]
-): number | null {
+function getMetadataNumber(metadata: LessonMetadata | null, ...keys: string[]): number | null {
   if (!metadata) {
     return null
   }

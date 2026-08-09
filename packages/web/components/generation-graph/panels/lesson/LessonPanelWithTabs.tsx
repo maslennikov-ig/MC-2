@@ -12,9 +12,7 @@ import { cn } from '@/lib/utils'
 import { LessonInspector } from './LessonInspector'
 // DISABLED: Enrichments tab (now managed via Course Viewer, not Workflow)
 // import { EnrichmentInspectorPanel } from '../stage7/EnrichmentInspectorPanel';
-import type {
-  LessonInspectorDataRefinementExtension,
-} from '@megacampus/shared-types'
+import type { LessonInspectorDataRefinementExtension } from '@megacampus/shared-types'
 import type { ReviewAwareLessonInspectorData } from '../../stage6-review-status'
 
 /**

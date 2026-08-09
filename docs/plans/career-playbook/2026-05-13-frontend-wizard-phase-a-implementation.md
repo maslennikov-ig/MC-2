@@ -12,21 +12,23 @@
 
 ## Parallel Decomposition Matrix
 
-| Stream | Mode | Write zone | Depends on | Reason |
-|---|---|---|---|---|
-| A: Store and unit tests | Parallel worker | `packages/web/stores/use-career-playbook-store.ts`, `packages/web/tests/unit/career-playbook-store.test.ts` | none | Store behavior is isolated from visual layout. |
-| B: Wizard components | Parallel worker | `packages/web/components/career-playbook/wizard/*`, component tests if needed | planned store API only | Components can be built against a stable store contract. |
-| C: Route, i18n, e2e | Sequential integration | `packages/web/app/[locale]/career-playbook/new/*`, `packages/web/messages/*/career-playbook.json`, `packages/web/src/i18n/config.ts`, `packages/web/types/i18n.d.ts`, e2e spec | A and B | Needs final imports, selectors, and copy. |
+| Stream                  | Mode                   | Write zone                                                                                                                                                                     | Depends on             | Reason                                                   |
+| ----------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | -------------------------------------------------------- |
+| A: Store and unit tests | Parallel worker        | `packages/web/stores/use-career-playbook-store.ts`, `packages/web/tests/unit/career-playbook-store.test.ts`                                                                    | none                   | Store behavior is isolated from visual layout.           |
+| B: Wizard components    | Parallel worker        | `packages/web/components/career-playbook/wizard/*`, component tests if needed                                                                                                  | planned store API only | Components can be built against a stable store contract. |
+| C: Route, i18n, e2e     | Sequential integration | `packages/web/app/[locale]/career-playbook/new/*`, `packages/web/messages/*/career-playbook.json`, `packages/web/src/i18n/config.ts`, `packages/web/types/i18n.d.ts`, e2e spec | A and B                | Needs final imports, selectors, and copy.                |
 
 ## Task 1: Store And Fixed Question Model
 
 **Files:**
+
 - Create: `packages/web/stores/use-career-playbook-store.ts`
 - Create: `packages/web/tests/unit/career-playbook-store.test.ts`
 
 **Step 1: Write failing tests**
 
 Cover:
+
 - initializes RU/EN fixed questions with optional `company_stage` hidden for `team_size` `201-1000` and `1000+`
 - records fixed answers and advances to the next visible question
 - persists only draft-safe fields
@@ -52,6 +54,7 @@ Run the same Vitest command and require all new store tests to pass.
 ## Task 2: Wizard UI Components
 
 **Files:**
+
 - Create: `packages/web/components/career-playbook/wizard/QuestionRenderer.tsx`
 - Create: `packages/web/components/career-playbook/wizard/ProgressIndicator.tsx`
 - Create: `packages/web/components/career-playbook/wizard/Wizard.tsx`
@@ -60,6 +63,7 @@ Run the same Vitest command and require all new store tests to pass.
 **Step 1: Write failing component test**
 
 Cover:
+
 - progress text and bar reflect visible questions
 - open, single-choice, and multi-choice questions render accessible controls
 - answered state enables next navigation
@@ -84,6 +88,7 @@ Run the same component test command and then the store test command.
 ## Task 3: Route, I18n, And E2E
 
 **Files:**
+
 - Create: `packages/web/app/[locale]/career-playbook/new/page.tsx`
 - Create: `packages/web/app/[locale]/career-playbook/new/page-client.tsx`
 - Create: `packages/web/messages/ru/career-playbook.json`
@@ -95,6 +100,7 @@ Run the same component test command and then the store test command.
 **Step 1: Write failing route/e2e checks**
 
 Add route/client unit tests and an e2e spec that verify:
+
 - unauthenticated users see the auth-required state instead of the wizard
 - authenticated rendering starts a best-effort Career Playbook backend session
 - Phase A answer flow preserves local draft persistence and conditional `company_stage` behavior
@@ -128,6 +134,7 @@ pnpm lint
 ## Task 4: Stage Closeout
 
 **Files:**
+
 - Create/update: `.codex/stages/mc2-db696.4/summary.md`
 - Create/update: `.codex/stages/mc2-db696.4/artifacts/*.md`
 - Modify: `.codex/handoff.md`

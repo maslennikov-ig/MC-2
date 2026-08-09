@@ -338,7 +338,7 @@ const nextConfig: NextConfig = {
     return config
   },
   // Rewrites for local development - proxy enrichments to staging server
-   
+
   async rewrites() {
     // Only proxy in development - in production nginx serves these files
     if (process.env.NODE_ENV === 'development') {
@@ -352,7 +352,7 @@ const nextConfig: NextConfig = {
     }
     return []
   },
-   
+
   async headers() {
     return [
       // Security headers for all pages

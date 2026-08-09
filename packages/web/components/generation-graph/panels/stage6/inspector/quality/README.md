@@ -66,7 +66,6 @@ interface DiffViewerProps {
 
 ```tsx
 import { DiffViewer } from './DiffViewer'
-
 ;<DiffViewer originalContent={originalMarkdown} fixedContent={patchedMarkdown} locale="en" />
 ```
 

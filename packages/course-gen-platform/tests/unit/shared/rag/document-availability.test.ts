@@ -1,4 +1,7 @@
-import { QdrantClientResourceExhaustedError, QdrantClientTimeoutError } from '@qdrant/js-client-rest';
+import {
+  QdrantClientResourceExhaustedError,
+  QdrantClientTimeoutError,
+} from '@qdrant/js-client-rest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetSupabaseAdmin, mockGetCollection, mockLogger } = vi.hoisted(() => ({
@@ -123,11 +126,8 @@ describe('document-availability', () => {
       })),
     });
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-metadata-error')).rejects.toBeInstanceOf(
@@ -146,11 +146,8 @@ describe('document-availability', () => {
     );
     mockGetCollection.mockRejectedValue(new QdrantClientTimeoutError('Request timed out'));
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-qdrant-down')).rejects.toBeInstanceOf(
@@ -167,13 +164,12 @@ describe('document-availability', () => {
     mockGetSupabaseAdmin.mockReturnValue(
       createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'indexed' }])
     );
-    mockGetCollection.mockRejectedValue(new Error('Unexpected Response: 404 (Not Found)\npage not found'));
+    mockGetCollection.mockRejectedValue(
+      new Error('Unexpected Response: 404 (Not Found)\npage not found')
+    );
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-404-page')).rejects.toBeInstanceOf(
@@ -196,11 +192,8 @@ describe('document-availability', () => {
       )
     );
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-collection-missing')).rejects.toBeInstanceOf(
@@ -221,11 +214,8 @@ describe('document-availability', () => {
       new QdrantClientResourceExhaustedError('Rate limited by Qdrant', '5')
     );
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-rate-limited')).rejects.toBeInstanceOf(
@@ -244,11 +234,8 @@ describe('document-availability', () => {
       createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'failed' }])
     );
 
-    const {
-      clearAllDocumentAvailabilityCache,
-      assertCourseRagReady,
-      RequiredRagUnavailableError,
-    } = await import('@/shared/rag/document-availability');
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady, RequiredRagUnavailableError } =
+      await import('@/shared/rag/document-availability');
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-unindexed')).rejects.toThrow(

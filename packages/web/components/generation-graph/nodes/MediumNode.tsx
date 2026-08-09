@@ -10,7 +10,8 @@ const MediumNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
   const reviewRequiredLessons =
     data.stageNumber === 6
       ? Number(
-          (data.outputData as { reviewRequiredLessons?: number } | undefined)?.reviewRequiredLessons || 0
+          (data.outputData as { reviewRequiredLessons?: number } | undefined)
+            ?.reviewRequiredLessons || 0
         )
       : 0
   const visualStatus = reviewRequiredLessons > 0 ? 'awaiting' : currentStatus

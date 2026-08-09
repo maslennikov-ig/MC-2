@@ -151,7 +151,7 @@ Furthermore, defining a schema with a confidence_score and a justification field
    "reasoning": "string"  
   }
 
-- **Mechanism:** By forcing the model to explicitly set boolean flags for contains_grading_policy _before_ setting the classification, we enforce a logical dependency. The model is statistically unlikely to output contains_grading_policy: true and then classification: SUPPLEMENTARY in the same JSON object.30
+- **Mechanism:** By forcing the model to explicitly set boolean flags for contains*grading_policy \_before* setting the classification, we enforce a logical dependency. The model is statistically unlikely to output contains_grading_policy: true and then classification: SUPPLEMENTARY in the same JSON object.30
 
 ### **4.4 Few-Shot Prompting with Counter-Balanced Examples**
 

@@ -366,6 +366,7 @@ WRONG: > "[!TIP] text"    CORRECT: > [!TIP]
    - No `dangerouslySetInnerHTML` in the codebase
 
 4. **Localized titles are constants**:
+
    ```typescript
    const displayTitle = title || getLocalizedTitle(type, language);
    ```

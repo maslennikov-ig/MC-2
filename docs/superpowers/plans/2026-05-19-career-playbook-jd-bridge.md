@@ -25,15 +25,16 @@
 
 ## Parallel Decomposition Matrix
 
-| Stream | Goal | Agent | Write Zone | Dependencies | Verification | Decision | Reason |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Backend | Service, schema, router, reusable initiation | Local orchestrator or backend worker | `packages/course-gen-platform/src/server/routers/career-playbook/*`, `packages/course-gen-platform/src/server/routers/generation/lifecycle/*`, backend unit tests | Existing Stage 1 upload and generation initiate | Targeted Vitest, type-check | Start first | Defines the mutation contract. |
-| Frontend | Library button, modal, adapter, i18n, tests | Local orchestrator or frontend worker | `packages/web/app/[locale]/career-playbook/library/*`, `packages/web/components/career-playbook/*`, messages, frontend unit tests | Backend response contract | Targeted Vitest, accessibility assertions | Can run after contract fixed | UI does not need backend internals. |
-| Review | Correctness/improvement/security review | Visible review subagents | Report artifacts only | Backend/frontend complete | Review reports plus local verification | Run after GREEN | User explicitly requested independent review streams. |
+| Stream   | Goal                                         | Agent                                 | Write Zone                                                                                                                                                        | Dependencies                                    | Verification                              | Decision                     | Reason                                                |
+| -------- | -------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------- |
+| Backend  | Service, schema, router, reusable initiation | Local orchestrator or backend worker  | `packages/course-gen-platform/src/server/routers/career-playbook/*`, `packages/course-gen-platform/src/server/routers/generation/lifecycle/*`, backend unit tests | Existing Stage 1 upload and generation initiate | Targeted Vitest, type-check               | Start first                  | Defines the mutation contract.                        |
+| Frontend | Library button, modal, adapter, i18n, tests  | Local orchestrator or frontend worker | `packages/web/app/[locale]/career-playbook/library/*`, `packages/web/components/career-playbook/*`, messages, frontend unit tests                                 | Backend response contract                       | Targeted Vitest, accessibility assertions | Can run after contract fixed | UI does not need backend internals.                   |
+| Review   | Correctness/improvement/security review      | Visible review subagents              | Report artifacts only                                                                                                                                             | Backend/frontend complete                       | Review reports plus local verification    | Run after GREEN              | User explicitly requested independent review streams. |
 
 ## Task 1: Backend RED Tests
 
 **Files:**
+
 - Modify: `packages/course-gen-platform/tests/unit/server/routers/career-playbook.router.test.ts`
 - Create: `packages/course-gen-platform/tests/unit/server/routers/career-playbook-course-bridge.service.test.ts`
 
@@ -77,6 +78,7 @@ Expected: tests fail because the bridge still throws `METHOD_NOT_SUPPORTED` and 
 ## Task 2: Backend GREEN Implementation
 
 **Files:**
+
 - Create: `packages/course-gen-platform/src/server/routers/career-playbook/course-bridge.service.ts`
 - Modify: `packages/course-gen-platform/src/server/routers/career-playbook/course-bridge.router.ts`
 - Modify: `packages/course-gen-platform/src/server/routers/career-playbook/_shared.ts`
@@ -150,9 +152,11 @@ and, when web research has sources:
 # Web research for <title>
 
 ## Sources
+
 - <url>
 
 ## KPI insights
+
 ...
 ```
 
@@ -169,6 +173,7 @@ Run the targeted backend command from Task 1. Expected: all targeted backend tes
 ## Task 3: Frontend RED Tests
 
 **Files:**
+
 - Modify: `packages/web/tests/unit/components/career-playbook/library-page-client.test.tsx`
 - Create: `packages/web/tests/unit/components/career-playbook/create-course-from-playbook-dialog.test.tsx`
 
@@ -177,7 +182,7 @@ Run the targeted backend command from Task 1. Expected: all targeted backend tes
 Mock:
 
 ```ts
-createCourseFromPlaybook: vi.fn()
+createCourseFromPlaybook: vi.fn();
 ```
 
 from `@/components/career-playbook/library/client-adapter`.
@@ -199,7 +204,10 @@ Cover:
 await user.click(screen.getByRole('button', { name: 'Create course' }));
 expect(screen.getByRole('dialog', { name: 'Create course from Role Guide' })).toBeInTheDocument();
 await user.click(screen.getByRole('button', { name: 'Start without extra materials' }));
-expect(createCourseFromPlaybook).toHaveBeenCalledWith({ playbookId: 'pb-1', includeWebResearch: true });
+expect(createCourseFromPlaybook).toHaveBeenCalledWith({
+  playbookId: 'pb-1',
+  includeWebResearch: true,
+});
 ```
 
 - [ ] **Step 4: Run RED**
@@ -215,6 +223,7 @@ Expected: tests fail because the adapter and dialog do not exist.
 ## Task 4: Frontend GREEN Implementation
 
 **Files:**
+
 - Modify: `packages/web/components/career-playbook/library/client-adapter.ts`
 - Modify: `packages/web/components/career-playbook/library/types.ts`
 - Create: `packages/web/components/career-playbook/viewer/CreateCourseFromPlaybookDialog.tsx`
@@ -227,7 +236,7 @@ Expected: tests fail because the adapter and dialog do not exist.
 `createCourseFromPlaybook(input)` calls:
 
 ```ts
-client.careerPlaybook?.courseBridge?.createCourseFromPlaybook.mutate(input)
+client.careerPlaybook?.courseBridge?.createCourseFromPlaybook.mutate(input);
 ```
 
 and throws a clear unavailable error if the procedure is absent.
@@ -247,6 +256,7 @@ Run the targeted frontend command from Task 3. Expected: all targeted frontend t
 ## Task 5: Review and Verification
 
 **Files:**
+
 - Create: `.codex/stages/mc2-db696.9/artifacts/review-correctness.md`
 - Create: `.codex/stages/mc2-db696.9/artifacts/review-improvements.md`
 - Modify: `.codex/stages/mc2-db696.9/summary.md`

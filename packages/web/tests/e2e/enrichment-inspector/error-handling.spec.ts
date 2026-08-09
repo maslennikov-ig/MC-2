@@ -9,11 +9,7 @@
 
 import { test, expect } from '@playwright/test'
 import { EnrichmentInspectorPage } from './pages/EnrichmentInspectorPage'
-import {
-  TEST_COURSES,
-  mockApiError,
-  waitForAnimation,
-} from './fixtures/enrichment-fixtures'
+import { TEST_COURSES, mockApiError, waitForAnimation } from './fixtures/enrichment-fixtures'
 
 // Test data for error handling tests
 const COURSE_SLUG = 'test-course'
@@ -107,9 +103,7 @@ test.describe('Enrichment Inspector - Error Handling', () => {
     await expect(failedEnrichment).toBeVisible()
 
     // Check for failed status indicator
-    failedEnrichment.locator(
-      '[data-testid*="status"], .badge, [class*="badge"]'
-    )
+    failedEnrichment.locator('[data-testid*="status"], .badge, [class*="badge"]')
 
     // Status should indicate failure (red color, "failed" text, etc.)
     const failedIndicators = [

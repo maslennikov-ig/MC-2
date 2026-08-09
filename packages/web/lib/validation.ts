@@ -8,7 +8,6 @@ import {
   RICH_TEXT_ALLOWED_ATTR,
 } from '@megacampus/shared-types'
 
- 
 const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F-\u009F]/g
 
 const PATTERNS = {

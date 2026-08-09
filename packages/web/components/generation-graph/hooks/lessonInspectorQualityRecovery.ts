@@ -69,9 +69,8 @@ function getMetadataModelId(metadata: unknown): string | null {
 
 function getAttemptModelId(recovery: QualityRecovery, terminalPhaseName: string): string | null {
   const terminalAttempt =
-    [...recovery.attempts]
-      .reverse()
-      .find((attempt) => attempt.phase_name === terminalPhaseName) ?? recovery.attempts.at(-1)
+    [...recovery.attempts].reverse().find((attempt) => attempt.phase_name === terminalPhaseName) ??
+    recovery.attempts.at(-1)
 
   if (!terminalAttempt) {
     return null

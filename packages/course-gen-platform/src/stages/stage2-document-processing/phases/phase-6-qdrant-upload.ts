@@ -98,10 +98,7 @@ export async function executeQdrantUpload(
   job: Job<DocumentProcessingJobData>
 ): Promise<ReturnType<typeof uploadChunksToQdrant>> {
   const reindexTargetCollection = process.env.QDRANT_REINDEX_TARGET_COLLECTION?.trim();
-  if (
-    reindexTargetCollection &&
-    job.data.qdrantTargetCollection !== reindexTargetCollection
-  ) {
+  if (reindexTargetCollection && job.data.qdrantTargetCollection !== reindexTargetCollection) {
     throw new Error('Isolated reindex job target must equal the worker physical collection');
   }
 

@@ -358,7 +358,9 @@ export function makeDecision(context: DecisionContext): DecisionResult {
         factors: {
           scoreThreshold: `Terminal rung score ${(score * 100).toFixed(1)}% >= ${(DECISION_THRESHOLDS.TERMINAL_REMEDIATION_ACCEPT * 100).toFixed(0)}% pragmatic threshold`,
           issueAnalysis:
-            issues.length > 0 ? `${issues.length} non-blocking issues remain` : 'No blocking issues found',
+            issues.length > 0
+              ? `${issues.length} non-blocking issues remain`
+              : 'No blocking issues found',
           confidenceLevel: confidence.toUpperCase(),
           iterationHistory:
             iterationCount > 0

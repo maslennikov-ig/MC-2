@@ -1310,7 +1310,11 @@ Advanced completion in Russian.`,
 
 ---existing tail---`;
 
-      const result = await generateTruncationContinuation(advancedLessonSpec, existingContent, 'ru');
+      const result = await generateTruncationContinuation(
+        advancedLessonSpec,
+        existingContent,
+        'ru'
+      );
 
       expect(result.modelUsed).toBe('test-complex-model-id');
       expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
@@ -1467,18 +1471,13 @@ ${marker}`;
         estimated_duration_minutes: 60,
       };
 
-      await generateLessonSingleCall(
-        longLessonSpec,
-        [],
-        'en',
-        null,
-        null,
-        null,
-        undefined,
+      await generateLessonSingleCall(longLessonSpec, [], 'en', null, null, null, undefined, 12000);
+
+      expect(createOpenRouterModel).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
         12000
       );
-
-      expect(createOpenRouterModel).toHaveBeenCalledWith(expect.any(String), expect.any(Number), 12000);
     });
   });
 });

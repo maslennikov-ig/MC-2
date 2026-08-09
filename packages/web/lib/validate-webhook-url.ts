@@ -36,7 +36,7 @@ const PRIVATE_IP_RANGES = [
  * @returns true if the IP is private/internal, false otherwise
  */
 export function isPrivateIP(ip: string): boolean {
-  return PRIVATE_IP_RANGES.some(range => range.test(ip))
+  return PRIVATE_IP_RANGES.some((range) => range.test(ip))
 }
 
 /**
@@ -77,6 +77,9 @@ export async function validateWebhookUrl(url: string): Promise<{ valid: boolean;
 
     return { valid: true }
   } catch (error) {
-    return { valid: false, error: `Failed to validate webhook URL: ${error instanceof Error ? error.message : 'Unknown error'}` }
+    return {
+      valid: false,
+      error: `Failed to validate webhook URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    }
   }
 }

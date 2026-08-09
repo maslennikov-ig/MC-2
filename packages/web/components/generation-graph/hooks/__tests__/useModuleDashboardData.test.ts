@@ -580,7 +580,10 @@ describe('resolveModuleLessonContentRows', () => {
       metadata: null,
     })
 
-    const selection = resolveModuleLessonContentRows([olderCompleted, latestReviewRequired] as never)
+    const selection = resolveModuleLessonContentRows([
+      olderCompleted,
+      latestReviewRequired,
+    ] as never)
 
     expect(selection.statusRow?.id).toBe('latest-review-required')
     expect(selection.usableContentRow?.id).toBe('older-completed')

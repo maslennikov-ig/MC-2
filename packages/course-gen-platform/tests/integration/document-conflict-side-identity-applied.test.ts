@@ -428,9 +428,9 @@ appliedDescribe('document conflict side identity applied PostgreSQL 15 matrix', 
       ])
     ).rows[0];
     expect(blockedQuestion.metadata.side_identity_migration).toBe('blocked_ambiguous');
-    expect(blockedQuestion.suggested_answers.map((answer: { value: string }) => answer.value)).toEqual(
-      [`alternative:${id.conflict}:0`, `recommendation:${id.conflict}`]
-    );
+    expect(
+      blockedQuestion.suggested_answers.map((answer: { value: string }) => answer.value)
+    ).toEqual([`alternative:${id.conflict}:0`, `recommendation:${id.conflict}`]);
     await expect(
       asRole('authenticated', () =>
         admin.query(
@@ -519,9 +519,8 @@ appliedDescribe('document conflict side identity applied PostgreSQL 15 matrix', 
     await insertLegacyConflictQuestion('Retain data 30 days.', 'Retain data indefinitely.');
     await admin.query(sideMigration);
     expect(
-      (
-        await admin.query(`SELECT metadata FROM clarifying_questions WHERE id=$1`, [id.question])
-      ).rows[0].metadata
+      (await admin.query(`SELECT metadata FROM clarifying_questions WHERE id=$1`, [id.question]))
+        .rows[0].metadata
     ).toMatchObject({
       side_identity_migration: 'blocked_ambiguous',
       side_identity_migration_reason: 'conflict_scope_unavailable',

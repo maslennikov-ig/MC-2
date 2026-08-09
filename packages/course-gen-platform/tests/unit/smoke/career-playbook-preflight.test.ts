@@ -384,7 +384,11 @@ describe('Career Playbook smoke preflight runner', () => {
           ok: false,
           checkedModelIds: ['deprecated/model-x'],
           unpricedModels: [
-            { phaseName: 'stage_career_playbook_spec', role: 'primary' as const, modelId: 'deprecated/model-x' },
+            {
+              phaseName: 'stage_career_playbook_spec',
+              role: 'primary' as const,
+              modelId: 'deprecated/model-x',
+            },
           ],
           missingPhases: [],
         })),

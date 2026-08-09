@@ -14,13 +14,13 @@
 
 ## Детальные документы (этот пакет)
 
-| # | Документ | Для какой фазы |
-|---|---|---|
-| 01 | [DB Schema](./01-db-schema.md) | Phase 1 (DB migration + RLS) |
-| 02 | [Fixed Questions Seed](./02-fixed-questions-seed.md) | Phase 1 (seed data для wizard) |
-| 03 | [Prompts Structure](./03-prompts-structure.md) | Phase 2-3 (все LLM prompts + RoleProfileSpec schema) |
-| 04 | [Course Bridge Flow](./04-course-bridge-flow.md) | Phase 9 (JD → Course с auto WebSearch) |
-| 05 | [Frontend Architecture](./05-frontend-architecture.md) | Phases 4-7 (компоненты, store, i18n, streaming) |
+| #   | Документ                                               | Для какой фазы                                       |
+| --- | ------------------------------------------------------ | ---------------------------------------------------- |
+| 01  | [DB Schema](./01-db-schema.md)                         | Phase 1 (DB migration + RLS)                         |
+| 02  | [Fixed Questions Seed](./02-fixed-questions-seed.md)   | Phase 1 (seed data для wizard)                       |
+| 03  | [Prompts Structure](./03-prompts-structure.md)         | Phase 2-3 (все LLM prompts + RoleProfileSpec schema) |
+| 04  | [Course Bridge Flow](./04-course-bridge-flow.md)       | Phase 9 (JD → Course с auto WebSearch)               |
+| 05  | [Frontend Architecture](./05-frontend-architecture.md) | Phases 4-7 (компоненты, store, i18n, streaming)      |
 
 ## Beads tracking
 

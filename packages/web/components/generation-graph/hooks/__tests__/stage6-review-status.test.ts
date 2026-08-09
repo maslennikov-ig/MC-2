@@ -152,15 +152,15 @@ describe('getReviewAwareGraphNodeState', () => {
 
 describe('summarizeReviewAwareStage6Statuses', () => {
   it('counts review-required lessons as ready while preserving a module-level review flag', () => {
-    expect(
-      summarizeReviewAwareStage6Statuses(['completed', 'review_required', 'pending'])
-    ).toEqual({
-      completedLessons: 1,
-      readyLessons: 2,
-      reviewRequiredLessons: 1,
-      status: 'active',
-      needsReview: true,
-    })
+    expect(summarizeReviewAwareStage6Statuses(['completed', 'review_required', 'pending'])).toEqual(
+      {
+        completedLessons: 1,
+        readyLessons: 2,
+        reviewRequiredLessons: 1,
+        status: 'active',
+        needsReview: true,
+      }
+    )
   })
 
   it('treats fully review-required batches as completed progress with review-needed state', () => {

@@ -22,7 +22,10 @@
  */
 
 import logger from '../logger';
-import type { Stage4TierConfig, Stage4ModelSelection } from '../../stages/stage4-analysis/phases/stage4-budget-allocator';
+import type {
+  Stage4TierConfig,
+  Stage4ModelSelection,
+} from '../../stages/stage4-analysis/phases/stage4-budget-allocator';
 
 // ============================================================================
 // ERROR DETECTION
@@ -131,10 +134,7 @@ export function getContextOverflowFallback(
   }
 
   // If current model is standard tier, escalate to extended
-  if (
-    currentModelId === standard.modelId ||
-    currentModelId === standard.fallbackModelId
-  ) {
+  if (currentModelId === standard.modelId || currentModelId === standard.fallbackModelId) {
     logger.info(
       {
         currentModel: currentModelId,
@@ -223,7 +223,12 @@ export async function executeWithContextFallback<T>(
       return { result, modelUsed: currentModelId };
     } catch (error) {
       if (isContextOverflowError(error)) {
-        const fallback = getContextOverflowFallback(currentModelId, language, tierConfig, modelSelection);
+        const fallback = getContextOverflowFallback(
+          currentModelId,
+          language,
+          tierConfig,
+          modelSelection
+        );
 
         if (fallback && !attemptedModels.has(fallback.modelId)) {
           logger.warn(
@@ -264,6 +269,6 @@ export async function executeWithContextFallback<T>(
 
   throw new Error(
     `Context overflow: exhausted all fallback models after ${maxRetries} retries ` +
-    `(initial: ${initialModelId}, final: ${currentModelId})`
+      `(initial: ${initialModelId}, final: ${currentModelId})`
   );
 }

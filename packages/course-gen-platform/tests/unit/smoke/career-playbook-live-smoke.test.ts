@@ -620,9 +620,7 @@ describe('Career Playbook live smoke artifact writer', () => {
     expect(meta.finalMarkdownFile).toBe(files.markdownFileName);
     expect(meta.evidence.status).toBe('pass');
     expect(meta.evidence.checks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'generated-blocks', status: 'pass' }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ id: 'generated-blocks', status: 'pass' })])
     );
   });
 
@@ -640,7 +638,11 @@ describe('Career Playbook live smoke artifact writer', () => {
 
     expect(files.markdown).toContain('no final_markdown captured');
     expect(files.markdown).toContain('runStatus=fail');
-    const meta = JSON.parse(files.json) as { costBreakdown: unknown; costSource: string; finalMarkdownSource: string };
+    const meta = JSON.parse(files.json) as {
+      costBreakdown: unknown;
+      costSource: string;
+      finalMarkdownSource: string;
+    };
     expect(meta.costBreakdown).toBeNull();
     expect(meta.costSource).toBe('unavailable');
     expect(meta.finalMarkdownSource).toBe('none');

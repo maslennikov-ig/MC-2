@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calculateLessonCoverage, termMatchesInContent } from '@/stages/stage6-lesson-content/rag/coverage';
+import {
+  calculateLessonCoverage,
+  termMatchesInContent,
+} from '@/stages/stage6-lesson-content/rag/coverage';
 
 describe('stage6 rag coverage', () => {
   it('does not throw when a short term contains regex metacharacters', () => {

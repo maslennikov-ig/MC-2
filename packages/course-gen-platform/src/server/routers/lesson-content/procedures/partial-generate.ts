@@ -20,7 +20,10 @@ import {
   shouldSkipCompletionCheckForPartialGeneration,
   type SectionFromStructure,
 } from '../helpers';
-import { enqueueStage6Lesson, getStage6Queue } from '../../../../stages/stage6-lesson-content/enqueue';
+import {
+  enqueueStage6Lesson,
+  getStage6Queue,
+} from '../../../../stages/stage6-lesson-content/enqueue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
 import { parseAnalysisResult } from '@megacampus/shared-types';
