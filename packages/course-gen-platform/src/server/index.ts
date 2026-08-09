@@ -42,8 +42,6 @@
  * ```bash
  * pnpm build
  * pnpm start
- * # or
- * node dist/server/index.js
  * ```
  *
  * ## Endpoints

@@ -1,14 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-5dzld`
+Current stage id: `mc2-zt4ju`
 
 ## Current stage
 
-`mc2-5dzld` is accepted locally. The canonical backend `build:types` command now forces TypeScript
-build mode, and a real-command CI contract proves it recreates all declaration files when `dist` is
-absent but `tsconfig.tsbuildinfo` is stale. The focused test, workspace type-check, production build,
-and orchestration process verification pass. Commit delivery is pending.
+`mc2-5dzld` is delivered locally in commit `858e4a707` and closed in Beads. `mc2-zt4ju` is accepted
+locally: the compiled API `start` facade now uses the same `tsx` runtime as local dev and the
+production container, and its isolated CI proof reaches the configuration boundary without
+`ERR_MODULE_NOT_FOUND`. Type-check, fresh production build, and process verification pass; commit
+delivery is pending.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -21,7 +22,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-jsamu`; the next exact item is `mc2-5dzld`.
+through `mc2-jz6y0.13.6`. Tier 4 is complete through `mc2-5dzld`; the active exact item is
+`mc2-zt4ju`.
 
 ## Verification facts
 
@@ -90,17 +92,17 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-5dzld`
-Current stage id: `mc2-5dzld`
-Next stage id: `mc2-zt4ju`
-Recommended action: commit `mc2-5dzld`, then continue Tier 4 with `mc2-zt4ju`.
+Accepted stage id: `mc2-zt4ju`
+Current stage id: `mc2-zt4ju`
+Next stage id: `mc2-n6szm`
+Recommended action: commit `mc2-zt4ju`, then continue Tier 4 with `mc2-n6szm`.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-5dzld` is accepted locally and awaits its explicit-path commit. After committing and
-closing it, continue with `mc2-zt4ju`. Do not reindex, migrate, force-push, perform paid work, or
+The item `mc2-zt4ju` is accepted locally and awaits its explicit-path commit. After committing and
+closing it, continue with `mc2-n6szm`. Do not reindex, migrate, force-push, perform paid work, or
 deploy before a green pipeline.
 
 ## Read first

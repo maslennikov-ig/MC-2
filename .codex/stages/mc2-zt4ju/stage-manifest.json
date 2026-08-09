@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-zt4ju",
+  "goal_id": "mc2-zt4ju",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "node24-compiled-api-start-runtime",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["course-gen-start-script", "compiled-api-runtime", "ci-start-contract"],
+    "risk_models": ["node-esm-resolution", "configuration-isolation", "runtime-parity"],
+    "test_environments": ["node-24", "isolated-missing-configuration", "production-build"],
+    "rollback_boundary": "revert-the-start-runtime-and-focused-regression-check",
+    "acceptance_proofs": [
+      "native-node-start-reproducer-red-before-fix",
+      "tsx-start-reaches-known-configuration-boundary",
+      "workspace-type-check-and-production-build-green"
+    ]
+  },
+  "work_areas": ["contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-zt4ju",
+    "source_digest": "ef593c0cff5c188b18ec7e4bfb9bc4ffac63f11e6ae33771688ad06255f1ce87",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The canonical course-gen-platform start command loads the compiled API entrypoint under Node 24 without ERR_MODULE_NOT_FOUND from extensionless relative ESM imports.",
+        "text_digest": "cc6f153d7910629328f1c55c9cf950697a2b024bb6dbb9b23c86e0a148790632"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "A safe real-command regression check proves module resolution reaches a known missing-configuration boundary without loading repository environment files or contacting external services.",
+        "text_digest": "a6bf3e72f95b1aba9b8bac0babbe73f689fcc74dc9b984d43d1c122263af37bb"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The CI type-check job verifies the built start runtime, and package documentation matches the tsx runtime already used by the production container.",
+        "text_digest": "e7b02691a04ccdf1daa81bb2ea4ffed00cc47e7cc1039321bef87f5b95f6ceb7"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-zt4ju/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "ef593c0cff5c188b18ec7e4bfb9bc4ffac63f11e6ae33771688ad06255f1ce87",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-zt4ju/artifacts/mc2-zt4ju.md",
+      "task_id": "mc2-zt4ju",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

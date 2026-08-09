@@ -227,6 +227,9 @@ jobs:
           pnpm --filter @megacampus/shared-utils build
           pnpm --filter @megacampus/course-gen-platform build
 
+      - name: Verify built backend start runtime
+        run: bash scripts/ci/test_course_gen_start_runtime.sh
+
       - name: Run type check
         run: pnpm type-check
 

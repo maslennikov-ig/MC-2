@@ -27,7 +27,7 @@
     "build:processor": "tsup",
     "generate:config-seed": "tsx src/build/generate-config-seed.ts",
     "prebuild": "tsx src/build/generate-config-seed.ts",
-    "start": "node dist/server/index.js",
+    "start": "tsx dist/server/index.js",
     "start:worker": "node dist/orchestrator/worker-entrypoint.js",
     "start:worker:stage7": "node dist/stages/stage7-enrichments/worker-entrypoint.js",
     "test": "vitest run --config vitest.config.unit.ts",

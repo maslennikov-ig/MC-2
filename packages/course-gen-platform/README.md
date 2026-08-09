@@ -42,6 +42,18 @@ pnpm build:types
 even when `tsconfig.tsbuildinfo` remains; the command recreates the complete declaration tree used
 by the web package. A normal repeated invocation remains supported.
 
+### Running the Compiled API
+
+```bash
+pnpm build
+pnpm start
+```
+
+`start` runs the compiled ESM entrypoint through the same `tsx` runtime used by the production
+container. This preserves resolution of the package's existing extensionless relative imports on
+current Node.js versions. Do not replace it with a direct `node dist/server/index.js` invocation
+unless the emitted import specifiers are made native-ESM compatible first.
+
 ### Testing
 
 #### TypeScript Tests (Unit & Integration)
