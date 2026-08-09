@@ -7,16 +7,16 @@ Current stage id: `mc2-wxun`
 
 `mc2-5dzld`, `mc2-zt4ju`, `mc2-n6szm`, `mc2-1mmop`, and `mc2-iioip` are delivered locally in
 commits `858e4a707`, `05d7fc7e7`, `e1857fadc`, `9d48cbfcc`, and `7d8e4b8eb` and closed in Beads.
-The shared `mc2-iioip` implementation is accepted in orchestration-console branch
-`codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
-accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
+The shared `mc2-iioip` implementation is delivered in orchestration-console `main` at `fada910`;
+its full validation/smoke block passed and the merged feature branch was removed. `mc2-db696.57`,
+`mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
 `mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, `mc2-stds7`, and `mc2-68qwn` are delivered locally in
 `1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-vb8kl` is delivered
 locally in `339cc6e00`. `mc2-r7udy` is blocked because a truthful worker lifecycle event needs a new
-`system_metrics` enum value, which is a forbidden schema migration. The accepted stage `mc2-wxun`
-adds disabled-by-default Tier 1 shadow observability shared with `mc2-vjbb`; both issues now stop at
-their separately authorized live experiment boundary.
+`system_metrics` enum value, which is a forbidden schema migration. `mc2-wxun` is delivered locally
+in `460784fc8` with disabled-by-default Tier 1 shadow observability shared with `mc2-vjbb`; both
+issues now stop at their separately authorized live experiment boundary.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -146,18 +146,17 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 Accepted stage id: `mc2-wxun`
 Current stage id: `mc2-wxun`
 Next stage id: `delivery-closeout`
-Recommended action: commit the accepted zero-default shadow instrumentation, then run the overall
-closeout and authorized delivery path. Do not enable a live cohort or change the threshold.
+Recommended action: run the overall release acceptance and authorized delivery path. Do not enable
+a live cohort or change the threshold.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-wxun` has a red-to-green shadow regression, stable zero-default cohort, raw-dense and exact
-hybrid trace measurements, preserved tenant/evidence filters, updated operator docs, and green RAG
-tests, lint, formatting, type-check, build, and graph evidence awaiting stage closeout and commit.
-Then begin overall delivery. Do not enable the cohort, change the threshold, reindex, migrate,
-force-push, perform paid work, or deploy before a green pipeline.
+`mc2-wxun` is committed in `460784fc8`; the orchestration-console compatibility fix is delivered in
+`main` at `fada910`. The accessible repository backlog is complete and awaits one release-level
+acceptance followed by the authorized delivery path. Do not enable the cohort, change the threshold,
+reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 
