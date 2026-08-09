@@ -445,7 +445,7 @@ export function useStage2DashboardData({
         // Build step data from traces
         const steps: DocumentStepData[] = []
         let totalDurationMs = 0
-        let errorMessage: string | undefined
+        let errorMessage = file.error_message || undefined
 
         for (const trace of fileTraces) {
           const stepName = extractStepName(trace.step_name)
@@ -459,8 +459,9 @@ export function useStage2DashboardData({
 
           if (status === 'error' && trace.error_data) {
             const errData = trace.error_data as Record<string, unknown>
-            errorMessage =
+            const traceErrorMessage =
               (errData.message as string) || (errData.error as string) || 'Unknown error'
+            errorMessage ||= traceErrorMessage
           }
 
           steps.push({
@@ -494,7 +495,6 @@ export function useStage2DashboardData({
             docStatus = 'completed'
           } else if (file.vector_status === 'failed' || file.error_message) {
             docStatus = 'error'
-            errorMessage = errorMessage || file.error_message || undefined
           } else if (file.vector_status === 'indexing' || steps.length > 0) {
             docStatus = getDocumentStatus(steps)
           } else {
@@ -600,7 +600,7 @@ export function useStage2DashboardData({
 
   // Fetch on mount and when dependencies change
   useEffect(() => {
-    fetchDocumentData()
+    void fetchDocumentData()
   }, [fetchDocumentData])
 
   // Set up realtime subscription
@@ -619,7 +619,7 @@ export function useStage2DashboardData({
     // Uses ref to always call latest version of fetch function
     const safeRefetch = () => {
       if (isMounted) {
-        fetchRef.current()
+        void fetchRef.current()
       }
     }
 
@@ -754,8 +754,8 @@ export function useStage2DashboardData({
     return () => {
       isMounted = false
       logger.debug('[useStage2DashboardData] Unsubscribing from realtime channels', { courseId })
-      fileCatalogChannel.unsubscribe()
-      traceChannel.unsubscribe()
+      void fileCatalogChannel.unsubscribe()
+      void traceChannel.unsubscribe()
     }
     // IMPORTANT: Only depend on courseId and enableRealtime
     // supabase is from ref (stable), fetchRef is used for fetch function
@@ -764,7 +764,7 @@ export function useStage2DashboardData({
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {
-    fetchDocumentData()
+    void fetchDocumentData()
   }, [fetchDocumentData])
 
   return {

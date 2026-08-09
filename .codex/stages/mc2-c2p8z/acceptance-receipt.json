@@ -1,0 +1,44 @@
+{
+  "command_results": [
+    {
+      "command": "node --check scripts/ci/check_color_env_contract.mjs && node --check scripts/ci/test_color_env_contract.mjs && node scripts/ci/check_color_env_contract.mjs && node scripts/ci/test_color_env_contract.mjs && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_detect_deploy_changes.sh && bash scripts/ci/test_blue_green_fail_closed.sh",
+      "duration_seconds": 0.898,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 30.209,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:99747) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99753) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99781) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99755) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:611) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:609) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 88.985,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "node --check scripts/ci/check_color_env_contract.mjs && node --check scripts/ci/test_color_env_contract.mjs && node scripts/ci/check_color_env_contract.mjs && node scripts/ci/test_color_env_contract.mjs && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_detect_deploy_changes.sh && bash scripts/ci/test_blue_green_fail_closed.sh",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-09T07:23:20.441242+00:00",
+  "diff_digest": "3130d1884c0d5cea4fb53a0380b7f5d9a2f099d48758a5122005f3a7c6c25d91",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "02aa50dd036e1f710ebcfb0b0a19118d043d7fda",
+  "idempotency_key": "d56ee42fe7e91d68bcbdbac1d2640c94b4030a6a9886b3c4622e06904f6a5421",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-c2p8z",
+  "started_at": "2026-08-09T07:21:20.186858+00:00",
+  "verification_fingerprint": "d56ee42fe7e91d68bcbdbac1d2640c94b4030a6a9886b3c4622e06904f6a5421"
+}

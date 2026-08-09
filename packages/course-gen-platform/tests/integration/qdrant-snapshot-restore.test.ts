@@ -207,7 +207,7 @@ describe.sequential('Qdrant 1.18.2 snapshot and restore recovery', () => {
     directory = await mkdtemp(join('/tmp', 'mc2-qdrant-recovery-integration-'));
     metricsDirectory = join(directory, 'qdrant-metrics');
     await mkdir(metricsDirectory, { mode: 0o700 });
-    await chmod(metricsDirectory, 0o2775);
+    await chmod(metricsDirectory, 0o3775);
     client = new QdrantClient({
       url: qdrantUrl,
       apiKey,

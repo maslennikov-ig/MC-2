@@ -1,0 +1,46 @@
+{
+  "schema_version": "stage-telemetry/v3",
+  "stage_id": "mc2-osty1",
+  "updated_at": "2026-08-08T07:10:34.753398Z",
+  "status": "in_progress",
+  "metrics": {
+    "worker_wall_seconds": null,
+    "queue_seconds": null,
+    "review_rounds": null,
+    "findings": {
+      "p0": null,
+      "p1": null
+    },
+    "integration_seconds": null,
+    "rebase_seconds": null
+  },
+  "verification": {},
+  "coverage": {
+    "integration": "unavailable",
+    "queue": "unavailable",
+    "rebase": "unavailable",
+    "review": "unavailable",
+    "verification": "unavailable",
+    "worker_wall": "unavailable"
+  },
+  "delegation": {
+    "decision": null,
+    "subagent_count": null,
+    "reasons": [],
+    "agent_wall_seconds": null,
+    "coordination_seconds": null
+  },
+  "orchestration_level": null,
+  "source_digest": null,
+  "verification_fingerprint": null,
+  "verification_decision": null,
+  "reuse_count": null,
+  "stage_count_window": null,
+  "product_commit_count": null,
+  "orchestration_commit_count": null,
+  "proof_commit_count": null,
+  "repeated_verification_count": null,
+  "bookkeeping_write_count": null,
+  "anomalies": ["suspicious_micro_stage"],
+  "replan_status": "replan_required"
+}

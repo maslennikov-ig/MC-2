@@ -79,6 +79,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['tests/**/*.test.ts'],
+      passWithNoTests: false,
       setupFiles: qdrantOnlyIntegration ? [] : ['./tests/setup.ts'],
       globalSetup: qdrantOnlyIntegration ? [] : ['./tests/global-setup.ts'],
       reporters: ['default', 'hanging-process'],

@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-raw1i",
+  "source_kind": "beads",
+  "source_id": "mc2-raw1i",
+  "source_digest": "78e81448711876f48a5136f87d4d97226a19424a28a4e8f9a55452a633aded35",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Проверка плотности считает только реальные секции урока с Markdown-заголовком второго уровня; заголовок урока и текст вступления секциями не считаются.",
+      "text_digest": "baa6d9b3eb46c61356fd0969e170380f078d51577d38dd3b63d2829e82749ac2"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Урок без единого H2-заголовка получает sectionCount=0 и критическую ошибку emptySections, а урок с H2-секциями возвращает их точное количество без этой ошибки.",
+      "text_digest": "550bd47e66587491a0499461e016227943c214a13b215bfb83c466a2b2b815b2"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Изменение подтверждено красно-зелёным фокусным unit-тестом через vitest.config.unit.ts, pnpm type-check и pnpm build; живой запуск генерации и платные вызовы не выполняются.",
+      "text_digest": "55731ce965fffe562e97bedf00f2792f53b57ed7108c98142b4e09c4baa28721"
+    }
+  ]
+}

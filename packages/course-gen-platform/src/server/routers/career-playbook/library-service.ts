@@ -1,17 +1,20 @@
 import { TRPCError } from '@trpc/server';
 import {
+  CareerPlaybookRoleProfileSpecSchema,
   JobType,
   cardEnrichmentContentSchema,
   dedupeCareerPlaybookQualityIssues,
   getUserVisibleCareerPlaybookWarnings,
 } from '@megacampus/shared-types';
 import type {
+  CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookGenerateImageJobData,
   CareerPlaybookImageStatus,
   CareerPlaybookLinkedCourse,
   CareerPlaybookPlaybookStatus,
   CareerPlaybookQualityIssue,
+  CareerPlaybookRegenerateBlockJobData,
   CareerPlaybookVisibility,
   CareerPlaybookViewerPermissions,
   Language,
@@ -34,6 +37,7 @@ import {
   remediateCareerPlaybookFinalMarkdown,
   remediateCareerPlaybookMermaidBlocks,
 } from '@/stages/stage-career-playbook/nodes/mermaid-quality';
+import { joinCareerPlaybookFinalBlocks } from '@/stages/stage-career-playbook/nodes/final-assembler';
 
 export interface CareerPlaybookLibraryItem {
   id: string;
@@ -125,6 +129,10 @@ export interface CareerPlaybookImageRegenerateResponse {
   imageStatus: CareerPlaybookImageStatus;
   imageUrl: null;
   imageErrorMessage: null;
+}
+
+export interface CareerPlaybookBlockMutationResponse extends CareerPlaybookBlockState {
+  blockId: CareerPlaybookBlockId;
 }
 
 export interface CareerPlaybookPdfExportResponse {
@@ -875,6 +883,148 @@ export async function getCareerPlaybookFromLibrary(
     organizationSlug,
     linkedCourseByPlaybookId.get(row.id) ?? null
   );
+}
+
+export async function editCareerPlaybookBlock(
+  ctx: Context,
+  input: { playbookId: string; blockId: CareerPlaybookBlockId; content: string }
+): Promise<CareerPlaybookBlockMutationResponse> {
+  const user = requireUser(ctx);
+  const row = await loadManageablePlaybook(input.playbookId, user);
+  const generatedBlocks = normalizeGeneratedBlocks(row.generated_blocks);
+  const previousBlock = generatedBlocks[input.blockId];
+
+  if (!previousBlock) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Career Playbook block not found' });
+  }
+
+  const updatedBlock: CareerPlaybookBlockState = {
+    ...previousBlock,
+    content: input.content,
+    status: 'generated',
+    generated_at: new Date().toISOString(),
+  };
+  const updatedBlocks = {
+    ...generatedBlocks,
+    [input.blockId]: updatedBlock,
+  };
+  const supabase = getCareerPlaybookSupabase();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .update({
+      generated_blocks: updatedBlocks,
+      final_markdown: joinCareerPlaybookFinalBlocks(updatedBlocks),
+    })
+    .eq('id', row.id)
+    .eq('user_id', row.user_id)
+    .select('*')
+    .single();
+
+  if (error || !data) throwOnDbError(error, 'Failed to edit Career Playbook block');
+
+  const persistedBlock = normalizeGeneratedBlocks(data.generated_blocks)[input.blockId];
+  if (!persistedBlock) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Edited Career Playbook block was not persisted',
+    });
+  }
+
+  return { blockId: input.blockId, ...persistedBlock };
+}
+
+export async function regenerateCareerPlaybookBlockFromLibrary(
+  ctx: Context,
+  input: { playbookId: string; blockId: CareerPlaybookBlockId; instruction: string }
+): Promise<CareerPlaybookBlockMutationResponse> {
+  const user = requireUser(ctx);
+  const row = await loadManageablePlaybook(input.playbookId, user);
+  if (row.status !== 'completed') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before block regeneration',
+    });
+  }
+
+  const roleProfileSpec = CareerPlaybookRoleProfileSpecSchema.safeParse(row.role_profile_spec);
+  if (!roleProfileSpec.success) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Career Playbook role profile is unavailable for block regeneration',
+      cause: roleProfileSpec.error,
+    });
+  }
+
+  const generatedBlocks = normalizeGeneratedBlocks(row.generated_blocks);
+  const originalBlock = generatedBlocks[input.blockId];
+  if (!originalBlock) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Career Playbook block not found' });
+  }
+
+  const regeneratingBlock: CareerPlaybookBlockState = {
+    ...originalBlock,
+    status: 'regenerating',
+  };
+  const regeneratingBlocks = {
+    ...generatedBlocks,
+    [input.blockId]: regeneratingBlock,
+  };
+  const supabase = getCareerPlaybookSupabase();
+  const { error } = await supabase
+    .from('career_playbooks')
+    .update({ generated_blocks: regeneratingBlocks })
+    .eq('id', row.id)
+    .eq('user_id', row.user_id)
+    .select('id')
+    .single();
+
+  if (error) throwOnDbError(error, 'Failed to mark Career Playbook block for regeneration');
+
+  const jobId = `career-playbook-regenerate-${row.id}-${input.blockId}`;
+  const now = new Date().toISOString();
+  const jobData: CareerPlaybookRegenerateBlockJobData = {
+    jobType: JobType.CAREER_PLAYBOOK,
+    operation: 'REGENERATE_BLOCK',
+    playbookId: row.id,
+    userId: row.user_id,
+    organizationId: row.organization_id,
+    language: row.language,
+    locale: row.language === 'en' ? 'en' : 'ru',
+    createdAt: now,
+    blockId: input.blockId,
+    instruction: input.instruction,
+    roleProfileSpec: roleProfileSpec.data,
+    originalBlock,
+    generatedBlocks,
+  };
+
+  try {
+    await removeTerminalJobById(jobId);
+    await addJob(JobType.CAREER_PLAYBOOK, jobData, {
+      jobId,
+      priority: 2,
+    });
+  } catch (enqueueError) {
+    const compensation = await supabase
+      .from('career_playbooks')
+      .update({ generated_blocks: generatedBlocks })
+      .eq('id', row.id)
+      .eq('user_id', row.user_id)
+      .select('id')
+      .single();
+
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: compensation.error
+        ? 'Failed to enqueue Career Playbook block regeneration and restore its state'
+        : 'Failed to enqueue Career Playbook block regeneration',
+      cause: compensation.error
+        ? { enqueueError, compensationError: compensation.error }
+        : enqueueError,
+    });
+  }
+
+  return { blockId: input.blockId, ...regeneratingBlock };
 }
 
 export async function deleteCareerPlaybookFromLibrary(

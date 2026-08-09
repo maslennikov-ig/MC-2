@@ -270,7 +270,8 @@ export async function generateLessonSingleCall(
   const introValidation = validateIntroStructure(
     responseContent,
     labels.introduction,
-    lessonSpec.lesson_context?.next_lesson?.title ?? null
+    lessonSpec.lesson_context?.next_lesson?.title ?? null,
+    language
   );
   if (introValidation.issues.length > 0) {
     logger.warn(
@@ -312,7 +313,8 @@ export async function generateLessonSingleCall(
     const retryValidation = validateIntroStructure(
       retryContent,
       labels.introduction,
-      lessonSpec.lesson_context?.next_lesson?.title ?? null
+      lessonSpec.lesson_context?.next_lesson?.title ?? null,
+      language
     );
     if (retryValidation.issues.length > 0) {
       const issueCodes = [...new Set(retryValidation.issues)].sort().join(',');

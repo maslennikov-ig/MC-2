@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-3sz3d",
+  "source_kind": "beads",
+  "source_id": "mc2-3sz3d",
+  "source_digest": "e802d6693c61aa4411fe71e21fb4806706d1b557da52b8d7190f104a2cb74410",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Default backend Vitest config treats zero collected tests as failure, and every setup or teardown failure path exits non-zero; the global teardown cannot overwrite a failed run with process.exit(0).",
+      "text_digest": "aa31d266077d32302122bf3f711fd455b41c4ab2e27cf4e4d690ed086d8eec7a"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Qdrant bootstrap remains strict by default and is skipped only when SKIP_QDRANT_TEST_SETUP equals exactly 1, with an explicit warning; the worker still starts and pinned Qdrant version/schema behavior is unchanged.",
+      "text_digest": "40f37779721a074082315d5c58b8ce7b8bb4d6ca87c24002e00d2e17acef9d5f"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The behavior is confirmed by red-green focused unit tests through vitest.config.unit.ts plus a safe child-process check against an unreachable loopback Qdrant, pnpm type-check, and pnpm build; no live integration suite, Qdrant mutation, reindex, migration, or paid call runs.",
+      "text_digest": "c7f62fa5f4171bdbd840a22c705f084ea6ed7300705b983c4670594df54c4f1a"
+    }
+  ]
+}

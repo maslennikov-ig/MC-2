@@ -1,0 +1,76 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-bswhl",
+  "goal_id": "mc2-bswhl",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "actionable-document-processing-failure",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage2-dashboard-data", "stage2-dashboard-ui", "generation-i18n"],
+    "risk_models": [
+      "silent-failure-reason",
+      "internal-detail-disclosure",
+      "misleading-recovery-guidance"
+    ],
+    "test_environments": ["vitest-web", "pnpm-monorepo-build"],
+    "rollback_boundary": "stage2-document-failure-presentation",
+    "acceptance_proofs": [
+      "stored-failure-survives-client-status-path",
+      "empty-text-failure-is-localized-and-actionable",
+      "unknown-errors-are-safely-bounded",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": [
+    "contract",
+    "implementation",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-bswhl",
+    "source_digest": "25ee0d7f41e27bc6b6401a903f2cd8ab77728a2fa135463e410f921066937b74",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Если обработка загруженного документа завершилась ошибкой и file_catalog.error_message сохранён, интерфейс Этапа 2 показывает загрузившему документ понятную и полезную причину независимо от состояния клиентского хранилища или наличия трассировки.",
+        "text_digest": "46b0e0797bd5a29e99d88121227408ea22ee7c54e73f023e604d8363de6e780e"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Для документа без извлекаемого текстового слоя интерфейс советует загрузить версию с выделяемым текстом или распознанным текстом и не раскрывает путь к файлу, технические счётчики или внутренние детали обработки.",
+        "text_digest": "37ac43203a0f6131bc2d3ea4294003e4a1979df09c220f0106c39d5a7209d357"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Неизвестная сохранённая ошибка отображается безопасно и кратко, а отсутствие причины не создаёт ложного объяснения.",
+        "text_digest": "781c68f068ee1c6874e85ef58f110e918555cc4887a9a2bed59474d941dc9f00"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Изменение подтверждено фокусными web-тестами, pnpm type-check и pnpm build; предварительное чтение файла, reindex, миграции, deploy и живые прогоны не выполняются.",
+        "text_digest": "3605c6dbaea0915320a618d1facb8d81f79bddb628d24d354ac844ee2e8d1b4f"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-bswhl/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "25ee0d7f41e27bc6b6401a903f2cd8ab77728a2fa135463e410f921066937b74",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-bswhl",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-bswhl/artifacts/mc2-bswhl.md",
+      "status": "accepted"
+    }
+  ]
+}

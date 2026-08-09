@@ -1,0 +1,38 @@
+[Unit]
+Description=Low-impact off-host backup of production Qdrant snapshots
+Documentation=https://github.com/maslennikov-ig/MC-2/blob/develop/deploy/qdrant-offhost-backup/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+LoadCredential=qdrant_offhost_ssh_key:/root/.ssh/megacampus-qdrant-offhost-backup
+LoadCredential=qdrant_offhost_known_hosts:/root/.ssh/megacampus-qdrant-offhost-known_hosts
+Environment=SSH_KEY=%d/qdrant_offhost_ssh_key
+Environment=KNOWN_HOSTS=%d/qdrant_offhost_known_hosts
+ExecStart=/usr/local/sbin/megacampus-qdrant-offhost-backup run
+TimeoutStartSec=1h
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+CPUWeight=10
+IOWeight=10
+CPUQuota=25%
+MemoryHigh=256M
+MemoryMax=512M
+TasksMax=64
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/backups/megacampus-qdrant /var/lock
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

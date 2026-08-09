@@ -1,0 +1,65 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-sznhi",
+  "goal_id": "mc2-sznhi",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "localized-intro-teaser-detection",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage6-intro-structure-guard", "shared-language-content-labels"],
+    "risk_models": [
+      "non-ru-en-teaser-leak",
+      "localized-false-positive",
+      "locale-fallback-regression"
+    ],
+    "test_environments": ["vitest-backend-unit", "pnpm-monorepo-build"],
+    "rollback_boundary": "stage6-next-lesson-teaser-pattern-selection",
+    "acceptance_proofs": [
+      "all-content-label-locales-mapped",
+      "three-non-ru-en-writing-systems-detected",
+      "normal-transitions-not-rejected",
+      "existing-title-and-ru-en-detection-preserved",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": ["implementation", "consumer_adoption", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-sznhi",
+    "source_digest": "cdd26fed64c83d7225d3d4a6c3ee71bad5c0d501f28c7ce86b56a9b9ad6fe70d",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Guard выбирает локализованный набор точных teaser-паттернов по нормализованному Language и исчерпывающе покрывает все языки CONTENT_LABELS; неизвестный код безопасно использует английский fallback.",
+        "text_digest": "f556d90a02c6477f97a8b9d91f17d5332421fe193f416e19df3fcc394f4231c2"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Явные упоминания следующего урока, раздела или главы обнаруживаются вне ru/en, включая минимум три разные письменности, а обычные переходные фразы без будущего урока не дают ложного срабатывания; существующие ru/en и совпадение заголовка следующего урока сохранены.",
+        "text_digest": "ec822b15a2d0d9ffdc5c33e8421fe4b9d8ed1620285ddf47b966803cd36ff172"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Изменение подтверждено красно-зелёными фокусными unit-тестами через vitest.config.unit.ts, pnpm type-check и pnpm build; живой запуск генерации и платные вызовы не выполняются.",
+        "text_digest": "dac57dcd0c4eee3275356d45384109e80e8fc90ec3b9c5d2f210bff8d3cb8d5a"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-sznhi/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "cdd26fed64c83d7225d3d4a6c3ee71bad5c0d501f28c7ce86b56a9b9ad6fe70d",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-sznhi",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-sznhi/artifacts/mc2-sznhi.md",
+      "status": "accepted"
+    }
+  ]
+}

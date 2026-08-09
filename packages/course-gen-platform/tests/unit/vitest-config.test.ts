@@ -42,4 +42,8 @@ describe('isQdrantOnlyIntegrationSelection', () => {
     expect(integrationConfig.test?.setupFiles).toEqual(['./tests/setup.ts']);
     expect(integrationConfig.test?.globalSetup).toEqual(['./tests/global-setup.ts']);
   });
+
+  it('fails the default backend run when no test module is collected', () => {
+    expect(integrationConfig.test?.passWithNoTests).toBe(false);
+  });
 });

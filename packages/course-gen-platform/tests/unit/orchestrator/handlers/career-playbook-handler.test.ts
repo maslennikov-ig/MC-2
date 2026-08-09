@@ -180,9 +180,14 @@ describe('CareerPlaybookHandler', () => {
   });
 
   it('routes REGENERATE_BLOCK through the block regenerator helper', async () => {
+    const regeneratedBlock = {
+      ...originalBlock,
+      content: '## 6. KPI\n\nNew content',
+      attempt: 2,
+    };
     mocks.regenerateCareerPlaybookBlock.mockResolvedValue({
       blockId: 'block_6',
-      block: { ...originalBlock, content: '## 6. KPI\n\nNew content', attempt: 2 },
+      block: regeneratedBlock,
       nodeCost: {
         node: 'blockRegenerator',
         model: 'mock-model',
@@ -191,6 +196,25 @@ describe('CareerPlaybookHandler', () => {
         cost_usd: 0,
       },
     });
+    const headerBlock: CareerPlaybookBlockState = {
+      content: '# B2B Sales Manager',
+      status: 'generated',
+      attempt: 1,
+    };
+    const builder = createBuilder([
+      {
+        data: {
+          id: playbookId,
+          generated_blocks: {
+            header: headerBlock,
+            block_6: { ...originalBlock, status: 'regenerating' },
+          },
+        },
+        error: null,
+      },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
 
     const result = await new CareerPlaybookHandler().process(
       job({
@@ -215,6 +239,50 @@ describe('CareerPlaybookHandler', () => {
         otherBlocks: { block_6: originalBlock },
       })
     );
+    expect(builder.update).toHaveBeenCalledWith({
+      generated_blocks: {
+        header: headerBlock,
+        block_6: regeneratedBlock,
+      },
+      final_markdown: '# B2B Sales Manager\n\n## 6. KPI\n\nNew content',
+    });
+  });
+
+  it('marks a regenerating block failed when the regenerator throws', async () => {
+    mocks.regenerateCareerPlaybookBlock.mockRejectedValue(new Error('LLM unavailable'));
+    const builder = createBuilder([
+      {
+        data: {
+          id: playbookId,
+          generated_blocks: {
+            block_6: { ...originalBlock, status: 'regenerating' },
+          },
+        },
+        error: null,
+      },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job({
+          ...baseJobData(),
+          operation: 'REGENERATE_BLOCK',
+          blockId: 'block_6',
+          instruction: 'Make metrics concrete',
+          roleProfileSpec,
+          originalBlock,
+          generatedBlocks: { block_6: originalBlock },
+        })
+      )
+    ).rejects.toThrow('LLM unavailable');
+
+    expect(builder.update).toHaveBeenCalledWith({
+      generated_blocks: {
+        block_6: { ...originalBlock, status: 'failed' },
+      },
+    });
   });
 
   it('routes PROCESS_SOURCE through the Career Playbook source processor', async () => {

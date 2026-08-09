@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-sznhi",
+  "source_kind": "beads",
+  "source_id": "mc2-sznhi",
+  "source_digest": "cdd26fed64c83d7225d3d4a6c3ee71bad5c0d501f28c7ce86b56a9b9ad6fe70d",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Guard выбирает локализованный набор точных teaser-паттернов по нормализованному Language и исчерпывающе покрывает все языки CONTENT_LABELS; неизвестный код безопасно использует английский fallback.",
+      "text_digest": "f556d90a02c6477f97a8b9d91f17d5332421fe193f416e19df3fcc394f4231c2"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Явные упоминания следующего урока, раздела или главы обнаруживаются вне ru/en, включая минимум три разные письменности, а обычные переходные фразы без будущего урока не дают ложного срабатывания; существующие ru/en и совпадение заголовка следующего урока сохранены.",
+      "text_digest": "ec822b15a2d0d9ffdc5c33e8421fe4b9d8ed1620285ddf47b966803cd36ff172"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Изменение подтверждено красно-зелёными фокусными unit-тестами через vitest.config.unit.ts, pnpm type-check и pnpm build; живой запуск генерации и платные вызовы не выполняются.",
+      "text_digest": "dac57dcd0c4eee3275356d45384109e80e8fc90ec3b9c5d2f210bff8d3cb8d5a"
+    }
+  ]
+}

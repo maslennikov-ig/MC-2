@@ -1,0 +1,39 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-jz6y0.13.6",
+  "source_kind": "beads",
+  "source_id": "mc2-jz6y0.13.6",
+  "source_digest": "b509e80e0c49f8844252d91943069b5283700924d3c4f3bfc6c392f3e5620cb6",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "helixa-new pulls the latest successful production Qdrant snapshot over SSH with a root-owned mode-0600 key whose forced command cannot open a shell, forward ports, or read any Qdrant credential.",
+      "text_digest": "5a5d77702cbdaff54bcab09f3a80ffa28c9716bfdc006a0c0e46721b79eb00b7"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "A pulled generation becomes visible only after its manifest, exact 1.18.2 version, freshness, byte length, and SHA-256 all validate; incomplete or altered data remains hidden and is discarded.",
+      "text_digest": "c82d0a2b5d54c57bd2019868af6e96877344e59776de6ace67c37beb4c41e015"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The backup host runs one low-priority off-peak pull per day, refuses to run below 10 GiB free, and retains no more than 14 successful daily generations and no generation older than 14 days.",
+      "text_digest": "0dab5f6951bddce55ac14f59a658cb844f8b2c1c11ce3197883633d67505f359"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "An isolated restore drill uses the same digest-pinned Qdrant 1.18.2 image, stays inside explicit CPU, memory, process, and loopback-network limits, and proves the restored point count equals the manifest.",
+      "text_digest": "a46c069ac4f7e7e78ca74c8752053c4683c2509ce3116ccb6ff90747727eca5c"
+    },
+    {
+      "criterion_id": "AC-5",
+      "text": "Production Prometheus receives separate off-host backup and restore timestamps only after success; missing or stale evidence reaches the existing Telegram route at 36 hours and 35 days respectively.",
+      "text_digest": "faa9bd9fdf3739591f7c0b95ffc90d0fa511218d66c66fc2b0384de8530df7ba"
+    },
+    {
+      "criterion_id": "AC-6",
+      "text": "The live configuration is installed reversibly, one real backup and exact-version restore drill pass, rollback is documented, and no reindex, schema migration, paid call, or production application-data mutation is performed.",
+      "text_digest": "37b082c6368fa6d26ac3a3d035d96cf7c228a23e94da383617eaae96bd4c6ea9"
+    }
+  ]
+}

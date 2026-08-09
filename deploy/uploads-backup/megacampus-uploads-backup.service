@@ -1,0 +1,23 @@
+[Unit]
+Description=Off-host backup of megacampus uploaded source documents
+Documentation=https://github.com/maslennikov-ig/MC-2/blob/develop/deploy/uploads-backup/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/megacampus-uploads-backup run
+# The pull is network-bound and small; a run that has not finished in an hour is
+# stuck, not slow.
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle
+# The unit reads one private key and writes one directory. Nothing else.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/backups/megacampus-uploads /var/lock
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

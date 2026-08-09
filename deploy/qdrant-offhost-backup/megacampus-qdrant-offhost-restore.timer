@@ -1,0 +1,14 @@
+[Unit]
+Description=Monthly exact-version restore from off-host Qdrant snapshot
+
+[Timer]
+# "monthly" is midnight on the first day, away from the 03:20 uploads pull and
+# the 04:20 Qdrant pull. Jitter prevents a fixed storage spike.
+OnCalendar=monthly
+RandomizedDelaySec=30m
+AccuracySec=1m
+Persistent=true
+Unit=megacampus-qdrant-offhost-restore.service
+
+[Install]
+WantedBy=timers.target

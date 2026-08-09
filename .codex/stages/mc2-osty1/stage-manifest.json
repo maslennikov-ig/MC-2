@@ -1,0 +1,78 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-osty1",
+  "goal_id": "mc2-osty1",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "backlog-truth-established",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "beads-tracker",
+      "repo-health-tooling",
+      "ci-cd-workflow",
+      "content-pipeline",
+      "career-playbook",
+      "stage7-enrichments"
+    ],
+    "risk_models": ["stale-backlog-claim", "closed-without-evidence", "ranking-before-truth"],
+    "test_environments": ["local-repo-readonly", "vitest", "prettier", "eslint", "tsc"],
+    "rollback_boundary": "beads-state-only-no-code-change",
+    "acceptance_proofs": [
+      "per-item-bucket-with-commit-or-measurement",
+      "format-check-measurement",
+      "tsbuildinfo-reproduction",
+      "deploy-gate-source-read",
+      "pypi-release-check"
+    ]
+  },
+  "work_areas": ["decision", "contract", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-osty1",
+    "source_digest": "cd9c546dd67cbe74fc7685240f22012b708ba76a89c810dee377a2b7c2532416",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Каждая из 89 открытых записей получила ровно один bucket и записанную улику.",
+        "text_digest": "afc5b787a098817bda70cad2c342f40871e924ad8ed16d3f45bd8694125320bb"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Запись, закрытая как fixed, называет коммит или измерение, которое её починило.",
+        "text_digest": "ac1d9aa683a0bd3bd76577279bdc84f422bb496b7a7697e886c9ec3b79d72391"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Оставленная запись несёт однофразовую переформулировку, размер и риск, если её не делать.",
+        "text_digest": "e885b93a92eb9514fb05ba2bdfe68e5e48b1777567b6bcb5b40174eadee4a23d"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "REF:-записи больше не появляются в `bd ready`.",
+        "text_digest": "f915156ad39ba48ca27d9ac23e8ce38501977b1f92beae6daeed840a0df481f8"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Остаточное количество названо вместе с его составом.",
+        "text_digest": "5ca623575a78b4b5c1d23331da0ec20e47498aa042753beed9f5ab1d0301ddc2"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-osty1/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "cd9c546dd67cbe74fc7685240f22012b708ba76a89c810dee377a2b7c2532416",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-osty1/artifacts/mc2-osty1.md",
+      "task_id": "mc2-osty1",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

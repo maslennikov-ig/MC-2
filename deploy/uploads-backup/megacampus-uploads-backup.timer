@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily off-host backup of megacampus uploaded source documents
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+# Spread the pull so it never lands exactly with the other nightly jobs on
+# either host.
+RandomizedDelaySec=1200
+# A host that was off at 03:20 still gets its backup rather than skipping a day.
+Persistent=true
+Unit=megacampus-uploads-backup.service
+
+[Install]
+WantedBy=timers.target

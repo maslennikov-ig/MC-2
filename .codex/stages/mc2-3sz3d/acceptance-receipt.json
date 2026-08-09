@@ -1,0 +1,47 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/global-setup.test.ts tests/unit/vitest-config.test.ts",
+      "duration_seconds": 1.573,
+      "result": "passed"
+    },
+    {
+      "command": "set +e; test_output=$(QDRANT_URL=http://127.0.0.1:1 QDRANT_API_KEY=synthetic-test-key timeout 60s pnpm --filter course-gen-platform exec vitest run tests/unit/vitest-config.test.ts 2>&1); test_status=$?; set -e; [ \"$test_status\" -ne 0 ] && ! printf \"%s\\n\" \"$test_output\" | rg -q \"exiting with code 0\" && printf \"%s\\n\" \"$test_output\" | rg -q \"No test files found, exiting with code 1\"",
+      "duration_seconds": 32.507,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 29.601,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:37702) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:37696) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:37910) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 89.088,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/global-setup.test.ts tests/unit/vitest-config.test.ts",
+    "set +e; test_output=$(QDRANT_URL=http://127.0.0.1:1 QDRANT_API_KEY=synthetic-test-key timeout 60s pnpm --filter course-gen-platform exec vitest run tests/unit/vitest-config.test.ts 2>&1); test_status=$?; set -e; [ \"$test_status\" -ne 0 ] && ! printf \"%s\\n\" \"$test_output\" | rg -q \"exiting with code 0\" && printf \"%s\\n\" \"$test_output\" | rg -q \"No test files found, exiting with code 1\"",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-08T16:31:46.753743+00:00",
+  "diff_digest": "c5a0fc0fddb4930756664e3a44dd3d5950bc60f7403738fbcccc85a4953c1021",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "f2eab74dbef7712bdde7f6c92397eb23f97f7952",
+  "idempotency_key": "d3322555a97f8e0d8c82a3b2e727fe317db724b7a7cecd8686def28104f6eac4",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-3sz3d",
+  "started_at": "2026-08-08T16:29:13.824208+00:00",
+  "verification_fingerprint": "d3322555a97f8e0d8c82a3b2e727fe317db724b7a7cecd8686def28104f6eac4"
+}

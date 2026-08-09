@@ -1,0 +1,64 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-2vtmk",
+  "goal_id": "mc2-2vtmk",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "production-claude-deploy-ghcr-read-access",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["production-host-ghcr-authentication"],
+    "risk_models": [
+      "stale-or-revoked-credential",
+      "secret-disclosure",
+      "credential-replacement-failure",
+      "overprivileged-job-token"
+    ],
+    "test_environments": ["production-host-readonly-registry-probe"],
+    "rollback_boundary": "claude-deploy-docker-client-config",
+    "acceptance_proofs": [
+      "remote-identity-is-claude-deploy",
+      "private-immutable-manifest-is-readable-without-pull",
+      "no-secret-or-docker-config-content-emitted",
+      "deploy-jobs-use-packages-read"
+    ]
+  },
+  "work_areas": ["decision", "implementation", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-2vtmk",
+    "source_digest": "a4ac35c0ac34c220a7b25106072090e7618e9828fa1ac41f0f8fa9d2383d75db",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The current GHCR access of the production claude-deploy identity is measured against an existing immutable private image with docker manifest inspect; no image pull, credential value, or Docker config content is emitted.",
+        "text_digest": "26a8eb1c1977f1346f8b3f4546c2dc9477d39bbd3a0c9d3815085ead26f76dc8"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "If the measurement is denied, the claude-deploy GHCR credential is replaced through a secure channel with the least privilege needed to read the private package, with the prior config restored on any failed verification and no secret stored in the repository or logs.",
+        "text_digest": "267ecb9805089969e091c135697f4e7b121c6cd9fbadcfbefbb1456ea97c4c7d"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The final state is proved by a successful read-only manifest inspection as claude-deploy; the issue remains open if replacement cannot be completed safely, and no deploy, image pull, service mutation, migration, reindex, push, or paid call is performed.",
+        "text_digest": "c6cbe3d868c4c5707dc0865fac5eaa6759ab2486273c860357c8e4789f332a67"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-2vtmk/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "a4ac35c0ac34c220a7b25106072090e7618e9828fa1ac41f0f8fa9d2383d75db",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-2vtmk",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-2vtmk/artifacts/mc2-2vtmk.md",
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-3sz3d",
+  "goal_id": "mc2-3sz3d",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "backend-vitest-bootstrap-exit-integrity",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "backend-vitest-config",
+      "backend-global-test-setup",
+      "qdrant-test-precondition"
+    ],
+    "risk_models": ["false-green-no-tests", "cleanup-overwrites-failure", "implicit-qdrant-skip"],
+    "test_environments": [
+      "vitest-backend-unit",
+      "isolated-loopback-child-process",
+      "pnpm-monorepo-build"
+    ],
+    "rollback_boundary": "backend-test-bootstrap-and-teardown",
+    "acceptance_proofs": [
+      "zero-tests-fail-default-backend-config",
+      "setup-and-cleanup-fail-nonzero",
+      "qdrant-opt-out-exact-and-explicit",
+      "unreachable-loopback-child-process-nonzero",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": ["implementation", "consumer_adoption", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-3sz3d",
+    "source_digest": "e802d6693c61aa4411fe71e21fb4806706d1b557da52b8d7190f104a2cb74410",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Default backend Vitest config treats zero collected tests as failure, and every setup or teardown failure path exits non-zero; the global teardown cannot overwrite a failed run with process.exit(0).",
+        "text_digest": "aa31d266077d32302122bf3f711fd455b41c4ab2e27cf4e4d690ed086d8eec7a"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Qdrant bootstrap remains strict by default and is skipped only when SKIP_QDRANT_TEST_SETUP equals exactly 1, with an explicit warning; the worker still starts and pinned Qdrant version/schema behavior is unchanged.",
+        "text_digest": "40f37779721a074082315d5c58b8ce7b8bb4d6ca87c24002e00d2e17acef9d5f"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The behavior is confirmed by red-green focused unit tests through vitest.config.unit.ts plus a safe child-process check against an unreachable loopback Qdrant, pnpm type-check, and pnpm build; no live integration suite, Qdrant mutation, reindex, migration, or paid call runs.",
+        "text_digest": "c7f62fa5f4171bdbd840a22c705f084ea6ed7300705b983c4670594df54c4f1a"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-3sz3d/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "e802d6693c61aa4411fe71e21fb4806706d1b557da52b8d7190f104a2cb74410",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-3sz3d",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-3sz3d/artifacts/mc2-3sz3d.md",
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-1ugj1",
+  "source_kind": "beads",
+  "source_id": "mc2-1ugj1",
+  "source_digest": "3144a384de69424c59fb9623903cefe99248cf1aa7e4dba0a2ac5569ad278f72",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Живое состояние Supabase измерено только чтением: для public.lesson_enrichments явно установлены членство в supabase_realtime и REPLICA IDENTITY; репозиторные миграции не считаются доказательством живого состояния.",
+      "text_digest": "d5798fb190b4f05936d9eed7cd56f558e0f11a58aac00651b8e3d27323d88d38"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Если живая таблица не может доставлять ожидаемые события, интерфейс сохраняет рабочий fallback polling после успешного подключения канала; если доставка уже настроена, задача переоценивается по измерению без ненужной починки.",
+      "text_digest": "7d64f2cd5adad27cf92bf82d341cf5225ae0d1404e0f01988d110de0fb2e178c"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Любое изменение подтверждено красно-зелёными фокусными web-тестами, pnpm type-check и pnpm build; миграции, изменения живой базы, deploy, merge и push не выполняются.",
+      "text_digest": "f3df9ce0c3b0b1491d1f2858e19f5c9e07d3e7701c85a2de0b58cf6559d34951"
+    }
+  ]
+}

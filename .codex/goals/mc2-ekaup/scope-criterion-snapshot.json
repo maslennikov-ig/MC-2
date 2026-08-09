@@ -1,0 +1,29 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-ekaup",
+  "source_kind": "beads",
+  "source_id": "mc2-ekaup",
+  "source_digest": "9a6c8138f51ed50fef35f5173a4a37d0aec6f544d73dacbe3c820f0f5e8eb217",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "При недоступном library.edit интерфейс не изменяет блок и прямо сообщает, что изменение не сохранено.",
+      "text_digest": "f527908029b98d60aa0774bda57065b4292dc13e03c67a7baee4bb375f5bc5cf"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "careerPlaybook.library.edit разрешает изменение только владельцу, атомарно сохраняет блок и согласованный final_markdown, а повторный library.get возвращает новое содержимое.",
+      "text_digest": "369217d377d9d4387cbe2c4aa5497b35803338758eff45789d181bd93a2b1bf1"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "careerPlaybook.library.regenerateBlock разрешает действие только владельцу, сохраняет реально сгенерированный блок и согласованный final_markdown, а повторный library.get возвращает результат.",
+      "text_digest": "4fc9f11ca81180c68127574f24c976514c965a7c5cd18f1a534f39d7fe66b1b4"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "Изменения подтверждены фокусными web/backend тестами, pnpm type-check и pnpm build; reindex, schema migrations и live-прогоны с тратами не выполняются.",
+      "text_digest": "2af0454ae14e9ff32336803c372370539c2d347517e850ea508615a0541d3e19"
+    }
+  ]
+}

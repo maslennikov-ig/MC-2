@@ -85,6 +85,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 
 - Beads (`bd`) is the task source of truth.
 - Graphify is the local knowledge-graph source for repo orientation; use `graphify query`, `graphify path`, or `graphify explain` with `graphify-out/graph.json`.
+- Qdrant source-local snapshot/restore lives in `packages/course-gen-platform/tools/qdrant/` and `deploy/systemd/`; restricted second-host pull, bounded retention, and exact-version off-host restore live in `deploy/qdrant-offhost-backup/`.
 - Shared contracts must be imported from `@megacampus/shared-types`.
 - Career Playbook product scope comes from `docs/plans/quiet-waddling-starfish.md` and `docs/plans/career-playbook/*`.
 - Supabase schema changes belong in backend migrations under `packages/course-gen-platform/supabase/migrations/`.

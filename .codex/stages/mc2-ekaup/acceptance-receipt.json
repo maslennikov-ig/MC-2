@@ -1,0 +1,47 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/orchestrator/handlers/career-playbook-handler.test.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts",
+      "duration_seconds": 11.981,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store-viewer.test.ts tests/unit/components/career-playbook/viewer-page-client.test.tsx",
+      "duration_seconds": 5.803,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 27.814,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:29364) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:29358) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:29954) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 88.062,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/career-playbook.router.test.ts tests/unit/orchestrator/handlers/career-playbook-handler.test.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts",
+    "pnpm --filter @megacampus/web exec vitest run tests/unit/career-playbook-store-viewer.test.ts tests/unit/components/career-playbook/viewer-page-client.test.tsx",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-08T08:41:05.469428+00:00",
+  "diff_digest": "62405064e4e5d75c0d13f0814a75b82cb00fadbf3a8dd461d8c293786ec2407c",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "e0572c25b7afeb3fd8c0f7a60be9dc2b9cff7787",
+  "idempotency_key": "58c35abd31df7402803eacadded4345b975b7662c454a1a903e18aa9bfc4904a",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-ekaup",
+  "started_at": "2026-08-08T08:38:51.652978+00:00",
+  "verification_fingerprint": "58c35abd31df7402803eacadded4345b975b7662c454a1a903e18aa9bfc4904a"
+}

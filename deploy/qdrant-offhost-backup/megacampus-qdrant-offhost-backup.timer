@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily low-impact off-host Qdrant snapshot pull
+
+[Timer]
+# The uploads backup starts at 03:20 local time with at most 20 minutes of
+# jitter. Starting an hour later prevents the two full-copy jobs overlapping.
+OnCalendar=*-*-* 04:20:00
+RandomizedDelaySec=20m
+AccuracySec=1m
+Persistent=true
+Unit=megacampus-qdrant-offhost-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -267,9 +267,8 @@ export function checkContentDensity(
   content: string,
   threshold: number
 ): FilterCheckResult & { avgWordsPerSection: number; sectionCount: number } {
-  // Find all sections (markdown headers)
-  const sections = content.split(/^#+\s+/m).filter(s => s.trim().length > 0);
-  const sectionCount = sections.length;
+  // H2 headings are the top-level content-section boundary in generated lessons.
+  const sectionCount = (content.match(/^##\s+/gm) ?? []).length;
 
   // Calculate total words and average per section
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];

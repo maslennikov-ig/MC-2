@@ -1,0 +1,60 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-dqbw1",
+  "goal_id": "mc2-dqbw1",
+  "epic_id": "mc2-p2908",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "lesson-inspector-auth-resolution-loading",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["lesson-inspector-data-hook", "supabase-auth-state-consumer"],
+    "risk_models": ["infinite-loading-without-session", "authenticated-fetch-regression"],
+    "test_environments": ["vitest-web", "pnpm-monorepo-build"],
+    "rollback_boundary": "lesson-inspector-initial-auth-effect",
+    "acceptance_proofs": [
+      "loading-kept-during-auth-resolution",
+      "loading-cleared-after-no-session-resolution",
+      "authenticated-fetch-preserved",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": ["implementation", "consumer_adoption", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-dqbw1",
+    "source_digest": "408f90dd86e177226639938131a8bc357cc7b4aae32471a607074ee6260f066e",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Lesson Inspector сохраняет состояние загрузки, пока авторизация определяется, и снимает его, когда авторизация завершилась без пользовательской сессии.",
+        "text_digest": "457e8f899ea762fd621bda1e8ab7f38e42c6f59b41cbdc91203503f151679280"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Путь с действующей сессией по-прежнему запускает существующую загрузку данных и не получает лишних повторных запросов из-за смены объекта сессии.",
+        "text_digest": "b9fa001808bb5baebdf85c0f7dd748810aad28fec8e9139354927eddd694235e"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Исправление подтверждено красно-зелёным фокусным web-тестом, pnpm type-check и pnpm build; закрытие не утверждает, что воспроизведён исторический случай superadmin с действующей сессией.",
+        "text_digest": "d4a7e4047fa0d9b7d54183e5fac4822d03a953f68f91f7de0a4d04304e871e6e"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-dqbw1/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "408f90dd86e177226639938131a8bc357cc7b4aae32471a607074ee6260f066e",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-dqbw1",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-dqbw1/artifacts/mc2-dqbw1.md",
+      "status": "accepted"
+    }
+  ]
+}

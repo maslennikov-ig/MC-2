@@ -1,0 +1,28 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:85117) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:85110) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:85200) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:85330) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 126.654,
+      "result": "passed"
+    }
+  ],
+  "commands": ["pnpm run build"],
+  "completed_at": "2026-08-08T14:08:24.454031+00:00",
+  "diff_digest": "02fa5b1f31b5fcdf0d8ecb81f446465a1550acf6252720fd9e4aa344a2c9cda4",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "b06f7ff2bf0d6071772c03030a45c4a22b7e0958",
+  "idempotency_key": "b7522faa2054a483710be9f611f8568f5f422ccfef1a435779f87bb59917e217",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-bswhl",
+  "started_at": "2026-08-08T14:06:17.606556+00:00",
+  "verification_fingerprint": "b7522faa2054a483710be9f611f8568f5f422ccfef1a435779f87bb59917e217"
+}

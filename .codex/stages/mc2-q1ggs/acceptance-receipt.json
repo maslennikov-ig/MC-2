@@ -1,0 +1,41 @@
+{
+  "command_results": [
+    {
+      "command": "bash -n scripts/lib/host-operation-lock.sh scripts/with_host_operation_lock.sh scripts/deploy_blue_green.sh scripts/deploy_dev.sh scripts/rollback_blue_green.sh scripts/deploy.sh scripts/ci/test_host_operation_lock.sh scripts/ci/test_detect_deploy_changes.sh && bash scripts/ci/test_host_operation_lock.sh && bash scripts/ci/test_detect_deploy_changes.sh && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_blue_green_fail_closed.sh",
+      "duration_seconds": 0.888,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 32.495,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:2050) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:2044) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:3128) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 95.032,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "bash -n scripts/lib/host-operation-lock.sh scripts/with_host_operation_lock.sh scripts/deploy_blue_green.sh scripts/deploy_dev.sh scripts/rollback_blue_green.sh scripts/deploy.sh scripts/ci/test_host_operation_lock.sh scripts/ci/test_detect_deploy_changes.sh && bash scripts/ci/test_host_operation_lock.sh && bash scripts/ci/test_detect_deploy_changes.sh && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_blue_green_fail_closed.sh",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-08T18:53:41.300053+00:00",
+  "diff_digest": "c534edc06d4bdfc39f858621cd04a17a8cec6e2bb542b3587349dd139d1d1aac",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "beca7ef7296ce1a28e08c6a6b76dd3106b5b11a2",
+  "idempotency_key": "9d96c67a59e1a211714f49fd50de94b6aa84224957b66bf99d312d411fbb2f97",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-q1ggs",
+  "started_at": "2026-08-08T18:51:32.702831+00:00",
+  "verification_fingerprint": "9d96c67a59e1a211714f49fd50de94b6aa84224957b66bf99d312d411fbb2f97"
+}

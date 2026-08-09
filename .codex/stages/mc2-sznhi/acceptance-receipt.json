@@ -1,0 +1,41 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/nodes/generator/generator-intro-guard.test.ts",
+      "duration_seconds": 2.925,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 44.307,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:22807) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:22813) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:23083) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 97.818,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/nodes/generator/generator-intro-guard.test.ts",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-08T16:16:56.520867+00:00",
+  "diff_digest": "116cc33af343121f774784a2f29f7eb2e2b0dc873a12ad55b03528adc218028d",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "bcb197989a64d030e1096e49f47dc1c5f1d450be",
+  "idempotency_key": "36c133fd3260e59aab674f120b63c9d6fc73476f916df9e151001ba8e9f42d52",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-sznhi",
+  "started_at": "2026-08-08T16:14:31.304986+00:00",
+  "verification_fingerprint": "36c133fd3260e59aab674f120b63c9d6fc73476f916df9e151001ba8e9f42d52"
+}

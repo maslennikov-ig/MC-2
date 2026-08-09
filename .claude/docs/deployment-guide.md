@@ -9,6 +9,68 @@
 
 Server: `95.81.98.230`, user: `claude-deploy`, path: `/opt/megacampus`
 
+## Shared host-operation lock
+
+All repository deploy and rollback entrypoints acquire
+`/opt/megacampus/.host-operation.lock` before changing containers, services, or
+Nginx. If another operation holds it, the new command exits with code 75 before
+performing work.
+
+Run any cooperating manual infrastructure operation through the same wrapper:
+
+```bash
+cd /opt/megacampus
+bash scripts/with_host_operation_lock.sh infrastructure-maintenance -- <reviewed-command> [args...]
+```
+
+The operation name is logged on rejection; do not put credentials in it. The
+wrapper holds the kernel lock for the complete child-command lifetime. Do not
+delete or replace `.host-operation.lock`: replacing the inode while it is held
+would let a second process acquire a different lock file.
+
+This is a cooperative safety boundary, not an access-control mechanism. Direct
+root commands can bypass it and remain outside the supported operating path.
+
+## GHCR credentials
+
+The production account has two distinct authentication lifetimes:
+
+- Manual host operations use a dedicated personal access token (classic) in
+  `/home/claude-deploy/.docker/config.json`. It needs only `read:packages` plus
+  read access to the private package. Authorize it for SSO if the organization
+  requires SSO.
+- CI deploys use the job-scoped `GITHUB_TOKEN`. The deploy scripts place it in
+  a private temporary `DOCKER_CONFIG` and remove that directory on exit. A
+  workflow token expires when its job ends and must never replace the persistent
+  host credential.
+
+Deploy `scripts/lib/ghcr-auth.sh` and the adopting deploy script before rotating
+the persistent credential; otherwise the next CI deploy will overwrite the new
+token. Never copy the broader root Docker config to `claude-deploy`.
+
+For an interactive rotation, avoid command history and verify metadata access
+without downloading image layers:
+
+```bash
+read -rsp 'GHCR read token: ' CR_PAT; echo
+printf '%s' "$CR_PAT" | docker login ghcr.io -u maslennikov-ig --password-stdin
+unset CR_PAT
+docker manifest inspect 'ghcr.io/maslennikov-ig/mc-2/api@sha256:<current-digest>' >/dev/null
+```
+
+## Colour environment contract
+
+`.env.blue` and `.env.green` are generated snapshots, not independent configuration sources.
+`scripts/deploy_blue_green.sh` copies `.env.production` and appends the colour, ports, project name,
+and immutable web/API image references.
+
+The CI lint job runs `node scripts/ci/check_color_env_contract.mjs`. It derives every `${VAR:?}`
+key from `docker-compose.app.yml` and `docker-compose.production.yml`, derives the available base and
+overlay keys from the workflow and generator, and fails if either generated colour environment
+would omit a required key. When adding a required Compose variable, add its producer to
+`.env.production` or the colour overlay in the same change; do not hand-edit only one live colour
+file.
+
 ## Architecture Overview
 
 ### Docker Compose Files
@@ -126,9 +188,9 @@ bootstrapped and verified; the ordinary deploy is not the first Q12 activation.
 ### Release-bound sequence
 
 1. Require the exact 40-character release commit and read the active color.
-2. Log in to GHCR when needed; pull the release-tagged `qdrant-operator`, resolve
-   its repository digest, validate 64 lowercase hex, and persist only
-   `QDRANT_OPERATOR_IMAGE_SHA256`.
+2. Log in to GHCR with the job token in an ephemeral Docker config; pull the
+   release-tagged `qdrant-operator`, resolve its repository digest, validate 64
+   lowercase hex, and persist only `QDRANT_OPERATOR_IMAGE_SHA256`.
 3. Verify the manually managed Docling image and prepare host data directories.
 4. Start the reviewed shared infrastructure with `.env.production`.
 5. Resolve immutable web/API digests for both current and target colors and

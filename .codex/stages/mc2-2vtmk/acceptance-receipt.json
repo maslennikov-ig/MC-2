@@ -1,0 +1,41 @@
+{
+  "command_results": [
+    {
+      "command": "bash -n scripts/lib/ghcr-auth.sh scripts/deploy_blue_green.sh scripts/deploy_dev.sh scripts/ci/test_ephemeral_ghcr_auth.sh scripts/ci/detect_deploy_changes.sh scripts/ci/test_detect_deploy_changes.sh scripts/ci/test_blue_green_fail_closed.sh && bash scripts/ci/test_ephemeral_ghcr_auth.sh && bash scripts/ci/test_detect_deploy_changes.sh && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_blue_green_fail_closed.sh",
+      "duration_seconds": 0.796,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run type-check",
+      "duration_seconds": 26.073,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm run build",
+      "deprecations": [
+        "packages/web build: (node:65691) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:65697) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:65904) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 82.748,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "bash -n scripts/lib/ghcr-auth.sh scripts/deploy_blue_green.sh scripts/deploy_dev.sh scripts/ci/test_ephemeral_ghcr_auth.sh scripts/ci/detect_deploy_changes.sh scripts/ci/test_detect_deploy_changes.sh scripts/ci/test_blue_green_fail_closed.sh && bash scripts/ci/test_ephemeral_ghcr_auth.sh && bash scripts/ci/test_detect_deploy_changes.sh && node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_blue_green_fail_closed.sh",
+    "pnpm run type-check",
+    "pnpm run build"
+  ],
+  "completed_at": "2026-08-09T07:08:06.510700+00:00",
+  "diff_digest": "0ef0e5b22c33da594abe7cfcc98819b2561870da45b210be4a4f573a1d603fe4",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "dc0eb563fdb2461ad87bbb16a411a61aa10dcf74",
+  "idempotency_key": "b47a26d5a74f04404d324315707ff1610ab8a83768249dde49eb1116ed8494c1",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-2vtmk",
+  "started_at": "2026-08-09T07:06:16.726972+00:00",
+  "verification_fingerprint": "b47a26d5a74f04404d324315707ff1610ab8a83768249dde49eb1116ed8494c1"
+}

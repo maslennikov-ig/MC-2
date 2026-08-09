@@ -3,7 +3,7 @@
   "stage_id": "mc2-nxd3g",
   "goal_id": "mc2-nxd3g",
   "profile_at_creation": "balanced-v2.16",
-  "status": "active",
+  "status": "accepted",
   "sequence": 1,
   "acceptance_boundary_id": "docling-mcp2-integration",
   "acceptance_owner": "root",

@@ -185,8 +185,6 @@ const messages = {
       coursePending: 'Course creation is unavailable until the backend action is connected',
       deletePending: 'Delete is unavailable until the backend action is connected',
       pdfPending: 'PDF export is unavailable until the backend action is connected',
-      editLocal: 'Block edit saved locally until the backend action is connected',
-      regenerateLocal: 'Block regenerated locally until the backend action is connected',
       generatingTitle: 'Generating {title}',
       blocksReady: '{ready} of {total} blocks ready',
       thinkingStream: 'Show thinking stream',

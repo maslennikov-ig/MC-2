@@ -179,9 +179,13 @@ jobs:
 
       - name: Verify deploy contracts
         run: |
+          node scripts/ci/check_color_env_contract.mjs
+          node scripts/ci/test_color_env_contract.mjs
           node scripts/ci/test_ci_cd_workflow_gates.mjs
           bash scripts/ci/test_detect_deploy_changes.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
+          bash scripts/ci/test_host_operation_lock.sh
+          bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
 
   type-check:
@@ -707,6 +711,9 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     needs: [changes, ci-success, build-docker, migration-drift-check]
     if: always() && needs.changes.outputs.should_deploy == 'true' && needs.ci-success.result == 'success' && (needs.build-docker.result == 'success' || (needs.build-docker.result == 'skipped' && needs.changes.outputs.should_build_docker != 'true')) && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && (github.ref == 'refs/heads/master' || inputs.force_deploy)
     timeout-minutes: 10
@@ -747,9 +754,12 @@ jobs:
           scp -i ~/.ssh/deploy_key \
             scripts/deploy_blue_green.sh \
             scripts/rollback_blue_green.sh \
+            scripts/with_host_operation_lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
           scp -i ~/.ssh/deploy_key \
             scripts/lib/docling-rollout.sh \
+            scripts/lib/ghcr-auth.sh \
+            scripts/lib/host-operation-lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
           # mc2-o0g75: deploy/qdrant/** is deployed read-only (0444, 0555) by the Q12 asset
@@ -1104,6 +1114,9 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     needs: [changes, ci-success, build-docker, migration-drift-check]
     if: always() && needs.changes.outputs.should_deploy == 'true' && needs.ci-success.result == 'success' && (needs.build-docker.result == 'success' || (needs.build-docker.result == 'skipped' && needs.changes.outputs.should_build_docker != 'true')) && (needs.migration-drift-check.result == 'success' || needs.migration-drift-check.result == 'skipped') && github.ref == 'refs/heads/develop' && github.event_name == 'push'
     timeout-minutes: 20
@@ -1138,9 +1151,12 @@ jobs:
 
           scp -i ~/.ssh/deploy_key \
             scripts/deploy_dev.sh \
+            scripts/with_host_operation_lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
           scp -i ~/.ssh/deploy_key \
             scripts/lib/docling-rollout.sh \
+            scripts/lib/ghcr-auth.sh \
+            scripts/lib/host-operation-lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
       - name: Create .env.dev

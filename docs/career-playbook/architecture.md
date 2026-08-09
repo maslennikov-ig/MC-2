@@ -70,6 +70,24 @@ The compatibility mutation `careerPlaybook.share.shareToggle` maps to
 `private`/`public`, while the canonical protected mutation is
 `careerPlaybook.library.updateVisibility({ playbookId, visibility })`.
 
+## Durable Block Actions
+
+Owner edits use `careerPlaybook.library.edit`. The backend updates the selected
+entry in `career_playbooks.generated_blocks` and rebuilds `final_markdown` in
+the same database update, so a later viewer load returns the edited document.
+The web store never applies an edit as a local fallback: when the mutation is
+unavailable or superseded by navigation to another playbook, it leaves the
+current viewer unchanged and reports that the change was not saved.
+
+Owner regeneration uses `careerPlaybook.library.regenerateBlock`. The mutation
+marks the selected block `regenerating` and enqueues a deterministic
+`REGENERATE_BLOCK` job. If queue preparation fails, the mutation restores the
+previous block state. The worker merges the generated block into the latest
+stored block map, rebuilds `final_markdown`, and marks the block `failed` while
+preserving its prior content if generation fails. The viewer polls
+`careerPlaybook.generation.getBlock` until it observes the persisted terminal
+state; it does not synthesize regenerated content in the browser.
+
 ## Generated Images
 
 Career Playbook images reuse the course card image pipeline without creating

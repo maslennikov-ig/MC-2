@@ -1,0 +1,76 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-q1ggs",
+  "goal_id": "mc2-q1ggs",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "shared-host-operation-lock",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "deployment-entrypoints",
+      "host-operation-wrapper",
+      "deployment-change-detection"
+    ],
+    "risk_models": ["concurrent-host-mutation", "interrupted-deployment", "unshipped-lock-helper"],
+    "test_environments": [
+      "isolated-shell-contention",
+      "deployment-contract-tests",
+      "pnpm-monorepo-build"
+    ],
+    "rollback_boundary": "repository-declared-deployment-entrypoints",
+    "acceptance_proofs": [
+      "second-operation-fails-before-command",
+      "lock-releases-after-owner-exit",
+      "all-deploy-entrypoints-share-lock",
+      "lock-helper-is-shipped-and-deploy-relevant",
+      "pnpm-type-check-build"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-q1ggs",
+    "source_digest": "24e09d1b7970326a683d2ce08fd1f7b3a767aecdf65fb6dc9bdd49fb40c10991",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Production, development, rollback, and legacy deploy entrypoints acquire one shared non-blocking host lock before any Docker, Nginx, or service mutation; a concurrent operation exits nonzero without running its command.",
+        "text_digest": "6568db0e594bdde270cf41a1be9edb0028bc2dcdbb38925304ef99a8d055be6f"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "A generic infrastructure wrapper holds the same lock for the full child-command lifetime, identifies the requested operation without exposing secrets, and releases the kernel lock automatically when the process exits.",
+        "text_digest": "40844fb92cf368edd673493aff61b808ba0da483707b72c9394e2db5d11dac55"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The deployment workflow ships the lock helper to the host, changes to the helper trigger deployment, and focused contention tests, deploy contract tests, type-check, and build pass without SSH, deploy, access, secret, migration, reindex, or paid work.",
+        "text_digest": "b0969eea4bdb5eca4b59428c8745d43d6789f832c7aba54fa231c6dcd207f775"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-q1ggs/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "24e09d1b7970326a683d2ce08fd1f7b3a767aecdf65fb6dc9bdd49fb40c10991",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-q1ggs",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-q1ggs/artifacts/mc2-q1ggs.md",
+      "status": "accepted"
+    }
+  ]
+}

@@ -28,6 +28,54 @@ DEBT_POLICY_REFERENCE_PATTERNS = (
 )
 PROJECT_INDEX_REVIEW_MARKER = "project-index: reviewed-no-change"
 DOCS_REVIEW_MARKER = "docs-reviewed:"
+# Accepts the kernel's own `Documentation:` spelling as well as the explicit
+# label, so an agent that recorded the decision in kernel form is not failed for
+# using a different word. Requires real content after the colon: a bare marker
+# or `n/a` would make the gate decorative. `check_project_index_review` accepts
+# DOCS_REVIEW_MARKER, so neither spelling may share that prefix.
+DOCUMENTATION_DECISION_RE = re.compile(
+    r"(?:^|;)\s*documentation(?:-decision)?:\s*(?P<value>[^;\n]*\S)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Trigger on dependency lockfiles only. `documentation_impact` classifies impact
+# on *project documentation*, and its `structural` prefixes (`app/`, `packages/`,
+# `frontend/`) match nearly every diff in a Next.js app or a monorepo, so reusing
+# it here would turn this into the blanket default it is meant to avoid. A
+# dependency bump is the one diff that reliably depends on external versioned
+# behavior.
+DEPENDENCY_LOCKFILES = {
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lockb",
+    "poetry.lock",
+    "uv.lock",
+    "Pipfile.lock",
+    "requirements.txt",
+    "go.sum",
+    "Cargo.lock",
+    "Gemfile.lock",
+    "composer.lock",
+}
+# Acceptance commands already run the typecheckers and linters that know an API
+# was removed or deprecated, but their output only ever reached the terminal:
+# the exit code cannot carry a warning. Surfacing those lines is the one signal
+# here that needs no guessing — a deprecation warning is a fact the toolchain
+# reports, not an inference from the diff. Kept deliberately small; widen only
+# after a real miss, because every added pattern is a chance to report noise.
+DEPRECATION_PATTERNS = (
+    re.compile(r"\bDeprecationWarning\b"),
+    re.compile(r"\bPendingDeprecationWarning\b"),
+    re.compile(r"\bis deprecated\b", re.IGNORECASE),
+    re.compile(r"\bdeprecated:", re.IGNORECASE),
+    re.compile(r"\bnpm warn deprecated\b", re.IGNORECASE),
+    # TS6385/TS6387: symbol and signature deprecation reported by tsc.
+    re.compile(r"\bTS638[57]\b"),
+)
+# One command can repeat the same warning per file it compiles. Report the
+# distinct lines and stop: this is a pointer to work, not a log.
+DEPRECATION_REPORT_LIMIT = 20
+DEPRECATION_LINE_LIMIT = 300
 PLACEHOLDERS = {"", "n/a", "<short cleanup result or blocker>"}
 STRUCTURAL_CHANGE_PREFIXES = (
     "app/",
@@ -752,11 +800,78 @@ def check_blocking_review_findings(
     raise SystemExit(1)
 
 
-def run_shell(command: str, cwd: pathlib.Path, dry_run: bool) -> None:
+def collect_deprecations(output: str) -> list[str]:
+    """Distinct deprecation lines from one command's output, in order."""
+
+    found: list[str] = []
+    seen: set[str] = set()
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or not any(pattern.search(line) for pattern in DEPRECATION_PATTERNS):
+            continue
+        line = line[:DEPRECATION_LINE_LIMIT]
+        if line in seen:
+            continue
+        seen.add(line)
+        found.append(line)
+        if len(found) >= DEPRECATION_REPORT_LIMIT:
+            break
+    return found
+
+
+def report_deprecations(results: list[dict[str, object]]) -> None:
+    """Print what the toolchain said about deprecated APIs.
+
+    Reporting only. Failing closeout on a warning would make the check fire on
+    ordinary work, which is exactly how two earlier attempts at this boundary
+    were reverted; the value is that the agent reads the lines and fixes them,
+    not that a gate refuses to close.
+    """
+
+    flagged = [entry for entry in results if entry.get("deprecations")]
+    if not flagged:
+        return
+    print("\ndeprecations reported by acceptance commands:")
+    for entry in flagged:
+        print(f"  $ {entry['command']}")
+        for line in entry["deprecations"]:  # type: ignore[index]
+            print(f"    {line}")
+
+
+def run_shell(command: str, cwd: pathlib.Path, dry_run: bool) -> str:
+    """Run one acceptance command, streaming its output and returning it.
+
+    The output has to stay live — waiting in silence for a long test run is a
+    real regression — so this reads the merged stream line by line instead of
+    buffering it. Merging stderr into stdout is deliberate: deprecation
+    warnings mostly arrive there, and interleaving keeps them next to the step
+    that produced them. Exit-code behavior is unchanged.
+    """
+
     print(f"$ {command}")
     if dry_run:
-        return
-    subprocess.run(command, shell=True, cwd=cwd, executable="/bin/bash", check=True)
+        return ""
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        cwd=cwd,
+        executable="/bin/bash",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        bufsize=1,
+    )
+    captured: list[str] = []
+    assert process.stdout is not None
+    with process.stdout:
+        for line in process.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            captured.append(line)
+    if process.wait() != 0:
+        raise subprocess.CalledProcessError(process.returncode, command)
+    return "".join(captured)
 
 
 def git_available(repo_root: pathlib.Path) -> bool:
@@ -991,6 +1106,49 @@ def check_documentation_review(repo_root: pathlib.Path, stage_id: str) -> None:
     raise SystemExit(1)
 
 
+def check_documentation_decision(
+    repo_root: pathlib.Path, stage_id: str, artifacts: list[dict[str, object]]
+) -> None:
+    """Close the docs preflight loop where the diff can actually depend on it.
+
+    The preflight has an entry obligation and no exit check, so a skipped
+    decision leaves no trace. Requiring the marker on every stage would just
+    produce a ritual line on local-only work, so this gates on the same impact
+    categories the documentation review already computes.
+    """
+
+    # `git_changed_files` only sees the working tree, so a stage whose work is
+    # already committed would report nothing and pass silently. Stage artifacts
+    # record their own changed files and survive the commit.
+    changed = set(git_changed_files(repo_root))
+    for artifact in artifacts:
+        recorded = artifact.get("changed_files")
+        if isinstance(recorded, list):
+            changed.update(str(raw).strip().replace("\\", "/") for raw in recorded)
+    touched_lockfiles = sorted(
+        path for path in changed if pathlib.PurePath(path).name in DEPENDENCY_LOCKFILES
+    )
+    if not touched_lockfiles:
+        print("documentation decision not required (no dependency lockfile changed)")
+        return
+
+    match = DOCUMENTATION_DECISION_RE.search(stage_summary_text(repo_root, stage_id))
+    value = match.group("value").strip().lower() if match else ""
+    if value and value not in PLACEHOLDERS:
+        print(f"documentation decision OK ({', '.join(touched_lockfiles)})")
+        return
+
+    print("Stage close requires a documentation decision marker:", file=sys.stderr)
+    print(f"- changed lockfiles: {', '.join(touched_lockfiles)}", file=sys.stderr)
+    print(
+        "- add `documentation-decision: docs-resolve - <package@version, status>` or "
+        "`documentation-decision: no external/versioned boundary - <reason>` "
+        "to the stage summary",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
 def has_tracked_defer(body: str) -> bool:
     normalized = body.strip().lower()
     if not normalized or normalized in {"none", "- none"}:
@@ -1068,14 +1226,17 @@ def main(argv: list[str]) -> int:
         results: list[dict[str, object]] = []
         for command in commands:
             started = time.monotonic()
-            run_shell(command, repo_root, args.dry_run)
-            results.append(
-                {
-                    "command": command,
-                    "result": "dry-run" if args.dry_run else "passed",
-                    "duration_seconds": round(time.monotonic() - started, 3),
-                }
-            )
+            output = run_shell(command, repo_root, args.dry_run)
+            entry: dict[str, object] = {
+                "command": command,
+                "result": "dry-run" if args.dry_run else "passed",
+                "duration_seconds": round(time.monotonic() - started, 3),
+            }
+            deprecations = collect_deprecations(output)
+            if deprecations:
+                entry["deprecations"] = deprecations
+            results.append(entry)
+        report_deprecations(results)
         return results
 
     if level == "inner_loop":
@@ -1139,6 +1300,7 @@ def main(argv: list[str]) -> int:
         check_child_acceptance_cleanup(artifacts)
         check_project_index_review(repo_root, contract, stage_id)
         check_documentation_review(repo_root, stage_id)
+        check_documentation_decision(repo_root, stage_id, artifacts)
         check_debt_markers(repo_root, contract)
         started_at = datetime.now(timezone.utc)
         results = run_selected_commands()

@@ -19,9 +19,7 @@ test.describe('Career Playbook viewer editor', () => {
   test.describe('authenticated flow', () => {
     test.use({ storageState: authenticatedStorageState })
 
-    test('edits a block and regenerates another block through the viewer fallback', async ({
-      page,
-    }) => {
+    test('persists a block edit after the viewer reloads', async ({ page }) => {
       await page.goto(`/en/career-playbook/${playbookId}`)
       await page.waitForLoadState('networkidle')
 
@@ -34,20 +32,8 @@ test.describe('Career Playbook viewer editor', () => {
       await page.getByRole('button', { name: 'Save changes' }).click()
 
       await expect(page.getByText('Edited viewer block')).toBeVisible()
-      await expect(page.getByRole('status')).toContainText(
-        'Block edit saved locally until the backend action is connected'
-      )
-
-      await page.getByRole('button', { name: 'Regenerate Mission and key results' }).click()
-      await page.getByLabel('Regeneration instruction').fill('Make it specific to enterprise sales')
-      await page.getByRole('button', { name: 'Regenerate block' }).click()
-
-      await expect(page.getByRole('article', { name: 'Mission and key results' })).toContainText(
-        'Make it specific to enterprise sales'
-      )
-      await expect(page.getByRole('status')).toContainText(
-        'Block regenerated locally until the backend action is connected'
-      )
+      await page.reload()
+      await expect(page.getByText('Edited viewer block')).toBeVisible({ timeout: 20000 })
     })
   })
 })

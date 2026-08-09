@@ -29,6 +29,11 @@ fi
 #   Green: web:3002, api:4002
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_PATH=${BASE_PATH:-/opt/megacampus}
+source "$SCRIPT_DIR/lib/host-operation-lock.sh"
+host_operation_lock_acquire blue-green-deploy \
+    "$BASE_PATH/.host-operation.lock"
+source "$SCRIPT_DIR/lib/ghcr-auth.sh"
 source "$SCRIPT_DIR/lib/docling-rollout.sh"
 
 # ============================================================================
@@ -417,7 +422,6 @@ fi
 
 ENV=${1:-production}
 TAG=${2:-}
-BASE_PATH=${BASE_PATH:-/opt/megacampus}
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/megacampus}
 DEPLOY_STATE="$BASE_PATH/deploy_state"
 WEB_REPOSITORY="ghcr.io/maslennikov-ig/mc-2/web"
@@ -649,10 +653,9 @@ fi
 
 # Resolve and pre-pull the exact operator image before any Compose invocation.
 # The CI change detector publishes this target for every deploy-relevant commit.
-if [ -n "$GITHUB_TOKEN" ]; then
-    echo "Logging in to GHCR..."
-    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
-fi
+# A workflow GITHUB_TOKEN expires with its job, so it must never replace the
+# persistent read-only host credential in ~/.docker/config.json.
+ghcr_login_with_ci_token
 OPERATOR_IMAGE="$(resolve_repo_digest "$OPERATOR_REPOSITORY:$TAG" "$OPERATOR_REPOSITORY")"
 QDRANT_OPERATOR_IMAGE_SHA256="${OPERATOR_IMAGE#"$OPERATOR_REPOSITORY@sha256:"}"
 [[ "$QDRANT_OPERATOR_IMAGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
@@ -666,8 +669,8 @@ upsert_env "$BASE_PATH/.env.$ENV" QDRANT_OPERATOR_IMAGE_SHA256 "$QDRANT_OPERATOR
 # pulls -- including a dev deploy -- which leaves the digest .env.production still points at with no
 # tag of its own. The operator image is the most exposed image on this host because no container
 # references it: all six of its services are one-shot `compose run --rm` with pull_policy: never.
-# It is also load-bearing for source recovery and for the document repair, and claude-deploy cannot
-# re-pull it while the GHCR token is dead (mc2-2vtmk), so losing it is unrecoverable in the moment.
+# It is also load-bearing for source recovery and for the document repair, so holding the accepted
+# digest keeps rollback independent from registry availability during an incident.
 docker tag "$OPERATOR_IMAGE" hold/qdrant-operator:pinned
 echo "   Operator image held as hold/qdrant-operator:pinned ($OPERATOR_IMAGE)"
 
