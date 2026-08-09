@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/host-operation-lock.sh"
 host_operation_lock_acquire development-deploy \
     "$BASE_PATH/.host-operation.lock"
+source "$SCRIPT_DIR/lib/ghcr-auth.sh"
 source "$BASE_PATH/scripts/lib/docling-rollout.sh"
 DEPLOY_WEB_CHANGED=${DEPLOY_WEB_CHANGED:-true}
 DEPLOY_API_CHANGED=${DEPLOY_API_CHANGED:-true}
@@ -139,11 +140,8 @@ qdrant_dev_gate() {
     unset admin_key
 }
 
-# 1. Docker Login to GHCR (if GITHUB_TOKEN provided)
-if [ -n "$GITHUB_TOKEN" ]; then
-    echo "Logging in to GHCR..."
-    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
-fi
+# 1. Authenticate CI without replacing the persistent read-only host credential.
+ghcr_login_with_ci_token
 
 # 2. Clean up any conflicting containers from previous failed deploys
 echo "Checking for legacy dev containers..."

@@ -65,8 +65,10 @@ former labelled as such.
   paths; never `git add -A`.
 - `q12-privileged-launch.sh` and `q12-writer-resume.py` are root-owned and deliberately NOT shipped
   by an ordinary deploy. Root ownership is the security property.
-- The GHCR token for `claude-deploy` is dead (`mc2-2vtmk`), so a digest-pinned image that gets pruned
-  cannot be re-pulled. The operator image is held under `hold/qdrant-operator:pinned` for that
-  reason, tagged BEFORE any prune.
+- The default GHCR credential for `claude-deploy` is currently unusable (`mc2-2vtmk`). CI deploys
+  were replacing it with a job-scoped `GITHUB_TOKEN`, which expires after the job. Until the
+  ephemeral-config fix is deployed and a dedicated `read:packages` PAT is installed, a
+  digest-pinned image that gets pruned cannot be re-pulled under this account. The operator image
+  remains held under `hold/qdrant-operator:pinned`, tagged BEFORE any prune.
 - Prometheus retention lives in `prometheus.yml` with the CLI flags REMOVED: a flag silently
   overrides the config file.

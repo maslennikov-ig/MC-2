@@ -115,6 +115,13 @@ assert_value "$host_lock" deploy_config_changed true
 assert_value "$host_lock" api_changed false
 assert_contains "$host_lock" '"image":"qdrant-operator"'
 
+ghcr_auth="$(run_case "ghcr-auth" scripts/lib/ghcr-auth.sh)"
+assert_value "$ghcr_auth" should_deploy true
+assert_value "$ghcr_auth" should_build_docker true
+assert_value "$ghcr_auth" deploy_config_changed true
+assert_value "$ghcr_auth" api_changed false
+assert_contains "$ghcr_auth" '"image":"qdrant-operator"'
+
 ci_only="$(run_case "ci-only" .github/workflows/ci-cd.yml scripts/ci/detect_deploy_changes.sh)"
 assert_value "$ci_only" should_deploy true
 assert_value "$ci_only" should_build_docker true

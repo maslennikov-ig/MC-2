@@ -41,6 +41,7 @@ for (const contractCommand of [
   'bash scripts/ci/test_detect_deploy_changes.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
   'bash scripts/ci/test_host_operation_lock.sh',
+  'bash scripts/ci/test_ephemeral_ghcr_auth.sh',
   'bash scripts/ci/test_docling_rollout.sh',
 ]) {
   assert(
@@ -99,13 +100,15 @@ for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
 }
 assert(
   copyDeploymentFiles.includes('scripts/lib/host-operation-lock.sh') &&
-    copyDeploymentFiles.includes('scripts/with_host_operation_lock.sh'),
-  'staging deploy must ship the shared host-operation lock entrypoints'
+    copyDeploymentFiles.includes('scripts/with_host_operation_lock.sh') &&
+    copyDeploymentFiles.includes('scripts/lib/ghcr-auth.sh'),
+  'staging deploy must ship the host-operation lock and ephemeral GHCR auth entrypoints'
 );
 assert(
   copyDevDeploymentFiles?.includes('scripts/lib/host-operation-lock.sh') &&
-    copyDevDeploymentFiles.includes('scripts/with_host_operation_lock.sh'),
-  'development deploy must ship the shared host-operation lock entrypoints'
+    copyDevDeploymentFiles.includes('scripts/with_host_operation_lock.sh') &&
+    copyDevDeploymentFiles.includes('scripts/lib/ghcr-auth.sh'),
+  'development deploy must ship the host-operation lock and ephemeral GHCR auth entrypoints'
 );
 
 assert(createProductionEnv, 'staging deploy must create .env.production');

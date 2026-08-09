@@ -183,6 +183,7 @@ jobs:
           bash scripts/ci/test_detect_deploy_changes.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
           bash scripts/ci/test_host_operation_lock.sh
+          bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
 
   type-check:
@@ -752,6 +753,7 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
           scp -i ~/.ssh/deploy_key \
             scripts/lib/docling-rollout.sh \
+            scripts/lib/ghcr-auth.sh \
             scripts/lib/host-operation-lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
@@ -1145,6 +1147,7 @@ jobs:
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
           scp -i ~/.ssh/deploy_key \
             scripts/lib/docling-rollout.sh \
+            scripts/lib/ghcr-auth.sh \
             scripts/lib/host-operation-lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
