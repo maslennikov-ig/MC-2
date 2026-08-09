@@ -19,7 +19,7 @@ epic_id: n/a
 stage_id: mc2-2vtmk
 session_id: mc2-2vtmk
 milestone: cohesive-vertical-slice
-milestone_status: in_progress
+milestone_status: accepted
 agent_type: custom
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -51,22 +51,22 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: no temporary credential backup or runtime resource exists yet
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: live rollback backup removed after verification; root owner has no child branch or worktree
 risk_level: high
 risk_tags:
   - security
   - authorization
   - rollback
 affected_surfaces:
-  - none
+  - backend
 invariants:
   - rollback
 docs_impact: ops-deploy
-docs_reviewed: n/a
+docs_reviewed: updated
 docs_review_notes: deployment guide updated with separate persistent and job-scoped credential lifetimes
 verification:
   - production docker manifest inspect as claude-deploy: failed with denied, proving the current credential is unusable
@@ -74,8 +74,11 @@ verification:
   - production empty temporary DOCKER_CONFIG compose preflight: passed, Docker Compose 5.0.2 remains available
   - focused deploy credential isolation and delivery contract tests: passed
   - independent security review: passed after packages permission finding was fixed and re-reviewed
+  - credential installation rollback preflight: passed with no Docker credential helper and a same-directory mode-0600 backup
+  - fresh-session production docker manifest inspect as claude-deploy: passed without pulling image layers; config mode 0600 and backup count zero
   - pnpm type-check: passed
   - pnpm build: passed with the existing mc2-p2908.1 url.parse warning
+  - canonical process verification: passed through the stage closeout entrypoint
 changed_files:
   - .github/workflows/ci-cd.yml
   - scripts/lib/ghcr-auth.sh
@@ -88,50 +91,48 @@ changed_files:
   - .claude/docs/deployment-guide.md
   - .codex/repository-failure-modes.md
 explicit_defers:
-  - production credential installation waits for delivery of commit 63b4e2efd so the next CI deploy cannot overwrite it again
+  - repository delivery waits until the owner finishes the backlog; the first later deploy must include commit 63b4e2efd
 ---
 
 # Summary
 
-The current production GHCR credential is unusable, but the historical claim that a PAT expired was
-too strong. The default Docker config was rewritten during a dev deployment with the job-scoped
-`GITHUB_TOKEN`, which GitHub expires after the job. Commit `63b4e2efd` isolates CI authentication in
-a temporary Docker config so a dedicated persistent read-only PAT can survive future deployments.
-Commit `38cf560d5` restricts both deploy jobs to `contents: read` and `packages: read`; image build
-jobs retain the write permission they need.
+The initial production GHCR credential was unusable, but the historical claim that a PAT expired
+was too strong. CI had rewritten the persistent Docker config with its job-scoped `GITHUB_TOKEN`.
+The dedicated read-only credential supplied by the owner is now installed and verified. Commit
+`63b4e2efd` isolates future CI authentication in a temporary Docker config, and `38cf560d5` limits
+deploy jobs to `contents: read` and `packages: read`.
 
 # Scope / Routing
 
 One root-owned production credential boundary. The user explicitly authorized the read-only live
 check and, if needed, credential reissuance. No deploy, image pull, or service mutation is in scope.
 
-Technical premortem verdict: GO WITH CONDITIONS. Rotating before the code fix is delivered would
-repeat the incident on the next deploy, so delivery of `63b4e2efd` is a hard precondition. An empty
-temporary `DOCKER_CONFIG` still exposes system Docker Compose 5.0.2 on the host. The focused test
-proves cleanup on failed login and preservation of the persistent config. Recovery for a failed
-future login is fail-closed before registry-backed deploy work; the persistent config remains
-unchanged.
+Technical premortem verdict: GO WITH CONDITIONS. The owner explicitly accepted the bounded risk of
+rotating before code delivery. The installation therefore used a same-directory mode-0600 backup,
+signal-safe rollback, stdin with terminal echo disabled, and a fresh-session manifest probe. The
+host has no Docker credential helper, so Docker's standard config is access-controlled but not
+encrypted at rest.
 
 # Verification
 
-The live probe ran as `claude-deploy` UID 1000 against the current immutable API image and returned
-`denied` without pulling layers. The Docker config mtime falls inside GitHub Actions run
+The initial live probe ran as `claude-deploy` UID 1000 against the current immutable API image and
+returned `denied` without pulling layers. The Docker config mtime falls inside GitHub Actions run
 `31254580512` job `Deploy to Dev`; the repository path executed a default-config `docker login` with
 that job's `GITHUB_TOKEN`. Focused tests first failed by observing both deploy entrypoints overwrite
 the persistent config, then passed after the ephemeral-config implementation. Type-check and build
-also passed.
+also passed. After replacement, an independent fresh SSH session inspected the same manifest with
+exit 0 as `claude-deploy`; the persistent config remained mode `0600` and no backup remained.
 
 # Delivery / Cleanup
 
 The repository fix is committed locally as `63b4e2efd` plus least-privilege hardening
 `38cf560d5`. An independent security reviewer reported no remaining findings after re-reviewing the
-hardening delta. The commits have not been pushed, merged, or deployed. The persistent PAT has not
-been created or installed because doing so before delivery would produce another known-bad
-transient repair.
+hardening delta and final rollback evidence. The commits have not been pushed, merged, or deployed.
+The persistent read-only credential is installed and verified; its temporary backup was deleted.
 
 # Risks / Follow-ups / Explicit Defers
 
-Delivery of `63b4e2efd` and a green pipeline must precede credential rotation. Then create a
-personal access token (classic) with only `read:packages`, authorize SSO if required, install it via
-stdin as `claude-deploy`, and rerun the same immutable manifest probe. Do not copy the broader root
-Docker config and do not paste the token into chat or shell history.
+Repository delivery is intentionally deferred until the owner finishes the backlog. The first later
+deploy must include `63b4e2efd`; an older deploy revision can overwrite the persistent credential
+again. Do not copy the broader root Docker config. The credential is stored in Docker's standard
+mode-0600 config because no credential helper is configured.

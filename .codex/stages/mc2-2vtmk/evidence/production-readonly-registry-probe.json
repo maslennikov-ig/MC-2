@@ -7,7 +7,7 @@
     "user": "claude-deploy",
     "uid": 1000
   },
-  "probe": {
+  "initial_probe": {
     "operation": "docker manifest inspect",
     "image_repository": "ghcr.io/maslennikov-ig/mc-2/api",
     "image_digest": "e30bf5faf6c0aa7171b64caa9e99967dd92d3356f31c5040d4ffba10167b9386",
@@ -41,5 +41,37 @@
     "operation": "DOCKER_CONFIG=<empty-temporary-directory> docker compose version --short",
     "result": "5.0.2",
     "temporary_directory_removed": true
+  },
+  "credential_replacement": {
+    "authorized_by_owner": true,
+    "input_channel": "stdin with terminal echo disabled",
+    "credential_present_in_argv_or_repository": false,
+    "credential_or_docker_config_content_emitted": false,
+    "credential_helper_present": false,
+    "rollback": {
+      "backup_location": "same directory as persistent Docker config",
+      "backup_mode": "0600",
+      "restore_on": ["failed login", "failed verification", "EXIT", "HUP", "INT", "TERM"],
+      "backup_removed_after_success": true
+    },
+    "installed_config_metadata": {
+      "owner": "claude-deploy",
+      "mode": "0600",
+      "ghcr_entry_present": true
+    }
+  },
+  "final_probe": {
+    "session": "fresh independent SSH session",
+    "operation": "docker manifest inspect",
+    "image_repository": "ghcr.io/maslennikov-ig/mc-2/api",
+    "image_digest": "e30bf5faf6c0aa7171b64caa9e99967dd92d3356f31c5040d4ffba10167b9386",
+    "identity": "claude-deploy",
+    "uid": 1000,
+    "exit_code": 0,
+    "sanitized_result": "authorized",
+    "image_layers_downloaded": false,
+    "credential_or_config_content_emitted": false,
+    "config_mode": "0600",
+    "temporary_backup_count": 0
   }
 }

@@ -5,20 +5,22 @@ Current stage id: `mc2-2vtmk`
 
 ## Current stage
 
-`mc2-2vtmk` is active. A read-only production probe as `claude-deploy` UID 1000 returned `denied`
-for the current immutable private API image. It did not pull layers or expose credential/config
-content. The issue is current, but the old claim that a PAT expired was imprecise.
+`mc2-2vtmk` is accepted locally. The initial read-only production probe as `claude-deploy` UID 1000
+returned `denied` for the current immutable private API image. The old claim that a PAT expired was
+imprecise: CI had replaced the persistent credential with its job-scoped `GITHUB_TOKEN`.
 
 Root cause: CI passed its job-scoped `GITHUB_TOKEN` to both deploy scripts, and `docker login` wrote
 the token to the account's persistent config. That config was modified at `2026-08-08T11:29:49Z`,
 inside successful run `31254580512` job `Deploy to Dev` (`11:29:22–11:31:29Z`). GitHub expires the
 job token after the job. Commit `63b4e2efd` isolates CI login in a private temporary Docker config;
-commit `38cf560d5` limits both deploy jobs to `contents: read` and `packages: read`. Focused tests,
-type-check, build, and independent security re-review pass. Neither commit is pushed or deployed.
+commit `38cf560d5` limits both deploy jobs to `contents: read` and `packages: read`.
 
-Do not install the replacement PAT until `63b4e2efd` is delivered on a green pipeline; the current
-host scripts would overwrite it on the next deploy. After delivery, create a classic PAT with only
-`read:packages`, install it via stdin as `claude-deploy`, and accept with the same manifest probe.
+The owner then explicitly authorized installing the supplied read-only credential before delivery.
+It was passed via stdin with terminal echo disabled, protected by same-directory rollback, and
+verified in a fresh SSH session: immutable manifest inspection succeeds as `claude-deploy`, config
+mode is `0600`, no backup remains, and no image was pulled. Neither repository commit is pushed or
+deployed. Do not run an older CI deploy revision: the first later deploy must include `63b4e2efd`
+or it can overwrite the persistent credential again.
 
 ## Backlog truth and order
 
@@ -27,7 +29,7 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-q1ggs`. Work is active on `mc2-2vtmk` in exact spec order.
+through `mc2-2vtmk`. The next item in exact spec order is `mc2-c2p8z`.
 
 ## Verification facts
 
@@ -83,17 +85,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Active stage id: `mc2-2vtmk`
-Recommended action: measure current `claude-deploy` GHCR access with a secret-safe manifest probe;
-replace the credential only if denied, then prove the final state with the same probe.
+Next stage id: `mc2-c2p8z`
+Recommended action: start `mc2-c2p8z` and implement the CI check that every required Compose
+`${VAR:?}` variable exists in both production colour environment files.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-Continue the active `mc2-2vtmk` stage. The user authorized its read-only production check and, if
-needed, credential reissuance. Keep the probe secret-safe and do not perform a deploy, image pull,
-service mutation, root credential change, or any other §9 work.
+Start `mc2-c2p8z` in exact specification order. Add the smallest fail-closed CI check that every
+required Compose `${VAR:?}` reference is present in both production colour environment files.
+Preserve unrelated work. Do not merge, push, deploy, migrate, reindex, change secrets/access, or
+perform paid work.
 
 ## Read first
 
