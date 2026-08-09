@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-stds7`
+Current stage id: `mc2-68qwn`
 
 ## Current stage
 
@@ -11,9 +11,10 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-`mc2-5e4ek.2`, `mc2-k2qih`, and `mc2-mt07s` are delivered locally in `1e4caad9f`, `02bb9a670`,
-and `4dc9a24e7`. The active item `mc2-stds7` fixes the remaining combined token-budget/task-cap
-finding after a red test proved the cross-batch skipped-task count could become negative.
+`mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, and `mc2-stds7` are delivered locally in `1e4caad9f`,
+`02bb9a670`, `4dc9a24e7`, and `8a613f98f`. `mc2-r7udy` is blocked because a truthful worker
+lifecycle event needs a new `system_metrics` enum value, which is a forbidden schema migration.
+The active item `mc2-68qwn` audits Q12 name/text union coercion and adds long-identity coverage.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -26,8 +27,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-mt07s`
-after `mc2-k2qih` and the research/migration gate review.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-68qwn`
+after the `mc2-r7udy` schema-migration gate review.
 
 ## Verification facts
 
@@ -65,6 +66,9 @@ after `mc2-k2qih` and the research/migration gate review.
 - Targeted refinement now counts budget-skipped work across the complete five-task selected set;
   combined eight-available/five-selected/three-executed coverage proves the count is two, not a
   negative cross-batch value.
+- The named Q12 capture/projection surfaces have a tracked name-versus-text coercion audit. No
+  second live hazard was found; a default structural guard and disposable PostgreSQL 17.10 test
+  preserve source-manifest identities longer than 63 bytes.
 
 ## Live operational facts
 
@@ -103,6 +107,9 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
   owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
   routing metadata but intentionally makes no output-quality claim.
+- Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
+  `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
+  specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
 - Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
   `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
   validator fixtures unchanged in meaning.
@@ -124,20 +131,20 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-stds7`
-Current stage id: `mc2-stds7`
-Next stage id: `mc2-r7udy`
-Recommended action: commit and close the combined token-safety fix, then continue with worker
-runtime build/instance observability in `mc2-r7udy`.
+Accepted stage id: `mc2-68qwn`
+Current stage id: `mc2-68qwn`
+Next stage id: `mc2-vb8kl`
+Recommended action: commit the Q12 SQL coercion audit and regression, then prove the reindex origin
+guard in `mc2-vb8kl` without executing a reindex.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-stds7` has a red/green combined cap-and-budget regression test plus green lint, formatting,
-type-check, build, and graph evidence awaiting stage closeout and commit. Then continue with
-`mc2-r7udy`. Do not reindex, migrate, force-push, perform paid work, or deploy before a green
-pipeline.
+`mc2-68qwn` has a tracked audit, a default structural guard, and a green disposable PostgreSQL
+17.10 long-identity regression plus green lint, formatting, type-check, build, and graph evidence
+awaiting stage closeout and commit. Then continue with `mc2-vb8kl`. Do not reindex, migrate,
+force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { catalogSql } from '../../../../../deploy/postgres/q12-source-manifest';
 
 const REAL_PG17 = process.env.MC2_Q12_REAL_PG17 === '1';
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
@@ -525,6 +526,26 @@ function createOidParityDatabase(
   );
 }
 
+describe('Q12 source-manifest identity union type anchors', () => {
+  it('anchors every composite catalog identity union as text', () => {
+    const sql = catalogSql(null);
+    const markers = ["'object_owners'", "'object_acls'", "'comments'", "'security_labels'"];
+    let cursor = 0;
+
+    for (const [index, startMarker] of markers.entries()) {
+      const start = sql.indexOf(startMarker, cursor);
+      const endMarker = markers[index + 1] ?? '\n  ) value\n)\nSELECT jsonb_build_object';
+      const end = sql.indexOf(endMarker, start + startMarker.length);
+      expect(start, `missing ${startMarker}`).toBeGreaterThan(-1);
+      expect(end, `missing ${endMarker} after ${startMarker}`).toBeGreaterThan(start);
+      expect(sql.slice(start, end)).toMatch(
+        /SELECT 'schema' object_type,\s*NULL::text schema,\s*n\.nspname::text identity/u
+      );
+      cursor = start + startMarker.length;
+    }
+  });
+});
+
 describe.runIf(REAL_PG17)('Q12 canonical catalog against real PostgreSQL 17.10', () => {
   beforeAll(async () => {
     expect(structuralCatalogSql).not.toContain(';');
@@ -562,6 +583,19 @@ describe.runIf(REAL_PG17)('Q12 canonical catalog against real PostgreSQL 17.10',
         name text,
         statements text[]
       );
+      CREATE SCHEMA cron;
+      CREATE TABLE cron.job(
+        jobid bigint,
+        schedule text,
+        command text,
+        nodename text,
+        nodeport integer,
+        database text,
+        username text,
+        active boolean
+      );
+      CREATE SCHEMA net;
+      CREATE TABLE net.http_request_queue(id bigint);
       CREATE SCHEMA fixture;
       CREATE TYPE fixture.cast_source AS ENUM ('source');
       CREATE TYPE fixture.cast_target AS ENUM ('target');
@@ -608,6 +642,48 @@ describe.runIf(REAL_PG17)('Q12 canonical catalog against real PostgreSQL 17.10',
 
   afterAll(() => {
     docker(['rm', '-f', CONTAINER], undefined, 30_000);
+  });
+
+  it('preserves function identities longer than PostgreSQL NAMEDATALEN in source-manifest unions', () => {
+    psql(`
+      CREATE FUNCTION fixture.long_identity_probe(
+        first_descriptive_argument text,
+        second_descriptive_argument text,
+        third_descriptive_argument text,
+        fourth_descriptive_argument text
+      ) RETURNS text LANGUAGE SQL IMMUTABLE
+      AS $function$ SELECT $1 || $2 || $3 || $4 $function$;
+      COMMENT ON FUNCTION fixture.long_identity_probe(text, text, text, text)
+        IS 'long-identity-regression';
+    `);
+
+    try {
+      const expectedIdentity = psql(`
+        SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'fixture' AND p.proname = 'long_identity_probe'
+      `);
+      expect(Buffer.byteLength(expectedIdentity, 'utf8')).toBeGreaterThan(63);
+
+      const output = psql(catalogSql(null));
+      const payloadLine = output.split('\n').find(line => line.startsWith('{'));
+      expect(payloadLine, output).toBeDefined();
+      const payload = JSON.parse(payloadLine!) as {
+        catalog: Record<string, Array<{ object_type: string; identity: string }>>;
+      };
+
+      for (const section of ['object_owners', 'object_acls', 'comments'] as const) {
+        expect(
+          payload.catalog[section].some(
+            item => item.object_type === 'function' && item.identity === expectedIdentity
+          ),
+          `${section} did not preserve ${expectedIdentity}`
+        ).toBe(true);
+      }
+    } finally {
+      psql('DROP FUNCTION IF EXISTS fixture.long_identity_probe(text, text, text, text)');
+    }
   });
 
   // mc2-34eua follow-up: the plan CAPTURES this catalog and the barrier RE-MEASURES it, and the two
