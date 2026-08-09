@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-mt07s`
+Current stage id: `mc2-stds7`
 
 ## Current stage
 
@@ -11,9 +11,9 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-`mc2-5e4ek.2` and `mc2-k2qih` are delivered locally in `1e4caad9f` and `02bb9a670`. The active
-item `mc2-mt07s` removes the last Stage 6 model-routing language normalization after restating its
-expired title risk against the current phase-based implementation.
+`mc2-5e4ek.2`, `mc2-k2qih`, and `mc2-mt07s` are delivered locally in `1e4caad9f`, `02bb9a670`,
+and `4dc9a24e7`. The active item `mc2-stds7` fixes the remaining combined token-budget/task-cap
+finding after a red test proved the cross-batch skipped-task count could become negative.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -62,6 +62,9 @@ after `mc2-k2qih` and the research/migration gate review.
 - Stage 6 main generation and self-review phase routing pass non-ru/en language codes unchanged;
   the dead ru/en-normalizing model helper and language-keyed fallback map are removed. Deterministic
   `de` coverage proves routing only; no paid multilingual quality run was performed.
+- Targeted refinement now counts budget-skipped work across the complete five-task selected set;
+  combined eight-available/five-selected/three-executed coverage proves the count is two, not a
+  negative cross-batch value.
 
 ## Live operational facts
 
@@ -121,19 +124,20 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-k2qih`
-Current stage id: `mc2-mt07s`
-Next stage id: `mc2-stds7`
-Recommended action: accept and close the narrowed multilingual routing cleanup, then narrow
-`mc2-stds7` to its remaining S-2 combined-limit test.
+Accepted stage id: `mc2-stds7`
+Current stage id: `mc2-stds7`
+Next stage id: `mc2-r7udy`
+Recommended action: commit and close the combined token-safety fix, then continue with worker
+runtime build/instance observability in `mc2-r7udy`.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The restated item `mc2-mt07s` has green non-ru/en routing tests, lint, type-check, and build evidence
-awaiting stage closeout and commit. Then continue with the S-2 remainder of `mc2-stds7`. Do not
-reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
+`mc2-stds7` has a red/green combined cap-and-budget regression test plus green lint, formatting,
+type-check, build, and graph evidence awaiting stage closeout and commit. Then continue with
+`mc2-r7udy`. Do not reindex, migrate, force-push, perform paid work, or deploy before a green
+pipeline.
 
 ## Read first
 
