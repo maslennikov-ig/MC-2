@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-k2qih",
+  "source_kind": "beads",
+  "source_id": "mc2-k2qih",
+  "source_digest": "98906cced77b5c0a10297f103804d675ef6a90d8e21ac5dcdbce1e09a8b9364e",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Left and right Career Playbook reader rails animate hide and show with compositor-friendly transform and opacity while the document layout moves smoothly.",
+      "text_digest": "3f109e85452cc369b37fecae4c2ae181faae99c7b8da836724f97b5706de97a4"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Panel URL state, semantic removal, existing TOC scroll synchronization, and reduced-motion accessibility remain intact.",
+      "text_digest": "227dbd9ec566e0eb70e58777a6b792dc86c3a41385614fece36cf10255951ce9"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Focused unit and browser coverage is added; lint, formatting, pnpm type-check, and pnpm build pass, with any environment-only browser blocker recorded exactly.",
+      "text_digest": "553842584bf38513d287c49d836b99d0e8ea102146753f4f3f8bc7cd645bde53"
+    }
+  ]
+}

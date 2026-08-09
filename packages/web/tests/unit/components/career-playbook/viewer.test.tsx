@@ -261,12 +261,13 @@ describe('Career Playbook viewer components', () => {
     )
 
     const inspector = screen.getByRole('complementary', { name: 'Инспектор документа' })
+    const inspectorScroller = inspector.parentElement
     const title = within(inspector).getByText('Инспектор документа')
     const imageHeading = within(inspector).getByRole('heading', { name: 'Изображение' })
     const pdfAction = within(inspector).getByRole('button', { name: 'PDF' })
 
-    expect(inspector).toHaveClass('xl:max-h-[calc(100vh-6rem)]')
-    expect(inspector).toHaveClass('xl:overflow-y-auto')
+    expect(inspectorScroller).toHaveClass('xl:max-h-[calc(100vh-6rem)]')
+    expect(inspectorScroller).toHaveClass('xl:overflow-y-auto')
     expect(title.compareDocumentPosition(imageHeading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(imageHeading.compareDocumentPosition(pdfAction)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     const kpiBlock = screen.getByRole('article', { name: 'Показатели эффективности' })
@@ -382,20 +383,30 @@ describe('Career Playbook viewer components', () => {
     )
 
     const leftPanelButton = screen.getByRole('button', { name: 'Скрыть левую панель' })
+    const leftPanel = screen.getByRole('navigation', {
+      name: 'Содержание должностной инструкции',
+    })
     expect(leftPanelButton).toHaveAttribute('aria-expanded', 'true')
     await user.click(leftPanelButton)
-    expect(
-      screen.queryByRole('navigation', { name: 'Содержание должностной инструкции' })
-    ).not.toBeInTheDocument()
+    expect(leftPanel).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('navigation', { name: 'Содержание должностной инструкции' })
+      ).not.toBeInTheDocument()
+    })
     expect(window.location.search).toContain('toc=closed')
     expect(window.location.hash).toBe('#block_1')
 
     const rightPanelButton = screen.getByRole('button', { name: 'Скрыть правый блок' })
+    const rightPanel = screen.getByRole('complementary', { name: 'Инспектор документа' })
     expect(rightPanelButton).toHaveAttribute('aria-expanded', 'true')
     await user.click(rightPanelButton)
-    expect(
-      screen.queryByRole('complementary', { name: 'Инспектор документа' })
-    ).not.toBeInTheDocument()
+    expect(rightPanel).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('complementary', { name: 'Инспектор документа' })
+      ).not.toBeInTheDocument()
+    })
     expect(window.location.search).toContain('panel=closed')
 
     await user.click(screen.getByRole('button', { name: 'Режим чтения' }))
@@ -412,6 +423,48 @@ describe('Career Playbook viewer components', () => {
     ).not.toBeInTheDocument()
     expect(window.location.search).toContain('mode=reading')
     expect(window.location.hash).toBe('#block_1')
+  })
+
+  it('removes panels without an exit animation when reduced motion is preferred', async () => {
+    const user = userEvent.setup()
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+
+    try {
+      render(
+        <PlaybookViewer
+          snapshot={snapshot}
+          blocks={makeBlocks()}
+          copy={ruViewerCopy}
+          onEditBlock={vi.fn()}
+          onRegenerateBlock={vi.fn()}
+          onPdf={vi.fn()}
+          onShare={vi.fn()}
+          onCreateCourse={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      await waitFor(() => {
+        expect(window.matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)')
+      })
+      await user.click(screen.getByRole('button', { name: 'Скрыть правый блок' }))
+
+      expect(
+        screen.queryByRole('complementary', { name: 'Инспектор документа' })
+      ).not.toBeInTheDocument()
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
   })
 
   it('lets the owner update document visibility from the right inspector', async () => {

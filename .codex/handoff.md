@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-5e4ek.2`
+Current stage id: `mc2-k2qih`
 
 ## Current stage
 
@@ -11,7 +11,8 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-The active item `mc2-5e4ek.2` centralizes Stage 5 structural quality state across web and backend.
+`mc2-5e4ek.2` is delivered locally in `1e4caad9f`. The active item `mc2-k2qih` adds the remaining
+Career Playbook reader-panel animation without changing the completed TOC synchronization.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -24,8 +25,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at
-`mc2-5e4ek.2` after `mc2-db696.79` and the research/migration gate review.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-k2qih`
+after `mc2-5e4ek.2` and the research/migration gate review.
 
 ## Verification facts
 
@@ -53,6 +54,10 @@ through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is acti
   longer queried in `courses`; Russian title generation is covered by a deterministic unit test.
 - Stage 5 approval controls, output quality UI, and backend approval derive `critical`, `warning`,
   or `pass` from one shared runtime helper; the three states have frontend unit coverage.
+- Career Playbook reader rails now use 220 ms transform/opacity exit and layout motion, retain URL
+  state and semantic removal, and disable motion for the reduced-motion preference. The focused
+  Chromium scenario is committed for CI; locally its global setup stopped before the test because
+  Supabase test credentials were absent.
 
 ## Live operational facts
 
@@ -109,18 +114,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.79`
-Current stage id: `mc2-5e4ek.2`
-Next stage id: `mc2-k2qih`
-Recommended action: accept and close the shared Stage 5 quality-state contract, then inspect the
-next Tier 5 item against repository truth.
+Accepted stage id: `mc2-5e4ek.2`
+Current stage id: `mc2-k2qih`
+Next stage id: `mc2-mt07s`
+Recommended action: accept and close the reader-panel animation, then restate `mc2-mt07s` against
+the current phase-based model routing before changing code.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-5e4ek.2` has green frontend behavior, lint, type-check, and build evidence awaiting
-stage closeout and commit. Then continue with `mc2-k2qih`. Do not reindex, migrate, force-push,
+The item `mc2-k2qih` has green unit behavior, lint, type-check, and build evidence awaiting stage
+closeout and commit; its authenticated Chromium run is blocked locally before execution by absent
+Supabase test credentials. Then continue with `mc2-mt07s`. Do not reindex, migrate, force-push,
 perform paid work, or deploy before a green pipeline.
 
 ## Read first

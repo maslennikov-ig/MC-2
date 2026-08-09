@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
   Building2,
@@ -48,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { useReducedMotion } from '@/lib/hooks/use-reduced-motion'
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookViewerBlock,
@@ -56,6 +58,11 @@ import { ActionsBar, type ActionsBarCopy } from './ActionsBar'
 
 type PanelState = 'open' | 'closed'
 type ReaderMode = 'standard' | 'reading'
+
+const PANEL_MOTION_TRANSITION = {
+  duration: 0.22,
+  ease: [0.16, 1, 0.3, 1],
+} as const
 
 export interface PlaybookViewerCopy {
   productLabel?: string
@@ -323,6 +330,7 @@ export function PlaybookViewer({
   const [activeBlockId, setActiveBlockId] = useState<CareerPlaybookBlockId | null>(() =>
     readInitialActiveBlockId(blocks)
   )
+  const prefersReducedMotion = useReducedMotion()
   const mode = readerMode ?? internalMode
   const viewerPermissions = snapshot.viewerPermissions ?? {
     canEdit: true,
@@ -472,7 +480,7 @@ export function PlaybookViewer({
 
           <section
             className={cn(
-              'mx-auto grid max-w-[1760px] gap-5 px-4 py-6 md:px-6',
+              'relative mx-auto grid max-w-[1760px] gap-5 px-4 py-6 md:px-6',
               tocOpen && panelOpen
                 ? 'xl:grid-cols-[18rem_minmax(0,1fr)_25rem] 2xl:grid-cols-[20rem_minmax(0,1fr)_28rem]'
                 : tocOpen
@@ -482,16 +490,32 @@ export function PlaybookViewer({
                     : 'xl:grid-cols-[minmax(0,1fr)]'
             )}
           >
-            {tocOpen ? (
-              <ContentsRail
-                groupedBlocks={groupedBlocks}
-                labels={labels}
-                activeBlockId={activeBlockId}
-                onActiveBlockChange={setActiveBlockId}
-              />
-            ) : null}
+            <AnimatePresence initial={false} mode="popLayout">
+              {tocOpen ? (
+                <motion.div
+                  key="contents-rail"
+                  layout={!prefersReducedMotion}
+                  initial={prefersReducedMotion ? false : { opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -16 }}
+                  transition={prefersReducedMotion ? { duration: 0 } : PANEL_MOTION_TRANSITION}
+                  className="hidden xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto"
+                >
+                  <ContentsRail
+                    groupedBlocks={groupedBlocks}
+                    labels={labels}
+                    activeBlockId={activeBlockId}
+                    onActiveBlockChange={setActiveBlockId}
+                  />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
-            <section className="min-w-0 overflow-hidden rounded-md border border-[#d6c2a6] bg-[#fbfaf7] shadow-xl shadow-stone-300/30 dark:border-slate-700 dark:bg-slate-950">
+            <motion.section
+              layout={!prefersReducedMotion}
+              transition={prefersReducedMotion ? { duration: 0 } : PANEL_MOTION_TRANSITION}
+              className="min-w-0 overflow-hidden rounded-md border border-[#d6c2a6] bg-[#fbfaf7] shadow-xl shadow-stone-300/30 dark:border-slate-700 dark:bg-slate-950"
+            >
               <ReaderTopbar
                 title={labels.productLabel}
                 subtitle={buildSubtitle(snapshot, labels)}
@@ -516,36 +540,48 @@ export function PlaybookViewer({
                   titleHeading="p"
                 />
               </div>
-            </section>
+            </motion.section>
 
-            {panelOpen ? (
-              <InspectorRail
-                snapshot={snapshot}
-                labels={labels}
-                actionMessage={actionMessage}
-                readyBlocks={readyBlocks}
-                totalBlocks={blocks.length}
-                blocks={blocks}
-                contentLanguage={snapshot.contentLanguage}
-                canManageVisibility={viewerPermissions.canManageVisibility}
-                canCreateCourse={viewerPermissions.canCreateCourse}
-                isUpdatingVisibility={isUpdatingVisibility}
-                onVisibilityChange={onVisibilityChange}
-                onPdf={onPdf}
-                onShare={onShare}
-                publicShareUrl={publicShareUrl}
-                onCopyShareLink={onCopyShareLink}
-                onEditBlock={onEditBlock}
-                onRegenerateBlock={onRegenerateBlock}
-                onCreateCourse={onCreateCourse}
-                createCourseAction={createCourseAction}
-                openCourseHref={openCourseHref}
-                onDelete={onDelete}
-                canRegenerateImage={viewerPermissions.canManageVisibility}
-                isRegeneratingImage={isRegeneratingImage}
-                onRegenerateImage={onRegenerateImage}
-              />
-            ) : null}
+            <AnimatePresence initial={false} mode="popLayout">
+              {panelOpen ? (
+                <motion.div
+                  key="inspector-rail"
+                  layout={!prefersReducedMotion}
+                  initial={prefersReducedMotion ? false : { opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: 16 }}
+                  transition={prefersReducedMotion ? { duration: 0 } : PANEL_MOTION_TRANSITION}
+                  className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
+                >
+                  <InspectorRail
+                    snapshot={snapshot}
+                    labels={labels}
+                    actionMessage={actionMessage}
+                    readyBlocks={readyBlocks}
+                    totalBlocks={blocks.length}
+                    blocks={blocks}
+                    contentLanguage={snapshot.contentLanguage}
+                    canManageVisibility={viewerPermissions.canManageVisibility}
+                    canCreateCourse={viewerPermissions.canCreateCourse}
+                    isUpdatingVisibility={isUpdatingVisibility}
+                    onVisibilityChange={onVisibilityChange}
+                    onPdf={onPdf}
+                    onShare={onShare}
+                    publicShareUrl={publicShareUrl}
+                    onCopyShareLink={onCopyShareLink}
+                    onEditBlock={onEditBlock}
+                    onRegenerateBlock={onRegenerateBlock}
+                    onCreateCourse={onCreateCourse}
+                    createCourseAction={createCourseAction}
+                    openCourseHref={openCourseHref}
+                    onDelete={onDelete}
+                    canRegenerateImage={viewerPermissions.canManageVisibility}
+                    isRegeneratingImage={isRegeneratingImage}
+                    onRegenerateImage={onRegenerateImage}
+                  />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </section>
         </>
       )}
@@ -662,10 +698,7 @@ function ContentsRail({
   }, [activeBlockId])
 
   return (
-    <nav
-      aria-label={labels.contentsAriaLabel}
-      className="hidden xl:sticky xl:top-20 xl:block xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
-    >
+    <nav aria-label={labels.contentsAriaLabel}>
       <div className="career-playbook-panel p-3">
         <p className="px-2 pb-2 text-xs font-semibold tracking-normal text-slate-500 uppercase dark:text-slate-400">
           {labels.contents}
@@ -762,7 +795,7 @@ function InspectorRail({
     <aside
       role="complementary"
       aria-label={labels.inspectorLabel}
-      className="career-playbook-panel xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
+      className="career-playbook-panel"
     >
       <div className="border-b border-[#d6c2a6] p-4 dark:border-slate-700">
         <div className="flex items-center gap-2 text-sm font-semibold">

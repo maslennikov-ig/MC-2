@@ -19,6 +19,30 @@ test.describe('Career Playbook viewer editor', () => {
   test.describe('authenticated flow', () => {
     test.use({ storageState: authenticatedStorageState })
 
+    test('animates both reader panels and preserves their URL state', async ({ page }) => {
+      await page.setViewportSize({ width: 1600, height: 900 })
+      await page.goto(`/en/career-playbook/${playbookId}`)
+      await page.waitForLoadState('networkidle')
+      await expect(page.getByRole('heading', { name: 'Sales Director' })).toBeVisible({
+        timeout: 20000,
+      })
+
+      const contents = page.getByRole('navigation', { name: 'Role guide contents' })
+      await page.getByRole('button', { name: 'Hide left panel' }).click()
+      await expect(contents).toBeAttached()
+      await expect(contents).not.toBeAttached()
+      await expect(page).toHaveURL(/\btoc=closed\b/)
+
+      await page.getByRole('button', { name: 'Show left panel' }).click()
+      await expect(contents).toBeVisible()
+
+      const inspector = page.getByRole('complementary', { name: 'Document inspector' })
+      await page.getByRole('button', { name: 'Hide right panel' }).click()
+      await expect(inspector).toBeAttached()
+      await expect(inspector).not.toBeAttached()
+      await expect(page).toHaveURL(/\bpanel=closed\b/)
+    })
+
     test('persists a block edit after the viewer reloads', async ({ page }) => {
       await page.goto(`/en/career-playbook/${playbookId}`)
       await page.waitForLoadState('networkidle')
