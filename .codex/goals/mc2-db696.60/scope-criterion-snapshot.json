@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-db696.60",
+  "source_kind": "beads",
+  "source_id": "mc2-db696.60",
+  "source_digest": "46f0a4903093343a2d5e0f20a52b65737a2fa397eded00c5d5657fa73838ba0f",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "A deterministic Chromium scenario clicks Продолжить к уточнениям and proves the follow-up request cannot start until business-context and progress synchronization completes.",
+      "text_digest": "9304ed115e22db402c9b7276e38de43df3a521589edfc171912ad60754199082"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "The browser scenario observes the loading status, the rendered follow-up question with completeness, and the ready-for-generation review state.",
+      "text_digest": "0e35605675c1088ee21e556aba3c9bdab8ff6ba1b098a48168d2abbbaf143a10"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The synthetic fixture performs no live generation or paid request, and focused Playwright, ESLint, pnpm type-check, and pnpm build all pass.",
+      "text_digest": "a4af1e2944c815c1bf8f102f4a4daa7352add09512e21256e901f78a97b1186d"
+    }
+  ]
+}
