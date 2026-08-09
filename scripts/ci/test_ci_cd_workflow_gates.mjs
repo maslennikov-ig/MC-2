@@ -66,6 +66,10 @@ for (const jobName of ['deploy', 'deploy-dev']) {
     ),
     `${jobName} must allow skipped build-docker only when Docker was not required`
   );
+  assert(
+    job.permissions?.contents === 'read' && job.permissions?.packages === 'read',
+    `${jobName} must restrict its job token to contents:read and packages:read`
+  );
 }
 
 const stagingDeploy = jobs.deploy;
