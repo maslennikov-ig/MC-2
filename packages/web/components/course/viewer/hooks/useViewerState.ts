@@ -229,7 +229,7 @@ export function useViewerState(
       }
       hasInitializedRef.current = true
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentLessonId is an intentional guard (init-only effect)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- currentLessonId is an intentional guard (init-only effect)
   }, [sections, lessonsBySection, lessons, initialLessonLabel, lessonLabelMap])
 
   // Sync URL when lesson changes

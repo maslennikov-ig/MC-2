@@ -13,6 +13,7 @@
 ### Task 1: RED Tests
 
 **Files:**
+
 - Create: `packages/course-gen-platform/tests/unit/smoke/career-playbook-live-smoke.test.ts`
 
 - [ ] **Step 1: Write failing tests**
@@ -23,44 +24,47 @@
   - cleanup manifest masks secrets and lists exact playbook/job/course IDs only
 
 - [ ] **Step 2: Verify RED**
-  Run:
-  `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-live-smoke.test.ts`
+      Run:
+      `pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-live-smoke.test.ts`
 
 ### Task 2: Runner And Validator
 
 **Files:**
+
 - Create: `packages/course-gen-platform/src/smoke/career-playbook-validation.ts`
 - Create: `packages/course-gen-platform/src/smoke/career-playbook-live-smoke.ts`
 
 - [ ] **Step 1: Implement deterministic validation**
-  Reuse `CAREER_PLAYBOOK_FINAL_BLOCK_ORDER` and `runCareerPlaybookDeterministicChecks`.
+      Reuse `CAREER_PLAYBOOK_FINAL_BLOCK_ORDER` and `runCareerPlaybookDeterministicChecks`.
 
 - [ ] **Step 2: Implement gate planner**
-  Default to `plan`; require explicit gates for `mutation-smoke`.
+      Default to `plan`; require explicit gates for `mutation-smoke`.
 
 - [ ] **Step 3: Implement injectable mutation runner**
-  Use an injected client interface in tests; the real adapter is only created by the CLI.
+      Use an injected client interface in tests; the real adapter is only created by the CLI.
 
 ### Task 3: CLI And Docs
 
 **Files:**
+
 - Create: `packages/course-gen-platform/scripts/career-playbook-live-smoke.ts`
 - Modify: `packages/course-gen-platform/package.json`
 - Modify: `docs/career-playbook/README.md`
 - Modify: `docs/career-playbook/architecture.md`
 
 - [ ] **Step 1: Add CLI parser**
-  Support `--target`, `--mode`, `--trpc-url`, `--expected-user-id`, `--expected-organization-id`, `--max-cost-usd`, `--cleanup-scope`, `--confirm-live-mutation`, `--json`. Read the bearer token only from `TOKEN` or `CAREER_PLAYBOOK_SMOKE_TOKEN` so package-manager command echo cannot leak it.
+      Support `--target`, `--mode`, `--trpc-url`, `--expected-user-id`, `--expected-organization-id`, `--max-cost-usd`, `--cleanup-scope`, `--confirm-live-mutation`, `--json`. Read the bearer token only from `TOKEN` or `CAREER_PLAYBOOK_SMOKE_TOKEN` so package-manager command echo cannot leak it.
 
 - [ ] **Step 2: Add package script**
-  Add `smoke:career-playbook:live`.
+      Add `smoke:career-playbook:live`.
 
 - [ ] **Step 3: Document safe usage**
-  State that default mode is non-mutating and live mode needs explicit approval.
+      State that default mode is non-mutating and live mode needs explicit approval.
 
 ### Task 4: Verification And Handoff
 
 **Files:**
+
 - Modify: `.codex/handoff.md`
 - Create/update: `.codex/stages/mc2-db696.11/artifacts/mc2-db696.11.5-live-runner.md`
 - Modify: `.codex/stages/mc2-db696.11/summary.md`

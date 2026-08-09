@@ -188,7 +188,7 @@ function decodeCopyText(value: string): string {
   return decoded;
 }
 
-function catalogSql(snapshot: string | null): string {
+export function catalogSql(snapshot: string | null): string {
   // pg_get_*def qualification depends on the session search_path, so it is
   // pinned empty to force deterministic full qualification on both the
   // source and the restored target.

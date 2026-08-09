@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/viewer.test.tsx",
+      "duration_seconds": 6.589,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/web test -- tests/unit/components/career-playbook/viewer.test.tsx"
+  ],
+  "completed_at": "2026-08-09T14:20:43.947736+00:00",
+  "diff_digest": "cd4ad57cd0d96d130b8b54a8e015d8c50bb5800d5c1ef16f5bb3557332e29183",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "1e4caad9f98e9d5ef45886bd138f84433538e99d",
+  "idempotency_key": "2ff547fe1411118a11b34e94bd5d5937c97e3f4befa6ba557c620c96226ca81d",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-k2qih",
+  "started_at": "2026-08-09T14:20:37.187066+00:00",
+  "verification_fingerprint": "2ff547fe1411118a11b34e94bd5d5937c97e3f4befa6ba557c620c96226ca81d"
+}

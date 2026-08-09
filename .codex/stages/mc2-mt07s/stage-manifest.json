@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-mt07s",
+  "goal_id": "mc2-mt07s",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "stage6-raw-language-phase-routing",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage6-model-routing", "stage6-self-review"],
+    "risk_models": ["language-code-loss", "dead-fallback-drift", "unsupported-quality-claim"],
+    "test_environments": ["vitest-node", "typescript", "next-production-build"],
+    "rollback_boundary": "restore-legacy-stage6-language-normalization-and-fallback-shape",
+    "acceptance_proofs": [
+      "raw-language-propagation-covered",
+      "legacy-normalization-absent",
+      "cross-package-code-gates-green"
+    ]
+  },
+  "work_areas": ["decision", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-mt07s",
+    "source_digest": "cdea4666f2bfe450c0b8efb066e5a2f83a0fcfa4e4604c232a36f55ea202f8c9",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The dead Stage 6 getStage6ModelConfig ru/en normalization path and language-keyed primary fallback map are removed.",
+        "text_digest": "c31de7905144877f8b5f3659ae26fbfb41495cc48a76e74d3ac9c9157c32ffed"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Main generation phase routing and self-review refinement routing pass a non-ru/en language code unchanged, with deterministic de coverage.",
+        "text_digest": "9bbb4a469cabefe3047bb3d79d1738814b9993a017cc2d57bf5b19c38a48a1bd"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "No live multilingual quality claim or paid generation is made; focused unit tests, lint, formatting, pnpm type-check, and pnpm build pass.",
+        "text_digest": "997303e66f6031c471f4f30f5fd33115a6a41f9765372c8be1a084c5548e1d9a"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-mt07s/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "cdea4666f2bfe450c0b8efb066e5a2f83a0fcfa4e4604c232a36f55ea202f8c9",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-mt07s/artifacts/mc2-mt07s.md",
+      "task_id": "mc2-mt07s",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

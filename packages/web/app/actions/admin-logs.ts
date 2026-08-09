@@ -2,7 +2,7 @@
 
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { wrapError } from '@/lib/trpc/action-error'
-import { logger } from "@/lib/logger";
+import { logger } from '@/lib/logger'
 
 // ============================================================================
 // Types (matching backend types)

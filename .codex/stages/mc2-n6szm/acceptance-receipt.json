@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm exec eslint packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.test.ts packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.fixtures.ts packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.cli.test.ts && pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/reindex-course-embeddings.test.ts tests/unit/tools/qdrant/reindex-course-embeddings.cli.test.ts && pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:99462) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99456) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99532) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:99688) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 242.819,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm exec eslint packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.test.ts packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.fixtures.ts packages/course-gen-platform/tests/unit/tools/qdrant/reindex-course-embeddings.cli.test.ts && pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/tools/qdrant/reindex-course-embeddings.test.ts tests/unit/tools/qdrant/reindex-course-embeddings.cli.test.ts && pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-09T12:05:35.941292+00:00",
+  "diff_digest": "26b1685b5a1fd3a5f42bd03c25b4201f0fa4968286b37e137a0c537f79cbaf4a",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "05d7fc7e751262df1a9cb278608d639fbe511961",
+  "idempotency_key": "db29552b8802048ea01f6efcb779d1aeff8111ce3178696ba3dec6b46b25495e",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-n6szm",
+  "started_at": "2026-08-09T12:01:32.937898+00:00",
+  "verification_fingerprint": "db29552b8802048ea01f6efcb779d1aeff8111ce3178696ba3dec6b46b25495e"
+}

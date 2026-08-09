@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-db696.79",
+  "goal_id": "mc2-db696.79",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "career-playbook-source-title-language",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["career-playbook-source-processing", "phase-6-summarization"],
+    "risk_models": ["wrong-entity-language-lookup", "source-title-language-drift", "course-flow-regression"],
+    "test_environments": ["vitest-unit", "typescript", "next-production-build"],
+    "rollback_boundary": "revert-the-explicit-title-language-option-and-career-playbook-callsite",
+    "acceptance_proofs": [
+      "playbook-language-forwarded-explicitly",
+      "course-language-lookup-bypassed-for-playbooks",
+      "focused-and-code-gates-green"
+    ]
+  },
+  "work_areas": ["contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-db696.79",
+    "source_digest": "40d3efc4d2824f093a46457f236dbc18ddda6868657d307b5e5acc3a9aa175f7",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Career Playbook source processing passes an explicit title-language mode to Phase 6, so a playbook id is never used for a course-language lookup.",
+        "text_digest": "c8025f77b8acef995e0b31d18d282d5c9f4839cddcc28299e4aa3f131f0eb8e2"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Russian Career Playbook sources use Russian title generation while non-Russian/non-English playbooks explicitly fall back to detected document language.",
+        "text_digest": "caff66de3e7efe476d25677ae2782ad483f2542a58eb85a895878277ae8a740b"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Focused unit and lint checks plus pnpm type-check and pnpm build pass without live database or LLM calls.",
+        "text_digest": "10e58099b99babbc3d94be4b235be704fb57bf2b24ccb0b290cfa46f6d7a9eed"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-db696.79/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "40d3efc4d2824f093a46457f236dbc18ddda6868657d307b5e5acc3a9aa175f7",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-db696.79/artifacts/mc2-db696.79.md",
+      "task_id": "mc2-db696.79",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

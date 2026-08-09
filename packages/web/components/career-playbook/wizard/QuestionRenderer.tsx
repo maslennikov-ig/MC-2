@@ -212,10 +212,7 @@ export function QuestionRenderer({ question, value, onValueChange, copy }: Quest
 
       {question.question_type === 'single_choice' ? (
         <div className="space-y-3" aria-label={labels.chooseOneLabel}>
-          <RadioGroup
-            value={localSingleValue}
-            onValueChange={selectSingleValue}
-          >
+          <RadioGroup value={localSingleValue} onValueChange={selectSingleValue}>
             {getChoiceOptionsWithCustom(options, labels.otherOptionLabel, customChoiceEnabled).map(
               (option) => {
                 const selected = localSingleValue === option.value

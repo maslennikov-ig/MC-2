@@ -121,7 +121,7 @@ export const getLessonContent = protectedProcedure
         .select('*')
         .eq('course_id', courseId)
         .eq('lesson_id', lessonUuid)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false });
       const data = getLatestUsableLessonContent(lessonContentRows);
 
       if (error) {

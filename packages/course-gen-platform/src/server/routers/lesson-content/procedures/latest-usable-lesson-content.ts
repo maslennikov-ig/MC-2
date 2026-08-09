@@ -104,9 +104,7 @@ export function getLessonContentMarkdown(row: LessonContentLike | null | undefin
     return null;
   }
 
-  const nestedContent = isRecord(row.content.content)
-    ? (row.content.content)
-    : null;
+  const nestedContent = isRecord(row.content.content) ? row.content.content : null;
 
   const markdown = buildMarkdownFromContent(nestedContent ?? row.content);
   return markdown.trim().length > 0 ? markdown : null;

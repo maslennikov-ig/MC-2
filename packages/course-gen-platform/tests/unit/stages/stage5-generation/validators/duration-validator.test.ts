@@ -115,12 +115,14 @@ describe('validateDurationProportionality', () => {
   it('returns passed=true and INFO for valid duration', () => {
     // 2 topics, 2 objectives, beginner => min=14, max=40
     // A duration of 20 min is within range
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 20,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 20,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.passed).toBe(true);
     expect(result.severity).toBe(ValidationSeverity.INFO);
     expect(result.score).toBe(1.0);
@@ -129,12 +131,14 @@ describe('validateDurationProportionality', () => {
   it('returns ERROR when duration is too short', () => {
     // 2 topics, 2 objectives, beginner => min=14
     // A duration of 5 min is too short
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 5,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 5,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.passed).toBe(false);
     expect(result.severity).toBe(ValidationSeverity.ERROR);
     expect(result.issues).toBeDefined();
@@ -145,12 +149,14 @@ describe('validateDurationProportionality', () => {
   it('returns WARNING (passed=true) when duration exceeds max', () => {
     // 2 topics, 2 objectives, beginner => max=40
     // A duration of 100 min exceeds max but passes
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 100,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 100,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.passed).toBe(true);
     expect(result.severity).toBe(ValidationSeverity.WARNING);
     expect(result.score).toBe(0.9);
@@ -168,12 +174,14 @@ describe('validateDurationProportionality', () => {
     // Duration=8: 8 < 11 (min), so ERROR. Need duration > cap but within range.
     // Try: 1 topic, 1 objective, beginner => min=7, max=20, cap=6
     // duration=8: >cap(6) AND within [7,20] → INFO for engagement cap
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1'],
-      lesson_objectives: ['o1'],
-      estimated_duration_minutes: 8,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1'],
+        lesson_objectives: ['o1'],
+        estimated_duration_minutes: 8,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.passed).toBe(true);
     expect(result.severity).toBe(ValidationSeverity.INFO);
   });
@@ -189,33 +197,39 @@ describe('validateDurationProportionality', () => {
   });
 
   it('score is proportional for ERROR case', () => {
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 7, // half of min (14)
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 7, // half of min (14)
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.score).toBeDefined();
     expect(result.score!).toBeGreaterThan(0);
     expect(result.score!).toBeLessThan(1);
   });
 
   it('includes suggestion in error result', () => {
-    const result = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 5,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 5,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.suggestion).toBeDefined();
     expect(result.suggestion!).toContain('Increase duration');
   });
 
   it('includes metadata in result', () => {
-    const result = validateDurationProportionality(makeLesson({
-      estimated_duration_minutes: 20,
-      difficulty_level: 'beginner',
-    }));
+    const result = validateDurationProportionality(
+      makeLesson({
+        estimated_duration_minutes: 20,
+        difficulty_level: 'beginner',
+      })
+    );
     expect(result.metadata).toBeDefined();
     expect(result.metadata).toHaveProperty('actual', 20);
   });
@@ -224,12 +238,14 @@ describe('validateDurationProportionality', () => {
     // Same topic/objectives, advanced multiplier means higher min
     // 2 topics, 2 objectives, advanced => min=28
     // So duration 20 is ERROR for advanced but OK for beginner
-    const advancedResult = validateDurationProportionality(makeLesson({
-      key_topics: ['t1', 't2'],
-      lesson_objectives: ['o1', 'o2'],
-      estimated_duration_minutes: 20,
-      difficulty_level: 'advanced',
-    }));
+    const advancedResult = validateDurationProportionality(
+      makeLesson({
+        key_topics: ['t1', 't2'],
+        lesson_objectives: ['o1', 'o2'],
+        estimated_duration_minutes: 20,
+        difficulty_level: 'advanced',
+      })
+    );
     expect(advancedResult.passed).toBe(false);
     expect(advancedResult.severity).toBe(ValidationSeverity.ERROR);
   });

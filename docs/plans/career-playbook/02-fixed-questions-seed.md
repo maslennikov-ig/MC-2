@@ -38,18 +38,18 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_type": "single_choice",
   "question_text": "Отдел или функциональная область",
   "options": [
-    {"value": "sales", "label": "Продажи / Sales"},
-    {"value": "marketing", "label": "Маркетинг"},
-    {"value": "product", "label": "Продукт / Product"},
-    {"value": "engineering", "label": "Инженерия / IT"},
-    {"value": "design", "label": "Дизайн / UX"},
-    {"value": "data", "label": "Аналитика / Data"},
-    {"value": "operations", "label": "Операционка / Operations"},
-    {"value": "hr", "label": "HR / People"},
-    {"value": "finance", "label": "Финансы"},
-    {"value": "support", "label": "Поддержка / Customer Success"},
-    {"value": "legal", "label": "Юридический"},
-    {"value": "other", "label": "Другое"}
+    { "value": "sales", "label": "Продажи / Sales" },
+    { "value": "marketing", "label": "Маркетинг" },
+    { "value": "product", "label": "Продукт / Product" },
+    { "value": "engineering", "label": "Инженерия / IT" },
+    { "value": "design", "label": "Дизайн / UX" },
+    { "value": "data", "label": "Аналитика / Data" },
+    { "value": "operations", "label": "Операционка / Operations" },
+    { "value": "hr", "label": "HR / People" },
+    { "value": "finance", "label": "Финансы" },
+    { "value": "support", "label": "Поддержка / Customer Success" },
+    { "value": "legal", "label": "Юридический" },
+    { "value": "other", "label": "Другое" }
   ],
   "is_required": true
 }
@@ -65,12 +65,12 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_type": "single_choice",
   "question_text": "Уровень должности",
   "options": [
-    {"value": "junior", "label": "Junior (до 2 лет опыта)"},
-    {"value": "middle", "label": "Middle (2-5 лет)"},
-    {"value": "senior", "label": "Senior (5+ лет, эксперт)"},
-    {"value": "lead", "label": "Lead / Team Lead (ведёт команду)"},
-    {"value": "director", "label": "Director / Head (руководит направлением)"},
-    {"value": "c-level", "label": "C-level (CEO, CTO, CFO ...)"}
+    { "value": "junior", "label": "Junior (до 2 лет опыта)" },
+    { "value": "middle", "label": "Middle (2-5 лет)" },
+    { "value": "senior", "label": "Senior (5+ лет, эксперт)" },
+    { "value": "lead", "label": "Lead / Team Lead (ведёт команду)" },
+    { "value": "director", "label": "Director / Head (руководит направлением)" },
+    { "value": "c-level", "label": "C-level (CEO, CTO, CFO ...)" }
   ],
   "is_required": true
 }
@@ -100,11 +100,11 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_type": "single_choice",
   "question_text": "Размер компании",
   "options": [
-    {"value": "1-10", "label": "1-10 человек (early-stage стартап)"},
-    {"value": "11-50", "label": "11-50 человек (растущий стартап)"},
-    {"value": "51-200", "label": "51-200 человек (Scale-up)"},
-    {"value": "201-1000", "label": "201-1000 человек (Established)"},
-    {"value": "1000+", "label": "1000+ человек (Enterprise)"}
+    { "value": "1-10", "label": "1-10 человек (early-stage стартап)" },
+    { "value": "11-50", "label": "11-50 человек (растущий стартап)" },
+    { "value": "51-200", "label": "51-200 человек (Scale-up)" },
+    { "value": "201-1000", "label": "201-1000 человек (Established)" },
+    { "value": "1000+", "label": "1000+ человек (Enterprise)" }
   ],
   "is_required": true
 }
@@ -120,14 +120,14 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_type": "single_choice",
   "question_text": "Какая стадия компании / продукта?",
   "options": [
-    {"value": "pre-pmf", "label": "Pre-PMF (ищем product-market fit)"},
-    {"value": "growth", "label": "Growth (PMF найден, масштабируем)"},
-    {"value": "scale", "label": "Scale (отлаженная машина, расширяем рынки)"},
-    {"value": "mature", "label": "Mature (стабильный бизнес, оптимизация)"}
+    { "value": "pre-pmf", "label": "Pre-PMF (ищем product-market fit)" },
+    { "value": "growth", "label": "Growth (PMF найден, масштабируем)" },
+    { "value": "scale", "label": "Scale (отлаженная машина, расширяем рынки)" },
+    { "value": "mature", "label": "Mature (стабильный бизнес, оптимизация)" }
   ],
   "is_required": false,
   "branching_rules": {
-    "when": {"question_key": "team_size", "value_in": ["1-10", "11-50", "51-200"]}
+    "when": { "question_key": "team_size", "value_in": ["1-10", "11-50", "51-200"] }
   }
 }
 ```
@@ -145,13 +145,13 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_text": "На каком языке сгенерировать Role Guide?",
   "helper_text": "Если документ будет использоваться в международной компании, выберите English. По умолчанию совпадает с языком интерфейса.",
   "options": [
-    {"value": "ru", "label": "Русский"},
-    {"value": "en", "label": "English"},
-    {"value": "es", "label": "Español"},
-    {"value": "de", "label": "Deutsch"},
-    {"value": "fr", "label": "Français"},
-    {"value": "pt", "label": "Português"},
-    {"value": "it", "label": "Italiano"}
+    { "value": "ru", "label": "Русский" },
+    { "value": "en", "label": "English" },
+    { "value": "es", "label": "Español" },
+    { "value": "de", "label": "Deutsch" },
+    { "value": "fr", "label": "Français" },
+    { "value": "pt", "label": "Português" },
+    { "value": "it", "label": "Italiano" }
   ],
   "is_required": true
 }
@@ -173,18 +173,18 @@ Frontend: input с autocomplete по top-50 ролям (статичный сп�
   "question_type": "single_choice",
   "question_text": "Department or functional area",
   "options": [
-    {"value": "sales", "label": "Sales"},
-    {"value": "marketing", "label": "Marketing"},
-    {"value": "product", "label": "Product"},
-    {"value": "engineering", "label": "Engineering / IT"},
-    {"value": "design", "label": "Design / UX"},
-    {"value": "data", "label": "Analytics / Data"},
-    {"value": "operations", "label": "Operations"},
-    {"value": "hr", "label": "HR / People"},
-    {"value": "finance", "label": "Finance"},
-    {"value": "support", "label": "Support / Customer Success"},
-    {"value": "legal", "label": "Legal"},
-    {"value": "other", "label": "Other"}
+    { "value": "sales", "label": "Sales" },
+    { "value": "marketing", "label": "Marketing" },
+    { "value": "product", "label": "Product" },
+    { "value": "engineering", "label": "Engineering / IT" },
+    { "value": "design", "label": "Design / UX" },
+    { "value": "data", "label": "Analytics / Data" },
+    { "value": "operations", "label": "Operations" },
+    { "value": "hr", "label": "HR / People" },
+    { "value": "finance", "label": "Finance" },
+    { "value": "support", "label": "Support / Customer Success" },
+    { "value": "legal", "label": "Legal" },
+    { "value": "other", "label": "Other" }
   ],
   "is_required": true
 }

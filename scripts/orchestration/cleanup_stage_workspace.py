@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Clean safe local branches and worktrees for accepted child streams."""
+"""Clean generated Next caches and safe local workspaces for accepted child streams.
+
+Only clean worktrees whose branch is merged into a delivery target are candidates. Dirty or
+unmerged worktrees, their caches, protected branches, and the primary worktree are preserved.
+Use --dry-run before every real cleanup.
+"""
 
 from __future__ import annotations
 
 import argparse
 import pathlib
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -74,6 +80,46 @@ def branch_delivered_to_remote(git_root: pathlib.Path, branch: str) -> bool:
     return branch_merged_into_ref(git_root, branch, f"refs/remotes/origin/{branch}")
 
 
+def branch_has_delivery_evidence(
+    git_root: pathlib.Path,
+    branch: str,
+    base_branch: str,
+    protected: set[str],
+) -> bool:
+    return branch_delivered_to_remote(git_root, branch) or branch_merged_into_delivery_target(
+        git_root, branch, base_branch, protected
+    )
+
+
+def branch_merged_into_delivery_target(
+    git_root: pathlib.Path,
+    branch: str,
+    base_branch: str,
+    protected: set[str],
+) -> bool:
+    return any(branch_merged_into(git_root, branch, target) for target in {base_branch, *protected})
+
+
+def worktree_is_clean(worktree: pathlib.Path) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(worktree), "status", "--porcelain", "--untracked-files=normal"],
+        text=True,
+        capture_output=True,
+    )
+    return result.returncode == 0 and not result.stdout.strip()
+
+
+def path_uses_symlink(root: pathlib.Path, target: pathlib.Path) -> bool:
+    current = target
+    while current != root:
+        if current.is_symlink():
+            return True
+        if root not in current.parents:
+            return True
+        current = current.parent
+    return root.is_symlink()
+
+
 def current_branch(git_root: pathlib.Path) -> str:
     result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], git_root)
     return result.stdout.strip()
@@ -129,7 +175,7 @@ def main(argv: list[str]) -> int:
     leftovers: list[str] = []
     cleaned: list[str] = []
 
-    worktrees: set[tuple[pathlib.Path, pathlib.Path, str]] = set()
+    worktrees: set[tuple[pathlib.Path, pathlib.Path, str, str, str, str]] = set()
     branches: set[tuple[pathlib.Path, str, str, str, str]] = set()
 
     for artifact in artifacts:
@@ -143,18 +189,75 @@ def main(argv: list[str]) -> int:
         task_id = artifact.get("task_id", "<unknown-task>")
 
         if worktree and worktree not in PLACEHOLDERS:
-            worktrees.add((git_root, pathlib.Path(worktree), task_id))
+            worktrees.add(
+                (git_root, pathlib.Path(worktree), branch, base_branch, delivery_method, task_id)
+            )
         if branch and branch not in PLACEHOLDERS:
             branches.add((git_root, branch, base_branch, delivery_method, task_id))
 
-    for git_root, worktree, task_id in sorted(worktrees, key=lambda item: str(item[1])):
+    retained_branches: set[tuple[pathlib.Path, str]] = set()
+    next_cache_relative = pathlib.Path("packages/web/.next/cache")
+
+    for git_root, worktree, branch, base_branch, delivery_method, task_id in sorted(
+        worktrees, key=lambda item: str(item[1])
+    ):
         if worktree == git_root or worktree == repo_root:
             continue
         if not worktree.exists():
             continue
+
+        branch_key = (git_root.resolve(), branch)
+        if (
+            not branch
+            or branch in PLACEHOLDERS
+            or branch in protected
+            or branch == base_branch
+            or not branch_exists(git_root, branch)
+        ):
+            retained_branches.add(branch_key)
+            leftovers.append(f"worktree branch is not a removable child: {worktree} ({task_id})")
+            continue
+
+        if not branch_merged_into_delivery_target(git_root, branch, base_branch, protected):
+            retained_branches.add(branch_key)
+            if delivery_method in {"cherry-pick", "manual integration"}:
+                leftovers.append(
+                    f"{git_root}:{branch} ({task_id}): accepted-content, not-git-merged; "
+                    "worktree and cache retained for manual cleanup"
+                )
+            else:
+                leftovers.append(
+                    f"unmerged worktree retained: {worktree} ({task_id}, branch {branch})"
+                )
+            continue
+
+        if not worktree_is_clean(worktree):
+            retained_branches.add(branch_key)
+            leftovers.append(f"dirty worktree and cache retained: {worktree} ({task_id})")
+            continue
+
         print(f"worktree candidate: {worktree} ({task_id})")
+        next_cache = worktree / next_cache_relative
+        if next_cache.exists() or next_cache.is_symlink():
+            if path_uses_symlink(worktree, next_cache):
+                retained_branches.add(branch_key)
+                leftovers.append(
+                    f"Next cache path uses a symbolic link; worktree retained: {next_cache} ({task_id})"
+                )
+                continue
+            print(f"next cache candidate: {next_cache}")
         if args.dry_run:
             continue
+
+        if next_cache.exists():
+            try:
+                shutil.rmtree(next_cache)
+                cleaned.append(f"removed Next cache {next_cache}")
+            except OSError as exc:
+                retained_branches.add(branch_key)
+                leftovers.append(f"could not remove Next cache {next_cache} ({task_id}): {exc}")
+                continue
+
         result = subprocess.run(
             ["git", "-C", str(git_root), "worktree", "remove", str(worktree)],
             text=True,
@@ -163,9 +266,15 @@ def main(argv: list[str]) -> int:
         if result.returncode == 0:
             cleaned.append(f"removed worktree {worktree}")
         else:
-            leftovers.append(f"could not remove worktree {worktree} ({task_id}): {result.stderr.strip() or result.stdout.strip()}")
+            retained_branches.add(branch_key)
+            detail = result.stderr.strip() or result.stdout.strip()
+            leftovers.append(f"could not remove worktree {worktree} ({task_id}): {detail}")
 
-    for git_root, branch, base_branch, delivery_method, task_id in sorted(branches, key=lambda item: (str(item[0]), item[1])):
+    for git_root, branch, base_branch, delivery_method, task_id in sorted(
+        branches, key=lambda item: (str(item[0]), item[1])
+    ):
+        if (git_root.resolve(), branch) in retained_branches:
+            continue
         if branch in protected or branch == base_branch:
             continue
         if branch == current_branch(git_root):
@@ -174,7 +283,7 @@ def main(argv: list[str]) -> int:
             continue
 
         delivered = branch_delivered_to_remote(git_root, branch)
-        merged = any(branch_merged_into(git_root, branch, target) for target in {base_branch, *protected})
+        merged = branch_has_delivery_evidence(git_root, branch, base_branch, protected)
         if not delivered and not merged:
             if delivery_method in {"cherry-pick", "manual integration"}:
                 leftovers.append(

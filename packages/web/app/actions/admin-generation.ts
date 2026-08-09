@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { toActionError } from '@/lib/trpc/action-error'
 import { ENV } from '@/lib/env'
-import { logger } from "@/lib/logger";
+import { logger } from '@/lib/logger'
 
 export async function triggerStage6ForLesson(lessonId: string) {
   try {

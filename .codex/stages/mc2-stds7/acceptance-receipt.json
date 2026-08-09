@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/judge/targeted-refinement-orchestrator.test.ts",
+      "duration_seconds": 3.209,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/judge/targeted-refinement-orchestrator.test.ts"
+  ],
+  "completed_at": "2026-08-09T14:45:15.769137+00:00",
+  "diff_digest": "16b8b543360f1699246ac87e2fec20e2494e2379f35faf3853c8e62ae96640e1",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "4dc9a24e71c601a4a9e93f44fd7ccd582b5dce7d",
+  "idempotency_key": "5e52cc3eaceea7e52bacb5b51b2c8b6525ec8dbc2a357c9c1e72b4d3e0141722",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-stds7",
+  "started_at": "2026-08-09T14:45:12.385180+00:00",
+  "verification_fingerprint": "5e52cc3eaceea7e52bacb5b51b2c8b6525ec8dbc2a357c9c1e72b4d3e0141722"
+}

@@ -57,6 +57,7 @@ later sections favor "analyze", "evaluate", "design".
 ### 2.1 Anti-overlap rules: 6 → 3 (lines 116-123)
 
 **Before** (6 rules, ~500 chars, negative framing):
+
 ```
 **ANTI-OVERLAP RULES** (CRITICAL — failure to follow will cause rejection):
 1. YOU are generating Section N ONLY...
@@ -68,6 +69,7 @@ later sections favor "analyze", "evaluate", "design".
 ```
 
 **After** (3 rules, ~280 chars, positive framing):
+
 ```
 **SECTION FOCUS RULES**:
 1. Generate lessons exclusively for Section N. Each section in the course map
@@ -93,6 +95,7 @@ Delete separate `**Quality Requirements**` block — already covered in Constrai
 ### 2.5 Reframe FORBIDDEN PATTERNS (lines 207-210)
 
 **Before** (3 lines, negative):
+
 ```
 **CRITICAL - FORBIDDEN PATTERNS** (will cause automatic rejection):
 - NO placeholders...
@@ -101,6 +104,7 @@ Delete separate `**Quality Requirements**` block — already covered in Constrai
 ```
 
 **After** (1 line, positive):
+
 ```
 **Content Completeness**: Every field must contain real, finished content in ${language}.
 Replace any placeholder text (e.g., [название], [insert X here]) with actual content.
@@ -109,6 +113,7 @@ Replace any placeholder text (e.g., [название], [insert X here]) with ac
 ### 2.6 Deduplicate COURSE CONSTRAINTS (lines 171-182)
 
 **Before** (~350 chars with CRITICAL, IMPORTANT, MUST, info repeated 3x):
+
 ```
 **CRITICAL COURSE CONSTRAINTS**...
 **IMPORTANT**: The user explicitly configured these limits. You MUST:
@@ -118,6 +123,7 @@ Replace any placeholder text (e.g., [название], [insert X here]) with ac
 ```
 
 **After** (~150 chars):
+
 ```
 **Course Structure** (from Stage 4):
 - Course: N sections, M total lessons
@@ -140,6 +146,7 @@ Same pattern as Stage 6: code assembles all dynamic/conditional content into str
 Template contains the static system instruction (role + pedagogical guidance + critical rules). Variables: `{{outputLanguage}}`, `{{schemaDescription}}`, `{{minLessonsRule}}`.
 
 **File changes**:
+
 - `phase-2-scope.ts`: `buildSystemPrompt()` → async, uses `promptService.renderPrompt()`
 - `stage4-prompts.ts`: Replace dead `stage4_phase2_scope` with real `stage4_phase2_scope_system` template
 
@@ -150,12 +157,14 @@ Template contains the static system instruction (role + pedagogical guidance + c
 The user prompt is large (~300 lines) with many conditional sections. All conditional sections become pre-assembled string variables (empty string when not applicable). Existing `build*()` helpers stay unchanged.
 
 **Variables** (all strings, pre-assembled in code):
+
 - `outputLanguage`, `topic`, `category`, `complexity`, `targetAudience`, `keyConcepts`
 - `documentsContext`, `clarifyingContext`, `courseDescriptionContext`, `learningOutcomesContext` (conditional, empty string if N/A)
 - `sizeSection`, `sizeConstraintNote`, `sectionsRange`, `sectionsSuffix`, `sizeSpecificNotes` (from size logic)
 - `overlapFeedbackSection`, `targetSectionsHint`
 
 **File changes**:
+
 - `phase-2-scope.ts`: `buildPhase2Prompt()` → async, uses two `promptService.renderPrompt()` calls
 - `buildPhase2PromptText()` → async
 - `runPhase2Scope()` already async — add `await` to `buildPhase2Prompt()`
@@ -168,6 +177,7 @@ The user prompt is large (~300 lines) with many conditional sections. All condit
 Template contains the full prompt structure with `{{variable}}` slots for all dynamic sections.
 
 **Variables** (all strings, pre-assembled in code):
+
 - `courseTitle`, `language`, `stylePrompt`, `style`
 - `targetAudienceLine`, `userContext` (conditional)
 - `courseStructureMap`, `antiOverlapRules`, `overlapFeedback`, `previousSectionsDigest` (conditional)
@@ -176,6 +186,7 @@ Template contains the full prompt structure with `{{variable}}` slots for all dy
 - `schemaDescription`, `lessonGuidance`, `ragToolInfo`, `outputFormat`
 
 **File changes**:
+
 - `prompt-builder.ts`: `buildBatchPrompt()` → `async`, uses `promptService.renderPrompt()`
 - `generator-core.ts:283`: Add `await` before `buildBatchPrompt()`
 - `stage5-prompts.ts`: Replace dead `stage5_sections_generator` with real `stage5_batch_section_generator`
@@ -191,26 +202,26 @@ Template contains the full prompt structure with `{{variable}}` slots for all dy
 
 ## Critical Files
 
-| File | Change |
-|------|--------|
-| `stages/stage4-analysis/phases/phase-2-scope.ts` | Add pedagogical guidance + migrate to PromptService |
-| `stages/stage5-generation/utils/section-batch/prompt-builder.ts` | 6 optimizations + migrate to PromptService |
-| `stages/stage5-generation/utils/section-batch/generator-core.ts:283` | Add `await` for async `buildBatchPrompt` |
-| `shared/prompts/stage4-prompts.ts` | Replace dead templates with real ones |
-| `shared/prompts/stage5-prompts.ts` | Replace dead template with real one |
+| File                                                                 | Change                                              |
+| -------------------------------------------------------------------- | --------------------------------------------------- |
+| `stages/stage4-analysis/phases/phase-2-scope.ts`                     | Add pedagogical guidance + migrate to PromptService |
+| `stages/stage5-generation/utils/section-batch/prompt-builder.ts`     | 6 optimizations + migrate to PromptService          |
+| `stages/stage5-generation/utils/section-batch/generator-core.ts:283` | Add `await` for async `buildBatchPrompt`            |
+| `shared/prompts/stage4-prompts.ts`                                   | Replace dead templates with real ones               |
+| `shared/prompts/stage5-prompts.ts`                                   | Replace dead template with real one                 |
 
 All paths relative to `packages/course-gen-platform/src/`.
 
 ## Existing Code to Reuse
 
-| What | File | Notes |
-|------|------|-------|
-| `createPromptService()` | `shared/prompts/prompt-service.ts` | Singleton, DB-backed with cache |
-| `PromptService.renderPrompt()` | Same | Mustache-style `{{variable}}` rendering |
-| `buildDocumentsContext()` etc. | `phase-2-scope.ts` | All `build*()` helpers stay unchanged |
-| `buildCourseStructureMap()` | `prompt-builder.ts` | Stays unchanged |
-| `formatPedagogicalStrategyForPrompt()` | `utils/analysis-formatters.ts` | Stays unchanged |
-| Stage 6 pattern | `generator-section.ts:144-226` | Reference for PromptService integration |
+| What                                   | File                               | Notes                                   |
+| -------------------------------------- | ---------------------------------- | --------------------------------------- |
+| `createPromptService()`                | `shared/prompts/prompt-service.ts` | Singleton, DB-backed with cache         |
+| `PromptService.renderPrompt()`         | Same                               | Mustache-style `{{variable}}` rendering |
+| `buildDocumentsContext()` etc.         | `phase-2-scope.ts`                 | All `build*()` helpers stay unchanged   |
+| `buildCourseStructureMap()`            | `prompt-builder.ts`                | Stays unchanged                         |
+| `formatPedagogicalStrategyForPrompt()` | `utils/analysis-formatters.ts`     | Stays unchanged                         |
+| Stage 6 pattern                        | `generator-section.ts:144-226`     | Reference for PromptService integration |
 
 ## Verification
 

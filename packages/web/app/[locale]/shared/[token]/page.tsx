@@ -191,19 +191,19 @@ export default async function SharedCoursePage({ params }: PageProps) {
       { data: enrichments, error: enrichmentsError },
       { data: lessonContents, error: lessonContentsError },
     ] = await Promise.all([
-        adminSupabase
-          .from('lesson_enrichments')
-          .select(ENRICHMENT_DISPLAY_COLUMNS)
-          .in('lesson_id', lessonIds)
-          .eq('status', 'completed')
-          .order('order_index'),
-        adminSupabase
-          .from('lesson_contents')
-          .select('*')
-          .in('lesson_id', lessonIds)
-          .in('status', [...VIEWER_READY_LESSON_CONTENT_STATUSES])
-          .order('created_at', { ascending: false }),
-      ])
+      adminSupabase
+        .from('lesson_enrichments')
+        .select(ENRICHMENT_DISPLAY_COLUMNS)
+        .in('lesson_id', lessonIds)
+        .eq('status', 'completed')
+        .order('order_index'),
+      adminSupabase
+        .from('lesson_contents')
+        .select('*')
+        .in('lesson_id', lessonIds)
+        .in('status', [...VIEWER_READY_LESSON_CONTENT_STATUSES])
+        .order('created_at', { ascending: false }),
+    ])
 
     if (enrichmentsError) {
       logger.warn('Failed to load lesson enrichments for shared course', {

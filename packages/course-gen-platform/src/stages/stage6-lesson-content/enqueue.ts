@@ -86,14 +86,7 @@ function getStage6Queue() {
 export async function enqueueStage6Lesson(
   opts: EnqueueStage6LessonOptions
 ): Promise<Job<Stage6JobInput, Stage6JobResult>> {
-  const {
-    jobData,
-    jobName,
-    source,
-    priority = 5,
-    deduplication,
-    extraJobOptions,
-  } = opts;
+  const { jobData, jobName, source, priority = 5, deduplication, extraJobOptions } = opts;
 
   const queue = getStage6Queue();
 

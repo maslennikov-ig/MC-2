@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-db696.78",
+  "source_kind": "beads",
+  "source_id": "mc2-db696.78",
+  "source_digest": "3a63aae4f4485cbd1881b0ee05279fb4acf8c3f57d958cecd2eaa6fd67d232c2",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Development connect-src contains no invalid partial-IP wildcard sources and includes exact HTTP/WebSocket origins derived from configured backend and Supabase URLs.",
+      "text_digest": "0feb7da6eda678db86507f18be4cb28806eac96c7124eb8e41fc72c999255a4c"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "The deterministic Career Playbook Chromium scenario records no browser console errors for invalid Content Security Policy sources.",
+      "text_digest": "b4cdf36b723e66061c320c946127a32a2092407a0f0b574efb682638d678cf01"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Production CSP behavior remains unchanged, and focused unit, browser, lint, type-check, and build verification passes.",
+      "text_digest": "ee3baa5f188fa9670c5038e69f311afc69426c2de2555ef03b28b8911a33bc19"
+    }
+  ]
+}

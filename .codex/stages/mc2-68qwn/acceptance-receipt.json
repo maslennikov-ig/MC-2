@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "MC2_Q12_REAL_PG17=1 pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/ops/q12-structural-catalog-pg17.test.ts -t 'preserves function identities longer than PostgreSQL NAMEDATALEN'",
+      "duration_seconds": 4.593,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "MC2_Q12_REAL_PG17=1 pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/ops/q12-structural-catalog-pg17.test.ts -t 'preserves function identities longer than PostgreSQL NAMEDATALEN'"
+  ],
+  "completed_at": "2026-08-09T15:02:02.958138+00:00",
+  "diff_digest": "b29395c65f87d92f190ed5cee67b56774bc2221b4bfaafd3774b83c739c31dd9",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "8a613f98f3947813c04e70cf90951d288308e87f",
+  "idempotency_key": "854b29d31437c91e71c15b903c9b9cfd1be3333557fb3e3bd5b7de5ea7b777e1",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-68qwn",
+  "started_at": "2026-08-09T15:01:58.180916+00:00",
+  "verification_fingerprint": "854b29d31437c91e71c15b903c9b9cfd1be3333557fb3e3bd5b7de5ea7b777e1"
+}

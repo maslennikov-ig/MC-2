@@ -849,7 +849,11 @@ export function VideoScriptPanel({
           <ScrollArea className="h-full">
             <div className="p-6">
               {fullScriptText ? (
-                <MarkdownRendererFull content={fullScriptText} preset="preview" language={language} />
+                <MarkdownRendererFull
+                  content={fullScriptText}
+                  preset="preview"
+                  language={language}
+                />
               ) : (
                 <p className="text-muted-foreground py-8 text-center text-sm">{t.noContent}</p>
               )}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-stds7",
+  "source_kind": "beads",
+  "source_id": "mc2-stds7",
+  "source_digest": "3805f8b4060c6b6c46ca1a021448bdcf1b79f92a3ed8eafc4f48848e8dcbd2bd",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "With eight available tasks and a five-task iteration cap, token exhaustion after the third selected task executes exactly three tasks and emits a budget warning.",
+      "text_digest": "27340546ec8aa162dc2efbf825f7b1eeef195a724b642cef69cb70c35d9f4c23"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "The combined cap-and-budget path records exactly two budget-skipped tasks; the three tasks outside the cap remain deferred and are not miscounted.",
+      "text_digest": "d1b6e12cc33d82578264ad2dd9bebd059d0565c20d268fbd29fd29952a1d98e9"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The focused backend unit test, formatting, lint, pnpm type-check, and pnpm build pass without a live model call.",
+      "text_digest": "5958c577743197e033702264c7e0160013508edaa54cd241692b7bff7735e77a"
+    }
+  ]
+}

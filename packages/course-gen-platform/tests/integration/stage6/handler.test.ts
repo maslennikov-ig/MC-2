@@ -474,9 +474,6 @@ describe('Stage 6 BullMQ Handler Integration', () => {
     it.skipIf(shouldSkipTests)('should have correct model fallback configuration', () => {
       // Verify model fallback configuration is properly defined
       expect(MODEL_FALLBACK).toBeDefined();
-      expect(MODEL_FALLBACK.primary).toBeDefined();
-      expect(MODEL_FALLBACK.primary.ru).toBeDefined();
-      expect(MODEL_FALLBACK.primary.en).toBeDefined();
       expect(MODEL_FALLBACK.fallback).toBeDefined();
       expect(MODEL_FALLBACK.maxPrimaryAttempts).toBeGreaterThanOrEqual(1);
     });

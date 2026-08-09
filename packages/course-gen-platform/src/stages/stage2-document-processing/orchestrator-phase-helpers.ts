@@ -24,10 +24,8 @@ import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
 import { processPlainTextDocument } from './plain-text-processing';
-import {
-  updateCourseProgressInDB,
-  updateDocumentProcessingProgress,
-} from './orchestrator-progress-helpers';
+import { updateDocumentProcessingProgress } from './orchestrator-progress-helpers';
+import { updateCourseProgressForJob } from './orchestrator-job-origin';
 import {
   attemptFallbackExtraction,
   storeFallbackProcessedContent,
@@ -83,14 +81,14 @@ export async function processDocument(
 
   // STANDARD/PREMIUM tier: Docling processing
   await job.updateProgress(10);
-  await updateCourseProgressInDB(courseId, t('stage2.docling_start'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.docling_start'));
 
   try {
     const result = await executeDoclingConversion(filePath, tier, job);
 
     await checkCancellation(job);
     await job.updateProgress(25);
-    await updateCourseProgressInDB(courseId, t('stage2.docling_complete'));
+    await updateCourseProgressForJob(job.id, courseId, t('stage2.docling_complete'));
 
     await logTrace({
       courseId,
@@ -162,7 +160,7 @@ export async function executeVectorIndexing(
 
   // Phase 4: Chunking (35-50%)
   await job.updateProgress(35);
-  await updateCourseProgressInDB(courseId, t('stage2.chunking'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.chunking'));
   const chunkingStartTime = Date.now();
 
   const chunkingResult = await executeChunking(
@@ -216,7 +214,7 @@ export async function executeVectorIndexing(
 
   // Phase 5: Embedding Generation (50-70%)
   await job.updateProgress(50);
-  await updateCourseProgressInDB(courseId, t('stage2.embedding'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.embedding'));
   const embeddingStartTime = Date.now();
 
   const batchResult = await executeEmbeddingGeneration(chunkingResult.enrichedChunks, job);
@@ -246,7 +244,7 @@ export async function executeVectorIndexing(
 
   // Phase 6: Qdrant Upload (70-80%)
   await job.updateProgress(70);
-  await updateCourseProgressInDB(courseId, t('stage2.qdrant'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.qdrant'));
   const uploadStartTime = Date.now();
 
   const uploadResult = await executeQdrantUpload(batchResult.embeddings, job);
@@ -290,7 +288,7 @@ export async function executeSummarization(
 
   // Phase 7: Document Summarization (80-90%)
   await job.updateProgress(80);
-  await updateCourseProgressInDB(courseId, t('stage2.summarizing'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.summarizing'));
   const summarizationStartTime = Date.now();
 
   try {
@@ -348,7 +346,7 @@ export async function finalizeProcessing(context: PhaseContext): Promise<void> {
 
   // Finalize (95%)
   await job.updateProgress(95);
-  await updateCourseProgressInDB(courseId, t('stage2.finalizing'));
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.finalizing'));
   await assertIndexedBeforeFinalize(fileId, supabase);
 
   logger.info(

@@ -24,13 +24,12 @@ import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
 import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
-import type {
-  Stage5OutputTabProps,
-  CourseStructure,
-  StructuralQualityResult,
-  StructuralQualityIssue,
-} from './types'
+import type { Stage5OutputTabProps, CourseStructure } from './types'
 import { createClient } from '@/lib/supabase/client'
+import {
+  deriveStage5StructuralQualityState,
+  type Stage5StructuralQualityIssue,
+} from '@megacampus/shared-types'
 
 // ============================================================================
 // TYPE GUARDS
@@ -44,29 +43,6 @@ function isCourseStructure(data: unknown): data is CourseStructure {
   if (!data || typeof data !== 'object') return false
   const d = data as Record<string, unknown>
   return typeof d.course_title === 'string' && Array.isArray(d.sections)
-}
-
-function getStructuralQuality(data: unknown): StructuralQualityResult | null {
-  if (!data || typeof data !== 'object') return null
-  const metadata = data as {
-    quality_scores?: {
-      structure?: Partial<StructuralQualityResult>
-    }
-  }
-  const structure = metadata.quality_scores?.structure
-  if (!structure || typeof structure !== 'object') return null
-  if (typeof structure.passed !== 'boolean') return null
-
-  return {
-    passed: structure.passed,
-    hasCriticalIssues: structure.hasCriticalIssues === true,
-    profileId: typeof structure.profileId === 'string' ? structure.profileId : 'unknown',
-    totalLessons: typeof structure.totalLessons === 'number' ? structure.totalLessons : 0,
-    computedDurationHours:
-      typeof structure.computedDurationHours === 'number' ? structure.computedDurationHours : 0,
-    criticalIssues: Array.isArray(structure.criticalIssues) ? structure.criticalIssues : [],
-    warnings: Array.isArray(structure.warnings) ? structure.warnings : [],
-  }
 }
 
 // ============================================================================
@@ -204,12 +180,12 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   }, [outputData, directFetchResult])
 
   const structureQuality = useMemo(
-    () => getStructuralQuality(directGenerationMetadata),
+    () => deriveStage5StructuralQualityState(directGenerationMetadata),
     [directGenerationMetadata]
   )
 
   const formatQualityIssue = useCallback(
-    (issue: StructuralQualityIssue) => {
+    (issue: Stage5StructuralQualityIssue) => {
       switch (issue.code) {
         case 'hard_max_lessons_exceeded':
           return t('structureQualityIssueHardMax')
@@ -333,34 +309,34 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
         <Card
           className={cn(
             'border-l-4',
-            structureQuality.hasCriticalIssues
+            structureQuality.status === 'critical'
               ? 'border-l-red-500 bg-red-50/70 dark:bg-red-950/20'
-              : structureQuality.warnings.length > 0
+              : structureQuality.status === 'warning'
                 ? 'border-l-amber-500 bg-amber-50/70 dark:bg-amber-950/20'
                 : 'border-l-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/20'
           )}
         >
           <CardContent className="space-y-3 pt-4">
             <div className="flex flex-wrap items-center gap-3">
-              {structureQuality.hasCriticalIssues ? (
+              {structureQuality.status === 'critical' ? (
                 <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              ) : structureQuality.warnings.length > 0 ? (
+              ) : structureQuality.status === 'warning' ? (
                 <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               ) : (
                 <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               )}
               <div className="min-w-0 flex-1">
                 <h4 className="text-sm font-semibold">
-                  {structureQuality.hasCriticalIssues
+                  {structureQuality.status === 'critical'
                     ? t('structureQualityCriticalTitle')
-                    : structureQuality.warnings.length > 0
+                    : structureQuality.status === 'warning'
                       ? t('structureQualityWarningTitle')
                       : t('structureQualityPassedTitle')}
                 </h4>
                 <p className="text-muted-foreground text-sm">
-                  {structureQuality.hasCriticalIssues
+                  {structureQuality.status === 'critical'
                     ? t('structureQualityCriticalDescription')
-                    : structureQuality.warnings.length > 0
+                    : structureQuality.status === 'warning'
                       ? t('structureQualityWarningDescription')
                       : t('structureQualityPassedDescription')}
                 </p>
@@ -368,16 +344,16 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
               <Badge
                 className={cn(
                   'text-xs font-medium',
-                  structureQuality.hasCriticalIssues
+                  structureQuality.status === 'critical'
                     ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                    : structureQuality.warnings.length > 0
+                    : structureQuality.status === 'warning'
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                       : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                 )}
               >
-                {structureQuality.hasCriticalIssues
+                {structureQuality.status === 'critical'
                   ? t('structureQualityNeedsFix')
-                  : structureQuality.warnings.length > 0
+                  : structureQuality.status === 'warning'
                     ? t('structureQualityWarning')
                     : t('structureQualityCanContinue')}
               </Badge>
@@ -386,7 +362,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             {(structureQuality.criticalIssues.length > 0 ||
               structureQuality.warnings.length > 0) && (
               <ul className="space-y-1.5">
-                {(structureQuality.hasCriticalIssues
+                {(structureQuality.status === 'critical'
                   ? structureQuality.criticalIssues
                   : structureQuality.warnings
                 )

@@ -115,7 +115,7 @@ export default function Stage5ChatDebugPage() {
         setTheme(prevThemeRef.current)
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect: force light theme once, restore on unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect: force light theme once, restore on unmount
   }, [])
 
   if (!isMounted) {
@@ -137,7 +137,7 @@ export default function Stage5ChatDebugPage() {
  * Inner component: all hooks (including useRefinement which calls useTranslations)
  * are called inside NextIntlClientProvider context.
  */
- 
+
 function ChatDebugContent() {
   const [recentCourses, setRecentCourses] = useState<RecentCourse[]>([])
   const [isLoadingList, setIsLoadingList] = useState(false)

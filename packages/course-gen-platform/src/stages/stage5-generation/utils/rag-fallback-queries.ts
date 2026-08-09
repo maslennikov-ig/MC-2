@@ -37,7 +37,7 @@ import type { SectionBreakdown } from '@megacampus/shared-types/analysis-result'
 export function buildFallbackSearchQueries(
   sectionBreakdown: SectionBreakdown | undefined,
   topic: string,
-  sectionId: string | number,
+  sectionId: string | number
 ): string[] {
   if (sectionBreakdown) {
     return [sectionBreakdown.area, ...sectionBreakdown.key_topics.slice(0, 3)];

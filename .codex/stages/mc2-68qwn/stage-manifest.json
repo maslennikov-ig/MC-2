@@ -1,0 +1,59 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-68qwn",
+  "goal_id": "mc2-68qwn",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "q12-name-text-union-audit-and-regression",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["q12-source-capture", "q12-structural-catalog", "q12-barrier", "q12-restore-drill"],
+    "risk_models": ["postgres-name-truncation", "silent-identity-corruption", "audit-only-churn"],
+    "test_environments": ["vitest-node", "postgresql-17.10-docker", "typescript", "next-production-build"],
+    "rollback_boundary": "remove-test-seam-regression-and-audit-report",
+    "acceptance_proofs": [
+      "tracked-surface-audit",
+      "default-text-anchor-regression",
+      "real-pg17-long-identity-regression",
+      "cross-package-code-gates-green"
+    ]
+  },
+  "work_areas": ["decision", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-68qwn",
+    "source_digest": "ee4ebddfd9917f5fab777c107a24b2468d6852c14c9b237a92ced9eb001f09c3",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Every named Q12 capture, projection, barrier, and restore-compare surface is audited for PostgreSQL name-versus-text set-operation coercion, with findings recorded in a tracked report.",
+        "text_digest": "70df455e16ab10b09bf81e0a091d3d17a61fd05ec47003546b04f7d94a54d4d7"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "A default unit guard anchors all four source-manifest composite identity unions as text, and a disposable PostgreSQL 17.10 test proves a function identity longer than 63 bytes survives unchanged in owners, ACLs, and comments.",
+        "text_digest": "2259e536987290ef9c91fc468953795836a343fec98e48d085f90f9dd6c1d3d1"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "No unaffected SQL is changed; focused tests, formatting, lint, pnpm type-check, pnpm build, and the local graph refresh pass.",
+        "text_digest": "b2200a6a69661797a996368a45246868f69777a37f5e361525b7ebd2b35c7d94"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-68qwn/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "ee4ebddfd9917f5fab777c107a24b2468d6852c14c9b237a92ced9eb001f09c3",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-68qwn/artifacts/mc2-68qwn.md",
+      "task_id": "mc2-68qwn",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

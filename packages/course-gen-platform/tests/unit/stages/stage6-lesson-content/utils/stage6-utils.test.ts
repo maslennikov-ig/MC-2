@@ -9,8 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import { quickSanityCheck } from '@/stages/stage6-lesson-content/utils/sanity-check';
 import {
-    countMermaidFallbackComments,
-    MERMAID_FALLBACK_COMMENT_REGEX,
+  countMermaidFallbackComments,
+  MERMAID_FALLBACK_COMMENT_REGEX,
 } from '@/stages/stage6-lesson-content/utils/mermaid-fallback-marker';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,73 +33,73 @@ Model evaluation uses metrics like accuracy, precision, recall, and F1-score for
 Deep learning represents a powerful subset of machine learning that uses neural networks with many layers to automatically learn hierarchical feature representations from raw data inputs like images text and audio. Convolutional neural networks excel at image recognition while recurrent networks and transformers handle sequential data including natural language processing tasks.`;
 
 describe('quickSanityCheck', () => {
-    it('returns ok=true for valid content with heading and sufficient words', () => {
-        const result = quickSanityCheck(VALID_CONTENT);
-        expect(result.ok).toBe(true);
-        expect(result.metrics?.hasHeadings).toBe(true);
-        expect(result.metrics?.wordCount).toBeGreaterThanOrEqual(200);
-    });
+  it('returns ok=true for valid content with heading and sufficient words', () => {
+    const result = quickSanityCheck(VALID_CONTENT);
+    expect(result.ok).toBe(true);
+    expect(result.metrics?.hasHeadings).toBe(true);
+    expect(result.metrics?.wordCount).toBeGreaterThanOrEqual(200);
+  });
 
-    it('returns EMPTY_OR_NEAR_EMPTY for empty string', () => {
-        const result = quickSanityCheck('');
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
-    });
+  it('returns EMPTY_OR_NEAR_EMPTY for empty string', () => {
+    const result = quickSanityCheck('');
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
+  });
 
-    it('returns EMPTY_OR_NEAR_EMPTY for very short content (< 100 chars)', () => {
-        const result = quickSanityCheck('# Title\n\nShort.');
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
-    });
+  it('returns EMPTY_OR_NEAR_EMPTY for very short content (< 100 chars)', () => {
+    const result = quickSanityCheck('# Title\n\nShort.');
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
+  });
 
-    it('returns NO_HEADINGS when content has no markdown headings', () => {
-        // >100 chars but no headings
-        const content = 'word '.repeat(100);
-        const result = quickSanityCheck(content);
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('NO_HEADINGS');
-    });
+  it('returns NO_HEADINGS when content has no markdown headings', () => {
+    // >100 chars but no headings
+    const content = 'word '.repeat(100);
+    const result = quickSanityCheck(content);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('NO_HEADINGS');
+  });
 
-    it('returns TOO_SHORT when content has headings but < 200 words', () => {
-        // Has a heading, >100 chars, but <200 words
-        const content = '# Title\n\n' + 'word '.repeat(150);
-        const result = quickSanityCheck(content);
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('TOO_SHORT');
-    });
+  it('returns TOO_SHORT when content has headings but < 200 words', () => {
+    // Has a heading, >100 chars, but <200 words
+    const content = '# Title\n\n' + 'word '.repeat(150);
+    const result = quickSanityCheck(content);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('TOO_SHORT');
+  });
 
-    it('excludes code blocks from word count', () => {
-        // Content with heading and lots of code — non-code words < 200
-        const heading = '# Lesson';
-        const codeBlock = '\n```javascript\n' + 'const x = 1; '.repeat(500) + '\n```\n';
-        const fewWords = ' word '.repeat(50); // 50 non-code words
-        const content = heading + codeBlock + fewWords;
-        const result = quickSanityCheck(content);
-        // Should fail TOO_SHORT since real word count (excluding code) is < 200
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('TOO_SHORT');
-    });
+  it('excludes code blocks from word count', () => {
+    // Content with heading and lots of code — non-code words < 200
+    const heading = '# Lesson';
+    const codeBlock = '\n```javascript\n' + 'const x = 1; '.repeat(500) + '\n```\n';
+    const fewWords = ' word '.repeat(50); // 50 non-code words
+    const content = heading + codeBlock + fewWords;
+    const result = quickSanityCheck(content);
+    // Should fail TOO_SHORT since real word count (excluding code) is < 200
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('TOO_SHORT');
+  });
 
-    it('accepts h2, h3, h4 headings', () => {
-        const content = '## Section Heading\n\n' + 'word '.repeat(200);
-        const result = quickSanityCheck(content);
-        expect(result.ok).toBe(true);
-    });
+  it('accepts h2, h3, h4 headings', () => {
+    const content = '## Section Heading\n\n' + 'word '.repeat(200);
+    const result = quickSanityCheck(content);
+    expect(result.ok).toBe(true);
+  });
 
-    it('returns metrics in result', () => {
-        const result = quickSanityCheck(VALID_CONTENT);
-        expect(result.metrics).toBeDefined();
-        expect(typeof result.metrics?.charCount).toBe('number');
-        expect(typeof result.metrics?.wordCount).toBe('number');
-        expect(result.metrics?.hasHeadings).toBe(true);
-    });
+  it('returns metrics in result', () => {
+    const result = quickSanityCheck(VALID_CONTENT);
+    expect(result.metrics).toBeDefined();
+    expect(typeof result.metrics?.charCount).toBe('number');
+    expect(typeof result.metrics?.wordCount).toBe('number');
+    expect(result.metrics?.hasHeadings).toBe(true);
+  });
 
-    it('handles null/undefined gracefully via string coercion', () => {
-        // The function uses (markdown || '') so passing undefined-like
-        const result = quickSanityCheck(null as any);
-        expect(result.ok).toBe(false);
-        expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
-    });
+  it('handles null/undefined gracefully via string coercion', () => {
+    // The function uses (markdown || '') so passing undefined-like
+    const result = quickSanityCheck(null as any);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('EMPTY_OR_NEAR_EMPTY');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,36 +107,36 @@ describe('quickSanityCheck', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('countMermaidFallbackComments', () => {
-    it('returns 0 for content with no fallback comments', () => {
-        expect(countMermaidFallbackComments('# Normal content\n\nSome text')).toBe(0);
-    });
+  it('returns 0 for content with no fallback comments', () => {
+    expect(countMermaidFallbackComments('# Normal content\n\nSome text')).toBe(0);
+  });
 
-    it('returns 0 for empty string', () => {
-        expect(countMermaidFallbackComments('')).toBe(0);
-    });
+  it('returns 0 for empty string', () => {
+    expect(countMermaidFallbackComments('')).toBe(0);
+  });
 
-    it('counts a single fallback comment', () => {
-        const content = `# Title\n<!-- Mermaid diagram could not be rendered. Please review manually. -->\nOther content`;
-        expect(countMermaidFallbackComments(content)).toBe(1);
-    });
+  it('counts a single fallback comment', () => {
+    const content = `# Title\n<!-- Mermaid diagram could not be rendered. Please review manually. -->\nOther content`;
+    expect(countMermaidFallbackComments(content)).toBe(1);
+  });
 
-    it('counts multiple fallback comments', () => {
-        const comment = '<!-- Mermaid diagram could not be rendered. Please review manually. -->';
-        const content = `# Title\n${comment}\nSection A\n${comment}\nSection B\n${comment}`;
-        expect(countMermaidFallbackComments(content)).toBe(3);
-    });
+  it('counts multiple fallback comments', () => {
+    const comment = '<!-- Mermaid diagram could not be rendered. Please review manually. -->';
+    const content = `# Title\n${comment}\nSection A\n${comment}\nSection B\n${comment}`;
+    expect(countMermaidFallbackComments(content)).toBe(3);
+  });
 
-    it('is case-insensitive for Mermaid keyword', () => {
-        const content = '<!-- MERMAID diagram could not be rendered. Please review manually. -->';
-        expect(countMermaidFallbackComments(content)).toBe(1);
-    });
+  it('is case-insensitive for Mermaid keyword', () => {
+    const content = '<!-- MERMAID diagram could not be rendered. Please review manually. -->';
+    expect(countMermaidFallbackComments(content)).toBe(1);
+  });
 
-    it('matches with extra whitespace in comment', () => {
-        const content = '<!--  Mermaid  something could not be rendered.  Please review manually.  -->';
-        expect(countMermaidFallbackComments(content)).toBe(1);
-    });
+  it('matches with extra whitespace in comment', () => {
+    const content = '<!--  Mermaid  something could not be rendered.  Please review manually.  -->';
+    expect(countMermaidFallbackComments(content)).toBe(1);
+  });
 
-    it('MERMAID_FALLBACK_COMMENT_REGEX is a global RegExp', () => {
-        expect(MERMAID_FALLBACK_COMMENT_REGEX.flags).toContain('g');
-    });
+  it('MERMAID_FALLBACK_COMMENT_REGEX is a global RegExp', () => {
+    expect(MERMAID_FALLBACK_COMMENT_REGEX.flags).toContain('g');
+  });
 });

@@ -88,7 +88,9 @@ async function main(): Promise<void> {
     targetEnvironment: args.targetEnvironment,
   });
 
-  console.log(args.json ? JSON.stringify(report, null, 2) : formatCareerPlaybookSmokeReport(report));
+  console.log(
+    args.json ? JSON.stringify(report, null, 2) : formatCareerPlaybookSmokeReport(report)
+  );
   process.exit(exitCodeFor(report.status));
 }
 

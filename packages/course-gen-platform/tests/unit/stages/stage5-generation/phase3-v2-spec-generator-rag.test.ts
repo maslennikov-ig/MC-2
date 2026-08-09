@@ -126,12 +126,7 @@ describe('V2SpecGenerator buildRAGContext - No document_relevance_mapping', () =
     const result = (generator as any).buildRAGContext('1', analysisResult);
 
     // Fallback to section breakdown triggered
-    expect(result.search_queries).toEqual([
-      'Introduction to ML',
-      'Topic 1',
-      'Topic 2',
-      'Topic 3',
-    ]);
+    expect(result.search_queries).toEqual(['Introduction to ML', 'Topic 1', 'Topic 2', 'Topic 3']);
     expect(result.search_queries).toHaveLength(4); // area + 3 topics
   });
 

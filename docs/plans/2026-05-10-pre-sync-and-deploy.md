@@ -66,6 +66,7 @@ git reset --hard origin/develop
 ```
 
 После этого:
+
 - Локальная `develop` = `35e06987` (актуальная).
 - Рабочий каталог переключится с `codex/checkpoint-2026-04-12` на `develop`. Файлы `.beads/embeddeddolt/.dolt/noms/*` после переключения должны исчезнуть из `git status` (на новой develop коммит `35e06987` явно убирает их из трекинга через `.gitignore`).
 - Файлы `.claude/skills/supabase*` останутся untracked — это нормально, это личные пользовательские скиллы.
@@ -82,6 +83,7 @@ git worktree prune -v
 ### 6. (Отложено, не часть этой синхронизации) Решить судьбу `codex/checkpoint-2026-04-12`
 
 После того как локальная develop актуальна, останется отдельный вопрос: что делать с 5 локальными RAG-коммитами (`f6f9ed39`, `259471df`, `edc12525`, `78d2cff5`, `cf5b4c6e`, `aca038fa`, `525f1286`, `06dbd8be`, `991a9c4d`, ... — нужно проверить через `git log 0662edeb..HEAD`), которых нет в новой `develop`. Возможные варианты — отдельным шагом, не сейчас:
+
 - Если работа уже закрыта другим путём → просто оставить в backup-ветке как архив.
 - Если работа актуальна → cherry-pick в новую feature-ветку от свежей `develop` и открыть PR через `/push-dev`.
 
@@ -146,14 +148,14 @@ git checkout backup/checkpoint-2026-04-12_2026-05-10
 
 Запушены архивные ветки и тег на `origin`:
 
-| ref | SHA | содержимое |
-|---|---|---|
-| `archive/checkpoint-pre-sync-2026-05-10` | `7ffa264c` | вся история локальной checkpoint, включая последние RAG-фиксы |
-| `archive/develop-pre-sync-2026-05-10` | `84055f86` | старая локальная develop |
-| `archive/stash-orchestration-noise-2026-04-12` | `3fb14625` | стэш с Beads/Dolt-кэшем + 2 новых orchestration-скрипта |
-| `archive/stash-wip-develop-telegram-2026-01-14` | `9ca48e9b` | стэш с черновиком Telegram-уведомлений |
-| `pre-sync-checkpoint-2026-05-10` (tag) | `7ffa264c` | дубль checkpoint как тег |
-| `codex/mc2-764sd-qdrant-not-found-research` | `d0686239` | WIP-коммит Stage 2 Qdrant fail-fast |
+| ref                                             | SHA        | содержимое                                                    |
+| ----------------------------------------------- | ---------- | ------------------------------------------------------------- |
+| `archive/checkpoint-pre-sync-2026-05-10`        | `7ffa264c` | вся история локальной checkpoint, включая последние RAG-фиксы |
+| `archive/develop-pre-sync-2026-05-10`           | `84055f86` | старая локальная develop                                      |
+| `archive/stash-orchestration-noise-2026-04-12`  | `3fb14625` | стэш с Beads/Dolt-кэшем + 2 новых orchestration-скрипта       |
+| `archive/stash-wip-develop-telegram-2026-01-14` | `9ca48e9b` | стэш с черновиком Telegram-уведомлений                        |
+| `pre-sync-checkpoint-2026-05-10` (tag)          | `7ffa264c` | дубль checkpoint как тег                                      |
+| `codex/mc2-764sd-qdrant-not-found-research`     | `d0686239` | WIP-коммит Stage 2 Qdrant fail-fast                           |
 
 WIP-коммит создан вручную в worktree через `git commit --no-verify`. Стэш `WIP on develop` (январь, Telegram UI) обошёл блокировку `git stash branch` (из-за `merge=beads` фильтра на `.beads/issues.jsonl`) через `git commit-tree` + `git update-ref`.
 
@@ -161,12 +163,12 @@ WIP-коммит создан вручную в worktree через `git commit 
 
 Файлы каждого артефакта сравнены с `origin/develop`:
 
-| Артефакт | Статус | Вывод |
-|---|---|---|
-| RAG fail-fast (checkpoint) | 12/14 source-файлов **byte-identical** с develop, 2 теста — develop впереди | вся работа уже в develop под SHA `5605323d`/`e26a8ee5`/`c3f2463b`/`dfb2b3d4` |
-| Stage 2 Qdrant fail-fast (`codex/mc2-764sd-…`) | 3/5 идентичны, 2 — develop чище (убран dead `const duration`, обновлён mock `batchUpdate('id', …)`) | уже в develop |
-| Telegram UI (stash@1) | поля `telegram_chat_id` и `handleTelegramSave` уже в `database.ts`/`AccountSettingsSection.tsx` на develop | уже в develop |
-| Orchestration scripts (stash@0) | `[completion_inbox]` секция удалена из `.codex/orchestrator.toml`, упоминания скриптов вырезаны из `AGENTS.md`, `role` переименовано `orchestrator-stage`→`stage-orchestrator` | сознательно отвергнуто в develop |
+| Артефакт                                       | Статус                                                                                                                                                                         | Вывод                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| RAG fail-fast (checkpoint)                     | 12/14 source-файлов **byte-identical** с develop, 2 теста — develop впереди                                                                                                    | вся работа уже в develop под SHA `5605323d`/`e26a8ee5`/`c3f2463b`/`dfb2b3d4` |
+| Stage 2 Qdrant fail-fast (`codex/mc2-764sd-…`) | 3/5 идентичны, 2 — develop чище (убран dead `const duration`, обновлён mock `batchUpdate('id', …)`)                                                                            | уже в develop                                                                |
+| Telegram UI (stash@1)                          | поля `telegram_chat_id` и `handleTelegramSave` уже в `database.ts`/`AccountSettingsSection.tsx` на develop                                                                     | уже в develop                                                                |
+| Orchestration scripts (stash@0)                | `[completion_inbox]` секция удалена из `.codex/orchestrator.toml`, упоминания скриптов вырезаны из `AGENTS.md`, `role` переименовано `orchestrator-stage`→`stage-orchestrator` | сознательно отвергнуто в develop                                             |
 
 **Решение:** вливать ничего не нужно. Архивы остаются как историческая справка.
 

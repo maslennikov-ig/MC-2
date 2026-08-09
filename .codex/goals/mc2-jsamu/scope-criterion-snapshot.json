@@ -1,0 +1,29 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-jsamu",
+  "source_kind": "beads",
+  "source_id": "mc2-jsamu",
+  "source_digest": "d20337176afad7da23a18d6f2df1de017125f51543aee8cafbd4efd9103d2774",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "The stage accounts for all 138 measured formatting mismatches and 11 raw captures across owned children before final verification.",
+      "text_digest": "b21005bf3fd46019bce7ed678920fc75e63a8b94994346fe812ea1d0377f7056"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Raw LLM captures, generated assets, caches, tool state, installed agent assets, and immutable stage evidence are explicitly ignored without changing their tracked bytes.",
+      "text_digest": "7cf849c0788ab5bf201e750bfb2d0feb0aebe87dd5b6510fb1e31659d4773607"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "All remaining docs, specs, and packages mismatches are changed only by the repository-pinned Prettier formatter.",
+      "text_digest": "b5e19141e08a56b8086f42ec129416883285c0f9356fa8cf6831116596c0771c"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "pnpm format:check, pnpm type-check, and pnpm build exit zero on the final tree.",
+      "text_digest": "5030a5146dde12220f2e62b72ed4e976f601a06e25c09433f13dbb9a09489dc3"
+    }
+  ]
+}

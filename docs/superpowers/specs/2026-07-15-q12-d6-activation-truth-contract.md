@@ -6,15 +6,15 @@ title: Q12 D6 activation-truth read-only inspection contract
 epic: mc2-jz6y0
 decision_issue: mc2-jz6y0.13.19
 downstream_root_join: mc2-jz6y0.13.13
-owner_decision: "Option A (approved)"
+owner_decision: 'Option A (approved)'
 owner_decision_date: 2026-07-15
 approved_candidate_path: .superpowers/sdd/q12-d6-activation-truth-candidate.md
 approved_candidate_sha256: 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5
 final_independent_review_verdict: PASS
-final_independent_review_scores_p0_p1_p2_p3: "0/0/0/0"
+final_independent_review_scores_p0_p1_p2_p3: '0/0/0/0'
 final_independent_review_sha256: 948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7
 transcription: verbatim
-transcription_note: "Everything below the FROZEN NORMATIVE CONTENT marker is a byte-for-byte transcription of the approved candidate (SHA-256 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5). Only this provenance block was added; no normative byte was edited. Re-verify with: tail -c 47092 on this file must hash to the approved candidate SHA-256."
+transcription_note: 'Everything below the FROZEN NORMATIVE CONTENT marker is a byte-for-byte transcription of the approved candidate (SHA-256 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5). Only this provenance block was added; no normative byte was edited. Re-verify with: tail -c 47092 on this file must hash to the approved candidate SHA-256.'
 ---
 
 <!-- FROZEN NORMATIVE CONTENT — byte-identical to approved candidate 2a2251ac0c03c042a61cc698728c012b9c68e0a9404df0e2f616eb3ec026aae5. Do not edit the normative content below. The final independent review (SHA-256 948982d99895489c6fefa1fb831791f7e02bb524bb268713e712629a6bdab5a7, PASS, P0/P1/P2/P3 = 0/0/0/0) and owner Option A approval on 2026-07-15 froze these bytes under decision mc2-jz6y0.13.19. -->
@@ -38,16 +38,16 @@ No Supabase, service, container, database, Beads, tracked file, branch, or remot
 
 ## Findings closed
 
-| Review finding | Revised contract |
-|---|---|
-| P1-1 endpoint, TLS, privileges | Exact host/user/database/TLS/CA/PG17 are frozen; a fail-closed read-only capability projection proves full-set lock privilege, activity visibility, and snapshot clearing; no grants are added. |
-| P1-2 provider sessions | The invented singleton is removed. D6 consumes a hash-bound exact D3/W reviewed managed-session/background inventory and preserves the trusted provider plane; unknown identities stop and are never learned. |
-| P1-3 incomplete race binding | D6 is blocked on accepted W bytes, SQL and lock catalog/order. Normal and recovery paths must prove a common conflicting lock precedes every tenant-controlled mutation and receipt. |
-| P1-4 predecision authority | Predecision and terminal seal are separate. Only a terminal seal after `closed` is authority. The graph is acyclic; durable `R` without seal is incident-only. |
-| P1-5 FD proof | Closure/mapping belongs to Root `posix_spawn` file actions plus close-from capability gate. Probe checks required FDs and a pinned runtime-created baseline only. pidfd/ptrace/proc/OFD capabilities are mandatory RED gates. |
-| P2-1 session projection | Exact safe fields, sorting, redaction, null rules and predicates are frozen. Statistics are cleared before every authority-bearing read. |
-| P2-2 writers/queue | Forward inventory is exactly ten final plus five held; all are stopped/restart `no`. The predicate is global `net.http_request_queue=0`. Pre-`R` authority binds prepared-quiesced predecessor ancestry, not a rollback final-writer manifest. |
-| P2-3 ownership | DB, Root and integration write zones are disjoint. `.13.13` starts/rebases only after accepted D6 integration. |
+| Review finding                 | Revised contract                                                                                                                                                                                                                               |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1 endpoint, TLS, privileges | Exact host/user/database/TLS/CA/PG17 are frozen; a fail-closed read-only capability projection proves full-set lock privilege, activity visibility, and snapshot clearing; no grants are added.                                                |
+| P1-2 provider sessions         | The invented singleton is removed. D6 consumes a hash-bound exact D3/W reviewed managed-session/background inventory and preserves the trusted provider plane; unknown identities stop and are never learned.                                  |
+| P1-3 incomplete race binding   | D6 is blocked on accepted W bytes, SQL and lock catalog/order. Normal and recovery paths must prove a common conflicting lock precedes every tenant-controlled mutation and receipt.                                                           |
+| P1-4 predecision authority     | Predecision and terminal seal are separate. Only a terminal seal after `closed` is authority. The graph is acyclic; durable `R` without seal is incident-only.                                                                                 |
+| P1-5 FD proof                  | Closure/mapping belongs to Root `posix_spawn` file actions plus close-from capability gate. Probe checks required FDs and a pinned runtime-created baseline only. pidfd/ptrace/proc/OFD capabilities are mandatory RED gates.                  |
+| P2-1 session projection        | Exact safe fields, sorting, redaction, null rules and predicates are frozen. Statistics are cleared before every authority-bearing read.                                                                                                       |
+| P2-2 writers/queue             | Forward inventory is exactly ten final plus five held; all are stopped/restart `no`. The predicate is global `net.http_request_queue=0`. Pre-`R` authority binds prepared-quiesced predecessor ancestry, not a rollback final-writer manifest. |
+| P2-3 ownership                 | DB, Root and integration write zones are disjoint. `.13.13` starts/rebases only after accepted D6 integration.                                                                                                                                 |
 
 ## Owner recommendation and the only genuine choices
 
@@ -201,20 +201,20 @@ This mechanism is accepted only if the pinned server Python/libc exposes an atom
 
 Descriptor contract:
 
-| FD | Exact meaning |
-|---:|---|
-| 0 | `/dev/null`, read-only |
-| 1 | Root-captured audit pipe, write-only |
-| 2 | Root-captured error pipe, write-only |
-| 3 | Root-opened `/opt/megacampus/secrets/supabase_db_url`, source owner `claude-deploy:claude-deploy`, source mode `0400` or `0600`, read-only |
-| 4 | Root-opened `/opt/megacampus/secrets/prod-ca-2021.crt`, source owner `claude-deploy:claude-deploy`, source mode `0644`, read-only |
-| 5 | immutable D6 request, read-only |
-| 6 | Root-to-probe control pipe, read-only |
-| 7 | probe-to-Root frame pipe, write-only |
-| 8 | closed/reserved, never journal |
-| 9 | canonical cutover lock and inherited exclusive OFD/flock |
-| 10 | immutable accepted catalog bundle, read-only |
-| 11 | exact accepted D6 SQL projection, read-only |
+|  FD | Exact meaning                                                                                                                              |
+| --: | ------------------------------------------------------------------------------------------------------------------------------------------ |
+|   0 | `/dev/null`, read-only                                                                                                                     |
+|   1 | Root-captured audit pipe, write-only                                                                                                       |
+|   2 | Root-captured error pipe, write-only                                                                                                       |
+|   3 | Root-opened `/opt/megacampus/secrets/supabase_db_url`, source owner `claude-deploy:claude-deploy`, source mode `0400` or `0600`, read-only |
+|   4 | Root-opened `/opt/megacampus/secrets/prod-ca-2021.crt`, source owner `claude-deploy:claude-deploy`, source mode `0644`, read-only          |
+|   5 | immutable D6 request, read-only                                                                                                            |
+|   6 | Root-to-probe control pipe, read-only                                                                                                      |
+|   7 | probe-to-Root frame pipe, write-only                                                                                                       |
+|   8 | closed/reserved, never journal                                                                                                             |
+|   9 | canonical cutover lock and inherited exclusive OFD/flock                                                                                   |
+|  10 | immutable accepted catalog bundle, read-only                                                                                               |
+|  11 | exact accepted D6 SQL projection, read-only                                                                                                |
 
 Root opens a pidfd immediately. Before accepting frames it proves on the pinned server:
 
@@ -316,12 +316,12 @@ w_activation_tuple_sha256
 
 Every host-projection field not named as nullable below is required and non-null. `H` means one lowercase 64-hex SHA-256 over the exact safely opened canonical object/projection bytes; `N` means JSON null and no file/path/hash substitute. The projection contains every key in every classification; omission is invalid.
 
-| Classification | `activation_evidence_state` | `barrier_receipt_sha256` | `probe_receipt_sha256` | `activation_result_sha256` | `activation_process_projection_sha256` | `process_manifest_sha256` |
-|---|---|---:|---:|---:|---:|---:|
-| `precommit_rollback` | `prepared_guarded` | H: exact accepted `recovery_ready_guarded` barrier receipt | H: its exact bound probe receipt | N | H: exact complete projection with zero live activation processes/sessions | N |
-| `committed_finish_forward` | `complete_receipt` | H: exact accepted activated barrier receipt | H: exact receipt-bound probe receipt | H: exact accepted activation result | H: exact complete projection with zero live activation processes/sessions | H: exact accepted activation process manifest |
-| `committed_finish_forward` | `committed_receipt_pending` | H: exact accepted predecessor `recovery_ready_guarded` barrier receipt, not an activated receipt | H: that predecessor receipt's exact bound probe receipt | N | H: exact complete projection with zero live activation processes/sessions | H: exact accepted process manifest proving the activation child exited and cannot recur |
-| `drift_incident` | `incident_observed` | H iff the exact safe canonical object exists, otherwise N | H iff the exact safe canonical object exists, otherwise N | H iff the exact safe canonical object exists, otherwise N | H: exact complete observed projection, including any live drift | H iff the exact safe canonical object exists, otherwise N |
+| Classification             | `activation_evidence_state` |                                                                         `barrier_receipt_sha256` |                                    `probe_receipt_sha256` |                                `activation_result_sha256` |                                    `activation_process_projection_sha256` |                                                               `process_manifest_sha256` |
+| -------------------------- | --------------------------- | -----------------------------------------------------------------------------------------------: | --------------------------------------------------------: | --------------------------------------------------------: | ------------------------------------------------------------------------: | --------------------------------------------------------------------------------------: |
+| `precommit_rollback`       | `prepared_guarded`          |                                       H: exact accepted `recovery_ready_guarded` barrier receipt |                          H: its exact bound probe receipt |                                                         N | H: exact complete projection with zero live activation processes/sessions |                                                                                       N |
+| `committed_finish_forward` | `complete_receipt`          |                                                      H: exact accepted activated barrier receipt |                      H: exact receipt-bound probe receipt |                       H: exact accepted activation result | H: exact complete projection with zero live activation processes/sessions |                                           H: exact accepted activation process manifest |
+| `committed_finish_forward` | `committed_receipt_pending` | H: exact accepted predecessor `recovery_ready_guarded` barrier receipt, not an activated receipt |   H: that predecessor receipt's exact bound probe receipt |                                                         N | H: exact complete projection with zero live activation processes/sessions | H: exact accepted process manifest proving the activation child exited and cannot recur |
+| `drift_incident`           | `incident_observed`         |                                        H iff the exact safe canonical object exists, otherwise N | H iff the exact safe canonical object exists, otherwise N | H iff the exact safe canonical object exists, otherwise N |           H: exact complete observed projection, including any live drift |                               H iff the exact safe canonical object exists, otherwise N |
 
 For `incident_observed`, H is mandatory when the named canonical path exists and can be opened/revalidated safely, and N is mandatory only when that path is absent. A present symlink, unsafe ancestor, wrong owner/mode/type, identity swap, malformed object or unhashed bytes stops before terminal-seal publication; Root records the already-authoritative lifecycle incident without converting unsafe bytes to null. No validator may choose between H and N. `committed_receipt_pending` is legal only when the current barrier receipt is the exact accepted predecessor `recovery_ready_guarded` object, not an activated receipt, and with the exact process manifest and zero-live-process projection above; absence or mismatch of any is `drift_incident`, never a broader reconstruction permission. Root's deterministic host publication may replace that predecessor with the missing accepted activated receipt/result only after a valid committed terminal seal and under the later Task 9 authority; D6 itself publishes neither.
 
@@ -478,11 +478,11 @@ transaction_end, connection_closed
 
 It is published only after exact `closed`, clean probe exit, final transcript fsync, and continuity verification. It binds `probe_exit_status=0`, `transaction_end=read_only_commit`, and `connection_closed=true`. Every evidence state and nullable/hash value must equal the exact host projection and the predecision classification.
 
-| `outcome` exact literal | Required predecision equality | Required `activation_evidence_state` | Actual `R` hashes | Sole authority |
-|---|---|---|---|---|
-| `precommit_rollback_sealed` | `classification=precommit_rollback`, `action=append_r_then_seal` | `prepared_guarded` | both H and byte-equal the predecision planned hashes | Task 9 post-`R` frontier retirement/rollback preparation only |
-| `committed_finish_forward_sealed` | `classification=committed_finish_forward`, `action=seal_finish_forward` | `complete_receipt` or `committed_receipt_pending` | both N | finish-forward only; pending evidence may be deterministically published as described above, never activation replay |
-| `drift_incident_sealed` | `classification=drift_incident`, `action=abort_incident` | `incident_observed` | both N | no mutation, finish-forward, rollback, retirement or activation authority |
+| `outcome` exact literal           | Required predecision equality                                           | Required `activation_evidence_state`              | Actual `R` hashes                                    | Sole authority                                                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `precommit_rollback_sealed`       | `classification=precommit_rollback`, `action=append_r_then_seal`        | `prepared_guarded`                                | both H and byte-equal the predecision planned hashes | Task 9 post-`R` frontier retirement/rollback preparation only                                                        |
+| `committed_finish_forward_sealed` | `classification=committed_finish_forward`, `action=seal_finish_forward` | `complete_receipt` or `committed_receipt_pending` | both N                                               | finish-forward only; pending evidence may be deterministically published as described above, never activation replay |
+| `drift_incident_sealed`           | `classification=drift_incident`, `action=abort_incident`                | `incident_observed`                               | both N                                               | no mutation, finish-forward, rollback, retirement or activation authority                                            |
 
 No other outcome literal, classification/action pairing, evidence state, null/hash pattern or authority exists. For precommit the actual `R` hashes exactly equal planned. For committed and incident the planned and actual `R` hashes are null. A durable `R` followed by any failure before a valid `precommit_rollback_sealed` object remains incident-only and has no substitute outcome.
 
@@ -537,11 +537,11 @@ Exact crash rules:
 
 Implementation remains blocked on accepted W/D5W. After an approved plan, streams may use separate worktrees with these exclusive zones:
 
-| Stream | Exclusive tracked write zone | Verification |
-|---|---|---|
-| DB probe | create `packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs`; create `deploy/qdrant/q12-activation-truth-projection.sql`; create `packages/course-gen-platform/tests/unit/ops/fixtures/q12-activation-truth-runner.cjs`; create `packages/course-gen-platform/tests/unit/ops/q12-activation-truth.test.ts` | production CLI negatives; disposable PG17 lock/capability/session/race tests |
-| Root coordinator | modify `deploy/qdrant/q12-lifecycle-core.py`; modify `packages/course-gen-platform/tests/unit/ops/q12-live-cutover.test.ts`; modify `packages/course-gen-platform/tests/unit/ops/q12-command-manifest.test.ts` only to prove unchanged five-command bytes/hashes | spawn/pidfd/FD/OFD, protocol, crash and authority tests |
-| D6 integration | create `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-q12-d6.md`; integration-only conflict resolution and accepted docs/handoff/Beads updates | independent correctness/docs review, full gates, commit/push |
+| Stream           | Exclusive tracked write zone                                                                                                                                                                                                                                                                                                    | Verification                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| DB probe         | create `packages/course-gen-platform/tools/qdrant/q12-activation-truth-probe.cjs`; create `deploy/qdrant/q12-activation-truth-projection.sql`; create `packages/course-gen-platform/tests/unit/ops/fixtures/q12-activation-truth-runner.cjs`; create `packages/course-gen-platform/tests/unit/ops/q12-activation-truth.test.ts` | production CLI negatives; disposable PG17 lock/capability/session/race tests |
+| Root coordinator | modify `deploy/qdrant/q12-lifecycle-core.py`; modify `packages/course-gen-platform/tests/unit/ops/q12-live-cutover.test.ts`; modify `packages/course-gen-platform/tests/unit/ops/q12-command-manifest.test.ts` only to prove unchanged five-command bytes/hashes                                                                | spawn/pidfd/FD/OFD, protocol, crash and authority tests                      |
+| D6 integration   | create `.codex/stages/mc2-jz6y0/artifacts/mc2-jz6y0.13.19-q12-d6.md`; integration-only conflict resolution and accepted docs/handoff/Beads updates                                                                                                                                                                              | independent correctness/docs review, full gates, commit/push                 |
 
 The five-command JSON manifest is never a write zone. The D6 artifact belongs only to integration. `.13.13` Task 9 may begin/rebase only after D6 is independently accepted, integrated, pushed and `.13.19` is closed; it must not run concurrently against shared lifecycle/tests.
 
@@ -596,13 +596,13 @@ Graph evidence remains the prior focused read-only query against `graphify-out/g
 
 These candidate line references are exact for this revision; this table is appended after the referenced material so it does not shift them.
 
-| Rereview finding | Exact closure in this candidate |
-|---|---|
-| P1-1 canonical command IDs | Lines 147-159 enumerate all five exact `barrier.*` IDs, bind manifest SHA-256, and reject shorthand; lines 123-139 add that manifest hash to the accepted W/D6 tuple. |
-| P1-2 D5/D6 post-`R` contradiction | Lines 48-60 are the sole explicit normative narrowing, including the no-descendant/no-mutation/read-only-commit and process/FD/session retirement rules; lines 413-466 freeze the close/seal sequence and authority; lines 572 contains the owner-visible approval text. |
-| P1-3 URI/CA ownership and modes | Lines 62-92 retain the exact absolute source paths, `claude-deploy:claude-deploy`, URI `0400|0600`, CA `0644`, safe ancestors and Root open/revalidation; lines 181-196 map those accepted sources to FD3/FD4; line 546 repeats the no-copy/no-chmod/no-chown boundary. |
-| P2-1 null/hash and terminal outcomes | Lines 282-305 freeze every host evidence field and H/N class; lines 332-348 apply the same exact pattern to the request; lines 440-466 freeze terminal keys, the three outcome literals, predecision equality, actual-`R` nullability and sole authority. |
-| P2-2 current version-sensitive sources | Lines 552-566 record PostgreSQL 17.10 release/manual sources and Python 3.14 `posix_spawn`/FD actions, plus the local 3.14.4/glibc 2.43 observation and retained pinned-server gate. |
+| Rereview finding                       | Exact closure in this candidate                                                                                                                                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1 canonical command IDs             | Lines 147-159 enumerate all five exact `barrier.*` IDs, bind manifest SHA-256, and reject shorthand; lines 123-139 add that manifest hash to the accepted W/D6 tuple.                                                                                                    |
+| P1-2 D5/D6 post-`R` contradiction      | Lines 48-60 are the sole explicit normative narrowing, including the no-descendant/no-mutation/read-only-commit and process/FD/session retirement rules; lines 413-466 freeze the close/seal sequence and authority; lines 572 contains the owner-visible approval text. |
+| P1-3 URI/CA ownership and modes        | Lines 62-92 retain the exact absolute source paths, `claude-deploy:claude-deploy`, URI `0400                                                                                                                                                                             | 0600`, CA `0644`, safe ancestors and Root open/revalidation; lines 181-196 map those accepted sources to FD3/FD4; line 546 repeats the no-copy/no-chmod/no-chown boundary. |
+| P2-1 null/hash and terminal outcomes   | Lines 282-305 freeze every host evidence field and H/N class; lines 332-348 apply the same exact pattern to the request; lines 440-466 freeze terminal keys, the three outcome literals, predecision equality, actual-`R` nullability and sole authority.                |
+| P2-2 current version-sensitive sources | Lines 552-566 record PostgreSQL 17.10 release/manual sources and Python 3.14 `posix_spawn`/FD actions, plus the local 3.14.4/glibc 2.43 observation and retained pinned-server gate.                                                                                     |
 
 ## Explicit defers and authority boundary
 

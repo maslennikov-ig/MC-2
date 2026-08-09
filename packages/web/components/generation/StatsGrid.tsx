@@ -3,7 +3,16 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { motion } from 'framer-motion'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
-import { FileText, BookOpen, Clock, Zap, CheckCircle2, Loader2, Layers, BrainCircuit } from 'lucide-react'
+import {
+  FileText,
+  BookOpen,
+  Clock,
+  Zap,
+  CheckCircle2,
+  Loader2,
+  Layers,
+  BrainCircuit,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { STAGE_CONFIG } from '../generation-celestial/utils'
@@ -244,7 +253,11 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
         <StatCard
           icon={<BrainCircuit className="h-4 w-4" />}
           label={t('tokens')}
-          value={typeof progress.total_tokens_used === 'number' ? formatTokensCompact(progress.total_tokens_used) : '—'}
+          value={
+            typeof progress.total_tokens_used === 'number'
+              ? formatTokensCompact(progress.total_tokens_used)
+              : '—'
+          }
           subValue={progress.total_tokens_used ? t('tokensUsed') : undefined}
           color="cyan"
         />

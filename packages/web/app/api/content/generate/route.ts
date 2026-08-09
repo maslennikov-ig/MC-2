@@ -108,12 +108,15 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser) {
     if (!ipValidation.valid) {
       logger.warn('Webhook URL failed IP validation', {
         webhookUrl: webhook,
-        error: ipValidation.error
+        error: ipValidation.error,
       })
-      return NextResponse.json({
-        error: 'Webhook URL validation failed',
-        details: ipValidation.error
-      }, { status: 403 })
+      return NextResponse.json(
+        {
+          error: 'Webhook URL validation failed',
+          details: ipValidation.error,
+        },
+        { status: 403 }
+      )
     }
 
     // Send webhook request with HMAC-SHA256 signature (never send secrets in plaintext)

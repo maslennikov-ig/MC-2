@@ -362,6 +362,7 @@ Project Conventions:
    ```
 
 3. **Team Coordination Rules**
+
    ```markdown
    ## Multi-Agent Protocol
 

@@ -502,6 +502,7 @@ frontend_parameters: {
    ```
 
 3. **Verify fix**:
+
    ```bash
    pnpm test tests/contract/generation.test.ts -t "should regenerate section successfully"
    ```

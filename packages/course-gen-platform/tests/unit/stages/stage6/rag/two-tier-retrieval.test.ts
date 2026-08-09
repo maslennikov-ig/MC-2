@@ -177,11 +177,13 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
 
     // Reset environment variables to defaults
     delete process.env.RAG_TWO_TIER_ENABLED;
+    delete process.env.RAG_SHADOW_RETRIEVAL_RATE;
   });
 
   afterEach(() => {
     // Clean up environment variables after each test
     delete process.env.RAG_TWO_TIER_ENABLED;
+    delete process.env.RAG_SHADOW_RETRIEVAL_RATE;
   });
 
   // ==========================================================================
@@ -420,7 +422,7 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
       retrievalDurationMs: 100,
     };
 
-    vi.mocked(ragContextCache.get).mockResolvedValue(cachedData);
+    vi.mocked(ragContextCache).get.mockResolvedValue(cachedData);
 
     const result = await retrieveLessonContext({
       courseId: mockCourseId,
@@ -543,6 +545,140 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
         }),
         durationMs: expect.any(Number),
       })
+    );
+  });
+
+  it('records a sampled Tier 1 score and Tier 2 false positive without changing the exit result', async () => {
+    process.env.RAG_SHADOW_RETRIEVAL_RATE = '1';
+    const lessonSpec = createMockLessonSpec({
+      rag_context: {
+        primary_documents: [],
+        search_queries: ['query1', 'query2', 'query3', 'query4'],
+        expected_chunks: 7,
+      },
+    });
+    const firstProbe = createMockSearchResult(1);
+    firstProbe.results[0].score = 0.12;
+    const secondProbe = createMockSearchResult(1);
+    secondProbe.results[0].score = 0.08;
+    const evidenceContext = {
+      acceptedRunId: 'run-1',
+      decisionIds: [],
+      decisionQueries: [],
+      sourceRefs: [{ document_id: 'doc-0', version_hash: 'sha256:accepted' }],
+      rejectedSourceRefs: [],
+      allowedDocumentIds: ['doc-0'],
+      sourceVersionByDocumentId: { 'doc-0': 'sha256:accepted' },
+      decisionIdsByDocumentId: {},
+      globalDecisionIds: [],
+      cacheIdentity: 'accepted-run-1',
+    } as const;
+    for (const response of [firstProbe, secondProbe]) {
+      response.results[0].payload = {
+        organization_id: 'organization-1',
+        course_id: mockCourseId,
+        version_hash: 'sha256:accepted',
+      };
+    }
+    const tier2Hit = createMockSearchResult(1);
+    tier2Hit.results[0].payload = {
+      organization_id: 'organization-1',
+      course_id: mockCourseId,
+      version_hash: 'sha256:accepted',
+    };
+
+    vi.mocked(searchChunks)
+      .mockResolvedValueOnce(createMockSearchResult(0))
+      .mockResolvedValueOnce(createMockSearchResult(0))
+      .mockResolvedValueOnce(firstProbe)
+      .mockResolvedValueOnce(secondProbe)
+      .mockResolvedValueOnce(tier2Hit)
+      .mockResolvedValueOnce(createMockSearchResult(0));
+
+    const result = await retrieveLessonContext({
+      courseId: mockCourseId,
+      organizationId: 'organization-1',
+      lessonSpec,
+      evidenceContext: evidenceContext as any,
+      useCache: false,
+    });
+
+    expect(result.chunks).toEqual([]);
+    expect(result.totalRetrieved).toBe(0);
+
+    await vi.waitFor(() => expect(searchChunks).toHaveBeenCalledTimes(6));
+    await vi.waitFor(() =>
+      expect(logTrace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepName: 'tier1_shadow',
+          outputData: expect.objectContaining({
+            tier1DenseMaxScore: 0.12,
+            tier1DenseScoreObserved: true,
+            tier2ChunksFound: 1,
+            falsePositive: true,
+            shadowRate: 1,
+            complete: true,
+            queryFailures: 0,
+          }),
+        })
+      )
+    );
+
+    const calls = vi.mocked(searchChunks).mock.calls;
+    expect(calls.slice(2, 4).map(([, options]) => options?.score_threshold)).toEqual([0, 0]);
+    for (const [, options] of calls.slice(2, 4)) {
+      expect(options).toMatchObject({
+        enable_hybrid: false,
+        enable_priority_boost: false,
+        group_by_document: false,
+      });
+    }
+    expect(calls.slice(4).map(([, options]) => options?.score_threshold)).toEqual([0.25, 0.25]);
+    for (const [, options] of calls.slice(2)) {
+      expect(options?.filters).toEqual(
+        expect.objectContaining({
+          organization_id: 'organization-1',
+          course_id: mockCourseId,
+          document_ids: ['doc-0'],
+        })
+      );
+      expect(options?.include_payload).toBe(true);
+    }
+
+    const shadowTrace = vi
+      .mocked(logTrace)
+      .mock.calls.find(([trace]) => trace.stepName === 'tier1_shadow');
+    expect(JSON.stringify(shadowTrace)).not.toContain('Content for chunk');
+  });
+
+  it('keeps a shadow query failure out of the active retrieval result', async () => {
+    process.env.RAG_SHADOW_RETRIEVAL_RATE = '1';
+    const lessonSpec = createMockLessonSpec();
+
+    vi.mocked(searchChunks)
+      .mockResolvedValueOnce(createMockSearchResult(0))
+      .mockResolvedValueOnce(createMockSearchResult(0))
+      .mockRejectedValue(new Error('shadow Qdrant unavailable'));
+
+    const result = await retrieveLessonContext({
+      courseId: mockCourseId,
+      organizationId: 'organization-1',
+      lessonSpec,
+      useCache: false,
+    });
+
+    expect(result).toMatchObject({ chunks: [], totalRetrieved: 0 });
+    await vi.waitFor(() =>
+      expect(logTrace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepName: 'tier1_shadow',
+          outputData: expect.objectContaining({
+            falsePositive: null,
+            complete: false,
+            queryFailures: 2,
+          }),
+        })
+      )
     );
   });
 });

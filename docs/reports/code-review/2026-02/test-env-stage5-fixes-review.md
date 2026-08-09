@@ -423,6 +423,7 @@ export function detectEnvironment(): LogEnvironment | null {
    - ✅ Prevents false alarms in Russian courses
 
 4. **Heuristic Skipped LLM Review** (expected_behavior):
+
    ```typescript
    {
      pattern: /Critical heuristic failures detected.*skipping LLM review/i,

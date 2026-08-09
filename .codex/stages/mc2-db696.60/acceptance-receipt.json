@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "TOKEN=synthetic-playwright-token PLAYWRIGHT_PORT=3114 PLAYWRIGHT_DISABLE_VIDEO=1 pnpm --dir packages/web exec playwright test tests/e2e/career-playbook/wizard-phase-a.spec.ts --project=chromium --grep 'waits for session sync' && pnpm exec eslint 'packages/web/app/(mocks)/mocks/career-playbook-followups/page.tsx' packages/web/tests/e2e/career-playbook/wizard-phase-a.spec.ts && git diff --check",
+      "duration_seconds": 167.06,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "TOKEN=synthetic-playwright-token PLAYWRIGHT_PORT=3114 PLAYWRIGHT_DISABLE_VIDEO=1 pnpm --dir packages/web exec playwright test tests/e2e/career-playbook/wizard-phase-a.spec.ts --project=chromium --grep 'waits for session sync' && pnpm exec eslint 'packages/web/app/(mocks)/mocks/career-playbook-followups/page.tsx' packages/web/tests/e2e/career-playbook/wizard-phase-a.spec.ts && git diff --check"
+  ],
+  "completed_at": "2026-08-09T13:08:54.717268+00:00",
+  "diff_digest": "eae75a3d42cc764b5653ed194c197a07537f7c4bbf253e9eb5ce72c39eb9e754",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "968d8d5136aaa9317f16d0b0686eea7d656d5bac",
+  "idempotency_key": "402da4dd998f9ab8c9a638df65942e8123c2168f247a552536779f94712439ef",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.60",
+  "started_at": "2026-08-09T13:06:07.492272+00:00",
+  "verification_fingerprint": "402da4dd998f9ab8c9a638df65942e8123c2168f247a552536779f94712439ef"
+}

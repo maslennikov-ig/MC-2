@@ -143,4 +143,32 @@ describe('runLLMReview modelUsed tracking', () => {
       'ru'
     );
   });
+
+  it('passes a non-ru/en language into refinement routing unchanged', async () => {
+    mockGetModelForPhase.mockResolvedValue({
+      modelId: 'multilingual-model',
+      fallbackModelId: 'fallback-model',
+    });
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({ status: 'PASS', reasoning: 'Looks good', issues: [] }),
+      totalTokens: 100,
+      finishReason: 'stop',
+      model: 'unused-by-code',
+    });
+
+    await runLLMReview({
+      lessonSpec: buildLessonSpec(),
+      ragChunks: [],
+      generatedContent: '## Einführung\nInhalt',
+      language: 'de',
+      courseId: 'course-123',
+    });
+
+    expect(mockGetModelForPhase).toHaveBeenCalledWith(
+      'stage_6_refinement',
+      'course-123',
+      expect.any(Number),
+      'de'
+    );
+  });
 });

@@ -510,6 +510,7 @@ When jobs fail, the error message is not reliably extracted and stored in the jo
    - No fallback to error.toString() or JSON.stringify(error)
 
 3. **Test Observation** (plan file line 40-43):
+
    ```
    "error": "error_message is undefined on failed jobs",
    "source": "Worker error handling logic",
@@ -575,6 +576,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    - All errors logged to Pino only, not database
 
 3. **Test Expectation** (plan file line 48-55):
+
    ```
    "error": "error_logs table has 0 entries",
    "source": "Error logging mechanism not triggering",

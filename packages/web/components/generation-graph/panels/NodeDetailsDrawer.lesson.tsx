@@ -3,9 +3,7 @@ import { LessonEditProvider } from '../contexts/LessonEditContext'
 import { LessonPanelErrorBoundary } from './NodeDetailsDrawer.error'
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
 import { RefinementChat } from './RefinementChat'
-import type {
-  LessonInspectorDataRefinementExtension,
-} from '@megacampus/shared-types'
+import type { LessonInspectorDataRefinementExtension } from '@megacampus/shared-types'
 import type { Proposal } from '@megacampus/shared-types/chat-types'
 import type { ChatMessage } from '../hooks/useRefinement'
 import type { ParsedLessonContent } from '@/lib/markdown-content-parser'

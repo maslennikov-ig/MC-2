@@ -1,0 +1,66 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-5dzld",
+  "goal_id": "mc2-5dzld",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "deterministic-course-gen-declaration-rebuild",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["course-gen-build-types", "web-type-consumer", "build-contract-test"],
+    "risk_models": [
+      "stale-incremental-state",
+      "missing-declaration-output",
+      "incremental-regression"
+    ],
+    "test_environments": [
+      "repository-pinned-typescript",
+      "workspace-type-check",
+      "production-build"
+    ],
+    "rollback_boundary": "revert-the-build-command-contract-and-focused-regression-test",
+    "acceptance_proofs": [
+      "stale-tsbuildinfo-reproducer-red-before-fix",
+      "clean-declaration-rebuild-green-after-fix",
+      "repeated-build-and-workspace-type-check-green"
+    ]
+  },
+  "work_areas": ["contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-5dzld",
+    "source_digest": "e46898bbbc8f0b7bac656ec6c2076a6e2c185dcf7f4d8efc4ee973125e982f13",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The canonical course-gen-platform build:types command recreates every required declaration when dist is absent but tsconfig.tsbuildinfo is stale.",
+        "text_digest": "6102c4133b8d1abe051e272a7097e481386c1b9941eef01fc8bbefddd958f323"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "The recovered declaration tree supports workspace and web type-check without misleading missing-type failures.",
+        "text_digest": "cbe021e761d86402f6735d2796ebda9867510872ddf55ceaf9d54f3c500fdafe"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "A normal repeated build remains green and cleanup guidance states that build:types is a forced project rebuild.",
+        "text_digest": "4fed6a95c2f8ec326934298009e1fa18f1d31e3da1821351d487e0263ff0fb55"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-5dzld/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "e46898bbbc8f0b7bac656ec6c2076a6e2c185dcf7f4d8efc4ee973125e982f13",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-5dzld/artifacts/mc2-5dzld.md",
+      "task_id": "mc2-5dzld",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

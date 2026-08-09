@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  retryLessonGeneration,
-  retryMultipleLessons,
-} from '@/app/actions/lesson-actions'
+import { retryLessonGeneration, retryMultipleLessons } from '@/app/actions/lesson-actions'
 
 const { mockGetServerTrpcClient, mockPartialGenerateMutate } = vi.hoisted(() => ({
   mockGetServerTrpcClient: vi.fn(),

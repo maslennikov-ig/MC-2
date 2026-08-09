@@ -92,7 +92,7 @@ function buildStage2ProgressJob(
 export async function processCareerPlaybookSource(
   input: ProcessCareerPlaybookSourceInput
 ): Promise<ProcessCareerPlaybookSourceResult> {
-  const { playbookId, sourceId, fileId, filePath, mimeType, organizationId, job } = input;
+  const { playbookId, sourceId, fileId, filePath, mimeType, organizationId, language, job } = input;
 
   try {
     await updateSourceStatus(sourceId, 'processing');
@@ -114,6 +114,7 @@ export async function processCareerPlaybookSource(
     await storeProcessedDocument(fileId, processingResult, playbookId);
 
     await executePhase6Summarization(playbookId, fileId, organizationId, {
+      titleLanguage: language === 'ru' || language === 'en' ? language : 'document',
       onProgress: progress => {
         void job?.updateProgress(Math.min(99, 80 + Math.round(progress / 5)));
       },
@@ -123,7 +124,7 @@ export async function processCareerPlaybookSource(
     await job?.updateProgress(100);
 
     logger.info(
-      { playbookId, sourceId, fileId, mimeType: input.mimeType, language: input.language },
+      { playbookId, sourceId, fileId, mimeType: input.mimeType, language },
       'Career Playbook source processed'
     );
 

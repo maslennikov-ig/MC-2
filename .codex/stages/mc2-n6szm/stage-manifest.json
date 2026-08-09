@@ -1,0 +1,58 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-n6szm",
+  "goal_id": "mc2-n6szm",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "reindex-test-lint-clean-split",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["reindex-unit-tests", "shared-test-fixtures", "lint-staged-contract"],
+    "risk_models": ["test-registration", "fixture-drift", "lint-regression"],
+    "test_environments": ["eslint", "vitest-unit", "workspace-build"],
+    "rollback_boundary": "revert-the-test-split-and-promise-mock-cleanup",
+    "acceptance_proofs": [
+      "baseline-sixteen-errors-four-warnings",
+      "zero-eslint-problems-without-rule-disables",
+      "all-sixty-seven-focused-tests-green"
+    ]
+  },
+  "work_areas": ["implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-n6szm",
+    "source_digest": "8f8c661523f175d0106e4d8df9f858167c2c7d719721d52814a34e43150e235a",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The reindex course embeddings test surface reports zero ESLint errors and zero warnings without disabling the affected rules.",
+        "text_digest": "72926f03b485d20f2139794ba11232033082cdeacc7c7bf5c2caae612ec501ee"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "The oversized test is split along fixture, command, recovery, and CLI boundaries while preserving all 67 focused unit tests.",
+        "text_digest": "ba61fbd7407b1f39adda18f04222ab33f78865a9f48cf78a7972748f05d01f26"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The staged test files pass lint-staged-compatible ESLint, workspace type-check, and production build verification.",
+        "text_digest": "e5fa585f1dbc1c86527d5347a424e4a178da8c342ae34792e0267b722fda85be"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-n6szm/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "8f8c661523f175d0106e4d8df9f858167c2c7d719721d52814a34e43150e235a",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-n6szm/artifacts/mc2-n6szm.md",
+      "task_id": "mc2-n6szm",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

@@ -136,6 +136,7 @@ Error: Stream isn't writeable and enableOfflineQueue options is false
    - **Gap**: Fix may not handle all edge cases in concurrent multi-document processing
 
 3. **Redis Configuration** (redis.ts:17):
+
    ```typescript
    redisClient = new Redis(redisUrl, {
      maxRetriesPerRequest: null,

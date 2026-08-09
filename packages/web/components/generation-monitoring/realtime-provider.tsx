@@ -356,11 +356,10 @@ export function GenerationRealtimeProvider({
       )
       .subscribe((status) => {
         logger.debug('Subscription status', { status })
-         
+
         if (status === 'SUBSCRIBED') {
           setIsConnected(true)
           logger.debug('Successfully subscribed to realtime channel')
-           
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setIsConnected(false)
           // Note: CLOSED is normal during React Strict Mode double-invoke in development

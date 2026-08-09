@@ -62,9 +62,7 @@ function createMockTask(overrides?: Partial<SectionRefinementTask>): SectionRefi
   } as SectionRefinementTask;
 }
 
-function createMockIterationContext(
-  overrides?: Partial<IterationContext>
-): IterationContext {
+function createMockIterationContext(overrides?: Partial<IterationContext>): IterationContext {
   return {
     score: 0.65,
     iteration: 2,
@@ -107,8 +105,10 @@ function createLlmCallMock(responseContent: string): LLMCallFn {
 // ============================================================================
 
 describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
-  const originalContent = 'TypeScript is a typed superset of JavaScript that compiles to plain JavaScript. It adds static types, classes, and interfaces.';
-  const cleanPatchedContent = 'TypeScript is a strongly-typed superset of JavaScript. It provides static types, classes, and interfaces for better developer experience.';
+  const originalContent =
+    'TypeScript is a typed superset of JavaScript that compiles to plain JavaScript. It adds static types, classes, and interfaces.';
+  const cleanPatchedContent =
+    'TypeScript is a strongly-typed superset of JavaScript. It provides static types, classes, and interfaces for better developer experience.';
 
   it('should return patched content when LLM response is clean', async () => {
     const llmCall = createLlmCallMock(cleanPatchedContent);
@@ -126,7 +126,8 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
   });
 
   it('should reject and return original content when LLM hallucinates ## SECTION TITLE', async () => {
-    const hallucinatedResponse = '## SECTION TITLE\nIntroduction to TypeScript\n\n## ORIGINAL CONTENT\nSome rewritten content here';
+    const hallucinatedResponse =
+      '## SECTION TITLE\nIntroduction to TypeScript\n\n## ORIGINAL CONTENT\nSome rewritten content here';
     const llmCall = createLlmCallMock(hallucinatedResponse);
 
     const result = await applyCoherencePreservingPatch(
@@ -142,7 +143,8 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
   });
 
   it('should reject and return original content when LLM hallucinates ## FIX INSTRUCTIONS', async () => {
-    const hallucinatedResponse = '## FIX INSTRUCTIONS\nPlease improve the following section:\n\nThe content here...';
+    const hallucinatedResponse =
+      '## FIX INSTRUCTIONS\nPlease improve the following section:\n\nThe content here...';
     const llmCall = createLlmCallMock(hallucinatedResponse);
 
     const result = await applyCoherencePreservingPatch(
@@ -158,7 +160,8 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
   });
 
   it('should reject when LLM returns COMPLETE CORRECTED SECTION: marker', async () => {
-    const hallucinatedResponse = 'COMPLETE CORRECTED SECTION:\nHere is the improved version of the content.';
+    const hallucinatedResponse =
+      'COMPLETE CORRECTED SECTION:\nHere is the improved version of the content.';
     const llmCall = createLlmCallMock(hallucinatedResponse);
 
     const result = await applyCoherencePreservingPatch(
@@ -174,7 +177,8 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
   });
 
   it('should reject when LLM returns ## OUTPUT REQUIREMENTS marker', async () => {
-    const hallucinatedResponse = '## OUTPUT REQUIREMENTS\n- Must include examples\n- Use clear language\n\nActual content here';
+    const hallucinatedResponse =
+      '## OUTPUT REQUIREMENTS\n- Must include examples\n- Use clear language\n\nActual content here';
     const llmCall = createLlmCallMock(hallucinatedResponse);
 
     const result = await applyCoherencePreservingPatch(
@@ -220,7 +224,7 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
 
     // Should NOT emit patch_applied since content was rejected
     const patchAppliedEvents = onStreamEvent.mock.calls.filter(
-      (call) => call[0]?.type === 'patch_applied'
+      call => call[0]?.type === 'patch_applied'
     );
     expect(patchAppliedEvents).toHaveLength(0);
   });
@@ -238,7 +242,7 @@ describe('applyCoherencePreservingPatch — prompt marker rejection', () => {
     );
 
     const patchAppliedEvents = onStreamEvent.mock.calls.filter(
-      (call) => call[0]?.type === 'patch_applied'
+      call => call[0]?.type === 'patch_applied'
     );
     expect(patchAppliedEvents).toHaveLength(1);
     expect(patchAppliedEvents[0][0].content).toBe(cleanPatchedContent);

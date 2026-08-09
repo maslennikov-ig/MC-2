@@ -30,6 +30,7 @@ import {
   executeExpanderTask,
   executePatcherTask,
 } from '@/stages/stage6-lesson-content/judge/targeted-refinement/task-executor';
+import { logger } from '@/shared/logger';
 
 function createMockLessonContent(sectionCount: number): LessonContent {
   return {
@@ -144,6 +145,7 @@ function createInput(
 describe('executeTargetedRefinement token safety', () => {
   const mockExecutePatcherTask = vi.mocked(executePatcherTask);
   const mockExecuteExpanderTask = vi.mocked(executeExpanderTask);
+  const mockLoggerInfo = vi.mocked(logger.info);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -199,5 +201,45 @@ describe('executeTargetedRefinement token safety', () => {
 
     expect(result.iterations).toBe(1);
     expect(mockExecutePatcherTask).toHaveBeenCalledTimes(5);
+  });
+
+  it('counts only capped tasks remaining when the budget is exhausted after three tasks', async () => {
+    const content = createMockLessonContent(8);
+    const tasks = Array.from({ length: 8 }, (_, index) => createMockTask(`sec_${index + 1}`));
+    const arbiterOutput = createMockArbiterOutput(tasks, {
+      agreementScore: 0.6,
+      tokensUsed: REFINEMENT_CONFIG.limits.maxTokens - 300,
+    });
+    const events: RefinementEvent[] = [];
+
+    mockExecutePatcherTask.mockImplementation((task: { sectionId: string }) =>
+      Promise.resolve({
+        success: true,
+        sectionId: task.sectionId,
+        patchedContent: `Patched ${task.sectionId}`,
+        tokensUsed: 120,
+      })
+    );
+
+    await executeTargetedRefinement(
+      createInput(content, arbiterOutput, {
+        onStreamEvent: (event: RefinementEvent) => events.push(event),
+      })
+    );
+
+    expect(mockExecutePatcherTask).toHaveBeenCalledTimes(3);
+    expect(mockExecutePatcherTask.mock.calls.map(([task]) => task.sectionId)).toEqual([
+      'sec_1',
+      'sec_3',
+      'sec_5',
+    ]);
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stopReason: 'stop_token_budget',
+        skippedTasksDueToBudget: 2,
+      }),
+      'Targeted refinement complete'
+    );
+    expect(events.some(event => event.type === 'budget_warning')).toBe(true);
   });
 });

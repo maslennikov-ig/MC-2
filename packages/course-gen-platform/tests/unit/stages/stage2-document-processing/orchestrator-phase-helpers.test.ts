@@ -200,5 +200,53 @@ describe('orchestrator-phase-helpers', () => {
 
     expect(executeQdrantUpload).toHaveBeenCalledWith(embeddings, context.job);
     expect(context.job.data.qdrantTargetCollection).toBe(targetCollection);
+    expect(mockUpdateCourseProgressInDB).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not update course progress while processing a Qdrant reindex job', async () => {
+    const embeddings = [{ chunk_id: 'chunk-1', embedding: [0.1, 0.2] }];
+    const { context } = createContext();
+    context.job.id =
+      'qdrant-reindex-123e4567-e89b-42d3-a456-426614174000-987fcdeb-51a2-43d7-9012-3456789abcde';
+
+    const { executeChunking } = await import(
+      '@/stages/stage2-document-processing/phases/phase-4-chunking'
+    );
+    const { executeEmbeddingGeneration } = await import(
+      '@/stages/stage2-document-processing/phases/phase-5-embedding'
+    );
+    const { executeQdrantUpload } = await import(
+      '@/stages/stage2-document-processing/phases/phase-6-qdrant-upload'
+    );
+
+    vi.mocked(executeChunking).mockResolvedValue({
+      chunks: { parent_chunks: [], child_chunks: [] },
+      enrichedChunks: [{ id: 'chunk-1' }],
+    } as never);
+    vi.mocked(executeEmbeddingGeneration).mockResolvedValue({
+      embeddings,
+      total_tokens: 2,
+    } as never);
+    vi.mocked(executeQdrantUpload).mockResolvedValue({
+      points_uploaded: 1,
+      batch_count: 1,
+      duration_ms: 1,
+    });
+
+    const { initializeProcessing } = await import(
+      '@/stages/stage2-document-processing/orchestrator-helpers'
+    );
+    const { executeVectorIndexing } = await import(
+      '@/stages/stage2-document-processing/orchestrator-phase-helpers'
+    );
+
+    await initializeProcessing(context);
+    await executeVectorIndexing(context, {
+      markdown: '# Test',
+      json: {},
+      stats: { pages: 1, images: 0 },
+    });
+
+    expect(mockUpdateCourseProgressInDB).not.toHaveBeenCalled();
   });
 });

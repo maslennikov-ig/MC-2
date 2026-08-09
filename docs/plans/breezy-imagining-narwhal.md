@@ -12,6 +12,7 @@
 **Текущее состояние**: `^0.554.0` в package.json (caret range, но lockfile зафиксирован на 0.554)
 
 **Действия**:
+
 1. `pnpm --filter @megacampus/web update lucide-react`
 2. Проверить `pnpm --filter @megacampus/web type-check`
 
@@ -25,12 +26,13 @@
 **Текущее состояние**: Не установлен
 
 **Действия**:
+
 1. `pnpm --filter @megacampus/web add -D @next/bundle-analyzer`
 2. Добавить в `next.config.ts`:
    ```ts
    const withBundleAnalyzer = require('@next/bundle-analyzer')({
      enabled: process.env.ANALYZE === 'true',
-   })
+   });
    ```
 3. Обернуть экспорт: `module.exports = withNextIntl(withPWA(withBundleAnalyzer(nextConfig)))`
 4. Добавить npm script: `"analyze": "ANALYZE=true pnpm build"`
@@ -46,6 +48,7 @@
 **Текущее**: `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]` (8 шт)
 
 **Действия**:
+
 1. Убрать 3 редко используемых размера: `750` (близок к 640/828), `2048` (близок к 1920), `3840` (ultra-wide, ~0.1% трафика)
 2. Результат: `[640, 828, 1080, 1200, 1920]` (5 шт)
 3. Это уменьшает количество вариантов изображений, ускоряет first-load
@@ -60,6 +63,7 @@
 **Текущее**: Husky v9.1.7 установлен, lint-staged работает. 0 `@ts-ignore` в коде (все уже очищены).
 
 **Действия**:
+
 1. Добавить в lint-staged конфиг для `*.{ts,tsx}` скрипт-проверку:
    ```json
    "*.{ts,tsx}": [
@@ -71,6 +75,7 @@
    Или проще — добавить ESLint правило `@typescript-eslint/ban-ts-comment` с `"error"` для `ts-ignore` в `eslint.config.mjs`.
 
 **Рекомендация**: Использовать ESLint правило (уже в lint-staged pipeline) — надёжнее и понятнее:
+
 ```js
 '@typescript-eslint/ban-ts-comment': ['error', {
   'ts-ignore': true,        // Ban @ts-ignore
@@ -91,11 +96,13 @@
 **Стратегия**: Промоутить поэтапно — сначала правила с 0 нарушениями, потом критические.
 
 **Фаза 1** — Правила с 0 нарушений (безопасное промоутирование):
+
 - `no-floating-promises` → `error` (0 нарушений, критично для Node.js)
 - `require-await` → `error`
 - `no-base-to-string` → `error`
 
 **Фаза 2** — Оценить и решить для каждого:
+
 - `no-explicit-any` (36 шт) — оставить `warn`, создать отдельную задачу на постепенное исправление
 - `no-unsafe-*` (assignment, member-access, call, return, argument) — оставить `warn`
 - `restrict-template-expressions` — оставить `warn`

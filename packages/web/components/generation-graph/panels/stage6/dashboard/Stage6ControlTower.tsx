@@ -135,9 +135,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
     stats.statusCounts.pending +
     stats.statusCounts.failed
   const readyLessons =
-    stats.statusCounts.completed +
-    stats.statusCounts.approved +
-    stats.statusCounts.reviewRequired
+    stats.statusCounts.completed + stats.statusCounts.approved + stats.statusCounts.reviewRequired
   const progressPercentage = totalLessons > 0 ? (readyLessons / totalLessons) * 100 : 0
 
   // Actions disabled when there are active lessons

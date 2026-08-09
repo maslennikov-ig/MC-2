@@ -250,10 +250,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
     }
 
     if (!result?.success) {
-      return NextResponse.json(
-        { error: result?.error || 'Deletion failed' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: result?.error || 'Deletion failed' }, { status: 404 })
     }
 
     logger.devLog('Successfully deleted course:', result.deleted_course_title)

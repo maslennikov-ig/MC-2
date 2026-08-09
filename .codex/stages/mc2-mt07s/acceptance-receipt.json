@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/services/model-routing-language.test.ts tests/unit/stages/stage6-lesson-content/services/job-processor.test.ts tests/unit/stages/stage6-lesson-content/nodes/self-reviewer-llm-model-used.test.ts",
+      "duration_seconds": 3.561,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6-lesson-content/services/model-routing-language.test.ts tests/unit/stages/stage6-lesson-content/services/job-processor.test.ts tests/unit/stages/stage6-lesson-content/nodes/self-reviewer-llm-model-used.test.ts"
+  ],
+  "completed_at": "2026-08-09T14:34:34.839361+00:00",
+  "diff_digest": "e047e8f76a31c42200689f26e991279cee9d807a627d65d8d770c8e072bf1969",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "02bb9a6701c8b4bcd6919d9f01ed3daadc6e4090",
+  "idempotency_key": "32a39de41091ef5668eea2c8b72bf12569144ba2a9dd4d373b0d51b39e03c2a8",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-mt07s",
+  "started_at": "2026-08-09T14:34:31.102786+00:00",
+  "verification_fingerprint": "32a39de41091ef5668eea2c8b72bf12569144ba2a9dd4d373b0d51b39e03c2a8"
+}

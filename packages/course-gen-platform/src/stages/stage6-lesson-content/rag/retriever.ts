@@ -14,6 +14,7 @@ import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { rerankChunks } from './reranking';
 import { calculateLessonCoverage } from './coverage';
+import { resolveTier1ShadowSelection } from './shadow-retrieval';
 import {
   getStage6EvidenceProvenance,
   isStage6EvidenceChunkAllowed,
@@ -50,6 +51,141 @@ function assertEvidenceSearchResult(input: {
   if (!isStage6EvidenceChunkAllowed(evidenceContext, result.document_id, result.chunk_id)) {
     throw new Stage6EvidenceScopeError(
       'Stage 6 Qdrant result is outside the accepted source-ref/chunk scope'
+    );
+  }
+}
+
+interface Tier1ShadowRetrievalInput {
+  courseId: string;
+  lessonId: string;
+  organizationId: string;
+  tier1Queries: string[];
+  tier2Queries: string[];
+  baseSearchOptions: Omit<SearchOptions, 'score_threshold'>;
+  evidenceContext?: Stage6AcceptedEvidenceContext;
+  shadowRate: number;
+}
+
+async function runTier1ShadowRetrieval(input: Tier1ShadowRetrievalInput): Promise<void> {
+  const {
+    courseId,
+    lessonId,
+    organizationId,
+    tier1Queries,
+    tier2Queries,
+    baseSearchOptions,
+    evidenceContext,
+    shadowRate,
+  } = input;
+  const startedAt = Date.now();
+  const tier2ChunkIds = new Set<string>();
+  let tier1DenseMaxScore: number | null = null;
+  let queryFailures = 0;
+
+  const observeResponse = (
+    response: Awaited<ReturnType<typeof searchChunks>>,
+    mode: 'tier1_probe' | 'tier2_shadow'
+  ): void => {
+    for (const result of response.results) {
+      if (evidenceContext) {
+        assertEvidenceSearchResult({
+          result,
+          courseId,
+          organizationId,
+          evidenceContext,
+        });
+      }
+      if (mode === 'tier1_probe') {
+        tier1DenseMaxScore =
+          tier1DenseMaxScore === null ? result.score : Math.max(tier1DenseMaxScore, result.score);
+      } else {
+        tier2ChunkIds.add(result.chunk_id);
+      }
+    }
+  };
+
+  for (const query of tier1Queries) {
+    try {
+      const response = await searchChunks(query, {
+        ...baseSearchOptions,
+        limit: 1,
+        score_threshold: 0,
+        enable_hybrid: false,
+        enable_priority_boost: false,
+        group_by_document: false,
+      });
+      observeResponse(response, 'tier1_probe');
+    } catch (error) {
+      queryFailures += 1;
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          courseId,
+          lessonId,
+          shadowPhase: 'tier1_probe',
+        },
+        '[Lesson RAG] Tier 1 shadow score probe failed'
+      );
+    }
+  }
+
+  for (const query of tier2Queries) {
+    try {
+      const response = await searchChunks(query, {
+        ...baseSearchOptions,
+        score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
+      });
+      observeResponse(response, 'tier2_shadow');
+    } catch (error) {
+      queryFailures += 1;
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          courseId,
+          lessonId,
+          shadowPhase: 'tier2_shadow',
+        },
+        '[Lesson RAG] Tier 1 shadow Tier 2 query failed'
+      );
+    }
+  }
+
+  const complete = queryFailures === 0;
+  try {
+    await logTrace({
+      courseId,
+      lessonId,
+      stage: 'stage_6',
+      phase: 'rag_retrieval',
+      stepName: 'tier1_shadow',
+      inputData: {
+        lessonId,
+        tier1Queries: tier1Queries.length,
+        tier2Queries: tier2Queries.length,
+        tier1ProbeMode: 'dense_raw',
+        tier1ProbeThreshold: 0,
+        tier2Threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
+      },
+      outputData: {
+        tier1DenseMaxScore: tier1DenseMaxScore ?? 0,
+        tier1DenseScoreObserved: tier1DenseMaxScore !== null,
+        tier1DenseProbeFloor: 0,
+        tier2ChunksFound: tier2ChunkIds.size,
+        falsePositive: complete ? tier2ChunkIds.size > 0 : null,
+        shadowRate,
+        complete,
+        queryFailures,
+      },
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+        lessonId,
+      },
+      '[Lesson RAG] Tier 1 shadow trace failed'
     );
   }
 }
@@ -240,6 +376,19 @@ async function retrieveLessonContextCore(
     return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
   }
   const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
+  const baseSearchOptions: Omit<SearchOptions, 'score_threshold'> = {
+    limit: Math.ceil(candidateCount / queries.length) + 2,
+    enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
+    enable_priority_boost: enablePriorityBoost,
+    filters: {
+      organization_id: tenantOrganizationId,
+      course_id: courseId,
+      ...(filteringByDocs && { document_ids: primaryDocIds }),
+    },
+    include_payload: Boolean(evidenceContext),
+    group_by_document: true,
+    group_size: 2,
+  };
 
   logger.debug(
     {
@@ -270,18 +419,8 @@ async function retrieveLessonContextCore(
     for (const query of tier1Queries) {
       try {
         const searchOptions: SearchOptions = {
-          limit: Math.ceil(candidateCount / queries.length) + 2,
+          ...baseSearchOptions,
           score_threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
-          enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
-          enable_priority_boost: enablePriorityBoost,
-          filters: {
-            organization_id: tenantOrganizationId,
-            course_id: courseId,
-            ...(filteringByDocs && { document_ids: primaryDocIds }),
-          },
-          include_payload: Boolean(evidenceContext),
-          group_by_document: true,
-          group_size: 2,
         };
 
         const response = await searchChunks(query, searchOptions);
@@ -355,6 +494,7 @@ async function retrieveLessonContextCore(
         '[Lesson RAG] Tier 1 exit - no results from gate queries (Strike-Two)'
       );
 
+      const shadowSelection = resolveTier1ShadowSelection(courseId, lessonSpec.lesson_id);
       // Log trace for observability
       try {
         await logTrace({
@@ -374,11 +514,35 @@ async function retrieveLessonContextCore(
             tier1Exit: true,
             queriesSaved: tier2Queries.length,
             rerankerSkipped: true,
+            shadowSampled: shadowSelection.sampled,
+            shadowRate: shadowSelection.rate,
           },
           durationMs: tier1DurationMs,
         });
       } catch {
         // Don't fail on trace error
+      }
+
+      if (shadowSelection.sampled) {
+        void runTier1ShadowRetrieval({
+          courseId,
+          lessonId: lessonSpec.lesson_id,
+          organizationId: tenantOrganizationId,
+          tier1Queries,
+          tier2Queries,
+          baseSearchOptions,
+          evidenceContext,
+          shadowRate: shadowSelection.rate,
+        }).catch(error =>
+          logger.warn(
+            {
+              err: error instanceof Error ? error.message : String(error),
+              courseId,
+              lessonId: lessonSpec.lesson_id,
+            },
+            '[Lesson RAG] Tier 1 shadow retrieval failed'
+          )
+        );
       }
 
       return {
@@ -436,18 +600,8 @@ async function retrieveLessonContextCore(
   for (const query of tier2QueryList) {
     try {
       const searchOptions: SearchOptions = {
-        limit: Math.ceil(candidateCount / queries.length) + 2,
+        ...baseSearchOptions,
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
-        enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
-        enable_priority_boost: enablePriorityBoost,
-        filters: {
-          organization_id: tenantOrganizationId,
-          course_id: courseId,
-          ...(filteringByDocs && { document_ids: primaryDocIds }),
-        },
-        include_payload: Boolean(evidenceContext),
-        group_by_document: true,
-        group_size: 2,
       };
 
       const response = await searchChunks(query, searchOptions);

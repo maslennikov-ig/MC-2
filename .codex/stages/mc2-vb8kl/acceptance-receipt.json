@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing/orchestrator-phase-helpers.test.ts",
+      "duration_seconds": 1.727,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing/orchestrator-phase-helpers.test.ts"
+  ],
+  "completed_at": "2026-08-09T15:13:56.958112+00:00",
+  "diff_digest": "9bb49168c1c6f2144b668cf713e22ac4acc7ae8515a14f54d93ebed7bbb979d2",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "c36adc1112ec135a5c6e2e92ec386084bc4b33f5",
+  "idempotency_key": "5cf5568fde2697b9ffb78e3eca97ae8e49c0d0eaf44bbb6f8d1a511d16739fd6",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-vb8kl",
+  "started_at": "2026-08-09T15:13:55.058840+00:00",
+  "verification_fingerprint": "5cf5568fde2697b9ffb78e3eca97ae8e49c0d0eaf44bbb6f8d1a511d16739fd6"
+}

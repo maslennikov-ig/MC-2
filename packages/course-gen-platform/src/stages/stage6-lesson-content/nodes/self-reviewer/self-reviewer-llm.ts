@@ -78,12 +78,11 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
   // Get model configuration
   const modelConfigService = createModelConfigService();
   const estimatedTokens = estimateSelfReviewerTokens(generatedContent, ragChunks, language);
-  const normalizedLanguage: 'ru' | 'en' = language === 'ru' ? 'ru' : 'en';
   const phaseConfig = await modelConfigService.getModelForPhase(
     'stage_6_refinement',
     courseId,
     estimatedTokens,
-    normalizedLanguage
+    language
   );
 
   nodeLogger.info({

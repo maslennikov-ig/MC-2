@@ -709,7 +709,11 @@ export function PresentationPreview({
           </div>
 
           {/* Current slide preview */}
-          <SlideContent slide={currentSlideData} theme={presentationContent.theme} language={language} />
+          <SlideContent
+            slide={currentSlideData}
+            theme={presentationContent.theme}
+            language={language}
+          />
 
           {/* Slide details panel */}
           <SlideDetailsPanel

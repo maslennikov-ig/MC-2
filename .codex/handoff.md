@@ -1,19 +1,26 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-jz6y0.13.6`
+Current stage id: `mc2-wxun`
 
 ## Current stage
 
-`mc2-jz6y0.13.6` is accepted locally. The owner selected a pull-based off-host Qdrant copy on
-`helixa-new` instead of provisioning S3, with explicit low-load scheduling and bounded retention.
-The acceptance boundary retains the original checksum, exact-version isolated restore, alerting,
-owner-only credential, and rollback requirements. Default retention is 14 days and at most 14 daily
-generations, with a 10 GiB free-space floor on the backup host.
+`mc2-5dzld`, `mc2-zt4ju`, `mc2-n6szm`, `mc2-1mmop`, and `mc2-iioip` are delivered locally in
+commits `858e4a707`, `05d7fc7e7`, `e1857fadc`, `9d48cbfcc`, and `7d8e4b8eb` and closed in Beads.
+The shared `mc2-iioip` implementation is delivered in orchestration-console `main` at `fada910`;
+its full validation/smoke block passed and the merged feature branch was removed. `mc2-db696.57`,
+`mc2-db696.60`, `mc2-db696.78`, and
+`mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
+`mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, `mc2-stds7`, and `mc2-68qwn` are delivered locally in
+`1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-vb8kl` is delivered
+locally in `339cc6e00`. `mc2-r7udy` is blocked because a truthful worker lifecycle event needs a new
+`system_metrics` enum value, which is a forbidden schema migration. `mc2-wxun` is delivered locally
+in `460784fc8` with disabled-by-default Tier 1 shadow observability shared with `mc2-vjbb`; both
+issues now stop at their separately authorized live experiment boundary.
 
-The previous `mc2-2vtmk` live credential repair and `mc2-c2p8z` CI contract remain accepted locally.
-The owner-authorized delivery must include `63b4e2efd` so CI cannot overwrite the persistent GHCR
-credential, and deploy only after the relevant pipelines are green.
+The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
+health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
+and both backup and restore timers remain enabled.
 
 ## Backlog truth and order
 
@@ -22,8 +29,9 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`. After delivery, the next exact item is Tier 4 restructuring of
-`mc2-jsamu` before any formatting batch is worked.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. All accessible Tier 5 repository
+work is complete through the `mc2-wxun`/`mc2-vjbb` instrumentation boundary; live, migration,
+research, and owner-decision items remain explicitly deferred.
 
 ## Verification facts
 
@@ -35,9 +43,40 @@ through `mc2-jz6y0.13.6`. After delivery, the next exact item is Tier 4 restruct
 - Repository deploy/rollback entrypoints now fail with exit 75 when
   `/opt/megacampus/.host-operation.lock` is held; manual infrastructure work must use
   `scripts/with_host_operation_lock.sh` to participate.
-- `pnpm format:check` currently fails on 138 files plus 11 unparseable raw LLM captures; this is
-  tracked repo-health work, not a reason to rewrite the captures.
+- `mc2-jsamu` reproduced 138 format mismatches plus 11 raw-capture parse blockers. Narrow ignores
+  removed all blockers; the 104 owned formatting files and global format/type/build acceptance are
+  green.
 - Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
+- Accepted child-workspace cleanup is dry-run first: `cleanup_stage_workspace.py` prunes the exact
+  Next cache only for clean, merged child worktrees and preserves dirty, unmerged, protected, and
+  primary worktrees.
+- The Career Playbook Business Context transition has a synthetic Chromium fixture that holds
+  session sync and follow-up responses independently, proving sync-before-request ordering without
+  a live generation call.
+- Development CSP now derives exact private-network HTTP/WebSocket origins from configured backend
+  and Supabase URLs; focused Chromium records no invalid CSP source console error.
+- Career Playbook source jobs pass an explicit Phase 6 title-language mode, so their ids are no
+  longer queried in `courses`; Russian title generation is covered by a deterministic unit test.
+- Stage 5 approval controls, output quality UI, and backend approval derive `critical`, `warning`,
+  or `pass` from one shared runtime helper; the three states have frontend unit coverage.
+- Career Playbook reader rails now use 220 ms transform/opacity exit and layout motion, retain URL
+  state and semantic removal, and disable motion for the reduced-motion preference. The focused
+  Chromium scenario is committed for CI; locally its global setup stopped before the test because
+  Supabase test credentials were absent.
+- Stage 6 main generation and self-review phase routing pass non-ru/en language codes unchanged;
+  the dead ru/en-normalizing model helper and language-keyed fallback map are removed. Deterministic
+  `de` coverage proves routing only; no paid multilingual quality run was performed.
+- Targeted refinement now counts budget-skipped work across the complete five-task selected set;
+  combined eight-available/five-selected/three-executed coverage proves the count is two, not a
+  negative cross-batch value.
+- The named Q12 capture/projection surfaces have a tracked name-versus-text coercion audit. No
+  second live hazard was found; a default structural guard and disposable PostgreSQL 17.10 test
+  preserve source-manifest identities longer than 63 bytes.
+- Qdrant reindex document-processing jobs skip all eight course-level Stage 2 progress writes by
+  their existing job-id origin; ordinary jobs retain the original updates. No reindex was run.
+- Tier 1 exits have a stable, zero-default shadow cohort. Complete `tier1_shadow` traces expose the
+  raw dense gate score and exact active-hybrid Tier 2 result count without content or result impact;
+  invalid rates fail closed and the active threshold remains 0.15.
 
 ## Live operational facts
 
@@ -73,8 +112,27 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Explicit defers
 
+- Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
+  owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
+  routing metadata but intentionally makes no output-quality claim.
+- Beads tasks `mc2-wxun` and `mc2-vjbb` — instrumentation is complete, disabled, and locally
+  accepted; enabling a cohort, observing capacity, collecting 1-2 weeks of complete production
+  traces, calculating false-positive/percentile results, staging a threshold, and deciding whether
+  to change 0.15 are live/owner actions outside this stage.
+- Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
+  `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
+  specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
+- Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
+  `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
+  validator fixtures unchanged in meaning.
+- Beads task `mc2-vr7ic` — make the pre-commit hook handle formatting-only legacy batches and
+  deliberately tracked `.codex/goals` snapshots without requiring unrelated lint cleanup or a
+  manual hook bypass.
 - `mc2-3gz2m` — unreadable vector diagrams; gated on
   `specs/025-remaining-debt/research-prompt.md`.
+- `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
+  require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
+  active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
 - `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
   page-data workers during an otherwise successful production build.
@@ -85,18 +143,20 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-jz6y0.13.6`
-Next stage id: `mc2-jsamu`
-Recommended action: perform the owner-authorized delivery and deploy only through green pipelines;
-then restructure `mc2-jsamu` before working any Tier 4 formatting batch.
+Accepted stage id: `mc2-wxun`
+Current stage id: `mc2-wxun`
+Next stage id: `delivery-closeout`
+Recommended action: run the overall release acceptance and authorized delivery path. Do not enable
+a live cohort or change the threshold.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The current item is `mc2-jz6y0.13.6`. The owner selected `helixa-new` with low-load scheduling and
-bounded retention, and authorized correct merge, push, and deploy after acceptance. Do not reindex,
-migrate, force-push, perform paid work, or deploy before the relevant pipeline is green.
+`mc2-wxun` is committed in `460784fc8`; the orchestration-console compatibility fix is delivered in
+`main` at `fada910`. The accessible repository backlog is complete and awaits one release-level
+acceptance followed by the authorized delivery path. Do not enable the cohort, change the threshold,
+reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 

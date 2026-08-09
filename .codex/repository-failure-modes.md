@@ -73,3 +73,9 @@ former labelled as such.
   `hold/qdrant-operator:pinned`, tagged BEFORE any prune.
 - Prometheus retention lives in `prometheus.yml` with the CLI flags REMOVED: a flag silently
   overrides the config file.
+- Stage cleanup is deliberately two-step: first run
+  `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id> --dry-run`, then run it
+  without `--dry-run` only after approving the exact candidates. It removes
+  `packages/web/.next/cache` only inside clean child worktrees whose branch is already merged into a
+  delivery target, then removes that worktree and its safe local branch. Dirty, unmerged, protected,
+  and primary worktrees — including their caches — are retained and reported.

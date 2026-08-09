@@ -4,6 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import withPWAInit from '@ducanh2912/next-pwa'
 import withBundleAnalyzer from '@next/bundle-analyzer'
 import packageJson from './package.json'
+import { getDevelopmentConnectSources } from './lib/security/content-security-policy'
 
 // Validate env vars early — fails fast before expensive Next.js compilation
 import './lib/env-schema'
@@ -338,7 +339,7 @@ const nextConfig: NextConfig = {
     return config
   },
   // Rewrites for local development - proxy enrichments to staging server
-   
+
   async rewrites() {
     // Only proxy in development - in production nginx serves these files
     if (process.env.NODE_ENV === 'development') {
@@ -352,7 +353,7 @@ const nextConfig: NextConfig = {
     }
     return []
   },
-   
+
   async headers() {
     return [
       // Security headers for all pages
@@ -401,7 +402,7 @@ const nextConfig: NextConfig = {
                 font-src 'self' https://fonts.gstatic.com https://static.userback.io;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://ai.megacampus.ru https://dev.ai.megacampus.ru https://drive.google.com https://*.googleusercontent.com https://*.supabase.co http://localhost:* http://127.0.0.1:* blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com https://static.userback.io https://api.userback.io wss://api.userback.io https://events.userback.io;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co ${getDevelopmentConnectSources().join(' ')} https://flow8n.ru https://drive.google.com https://www.react-grab.com https://static.userback.io https://api.userback.io wss://api.userback.io https://events.userback.io;
                 frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';

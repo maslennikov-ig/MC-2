@@ -235,7 +235,7 @@ export async function executeTargetedRefinement(
         for (const task of patcherTasks) {
           const budgetCheck = checkBudgetExhausted(
             state,
-            patcherTasks.length + expanderTasks.length - startedTaskCount,
+            selectedTasks.length - startedTaskCount,
             onStreamEvent
           );
           if (budgetCheck.exhausted) {
@@ -293,7 +293,7 @@ export async function executeTargetedRefinement(
         for (const task of expanderTasks) {
           const budgetCheck = checkBudgetExhausted(
             state,
-            expanderTasks.length - (startedTaskCount - patcherTasks.length),
+            selectedTasks.length - startedTaskCount,
             onStreamEvent
           );
           if (budgetCheck.exhausted) {

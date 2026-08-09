@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-1mmop",
+  "source_kind": "beads",
+  "source_id": "mc2-1mmop",
+  "source_digest": "282b62f9435dfc651686bed5054105127894de9a34baab7103aba762a6d438b4",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Dry-run reports the exact packages/web/.next/cache candidate only for an accepted clean child worktree whose branch is already merged into a delivery target.",
+      "text_digest": "05f930414bee0af7036b7bedc8a737c0ab4efc5325b84af77433fd76c69562fc"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Actual cleanup removes only the clean merged child worktree, its exact Next cache, and its safe local branch while preserving dirty, unmerged, protected, and primary worktrees and caches.",
+      "text_digest": "1cc8610d6316ffc9ae9285a16cedbf77ccf585eab33e9df6cfa478eb7c7f9dca"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The cleanup regression is enforced by CI and process verification, and durable handoff and failure-mode guidance require dry-run-first operation.",
+      "text_digest": "4a30580d3bccf05f274681ac6de787cf49413ffcfe2f428296ab7c9cfdafa4bd"
+    }
+  ]
+}

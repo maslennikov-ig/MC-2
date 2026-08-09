@@ -262,10 +262,10 @@ templates (contract "Allowed SQL is limited to fixed templates from FD 11"):
 
 2. capability queries (see Task 4): `megacampus.q12.activation-truth-capability/v1`
    projection with exact keys `schema_version, session_user, current_database,
-   server_version_num, lock_relation_count, lock_privilege_sha256,
-   activity_visibility_mode, activity_visibility_sha256, clear_snapshot_executed`,
+server_version_num, lock_relation_count, lock_privilege_sha256,
+activity_visibility_mode, activity_visibility_sha256, clear_snapshot_executed`,
    plus per-OID lock rows `qualified_name, oid, maintain, update, delete,
-   truncate, lock_authorized`;
+truncate, lock_authorized`;
 3. full-catalog `LOCK TABLE … IN SHARE MODE` over the complete accepted catalog
    in the accepted byte order (from W tuple `activation_lock_catalog_sha256` /
    `activation_lock_order_sha256`);
@@ -605,35 +605,35 @@ authorize its evidence state or classification. Assert each frame payload has
 exactly the contract keys:
 
 1. probe `db_locked`: `request_sha256, initial_database_projection_sha256,
-   capability_projection_sha256, lock_projection_sha256, fd9_identity_sha256`;
+capability_projection_sha256, lock_projection_sha256, fd9_identity_sha256`;
 2. Root `host_projection`: `request_sha256, initial_database_projection_sha256,
-   host_projection_sha256, proposed_classification,
-   prepared_quiesced_predecessor_sha256`;
+host_projection_sha256, proposed_classification,
+prepared_quiesced_predecessor_sha256`;
 3. probe `host_bound` (after snapshot clear + fresh read): `request_sha256,
-   initial_database_projection_sha256, bound_database_projection_sha256,
-   host_projection_sha256, session_observation_sha256, fd9_identity_sha256`;
+initial_database_projection_sha256, bound_database_projection_sha256,
+host_projection_sha256, session_observation_sha256, fd9_identity_sha256`;
 4. Root predecision + exactly one of `predecision_precommit` /
    `predecision_finish_forward` / `abort_incident`, payload `request_sha256,
-   predecision_sha256, classification, action, planned_r_journal_entry_hash,
-   planned_r_checkpoint_sha256, predecessor_journal_entry_hash,
-   predecessor_checkpoint_sha256` (both planned hashes non-null for precommit,
+predecision_sha256, classification, action, planned_r_journal_entry_hash,
+planned_r_checkpoint_sha256, predecessor_journal_entry_hash,
+predecessor_checkpoint_sha256` (both planned hashes non-null for precommit,
    null for finish-forward and incident); exact pairs
    `precommit_rollback/append_r_then_seal`,
    `committed_finish_forward/seal_finish_forward`,
    `drift_incident/abort_incident`;
 5. probe `sealed` (after another snapshot clear + fresh read): `request_sha256,
-   predecision_sha256, initial_database_projection_sha256,
-   final_database_projection_sha256, host_projection_sha256,
-   actual_r_journal_entry_hash, actual_r_checkpoint_sha256, fd9_identity_sha256`
+predecision_sha256, initial_database_projection_sha256,
+final_database_projection_sha256, host_projection_sha256,
+actual_r_journal_entry_hash, actual_r_checkpoint_sha256, fd9_identity_sha256`
    (actual `R` hashes equal planned for precommit, null otherwise);
 6. Root `release`: `request_sha256, predecision_sha256, sealed_frame_sha256,
-   actual_r_journal_entry_hash, actual_r_checkpoint_sha256,
-   expected_transaction_end, expected_connection_close` (final two literals
+actual_r_journal_entry_hash, actual_r_checkpoint_sha256,
+expected_transaction_end, expected_connection_close` (final two literals
    `read_only_commit` and `true`);
 7. probe `closed` (after read-only commit + connection close): `request_sha256,
-   predecision_sha256, sealed_frame_sha256, release_frame_sha256,
-   actual_r_journal_entry_hash, actual_r_checkpoint_sha256, transaction_end,
-   connection_closed, fd9_identity_sha256` with
+predecision_sha256, sealed_frame_sha256, release_frame_sha256,
+actual_r_journal_entry_hash, actual_r_checkpoint_sha256, transaction_end,
+connection_closed, fd9_identity_sha256` with
    `transaction_end=read_only_commit`, `connection_closed=true`.
 
 Assert any direction/sequence/schema/hash/EOF/timeout/pidfd/FD9/projection
@@ -851,25 +851,25 @@ Contract: "Predecision, optional R and terminal seal", "Exact frame payloads"
 RED: assert Root drives `host_projection → predecision → release` correctly and:
 
 - predecision has exactly the keys `schema_version, run_id, lease_epoch,
-  request_sha256, classification, action, initial_database_projection_sha256,
-  bound_database_projection_sha256, host_projection_sha256,
-  transcript_head_before_predecision_sha256, predecessor_journal_entry_hash,
-  predecessor_checkpoint_sha256, planned_r_journal_entry_hash,
-  planned_r_checkpoint_sha256, previous_terminal_seal_sha256,
-  abandoned_predecision_sha256`, is atomically published/fsynced before optional
+request_sha256, classification, action, initial_database_projection_sha256,
+bound_database_projection_sha256, host_projection_sha256,
+transcript_head_before_predecision_sha256, predecessor_journal_entry_hash,
+predecessor_checkpoint_sha256, planned_r_journal_entry_hash,
+planned_r_checkpoint_sha256, previous_terminal_seal_sha256,
+abandoned_predecision_sha256`, is atomically published/fsynced before optional
   `R`, and is never finish-forward/rollback/retirement/recovery/operator
   authority by itself;
 - terminal seal has exactly the contract keys (`schema_version, run_id,
-  lease_epoch, outcome, request_sha256, predecision_sha256,
-  final_transcript_head_sha256, initial_database_projection_sha256,
-  final_database_projection_sha256, host_projection_sha256,
-  activation_evidence_state, actual_r_journal_entry_hash,
-  actual_r_checkpoint_sha256, probe_pidfd_identity_sha256, fd9_identity_sha256,
-  spawn_capability_sha256, prepared_quiesced_predecessor_sha256,
-  writer_quiesce_manifest_sha256, barrier_receipt_sha256, probe_receipt_sha256,
-  activation_result_sha256, activation_process_projection_sha256,
-  process_manifest_sha256, probe_exit_status, transaction_end,
-  connection_closed`), is published only after exact `closed`, clean probe exit,
+lease_epoch, outcome, request_sha256, predecision_sha256,
+final_transcript_head_sha256, initial_database_projection_sha256,
+final_database_projection_sha256, host_projection_sha256,
+activation_evidence_state, actual_r_journal_entry_hash,
+actual_r_checkpoint_sha256, probe_pidfd_identity_sha256, fd9_identity_sha256,
+spawn_capability_sha256, prepared_quiesced_predecessor_sha256,
+writer_quiesce_manifest_sha256, barrier_receipt_sha256, probe_receipt_sha256,
+activation_result_sha256, activation_process_projection_sha256,
+process_manifest_sha256, probe_exit_status, transaction_end,
+connection_closed`), is published only after exact `closed`, clean probe exit,
   final transcript fsync, and continuity verification, and binds
   `probe_exit_status=0`, `transaction_end=read_only_commit`,
   `connection_closed=true`;
@@ -979,14 +979,14 @@ Run, in order, and record evidence in the artifact:
    missing visibility / restricted null / failed snapshot clear blocks; PG17
    READ ONLY `SHARE` + complete locks + normal/recovery conflict ordering +
    wait-winner visibility + disconnect invalidation; managed inventory positives
-   + null/unknown negatives; 10+5 Docker inventory + global net queue zero;
-   `posix_spawn` close-from/mapping under descriptor pressure (local; server side
-   flagged as remote gate); `pidfd_open`/`pidfd_getfd`/ptrace-Yama/proc identity/
-   FD9 OFD contention (local; server side flagged as remote gate); every
-   frame/payload/hash + predecision/optional-R/transcript/seal frontier +
-   authority fork/restart negative; durable-`R`-without-seal incident-only +
-   predecision-alone never finish-forward; five retained commands/hashes
-   unchanged.
+   - null/unknown negatives; 10+5 Docker inventory + global net queue zero;
+     `posix_spawn` close-from/mapping under descriptor pressure (local; server side
+     flagged as remote gate); `pidfd_open`/`pidfd_getfd`/ptrace-Yama/proc identity/
+     FD9 OFD contention (local; server side flagged as remote gate); every
+     frame/payload/hash + predecision/optional-R/transcript/seal frontier +
+     authority fork/restart negative; durable-`R`-without-seal incident-only +
+     predecision-alone never finish-forward; five retained commands/hashes
+     unchanged.
 2. Run the focused suites:
 
    ```bash
@@ -1024,29 +1024,29 @@ five-command immutability proven; no file outside the ownership table changed.
 
 ## Task-to-contract coverage map
 
-| Contract normative section | Task(s) |
-|---|---|
-| Sole normative narrowing of D5 after `R` | 19 |
-| Immutable database and TLS identity | 3 |
-| Required read-only capability projection | 4 |
-| Accepted W dependency + common-lock proof | 0, 6 |
-| Fixed retained commands + production process | 12, 15 |
-| Root spawn boundary, FDs, capability gates | 16, 17 (probe FDs: 12, 13) |
-| Database transaction, lock and SQL allowlist | 2, 5 |
-| Exact managed-provider and session projection | 7 |
-| Database and host projections | 8, 9 |
-| Exact pre-`R` writer ancestry and Docker truth | 10 |
-| Canonical objects and frame envelope | 1, 11 |
-| Exact frame payloads | 11 (probe), 18 (Root) |
-| Predecision, optional R and terminal seal | 18 |
-| Classifications | 9, 14 |
-| Race closure and restart authority | 19 |
-| Disjoint implementation ownership | streams 1/2/3 write zones |
-| Required RED/capability and verification gates | every RED step + 20 |
-| Secrets, observability and recovery limits | Global Constraints 1–2, 7; 12; 20 |
-| First-party references | Tech stack |
-| Owner question + authority separation | Global Constraints 1, 3; 20 |
-| Explicit defers | Task 0; Global Constraint 3 |
+| Contract normative section                     | Task(s)                           |
+| ---------------------------------------------- | --------------------------------- |
+| Sole normative narrowing of D5 after `R`       | 19                                |
+| Immutable database and TLS identity            | 3                                 |
+| Required read-only capability projection       | 4                                 |
+| Accepted W dependency + common-lock proof      | 0, 6                              |
+| Fixed retained commands + production process   | 12, 15                            |
+| Root spawn boundary, FDs, capability gates     | 16, 17 (probe FDs: 12, 13)        |
+| Database transaction, lock and SQL allowlist   | 2, 5                              |
+| Exact managed-provider and session projection  | 7                                 |
+| Database and host projections                  | 8, 9                              |
+| Exact pre-`R` writer ancestry and Docker truth | 10                                |
+| Canonical objects and frame envelope           | 1, 11                             |
+| Exact frame payloads                           | 11 (probe), 18 (Root)             |
+| Predecision, optional R and terminal seal      | 18                                |
+| Classifications                                | 9, 14                             |
+| Race closure and restart authority             | 19                                |
+| Disjoint implementation ownership              | streams 1/2/3 write zones         |
+| Required RED/capability and verification gates | every RED step + 20               |
+| Secrets, observability and recovery limits     | Global Constraints 1–2, 7; 12; 20 |
+| First-party references                         | Tech stack                        |
+| Owner question + authority separation          | Global Constraints 1, 3; 20       |
+| Explicit defers                                | Task 0; Global Constraint 3       |
 
 ## Self-review checklist (run before declaring the plan done)
 

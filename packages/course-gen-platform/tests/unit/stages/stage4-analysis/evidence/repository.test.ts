@@ -489,10 +489,12 @@ describe('DocumentEvidenceRepository', () => {
       document_evidence_conflict_checkpoints: [{ data: [checkpoint], error: null }],
     });
     const repository = createDocumentEvidenceRepository(client as never);
-    await expect(repository.getAcceptedRun(ids.run, ids.course, ids.organization)).resolves.toEqual({
-      id: ids.run,
-      status: 'accepted',
-    });
+    await expect(repository.getAcceptedRun(ids.run, ids.course, ids.organization)).resolves.toEqual(
+      {
+        id: ids.run,
+        status: 'accepted',
+      }
+    );
     await expect(repository.listConflicts(ids.run)).resolves.toEqual([conflict]);
     await expect(repository.listConflictCheckpoints(ids.run)).resolves.toEqual([checkpoint]);
   });

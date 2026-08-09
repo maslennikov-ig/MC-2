@@ -52,6 +52,7 @@ required = [
     pathlib.Path("scripts/orchestration/run_bounded_node_tests.py"),
     pathlib.Path("scripts/orchestration/record_stage_telemetry.py"),
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
+    pathlib.Path("scripts/orchestration/test_cleanup_stage_workspace.py"),
     pathlib.Path("scripts/orchestration/report_child_completion.py"),
     pathlib.Path("scripts/orchestration/review_completion_inbox.py"),
 ]

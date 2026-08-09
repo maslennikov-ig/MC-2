@@ -84,7 +84,9 @@ export function evaluateStage6Reconciliation(args: {
     }
   }
 
-  const expectedLessonIds = extractExpectedLessonIds(course.course_structure as Stage6CourseStructure)
+  const expectedLessonIds = extractExpectedLessonIds(
+    course.course_structure as Stage6CourseStructure
+  )
   if (expectedLessonIds.length === 0) {
     return {
       shouldReconcile: false,
@@ -120,7 +122,10 @@ export function evaluateStage6Reconciliation(args: {
     }
   }
 
-  if (latestRowByLesson.size < expectedLessonIds.length || terminalLessonsCount < expectedLessonIds.length) {
+  if (
+    latestRowByLesson.size < expectedLessonIds.length ||
+    terminalLessonsCount < expectedLessonIds.length
+  ) {
     return {
       shouldReconcile: false,
       targetStatus: null,

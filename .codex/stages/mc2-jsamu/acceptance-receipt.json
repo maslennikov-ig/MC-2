@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm format:check && pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:86330) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:86358) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:86512) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:86465) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:86737) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:86730) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 455.932,
+      "result": "passed"
+    }
+  ],
+  "commands": ["pnpm format:check && pnpm type-check && pnpm build"],
+  "completed_at": "2026-08-09T10:35:07.962295+00:00",
+  "diff_digest": "91b926a6183b779a1857bd13a960ec8c1599f91513c66715c5150bc0ffc6f7cc",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "2d0ccd6e1726b7bd3a6985a5e16e2e0cc2ad884c",
+  "idempotency_key": "74469ca52d1a1f4914c545d6f393428019d2cff199cbdc59e1c59dd13a55702c",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-jsamu",
+  "started_at": "2026-08-09T10:27:31.834216+00:00",
+  "verification_fingerprint": "74469ca52d1a1f4914c545d6f393428019d2cff199cbdc59e1c59dd13a55702c"
+}

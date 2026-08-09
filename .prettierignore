@@ -12,6 +12,32 @@ build
 # Generated files
 database.types.ts
 *.tsbuildinfo
+packages/web/public/sw.js
+packages/web/public/workbox-*.js
+packages/web/public/worker-*.js
+packages/web/test-results/
+packages/web/types/database.generated.ts
+packages/course-gen-platform/tests/test-results/
+
+# Tool-owned state, caches, installed agent assets, and immutable stage evidence
+.beads/
+.claude/agents/
+.codex/stages/
+**/.pytest_cache/
+test.js
+
+# Raw LLM captures: these intentionally preserve malformed model output byte-for-byte
+docs/llm-testing/test-run-2/qwen3-32b/lesson-ru-run1.json
+docs/llm-testing/test-run-2/qwen3-32b/lesson-ru-run3.json
+docs/llm-testing/test-run-2/qwen3-32b/metadata-ru-run3.json
+specs/008-generation-generation-json/quality-tests/kimi-k2-thinking/lesson-ru-run1.json
+specs/008-generation-generation-json/quality-tests/oss-120b/metadata-en-run2.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/lesson-en-run2.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/lesson-ru-run2.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/lesson-ru-run3.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/metadata-en-run1.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/metadata-ru-run2.json
+specs/008-generation-generation-json/quality-tests/qwen3-32b/metadata-ru-run3.json
 
 # Exact-SHA-reviewed approval candidates
 docs/superpowers/specs/2026-07-14-q12-retained-barrier-capability-provenance-addendum-design.md
