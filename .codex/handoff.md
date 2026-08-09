@@ -1,20 +1,17 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-08. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-q1ggs`
+Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
+Current stage id: `mc2-2vtmk`
 
 ## Current stage
 
-`mc2-q1ggs` is accepted locally. Product commit `beca7ef72` adds one cooperative non-blocking host
-lock for production, development, rollback, legacy deploy, and wrapped infrastructure operations.
-Separate accounts and narrower sudoers remain intentionally deferred until another regular
-operator exists.
+`mc2-2vtmk` is active. The user explicitly authorized a current read-only GHCR check on production
+under `claude-deploy` and, only if the check proves access is unusable, credential reissuance.
 
-Focused red-green, deploy contract checks, `pnpm run type-check`, `pnpm run build`, and canonical
-process verification passed. The task is closed in Beads. No server or access change was performed.
-
-Implementation must remain repository-local. No account, sudoers, SSH, secret, deploy, migration,
-reindex, or live production action is authorized.
+The acceptance boundary is a successful `docker manifest inspect` of an existing immutable private
+image as `claude-deploy`, without pulling the image or exposing Docker config or credential content.
+Deploy, service mutation, root credential changes, migration, reindex, push, and paid work remain
+outside this stage.
 
 ## Backlog truth and order
 
@@ -23,7 +20,7 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-q1ggs`. The next item is `mc2-2vtmk` in exact spec order.
+through `mc2-q1ggs`. Work is active on `mc2-2vtmk` in exact spec order.
 
 ## Verification facts
 
@@ -57,9 +54,10 @@ through `mc2-q1ggs`. The next item is `mc2-2vtmk` in exact spec order.
 
 ## Safety boundary
 
-Do not perform reindex, schema migrations, secrets/access changes, or force-push. Deploy only under
-the standing authorization and only on a green pipeline. Do not run live paid work without a
-specific current budget/authority.
+Do not perform reindex, schema migrations, force-push, or any secrets/access change outside the
+explicitly authorized `mc2-2vtmk` GHCR credential repair. Deploy only under the standing
+authorization and only on a green pipeline. Do not run live paid work without a specific current
+budget/authority.
 
 Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`,
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
@@ -78,17 +76,17 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-2vtmk`
-Recommended action: inspect the dead `claude-deploy` GHCR credential and identify the smallest
-repair that stays within §9; stop before any secret, access, or production change.
+Active stage id: `mc2-2vtmk`
+Recommended action: measure current `claude-deploy` GHCR access with a secret-safe manifest probe;
+replace the credential only if denied, then prove the final state with the same probe.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-Continue in exact spec order at `mc2-2vtmk`. Inspect repository and recorded host evidence first,
-but stop before any secret, access, or production change prohibited by §9. Do not start
-`mc2-3gz2m` or any other §9 work.
+Continue the active `mc2-2vtmk` stage. The user authorized its read-only production check and, if
+needed, credential reissuance. Keep the probe secret-safe and do not perform a deploy, image pull,
+service mutation, root credential change, or any other §9 work.
 
 ## Read first
 
