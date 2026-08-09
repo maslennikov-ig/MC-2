@@ -1,24 +1,41 @@
 {
   "command_results": [
     {
-      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6/rag",
-      "duration_seconds": 3.684,
+      "command": "pnpm type-check",
+      "duration_seconds": 47.655,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build",
+      "deprecations": [
+        "packages/web build: (node:97579) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:97573) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:97786) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 107.98,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm test",
+      "duration_seconds": 508.822,
       "result": "passed"
     }
   ],
   "commands": [
-    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6/rag"
+    "pnpm type-check",
+    "pnpm build",
+    "pnpm test"
   ],
-  "completed_at": "2026-08-09T15:32:34.341644+00:00",
-  "diff_digest": "1a1314dc3234bcc8ae7f7c102bd0d99b0306803de707671af7f9c4490eb5034d",
+  "completed_at": "2026-08-09T16:05:57.963808+00:00",
+  "diff_digest": "16b40105c797ca1e7361fd1c68f7ea7212f629e153bdff3b49bdefeea08bd9a2",
   "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
-  "git_head": "339cc6e005ef2b65f883b3ff892adc43b4d8391f",
-  "idempotency_key": "948f65801bf65201e46468cef7bb6c0bd2b8b9388f8e56d53580644cb40d1a90",
-  "orchestration_level": "slice_acceptance",
+  "git_head": "4474b6f4567198e291bf952db487745b73f6beb4",
+  "idempotency_key": "19d0010762b5f1238320c55b2f3204726f8dde0944da61749504c868fac52b6a",
+  "orchestration_level": "release",
   "process_check": "passed",
   "result": "passed",
   "schema_version": "acceptance-receipt/v1",
   "stage_id": "mc2-wxun",
-  "started_at": "2026-08-09T15:32:30.481776+00:00",
-  "verification_fingerprint": "948f65801bf65201e46468cef7bb6c0bd2b8b9388f8e56d53580644cb40d1a90"
+  "started_at": "2026-08-09T15:54:53.272403+00:00",
+  "verification_fingerprint": "19d0010762b5f1238320c55b2f3204726f8dde0944da61749504c868fac52b6a"
 }
