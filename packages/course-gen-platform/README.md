@@ -32,6 +32,16 @@ supabase db reset
 pnpm dev
 ```
 
+### Rebuilding Type Declarations
+
+```bash
+pnpm build:types
+```
+
+`build:types` performs a forced TypeScript project build. It is safe to run after deleting `dist`
+even when `tsconfig.tsbuildinfo` remains; the command recreates the complete declaration tree used
+by the web package. A normal repeated invocation remains supported.
+
 ### Testing
 
 #### TypeScript Tests (Unit & Integration)

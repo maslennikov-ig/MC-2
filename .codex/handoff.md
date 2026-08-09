@@ -1,16 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-jsamu`
+Current stage id: `mc2-5dzld`
 
 ## Current stage
 
-`mc2-jsamu` is delivered to `develop` as commit `9916d22c9` through green CI run `31309127007`,
-including a successful automatic dev deploy. It was restructured before formatting:
-`.2` preserves and excludes the 11 raw LLM captures, and new child `.7` owns repository metadata,
-caches, installed agent assets, immutable stage evidence, generated outputs, and the 28 paths that
-previously belonged to no child. The remaining measured batches are docs 29, specs 1, and packages 74. All scoped checks, global format-check, type-check, build, process verification, stage readiness,
-CI, and dev deployment pass.
+`mc2-5dzld` is accepted locally. The canonical backend `build:types` command now forces TypeScript
+build mode, and a real-command CI contract proves it recreates all declaration files when `dist` is
+absent but `tsconfig.tsbuildinfo` is stale. The focused test, workspace type-check, production build,
+and orchestration process verification pass. Commit delivery is pending.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -92,17 +90,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-jsamu`
-Next stage id: `mc2-5dzld`
-Recommended action: start `mc2-5dzld` in the specification's fixed order.
+Accepted stage id: `mc2-5dzld`
+Current stage id: `mc2-5dzld`
+Next stage id: `mc2-zt4ju`
+Recommended action: commit `mc2-5dzld`, then continue Tier 4 with `mc2-zt4ju`.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-jsamu` is delivered to `develop` through green CI and dev deployment. The next ordered
-item is `mc2-5dzld`. Do not reindex, migrate, force-push, perform paid work, or deploy before a green
-pipeline.
+The item `mc2-5dzld` is accepted locally and awaits its explicit-path commit. After committing and
+closing it, continue with `mc2-zt4ju`. Do not reindex, migrate, force-push, perform paid work, or
+deploy before a green pipeline.
 
 ## Read first
 

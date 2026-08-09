@@ -187,6 +187,7 @@ jobs:
           bash scripts/ci/test_host_operation_lock.sh
           bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
+          bash scripts/ci/test_course_gen_types_rebuild.sh
 
   type-check:
     name: Type Check

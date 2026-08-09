@@ -1,0 +1,30 @@
+{
+  "command_results": [
+    {
+      "command": "node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_course_gen_types_rebuild.sh && pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:65123) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:65129) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:65136) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:65443) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 353.071,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "node scripts/ci/test_ci_cd_workflow_gates.mjs && bash scripts/ci/test_course_gen_types_rebuild.sh && pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-09T11:38:20.017547+00:00",
+  "diff_digest": "d3aad7ddb52e2c4cb64f6403fa19a09af8b08402ece2ea07f7bbf733c58470a9",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "242f351fdf80d95abfd4fc392bec977e33384adb",
+  "idempotency_key": "9cc2847e6e8215b78ceac8ffb27370281442f500d3573a130d311b015ac631e3",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-5dzld",
+  "started_at": "2026-08-09T11:32:26.695291+00:00",
+  "verification_fingerprint": "9cc2847e6e8215b78ceac8ffb27370281442f500d3573a130d311b015ac631e3"
+}
