@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-vb8kl`
+Current stage id: `mc2-wxun`
 
 ## Current stage
 
@@ -12,9 +12,11 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
 `mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, `mc2-stds7`, and `mc2-68qwn` are delivered locally in
-`1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-r7udy` is blocked because
-a truthful worker lifecycle event needs a new `system_metrics` enum value, which is a forbidden
-schema migration. The active item `mc2-vb8kl` isolates course progress from Qdrant reindex jobs.
+`1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-vb8kl` is delivered
+locally in `339cc6e00`. `mc2-r7udy` is blocked because a truthful worker lifecycle event needs a new
+`system_metrics` enum value, which is a forbidden schema migration. The accepted stage `mc2-wxun`
+adds disabled-by-default Tier 1 shadow observability shared with `mc2-vjbb`; both issues now stop at
+their separately authorized live experiment boundary.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -27,8 +29,9 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-vb8kl`
-after the `mc2-r7udy` schema-migration gate review and completed Q12 audit.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. All accessible Tier 5 repository
+work is complete through the `mc2-wxun`/`mc2-vjbb` instrumentation boundary; live, migration,
+research, and owner-decision items remain explicitly deferred.
 
 ## Verification facts
 
@@ -71,6 +74,9 @@ after the `mc2-r7udy` schema-migration gate review and completed Q12 audit.
   preserve source-manifest identities longer than 63 bytes.
 - Qdrant reindex document-processing jobs skip all eight course-level Stage 2 progress writes by
   their existing job-id origin; ordinary jobs retain the original updates. No reindex was run.
+- Tier 1 exits have a stable, zero-default shadow cohort. Complete `tier1_shadow` traces expose the
+  raw dense gate score and exact active-hybrid Tier 2 result count without content or result impact;
+  invalid rates fail closed and the active threshold remains 0.15.
 
 ## Live operational facts
 
@@ -109,6 +115,10 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
   owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
   routing metadata but intentionally makes no output-quality claim.
+- Beads tasks `mc2-wxun` and `mc2-vjbb` — instrumentation is complete, disabled, and locally
+  accepted; enabling a cohort, observing capacity, collecting 1-2 weeks of complete production
+  traces, calculating false-positive/percentile results, staging a threshold, and deciding whether
+  to change 0.15 are live/owner actions outside this stage.
 - Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
   `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
   specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
@@ -133,20 +143,21 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-vb8kl`
-Current stage id: `mc2-vb8kl`
-Next stage id: `mc2-wxun`
-Recommended action: commit the reindex origin guard, then implement only the pre-experiment
-instrumentation required by `mc2-wxun`; do not perform a live threshold experiment.
+Accepted stage id: `mc2-wxun`
+Current stage id: `mc2-wxun`
+Next stage id: `delivery-closeout`
+Recommended action: commit the accepted zero-default shadow instrumentation, then run the overall
+closeout and authorized delivery path. Do not enable a live cohort or change the threshold.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-vb8kl` has a red-to-green origin regression, all eight Stage 2 course-progress writes behind
-one Qdrant reindex guard, and green Stage 2 tests, lint, formatting, type-check, build, and graph
-evidence awaiting stage closeout and commit. Then continue with `mc2-wxun`. Do not reindex,
-migrate, force-push, perform paid work, or deploy before a green pipeline.
+`mc2-wxun` has a red-to-green shadow regression, stable zero-default cohort, raw-dense and exact
+hybrid trace measurements, preserved tenant/evidence filters, updated operator docs, and green RAG
+tests, lint, formatting, type-check, build, and graph evidence awaiting stage closeout and commit.
+Then begin overall delivery. Do not enable the cohort, change the threshold, reindex, migrate,
+force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 

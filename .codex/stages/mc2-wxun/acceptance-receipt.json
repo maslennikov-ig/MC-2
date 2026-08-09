@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6/rag",
+      "duration_seconds": 3.684,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage6/rag"
+  ],
+  "completed_at": "2026-08-09T15:32:34.341644+00:00",
+  "diff_digest": "1a1314dc3234bcc8ae7f7c102bd0d99b0306803de707671af7f9c4490eb5034d",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "339cc6e005ef2b65f883b3ff892adc43b4d8391f",
+  "idempotency_key": "948f65801bf65201e46468cef7bb6c0bd2b8b9388f8e56d53580644cb40d1a90",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-wxun",
+  "started_at": "2026-08-09T15:32:30.481776+00:00",
+  "verification_fingerprint": "948f65801bf65201e46468cef7bb6c0bd2b8b9388f8e56d53580644cb40d1a90"
+}

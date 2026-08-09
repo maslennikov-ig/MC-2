@@ -1,0 +1,60 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-wxun",
+  "goal_id": "mc2-wxun",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "tier1-shadow-retrieval-observability",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage6-two-tier-retrieval", "trace-observability", "shadow-rollout"],
+    "risk_models": ["retrieval-output-influence", "tenant-scope-leak", "unstable-sampling", "unbounded-shadow-load"],
+    "test_environments": ["vitest-node", "eslint", "typescript", "next-production-build"],
+    "rollback_boundary": "remove-disabled-shadow-path-and-operator-contract",
+    "acceptance_proofs": [
+      "disabled-default-no-extra-query",
+      "stable-bounded-cohort",
+      "content-free-score-and-false-positive-trace",
+      "normal-result-unchanged",
+      "cross-package-code-gates-green"
+    ]
+  },
+  "work_areas": ["decision", "contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-wxun",
+    "source_digest": "eac85658c91b17bedba80afa9879383e6565805608de142e43b4b6404856c3f8",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "A disabled-by-default, bounded stable cohort can run shadow retrieval only after a genuine Tier 1 exit, without changing the returned lesson context or required-RAG outcome.",
+        "text_digest": "28d7c2b4cc03114220a93efffc3ca9f2a4e426f522d03ea6a9a85212558dee85"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Each sampled shadow run records one content-free tier1_shadow trace with an unthresholded raw dense Tier 1 maximum score, exact active-hybrid Tier 2 result count, false-positive classification, configured rate, and completion/failure metadata.",
+        "text_digest": "c3e86e9a6122110ece497e3fcbf2cdf48f3e1c2df25f2672e45b5eaec98427e2"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Invalid or absent rollout rates fail closed, tenant/course/evidence filters are preserved in every shadow query, and deterministic unit tests plus type-check and build pass without a live experiment.",
+        "text_digest": "03f3d7cfd02ef467a638c84f7e3b56755b4397ac12d4bfb7013b022ee0addfb0"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-wxun/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "eac85658c91b17bedba80afa9879383e6565805608de142e43b4b6404856c3f8",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-wxun/artifacts/mc2-wxun.md",
+      "task_id": "mc2-wxun",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

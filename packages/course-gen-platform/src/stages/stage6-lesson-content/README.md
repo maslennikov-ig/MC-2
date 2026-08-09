@@ -62,6 +62,7 @@ stage6-lesson-content/
 - **Model Fallback**: Primary → fallback model on failure (configured via database)
 - **Partial Success**: Save successful, mark failed for review
 - **RAG Context**: Optional lesson-level retrieval, scoped to the current accepted evidence run and decisions when documents exist
+- **Tier 1 shadow observability**: A disabled-by-default stable cohort can measure exit scores and saved Tier 2 results without changing generated context
 - **Quality Gates**: 0.75 threshold with CLEV voting
 - **XSS Protection**: DOMPurify sanitization (FR-024)
 - **Generation Locks**: Redis-backed atomic locks prevent concurrent course generation (FR-037)
@@ -189,6 +190,22 @@ required retrieval, or any evidence scope violation, fails the course through
 the existing required-RAG error path instead of silently generating
 source-backed content from partial or fabricated context. A non-evidence
 optional retrieval error may still continue without context.
+
+### Tier 1 shadow measurement
+
+`RAG_SHADOW_RETRIEVAL_RATE` accepts a decimal rate from `0` to `1` and fails closed to `0` when
+absent or invalid. Selection is stable per course and lesson across worker retries. The default is
+disabled; a non-zero production value is a separate live experiment and capacity decision.
+
+Only a selected Tier 1 exit starts shadow work. It runs one raw dense probe per Tier 1 query at a
+floor of `0`, then executes only the normal hybrid Tier 2 queries that the exit skipped. The active
+empty result is returned immediately and never consumes shadow chunks. Query and trace failures
+remain non-influential.
+
+The content-free `tier1_shadow` trace records `tier1DenseMaxScore`, whether a dense score was
+observed above the probe floor, the unique Tier 2 chunk count, a false-positive flag only for a
+complete shadow run, the configured rate, and query-failure count. All shadow queries reuse the
+active tenant, course, document allowlist, and evidence payload validation.
 
 Lesson chunks carry bounded structured provenance: accepted run ID, relevant
 decision IDs and exact/document-level source refs, plus total/overflow/hash

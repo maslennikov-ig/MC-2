@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-wxun",
+  "source_kind": "beads",
+  "source_id": "mc2-wxun",
+  "source_digest": "eac85658c91b17bedba80afa9879383e6565805608de142e43b4b6404856c3f8",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "A disabled-by-default, bounded stable cohort can run shadow retrieval only after a genuine Tier 1 exit, without changing the returned lesson context or required-RAG outcome.",
+      "text_digest": "28d7c2b4cc03114220a93efffc3ca9f2a4e426f522d03ea6a9a85212558dee85"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Each sampled shadow run records one content-free tier1_shadow trace with an unthresholded raw dense Tier 1 maximum score, exact active-hybrid Tier 2 result count, false-positive classification, configured rate, and completion/failure metadata.",
+      "text_digest": "c3e86e9a6122110ece497e3fcbf2cdf48f3e1c2df25f2672e45b5eaec98427e2"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Invalid or absent rollout rates fail closed, tenant/course/evidence filters are preserved in every shadow query, and deterministic unit tests plus type-check and build pass without a live experiment.",
+      "text_digest": "03f3d7cfd02ef467a638c84f7e3b56755b4397ac12d4bfb7013b022ee0addfb0"
+    }
+  ]
+}
