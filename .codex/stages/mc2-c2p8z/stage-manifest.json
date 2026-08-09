@@ -1,0 +1,66 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-c2p8z",
+  "goal_id": "mc2-c2p8z",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "in_progress",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "generated-colour-env-compose-contract",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["ci-deploy-contracts", "blue-green-environment-generation"],
+    "risk_models": ["required-variable-drift", "one-colour-only-configuration"],
+    "test_environments": ["repository-derived-synthetic-colour-envs"],
+    "rollback_boundary": "ci-contract-check-only",
+    "acceptance_proofs": [
+      "synthetic-one-colour-drift-fails",
+      "required-keys-derived-from-compose",
+      "generated-blue-and-green-contracts-pass",
+      "existing-deploy-contracts-pass"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-c2p8z",
+    "source_digest": "b4607475fd901a9601402be52ff750e58b08b6c9e1453ee411afa701f5c5fd7d",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "CI must fail before deployment when any ${VAR:?} required by docker-compose.app.yml or docker-compose.production.yml is not guaranteed in either generated .env.blue or .env.green.",
+        "text_digest": "03502177c4bb3c5d748d531ac7a5b373abb9bd5ac97cf1ec2217efdc6461a1e3"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "The check derives required keys and generated environment keys from repository artifacts rather than a hard-coded four-variable allowlist, and a focused test proves one-colour drift fails.",
+        "text_digest": "332e353c49dd8f0a3068bba18edf8fde06103ffaaa077e21343a98424eef400f"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The current repository contract passes the new CI check, existing deploy contract tests pass, and no live host, secret, deploy, migration, reindex, push, or paid action is used.",
+        "text_digest": "b143dd36409367c8be271a38ead0682b5e162e89af6c3fa704073b3abbb9ad27"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-c2p8z/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "b4607475fd901a9601402be52ff750e58b08b6c9e1453ee411afa701f5c5fd7d",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-c2p8z",
+      "stream_owner": "root-owner",
+      "artifact_path": ".codex/stages/mc2-c2p8z/artifacts/mc2-c2p8z.md",
+      "status": "in_progress"
+    }
+  ]
+}

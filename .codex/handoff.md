@@ -1,26 +1,18 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-2vtmk`
+Current stage id: `mc2-c2p8z`
 
 ## Current stage
 
-`mc2-2vtmk` is accepted locally. The initial read-only production probe as `claude-deploy` UID 1000
-returned `denied` for the current immutable private API image. The old claim that a PAT expired was
-imprecise: CI had replaced the persistent credential with its job-scoped `GITHUB_TOKEN`.
+`mc2-c2p8z` is active. The accepted option is the small CI contract check from §5.3: derive every
+`${VAR:?}` key from `docker-compose.app.yml` and `docker-compose.production.yml`, then prove the
+repository's `.env.production` producer plus the colour overlay generator guarantees each key in
+both generated `.env.blue` and `.env.green` files.
 
-Root cause: CI passed its job-scoped `GITHUB_TOKEN` to both deploy scripts, and `docker login` wrote
-the token to the account's persistent config. That config was modified at `2026-08-08T11:29:49Z`,
-inside successful run `31254580512` job `Deploy to Dev` (`11:29:22–11:31:29Z`). GitHub expires the
-job token after the job. Commit `63b4e2efd` isolates CI login in a private temporary Docker config;
-commit `38cf560d5` limits both deploy jobs to `contents: read` and `packages: read`.
-
-The owner then explicitly authorized installing the supplied read-only credential before delivery.
-It was passed via stdin with terminal echo disabled, protected by same-directory rollback, and
-verified in a fresh SSH session: immutable manifest inspection succeeds as `claude-deploy`, config
-mode is `0600`, no backup remains, and no image was pulled. Neither repository commit is pushed or
-deployed. Do not run an older CI deploy revision: the first later deploy must include `63b4e2efd`
-or it can overwrite the persistent credential again.
+This is repository-only work. Do not inspect or modify the live colour files, secrets, or host, and
+do not deploy. The previous `mc2-2vtmk` live credential repair is accepted and committed locally;
+the first later deploy must include `63b4e2efd` so it cannot overwrite that credential again.
 
 ## Backlog truth and order
 
@@ -29,7 +21,7 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-2vtmk`. The next item in exact spec order is `mc2-c2p8z`.
+through `mc2-2vtmk`. Work is active on `mc2-c2p8z` in exact spec order.
 
 ## Verification facts
 
@@ -85,18 +77,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Next stage id: `mc2-c2p8z`
-Recommended action: start `mc2-c2p8z` and implement the CI check that every required Compose
-`${VAR:?}` variable exists in both production colour environment files.
+Active stage id: `mc2-c2p8z`
+Recommended action: prove the missing generic colour-env contract check red, implement it, and run
+focused deploy contract verification.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-Start `mc2-c2p8z` in exact specification order. Add the smallest fail-closed CI check that every
-required Compose `${VAR:?}` reference is present in both production colour environment files.
-Preserve unrelated work. Do not merge, push, deploy, migrate, reindex, change secrets/access, or
-perform paid work.
+Continue active stage `mc2-c2p8z`. Preserve its generic contract: derive required Compose variables
+and both generated colour-env key sets from repository artifacts, never from a hard-coded allowlist.
+Use focused TDD, then type-check/build at closeout. Do not merge, push, deploy, migrate, reindex,
+change secrets/access, or perform paid work.
 
 ## Read first
 
