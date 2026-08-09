@@ -15,14 +15,16 @@
     "risk_models": [
       "stale-or-revoked-credential",
       "secret-disclosure",
-      "credential-replacement-failure"
+      "credential-replacement-failure",
+      "overprivileged-job-token"
     ],
     "test_environments": ["production-host-readonly-registry-probe"],
     "rollback_boundary": "claude-deploy-docker-client-config",
     "acceptance_proofs": [
       "remote-identity-is-claude-deploy",
       "private-immutable-manifest-is-readable-without-pull",
-      "no-secret-or-docker-config-content-emitted"
+      "no-secret-or-docker-config-content-emitted",
+      "deploy-jobs-use-packages-read"
     ]
   },
   "work_areas": ["decision", "implementation", "proof", "docs_and_graph_review"],

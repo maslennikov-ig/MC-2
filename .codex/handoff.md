@@ -5,13 +5,20 @@ Current stage id: `mc2-2vtmk`
 
 ## Current stage
 
-`mc2-2vtmk` is active. The user explicitly authorized a current read-only GHCR check on production
-under `claude-deploy` and, only if the check proves access is unusable, credential reissuance.
+`mc2-2vtmk` is active. A read-only production probe as `claude-deploy` UID 1000 returned `denied`
+for the current immutable private API image. It did not pull layers or expose credential/config
+content. The issue is current, but the old claim that a PAT expired was imprecise.
 
-The acceptance boundary is a successful `docker manifest inspect` of an existing immutable private
-image as `claude-deploy`, without pulling the image or exposing Docker config or credential content.
-Deploy, service mutation, root credential changes, migration, reindex, push, and paid work remain
-outside this stage.
+Root cause: CI passed its job-scoped `GITHUB_TOKEN` to both deploy scripts, and `docker login` wrote
+the token to the account's persistent config. That config was modified at `2026-08-08T11:29:49Z`,
+inside successful run `31254580512` job `Deploy to Dev` (`11:29:22–11:31:29Z`). GitHub expires the
+job token after the job. Commit `63b4e2efd` isolates CI login in a private temporary Docker config;
+commit `38cf560d5` limits both deploy jobs to `contents: read` and `packages: read`. Focused tests,
+type-check, build, and independent security re-review pass. Neither commit is pushed or deployed.
+
+Do not install the replacement PAT until `63b4e2efd` is delivered on a green pipeline; the current
+host scripts would overwrite it on the next deploy. After delivery, create a classic PAT with only
+`read:packages`, install it via stdin as `claude-deploy`, and accept with the same manifest probe.
 
 ## Backlog truth and order
 

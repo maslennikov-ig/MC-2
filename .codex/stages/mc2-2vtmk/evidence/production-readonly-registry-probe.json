@@ -1,0 +1,45 @@
+{
+  "schema_version": "mc2.production-ghcr-readonly-probe/v1",
+  "observed_date": "2026-08-09",
+  "target": {
+    "ssh_alias": "megacampus-prod",
+    "hostname": "info511.fvds.ru",
+    "user": "claude-deploy",
+    "uid": 1000
+  },
+  "probe": {
+    "operation": "docker manifest inspect",
+    "image_repository": "ghcr.io/maslennikov-ig/mc-2/api",
+    "image_digest": "e30bf5faf6c0aa7171b64caa9e99967dd92d3356f31c5040d4ffba10167b9386",
+    "image_layers_downloaded": false,
+    "exit_code": 1,
+    "sanitized_reason": "denied",
+    "credential_or_config_content_emitted": false
+  },
+  "docker_config_metadata": {
+    "owner": "claude-deploy",
+    "mode": "0600",
+    "mtime_utc": "2026-08-08T11:29:49.597246233Z",
+    "size_bytes": 575,
+    "ghcr_entry_present": true
+  },
+  "correlated_workflow_run": {
+    "database_id": 31254580512,
+    "url": "https://github.com/maslennikov-ig/MC-2/actions/runs/31254580512",
+    "job": "Deploy to Dev",
+    "started_at": "2026-08-08T11:29:22Z",
+    "completed_at": "2026-08-08T11:31:29Z",
+    "conclusion": "success"
+  },
+  "root_cause_evidence": {
+    "repository_behavior": "Both deploy scripts ran docker login without DOCKER_CONFIG while receiving the job-scoped GITHUB_TOKEN.",
+    "external_contract": "GitHub documents that GITHUB_TOKEN expires when its job finishes or at its effective maximum lifetime.",
+    "temporal_match": "The persistent Docker config mtime falls inside the successful Deploy to Dev job interval.",
+    "conclusion": "The workflow replaced the persistent host credential with a job token that was unusable after the job. The denied result does not prove that an earlier PAT expired."
+  },
+  "compose_compatibility_preflight": {
+    "operation": "DOCKER_CONFIG=<empty-temporary-directory> docker compose version --short",
+    "result": "5.0.2",
+    "temporary_directory_removed": true
+  }
+}
