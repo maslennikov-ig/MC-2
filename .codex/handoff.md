@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-k2qih`
+Current stage id: `mc2-mt07s`
 
 ## Current stage
 
@@ -11,8 +11,9 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-`mc2-5e4ek.2` is delivered locally in `1e4caad9f`. The active item `mc2-k2qih` adds the remaining
-Career Playbook reader-panel animation without changing the completed TOC synchronization.
+`mc2-5e4ek.2` and `mc2-k2qih` are delivered locally in `1e4caad9f` and `02bb9a670`. The active
+item `mc2-mt07s` removes the last Stage 6 model-routing language normalization after restating its
+expired title risk against the current phase-based implementation.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -25,8 +26,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-k2qih`
-after `mc2-5e4ek.2` and the research/migration gate review.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-mt07s`
+after `mc2-k2qih` and the research/migration gate review.
 
 ## Verification facts
 
@@ -58,6 +59,9 @@ after `mc2-5e4ek.2` and the research/migration gate review.
   state and semantic removal, and disable motion for the reduced-motion preference. The focused
   Chromium scenario is committed for CI; locally its global setup stopped before the test because
   Supabase test credentials were absent.
+- Stage 6 main generation and self-review phase routing pass non-ru/en language codes unchanged;
+  the dead ru/en-normalizing model helper and language-keyed fallback map are removed. Deterministic
+  `de` coverage proves routing only; no paid multilingual quality run was performed.
 
 ## Live operational facts
 
@@ -93,6 +97,9 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Explicit defers
 
+- Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
+  owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
+  routing metadata but intentionally makes no output-quality claim.
 - Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
   `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
   validator fixtures unchanged in meaning.
@@ -114,20 +121,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-5e4ek.2`
-Current stage id: `mc2-k2qih`
-Next stage id: `mc2-mt07s`
-Recommended action: accept and close the reader-panel animation, then restate `mc2-mt07s` against
-the current phase-based model routing before changing code.
+Accepted stage id: `mc2-k2qih`
+Current stage id: `mc2-mt07s`
+Next stage id: `mc2-stds7`
+Recommended action: accept and close the narrowed multilingual routing cleanup, then narrow
+`mc2-stds7` to its remaining S-2 combined-limit test.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-k2qih` has green unit behavior, lint, type-check, and build evidence awaiting stage
-closeout and commit; its authenticated Chromium run is blocked locally before execution by absent
-Supabase test credentials. Then continue with `mc2-mt07s`. Do not reindex, migrate, force-push,
-perform paid work, or deploy before a green pipeline.
+The restated item `mc2-mt07s` has green non-ru/en routing tests, lint, type-check, and build evidence
+awaiting stage closeout and commit. Then continue with the S-2 remainder of `mc2-stds7`. Do not
+reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 

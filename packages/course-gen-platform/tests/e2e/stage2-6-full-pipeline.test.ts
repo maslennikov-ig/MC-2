@@ -1009,17 +1009,12 @@ describe('Stage 2-6 Full Pipeline E2E', () => {
 
       // Verify model fallback configuration
       const { MODEL_FALLBACK } = await import('../../src/stages/stage6-lesson-content/handler');
-      expect(MODEL_FALLBACK.primary).toBeDefined();
-      expect(MODEL_FALLBACK.primary.ru).toBeDefined();
-      expect(MODEL_FALLBACK.primary.en).toBeDefined();
       expect(MODEL_FALLBACK.fallback).toBeDefined();
       expect(MODEL_FALLBACK.maxPrimaryAttempts).toBeGreaterThanOrEqual(1);
 
       console.log('[Stage2-6] Error recovery configuration verified:');
       console.log(`  - Max retries: ${HANDLER_CONFIG.MAX_RETRIES}`);
       console.log(`  - Retry delay: ${HANDLER_CONFIG.RETRY_DELAY_MS}ms`);
-      console.log(`  - Primary model (ru): ${MODEL_FALLBACK.primary.ru}`);
-      console.log(`  - Primary model (en): ${MODEL_FALLBACK.primary.en}`);
       console.log(`  - Fallback model: ${MODEL_FALLBACK.fallback}`);
 
       console.log('\n[Stage2-6] ========================================');

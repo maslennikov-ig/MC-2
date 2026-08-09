@@ -136,7 +136,6 @@ vi.mock('@/shared/llm/model-config-service', () => ({
 // Mock config
 vi.mock('@/stages/stage6-lesson-content/config', () => ({
   MODEL_FALLBACK: {
-    primary: { ru: 'test-primary-model', en: 'test-primary-model' },
     fallback: 'test-fallback-model',
     maxPrimaryAttempts: 2,
   },
@@ -756,6 +755,20 @@ describe('stage6/services/job-processor', () => {
       });
       expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
       expect(mockMarkForReview).not.toHaveBeenCalled();
+    });
+
+    it('passes a non-ru/en language to the selected phase unchanged', async () => {
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
+
+      const result = await processStage6Job(createMockJob({ language: 'de' }));
+
+      expect(result.success).toBe(true);
+      expect(mockGetModelForPhase).toHaveBeenCalledWith(
+        'stage_6_normal',
+        'course-uuid',
+        undefined,
+        'de'
+      );
     });
 
     it('retries the same tier once before promoting on quality_retryable', async () => {

@@ -62,12 +62,7 @@ export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — budget models via
  * - ModelConfigService is unavailable
  */
 export const MODEL_FALLBACK = {
-  /** Primary models by language (FALLBACK ONLY - used when DB unavailable) */
-  primary: {
-    ru: 'moonshotai/kimi-k2-thinking',
-    en: 'moonshotai/kimi-k2-thinking',
-  },
-  /** Fallback model for all languages */
+  /** Provider fallback model for every language. Phase defaults own primary model selection. */
   fallback: 'qwen/qwen3.7-plus',
   /** Max attempts before switching to fallback model */
   maxPrimaryAttempts: 2,

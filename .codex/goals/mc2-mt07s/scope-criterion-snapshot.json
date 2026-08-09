@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-mt07s",
+  "source_kind": "beads",
+  "source_id": "mc2-mt07s",
+  "source_digest": "cdea4666f2bfe450c0b8efb066e5a2f83a0fcfa4e4604c232a36f55ea202f8c9",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "The dead Stage 6 getStage6ModelConfig ru/en normalization path and language-keyed primary fallback map are removed.",
+      "text_digest": "c31de7905144877f8b5f3659ae26fbfb41495cc48a76e74d3ac9c9157c32ffed"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Main generation phase routing and self-review refinement routing pass a non-ru/en language code unchanged, with deterministic de coverage.",
+      "text_digest": "9bbb4a469cabefe3047bb3d79d1738814b9993a017cc2d57bf5b19c38a48a1bd"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "No live multilingual quality claim or paid generation is made; focused unit tests, lint, formatting, pnpm type-check, and pnpm build pass.",
+      "text_digest": "997303e66f6031c471f4f30f5fd33115a6a41f9765372c8be1a084c5548e1d9a"
+    }
+  ]
+}
