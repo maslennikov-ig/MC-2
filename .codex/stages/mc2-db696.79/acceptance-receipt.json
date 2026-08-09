@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --dir packages/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/source-processing.test.ts && pnpm exec eslint packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-summarization.ts packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts packages/course-gen-platform/tests/unit/stages/stage-career-playbook/source-processing.test.ts && git diff --check",
+      "duration_seconds": 17.294,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --dir packages/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/source-processing.test.ts && pnpm exec eslint packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-6-summarization.ts packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts packages/course-gen-platform/tests/unit/stages/stage-career-playbook/source-processing.test.ts && git diff --check"
+  ],
+  "completed_at": "2026-08-09T13:45:28.789711+00:00",
+  "diff_digest": "1cc9605af5d1aaca8a4187a5a81f21e6bad36549f5461ef32d53c665da954c41",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "99e83952059ade47fa44086471d0d865981d935f",
+  "idempotency_key": "d597e5db09019eb41c304c07b9bfc38022f7123bf9f94f32686b6b4a89170a24",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.79",
+  "started_at": "2026-08-09T13:45:11.307232+00:00",
+  "verification_fingerprint": "d597e5db09019eb41c304c07b9bfc38022f7123bf9f94f32686b6b4a89170a24"
+}

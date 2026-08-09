@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.78`
+Current stage id: `mc2-db696.79`
 
 ## Current stage
 
@@ -9,9 +9,9 @@ Current stage id: `mc2-db696.78`
 commits `858e4a707`, `05d7fc7e7`, `e1857fadc`, `9d48cbfcc`, and `7d8e4b8eb` and closed in Beads.
 The shared `mc2-iioip` implementation is accepted in orchestration-console branch
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
-accessible backlog is complete. `mc2-db696.57` and `mc2-db696.60` are delivered locally in
-`968d8d513` and `22234881b`. The active item `mc2-db696.78` replaces invalid development CSP
-partial-IP wildcards with exact configured origins and adds browser console regression coverage.
+accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, and `mc2-db696.78` are delivered
+locally in `968d8d513`, `22234881b`, and `99e839520`. The active item `mc2-db696.79` forwards the
+Career Playbook source language into Phase 6 without treating a playbook id as a course id.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -25,7 +25,7 @@ measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
 through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at
-`mc2-db696.78` after `mc2-db696.60` and the research/migration gate review.
+`mc2-db696.79` after `mc2-db696.78` and the research/migration gate review.
 
 ## Verification facts
 
@@ -49,6 +49,8 @@ through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is acti
   a live generation call.
 - Development CSP now derives exact private-network HTTP/WebSocket origins from configured backend
   and Supabase URLs; focused Chromium records no invalid CSP source console error.
+- Career Playbook source jobs pass an explicit Phase 6 title-language mode, so their ids are no
+  longer queried in `courses`; Russian title generation is covered by a deterministic unit test.
 
 ## Live operational facts
 
@@ -105,19 +107,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.60`
-Current stage id: `mc2-db696.78`
-Next stage id: `mc2-db696.79`
-Recommended action: accept and close the development CSP fix, then trace the Career Playbook source
-language path and add a deterministic regression without a live generation call.
+Accepted stage id: `mc2-db696.78`
+Current stage id: `mc2-db696.79`
+Next stage id: `mc2-5e4ek.2`
+Recommended action: accept and close the Career Playbook source-language fix, then inspect the next
+Tier 5 item against repository truth.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-db696.78` has green unit, Chromium, type-check, and build evidence awaiting stage
-closeout and commit. Then continue with `mc2-db696.79`. Do not reindex, migrate, force-push,
-perform paid work, or deploy before a green pipeline.
+The item `mc2-db696.79` has green unit, lint, type-check, and build evidence awaiting stage closeout
+and commit. Then continue with `mc2-5e4ek.2`. Do not reindex, migrate, force-push, perform paid
+work, or deploy before a green pipeline.
 
 ## Read first
 

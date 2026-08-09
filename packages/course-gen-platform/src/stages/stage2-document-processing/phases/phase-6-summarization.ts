@@ -119,6 +119,17 @@ export interface SummarizationConfig {
   retryAttempt: number;
 }
 
+export type Phase6TitleLanguage = 'ru' | 'en' | 'document';
+
+export interface Phase6Options {
+  onProgress?: (progress: number, message: string) => void;
+  /**
+   * Explicit title language for non-course callers. `document` keeps detected
+   * source language and avoids looking up a course row for another entity id.
+   */
+  titleLanguage?: Phase6TitleLanguage;
+}
+
 /**
  * Result from a single summarization attempt (used by helpers)
  */
@@ -143,9 +154,7 @@ export async function executePhase6Summarization(
   courseId: string,
   fileId: string,
   organizationId: string,
-  options?: {
-    onProgress?: (progress: number, message: string) => void;
-  }
+  options?: Phase6Options
 ): Promise<Phase6Result> {
   const startTime = Date.now();
 
@@ -162,9 +171,12 @@ export async function executePhase6Summarization(
 
   // Step 2: Detect languages
   const documentLanguage = detectLanguage(extractedText);
-  const supabase = getSupabaseAdmin();
-  const courseLanguage = await getCourseLanguage(supabase, courseId);
-  const titleLanguage = courseLanguage || documentLanguage;
+  const titleLanguage =
+    options?.titleLanguage === 'document'
+      ? documentLanguage
+      : (options?.titleLanguage ??
+        (await getCourseLanguage(getSupabaseAdmin(), courseId)) ??
+        documentLanguage);
   const language = documentLanguage;
 
   logger.info({ fileId, textLength: extractedText.length, language }, '[Phase 6] Document loaded');

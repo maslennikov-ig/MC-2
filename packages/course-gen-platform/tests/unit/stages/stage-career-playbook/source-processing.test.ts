@@ -148,7 +148,10 @@ describe('Career Playbook source processing', () => {
       playbookId,
       fileId,
       organizationId,
-      expect.objectContaining({ onProgress: expect.any(Function) })
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+        titleLanguage: 'ru',
+      })
     );
   });
 
