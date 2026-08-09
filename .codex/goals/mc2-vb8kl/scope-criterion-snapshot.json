@@ -1,0 +1,24 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-vb8kl",
+  "source_kind": "beads",
+  "source_id": "mc2-vb8kl",
+  "source_digest": "114db90cfb6e8ffc8477aa17db57eafc59dc3155b37cefd83d7cca92bca002a0",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Qdrant reindex jobs, identified by the existing qdrant-reindex- job-id prefix, do not write course-level Stage 2 progress in initialization or any later phase.",
+      "text_digest": "1a84f474f37afd0329b8005c761ddaa90a66177ba77f4c42ce08714e11741100"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Ordinary document-processing jobs retain their existing course-progress writes and all jobs retain BullMQ progress and document/vector processing behavior.",
+      "text_digest": "e52133d5218aea22badcec0ac60fcbc64fb6f5c224a7118b5add810580ad3287"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "A red-to-green focused regression, the complete Stage 2 unit set, focused format/lint, pnpm type-check, pnpm build, and local graph refresh pass without executing a live reindex.",
+      "text_digest": "3909b817919707a52442feeda34b0fd93265498aa95d8ca3d6469ac05789695a"
+    }
+  ]
+}

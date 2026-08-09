@@ -49,7 +49,7 @@ export async function initializeProcessing(context: {
   mimeType: string;
   priority: DocumentPriorityLevel;
   priorityWeight: number;
-  job: { updateProgress: (progress: number) => Promise<void> };
+  job: { id?: string; updateProgress: (progress: number) => Promise<void> };
 }): Promise<{ usePlainText: boolean }> {
   const { fileId, courseId, locale, tier, mimeType, priority, priorityWeight, job } = context;
   const t = getTranslator(locale);
@@ -75,8 +75,8 @@ export async function initializeProcessing(context: {
   // Update progress
   await job.updateProgress(5);
 
-  const { updateCourseProgressInDB } = await import('./orchestrator-progress-helpers');
-  await updateCourseProgressInDB(courseId, t('stage2.init'));
+  const { updateCourseProgressForJob } = await import('./orchestrator-job-origin');
+  await updateCourseProgressForJob(job.id, courseId, t('stage2.init'));
 
   // Determine processing strategy
   const usePlainText = shouldUsePlainTextProcessing(tier, mimeType);

@@ -1,0 +1,59 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-vb8kl",
+  "goal_id": "mc2-vb8kl",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "qdrant-reindex-course-progress-isolation",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["stage2-document-processing", "qdrant-reindex-job-origin"],
+    "risk_models": ["backwards-course-transition", "reindex-log-noise", "ordinary-job-regression"],
+    "test_environments": ["vitest-node", "eslint", "typescript", "next-production-build"],
+    "rollback_boundary": "remove-origin-guard-and-associated-regression",
+    "acceptance_proofs": [
+      "red-unguarded-reindex-progress-calls",
+      "zero-reindex-course-progress-writes",
+      "ordinary-course-progress-preserved",
+      "cross-package-code-gates-green"
+    ]
+  },
+  "work_areas": ["implementation", "consumer_adoption", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-vb8kl",
+    "source_digest": "114db90cfb6e8ffc8477aa17db57eafc59dc3155b37cefd83d7cca92bca002a0",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Qdrant reindex jobs, identified by the existing qdrant-reindex- job-id prefix, do not write course-level Stage 2 progress in initialization or any later phase.",
+        "text_digest": "1a84f474f37afd0329b8005c761ddaa90a66177ba77f4c42ce08714e11741100"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Ordinary document-processing jobs retain their existing course-progress writes and all jobs retain BullMQ progress and document/vector processing behavior.",
+        "text_digest": "e52133d5218aea22badcec0ac60fcbc64fb6f5c224a7118b5add810580ad3287"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "A red-to-green focused regression, the complete Stage 2 unit set, focused format/lint, pnpm type-check, pnpm build, and local graph refresh pass without executing a live reindex.",
+        "text_digest": "3909b817919707a52442feeda34b0fd93265498aa95d8ca3d6469ac05789695a"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-vb8kl/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "114db90cfb6e8ffc8477aa17db57eafc59dc3155b37cefd83d7cca92bca002a0",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-vb8kl/artifacts/mc2-vb8kl.md",
+      "task_id": "mc2-vb8kl",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

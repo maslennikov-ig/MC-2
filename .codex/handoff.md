@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-68qwn`
+Current stage id: `mc2-vb8kl`
 
 ## Current stage
 
@@ -11,10 +11,10 @@ The shared `mc2-iioip` implementation is accepted in orchestration-console branc
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
 accessible backlog is complete. `mc2-db696.57`, `mc2-db696.60`, `mc2-db696.78`, and
 `mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-`mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, and `mc2-stds7` are delivered locally in `1e4caad9f`,
-`02bb9a670`, `4dc9a24e7`, and `8a613f98f`. `mc2-r7udy` is blocked because a truthful worker
-lifecycle event needs a new `system_metrics` enum value, which is a forbidden schema migration.
-The active item `mc2-68qwn` audits Q12 name/text union coercion and adds long-identity coverage.
+`mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, `mc2-stds7`, and `mc2-68qwn` are delivered locally in
+`1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-r7udy` is blocked because
+a truthful worker lifecycle event needs a new `system_metrics` enum value, which is a forbidden
+schema migration. The active item `mc2-vb8kl` isolates course progress from Qdrant reindex jobs.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -27,8 +27,8 @@ contains 49 work items plus 5 epics; do not re-open the 27 already closed with a
 measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-68qwn`
-after the `mc2-r7udy` schema-migration gate review.
+through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at `mc2-vb8kl`
+after the `mc2-r7udy` schema-migration gate review and completed Q12 audit.
 
 ## Verification facts
 
@@ -69,6 +69,8 @@ after the `mc2-r7udy` schema-migration gate review.
 - The named Q12 capture/projection surfaces have a tracked name-versus-text coercion audit. No
   second live hazard was found; a default structural guard and disposable PostgreSQL 17.10 test
   preserve source-manifest identities longer than 63 bytes.
+- Qdrant reindex document-processing jobs skip all eight course-level Stage 2 progress writes by
+  their existing job-id origin; ordinary jobs retain the original updates. No reindex was run.
 
 ## Live operational facts
 
@@ -131,20 +133,20 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-68qwn`
-Current stage id: `mc2-68qwn`
-Next stage id: `mc2-vb8kl`
-Recommended action: commit the Q12 SQL coercion audit and regression, then prove the reindex origin
-guard in `mc2-vb8kl` without executing a reindex.
+Accepted stage id: `mc2-vb8kl`
+Current stage id: `mc2-vb8kl`
+Next stage id: `mc2-wxun`
+Recommended action: commit the reindex origin guard, then implement only the pre-experiment
+instrumentation required by `mc2-wxun`; do not perform a live threshold experiment.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-68qwn` has a tracked audit, a default structural guard, and a green disposable PostgreSQL
-17.10 long-identity regression plus green lint, formatting, type-check, build, and graph evidence
-awaiting stage closeout and commit. Then continue with `mc2-vb8kl`. Do not reindex, migrate,
-force-push, perform paid work, or deploy before a green pipeline.
+`mc2-vb8kl` has a red-to-green origin regression, all eight Stage 2 course-progress writes behind
+one Qdrant reindex guard, and green Stage 2 tests, lint, formatting, type-check, build, and graph
+evidence awaiting stage closeout and commit. Then continue with `mc2-wxun`. Do not reindex,
+migrate, force-push, perform paid work, or deploy before a green pipeline.
 
 ## Read first
 
