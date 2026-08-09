@@ -58,6 +58,19 @@ unset CR_PAT
 docker manifest inspect 'ghcr.io/maslennikov-ig/mc-2/api@sha256:<current-digest>' >/dev/null
 ```
 
+## Colour environment contract
+
+`.env.blue` and `.env.green` are generated snapshots, not independent configuration sources.
+`scripts/deploy_blue_green.sh` copies `.env.production` and appends the colour, ports, project name,
+and immutable web/API image references.
+
+The CI lint job runs `node scripts/ci/check_color_env_contract.mjs`. It derives every `${VAR:?}`
+key from `docker-compose.app.yml` and `docker-compose.production.yml`, derives the available base and
+overlay keys from the workflow and generator, and fails if either generated colour environment
+would omit a required key. When adding a required Compose variable, add its producer to
+`.env.production` or the colour overlay in the same change; do not hand-edit only one live colour
+file.
+
 ## Architecture Overview
 
 ### Docker Compose Files

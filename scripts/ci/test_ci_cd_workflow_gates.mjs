@@ -37,6 +37,8 @@ const deployContractStep = jobs.lint?.steps?.find(
   step => step?.name === 'Verify deploy contracts'
 )?.run;
 for (const contractCommand of [
+  'node scripts/ci/check_color_env_contract.mjs',
+  'node scripts/ci/test_color_env_contract.mjs',
   'node scripts/ci/test_ci_cd_workflow_gates.mjs',
   'bash scripts/ci/test_detect_deploy_changes.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
@@ -258,7 +260,10 @@ assert(
   'deploy script must contain the main blue/green flow marker "# 1. Determine Active Color"'
 );
 const mainInfraStart = deployScript.indexOf('up -d "${INFRA_SERVICES[@]}"', mainDeployFlowStart);
-assert(mainInfraStart !== -1, 'main deploy flow must start the explicit infrastructure service set');
+assert(
+  mainInfraStart !== -1,
+  'main deploy flow must start the explicit infrastructure service set'
+);
 assert(
   deployScript.indexOf('QDRANT_OPERATOR_IMAGE_SHA256', mainDeployFlowStart) < mainInfraStart,
   'operator image digest must be resolved and persisted before infrastructure Compose starts'
@@ -347,7 +352,8 @@ for (const [label, script] of [
     // The worker compose is named literally in the rollback and through WORKER_COMPOSE /
     // Q12_WORKER_COMPOSE in the deploy; catch both, or this guard silently covers only half of it.
     const isWorkerCompose =
-      line.includes('docker-compose.production.yml') || /\$\{?Q12_WORKER_COMPOSE|\$\{?WORKER_COMPOSE/.test(line);
+      line.includes('docker-compose.production.yml') ||
+      /\$\{?Q12_WORKER_COMPOSE|\$\{?WORKER_COMPOSE/.test(line);
     if (!isWorkerCompose) continue;
     assert(
       line.includes('docker compose -p megacampus '),
@@ -375,7 +381,9 @@ assert(
 // mc2-1cxna. The Supabase backup timer is ENABLED and runs scripts under deploy/postgres, which
 // the deploy tarball did not carry: a fix committed to scheduled-backup-run.sh never reached the
 // host, and the only way it surfaced was a metric that failed to appear after a manual run.
-const copyStep = (jobs.deploy?.steps ?? []).find(step => step?.name === 'Copy deployment files')?.run;
+const copyStep = (jobs.deploy?.steps ?? []).find(
+  step => step?.name === 'Copy deployment files'
+)?.run;
 assert(
   /find deploy\/qdrant deploy\/systemd deploy\/postgres -type f/.test(copyStep ?? ''),
   'the deploy must ship deploy/postgres, whose scripts a scheduled production timer executes'

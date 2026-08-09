@@ -179,6 +179,8 @@ jobs:
 
       - name: Verify deploy contracts
         run: |
+          node scripts/ci/check_color_env_contract.mjs
+          node scripts/ci/test_color_env_contract.mjs
           node scripts/ci/test_ci_cd_workflow_gates.mjs
           bash scripts/ci/test_detect_deploy_changes.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
