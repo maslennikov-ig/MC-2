@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.60`
+Current stage id: `mc2-db696.78`
 
 ## Current stage
 
@@ -9,8 +9,9 @@ Current stage id: `mc2-db696.60`
 commits `858e4a707`, `05d7fc7e7`, `e1857fadc`, `9d48cbfcc`, and `7d8e4b8eb` and closed in Beads.
 The shared `mc2-iioip` implementation is accepted in orchestration-console branch
 `codex/prompt-check-markdown-headings` at `fada910`; its integration remains pending until the
-accessible backlog is complete. `mc2-db696.57` is delivered locally in `968d8d513`. The active item
-`mc2-db696.60` adds a deterministic Business Context to follow-up browser transition.
+accessible backlog is complete. `mc2-db696.57` and `mc2-db696.60` are delivered locally in
+`968d8d513` and `22234881b`. The active item `mc2-db696.78` replaces invalid development CSP
+partial-IP wildcards with exact configured origins and adds browser console regression coverage.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -24,7 +25,7 @@ measurement, and do not re-rank by tracker priority.
 
 Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
 through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is active at
-`mc2-db696.60` after `mc2-db696.57` and the research/migration gate review.
+`mc2-db696.78` after `mc2-db696.60` and the research/migration gate review.
 
 ## Verification facts
 
@@ -46,6 +47,8 @@ through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. Tier 5 is acti
 - The Career Playbook Business Context transition has a synthetic Chromium fixture that holds
   session sync and follow-up responses independently, proving sync-before-request ordering without
   a live generation call.
+- Development CSP now derives exact private-network HTTP/WebSocket origins from configured backend
+  and Supabase URLs; focused Chromium records no invalid CSP source console error.
 
 ## Live operational facts
 
@@ -102,19 +105,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.57`
-Current stage id: `mc2-db696.60`
-Next stage id: `mc2-db696.78`
-Recommended action: accept and close the deterministic browser transition, then review the
-development CSP wildcard task against the current Next configuration.
+Accepted stage id: `mc2-db696.60`
+Current stage id: `mc2-db696.78`
+Next stage id: `mc2-db696.79`
+Recommended action: accept and close the development CSP fix, then trace the Career Playbook source
+language path and add a deterministic regression without a live generation call.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-The item `mc2-db696.60` has a green synthetic Chromium transition awaiting stage closeout and
-commit. Then continue with `mc2-db696.78`. Do not reindex, migrate, force-push, perform paid work,
-or deploy before a green pipeline.
+The item `mc2-db696.78` has green unit, Chromium, type-check, and build evidence awaiting stage
+closeout and commit. Then continue with `mc2-db696.79`. Do not reindex, migrate, force-push,
+perform paid work, or deploy before a green pipeline.
 
 ## Read first
 

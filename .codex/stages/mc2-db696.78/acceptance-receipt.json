@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm --dir packages/web exec vitest run tests/unit/next-config-csp.test.ts && pnpm exec eslint packages/web/lib/security/content-security-policy.ts packages/web/tests/unit/next-config-csp.test.ts packages/web/tests/e2e/career-playbook/wizard-phase-a.spec.ts && git diff --check",
+      "duration_seconds": 23.144,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm --dir packages/web exec vitest run tests/unit/next-config-csp.test.ts && pnpm exec eslint packages/web/lib/security/content-security-policy.ts packages/web/tests/unit/next-config-csp.test.ts packages/web/tests/e2e/career-playbook/wizard-phase-a.spec.ts && git diff --check"
+  ],
+  "completed_at": "2026-08-09T13:32:16.756384+00:00",
+  "diff_digest": "2479260d563a60c647e0b94cb1557ae2fa900994fec99628065565231bd39c74",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "22234881b5bf778f56dacb626495f91e31e5552b",
+  "idempotency_key": "f93ee44c9127094fbc35296b16b72660c727d68d359e57fb0752671c3956702e",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.78",
+  "started_at": "2026-08-09T13:31:53.431371+00:00",
+  "verification_fingerprint": "f93ee44c9127094fbc35296b16b72660c727d68d359e57fb0752671c3956702e"
+}

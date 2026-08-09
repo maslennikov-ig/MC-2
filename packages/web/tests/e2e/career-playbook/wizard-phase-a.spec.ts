@@ -143,6 +143,15 @@ test.describe('Career Playbook Phase A wizard', () => {
 
     test('waits for session sync, then moves through follow-ups to ready', async ({ page }) => {
       const backend = await mockFollowupTransition(page)
+      const invalidCspSources: string[] = []
+      page.on('console', (message) => {
+        if (
+          message.type() === 'error' &&
+          /Content Security Policy.*contains an invalid source/i.test(message.text())
+        ) {
+          invalidCspSources.push(message.text())
+        }
+      })
 
       await page.goto('/mocks/career-playbook-followups')
       await expect(page.getByRole('heading', { name: 'Материалы и заметки' })).toBeVisible()
@@ -179,6 +188,7 @@ test.describe('Career Playbook Phase A wizard', () => {
           (procedure) => procedure === 'careerPlaybook.generation.requestFollowups'
         )
       ).toHaveLength(1)
+      expect(invalidCspSources).toEqual([])
     })
   })
 
