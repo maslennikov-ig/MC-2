@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthModal } from '@/lib/hooks/use-auth-modal'
@@ -30,6 +31,7 @@ export default function AuthButton({
   const [user, setUser] = useState<User | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const { open } = useAuthModal()
+  const t = useTranslations('common.nav')
   const router = useRouter()
   const pathname = usePathname()
 
@@ -126,7 +128,7 @@ export default function AuthButton({
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
                 : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
             }`}
-            aria-label="Открыть меню входа"
+            aria-label={t('signIn')}
             aria-hidden="true"
             tabIndex={-1}
           >
@@ -152,9 +154,9 @@ export default function AuthButton({
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
                 : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
             }`}
-            aria-label="Войти в аккаунт"
+            aria-label={t('signIn')}
           >
-            Войти
+            {t('signIn')}
           </button>
         </div>
       </>

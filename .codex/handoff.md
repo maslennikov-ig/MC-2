@@ -1,9 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `delivery-closeout`
+Current stage id: `mc2-sshkz`
 
 ## Current stage
+
+`mc2-sshkz` audits every backend/web skip, repairs accidental coverage loss, runs one canonical
+release acceptance, and proves the exact delivered `develop` identity on `dev.ai.megacampus.ru`
+with read-only API/UI checks. Paid generation, load tests, reindex, migrations, destructive live
+mutation, and secrets/access changes remain outside the boundary.
 
 The accessible backlog is delivered to `origin/develop` at `998782668` and deployed to staging in
 the `develop -> master` merge `123152924`. The exact-SHA develop pipeline

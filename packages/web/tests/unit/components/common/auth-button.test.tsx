@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
 import AuthButton from '@/components/common/auth-button'
+import enCommon from '@/messages/en/common.json'
+import ruCommon from '@/messages/ru/common.json'
 
 const mockUseSupabase = vi.hoisted(() => vi.fn())
 const mockOpen = vi.hoisted(() => vi.fn())
@@ -32,9 +35,13 @@ describe('AuthButton', () => {
       },
     })
 
-    render(<AuthButton darkMode />)
+    render(
+      <NextIntlClientProvider locale="ru" messages={{ common: ruCommon }}>
+        <AuthButton darkMode />
+      </NextIntlClientProvider>
+    )
 
-    const loginButton = await screen.findByRole('button', { name: 'Войти в аккаунт' })
+    const loginButton = await screen.findByRole('button', { name: 'Войти' })
     const gooeyContainer = loginButton.closest('#gooey-btn')
     const decorativeButton = gooeyContainer?.querySelector('button[aria-hidden="true"]')
 
@@ -42,5 +49,25 @@ describe('AuthButton', () => {
     expect(decorativeButton).toHaveClass('sm:flex')
     expect(decorativeButton).toHaveClass('opacity-0')
     expect(decorativeButton).toHaveClass('sm:group-hover:opacity-100')
+  })
+
+  it('renders the signed-out action in the active locale', async () => {
+    mockUseSupabase.mockReturnValue({
+      isLoading: false,
+      session: null,
+      supabase: {
+        auth: {
+          signOut: vi.fn(),
+        },
+      },
+    })
+
+    render(
+      <NextIntlClientProvider locale="en" messages={{ common: enCommon }}>
+        <AuthButton />
+      </NextIntlClientProvider>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Sign In' })).toHaveTextContent('Sign In')
   })
 })
