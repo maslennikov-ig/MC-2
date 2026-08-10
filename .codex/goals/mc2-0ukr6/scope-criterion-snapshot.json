@@ -1,0 +1,34 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-0ukr6",
+  "source_kind": "beads",
+  "source_id": "mc2-0ukr6",
+  "source_digest": "ba1fc396ab654d2a1173eac76bb05351987e81b60fdc4f74a83b1ec4d867ed03",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Reproduce the current audit from the pinned lockfile.",
+      "text_digest": "e5af585e8f52a42c98b093f9f8586eb92c14f496b2702558de68d7a67f197b7d"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Classify production-reachable versus dev-only paths.",
+      "text_digest": "0d259178c425e63fd4e7f0ac69e2b39e9221eed28dd65c4817537e53f7e54d3f"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "Remediate actionable critical/high findings or document bounded overrides.",
+      "text_digest": "f613b5b62c7ebf85112f37715b41db9adefe5bc580963e1207d47be29a24b5fa"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "Make the CI blocking/non-blocking policy explicit.",
+      "text_digest": "92fcb1feb781848600f3f88b7e0bc0d89f1c126ef5fb60a82b4be02127999695"
+    },
+    {
+      "criterion_id": "AC-5",
+      "text": "Keep type-check, build, tests, and deploy contracts green.",
+      "text_digest": "4629a038807fbf56093b4c4374889cb3dc47a4f9219c7378d19563fa45d8fdb4"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm type-check",
+      "duration_seconds": 48.556,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build",
+      "deprecations": [
+        "packages/web build: (node:19393) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:19442) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:19477) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:19449) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:19921) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:19914) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 174.391,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm test",
+      "duration_seconds": 543.775,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm type-check",
+    "pnpm build",
+    "pnpm test"
+  ],
+  "completed_at": "2026-08-10T07:09:41.836526+00:00",
+  "diff_digest": "d8777dd952f56de11a0d11db39961236ea6608eeda1ddeb90c0ba260862802aa",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "e7b015675949a9a1fb0737fe18d00f74d91a1615",
+  "idempotency_key": "fda2c386eb278fe806785e865a8d19acfce52283b250d5b352d1e0162c2f06d5",
+  "orchestration_level": "release",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-0ukr6",
+  "started_at": "2026-08-10T06:56:54.862594+00:00",
+  "verification_fingerprint": "fda2c386eb278fe806785e865a8d19acfce52283b250d5b352d1e0162c2f06d5"
+}

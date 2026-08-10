@@ -1,22 +1,24 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-09. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-wxun`
+Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
+Current stage id: `mc2-0ukr6`
 
 ## Current stage
 
-`mc2-5dzld`, `mc2-zt4ju`, `mc2-n6szm`, `mc2-1mmop`, and `mc2-iioip` are delivered locally in
-commits `858e4a707`, `05d7fc7e7`, `e1857fadc`, `9d48cbfcc`, and `7d8e4b8eb` and closed in Beads.
-The shared `mc2-iioip` implementation is delivered in orchestration-console `main` at `fada910`;
-its full validation/smoke block passed and the merged feature branch was removed. `mc2-db696.57`,
-`mc2-db696.60`, `mc2-db696.78`, and
-`mc2-db696.79` are delivered locally in `968d8d513`, `22234881b`, `99e839520`, and `f52719137`.
-`mc2-5e4ek.2`, `mc2-k2qih`, `mc2-mt07s`, `mc2-stds7`, and `mc2-68qwn` are delivered locally in
-`1e4caad9f`, `02bb9a670`, `4dc9a24e7`, `8a613f98f`, and `c36adc111`. `mc2-vb8kl` is delivered
-locally in `339cc6e00`. `mc2-r7udy` is blocked because a truthful worker lifecycle event needs a new
-`system_metrics` enum value, which is a forbidden schema migration. `mc2-wxun` is delivered locally
-in `460784fc8` with disabled-by-default Tier 1 shadow observability shared with `mc2-vjbb`; both
-issues now stop at their separately authorized live experiment boundary.
+`mc2-0ukr6` re-triages and remediates all advisories from the committed pnpm lockfile, classifies
+production versus development paths, and replaces the currently swallowed audit failure with an
+explicit enforced policy. Root owns all manifest, lockfile, CI-policy, acceptance, and delivery
+writes. Unrelated major upgrades, migrations, reindex, secrets/access changes, and paid or
+destructive live actions remain outside the boundary.
+
+The accessible backlog plus the release-audit correction is delivered to `origin/develop` at
+`50208b60a`; the accessible backlog is deployed to staging in
+the `develop -> master` merge `123152924`. The exact-SHA develop pipeline
+[`31322960981`](https://github.com/maslennikov-ig/MC-2/actions/runs/31322960981) and staging
+pipeline [`31324154741`](https://github.com/maslennikov-ig/MC-2/actions/runs/31324154741) are green;
+the staging Blue/Green deploy, public health verification, monitoring drift check, and notification
+all succeeded, while rollback was correctly skipped. A separate read-only request to
+`https://ai.megacampus.ru/api/health` returned `{"status":"ok"}` after the workflow completed.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -35,11 +37,32 @@ research, and owner-decision items remain explicitly deferred.
 
 ## Verification facts
 
+- Release acceptance for `mc2-sshkz` passed via
+  `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-sshkz --level release --process-check`:
+  `pnpm type-check`, `pnpm build`, `pnpm test`, process verification, stage readiness, and artifact
+  validation were green. The final web unit total was 1,272/1,272 with zero skips.
+- The 111 default backend skips are fully classified: 106 PostgreSQL 17 opt-ins, three pgcrypto
+  fixture tests, and two mutually exclusive environment branches. Their opt-in runs passed 309,
+  3, and 21 tests respectively with zero skips; the incompatible-Qdrant default runner exits 1
+  instead of producing a false green.
+- Develop exact-SHA run `31357791241` deployed `50208b60a` to dev. API health and the English
+  browser regression passed afterward with zero console messages and observed dynamic requests
+  returning HTTP 200.
+- Dependency-security remediation for `mc2-0ukr6` is accepted and delivered: the baseline 77
+  findings (9 low, 38 moderate, 29 high, 1 critical) are zero in full, production-only, and dev-only
+  audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Canonical release
+  acceptance passed; exact-SHA run `31364905125` deployed `d18910ee4` to dev, whose API returned
+  `status: ok` and homepage returned HTTP 200. Closed `mc2-bwx1o` remains closed.
+- The migration-drift jobs concluded successfully, but their optional database probe was skipped
+  because the available connection required SSL. This release contains no schema migration and
+  does not use that skipped probe as migration evidence.
+- `graph-reviewed: updated` — local-only Graphify refresh after code commit `4474b6f45` contains
+  61,495 nodes, 88,538 edges, and 7,335 communities. Later commits are acceptance metadata and the
+  delivery merge, so no second graph refresh is needed.
+
 - The default backend Vitest command is now fail-closed: an unmet Qdrant precondition and an empty
   run exit nonzero. It still requires the pinned Qdrant 1.18.2 precondition unless the operator
   explicitly sets `SKIP_QDRANT_TEST_SETUP=1`; use `vitest.config.unit.ts` for focused unit tests.
-- Web tests work.
-- Typical code gates are `pnpm type-check` and `pnpm build`.
 - Repository deploy/rollback entrypoints now fail with exit 75 when
   `/opt/megacampus/.host-operation.lock` is held; manual infrastructure work must use
   `scripts/with_host_operation_lock.sh` to participate.
@@ -143,20 +166,24 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-wxun`
-Current stage id: `mc2-wxun`
-Next stage id: `delivery-closeout`
-Recommended action: run the overall release acceptance and authorized delivery path. Do not enable
-a live cohort or change the threshold.
+Accepted stage id: `mc2-0ukr6`
+Current stage id: `mc2-0ukr6` (accepted)
+Next stage id: `owner-live-or-migration-boundary`.
+Recommended action: choose a separately authorized defer only if desired: provide the missing
+`mc2-3gz2m` research, approve a concrete paid/live experiment budget and disposable inputs, or
+explicitly authorize a future schema-migration stage. Do not enable the RAG cohort, change the
+threshold, reindex, or migrate without that separate boundary.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-wxun` is committed in `460784fc8`; the orchestration-console compatibility fix is delivered in
-`main` at `fada910`. The accessible repository backlog is complete and awaits one release-level
-acceptance followed by the authorized delivery path. Do not enable the cohort, change the threshold,
-reindex, migrate, force-push, perform paid work, or deploy before a green pipeline.
+`mc2-0ukr6` is accepted at `d18910ee4`: all 77 dependency advisories are removed, Security Audit and
+the aggregate CI gate fail closed, release acceptance passed, and exact-SHA run `31364905125`
+deployed successfully to healthy dev API/Web endpoints. Staging remains at `123152924`. Choose only
+a separately authorized live-budget, missing-research, or schema-migration boundary next. Do not
+enable the cohort, change the threshold, reindex, migrate, force-push, or perform paid work without
+that separate authorization.
 
 ## Read first
 

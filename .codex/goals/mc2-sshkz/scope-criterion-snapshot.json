@@ -1,0 +1,34 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-sshkz",
+  "source_kind": "beads",
+  "source_id": "mc2-sshkz",
+  "source_digest": "e5d44bb99ec4e0d2fd14ffb380b7b528c617f7408cc3bd9665ba3b140e6e6f32",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Current develop/master and CI/deploy identities are recorded.",
+      "text_digest": "4e493d77d0ee000c00b4ae68895a0a77298d74f30da096881cc2c1636a031a45"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "Every skipped backend and web test is counted and classified by an explicit structural reason; accidental skips are fixed and affected tests pass.",
+      "text_digest": "468ecd0584989033d83d615ea8e5c3aa811df3090f76919300cb39127385179e"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "The canonical release acceptance passes without a no-tests false positive.",
+      "text_digest": "465c69b08d0bb968297c23eae7ed53a17a96d86a3383f6b72786a5897d0d6c59"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "dev.ai.megacampus.ru passes public health plus representative read-only API and UI checks for the delivered develop SHA.",
+      "text_digest": "8947adef001674be4e021628456ed89c41bfca82a0d476176c654de7339c1daf"
+    },
+    {
+      "criterion_id": "AC-5",
+      "text": "Remaining unavailable live checks are named precisely and are not misreported as passing.",
+      "text_digest": "539f9338b58c5b754bf7138693f4b1d3f62d4ce05c38eb688ab6c0a64f5e509b"
+    }
+  ]
+}

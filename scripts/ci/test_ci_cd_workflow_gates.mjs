@@ -431,4 +431,20 @@ assert(
   'test-contract must not report a failing suite as a passing check'
 );
 
+// mc2-0ukr6. A dependency audit that exits non-zero must block ci-success and therefore delivery.
+// `continue-on-error` converts a real critical/high advisory into a successful security check.
+const securityJob = jobs.security ?? {};
+assert(
+  securityJob['continue-on-error'] !== true &&
+    !(securityJob.steps ?? []).some(step => step?.['continue-on-error'] === true),
+  'security audit findings must fail the security job instead of reporting a passing check'
+);
+const ciSuccessCheck = (jobs['ci-success']?.steps ?? []).find(
+  step => step?.name === 'Check CI status'
+)?.run;
+assert(
+  ciSuccessCheck?.includes('needs.security.result'),
+  'ci-success must reject a failed or skipped security audit before delivery'
+);
+
 console.log('CI/CD workflow deploy gate test passed');
