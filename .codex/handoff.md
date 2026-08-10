@@ -1,17 +1,16 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3gz2m.2`
+Current stage id: `mc2-3gz2m.3`
 
 ## Current stage
 
-`mc2-3gz2m.2` completed the final official Docling-native OCR check. The exact current Docling Serve
-1.30.0 / Docling 2.118.0 image ran RapidOCR 3.9.2 with PP-OCRv5 Cyrillic in `FULL_PAGE` mode at
-scale 3.0. It passed the fixed time and memory gates but recovered 0/36 labels and 0/16 small labels,
-returning only 14 characters and no Cyrillic. No product profile was added, and the existing
-actionable `EmptyConversionError` remains. The parent capability `mc2-3gz2m` stays open; sanitized
-evidence is in `specs/025-remaining-debt/alternative-ocr-findings.md`. No cloud/paid OCR,
-production retry, reindex, migration, delivery or live action occurred.
+`mc2-3gz2m.3` accepted the owner-authorized final tiled EasyOCR measurement. The exact current Docling
+image was OOM-killed before its first 768-pt direct-clip tile at a 6-GiB no-swap hard limit. This is
+already above both the 2.8-GiB fallback and 4-GiB service gates, so no tiled product fallback is
+admissible and `EmptyConversionError` remains unchanged. The parent capability closed by its
+pre-registered measured-rejection path. The local measurement used the unchanged
+36-label corpus and performed no cloud/paid OCR, production retry, reindex, migration or live action.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -131,9 +130,6 @@ research, and owner-decision items remain explicitly deferred.
 - `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
 - `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
-- `mc2-3gz2m` — the official built-in RapidOCR path is now also measured and rejected. Choose
-  between implementing page tiling, a larger/GPU VLM host, managed paid OCR, or requiring an
-  editable source/text layer for oversized outlined-text PDFs.
 
 ## Safety boundary
 
@@ -167,8 +163,6 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
-- `mc2-3gz2m` — built-in full-page OCR and the bounded alternative-engine search are exhausted.
-  Page tiling remains unimplemented; other paths change cost, infrastructure, or input policy.
 - `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
   page-data workers during an otherwise successful production build.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
@@ -178,13 +172,11 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-3gz2m.2`
-Current stage id: `mc2-3gz2m.2`
-Next stage id: selected only after the `mc2-3gz2m` owner decision.
-Recommended action: choose whether to implement a bounded page-tiling prototype or change the
-recognition/input policy. Do not add RapidOCR or PaddleOCR merely because they were official or best
-among failed candidates. Do not enable the RAG cohort, change its threshold, reindex, migrate, run a
-paid model, or deploy as part of this stage.
+Accepted stage id: `mc2-3gz2m.3`
+Current stage id: `mc2-3gz2m.3`
+Next stage id: selected only from an authorized owner/live/migration boundary.
+Recommended action: preserve the actionable rejection. A future GPU/managed OCR or editable-source
+policy is a new owner decision, not unfinished work in this accepted stage.
 
 ## Starter prompt for next orchestrator
 

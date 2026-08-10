@@ -1,0 +1,28 @@
+{
+  "command_results": [
+    {
+      "command": "python3 -m unittest discover -s scripts/benchmarks -p 'test_outlined_pdf_tiled_easyocr.py' && python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py scripts/benchmarks/outlined_pdf_docling_rapidocr.py scripts/benchmarks/outlined_pdf_tiled_easyocr.py scripts/benchmarks/test_outlined_pdf_tiled_easyocr.py && pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:73976) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:74586) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 181.954,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "python3 -m unittest discover -s scripts/benchmarks -p 'test_outlined_pdf_tiled_easyocr.py' && python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py scripts/benchmarks/outlined_pdf_docling_rapidocr.py scripts/benchmarks/outlined_pdf_tiled_easyocr.py scripts/benchmarks/test_outlined_pdf_tiled_easyocr.py && pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-10T13:20:06.967264+00:00",
+  "diff_digest": "406252455ac99dd735d465fa3a669be3ff6053f7219b322f0025ecc60eab84f8",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "ca93b93b4f30db2a32e20b663f955b31d131b773",
+  "idempotency_key": "4a5b0e4c7c9200f5a93b4c5e434b7e12f425a289188704d683fcbf8bf0bc4b85",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-3gz2m.3",
+  "started_at": "2026-08-10T13:17:04.827826+00:00",
+  "verification_fingerprint": "4a5b0e4c7c9200f5a93b4c5e434b7e12f425a289188704d683fcbf8bf0bc4b85"
+}

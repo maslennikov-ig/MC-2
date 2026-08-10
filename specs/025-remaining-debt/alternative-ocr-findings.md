@@ -1,6 +1,6 @@
 # Alternative OCR findings — oversized outlined Russian PDFs
 
-Date: 2026-08-10. Bead: `mc2-3gz2m.1`. Raw OCR text, model caches and the
+Date: 2026-08-10. Beads: `mc2-3gz2m.1`, `mc2-3gz2m.2`, `mc2-3gz2m.3`. Raw OCR text, model caches and the
 representative document remain ignored local-only data; this file contains only
 sanitized aggregate evidence.
 
@@ -36,6 +36,7 @@ source/text-layer requirement.
 | Surya OCR 0.17.0 classic                                                             | bounded model-load probe   |                                           not scored |      not scored |    not scored | exited 137 inside 2.8-GiB cap                     | reject memory       |
 | PaddleOCR-VL 1.6, revision `c5630abae1d940eafe0697512a0325494b02ab42`                | one crop, then one 1x page | crop contained the expected heading; page not scored |      not scored |    not scored | crop 65.38 s / 2,177,528 KiB; page exceeded 180 s | reject page latency |
 | Docling 2.118.0 / RapidOCR 3.9.2, PP-OCRv5 Cyrillic, ONNX, `FULL_PAGE`, scale 3.0    | complete 1x page           |                                                 0/36 |          0.0289 |          0/16 | 87.78 s / 2,719,920 KiB; cgroup peak 3.50 GiB     | reject quality      |
+| EasyOCR 1.7.2, sequential 768-pt direct clips, 20% overlap, scale 3, canvas 4096     | bounded full-page attempt  |                                           not scored |      not scored |    not scored | OOM before tile 1 at 6-GiB no-swap hard limit     | reject memory       |
 
 PaddleOCR initially hit a oneDNN conversion failure; setting the documented
 `enable_mkldnn=False` CPU option made the fixed model configuration runnable.
@@ -52,6 +53,16 @@ killed after 89 seconds; the decisive run used the repository's 4-GiB service
 limit and peaked at 3,759,906,816 cgroup bytes while the Python process stayed
 below the separate 2.8-GiB RSS gate. It therefore passed the fixed time and
 memory gates and failed only recognition quality.
+
+The owner-authorized final tiling check used `pypdfium2 5.12.1` direct page
+crops and released each copied tile before rendering the next. It ran in the
+exact current Docling image with four CPUs, networking disabled, no swap, a
+6-GiB hard limit and a 190-second wall limit. EasyOCR was OOM-killed during
+initialization before the first tile (`exit 137`, Docker
+`State.OOMKilled=true`). Because the run exceeded the complete service's
+4-GiB gate before recognition began, a lower-quality/downscaled rerun cannot
+qualify the proposed high-resolution fallback and was not used to manufacture
+a passing number.
 
 ## Reproduction
 
@@ -78,6 +89,12 @@ python scripts/benchmarks/outlined_pdf_docling_rapidocr.py \
   .tmp/mc2-3gz2m/ground-truth.json \
   --scale 3.0 \
   --output .tmp/mc2-3gz2m/rapidocr-docling-full-page.json
+
+python scripts/benchmarks/outlined_pdf_tiled_easyocr.py \
+  .tmp/mc2-3gz2m/representative.pdf \
+  .tmp/mc2-3gz2m/ground-truth.json \
+  --tile-height 768 --overlap 0.2 --render-scale 3 --canvas-size 4096 \
+  --output .tmp/mc2-3gz2m/tiled-easyocr-768-20.json
 ```
 
 Apply the host envelope outside the runner (container/cgroup): four CPUs,
@@ -90,5 +107,10 @@ python3 -m py_compile \
   scripts/benchmarks/outlined_pdf_ocr_ab.py \
   scripts/benchmarks/outlined_pdf_paddleocr.py \
   scripts/benchmarks/outlined_pdf_surya.py \
-  scripts/benchmarks/outlined_pdf_docling_rapidocr.py
+  scripts/benchmarks/outlined_pdf_docling_rapidocr.py \
+  scripts/benchmarks/outlined_pdf_tiled_easyocr.py \
+  scripts/benchmarks/test_outlined_pdf_tiled_easyocr.py
+
+python3 -m unittest discover -s scripts/benchmarks \
+  -p 'test_outlined_pdf_tiled_easyocr.py'
 ```

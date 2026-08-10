@@ -79,6 +79,13 @@ for 16 small-body labels. This fails the pre-registered quality gate before the
 tiling branch. No product fallback is implemented; the existing actionable
 rejection remains. See `research-findings.md` for the reproducible measurement.
 
+**Owner-authorized follow-up 2026-08-10:** after the stop rule above was made
+explicit, the owner asked to run the bounded tiled profile anyway. The exact
+current Docling image was OOM-killed before its first 768-pt, 20%-overlap,
+scale-3 tile at a 6-GiB no-swap hard limit. That exceeds both the 2.8-GiB
+fallback and 4-GiB complete-service gates, so it does not reopen product work;
+the actionable rejection remains.
+
 The research gate is satisfied by two independent reports returned on
 2026-08-10. They agree on the material points:
 
