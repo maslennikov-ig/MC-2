@@ -36,7 +36,7 @@ function needsList(job) {
 }
 
 const pinnedPnpmVersion = rootManifest.packageManager?.replace(/^pnpm@/, '');
-assert(pinnedPnpmVersion === '10.33.4', 'packageManager must pin the accepted pnpm version');
+assert(pinnedPnpmVersion === '10.34.5', 'packageManager must pin the accepted pnpm version');
 assert(
   workflow.env?.PNPM_VERSION === pinnedPnpmVersion,
   'active CI and packageManager must pin the same pnpm version'

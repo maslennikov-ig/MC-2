@@ -5,7 +5,7 @@ Current stage id: `mc2-ve1eq`
 
 ## Current stage
 
-`mc2-ve1eq` is accepted locally. The repository and active CI now pin pnpm 10.33.4; frozen install
+`mc2-ve1eq` is accepted locally. The repository and active CI now pin pnpm 10.34.5; frozen install
 and audit are clean under Node 24, the v9 lockfile migration is reproducible, and a clean temporary
 clone passed all reviewed dependency build scripts plus backend/web production builds. New
 unreviewed dependency build scripts fail closed. There are no delegated worktrees or live actions.
@@ -109,7 +109,7 @@ research, and owner-decision items remain explicitly deferred.
 - The web production build's Node `DEP0169` warning was traced to ioredis 5.8.2. Direct ioredis
   dependencies and BullMQ are aligned on ioredis 5.11.1; `NODE_OPTIONS=--throw-deprecation` now
   passes the complete web build.
-- The package-manager `DEP0169` warning is also removed: pnpm 10.33.4 is pinned in the manifest and
+- The package-manager `DEP0169` warning is also removed: pnpm 10.34.5 is pinned in the manifest and
   active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
   build policy and explicit-script-only workspace behavior pass a clean-install/build proof.
 

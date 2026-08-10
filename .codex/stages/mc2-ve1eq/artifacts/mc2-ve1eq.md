@@ -55,7 +55,7 @@ invariants:
   - unreviewed-builds-fail-closed
   - explicit-script-only-project-hooks
 verification:
-  - pnpm 9.15.9 reproduced DEP0169 and pnpm 10.33.4 did not under Node 24.18.0
+  - pnpm 9.15.9 reproduced DEP0169 and pnpm 10.34.5 did not under Node 24.18.0
   - clean frozen install ran every reviewed native build and reported no ignored builds
   - bcrypt native smoke passed in the clean checkout
   - clean backend and web production builds passed
@@ -79,7 +79,7 @@ explicit_defers:
 
 # Summary
 
-The repository now uses pnpm 10.33.4, the smallest tested current major that removes the Node 24
+The repository now uses pnpm 10.34.5, the latest tested patch of the smallest current major that removes the Node 24
 package-manager `DEP0169` warning. The lockfile and active CI use the same version. Required
 dependency build scripts are explicitly reviewed and future unknown scripts fail closed.
 

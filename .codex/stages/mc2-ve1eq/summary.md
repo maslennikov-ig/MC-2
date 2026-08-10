@@ -12,16 +12,16 @@ native builds and the prior explicit-script-only project behavior.
 ## Acceptance intent
 
 - `pnpm install --frozen-lockfile` and `pnpm audit --json` emit no `DEP0169` under Node 24;
-- packageManager, engine requirement, active CI and lockfile agree on pnpm 10.33.4;
+- packageManager, engine requirement, active CI and lockfile agree on pnpm 10.34.5;
 - type-check and production build remain green;
 - disabled historical workflows and immutable prior evidence remain untouched.
 
 ## Outcome
 
 - pnpm 8.15.0 and the last v9 release, 9.15.9, both reproduce `DEP0169` from the bundled
-  `toNerfDart()` call during frozen install under Node 24.18.0. pnpm 10.33.4 completes frozen
+  `toNerfDart()` call during frozen install under Node 24.18.0. pnpm 10.34.5 completes frozen
   install and audit with deprecations promoted to errors.
-- `packageManager`, the pnpm engine, active CI and lockfile now agree on pnpm 10.33.4. Historical
+- `packageManager`, the pnpm engine, active CI and lockfile now agree on pnpm 10.34.5. Historical
   disabled workflows and prior evidence were not rewritten.
 - A clean temporary clone proved the pnpm 10 install boundary. Six required native/transpiler
   packages are explicitly allowed to build, while `strictDepBuilds` makes any future unreviewed
@@ -32,7 +32,7 @@ native builds and the prior explicit-script-only project behavior.
 - The clean backend and web production builds pass. The active CI contract test binds every pnpm
   setup step to the shared version pin and protects the build allowlist/settings.
 
-documentation-decision: docs-resolve - pnpm 8.15.0 L1 did not cover the Node 24 parser boundary and pnpm 10.33.4 L1 was missing; official pnpm compatibility/settings/approve-builds documentation plus direct Node 24 measurements selected pnpm 10.33.4. The exact migration facts were persisted as L2 for pnpm 10.33.4.
+documentation-decision: docs-resolve - pnpm 8.15.0 L1 did not cover the Node 24 parser boundary and pnpm 10.34.5 L1 was missing; official pnpm compatibility/settings/approve-builds documentation plus direct Node 24 measurements selected the latest v10 patch, pnpm 10.34.5. The exact migration facts were persisted as L2 for pnpm 10.34.5.
 
 docs-reviewed: no-change-needed - packageManager, workspace settings, CI contract test and this tracked artifact are the durable repository contract.
 

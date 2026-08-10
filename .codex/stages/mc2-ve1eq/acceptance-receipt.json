@@ -2,23 +2,23 @@
   "command_results": [
     {
       "command": "NODE_OPTIONS=--throw-deprecation pnpm install --frozen-lockfile && NODE_OPTIONS=--throw-deprecation pnpm audit --json && node scripts/ci/test_ci_cd_workflow_gates.mjs && NODE_OPTIONS=--throw-deprecation pnpm type-check && NODE_OPTIONS=--throw-deprecation pnpm build",
-      "duration_seconds": 220.898,
+      "duration_seconds": 196.501,
       "result": "passed"
     }
   ],
   "commands": [
     "NODE_OPTIONS=--throw-deprecation pnpm install --frozen-lockfile && NODE_OPTIONS=--throw-deprecation pnpm audit --json && node scripts/ci/test_ci_cd_workflow_gates.mjs && NODE_OPTIONS=--throw-deprecation pnpm type-check && NODE_OPTIONS=--throw-deprecation pnpm build"
   ],
-  "completed_at": "2026-08-10T15:48:50.249293+00:00",
-  "diff_digest": "66a1d2c5eaadbf511202aa2e98bec27e4eda0433a850a47d5ee13f96455235b5",
-  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=10.33.4",
-  "git_head": "ad4f50e9050f38e2d193347088c042a4dfa8a1ad",
-  "idempotency_key": "5c9bae16aac99e19ab13b879cd130844206d57ae476280c136dfdc3683a5a6f9",
+  "completed_at": "2026-08-10T15:54:27.451227+00:00",
+  "diff_digest": "578f167a3329fafe734055efe9d17dd07c4eeab2e273cd0756a23d229282a862",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=10.34.5",
+  "git_head": "af1d2d126d414f21f6b38a59b734b61d16b8328c",
+  "idempotency_key": "8b9becfd596aa7c0959d9bf5517d34aaf1c45235b4a11160b9691649391f4f56",
   "orchestration_level": "slice_acceptance",
   "process_check": "passed",
   "result": "passed",
   "schema_version": "acceptance-receipt/v1",
   "stage_id": "mc2-ve1eq",
-  "started_at": "2026-08-10T15:45:09.142529+00:00",
-  "verification_fingerprint": "5c9bae16aac99e19ab13b879cd130844206d57ae476280c136dfdc3683a5a6f9"
+  "started_at": "2026-08-10T15:51:10.775047+00:00",
+  "verification_fingerprint": "8b9becfd596aa7c0959d9bf5517d34aaf1c45235b4a11160b9691649391f4f56"
 }
