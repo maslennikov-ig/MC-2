@@ -1,24 +1,21 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-0ukr6`
+Current stage id: `mc2-3gz2m.3`
 
 ## Current stage
 
-`mc2-0ukr6` re-triages and remediates all advisories from the committed pnpm lockfile, classifies
-production versus development paths, and replaces the currently swallowed audit failure with an
-explicit enforced policy. Root owns all manifest, lockfile, CI-policy, acceptance, and delivery
-writes. Unrelated major upgrades, migrations, reindex, secrets/access changes, and paid or
-destructive live actions remain outside the boundary.
+`mc2-3gz2m.3` accepted the owner-authorized final tiled EasyOCR measurement. The exact current Docling
+image was OOM-killed before its first 768-pt direct-clip tile at a 6-GiB no-swap hard limit. This is
+already above both the 2.8-GiB fallback and 4-GiB service gates, so no tiled product fallback is
+admissible and `EmptyConversionError` remains unchanged. The parent capability closed by its
+pre-registered measured-rejection path. The local measurement used the unchanged
+36-label corpus and performed no cloud/paid OCR, production retry, reindex, migration or live action.
 
-The accessible backlog plus the release-audit correction is delivered to `origin/develop` at
-`50208b60a`; the accessible backlog is deployed to staging in
-the `develop -> master` merge `123152924`. The exact-SHA develop pipeline
-[`31322960981`](https://github.com/maslennikov-ig/MC-2/actions/runs/31322960981) and staging
-pipeline [`31324154741`](https://github.com/maslennikov-ig/MC-2/actions/runs/31324154741) are green;
-the staging Blue/Green deploy, public health verification, monitoring drift check, and notification
-all succeeded, while rollback was correctly skipped. A separate read-only request to
-`https://ai.megacampus.ru/api/health` returned `{"status":"ok"}` after the workflow completed.
+The accessible backlog, release audit, dependency remediation and CI-timeout correction are
+delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
+staging run `31371888070` are green; Blue/Green switching, public/active-color health and monitoring
+checks passed, and the API health endpoint plus homepage were healthy afterward.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -53,13 +50,17 @@ research, and owner-decision items remain explicitly deferred.
   audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Canonical release
   acceptance passed; exact-SHA run `31364905125` deployed `d18910ee4` to dev, whose API returned
   `status: ok` and homepage returned HTTP 200. Closed `mc2-bwx1o` remains closed.
+- Staging deploy correction `mc2-n4cog` is accepted and delivered: the original master run
+  `31369687249` stopped safely before image build/deploy on a 30-second Stage 4 test timeout; the
+  same focused file passed 11/11 locally after the narrow 60-second per-test limit. Exact develop
+  run `31370658686` and exact master run `31371888070` then passed unit, integration, contract,
+  lint, type-check, security, build, all four image builds, Blue/Green deploy, public verification,
+  monitoring drift, and notification. Rollback was correctly skipped.
 - The migration-drift jobs concluded successfully, but their optional database probe was skipped
   because the available connection required SSL. This release contains no schema migration and
   does not use that skipped probe as migration evidence.
-- `graph-reviewed: updated` — local-only Graphify refresh after code commit `4474b6f45` contains
-  61,495 nodes, 88,538 edges, and 7,335 communities. Later commits are acceptance metadata and the
-  delivery merge, so no second graph refresh is needed.
-
+- `graph-reviewed: updated` — the local-only Graphify refresh for `mc2-3gz2m` contains 61,555
+  nodes, 88,596 edges, and 7,344 communities; no external semantic backend was used.
 - The default backend Vitest command is now fail-closed: an unmet Qdrant precondition and an empty
   run exit nonzero. It still requires the pinned Qdrant 1.18.2 precondition unless the operator
   explicitly sets `SKIP_QDRANT_TEST_SETUP=1`; use `vitest.config.unit.ts` for focused unit tests.
@@ -100,6 +101,13 @@ research, and owner-decision items remain explicitly deferred.
 - Tier 1 exits have a stable, zero-default shadow cohort. Complete `tier1_shadow` traces expose the
   raw dense gate score and exact active-hybrid Tier 2 result count without content or result impact;
   invalid rates fail closed and the active threshold remains 0.15.
+- The alternative OCR child `mc2-3gz2m.1` exhausts the safe local CPU candidates: EasyOCR and
+  PaddleOCR fail quality, Surya fails the load-memory gate, and PaddleOCR-VL fails whole-page
+  latency. This closes only the experiment by measurement; parent capability `mc2-3gz2m` remains
+  open and no fallback was shipped.
+- The follow-up `mc2-3gz2m.2` proves the built-in official path is not the missing solution:
+  Docling-native RapidOCR PP-OCRv5 Cyrillic finished in 87.78 seconds at 2,719,920 KiB process RSS
+  and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
 
 ## Live operational facts
 
@@ -151,8 +159,6 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - Beads task `mc2-vr7ic` — make the pre-commit hook handle formatting-only legacy batches and
   deliberately tracked `.codex/goals` snapshots without requiring unrelated lint cleanup or a
   manual hook bypass.
-- `mc2-3gz2m` — unreadable vector diagrams; gated on
-  `specs/025-remaining-debt/research-prompt.md`.
 - `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
@@ -166,24 +172,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-0ukr6`
-Current stage id: `mc2-0ukr6` (accepted)
-Next stage id: `owner-live-or-migration-boundary`.
-Recommended action: choose a separately authorized defer only if desired: provide the missing
-`mc2-3gz2m` research, approve a concrete paid/live experiment budget and disposable inputs, or
-explicitly authorize a future schema-migration stage. Do not enable the RAG cohort, change the
-threshold, reindex, or migrate without that separate boundary.
+Accepted stage id: `mc2-3gz2m.3`
+Current stage id: `mc2-3gz2m.3`
+Next stage id: selected only from an authorized owner/live/migration boundary.
+Recommended action: preserve the actionable rejection. A future GPU/managed OCR or editable-source
+policy is a new owner decision, not unfinished work in this accepted stage.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the current Codex task.
-
-`mc2-0ukr6` is accepted at `d18910ee4`: all 77 dependency advisories are removed, Security Audit and
-the aggregate CI gate fail closed, release acceptance passed, and exact-SHA run `31364905125`
-deployed successfully to healthy dev API/Web endpoints. Staging remains at `123152924`. Choose only
-a separately authorized live-budget, missing-research, or schema-migration boundary next. Do not
-enable the cohort, change the threshold, reindex, migrate, force-push, or perform paid work without
-that separate authorization.
+Use $orchestrator-stage for the current Codex task. Select only an authorized live-budget,
+research or migration boundary.
+Do not enable the cohort, change its threshold, reindex, migrate, force-push or perform paid work
+without separate authorization.
 
 ## Read first
 

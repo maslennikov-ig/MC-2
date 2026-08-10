@@ -1,0 +1,87 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-3gz2m",
+  "goal_id": "mc2-3gz2m",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "oversized-outlined-pdf-extraction-decision",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "stage2-document-processing",
+      "docling-serve-runtime",
+      "docling-quality-benchmark"
+    ],
+    "risk_models": [
+      "false-success-empty-extraction",
+      "ocr-quality-regression",
+      "runtime-memory-exhaustion",
+      "concurrent-fallback-amplification",
+      "stale-conversion-cache"
+    ],
+    "test_environments": [
+      "local-pinned-docling-container",
+      "vitest-unit",
+      "synthetic-outlined-russian-pdf"
+    ],
+    "rollback_boundary": "disable-or-revert-the-on-demand-fallback-while-preserving-the-existing-actionable-rejection",
+    "acceptance_proofs": [
+      "crop-downscale-causal-ab",
+      "quality-time-and-rss-gate-or-measured-rejection",
+      "empty-conversion-remains-fail-closed",
+      "type-check-and-build"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-3gz2m",
+    "source_digest": "2811e99557507674cd5037bf4fd11fd41119195ff8860f38839df0857bbc6c82",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "A representative 4296pt outlined-Russian input and 30-50-label ground truth produce saved full-resolution-versus-0.1986-downscale causal evidence.",
+        "text_digest": "e202d3580a4771baa775a98ba27931273b8451dc4f4eb603818f2f94f11e3df1"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "A selected extraction path either passes label recall >=95%, mean character similarity >=0.90, smallest-text coverage, wall time <180s/page, fallback RSS <2.8GiB and complete-service RSS <4GiB, or the issue closes with the failed measurement and the actionable rejection remains.",
+        "text_digest": "f93e98d142f6f2574255dd32b05c45dcac7dae096d7982463cd8482bad608f3e"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Any shipped fallback is on-demand, concurrency-bounded, fail-closed, and cannot convert a short OCR result into document-processing success.",
+        "text_digest": "04f904f3e1a3f94ed65c086b7b1bb7209b70f4790418ff883c529d245876dc63"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Focused tests, saved benchmark evidence, pnpm type-check and pnpm build pass without reindex, production-file retry, paid model call, schema migration or deploy.",
+        "text_digest": "81749fca409801ccd3c26bba672d70a72f75fce03ea89f45c918686753c5f2eb"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-3gz2m/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "2811e99557507674cd5037bf4fd11fd41119195ff8860f38839df0857bbc6c82",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-3gz2m/artifacts/mc2-3gz2m.md",
+      "task_id": "mc2-3gz2m",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

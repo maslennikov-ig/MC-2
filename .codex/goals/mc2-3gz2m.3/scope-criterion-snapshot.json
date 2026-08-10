@@ -1,0 +1,14 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-3gz2m.3",
+  "source_kind": "beads",
+  "source_id": "mc2-3gz2m.3",
+  "source_digest": "0a957175bd0ec0e33e1dac5253ab11f6759b99da3fc1131fa02141e99adc00c4",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "AC-1: the unchanged representative PDF and all 36 stored labels are scored from sequential overlapping tiles; report recall at similarity 0.8, mean character similarity, 16-label small-text recovery, wall time, process RSS, cgroup peak, timeout/OOM state and corpus hashes. AC-2: ship no fallback unless recall >=95%, mean similarity >=0.90, small labels >=15/16, wall <180s, process RSS <2.8 GiB and service peak <4 GiB. AC-3: if shipped, fallback is PDF-only, on-demand after empty conversion, concurrency-bounded, sequential and fail-closed below the existing 50-character floor. AC-4: focused tests/benchmark plus pnpm type-check and pnpm build pass; no forbidden live/schema actions occur.",
+      "text_digest": "b6fd6f6586e55cfd554e29d2360cf0d7439cc7ab608bb6c5321c71ae3bfdc45e"
+    }
+  ]
+}

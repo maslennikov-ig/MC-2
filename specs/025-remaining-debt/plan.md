@@ -70,17 +70,89 @@ it.
 Reproduce, fix, re-check with the same check. If one no longer reproduces, it
 belongs in Stage 1's "not reproducible" bucket with the evidence, not in a fix.
 
-## Stage 5 — Vector diagrams, gated
+## Stage 5 — Vector diagrams, experiment-gated
 
-1. Hand `research-prompt.md` to the owner, who runs deep research externally.
-2. Findings come back into the working context.
-3. Choose an approach against them and write the design down before code.
-4. Implement behind a flag defaulting to current behaviour.
-5. Prove it on the real fixture (`vector-outlines-no-text.pdf` and the four
-   production files, which are test-course material and safe to use).
+**Decision recorded 2026-08-10:** the crop A/B confirmed that the 0.1986
+full-page reduction harms recognition, but full-resolution crops still reached
+only 2.78% label recall and 0.3551 mean character similarity, with zero recall
+for 16 small-body labels. This fails the pre-registered quality gate before the
+tiling branch. No product fallback is implemented; the existing actionable
+rejection remains. See `research-findings.md` for the reproducible measurement.
 
-The negative case must keep passing: `vector-outlines-negative` asserts that an
-empty conversion still raises. Reading these files must not weaken that.
+**Owner-authorized follow-up 2026-08-10:** after the stop rule above was made
+explicit, the owner asked to run the bounded tiled profile anyway. The exact
+current Docling image was OOM-killed before its first 768-pt, 20%-overlap,
+scale-3 tile at a 6-GiB no-swap hard limit. That exceeds both the 2.8-GiB
+fallback and 4-GiB complete-service gates, so it does not reopen product work;
+the actionable rejection remains.
+
+The research gate is satisfied by two independent reports returned on
+2026-08-10. They agree on the material points:
+
+- EasyOCR reduces the long side to 2560 px, so a 4296-pt page reaches its
+  detector at roughly 43 effective DPI;
+- raising `images_scale` cannot remove that limit;
+- the first candidate is direct clip rendering plus the existing EasyOCR
+  `ru,en`, not a new OCR engine;
+- vector-glyph reconstruction and a resident VLM are disproportionate and have
+  no measured Russian-diagram quality that justifies them;
+- an explicit refusal with a request for the editable source is the correct
+  fallback when recognition does not pass a quality gate.
+
+This is one root-owned `slice_acceptance` stage. The experiment, the contingent
+implementation, the negative path and the final proof share one subsystem and
+one rollback boundary. The stage runs in this order:
+
+1. **Preserve the evidence and the representative input.** Store a short
+   source-linked synthesis of both reports. Obtain one of the four original
+   4296-pt PDFs as a local-only test input; do not commit sales-script content.
+   Manually transcribe 30–50 representative Russian labels, including small,
+   rotated and frame-adjacent text. The tracked
+   `vector-outlines-no-text.pdf` remains the negative guard; it is not a Russian
+   OCR quality fixture.
+2. **Prove or kill the scale hypothesis.** Render each labelled PDF crop at
+   OCR scale 3 (216 DPI), then run the same crop after a 0.1986 linear
+   downscale. Use the existing EasyOCR `ru,en` and the repository's character
+   similarity/label checks. Record both outputs, label recall, mean character
+   similarity, smallest-text misses, wall time and peak RSS. Do not write
+   product code if full-resolution crops do not materially recover the text.
+3. **Run a bounded tiling prototype only after the crop A/B passes.** Render
+   PDF clips directly rather than rasterising the whole 12,888-pixel-tall page.
+   Sweep tile sizes 512/768/1024 pt and overlap 0/10/20/30%, process tiles
+   sequentially, map polygons back to page coordinates and deduplicate by
+   geometry plus text. Pre-register the pilot gate: label recall at least 95%,
+   mean character similarity at least 0.90, no systematic loss of the smallest
+   text class, wall time below 180 seconds per page, and peak fallback RSS below
+   2.8 GiB while the complete service remains below its 4-GiB limit.
+4. **Choose from the measured branch.**
+   - If tiling passes, write the smallest on-demand fallback design around the
+     existing Docling/EasyOCR runtime. It must have no new resident service or
+     model, run only for oversized zero-text vector PDFs after the ordinary
+     conversion is rejected, be concurrency-bounded, and be disabled by
+     default until its container-level memory proof passes.
+   - If crops pass but tiling misses labels because of diagram geometry, allow
+     one bounded vector-region experiment using PyMuPDF drawings/clusters. It
+     must find at least 95% of labelled nodes before OCR to stay in scope.
+   - If the classical paths fail, keep the already shipped actionable rejection
+     and close `mc2-3gz2m` with the measurements. A VLM, glyph matching, a new
+     service or a larger host is a separate owner-authorized stage, not an
+     automatic fallback.
+5. **Implement only the passing path with focused red-green coverage.** Preserve
+   the current `EmptyConversionError` path; add anomaly-trigger, tile merge,
+   timeout/memory/concurrency failure coverage and a deterministic sanitized
+   outlined-Russian fixture that reproduces the accepted geometry without
+   committing production content. An OCR failure must remain a visible failed
+   document, never a short successful conversion.
+6. **Accept once at the stage boundary.** Re-run the benchmark against its saved
+   baseline, the focused backend/container tests, `pnpm type-check` and
+   `pnpm build`. Record exact quality/time/RSS evidence in the stage artifact.
+   No reindex, production-file retry, paid model call, schema migration or
+   deploy belongs to this acceptance.
+
+The implementation adapter is deliberately selected after step 3. The current
+MCP image is a thin remote client without OCR models, while the Serve image owns
+EasyOCR and its weights; choosing a boundary before the prototype would either
+duplicate models or bake an unproved path into the conversion service.
 
 ## Stage 6 — Repo health
 
