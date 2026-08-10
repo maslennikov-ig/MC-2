@@ -267,7 +267,6 @@ jobs:
 
       - name: Run security audit
         run: pnpm audit --audit-level=high
-        continue-on-error: true
 
   # ============================================
   # Test Tier 1: Unit Tests (fast, always blocks merge)
@@ -593,6 +592,10 @@ jobs:
           fi
           if [ "${{ needs.type-check.result }}" != "success" ]; then
             echo "Type check failed!"
+            exit 1
+          fi
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "Security audit failed with result: ${{ needs.security.result }}"
             exit 1
           fi
           if [ "${{ needs.build.result }}" != "success" ]; then

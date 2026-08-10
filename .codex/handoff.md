@@ -1,18 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-sshkz`
+Current stage id: `mc2-0ukr6`
 
 ## Current stage
 
-`mc2-sshkz` is accepted and delivered. It audited every backend/web skip, repaired the English
-signed-out action, ran one canonical release acceptance, and proved exact SHA
-`50208b60a0c26f61c398a4806e747f0762e6a638` on `dev.ai.megacampus.ru`. GitHub Actions run
-[`31357791241`](https://github.com/maslennikov-ig/MC-2/actions/runs/31357791241) passed unit,
-integration, contract, type, lint, build, image, and dev-deploy jobs. Post-deploy API health was
-`ok`; Playwright found `Sign In` on the English route, zero console messages, and only HTTP 200
-responses among observed dynamic requests. Paid generation, load tests, reindex, migrations,
-destructive live mutation, and secrets/access changes remain outside the boundary.
+`mc2-0ukr6` re-triages and remediates all advisories from the committed pnpm lockfile, classifies
+production versus development paths, and replaces the currently swallowed audit failure with an
+explicit enforced policy. Root owns all manifest, lockfile, CI-policy, acceptance, and delivery
+writes. Unrelated major upgrades, migrations, reindex, secrets/access changes, and paid or
+destructive live actions remain outside the boundary.
 
 The accessible backlog plus the release-audit correction is delivered to `origin/develop` at
 `50208b60a`; the accessible backlog is deployed to staging in
@@ -51,10 +48,10 @@ research, and owner-decision items remain explicitly deferred.
 - Develop exact-SHA run `31357791241` deployed `50208b60a` to dev. API health and the English
   browser regression passed afterward with zero console messages and observed dynamic requests
   returning HTTP 200.
-- The non-blocking security audit reports 77 dependency findings (9 low, 38 moderate, 29 high,
-  1 critical), exactly matching the preceding deploy run `31322960981`; no manifest or lockfile
-  changed in this release. New P1 Bead `mc2-0ukr6` owns re-triage without reopening the closed
-  `mc2-bwx1o`.
+- Dependency-security remediation for `mc2-0ukr6` is locally implementation-complete: the baseline
+  77 findings (9 low, 38 moderate, 29 high, 1 critical) are zero in full, production-only, and
+  dev-only audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Final
+  release acceptance and exact-SHA delivery evidence are pending; closed `mc2-bwx1o` remains closed.
 - The migration-drift jobs concluded successfully, but their optional database probe was skipped
   because the available connection required SSL. This release contains no schema migration and
   does not use that skipped probe as migration evidence.
@@ -137,10 +134,6 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Explicit defers
 
-- Beads task `mc2-0ukr6` — re-triage the 77 dependency advisories now reported by `pnpm audit`,
-  classify production-reachable versus dev-only paths, remediate actionable critical/high findings,
-  and make the currently non-blocking CI policy explicit. Counts are unchanged across the two most
-  recent dev deploys and are not caused by `mc2-sshkz`.
 - Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
   owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
   routing metadata but intentionally makes no output-quality claim.
@@ -173,10 +166,10 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 ## Next recommended
 
 Accepted stage id: `mc2-sshkz`
-Current stage id: `mc2-sshkz`
-Next stage id: `mc2-0ukr6` or `owner-live-or-migration-boundary`
-Recommended action: treat `mc2-0ukr6` as a new dependency-security stage with its own upgrade and
-regression boundary. Otherwise choose a separately authorized defer: provide the missing
+Current stage id: `mc2-0ukr6`
+Next stage id: `owner-live-or-migration-boundary` after exact-SHA delivery.
+Recommended action: finish the root-owned release acceptance and exact-SHA develop delivery for
+`mc2-0ukr6`. Otherwise choose a separately authorized defer: provide the missing
 `mc2-3gz2m` research, approve a concrete paid/live experiment budget and disposable inputs, or
 explicitly authorize a future schema-migration stage. Do not enable the RAG cohort, change the
 threshold, reindex, or migrate as part of this completed delivery.
@@ -185,12 +178,13 @@ threshold, reindex, or migrate as part of this completed delivery.
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-sshkz` is delivered to `develop` and dev at `50208b60a` through green exact-SHA run
-`31357791241`; post-deploy API and Playwright checks are green. The accessible ranked backlog is
-complete, while new P1 `mc2-0ukr6` tracks the non-blocking dependency advisories found during release
-verification. Staging remains at `123152924`. Explicit live-budget, missing-research,
-schema-migration, and §9 defers remain. Do not enable the cohort, change the threshold, reindex,
-migrate, force-push, or perform paid work without a separately authorized next stage.
+`mc2-0ukr6` has a local zero-finding dependency graph, fail-closed Security Audit and aggregate CI
+gate, reproducible frozen install, and focused compatibility evidence. Run its single canonical
+release closeout, then deliver only after a fresh fetch proves `origin/develop` is not ahead or
+diverged; confirm the exact pushed SHA through CI/deploy and read-only dev health. Staging remains at
+`123152924`. Explicit live-budget, missing-research, schema-migration, and §9 defers remain. Do not
+enable the cohort, change the threshold, reindex, migrate, force-push, or perform paid work without
+a separately authorized next stage.
 
 ## Read first
 
