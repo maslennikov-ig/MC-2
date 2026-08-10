@@ -1,0 +1,40 @@
+{
+  "command_results": [
+    {
+      "command": "TMPDIR=/tmp pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing/empty-conversion.test.ts tests/unit/stages/stage2-document-processing/docling/ocr-assertions.test.ts",
+      "duration_seconds": 3.375,
+      "result": "passed"
+    },
+    {
+      "command": "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py && docker run --rm --network none --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD:/repo:ro\" helixa/docling-serve:1.30.0 python /repo/scripts/benchmarks/outlined_pdf_ocr_ab.py --help",
+      "duration_seconds": 5.695,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:41608) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:41863) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 217.499,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "TMPDIR=/tmp pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage2-document-processing/empty-conversion.test.ts tests/unit/stages/stage2-document-processing/docling/ocr-assertions.test.ts",
+    "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py && docker run --rm --network none --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD:/repo:ro\" helixa/docling-serve:1.30.0 python /repo/scripts/benchmarks/outlined_pdf_ocr_ab.py --help",
+    "pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-10T11:09:32.529906+00:00",
+  "diff_digest": "31c45321f41e224a8077f898209218802583ab691bb893dec0cb92c2bef37074",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "7b11f7d4daedce480251f74ebdf23f9aafd326d8",
+  "idempotency_key": "296da597290b5866a5a59740d046cd52686b827c7acb274d760e01e89e5b9bd1",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-3gz2m",
+  "started_at": "2026-08-10T11:05:45.771164+00:00",
+  "verification_fingerprint": "296da597290b5866a5a59740d046cd52686b827c7acb274d760e01e89e5b9bd1"
+}
