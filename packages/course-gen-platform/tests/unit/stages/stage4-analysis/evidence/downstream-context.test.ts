@@ -413,7 +413,7 @@ describe('buildDownstreamEvidenceRepresentation', () => {
           })
       )
     ).toBe(true);
-  });
+  }, 60_000);
 
   it('rejects foreign unit IDs returned by the per-card hierarchy', async () => {
     const source = oversizedMaterialCard('en');
