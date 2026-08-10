@@ -3,7 +3,7 @@
   "stage_id": "mc2-0ukr6",
   "goal_id": "mc2-0ukr6",
   "profile_at_creation": "balanced-v2.19",
-  "status": "in_progress",
+  "status": "accepted",
   "sequence": 1,
   "orchestration_level": "release",
   "acceptance_boundary_id": "dependency-security-audit-remediation",
@@ -63,7 +63,7 @@
       "artifact_path": ".codex/stages/mc2-0ukr6/artifacts/mc2-0ukr6.md",
       "task_id": "mc2-0ukr6",
       "stream_owner": "root-owner",
-      "status": "returned"
+      "status": "accepted"
     }
   ]
 }

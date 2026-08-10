@@ -21,7 +21,7 @@ epic_id: n/a
 stage_id: mc2-0ukr6
 session_id: mc2-0ukr6
 milestone: dependency-security-remediation
-milestone_status: internal_ready
+milestone_status: accepted
 agent_type: root
 subagent_model: n/a
 reasoning_effort: inherit_orchestrator
@@ -64,11 +64,11 @@ parallel_group: baseline-read-only-audit
 depends_on_streams:
   - none
 parallel_decision: parallel-read-only-analysis-then-sequential-root-updates
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: ignored audit workspace exists under .tmp/current; no child worktree exists
+status: accepted
+delivery_method: manual integration
+accepted_by_orchestrator: yes
+cleanup_status: cleaned
+cleanup_notes: no child worktree or branch exists; the primary develop worktree is preserved
 risk_level: high
 risk_tags:
   - security
@@ -91,7 +91,11 @@ verification:
   - focused backend 75 plus 35 tests pass
   - focused web Mermaid 47 tests pass
   - sharp 0.35.0 type export failure reproduced; sharp 0.35.3 exact pnpm type-check passes
-  - canonical release acceptance pending
+  - canonical release closeout passed type-check, build, test, and process verification
+  - github-actions-run-31364905125-green-for-d18910ee4e9efa5df3bb22502b017b9eb94f929e
+  - enforced-security-audit-and-aggregate-ci-success-green
+  - exact-sha-dev-deploy-job-93385074233-green
+  - dev-api-health-status-ok-and-homepage-http-200-after-deploy
 changed_files:
   - package.json
   - pnpm-lock.yaml
@@ -121,11 +125,13 @@ under the root owner.
 
 # Verification
 
-Focused compatibility checks are green; the single canonical release acceptance is pending.
+Focused compatibility checks and the single canonical release acceptance are green. Exact-SHA CI,
+image builds, deploy, workflow health checks, and independent dev HTTP checks also passed.
 
 # Delivery / Cleanup
 
-Not yet accepted or delivered.
+Committed in `d18910ee4`, pushed to `origin/develop`, and deployed by exact-SHA run `31364905125`.
+No child worktree or branch exists; the primary `develop` worktree is intentionally preserved.
 
 # Risks / Follow-ups / Explicit Defers
 

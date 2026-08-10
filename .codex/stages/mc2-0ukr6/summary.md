@@ -1,6 +1,6 @@
 # Stage `mc2-0ukr6` — dependency security remediation
 
-Status: implementation complete; final release acceptance pending.
+Status: accepted, delivered to `develop`, and verified on dev.
 
 ## Classification and boundary
 
@@ -34,11 +34,17 @@ major upgrades, migrations, reindex, secrets/access changes, and paid or destruc
   First-party package metadata and Context7 showed corrected ESM/CJS type exports in later 0.35.x;
   `sharp@0.35.3` preserves the required security floor and now passes both the exact type-check and
   the native image smoke.
+- Canonical release acceptance passed `pnpm type-check`, `pnpm build`, `pnpm test`, and process
+  verification. Exact-SHA GitHub Actions run `31364905125` passed the enforced Security Audit,
+  lint, type, unit, integration, contract, build, image, aggregate, and dev-deploy jobs for
+  `d18910ee4e9efa5df3bb22502b017b9eb94f929e`.
+- The workflow's internal API/Web health checks passed after deployment. Independent read-only
+  checks returned API `status: ok` and HTTP 200 from `https://dev.ai.megacampus.ru/`.
 
 ## Next action
 
-Run the root-owned release closeout, then commit, fetch/prove, push `develop`, and accept only the
-exact SHA whose CI/deploy and dev health checks pass.
+No further action in this stage. Remaining work requires a separately authorized owner/live,
+research, or schema-migration boundary and was not folded into this dependency remediation.
 
 docs-reviewed: updated - stage and handoff record dependency and fail-closed CI policy truth;
 documentation-decision: L1 was queried first for lockfile-routed pnpm 8.15.0, Next 15.5.19, and

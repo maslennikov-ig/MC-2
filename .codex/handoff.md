@@ -48,10 +48,11 @@ research, and owner-decision items remain explicitly deferred.
 - Develop exact-SHA run `31357791241` deployed `50208b60a` to dev. API health and the English
   browser regression passed afterward with zero console messages and observed dynamic requests
   returning HTTP 200.
-- Dependency-security remediation for `mc2-0ukr6` is locally implementation-complete: the baseline
-  77 findings (9 low, 38 moderate, 29 high, 1 critical) are zero in full, production-only, and
-  dev-only audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Final
-  release acceptance and exact-SHA delivery evidence are pending; closed `mc2-bwx1o` remains closed.
+- Dependency-security remediation for `mc2-0ukr6` is accepted and delivered: the baseline 77
+  findings (9 low, 38 moderate, 29 high, 1 critical) are zero in full, production-only, and dev-only
+  audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Canonical release
+  acceptance passed; exact-SHA run `31364905125` deployed `d18910ee4` to dev, whose API returned
+  `status: ok` and homepage returned HTTP 200. Closed `mc2-bwx1o` remains closed.
 - The migration-drift jobs concluded successfully, but their optional database probe was skipped
   because the available connection required SSL. This release contains no schema migration and
   does not use that skipped probe as migration evidence.
@@ -165,26 +166,24 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-sshkz`
-Current stage id: `mc2-0ukr6`
-Next stage id: `owner-live-or-migration-boundary` after exact-SHA delivery.
-Recommended action: finish the root-owned release acceptance and exact-SHA develop delivery for
-`mc2-0ukr6`. Otherwise choose a separately authorized defer: provide the missing
+Accepted stage id: `mc2-0ukr6`
+Current stage id: `mc2-0ukr6` (accepted)
+Next stage id: `owner-live-or-migration-boundary`.
+Recommended action: choose a separately authorized defer only if desired: provide the missing
 `mc2-3gz2m` research, approve a concrete paid/live experiment budget and disposable inputs, or
 explicitly authorize a future schema-migration stage. Do not enable the RAG cohort, change the
-threshold, reindex, or migrate as part of this completed delivery.
+threshold, reindex, or migrate without that separate boundary.
 
 ## Starter prompt for next orchestrator
 
 Use $orchestrator-stage for the current Codex task.
 
-`mc2-0ukr6` has a local zero-finding dependency graph, fail-closed Security Audit and aggregate CI
-gate, reproducible frozen install, and focused compatibility evidence. Run its single canonical
-release closeout, then deliver only after a fresh fetch proves `origin/develop` is not ahead or
-diverged; confirm the exact pushed SHA through CI/deploy and read-only dev health. Staging remains at
-`123152924`. Explicit live-budget, missing-research, schema-migration, and §9 defers remain. Do not
+`mc2-0ukr6` is accepted at `d18910ee4`: all 77 dependency advisories are removed, Security Audit and
+the aggregate CI gate fail closed, release acceptance passed, and exact-SHA run `31364905125`
+deployed successfully to healthy dev API/Web endpoints. Staging remains at `123152924`. Choose only
+a separately authorized live-budget, missing-research, or schema-migration boundary next. Do not
 enable the cohort, change the threshold, reindex, migrate, force-push, or perform paid work without
-a separately authorized next stage.
+that separate authorization.
 
 ## Read first
 
