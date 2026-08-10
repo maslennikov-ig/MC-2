@@ -1,24 +1,26 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-0ukr6`
+Current stage id: `mc2-n4cog`
 
 ## Current stage
 
-`mc2-0ukr6` re-triages and remediates all advisories from the committed pnpm lockfile, classifies
-production versus development paths, and replaces the currently swallowed audit failure with an
-explicit enforced policy. Root owns all manifest, lockfile, CI-policy, acceptance, and delivery
-writes. Unrelated major upgrades, migrations, reindex, secrets/access changes, and paid or
-destructive live actions remain outside the boundary.
+`mc2-n4cog` closes the staging-deploy blocker discovered after the accepted dependency audit. The
+computationally heavy Stage 4 evidence checkpoint/resume unit test now has the repository-standard
+60-second per-test timeout; product code and the global unit timeout are unchanged. Root owns the
+single test correction, exact develop/master verification, and staging delivery. Migrations,
+reindex, secrets/access changes, and paid or destructive live actions remain outside the boundary.
 
-The accessible backlog plus the release-audit correction is delivered to `origin/develop` at
-`50208b60a`; the accessible backlog is deployed to staging in
-the `develop -> master` merge `123152924`. The exact-SHA develop pipeline
-[`31322960981`](https://github.com/maslennikov-ig/MC-2/actions/runs/31322960981) and staging
-pipeline [`31324154741`](https://github.com/maslennikov-ig/MC-2/actions/runs/31324154741) are green;
-the staging Blue/Green deploy, public health verification, monitoring drift check, and notification
-all succeeded, while rollback was correctly skipped. A separate read-only request to
-`https://ai.megacampus.ru/api/health` returned `{"status":"ok"}` after the workflow completed.
+The accessible backlog, release-audit correction, dependency remediation, and CI-timeout
+correction are delivered to `origin/develop` at `567566726` and deployed to staging in the
+`develop -> master` merge `e498451e8`. The exact-SHA develop pipeline
+[`31370658686`](https://github.com/maslennikov-ig/MC-2/actions/runs/31370658686) and forced-component
+staging pipeline [`31371888070`](https://github.com/maslennikov-ig/MC-2/actions/runs/31371888070)
+are green. The staging run kept all tests enabled, rebuilt web, API, NotebookLM bridge, and Qdrant
+operator images, completed the Blue/Green traffic switch, public and active-color health checks,
+monitoring drift check, and notification; rollback was correctly skipped. A separate read-only
+request to `https://ai.megacampus.ru/api/health` returned `{"status":"ok"}` and the homepage
+returned HTTP 200 after the workflow completed.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -53,12 +55,18 @@ research, and owner-decision items remain explicitly deferred.
   audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Canonical release
   acceptance passed; exact-SHA run `31364905125` deployed `d18910ee4` to dev, whose API returned
   `status: ok` and homepage returned HTTP 200. Closed `mc2-bwx1o` remains closed.
+- Staging deploy correction `mc2-n4cog` is accepted and delivered: the original master run
+  `31369687249` stopped safely before image build/deploy on a 30-second Stage 4 test timeout; the
+  same focused file passed 11/11 locally after the narrow 60-second per-test limit. Exact develop
+  run `31370658686` and exact master run `31371888070` then passed unit, integration, contract,
+  lint, type-check, security, build, all four image builds, Blue/Green deploy, public verification,
+  monitoring drift, and notification. Rollback was correctly skipped.
 - The migration-drift jobs concluded successfully, but their optional database probe was skipped
   because the available connection required SSL. This release contains no schema migration and
   does not use that skipped probe as migration evidence.
 - `graph-reviewed: updated` — local-only Graphify refresh after code commit `4474b6f45` contains
   61,495 nodes, 88,538 edges, and 7,335 communities. Later commits are acceptance metadata and the
-  delivery merge, so no second graph refresh is needed.
+  delivery merge; `mc2-n4cog` changes only one test timeout, so no second graph refresh is needed.
 
 - The default backend Vitest command is now fail-closed: an unmet Qdrant precondition and an empty
   run exit nonzero. It still requires the pinned Qdrant 1.18.2 precondition unless the operator
@@ -166,8 +174,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-0ukr6`
-Current stage id: `mc2-0ukr6` (accepted)
+Accepted stage id: `mc2-n4cog`
+Current stage id: `mc2-n4cog` (accepted)
 Next stage id: `owner-live-or-migration-boundary`.
 Recommended action: choose a separately authorized defer only if desired: provide the missing
 `mc2-3gz2m` research, approve a concrete paid/live experiment budget and disposable inputs, or
