@@ -10,26 +10,13 @@
 // 2026-07-31 commit that changed a single assertion in a 2147-line test file used --no-verify and
 // said so. Linting what the repo lints removes the reason to reach for --no-verify at all.
 //
-// Formatting is unchanged and still covers everything staged, tests included.
-const LINTED = [
-  /^packages\/course-gen-platform\/src\//,
-  /^packages\/shared-types\/src\//,
-  /^packages\/web\//,
-];
-
-const isLinted = file => LINTED.some(root => root.test(file.split(`${process.cwd()}/`).pop()));
+// Formatting still covers every staged source/test file. Ignored goal snapshots are handled by the
+// exact-path helper before lint-staged so its ordinary restaging cannot drop them.
+import { buildTypeScriptCommands } from './scripts/precommit/staged-file-policy.mjs';
 
 export default {
-  '*.{ts,tsx}': files => {
-    const lintable = files.filter(isLinted);
-    return [
-      ...(lintable.length
-        ? [`eslint --fix ${lintable.map(file => JSON.stringify(file)).join(' ')}`]
-        : []),
-      `prettier --write ${files.map(file => JSON.stringify(file)).join(' ')}`,
-    ];
-  },
-  '*.{json,md,yml,yaml}': files => [
+  '*.{ts,tsx}': files => buildTypeScriptCommands(files),
+  '!(.codex/goals/**/*).{json,md,yml,yaml}': files => [
     `prettier --write ${files.map(file => JSON.stringify(file)).join(' ')}`,
   ],
 };

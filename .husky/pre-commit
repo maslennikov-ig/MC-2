@@ -1,5 +1,6 @@
 # eslint --fix on a large type-checked file OOMs at Node's default heap (FATAL ERROR: Ineffective
 # mark-compacts near heap limit), which killed this hook rather than reporting a lint result. Give
 # every child a heap that survives the biggest file in the tree; an explicit NODE_OPTIONS still wins.
+node scripts/precommit/format-tracked-goal-snapshots.mjs
 NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}" pnpm lint-staged --no-stash
 bd hooks run pre-commit 2>/dev/null || true

@@ -1,16 +1,15 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3gz2m.3`
+Current stage id: `mc2-vr7ic`
 
 ## Current stage
 
-`mc2-3gz2m.3` accepted the owner-authorized final tiled EasyOCR measurement. The exact current Docling
-image was OOM-killed before its first 768-pt direct-clip tile at a 6-GiB no-swap hard limit. This is
-already above both the 2.8-GiB fallback and 4-GiB service gates, so no tiled product fallback is
-admissible and `EmptyConversionError` remains unchanged. The parent capability closed by its
-pre-registered measured-rejection path. The local measurement used the unchanged
-36-label corpus and performed no cloud/paid OCR, production retry, reindex, migration or live action.
+`mc2-vr7ic` is accepted with `mc2-xq2w0`: normal pre-commit now accepts format-only canonical
+source and deliberately tracked ignored goal snapshots without weakening ESLint for semantic
+source changes. Closeout ignores debt markers only in exact test-fixture paths; production markers
+remain blocking. Focused red/green tests and the real staged hook pass. There are no delegated
+worktrees or application-code changes.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -153,12 +152,6 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
   `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
   specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
-- Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
-  `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
-  validator fixtures unchanged in meaning.
-- Beads task `mc2-vr7ic` — make the pre-commit hook handle formatting-only legacy batches and
-  deliberately tracked `.codex/goals` snapshots without requiring unrelated lint cleanup or a
-  manual hook bypass.
 - `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
@@ -172,18 +165,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-3gz2m.3`
-Current stage id: `mc2-3gz2m.3`
-Next stage id: selected only from an authorized owner/live/migration boundary.
-Recommended action: preserve the actionable rejection. A future GPU/managed OCR or editable-source
-policy is a new owner decision, not unfinished work in this accepted stage.
+Accepted stage id: `mc2-vr7ic`
+Current stage id: `mc2-vr7ic`
+Next stage id: `mc2-p2908.1`
+Recommended action: trace the existing Node `DEP0169 url.parse()` warning from the successful web
+production build, then either remove it through a compatible upstream change or close it with the
+exact package/call-site and upstream version gate.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the current Codex task. Select only an authorized live-budget,
-research or migration boundary.
-Do not enable the cohort, change its threshold, reindex, migrate, force-push or perform paid work
-without separate authorization.
+Use $orchestrator-stage for `mc2-p2908.1`. Trace the existing Node `DEP0169 url.parse()` warning
+from the successful web production build and resolve or precisely reclassify it from first-party
+versioned evidence. Do not enable the cohort, change its threshold, reindex, migrate, force-push,
+deploy or perform paid work without separate authorization.
 
 ## Read first
 
