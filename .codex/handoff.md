@@ -1,27 +1,24 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3gz2m`
+Current stage id: `mc2-3gz2m.1`
 
 ## Current stage
 
-`mc2-3gz2m` is accepted as a measured rejection. On 36 real labels, direct full-resolution crops
-improved mean character similarity from 0.1181 to 0.3551 versus the 0.1986 control, but recovered
-only 1/36 labels at similarity 0.8 and none of 16 small-body labels. This fails the pre-registered
-0.90/95% quality gate before tiling. No product fallback was added; the existing actionable
-`EmptyConversionError` path remains. The reproducible protocol and sanitized aggregate evidence
-are in `specs/025-remaining-debt/research-findings.md`.
+`mc2-3gz2m.1` completed and accepted its bounded alternative-engine comparison.
+No local CPU candidate passed every unchanged gate: EasyOCR preprocessing peaked at 1/36 labels;
+PaddleOCR was best at 19/36 labels and 10/16 small labels; Surya classic exceeded the 2.8-GiB load
+limit; PaddleOCR-VL 1.6 recognized a crop but exceeded 180 seconds for a complete 1x page. No
+product adapter was added, and the existing actionable `EmptyConversionError` remains. The parent
+capability `mc2-3gz2m` stays open for an owner choice among a larger/GPU VLM host, managed paid OCR,
+or an editable-source/text-layer requirement. Sanitized evidence is in
+`specs/025-remaining-debt/alternative-ocr-findings.md`. No cloud/paid OCR, production retry,
+reindex, migration, delivery or live action occurred.
 
-The accessible backlog, release-audit correction, dependency remediation, and CI-timeout
-correction are delivered to `origin/develop` at `567566726` and deployed to staging in the
-`develop -> master` merge `e498451e8`. The exact-SHA develop pipeline
-[`31370658686`](https://github.com/maslennikov-ig/MC-2/actions/runs/31370658686) and forced-component
-staging pipeline [`31371888070`](https://github.com/maslennikov-ig/MC-2/actions/runs/31371888070)
-are green. The staging run kept all tests enabled, rebuilt web, API, NotebookLM bridge, and Qdrant
-operator images, completed the Blue/Green traffic switch, public and active-color health checks,
-monitoring drift check, and notification; rollback was correctly skipped. A separate read-only
-request to `https://ai.megacampus.ru/api/health` returned `{"status":"ok"}` and the homepage
-returned HTTP 200 after the workflow completed.
+The accessible backlog, release audit, dependency remediation and CI-timeout correction are
+delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
+staging run `31371888070` are green; Blue/Green switching, public/active-color health and monitoring
+checks passed, and the API health endpoint plus homepage were healthy afterward.
 
 The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
 health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
@@ -107,9 +104,10 @@ research, and owner-decision items remain explicitly deferred.
 - Tier 1 exits have a stable, zero-default shadow cohort. Complete `tier1_shadow` traces expose the
   raw dense gate score and exact active-hybrid Tier 2 result count without content or result impact;
   invalid rates fail closed and the active threshold remains 0.15.
-- Oversized outlined Russian PDFs now have a measured decision: the current pinned EasyOCR cannot
-  read the representative font reliably even from direct 216-DPI crops. The task is closed without
-  a fallback; a different recognition capability requires a separately authorized stage.
+- The alternative OCR child `mc2-3gz2m.1` exhausts the safe local CPU candidates: EasyOCR and
+  PaddleOCR fail quality, Surya fails the load-memory gate, and PaddleOCR-VL fails whole-page
+  latency. This closes only the experiment by measurement; parent capability `mc2-3gz2m` remains
+  open and no fallback was shipped.
 
 ## Live operational facts
 
@@ -132,6 +130,8 @@ research, and owner-decision items remain explicitly deferred.
 - `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
 - `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
+- `mc2-3gz2m` — choose between a larger/GPU VLM host, managed paid OCR, or requiring an editable
+  source/text layer for oversized outlined-text PDFs.
 
 ## Safety boundary
 
@@ -165,6 +165,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
+- `mc2-3gz2m` — the bounded local CPU search is exhausted; every remaining path changes cost,
+  infrastructure, or accepted-input policy and therefore belongs to the owner decision above.
 - `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
   page-data workers during an otherwise successful production build.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
@@ -174,23 +176,19 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-3gz2m`
-Current stage id: `mc2-3gz2m`
-Next stage id: selected only after this slice accepts.
-Recommended action: choose the next item from the specification; do not continue EasyOCR tiling,
-enable the RAG cohort, change its threshold, reindex, migrate, run a paid model, or deploy as part
-of this accepted stage.
+Accepted stage id: `mc2-3gz2m.1`
+Current stage id: `mc2-3gz2m.1`
+Next stage id: selected only after the `mc2-3gz2m` owner decision.
+Recommended action: choose the next recognition policy; do not add PaddleOCR merely because it was
+best among failed candidates. Do not enable the RAG cohort, change its threshold, reindex, migrate,
+run a paid model, or deploy as part of this stage.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the current Codex task.
-
-`mc2-0ukr6` is accepted at `d18910ee4`: all 77 dependency advisories are removed, Security Audit and
-the aggregate CI gate fail closed, release acceptance passed, and exact-SHA run `31364905125`
-deployed successfully to healthy dev API/Web endpoints. Staging remains at `123152924`. Choose only
-a separately authorized live-budget, missing-research, or schema-migration boundary next. Do not
-enable the cohort, change the threshold, reindex, migrate, force-push, or perform paid work without
-that separate authorization.
+Use $orchestrator-stage for the current Codex task. Select only an authorized live-budget,
+research or migration boundary.
+Do not enable the cohort, change its threshold, reindex, migrate, force-push or perform paid work
+without separate authorization.
 
 ## Read first
 

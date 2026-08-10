@@ -11,10 +11,9 @@ import resource
 import time
 from pathlib import Path
 
-import easyocr
 import numpy as np
 import pypdfium2 as pdfium
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 def normalize(value: str) -> str:
@@ -71,6 +70,50 @@ def best_window(output: str, phrase: str) -> tuple[str, float]:
     return best_text, max(0.0, best_score)
 
 
+def otsu_threshold(image: Image.Image) -> Image.Image:
+    grayscale = image.convert("L")
+    histogram = grayscale.histogram()
+    total = sum(histogram)
+    weighted_total = sum(index * count for index, count in enumerate(histogram))
+    background_count = 0
+    background_weight = 0
+    best_variance = -1.0
+    threshold = 127
+
+    for index, count in enumerate(histogram):
+        background_count += count
+        if background_count == 0:
+            continue
+        foreground_count = total - background_count
+        if foreground_count == 0:
+            break
+        background_weight += index * count
+        background_mean = background_weight / background_count
+        foreground_mean = (
+            weighted_total - background_weight
+        ) / foreground_count
+        variance = (
+            background_count
+            * foreground_count
+            * (background_mean - foreground_mean) ** 2
+        )
+        if variance > best_variance:
+            best_variance = variance
+            threshold = index
+
+    return grayscale.point(lambda value: 255 if value > threshold else 0)
+
+
+def preprocess_image(image: Image.Image, mode: str) -> Image.Image:
+    if mode == "rgb":
+        return image
+    if mode == "autocontrast":
+        return ImageOps.autocontrast(image.convert("L"))
+    if mode == "otsu":
+        return otsu_threshold(image)
+    raise ValueError(f"unsupported preprocessing mode: {mode}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("pdf", type=Path)
@@ -89,6 +132,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--linear-downscale", type=float, default=0.1986)
     parser.add_argument("--canvas-size", type=int, default=2560)
     parser.add_argument(
+        "--preprocess",
+        choices=("rgb", "autocontrast", "otsu"),
+        default="rgb",
+    )
+    parser.add_argument(
+        "--decoder", choices=("greedy", "beamsearch", "wordbeamsearch"), default="greedy"
+    )
+    parser.add_argument("--text-threshold", type=float, default=0.7)
+    parser.add_argument("--low-text", type=float, default=0.4)
+    parser.add_argument("--link-threshold", type=float, default=0.4)
+    parser.add_argument("--contrast-ths", type=float, default=0.1)
+    parser.add_argument("--adjust-contrast", type=float, default=0.5)
+    parser.add_argument(
         "--model-storage-directory",
         default="/opt/app-root/src/.cache/docling/models/EasyOcr",
     )
@@ -97,6 +153,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    import easyocr
+
     labels = json.loads(args.ground_truth.read_text(encoding="utf-8"))
     if not 30 <= len(labels) <= 50:
         raise ValueError("ground truth must contain 30-50 labels")
@@ -132,13 +190,20 @@ def main() -> None:
                 ),
                 Image.Resampling.LANCZOS,
             )
+        image = preprocess_image(image, args.preprocess)
 
         ocr_started = time.monotonic()
         detections = reader.readtext(
             np.asarray(image),
             detail=1,
+            decoder=args.decoder,
             canvas_size=args.canvas_size,
             mag_ratio=1.0,
+            text_threshold=args.text_threshold,
+            low_text=args.low_text,
+            link_threshold=args.link_threshold,
+            contrast_ths=args.contrast_ths,
+            adjust_contrast=args.adjust_contrast,
         )
         ocr_finished = time.monotonic()
         output = " ".join(text for _, text, _ in detections)
@@ -164,6 +229,15 @@ def main() -> None:
         "mode": args.mode,
         "engine": {"easyocr": "1.7.2", "pypdfium2": "5.12.1"},
         "render_scale": args.render_scale,
+        "preprocess": args.preprocess,
+        "decoder": args.decoder,
+        "detector_thresholds": {
+            "text_threshold": args.text_threshold,
+            "low_text": args.low_text,
+            "link_threshold": args.link_threshold,
+            "contrast_ths": args.contrast_ths,
+            "adjust_contrast": args.adjust_contrast,
+        },
         "linear_downscale": (
             args.linear_downscale if args.mode == "downscaled" else 1.0
         ),

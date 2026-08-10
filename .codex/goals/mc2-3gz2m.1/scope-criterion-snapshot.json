@@ -1,0 +1,34 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-3gz2m.1",
+  "source_kind": "beads",
+  "source_id": "mc2-3gz2m.1",
+  "source_digest": "be8a22d6213f366c94ac0ffb3154d289b101ab8b7947afc3fa010efa91833902",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "The plan records candidate classes, exact versions/docs, resource limits, evaluation order, stop rules, and unchanged corpus/metrics.",
+      "text_digest": "6544035f7713a2d224c3fef1fae600970b6381cc096bbe1acecaebb3e86bb4ac"
+    },
+    {
+      "criterion_id": "AC-2",
+      "text": "EasyOCR preprocessing and PaddleOCR are scored on the same 36 labels; Surya and PaddleOCR-VL are scored or rejected by the unchanged load-memory/page-latency gates with measured evidence.",
+      "text_digest": "88b63b66ebeb59b825d9f069122d5b453fa5518169ebfac86657ca3c021e75be"
+    },
+    {
+      "criterion_id": "AC-3",
+      "text": "A selected path must reach label recall >=95% at similarity >=0.8, mean character similarity >=0.90, recover at least 15/16 small-body labels without a systematic class loss, finish <180s/page, use <2.8GiB fallback RSS and keep projected service RSS <4GiB.",
+      "text_digest": "21c5f35586aeb7908cc1b219f689df4d8275ea2cbff47c90f66d0d92ec453e5f"
+    },
+    {
+      "criterion_id": "AC-4",
+      "text": "Any shipped adapter is on-demand, concurrency-one, fail-closed, and covered by a focused failing proof; otherwise existing EmptyConversionError remains and the parent capability stays open.",
+      "text_digest": "c6507d876540e87dc544a8dc9b54352c8d96b764b6288d9524824ce3fd806cff"
+    },
+    {
+      "criterion_id": "AC-5",
+      "text": "Saved sanitized measurements, focused tests, pnpm type-check, pnpm build, and process verification pass; no forbidden live, paid, schema, delivery, or destructive action occurs.",
+      "text_digest": "94a8b9a21ec8b5b73bbfc0556cb57b72b5c254632f59a44a36d7aabedc886a4b"
+    }
+  ]
+}

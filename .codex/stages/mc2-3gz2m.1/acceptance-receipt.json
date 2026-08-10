@@ -1,0 +1,38 @@
+{
+  "command_results": [
+    {
+      "command": "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py",
+      "duration_seconds": 0.053,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm type-check && pnpm build",
+      "deprecations": [
+        "packages/web build: (node:52842) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:52863) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:52880) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:52891) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:53300) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "packages/web build: (node:53294) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 225.241,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py",
+    "pnpm type-check && pnpm build"
+  ],
+  "completed_at": "2026-08-10T12:28:18.474682+00:00",
+  "diff_digest": "d8e73d35505c3ac671ef8437db6e4c547259521e80821a95cedaedf46f4ce656",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "1e34a10600aca1bd7661141f0da6f2ec28fbf76e",
+  "idempotency_key": "6cf47d3bc0520de4b1d3c0d715e7ba68d88ff49524ebc0adf95d509893ba5959",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-3gz2m.1",
+  "started_at": "2026-08-10T12:24:32.986545+00:00",
+  "verification_fingerprint": "6cf47d3bc0520de4b1d3c0d715e7ba68d88ff49524ebc0adf95d509893ba5959"
+}
