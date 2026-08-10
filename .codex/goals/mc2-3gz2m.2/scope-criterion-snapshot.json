@@ -1,0 +1,14 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-3gz2m.2",
+  "source_kind": "beads",
+  "source_id": "mc2-3gz2m.2",
+  "source_digest": "1d499d4ab7fd0db90082ba5b23f9c6614aa3038d45354fbdcd79ba15b03127b1",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "Same stored SHA-256 corpus is used; Docling-native RapidOCR result is scored against all 36 labels; report recall at similarity 0.8, mean character similarity, small-label recovery, wall time, peak RSS/cgroup result, and timeout/OOM state. Add a product profile only if recall >=95%, mean similarity >=0.90, small labels >=15/16, wall <180s, RSS <2.8 GiB, and projected service <4 GiB; otherwise close this child by measurement and leave mc2-3gz2m open.",
+      "text_digest": "41a6c904dc26233dd4718bdead2c3a164a2dab2dc1710b9cb203bd3f7c14ccfc"
+    }
+  ]
+}

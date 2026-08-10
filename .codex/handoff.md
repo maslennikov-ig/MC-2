@@ -1,19 +1,17 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3gz2m.1`
+Current stage id: `mc2-3gz2m.2`
 
 ## Current stage
 
-`mc2-3gz2m.1` completed and accepted its bounded alternative-engine comparison.
-No local CPU candidate passed every unchanged gate: EasyOCR preprocessing peaked at 1/36 labels;
-PaddleOCR was best at 19/36 labels and 10/16 small labels; Surya classic exceeded the 2.8-GiB load
-limit; PaddleOCR-VL 1.6 recognized a crop but exceeded 180 seconds for a complete 1x page. No
-product adapter was added, and the existing actionable `EmptyConversionError` remains. The parent
-capability `mc2-3gz2m` stays open for an owner choice among a larger/GPU VLM host, managed paid OCR,
-or an editable-source/text-layer requirement. Sanitized evidence is in
-`specs/025-remaining-debt/alternative-ocr-findings.md`. No cloud/paid OCR, production retry,
-reindex, migration, delivery or live action occurred.
+`mc2-3gz2m.2` completed the final official Docling-native OCR check. The exact current Docling Serve
+1.30.0 / Docling 2.118.0 image ran RapidOCR 3.9.2 with PP-OCRv5 Cyrillic in `FULL_PAGE` mode at
+scale 3.0. It passed the fixed time and memory gates but recovered 0/36 labels and 0/16 small labels,
+returning only 14 characters and no Cyrillic. No product profile was added, and the existing
+actionable `EmptyConversionError` remains. The parent capability `mc2-3gz2m` stays open; sanitized
+evidence is in `specs/025-remaining-debt/alternative-ocr-findings.md`. No cloud/paid OCR,
+production retry, reindex, migration, delivery or live action occurred.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -108,6 +106,9 @@ research, and owner-decision items remain explicitly deferred.
   PaddleOCR fail quality, Surya fails the load-memory gate, and PaddleOCR-VL fails whole-page
   latency. This closes only the experiment by measurement; parent capability `mc2-3gz2m` remains
   open and no fallback was shipped.
+- The follow-up `mc2-3gz2m.2` proves the built-in official path is not the missing solution:
+  Docling-native RapidOCR PP-OCRv5 Cyrillic finished in 87.78 seconds at 2,719,920 KiB process RSS
+  and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
 
 ## Live operational facts
 
@@ -130,8 +131,9 @@ research, and owner-decision items remain explicitly deferred.
 - `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
 - `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
-- `mc2-3gz2m` — choose between a larger/GPU VLM host, managed paid OCR, or requiring an editable
-  source/text layer for oversized outlined-text PDFs.
+- `mc2-3gz2m` — the official built-in RapidOCR path is now also measured and rejected. Choose
+  between implementing page tiling, a larger/GPU VLM host, managed paid OCR, or requiring an
+  editable source/text layer for oversized outlined-text PDFs.
 
 ## Safety boundary
 
@@ -165,8 +167,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
-- `mc2-3gz2m` — the bounded local CPU search is exhausted; every remaining path changes cost,
-  infrastructure, or accepted-input policy and therefore belongs to the owner decision above.
+- `mc2-3gz2m` — built-in full-page OCR and the bounded alternative-engine search are exhausted.
+  Page tiling remains unimplemented; other paths change cost, infrastructure, or input policy.
 - `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
   page-data workers during an otherwise successful production build.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
@@ -176,12 +178,13 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-3gz2m.1`
-Current stage id: `mc2-3gz2m.1`
+Accepted stage id: `mc2-3gz2m.2`
+Current stage id: `mc2-3gz2m.2`
 Next stage id: selected only after the `mc2-3gz2m` owner decision.
-Recommended action: choose the next recognition policy; do not add PaddleOCR merely because it was
-best among failed candidates. Do not enable the RAG cohort, change its threshold, reindex, migrate,
-run a paid model, or deploy as part of this stage.
+Recommended action: choose whether to implement a bounded page-tiling prototype or change the
+recognition/input policy. Do not add RapidOCR or PaddleOCR merely because they were official or best
+among failed candidates. Do not enable the RAG cohort, change its threshold, reindex, migrate, run a
+paid model, or deploy as part of this stage.
 
 ## Starter prompt for next orchestrator
 

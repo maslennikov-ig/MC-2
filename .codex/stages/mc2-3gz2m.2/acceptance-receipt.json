@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py scripts/benchmarks/outlined_pdf_docling_rapidocr.py",
+      "duration_seconds": 0.05,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "python3 -m py_compile scripts/benchmarks/outlined_pdf_ocr_ab.py scripts/benchmarks/outlined_pdf_paddleocr.py scripts/benchmarks/outlined_pdf_surya.py scripts/benchmarks/outlined_pdf_docling_rapidocr.py"
+  ],
+  "completed_at": "2026-08-10T12:59:07.750301+00:00",
+  "diff_digest": "6133e7c74135a3261be6131346c15f8b2bb944f5c8904ed52a10812c30aa0884",
+  "environment_marker": "Linux-x86_64-python-3.14",
+  "git_head": "1357e8c712106c2b32226baf8fdd29cee2ca8e72",
+  "idempotency_key": "2b066026219772701bbaf165d6b40387d6e5cc2cf9d156fce7a1a93f47063d24",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-3gz2m.2",
+  "started_at": "2026-08-10T12:59:07.464812+00:00",
+  "verification_fingerprint": "2b066026219772701bbaf165d6b40387d6e5cc2cf9d156fce7a1a93f47063d24"
+}

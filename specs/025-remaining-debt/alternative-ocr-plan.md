@@ -128,6 +128,11 @@ recorded in `alternative-ocr-findings.md`.
   recognition model, before an inference could be scored.
 - PaddleOCR-VL 1.6 loaded and recognized a single crop below the memory cap,
   but a complete 1x page did not finish inside 180 seconds.
+- The official Docling-native RapidOCR 3.9.2 path with PP-OCRv5 Cyrillic,
+  `FULL_PAGE` mode and scale 3.0 finished in 87.78 seconds inside the process
+  and service memory gates, but recovered 0/36 labels and 0/16 small labels.
+  It returned 14 characters with no Cyrillic text, so no service profile was
+  added.
 
 The remaining solution types are intentionally owner-owned because they change
 cost, infrastructure or accepted input policy: run a stronger VLM on a larger

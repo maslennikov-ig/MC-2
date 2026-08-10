@@ -35,6 +35,7 @@ source/text-layer requirement.
 | PaddleOCR 3.7.0 / PaddlePaddle 3.3.0, PP-OCRv5 mobile detector + Cyrillic recognizer | 36 direct crops            |                                       19/36 (52.78%) |          0.6528 | 10/16 (62.5%) | 66.11 s / 746,804 KiB                             | reject quality      |
 | Surya OCR 0.17.0 classic                                                             | bounded model-load probe   |                                           not scored |      not scored |    not scored | exited 137 inside 2.8-GiB cap                     | reject memory       |
 | PaddleOCR-VL 1.6, revision `c5630abae1d940eafe0697512a0325494b02ab42`                | one crop, then one 1x page | crop contained the expected heading; page not scored |      not scored |    not scored | crop 65.38 s / 2,177,528 KiB; page exceeded 180 s | reject page latency |
+| Docling 2.118.0 / RapidOCR 3.9.2, PP-OCRv5 Cyrillic, ONNX, `FULL_PAGE`, scale 3.0    | complete 1x page           |                                                 0/36 |          0.0289 |          0/16 | 87.78 s / 2,719,920 KiB; cgroup peak 3.50 GiB     | reject quality      |
 
 PaddleOCR initially hit a oneDNN conversion failure; setting the documented
 `enable_mkldnn=False` CPU option made the fixed model configuration runnable.
@@ -42,6 +43,15 @@ Surya 0.17.0 also required `requests==2.34.2` and
 `transformers==4.56.1` because its published dependency set otherwise installed
 an incompatible Transformers 5.x runtime. Those compatibility repairs did not
 change the unchanged resource gate.
+
+The final built-in Docling check used the repository's exact Docling Serve
+1.30.0 image, Docling Slim 2.118.0, Docling Core 2.90.0 and the official
+`cyrillic_PP-OCRv5_rec_mobile` checkpoint. It finished with only 14 output
+characters and zero Cyrillic characters. A 2.8-GiB whole-container run was OOM
+killed after 89 seconds; the decisive run used the repository's 4-GiB service
+limit and peaked at 3,759,906,816 cgroup bytes while the Python process stayed
+below the separate 2.8-GiB RSS gate. It therefore passed the fixed time and
+memory gates and failed only recognition quality.
 
 ## Reproduction
 
@@ -62,6 +72,12 @@ python scripts/benchmarks/outlined_pdf_paddleocr.py \
 python scripts/benchmarks/outlined_pdf_surya.py \
   .tmp/mc2-3gz2m/representative.pdf \
   .tmp/mc2-3gz2m/ground-truth.json --limit-labels 1
+
+python scripts/benchmarks/outlined_pdf_docling_rapidocr.py \
+  .tmp/mc2-3gz2m/representative.pdf \
+  .tmp/mc2-3gz2m/ground-truth.json \
+  --scale 3.0 \
+  --output .tmp/mc2-3gz2m/rapidocr-docling-full-page.json
 ```
 
 Apply the host envelope outside the runner (container/cgroup): four CPUs,
@@ -73,5 +89,6 @@ without proprietary inputs with:
 python3 -m py_compile \
   scripts/benchmarks/outlined_pdf_ocr_ab.py \
   scripts/benchmarks/outlined_pdf_paddleocr.py \
-  scripts/benchmarks/outlined_pdf_surya.py
+  scripts/benchmarks/outlined_pdf_surya.py \
+  scripts/benchmarks/outlined_pdf_docling_rapidocr.py
 ```
