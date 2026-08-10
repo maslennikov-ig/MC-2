@@ -8,7 +8,10 @@ Current stage id: `mc2-ve1eq`
 `mc2-ve1eq` is accepted locally. The repository and active CI now pin pnpm 10.34.5; frozen install
 and audit are clean under Node 24, the v9 lockfile migration is reproducible, and a clean temporary
 clone passed all reviewed dependency build scripts plus backend/web production builds. New
-unreviewed dependency build scripts fail closed. There are no delegated worktrees or live actions.
+unreviewed dependency build scripts fail closed. The pnpm 10 Docker delivery correction explicitly
+preserves the existing non-injected workspace deployment through `forceLegacyDeploy`; the real
+backend deploy command produces a portable package again. There are no delegated worktrees or live
+actions.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -111,7 +114,8 @@ research, and owner-decision items remain explicitly deferred.
   passes the complete web build.
 - The package-manager `DEP0169` warning is also removed: pnpm 10.34.5 is pinned in the manifest and
   active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
-  build policy and explicit-script-only workspace behavior pass a clean-install/build proof.
+  build policy, explicit-script-only workspace behavior and legacy-compatible portable backend
+  deploy pass focused clean-install/build/deploy proofs.
 
 ## Live operational facts
 
