@@ -1,0 +1,28 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm install --frozen-lockfile --offline && pnpm type-check && NODE_OPTIONS=--trace-deprecation pnpm build && pnpm audit --json",
+      "deprecations": [
+        "(node:29383) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+        "(node:29382) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      ],
+      "duration_seconds": 276.12,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm install --frozen-lockfile --offline && pnpm type-check && NODE_OPTIONS=--trace-deprecation pnpm build && pnpm audit --json"
+  ],
+  "completed_at": "2026-08-10T15:31:27.253204+00:00",
+  "diff_digest": "cecd86f8a3c84f626abdfa6fb7621549cfa8d73950ada20d2632c894d58a6e54",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=8.15.0",
+  "git_head": "2d624cd97985d7644ac062c4b47f9702619068f0",
+  "idempotency_key": "8a6d198a823243289ec1c3f13ef9e0f694d3a13b10c9ef919cff6d1b835d5c45",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-p2908.1",
+  "started_at": "2026-08-10T15:26:50.767266+00:00",
+  "verification_fingerprint": "8a6d198a823243289ec1c3f13ef9e0f694d3a13b10c9ef919cff6d1b835d5c45"
+}

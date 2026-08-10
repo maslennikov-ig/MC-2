@@ -1,0 +1,44 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-p2908.1",
+  "goal_id": "mc2-p2908.1",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "node-dep0169-build-trace",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["web-production-build", "node-deprecation-diagnostics"],
+    "risk_models": ["blind-dependency-upgrade", "false-resolution", "build-regression"],
+    "test_environments": ["local-node-24-production-build"],
+    "rollback_boundary": "revert-proven-change-or-record-upstream-gate",
+    "acceptance_proofs": ["trace-deprecation-call-site", "warning-free-build-or-explicit-upstream-version-gate"]
+  },
+  "work_areas": ["diagnosis", "documentation", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-p2908.1",
+    "source_digest": "a9d7ae31eaf420431390f29e41ab66839399223adc871548da67cd0b2e470622",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "pnpm build completes without DEP0169 url.parse() warnings, or the warning is reclassified with traced package/call-site evidence and an explicit upstream/version gate.",
+        "text_digest": "577d85253d23f4a83d29081055ca3d8b39222cbb88aaf971ec18f2d5979a747b"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-p2908.1/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "a9d7ae31eaf420431390f29e41ab66839399223adc871548da67cd0b2e470622",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-p2908.1/artifacts/mc2-p2908.1.md",
+      "task_id": "mc2-p2908.1",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

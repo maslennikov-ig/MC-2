@@ -98,7 +98,7 @@
     "framer-motion": "^12.33.0",
     "html-entities": "^2.6.0",
     "immer": "^11.0.1",
-    "ioredis": "^5.8.2",
+    "ioredis": "^5.11.1",
     "isomorphic-dompurify": "^2.34.0",
     "json-diff-kit": "^1.0.34",
     "lucide-react": "~0.563.0",

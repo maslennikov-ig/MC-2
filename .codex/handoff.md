@@ -1,15 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-vr7ic`
+Current stage id: `mc2-p2908.1`
 
 ## Current stage
 
-`mc2-vr7ic` is accepted with `mc2-xq2w0`: normal pre-commit now accepts format-only canonical
-source and deliberately tracked ignored goal snapshots without weakening ESLint for semantic
-source changes. Closeout ignores debt markers only in exact test-fixture paths; production markers
-remain blocking. Focused red/green tests and the real staged hook pass. There are no delegated
-worktrees or application-code changes.
+`mc2-p2908.1` is accepted locally. The repeated Node 24 `DEP0169 url.parse()` warning in the Next
+15.5.21 production build was traced to `ioredis@5.8.2` and removed with the compatible aligned pair
+`ioredis@5.11.1` / `bullmq@5.80.4`. Type-check, strict web production build, Redis URL parsing smoke
+and zero-vulnerability audit pass. There are no delegated worktrees or live actions.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -107,6 +106,10 @@ research, and owner-decision items remain explicitly deferred.
 - The follow-up `mc2-3gz2m.2` proves the built-in official path is not the missing solution:
   Docling-native RapidOCR PP-OCRv5 Cyrillic finished in 87.78 seconds at 2,719,920 KiB process RSS
   and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
+- The web production build's Node `DEP0169` warning was traced to ioredis 5.8.2. Direct ioredis
+  dependencies and BullMQ are aligned on ioredis 5.11.1; `NODE_OPTIONS=--throw-deprecation` now
+  passes the complete web build. The remaining package-manager warning is separately tracked as
+  `mc2-ve1eq` and originates inside Corepack's pnpm 8.15.0 bundle before workspace code runs.
 
 ## Live operational facts
 
@@ -156,8 +159,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
-- `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
-  page-data workers during an otherwise successful production build.
+- `mc2-ve1eq` — upgrade the repository package-manager line through a compatible lockfile boundary;
+  pnpm 8.15.0 itself calls `url.parse()` under Node 24 during install/audit commands.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
   reconsider only if another regular production operator appears.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -165,19 +168,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-vr7ic`
-Current stage id: `mc2-vr7ic`
-Next stage id: `mc2-p2908.1`
-Recommended action: trace the existing Node `DEP0169 url.parse()` warning from the successful web
-production build, then either remove it through a compatible upstream change or close it with the
-exact package/call-site and upstream version gate.
+Accepted stage id: `mc2-p2908.1`
+Current stage id: `mc2-p2908.1`
+Next stage id: `mc2-ve1eq`
+Recommended action: upgrade the repository package-manager line through a compatible tested
+lockfile boundary so Node 24 package-manager commands no longer emit `DEP0169`.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-p2908.1`. Trace the existing Node `DEP0169 url.parse()` warning
-from the successful web production build and resolve or precisely reclassify it from first-party
-versioned evidence. Do not enable the cohort, change its threshold, reindex, migrate, force-push,
-deploy or perform paid work without separate authorization.
+Use $orchestrator-stage for `mc2-ve1eq`. Upgrade the repository package-manager line through a
+compatible tested lockfile boundary and prove frozen install, audit, type-check and build under the
+repository Node runtime. Do not enable the cohort, change its threshold, reindex, migrate,
+force-push, deploy or perform paid work without separate authorization.
 
 ## Read first
 
