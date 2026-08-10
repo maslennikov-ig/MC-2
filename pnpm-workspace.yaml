@@ -1,2 +1,13 @@
 packages:
   - 'packages/*'
+
+strictDepBuilds: true
+enablePrePostScripts: false
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  bcrypt: true
+  esbuild: true
+  msgpackr-extract: true
+  unrs-resolver: true

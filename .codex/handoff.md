@@ -1,14 +1,14 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-p2908.1`
+Current stage id: `mc2-ve1eq`
 
 ## Current stage
 
-`mc2-p2908.1` is accepted locally. The repeated Node 24 `DEP0169 url.parse()` warning in the Next
-15.5.21 production build was traced to `ioredis@5.8.2` and removed with the compatible aligned pair
-`ioredis@5.11.1` / `bullmq@5.80.4`. Type-check, strict web production build, Redis URL parsing smoke
-and zero-vulnerability audit pass. There are no delegated worktrees or live actions.
+`mc2-ve1eq` is accepted locally. The repository and active CI now pin pnpm 10.33.4; frozen install
+and audit are clean under Node 24, the v9 lockfile migration is reproducible, and a clean temporary
+clone passed all reviewed dependency build scripts plus backend/web production builds. New
+unreviewed dependency build scripts fail closed. There are no delegated worktrees or live actions.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -108,8 +108,10 @@ research, and owner-decision items remain explicitly deferred.
   and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
 - The web production build's Node `DEP0169` warning was traced to ioredis 5.8.2. Direct ioredis
   dependencies and BullMQ are aligned on ioredis 5.11.1; `NODE_OPTIONS=--throw-deprecation` now
-  passes the complete web build. The remaining package-manager warning is separately tracked as
-  `mc2-ve1eq` and originates inside Corepack's pnpm 8.15.0 bundle before workspace code runs.
+  passes the complete web build.
+- The package-manager `DEP0169` warning is also removed: pnpm 10.33.4 is pinned in the manifest and
+  active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
+  build policy and explicit-script-only workspace behavior pass a clean-install/build proof.
 
 ## Live operational facts
 
@@ -159,8 +161,6 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
-- `mc2-ve1eq` — upgrade the repository package-manager line through a compatible lockfile boundary;
-  pnpm 8.15.0 itself calls `url.parse()` under Node 24 during install/audit commands.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
   reconsider only if another regular production operator appears.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -168,18 +168,18 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-p2908.1`
-Current stage id: `mc2-p2908.1`
-Next stage id: `mc2-ve1eq`
-Recommended action: upgrade the repository package-manager line through a compatible tested
-lockfile boundary so Node 24 package-manager commands no longer emit `DEP0169`.
+Accepted stage id: `mc2-ve1eq`
+Current stage id: `mc2-ve1eq`
+Next stage id: none without an owner/live/migration boundary decision
+Recommended action: preserve the accepted local commits, then request explicit authority before an
+ordinary push or any deploy. Remaining product work requires an owner decision, live spend, a
+forbidden schema migration, production observation, or a §9 reopen gate.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for `mc2-ve1eq`. Upgrade the repository package-manager line through a
-compatible tested lockfile boundary and prove frozen install, audit, type-check and build under the
-repository Node runtime. Do not enable the cohort, change its threshold, reindex, migrate,
-force-push, deploy or perform paid work without separate authorization.
+Use $orchestrator-stage only after the owner selects an explicit remaining boundary. Do not enable
+the cohort, change its threshold, reindex, migrate, force-push, deploy or perform paid work without
+separate current authorization.
 
 ## Read first
 

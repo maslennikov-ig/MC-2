@@ -13,6 +13,8 @@ const yaml = requireFromBackend('js-yaml');
 
 const workflowPath = resolve(rootDir, '.github/workflows/ci-cd.yml');
 const workflow = yaml.load(readFileSync(workflowPath, 'utf8'));
+const rootManifest = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
+const workspace = yaml.load(readFileSync(resolve(rootDir, 'pnpm-workspace.yaml'), 'utf8'));
 const jobs = workflow?.jobs ?? {};
 const deployScript = readFileSync(resolve(rootDir, 'scripts/deploy_blue_green.sh'), 'utf8');
 const rollbackScript = readFileSync(resolve(rootDir, 'scripts/rollback_blue_green.sh'), 'utf8');
@@ -31,6 +33,42 @@ function assert(condition, message) {
 function needsList(job) {
   if (!job?.needs) return [];
   return Array.isArray(job.needs) ? job.needs : [job.needs];
+}
+
+const pinnedPnpmVersion = rootManifest.packageManager?.replace(/^pnpm@/, '');
+assert(pinnedPnpmVersion === '10.33.4', 'packageManager must pin the accepted pnpm version');
+assert(
+  workflow.env?.PNPM_VERSION === pinnedPnpmVersion,
+  'active CI and packageManager must pin the same pnpm version'
+);
+assert(rootManifest.engines?.pnpm === '>=10.0.0', 'pnpm engine must reject pre-v10 installs');
+assert(workspace.strictDepBuilds === true, 'unreviewed dependency build scripts must fail closed');
+assert(
+  workspace.enablePrePostScripts === false,
+  'pnpm 10 must preserve the prior explicit-script-only workspace behavior'
+);
+for (const packageName of [
+  '@parcel/watcher',
+  '@swc/core',
+  'bcrypt',
+  'esbuild',
+  'msgpackr-extract',
+  'unrs-resolver',
+]) {
+  assert(
+    workspace.allowBuilds?.[packageName] === true,
+    `required dependency build must be explicitly allowed: ${packageName}`
+  );
+}
+for (const [jobName, job] of Object.entries(jobs)) {
+  for (const step of job?.steps ?? []) {
+    if (step?.uses === 'pnpm/action-setup@v6') {
+      assert(
+        step.with?.version === '${{ env.PNPM_VERSION }}',
+        `${jobName} pnpm setup must use the shared PNPM_VERSION pin`
+      );
+    }
+  }
 }
 
 const deployContractStep = jobs.lint?.steps?.find(
