@@ -23,7 +23,7 @@ epic_id: n/a
 stage_id: mc2-sshkz
 session_id: mc2-sshkz
 milestone: develop-release-skip-and-runtime-audit
-milestone_status: in_progress
+milestone_status: accepted
 agent_type: root
 subagent_model: n/a
 reasoning_effort: inherit_orchestrator
@@ -71,9 +71,9 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local-root-owner
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: manual integration
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: disposable PostgreSQL containers and the isolated Playwright browser session were removed; no child worktree exists
 risk_level: high
@@ -107,7 +107,13 @@ verification:
   - release-typecheck-caught-nav-namespace-then-production-shaped-provider-red-and-green
   - canonical-release-closeout-passed-typecheck-build-test-and-process-check
   - web-final-unit-1272-passed-zero-skipped
+  - github-actions-run-31357791241-green-for-50208b60a0c26f61c398a4806e747f0762e6a638
+  - exact-sha-dev-deploy-job-93362809295-green
+  - dev-api-health-status-ok-after-deploy
+  - dev-english-sign-in-playwright-zero-console-errors-and-observed-requests-200
+  - security-audit-77-findings-identical-before-and-after-release-and-tracked-as-mc2-0ukr6
 changed_files:
+  - .beads/interactions.jsonl
   - .codex/goals/mc2-sshkz/scope-criterion-snapshot.json
   - .codex/orchestrator.toml
   - .codex/handoff.md
@@ -130,19 +136,23 @@ existing `nav.signIn` translation.
 
 # Verification
 
-The previous delivered application SHA `9987826687ef44340c0713740a4ecfcb55d0a2eb` is tied to green
-GitHub Actions run `31322960981`, including integration tests and dev deployment. Read-only dev
-checks covered health, Russian and English landing pages, the 26-block interactive role example,
-the course catalog and search, and the signed-out create/auth flow. The canonical release closeout
-then passed `pnpm type-check`, `pnpm build`, `pnpm test`, and process verification after the
-localization correction; its tracked acceptance receipt records the exact diff fingerprint.
+The corrected application SHA `50208b60a0c26f61c398a4806e747f0762e6a638` is tied to green
+GitHub Actions run `31357791241`, including unit, integration, contract, type, lint, build, image,
+and dev deployment jobs. Read-only post-deploy checks returned API `status: ok`; Playwright found
+the English `Sign In` action, zero console messages, and only HTTP 200 responses among observed
+dynamic requests. The canonical release closeout passed `pnpm type-check`, `pnpm build`,
+`pnpm test`, and process verification; its tracked acceptance receipt records the exact accepted
+diff fingerprint.
 
 # Delivery / Cleanup
 
-Pending commit and dev delivery. All disposable PostgreSQL containers and the Playwright session
-were removed; no child worktree or branch exists.
+Committed in `50208b60a`, pushed to `origin/develop`, and deployed by exact-SHA run `31357791241`.
+The deploy reclaimed 217.9 MB of dangling images and reported 48 GB free. All disposable
+PostgreSQL containers and Playwright sessions were removed; no child worktree or branch exists.
 
 # Risks / Follow-ups / Explicit Defers
 
 Paid generation, load testing, reindex, real schema migration, and destructive live mutation were
-not run and are not reported as passing.
+not run and are not reported as passing. The non-blocking security audit reports the same 77
+dependency findings in the preceding and current deploy runs, so it is not a release regression;
+new P1 Bead `mc2-0ukr6` owns production-reachability triage and remediation.

@@ -1,6 +1,6 @@
 # Stage `mc2-sshkz` — develop release skip and runtime audit
 
-Status: implementation and release acceptance complete; delivery pending.
+Status: accepted, delivered to `develop`, and verified on dev.
 
 ## Classification and boundary
 
@@ -18,8 +18,8 @@ generation, reindex, schema migration, destructive live mutation, and secrets/ac
 
 ## Next action
 
-Commit the accepted diff, safely push `develop`, wait for the exact green CI/dev deployment, and
-repeat the English sign-in browser assertion.
+No further action in this stage. Dependency advisory re-triage is tracked separately as
+`mc2-0ukr6`; paid or mutating live work remains outside this acceptance boundary.
 
 documentation-decision: no external/versioned boundary - this audit uses repository-owned runners,
 CI configuration, and runtime endpoints only.
