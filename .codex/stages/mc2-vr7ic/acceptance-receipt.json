@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "node --test scripts/precommit/test_precommit_policy.mjs && python3 -m unittest scripts/orchestration/test_run_stage_closeout.py && node --check scripts/precommit/staged-file-policy.mjs && node --check scripts/precommit/format-tracked-goal-snapshots.mjs && python3 -m py_compile scripts/orchestration/run_stage_closeout.py",
+      "duration_seconds": 5.166,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "node --test scripts/precommit/test_precommit_policy.mjs && python3 -m unittest scripts/orchestration/test_run_stage_closeout.py && node --check scripts/precommit/staged-file-policy.mjs && node --check scripts/precommit/format-tracked-goal-snapshots.mjs && python3 -m py_compile scripts/orchestration/run_stage_closeout.py"
+  ],
+  "completed_at": "2026-08-10T15:04:31.787046+00:00",
+  "diff_digest": "bc5d6f9a9cccec3587d180022ac3bf881f59968ba9a3a0cb3fa6405485af4a50",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0",
+  "git_head": "95a1f2f46a8873c068a418a5c5a7e9303bfae5d2",
+  "idempotency_key": "7c09e7288f6d3a6bf4347b3ceb874e7253f48c988abea46a010f4cb74d85dd2c",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-vr7ic",
+  "started_at": "2026-08-10T15:04:26.347026+00:00",
+  "verification_fingerprint": "7c09e7288f6d3a6bf4347b3ceb874e7253f48c988abea46a010f4cb74d85dd2c"
+}
