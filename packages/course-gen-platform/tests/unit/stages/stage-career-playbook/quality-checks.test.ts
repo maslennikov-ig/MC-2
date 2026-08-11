@@ -144,6 +144,20 @@ describe('validateMetricLedgerConsistency', () => {
     expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
   });
 
+  it('does not treat a marked illustration as a competing target', () => {
+    // "target variable 50% of base (example — replace)" is a compensation share
+    // that happens to sit beside a metric name; it commits to nothing.
+    const issues = validateMetricLedgerConsistency(
+      blocks({
+        block_15:
+          'Variable bonus tied to Pipeline coverage ratio. An illustrative package (example — replace): target variable 50% of base.',
+      }),
+      context({ metricLedger: [PIPELINE_COVERAGE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
   it('does nothing when the ledger is empty, so legacy specs still judge cleanly', () => {
     const issues = validateMetricLedgerConsistency(
       blocks({ block_3: 'Pipeline coverage ratio is at least 2x' }),
@@ -252,6 +266,20 @@ describe('validateExampleMarking', () => {
   it('accepts the same value once marked as replaceable', () => {
     const issues = validateExampleMarking(
       blocks({ block_15: '| Base salary | $120,000 (example — replace) | |' }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts marker variants that carry a qualifier', () => {
+    // Observed on the first clean live run: the model wrote the marker with the
+    // value or a note inside it. Requiring the bare form flagged correct output.
+    const issues = validateExampleMarking(
+      blocks({
+        block_15: '- Annual conference budget (example — replace: $4,000) for leadership events.',
+        block_8: '| Seat cost | $25,000 (example — replace numbers) | |',
+      }),
       context()
     );
 

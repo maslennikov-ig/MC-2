@@ -293,10 +293,16 @@ describe('career-playbook-pdf markdown fidelity', () => {
     expect(html).toMatch(/\.mermaid-diagram svg\s*\{[^}]*max-height:\s*200mm/);
   });
 
-  it('declares a symbol-capable font so check and warning glyphs render', () => {
+  it('substitutes status glyphs with ASCII the rendering container can draw', () => {
+    // Declaring a symbol-capable font family is not sufficient: the container has
+    // no font covering U+2705, so the glyph draws as an empty box. Verified by
+    // screenshotting the rendered cell after the font-family change.
     const html = buildCareerPlaybookPdfHtml(fixtureInput());
 
-    expect(html).toMatch(/font-family:[^;]*Noto Sans/);
+    expect(html).toContain('[OK]');
+    expect(html).toContain('[!]');
+    expect(html).not.toContain('✅');
+    expect(html).not.toContain('⚠');
   });
 
   it('produces a PDF with no fully blank page', async () => {

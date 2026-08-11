@@ -66,11 +66,41 @@ function pdfChrome(language: Language): {
   };
 }
 
+/**
+ * Status glyphs the guide uses in checklist tables, mapped to ASCII.
+ *
+ * Declaring a symbol-capable font family is not enough: the rendering container
+ * has no font covering U+2705/U+26A0, so the glyph draws as an empty box — the
+ * defect the 2026-08-11 review found on page 32, still reproducible after the
+ * font-family change. Substitution is done here rather than in the content so
+ * the Markdown export keeps the richer glyphs, which render fine anywhere a
+ * system emoji font exists; only the PDF, where the failure actually happens,
+ * falls back to text that is guaranteed to draw.
+ */
+const PDF_GLYPH_FALLBACKS: Array<[RegExp, string]> = [
+  [/✅/g, '[OK]'],
+  [/⚠️?/g, '[!]'],
+  [/❌/g, '[X]'],
+  [/\u{1F7E2}/gu, '[green]'],
+  [/\u{1F7E1}/gu, '[yellow]'],
+  [/\u{1F534}/gu, '[red]'],
+];
+
+export function replacePdfGlyphFallbacks(markdown: string): string {
+  return PDF_GLYPH_FALLBACKS.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    markdown
+  );
+}
+
 function collectMarkdown(input: CareerPlaybookPdfInput): string {
-  if (input.finalMarkdown?.trim()) return input.finalMarkdown.trim();
-  return BLOCK_ORDER.map(blockId => input.generatedBlocks[blockId]?.content?.trim())
-    .filter((content): content is string => Boolean(content))
-    .join('\n\n');
+  const markdown = input.finalMarkdown?.trim()
+    ? input.finalMarkdown.trim()
+    : BLOCK_ORDER.map(blockId => input.generatedBlocks[blockId]?.content?.trim())
+        .filter((content): content is string => Boolean(content))
+        .join('\n\n');
+
+  return replacePdfGlyphFallbacks(markdown);
 }
 
 function extractBlockHeadings(markdown: string): Array<{ id: string; label: string }> {

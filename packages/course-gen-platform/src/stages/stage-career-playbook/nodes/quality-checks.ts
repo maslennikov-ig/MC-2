@@ -101,6 +101,13 @@ function thresholdNumbers(metric: CareerPlaybookMetricLedgerEntry): Set<string> 
   return values;
 }
 
+/**
+ * The example marker, tolerating the qualifiers a writer naturally adds:
+ * "(example — replace)", "(example — replace: $4,000)", "(пример — заменить числа)".
+ * Requiring the bare form flagged correctly-marked values on the first clean run.
+ */
+const EXAMPLE_MARKER = /\(\s*(?:пример\s*[—–-]\s*заменит[ьи]|example\s*[—–-]\s*replace)[^)]*\)/i;
+
 const TRAFFIC_LIGHT_WORD = /\b(green|yellow|red|amber)\b|зелён|жёлт|желт|красн/i;
 
 /**
@@ -180,6 +187,10 @@ export function validateMetricLedgerConsistency(
 
         const thresholds = thresholdNumbers(metric);
         if (isTrafficLightLine(line, thresholds)) continue;
+        // A line the author already marked as an illustration is not claiming a
+        // competing target: "target variable 50% of base (example — replace)"
+        // is about compensation, not about the metric named beside it.
+        if (EXAMPLE_MARKER.test(line)) continue;
 
         const conflicting = candidates.filter(value => !targetNumbers.has(value));
         if (conflicting.length === 0) continue;
@@ -305,8 +316,6 @@ export function validateUnsourcedStatistics(
 // ---------------------------------------------------------------------------
 // 3. Example marking
 // ---------------------------------------------------------------------------
-
-const EXAMPLE_MARKER = /\(\s*(?:пример\s*[—-]\s*заменить|example\s*[—-]\s*replace)\s*\)/i;
 
 /** Currency amounts and ARR/budget figures — the values a reader is most likely to copy verbatim. */
 const COMPANY_VALUE =
