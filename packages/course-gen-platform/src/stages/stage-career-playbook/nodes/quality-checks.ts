@@ -107,7 +107,73 @@ function thresholdNumbers(metric: CareerPlaybookMetricLedgerEntry): Set<string> 
  * "(example — replace)", "(example — replace: $4,000)", "(пример — заменить числа)".
  * Requiring the bare form flagged correctly-marked values on the first clean run.
  */
-const EXAMPLE_MARKER = /\(\s*(?:пример\s*[—–-]\s*заменит[ьи]|example\s*[—–-]\s*replace)[^)]*\)/i;
+// The verb may follow the value: "(example: $100K — replace with your threshold)".
+const EXAMPLE_MARKER = /\(\s*(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/i;
+
+type ThresholdDirection = 'floor' | 'ceiling' | 'range';
+
+const CEILING_CUE =
+  /(?:<|≤|below|under|less than|at most|no more than|drops? below|ниже|меньше|не более)\s*$/i;
+const FLOOR_CUE = /(?:>|≥|above|over|more than|at least|minimum|выше|больше|не менее)\s*$/i;
+
+/** Direction of the comparison attached to a number, read from the text before it. */
+function directionBefore(text: string, index: number): ThresholdDirection | null {
+  const lead = text.slice(Math.max(0, index - 24), index);
+  if (CEILING_CUE.test(lead)) return 'ceiling';
+  if (FLOOR_CUE.test(lead)) return 'floor';
+  return null;
+}
+
+/** Band values with the direction the ledger states them in. A range matches either way. */
+function directedBandValues(
+  metric: CareerPlaybookMetricLedgerEntry
+): Map<string, Set<ThresholdDirection>> {
+  const bands = new Map<string, Set<ThresholdDirection>>();
+
+  const record = (field: string, fallback: ThresholdDirection) => {
+    if (!field) return;
+    for (const match of field.matchAll(NUMBER_TOKEN)) {
+      const value = canonicalNumber(match[0]);
+      if (!value) continue;
+      const direction = directionBefore(field, match.index ?? 0) ?? fallback;
+      const existing = bands.get(value) ?? new Set<ThresholdDirection>();
+      existing.add(direction);
+      bands.set(value, existing);
+    }
+  };
+
+  record(metric.green, 'floor');
+  // A yellow band is a corridor: either side of it may be quoted.
+  record(metric.yellow, 'range');
+  record(metric.red, 'ceiling');
+
+  return bands;
+}
+
+/**
+ * Whether the line is quoting a traffic-light band rather than asserting a
+ * competing target. Requires the direction to agree: the red band "<2x" and a
+ * claim of "at least 2x" share digits and mean opposite things.
+ */
+function citesBand(
+  line: string,
+  value: string,
+  bands: Map<string, Set<ThresholdDirection>>
+): boolean {
+  const directions = bands.get(value);
+  if (!directions) return false;
+  if (directions.has('range')) return true;
+
+  for (const match of line.matchAll(NUMBER_TOKEN)) {
+    if (canonicalNumber(match[0]) !== value) continue;
+    const direction = directionBefore(line, match.index ?? 0);
+    // An undirected mention is ambiguous; treat it as quoting the band rather
+    // than spending a regeneration on a guess.
+    if (!direction || directions.has(direction)) return true;
+  }
+
+  return false;
+}
 
 const TRAFFIC_LIGHT_WORD = /\b(green|yellow|red|amber)\b|зелён|жёлт|желт|красн/i;
 
@@ -176,9 +242,9 @@ export function validateMetricLedgerConsistency(
         const targetNumbers = numbersIn(metric.target);
         if (targetNumbers.size === 0) continue;
 
-        // Compare like with like: a 25% responsibility weight on the same line as
-        // "pipeline coverage" is not a claim about coverage, so only numbers
-        // sharing a unit with the target are candidates.
+        // Compare like with like: a 25% responsibility weight beside "pipeline
+        // coverage" is not a claim about coverage, so only numbers sharing a
+        // unit with the target are candidates.
         const targetUnits = new Set([...targetNumbers].map(unitOf));
         const candidates = [...numbersIn(line)].filter(value => targetUnits.has(unitOf(value)));
         if (candidates.length === 0) continue;
@@ -188,6 +254,12 @@ export function validateMetricLedgerConsistency(
 
         const thresholds = thresholdNumbers(metric);
         if (isTrafficLightLine(line, thresholds)) continue;
+        // A line may legitimately quote a band: "if coverage drops below 2x,
+        // flag" restates the red threshold. Direction is what separates that
+        // from a competing target — "coverage is at least 2x" uses the same
+        // digits to mean the opposite of the red band "<2x".
+        const bands = directedBandValues(metric);
+        if (candidates.every(value => citesBand(line, value, bands))) continue;
         // A line the author already marked as an illustration is not claiming a
         // competing target: "target variable 50% of base (example — replace)"
         // is about compensation, not about the metric named beside it.
@@ -246,7 +318,7 @@ const EXTERNAL_POPULATION =
   /\b(b2b|saas|companies|organi[sz]ations|firms|respondents|buyers|professionals|marketers|vendors|enterprises|employers)\b|компани\w*\s+рынка|респондент/i;
 
 const EXTERNAL_SCOPE =
-  /\b(industry|market|sector|worldwide|globally|industry-wide|across the industry)\b|отраслев|рыночн\w*\s+(?:данн|показател)/i;
+  /\b(industry|sector|worldwide|globally|industry-wide|across the industry)\b|(?<![\w‐-―-])market\b|отраслев|рыночн\w*\s+(?:данн|показател)/i;
 
 const PRECISE_STATISTIC = /\b\d{1,3}(?:[.,]\d+)?\s*%|\b\d+(?:[.,]\d+)?\s*[x×]\b/i;
 

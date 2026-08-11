@@ -542,3 +542,89 @@ describe('validateUnsourcedStatistics citation support', () => {
     expect(issues[0].description).toContain('does not appear in the retrieved source text');
   });
 });
+
+/**
+ * Precision cases from the 2026-08-11 v3 acceptance run.
+ *
+ * The run produced seven scorecard criticals of which one was real. Six false
+ * positives is not a cosmetic problem: every one of them spends a paid
+ * regeneration, and that run hit the per-block cap on eleven blocks.
+ */
+describe('metric conflict precision', () => {
+  const WIN_RATE: CareerPlaybookMetricLedgerEntry = {
+    key: 'win_rate',
+    label: 'Win Rate',
+    unit: '%',
+    target: '>=25%',
+    green: '>=25%',
+    yellow: '15-24%',
+    red: '<15%',
+    review_period: 'month',
+    provenance: 'assumption',
+    source_ref: null,
+  };
+
+  it('accepts a line citing only a band value', () => {
+    // "- Pipeline Coverage Ratio – if <2x, flag." quotes the red band.
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_17: '- Pipeline Coverage Ratio – if **<2x**, flag.' }),
+      context({ metricLedger: [PIPELINE_COVERAGE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a number that belongs to another quantity in the same row — a known cost', () => {
+    // The 20% describes deal size, not the win rate whose row it sits in, so this
+    // finding is noise. Narrowing the comparison to the naming cell or clause
+    // removed it — and also disabled detection on the standard KPI table shape,
+    // where the metric is in column 1 and its target in column 3. Losing the
+    // core detection is worse than one extra regeneration, so the row stays the
+    // unit of comparison and this residue is accepted deliberately.
+    const issues = validateMetricLedgerConsistency(
+      blocks({
+        block_6:
+          '| Win Rate | Pushing cheap deals | Monitor average deal size alongside win rate; flag if average deal size drops >20% quarter over quarter. |',
+      }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+
+  it('still flags a genuine competing target', () => {
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_15: 'Bonus pays out when Win Rate reaches 40%.' }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+});
+
+describe('external-claim precision', () => {
+  it('does not read "mid-market" as a claim about the market', () => {
+    // The guide writes mid‑market with U+2011, which ASCII-only exclusion missed.
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_16:
+          '- **Situation:** Deal with a mid‑market prospect is stalled; the buyer demands a discount above the 15% authority threshold.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts the marker form that carries the value before the verb', () => {
+    const issues = validateExampleMarking(
+      blocks({
+        block_6:
+          '| Red | require sign-off above a value (example: $100K — replace with your threshold) |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
