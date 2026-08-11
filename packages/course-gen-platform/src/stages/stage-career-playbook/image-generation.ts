@@ -101,6 +101,68 @@ function buildRoleFocusSummary(row: CareerPlaybookRow): string {
   return parts.length > 0 ? parts.join('\n') : 'Focus on role responsibilities and outcomes.';
 }
 
+/**
+ * Per-department visual direction for the cover.
+ *
+ * Every role previously received the same `DEFAULT_CARD_VISUAL_STYLE`, which is
+ * why the reviewed cover was a generic blue "business growth" scene that said
+ * nothing about B2B sales leadership. The role focus already reaches the prompt;
+ * what was missing was any variation in the visual direction itself.
+ */
+const DEPARTMENT_CARD_VISUAL_STYLES: Record<
+  string,
+  { colorScheme: string; visualElements: string; mood: string }
+> = {
+  sales: {
+    colorScheme: 'deep teal and warm amber with high contrast',
+    visualElements: 'pipeline funnels, upward trajectories, negotiation table silhouettes',
+    mood: 'decisive, energetic, relationship-driven',
+  },
+  engineering: {
+    colorScheme: 'indigo and cyan on a dark neutral base',
+    visualElements: 'modular blocks, connected nodes, layered architecture planes',
+    mood: 'precise, systematic, calm',
+  },
+  marketing: {
+    colorScheme: 'magenta and coral with a light neutral base',
+    visualElements: 'audience clusters, signal waves, campaign layers',
+    mood: 'expressive, inventive, outward-facing',
+  },
+  hr: {
+    colorScheme: 'warm violet and sand',
+    visualElements: 'growth paths, abstract people groupings, development ladders',
+    mood: 'supportive, human, steady',
+  },
+  finance: {
+    colorScheme: 'forest green and graphite',
+    visualElements: 'balance structures, layered ledgers, measured grids',
+    mood: 'rigorous, controlled, trustworthy',
+  },
+  operations: {
+    colorScheme: 'slate blue and safety orange',
+    visualElements: 'process flows, checkpoints, throughput lanes',
+    mood: 'orderly, reliable, kinetic',
+  },
+  product: {
+    colorScheme: 'royal purple and soft lime',
+    visualElements: 'roadmaps, discovery loops, prioritization matrices',
+    mood: 'curious, deliberate, forward-looking',
+  },
+};
+
+/** Visual direction for a department, falling back to the shared default. */
+export function resolveCareerPlaybookCardVisualStyle(department: string | null | undefined) {
+  const key = (department ?? '').trim().toLowerCase();
+  const departmentStyle = DEPARTMENT_CARD_VISUAL_STYLES[key];
+
+  return {
+    colorScheme: departmentStyle?.colorScheme ?? DEFAULT_CARD_VISUAL_STYLE.colorScheme,
+    aesthetic: DEFAULT_CARD_VISUAL_STYLE.aesthetic,
+    visualElements: departmentStyle?.visualElements ?? DEFAULT_CARD_VISUAL_STYLE.visualElements,
+    mood: departmentStyle?.mood ?? DEFAULT_CARD_VISUAL_STYLE.mood,
+  };
+}
+
 function buildPromptVars(row: CareerPlaybookRow): PromptVars {
   const parsedSpec = CareerPlaybookRoleProfileSpecSchema.safeParse(row.role_profile_spec);
   const spec = parsedSpec.success ? parsedSpec.data : null;
@@ -120,10 +182,7 @@ function buildPromptVars(row: CareerPlaybookRow): PromptVars {
     businessContextSummary: buildBusinessContextSummary(row),
     roleFocusSummary: buildRoleFocusSummary(row),
     languageContext,
-    colorScheme: DEFAULT_CARD_VISUAL_STYLE.colorScheme,
-    aesthetic: DEFAULT_CARD_VISUAL_STYLE.aesthetic,
-    visualElements: DEFAULT_CARD_VISUAL_STYLE.visualElements,
-    mood: DEFAULT_CARD_VISUAL_STYLE.mood,
+    ...resolveCareerPlaybookCardVisualStyle(row.department ?? spec?.position.department),
   };
 }
 

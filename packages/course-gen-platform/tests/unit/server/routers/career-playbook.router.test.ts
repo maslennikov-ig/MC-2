@@ -126,6 +126,10 @@ const roleProfileSpec = {
     failure_patterns: ['Shipping without validation'],
   },
   research: null,
+  // Quality-contract ledgers. The router parses the stored spec through the
+  // schema, so the queued job always carries these defaults.
+  metric_ledger: [],
+  evidence_ledger: [],
   block_boundaries: {},
   content_language: 'en',
 };
@@ -557,6 +561,9 @@ describe('careerPlaybookRouter transport', () => {
         cost_breakdown: {
           nodeCosts: [nodeCost],
           total_cost_usd: 0.25,
+          // Zero here means the total is complete. A non-zero count would mark it
+          // as a lower bound, because an aborted attempt has no usage record.
+          unknown_cost_attempts: 0,
         },
       })
     );
@@ -616,6 +623,7 @@ describe('careerPlaybookRouter transport', () => {
         cost_breakdown: {
           nodeCosts: [existingNodeCost, nodeCost],
           total_cost_usd: 0.75,
+          unknown_cost_attempts: 0,
         },
       })
     );

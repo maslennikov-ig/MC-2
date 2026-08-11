@@ -60,6 +60,86 @@ function groupHeadingVariable(name: string) {
   return variable;
 }
 
+/**
+ * Contract variables shared by every group prompt. Declared once so a rule can
+ * never drift between the six groups — the previous per-prompt copies are how
+ * the "invented example" instruction ended up in all six while the citation
+ * requirement made it into none.
+ */
+const groupContractVariables = [
+  {
+    name: 'metric_ledger_md',
+    description: 'Canonical metric ledger rendered as a markdown table',
+    required: true,
+  },
+  {
+    name: 'evidence_ledger_md',
+    description: 'Citable sources rendered as a [Sn] list, or an explicit "none" notice',
+    required: true,
+  },
+  {
+    name: 'generated_on',
+    description: 'Generation date (ISO), application-filled',
+    required: true,
+  },
+  {
+    name: 'prior_blocks_digest',
+    description: 'Anti-goals, numeric commitments and cadences already published',
+    required: true,
+  },
+];
+
+/**
+ * The output contract every group shares.
+ *
+ * Each rule here answers a measured defect from the 2026-08-11 review rather
+ * than a style preference: conflicting thresholds across blocks, precise market
+ * statistics with no source, invented company values presented as truth, a
+ * Gantt chart pinned to 2025 in a document generated in 2026, and duties that
+ * contradicted the guide's own anti-goals.
+ */
+const GROUP_OUTPUT_CONTRACT = `Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
+- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+
+NUMBERS — the metric ledger is the only source of numeric truth:
+- Reproduce every value and traffic-light threshold from the metric ledger VERBATIM, including its review period.
+- Never state a different number for a metric that appears in the ledger, in any block, table, or checklist.
+- A metric that is not in the ledger is described qualitatively, without a precise target.
+
+EXTERNAL CLAIMS — no precise statistic without a source:
+- A precise statistic about the market, the industry, competitors, or AI impact is allowed ONLY with a [Sn] reference to an entry in the evidence ledger below.
+- If the evidence ledger has no entry supporting the claim, rewrite it without the number, as an explicit hypothesis to validate.
+- Never write "research shows", "studies indicate", or a dated study reference unless it carries a [Sn] reference.
+
+EXAMPLES — mark every unverified company-specific value:
+- A company-specific value that is not backed by the business context or the user's answers (salary, bonus, ARR, budget, headcount cost, a person's name, an internal tool name) stays concrete, but MUST carry the marker "(пример — заменить)" in Russian or "(example — replace)" in English, immediately after the value in the same sentence or table cell.
+- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}). Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later, such as an onboarding form or a backup-contact table.
+
+DATES — today is {{generated_on}}:
+- Plans, schedules, ramp charts, and Gantt-style tables use relative labels only: "Day 1-30", "Week 2", "Month 3", "Quarter 1".
+- Never write an absolute calendar year in a plan, a training record, or a milestone.
+
+CONSISTENCY — do not contradict what is already published:
+- The digest below lists anti-goals, numeric commitments, and cadences that earlier blocks already state.
+- Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.`;
+
+/** The USER section every group prompt shares. */
+const GROUP_USER_SECTION = `USER:
+RoleProfileSpec:
+{{spec_json}}
+
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
+
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
+
+Already published content (do not contradict):
+{{prior_blocks_digest}}`;
+
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
     stage: 'stage_6',
@@ -219,6 +299,21 @@ Critical requirements:
 - Put each topic in do_not_repeat only when another block id owns it; never list a
   block's own canonical topic in its own do_not_repeat.
 - Extract anti_goals and failure_patterns explicitly.
+- Build metric_ledger: exactly one entry per metric in focus_areas.primary_kpis, each with a
+  concrete target and green/yellow/red thresholds plus a review period. This ledger becomes the
+  single source of numeric truth for all 26 blocks, so the values must be internally coherent —
+  a metric may hold only one target across the whole guide.
+- Set provenance on every metric entry:
+  * company_source — supported by the business context digest or source evidence pack
+  * user_answer   — stated by the user in the Q&A
+  * benchmark     — supported by a web research source
+  * assumption    — not supported by anything; the guide will present it as a hypothesis to agree
+  Research availability for this run: {{research_availability}}. When research is unavailable, no
+  entry may use provenance "benchmark".
+- Do NOT populate evidence_ledger or generated_on. The application fills both deterministically
+  from the real research result and the system clock; anything you emit in those fields is
+  discarded.
+- Today is {{generated_on}}. Do not put absolute calendar dates into the spec.
 - Keep client business_context separate from web research. Business context is first-party user/company data; web research is external benchmark data.
 - If business_context_mode is "universal", do not invent product, customer, sales, process, or metric facts. Build a benchmark Role Guide and mark company-specific details as adaptation points.
 - Keep content_language equal to {{content_language}}.
@@ -282,6 +377,16 @@ Source URLs:
         required: true,
       },
       { name: 'source_urls', description: 'Research source URLs', required: true },
+      {
+        name: 'research_availability',
+        description: 'Whether external research produced usable sources for this run',
+        required: true,
+      },
+      {
+        name: 'generated_on',
+        description: 'Generation date (ISO), application-filled',
+        required: true,
+      },
       contentLanguageVariable,
     ],
   },
@@ -296,15 +401,18 @@ Generate Role Guide group 1: Header + Block 1 (Mission/KR) + Block 2 (Anti-goals
 Methodology:
 - Block 1: Job Scorecard. Mission in 2-3 sentences + 3-5 measurable key results in a table.
 - Block 2: Munger inversion. At least 4 anti-goals and the actual owner.
-- Block 5: Management 3.0 + Amazon one-way/two-way door. At least 4 decisions across autonomy levels.
+- Block 5: Decision authority. Classify every decision on FOUR independent axes instead of a single
+  one-way/two-way door label:
+  * Reversibility: reversible / reversible with cost / irreversible
+  * Blast radius: team / function / company / customer
+  * Contract commitment: none / has deadline / has penalty
+  * Approval level: act alone / notify / align / manager decides
+  Changing CRM stages, adjusting a process, and selecting a tool or vendor are "reversible with
+  cost" — a migration or a contract with switching costs, not a one-way door. Hiring, termination,
+  and anything with a customer-facing penalty stay high-consequence. At least 4 decisions spanning
+  different approval levels.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+${GROUP_OUTPUT_CONTRACT}
 - Deterministic format minimums (verified automatically, so meet them on the first draft): Block 2 lists at least 4 anti-goals; Block 5 lists at least 4 decision rows.
 - Use exactly these top-level headings:
 {{heading_header}}
@@ -312,12 +420,11 @@ Output rules:
 {{heading_block_2}}
 {{heading_block_5}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_header'),
       groupHeadingVariable('heading_block_1'),
       groupHeadingVariable('heading_block_2'),
@@ -335,28 +442,26 @@ Generate Role Guide group 2: Block 3 (Responsibility zones), Block 4 (Duties), B
 Methodology:
 - Block 3: 4-6 responsibility zones with weight percentages summing to 100 and Definition of Done.
 - Block 4: Daily / weekly / monthly / quarterly duties with measurable result and Definition of Done.
-- Block 6: Input/Output metrics, traffic-light actions, and anti-metrics warnings.
+- Block 6: Input/Output metrics, traffic-light actions, and anti-metrics warnings. Every metric in
+  the ledger appears here with exactly the ledger's target and thresholds.
 - Block 8: Tools table with purpose and required proficiency.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+Forecast wording: describe forecast quality as absolute error ("forecast error above 20%"), never
+as "accuracy above +/-20%" — accuracy and variance are opposite directions and mixing them makes
+the threshold unreadable.
+
+${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_3}}
 {{heading_block_4}}
 {{heading_block_6}}
 {{heading_block_8}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_block_3'),
       groupHeadingVariable('heading_block_4'),
       groupHeadingVariable('heading_block_6'),
@@ -378,25 +483,21 @@ Methodology:
 - Block 12: education, experience, personality profile, and GWC filter (Get it / Want it / Capacity).
 - Block 13: hourly schedule plus cognitive load profile and focus-block recommendations.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+Block 9 in particular attracts unsupported statistics about AI accuracy, adoption rates, and hours
+saved. State those only with a [Sn] citation; otherwise describe the shift qualitatively.
+
+${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_7}}
 {{heading_block_9}}
 {{heading_block_12}}
 {{heading_block_13}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_block_7'),
       groupHeadingVariable('heading_block_9'),
       groupHeadingVariable('heading_block_12'),
@@ -413,18 +514,19 @@ RoleProfileSpec:
 Generate Role Guide group 4: Block 11 (Career Growth), Block 14 (Onboarding), Block 15 (Motivation System), Block 17 (Red Flags).
 
 Methodology:
-- Block 11: dual IC/management tracks, promotion criteria, timelines, and Mermaid career diagram.
-- Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment.
-- Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries.
-- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints.
+- Block 11: dual IC/management tracks, promotion criteria, relative timelines, and Mermaid career
+  diagram. Ladder rules:
+  * Every step must differ in scope from the one before it. Never emit a step that renames the same
+    level (for example "CRO -> Chief Revenue Officer / President of Revenue").
+  * Never label a people-management position as "Senior <role> (IC)"; the IC track and the
+    management track are separate branches.
+  * Every transition carries a promotion criterion and a relative timeline ("after 4 quarters"),
+    never a calendar date.
+- Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment. Milestones use relative day and week labels only.
+- Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries. Any compensation figure is an unverified example and must carry the example marker.
+- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. Warning thresholds come from the metric ledger, not from new numbers.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+${GROUP_OUTPUT_CONTRACT}
 - Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
@@ -433,12 +535,11 @@ Output rules:
 {{heading_block_15}}
 {{heading_block_17}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_block_11'),
       groupHeadingVariable('heading_block_14'),
       groupHeadingVariable('heading_block_15'),
@@ -459,15 +560,12 @@ Methodology:
 - Block 16: primary business process, DO-CONFIRM / READ-DO checklists, SBAR, exception handling, and scripts only for communication roles.
 - Block 19: 3-layer context, durable skills, AI impact, continuous learning, and skill stacking.
 - Block 20: business goals, how this role impacts them, impact metrics, and Netflix Context Over Control paragraph.
-- Block 21: FMEA-style pre-mortem with at least 3 failure modes, early signals, and prevention actions.
+- Block 21: FMEA-style pre-mortem with at least 3 failure modes, early signals, and prevention actions. Every threshold that names a ledger metric uses the ledger's value.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+Block 19 attracts unsupported market statistics (adoption rates, growth rates, benchmark
+multiples). State those only with a [Sn] citation; otherwise describe the trend qualitatively.
+
+${GROUP_OUTPUT_CONTRACT}
 - Include Mermaid diagrams in Blocks 10 and 16, and keep at least 3 failure modes in Block 21 (all verified automatically, so satisfy them on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
@@ -477,12 +575,11 @@ Output rules:
 {{heading_block_20}}
 {{heading_block_21}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_block_10'),
       groupHeadingVariable('heading_block_16'),
       groupHeadingVariable('heading_block_19'),
@@ -502,18 +599,12 @@ Generate Role Guide group 6: Block 18 (FAQ), Block 22 (Working with me README), 
 Methodology:
 - Block 18: 5-8 FAQ items mixing employee questions and questions about the role.
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
-- Block 23: continuity checklist, critical knowledge, backups, and last-training dates.
-- Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win.
-- Block 25: revision triggers, version/date metadata, and MegaCampus AI CTA.
-- Block 26: implementation checklist for manager, HR, and employee to operationalize the guide.
+- Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
+- Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
+- Block 25: revision triggers, version metadata dated {{generated_on}}, and MegaCampus AI CTA. This is the only block allowed to print an absolute date.
+- Block 26: implementation checklist for manager, HR, and employee to operationalize the guide. It must include a "calibrate before publishing" section listing every value elsewhere in the guide that carries the example marker, so the reader knows exactly what to replace.
 
-Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}) in the output. For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example. Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later (such as an onboarding form or a backup-contact table); never rewrite a narrative name into a "field to fill" phrase inside a sentence.
-- Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_18}}
 {{heading_block_22}}
@@ -522,12 +613,11 @@ Output rules:
 {{heading_block_25}}
 {{heading_block_26}}
 
-USER:
-RoleProfileSpec:
-{{spec_json}}`,
+${GROUP_USER_SECTION}`,
     variables: [
       specJsonVariable,
       contentLanguageVariable,
+      ...groupContractVariables,
       groupHeadingVariable('heading_block_18'),
       groupHeadingVariable('heading_block_22'),
       groupHeadingVariable('heading_block_23'),
@@ -545,19 +635,24 @@ RoleProfileSpec:
     promptTemplate: `SYSTEM:
 Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
 
-Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these five categories:
-- "contradiction": the block contradicts RoleProfileSpec, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block.
+Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these categories:
+- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
 - "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
 - "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
 - "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence.
+- "metric_conflict": a metric that appears in the metric ledger is stated with a different value or threshold. The ledger wins; the block is wrong.
+- "unsourced_claim": a precise external statistic (market, industry, competitor, AI impact) is stated without a [Sn] reference to the evidence ledger, or with a [Sn] that is not in the ledger.
+- "stale_date": an absolute calendar year appears outside block 25, or block 25's date is not the generation date.
+- "unmarked_example": an unverified company-specific value (salary, bonus, ARR, budget, person name, internal tool) appears without the example marker.
 
 Everything else — tone, "too generic", "not actionable enough", "reads like HR jargon", phrasing, style preferences — is at most "warning" (or "info"), and is NEVER grounds for regeneration. Reason: the deterministic layer already blocks the hard failures reliably, so routing style opinions into regeneration only burns cycles without improving correctness; prefer author freedom over rigid style rules.
 
 Rules:
 - Every issue MUST include a "category" field. Use "style" for any non-critical stylistic or tone finding.
-- Use severity "critical" ONLY for issues in the five critical categories above; use "warning" or "info" for everything else.
-- List a block id in "needs_regeneration" only when it has a critical issue in one of the five critical categories.
+- Use severity "critical" ONLY for issues in the critical categories above; use "warning" or "info" for everything else.
+- List a block id in "needs_regeneration" only when it has a critical issue in one of the critical categories.
+- The deterministic layer already scans for metric conflicts, unsourced statistics, absolute dates, and unmarked examples by pattern. Spend your attention on what a pattern cannot see: a claim that contradicts another block in meaning rather than in digits, a duty that undermines a stated anti-goal, a threshold that is internally incoherent.
 
 Return only valid JSON:
 {
@@ -567,7 +662,7 @@ Return only valid JSON:
     {
       "block_id": "block_5",
       "severity": "critical" | "warning" | "info",
-      "category": "contradiction" | "format_minimum" | "wrong_language" | "unresolved_placeholder" | "invented_number" | "style",
+      "category": "contradiction" | "format_minimum" | "wrong_language" | "unresolved_placeholder" | "invented_number" | "metric_conflict" | "unsourced_claim" | "stale_date" | "unmarked_example" | "style",
       "description": "...",
       "suggestion": "..."
     }
@@ -577,8 +672,15 @@ Return only valid JSON:
 
 USER:
 Group id: {{group_id}}
+Today is {{generated_on}}.
 RoleProfileSpec:
 {{spec_json}}
+
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
+
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
 
 Previous groups output:
 {{prev_groups_content}}
@@ -588,6 +690,21 @@ Current group output:
     variables: [
       { name: 'group_id', description: 'Current group or block ids under review', required: true },
       specJsonVariable,
+      {
+        name: 'metric_ledger_md',
+        description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'evidence_ledger_md',
+        description: 'Citable sources rendered as a [Sn] list',
+        required: true,
+      },
+      {
+        name: 'generated_on',
+        description: 'Generation date (ISO), application-filled',
+        required: true,
+      },
       {
         name: 'prev_groups_content',
         description: 'Previously generated group markdown for cross-reference checks',
@@ -626,11 +743,25 @@ User edit instruction:
 {{user_instruction}}
 
 Return only markdown for this one block.
-Exact company-specific numbers, quotas, KPI targets, budgets, and deadlines must come from RoleProfileSpec, user Q&A, business context, or source evidence. If no source supports a precise value, write it as a recommendation/benchmark or say it must be agreed.
+
+- Numbers: reproduce every value from the metric ledger VERBATIM. If the issue is a metric conflict,
+  align the block to the ledger — never invent a third value to split the difference.
+- External statistics: allowed only with a [Sn] reference to the evidence ledger. Without a matching
+  entry, rewrite without the precise number.
+- Unverified company-specific values (salary, bonus, ARR, budget, person name, internal tool) keep
+  the marker "(пример — заменить)" in Russian or "(example — replace)" in English.
+- Today is {{generated_on}}. Use relative labels ("Day 1-30", "Week 2") in plans; an absolute
+  calendar year is allowed only in block 25.
 
 USER:
 RoleProfileSpec:
 {{spec_json}}
+
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
+
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
 
 Other blocks summary:
 {{other_blocks_brief}}
@@ -648,6 +779,21 @@ Content language: {{content_language}}`,
         required: true,
       },
       specJsonVariable,
+      {
+        name: 'metric_ledger_md',
+        description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'evidence_ledger_md',
+        description: 'Citable sources rendered as a [Sn] list',
+        required: true,
+      },
+      {
+        name: 'generated_on',
+        description: 'Generation date (ISO), application-filled',
+        required: true,
+      },
       {
         name: 'other_blocks_brief',
         description: 'Compact summary of other generated blocks',

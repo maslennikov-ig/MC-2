@@ -28,7 +28,10 @@ import type {
   CareerPlaybookSupabase,
 } from '../../server/routers/career-playbook/service-mappers';
 import { normalizeGeneratedBlocks } from '../../server/routers/career-playbook/service-mappers';
-import { sumCareerPlaybookNodeCosts } from '../../server/routers/career-playbook/cost-breakdown';
+import {
+  countCareerPlaybookUnknownCostAttempts,
+  sumCareerPlaybookNodeCosts,
+} from '../../server/routers/career-playbook/cost-breakdown';
 import {
   getCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
@@ -88,6 +91,9 @@ function buildCostBreakdown(result: CareerPlaybookGraphResult) {
   return {
     nodeCosts: result.nodeCosts,
     total_cost_usd: sumCareerPlaybookNodeCosts(result.nodeCosts),
+    // Non-zero means the total is a lower bound: some attempts aborted before the
+    // provider reported usage, so their cost is unknown rather than zero.
+    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(result.nodeCosts),
     ...(regenerationAttempts ? { regeneration_attempts: regenerationAttempts } : {}),
   };
 }

@@ -5,7 +5,7 @@ import {
   type CareerPlaybookJudgeVerdict,
   type CareerPlaybookNodeCost,
 } from '@megacampus/shared-types';
-import type { CareerPlaybookRuntime } from './runtime';
+import { buildCareerPlaybookAbortedAttemptCosts, type CareerPlaybookRuntime } from './runtime';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
 const JUDGE_PHASE = 'stage_career_playbook_judge';
@@ -104,7 +104,7 @@ Return only a valid JSON object matching this shape:
     {
       "block_id": "header or block_1 through block_26",
       "severity": "critical | warning | info",
-      "category": "contradiction | format_minimum | wrong_language | unresolved_placeholder | invented_number | style",
+      "category": "contradiction | format_minimum | wrong_language | unresolved_placeholder | invented_number | metric_conflict | unsourced_claim | stale_date | unmarked_example | style",
       "description": "clear issue",
       "suggestion": "clear repair suggestion or null"
     }
@@ -138,7 +138,10 @@ export async function invokeStructuredJudgeWithRepair(
     structuredOutputStrict: true,
   };
   const firstResult = await runtime.invokeLLM(prompt, baseOptions);
-  const nodeCosts = [buildNodeCost(firstResult)];
+  const nodeCosts = [
+    buildNodeCost(firstResult),
+    ...buildCareerPlaybookAbortedAttemptCosts('crossBlockJudge', firstResult.abortedAttempts),
+  ];
 
   try {
     return {
@@ -157,7 +160,10 @@ export async function invokeStructuredJudgeWithRepair(
       preferFallbackModel: true,
       maxTokensMultiplier: 1.1,
     });
-    nodeCosts.push(buildNodeCost(repairResult));
+    nodeCosts.push(
+      buildNodeCost(repairResult),
+      ...buildCareerPlaybookAbortedAttemptCosts('crossBlockJudge', repairResult.abortedAttempts)
+    );
 
     try {
       return {

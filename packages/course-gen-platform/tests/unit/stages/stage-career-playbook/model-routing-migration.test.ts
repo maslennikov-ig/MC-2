@@ -112,3 +112,48 @@ describe('Career Playbook DeepSeek V4 Pro routing migration', () => {
     expect(sql).not.toContain('stage_career_playbook_regenerator');
   });
 });
+
+/**
+ * Quality v2 routing: the spec output budget and the phase timeouts.
+ *
+ * Both values are measured rather than chosen. The 8000-token spec budget
+ * truncated the RoleProfileSpec JSON (the model returned exactly 8000 output
+ * tokens), and the 300s timeout turned each stuck call into a 15-20 minute
+ * stall — together a third of the 56-minute run of 2026-08-11.
+ */
+const qualityV2MigrationPath = resolve(
+  __dirname,
+  '../../../../supabase/migrations/20260811120000_career_playbook_quality_v2_routing.sql'
+);
+
+describe('career playbook quality v2 routing migration', () => {
+  const sql = readFileSync(qualityV2MigrationPath, 'utf8');
+
+  it('raises the spec output budget to 16000 tokens', () => {
+    expect(sql).toContain("('stage_career_playbook_spec', 16000, 120000)");
+  });
+
+  it('lowers every career playbook phase timeout to 120000 ms', () => {
+    for (const phase of Object.keys(EXPECTED_ROUTING)) {
+      expect(sql).toMatch(new RegExp(`\\('${phase}', \\d+, 120000\\)`));
+    }
+
+    // Scoped to the executable rows: the header comment names the old 300000
+    // value on purpose, to record what changed and why.
+    const statements = sql.replace(/^--.*$/gm, '');
+    expect(statements).not.toContain('300000');
+  });
+
+  it('converges only the fields it owns so later routing decisions survive a re-run', () => {
+    const updateClause = sql.slice(sql.lastIndexOf('UPDATE public.llm_model_config'));
+
+    expect(updateClause).toContain('max_tokens = desired.max_tokens');
+    expect(updateClause).toContain('timeout_ms = desired.timeout_ms');
+    expect(updateClause).not.toContain('model_id = desired.model_id');
+  });
+
+  it('stays idempotent by inserting only when the active global row is missing', () => {
+    expect(sql).toContain('WHERE NOT EXISTS');
+    expect(sql).toContain("existing.config_type = 'global'");
+  });
+});

@@ -13,8 +13,20 @@ import type {
   CareerPlaybookGroupResult,
   CareerPlaybookGraphNode,
 } from '../state';
-import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import {
+  buildCareerPlaybookAbortedAttemptCosts,
+  CareerPlaybookLLMCallError,
+  createCareerPlaybookRuntime,
+  type CareerPlaybookRuntime,
+} from './runtime';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
+import {
+  formatCareerPlaybookEvidenceLedgerForPrompt,
+  formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookEvidenceLedger,
+  getCareerPlaybookMetricLedger,
+} from './quality-ledger';
+import { buildCareerPlaybookPriorBlocksDigest } from './prior-blocks-digest';
 
 export interface CareerPlaybookBlockSpec {
   blockId: CareerPlaybookBlockId;
@@ -36,6 +48,8 @@ export interface GenerateCareerPlaybookGroupInput {
   language: string;
   qaData?: CareerPlaybookQAData;
   webResearch?: CareerPlaybookWebResearchResult | null;
+  /** Blocks accepted by earlier groups; source of the anti-contradiction digest. */
+  generatedBlocks?: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
 }
 
 export interface GenerateCareerPlaybookGroupResult {
@@ -43,6 +57,8 @@ export interface GenerateCareerPlaybookGroupResult {
   blocks: Record<CareerPlaybookBlockId, CareerPlaybookBlockState>;
   qualityIssues: CareerPlaybookQualityIssue[];
   nodeCost: CareerPlaybookNodeCost;
+  /** Unknown-cost rows for attempts that never returned before this call succeeded. */
+  abortedCosts: CareerPlaybookNodeCost[];
 }
 
 const GROUP_SPECS: Record<CareerPlaybookGroupKey, CareerPlaybookGroupSpec> = {
@@ -472,9 +488,25 @@ export async function generateCareerPlaybookGroup(
   runtime: CareerPlaybookRuntime = createCareerPlaybookRuntime()
 ): Promise<GenerateCareerPlaybookGroupResult> {
   const groupSpec = getCareerPlaybookGroupSpec(input.groupKey);
+  const spec = input.roleProfileSpec;
   const prompt = await runtime.renderPrompt(groupSpec.promptKey, {
-    spec_json: JSON.stringify(input.roleProfileSpec, null, 2),
+    spec_json: JSON.stringify(spec, null, 2),
     content_language: input.language,
+    // The four contract variables. Passing the spec alone was the structural
+    // reason blocks contradicted each other and cited nothing: numbers had no
+    // canonical home, sources never left the spec-builder prompt, the model had
+    // no idea what today's date was, and no generator could see earlier blocks.
+    metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
+      getCareerPlaybookMetricLedger(spec)
+    ),
+    evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
+      getCareerPlaybookEvidenceLedger(spec)
+    ),
+    generated_on: spec.generated_on ?? new Date().toISOString().slice(0, 10),
+    prior_blocks_digest: buildCareerPlaybookPriorBlocksDigest(
+      input.generatedBlocks ?? {},
+      groupSpec.blocks.map(block => block.blockId)
+    ),
     ...getGroupHeadingLabels(input.language),
   });
   const llmResult = await runtime.invokeLLM(prompt, {
@@ -511,7 +543,9 @@ export async function generateCareerPlaybookGroup(
       cost_usd: llmResult.costUsd,
       duration_ms: llmResult.durationMs,
       attempts: llmResult.attemptCount,
+      outcome: 'succeeded',
     },
+    abortedCosts: buildCareerPlaybookAbortedAttemptCosts(groupSpec.node, llmResult.abortedAttempts),
   };
 }
 
@@ -539,6 +573,7 @@ export function createGroupGeneratorNode(
           language: state.language,
           qaData: state.qaData,
           webResearch: state.webResearch,
+          generatedBlocks: state.generatedBlocks,
         },
         runtime
       );
@@ -547,7 +582,7 @@ export function createGroupGeneratorNode(
         generatedGroups: { [groupKey]: result.group },
         generatedBlocks: result.blocks,
         ...(result.qualityIssues.length > 0 ? { qualityIssues: result.qualityIssues } : {}),
-        nodeCosts: [result.nodeCost],
+        nodeCosts: [result.nodeCost, ...result.abortedCosts],
         currentNode: NEXT_GROUP_NODE[groupKey] ?? groupSpec.node,
       };
     } catch (error) {
@@ -555,6 +590,10 @@ export function createGroupGeneratorNode(
         errors: [
           `${groupSpec.node} failed: ${error instanceof Error ? error.message : String(error)}`,
         ],
+        nodeCosts:
+          error instanceof CareerPlaybookLLMCallError
+            ? buildCareerPlaybookAbortedAttemptCosts(groupSpec.node, error.abortedAttempts)
+            : [],
         currentNode: groupSpec.node,
       };
     }

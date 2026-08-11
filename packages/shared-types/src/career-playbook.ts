@@ -477,6 +477,14 @@ export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
   'wrong_language',
   'unresolved_placeholder',
   'invented_number',
+  // Quality contract v2 categories. Each has a deterministic check as its first
+  // line of defence; the LLM judge is the second contour for the cases a regex
+  // cannot see (a semantic clash between blocks, a duty that violates an
+  // anti-goal). See docs/career-playbook/quality-contract.md section 7.
+  'metric_conflict',
+  'unsourced_claim',
+  'stale_date',
+  'unmarked_example',
   'style',
 ] as const;
 export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
@@ -497,6 +505,10 @@ export const CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES = [
   'wrong_language',
   'unresolved_placeholder',
   'invented_number',
+  'metric_conflict',
+  'unsourced_claim',
+  'stale_date',
+  'unmarked_example',
 ] as const satisfies readonly CareerPlaybookJudgeIssueCategory[];
 export type CareerPlaybookJudgeCriticalCategory =
   (typeof CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES)[number];
@@ -793,17 +805,77 @@ export const CareerPlaybookNodeCostSchema = z.object({
   // of attempts consumed by the LLM call that produced this node cost.
   duration_ms: z.number().nonnegative().optional(),
   attempts: z.number().int().positive().optional(),
+  // An attempt that never returned (timeout, transport failure) has no usage
+  // record, so its cost is genuinely unknown rather than zero: the provider may
+  // still bill for tokens it generated before the abort. Recording it as an
+  // explicit unknown keeps the receipt honest instead of silently omitting it,
+  // which is what made the 2026-08-11 cost claim unprovable.
+  outcome: z.enum(['succeeded', 'aborted']).optional(),
+  cost_unknown: z.boolean().optional(),
+  error: z.string().min(1).optional(),
 });
 export type CareerPlaybookNodeCost = z.infer<typeof CareerPlaybookNodeCostSchema>;
 
 export const CareerPlaybookCostBreakdownSchema = z.object({
   nodeCosts: z.array(CareerPlaybookNodeCostSchema).default([]),
   total_cost_usd: z.number().nonnegative().default(0),
+  // How many recorded attempts carry an unknown cost. Non-zero means
+  // total_cost_usd is a lower bound on real provider spend, not the final figure.
+  unknown_cost_attempts: z.number().int().nonnegative().optional(),
   // Ground-truth block regeneration counts keyed by block id. Optional so legacy
   // breakdowns without the field still parse and round-trip unchanged.
   regeneration_attempts: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 export type CareerPlaybookCostBreakdown = z.infer<typeof CareerPlaybookCostBreakdownSchema>;
+
+/**
+ * Where a metric target came from. Drives how the guide is allowed to phrase it:
+ * company_source/user_answer may be stated as fact, benchmark needs an
+ * evidence_ledger citation, assumption must read as a hypothesis to agree on.
+ */
+export const CareerPlaybookMetricProvenanceSchema = z.enum([
+  'company_source',
+  'user_answer',
+  'benchmark',
+  'assumption',
+]);
+export type CareerPlaybookMetricProvenance = z.infer<typeof CareerPlaybookMetricProvenanceSchema>;
+
+/**
+ * One row of the canonical numeric ledger. Before this existed, focus_areas
+ * carried only metric *names*, so every block invented its own thresholds and
+ * the same metric appeared with conflicting targets across the document (the
+ * 2026-08-11 review found four such conflicts). Blocks now quote these values
+ * verbatim instead of inventing them.
+ */
+export const CareerPlaybookMetricLedgerEntrySchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  unit: z.string().default(''),
+  target: z.string().min(1),
+  green: z.string().default(''),
+  yellow: z.string().default(''),
+  red: z.string().default(''),
+  review_period: z.string().default(''),
+  provenance: CareerPlaybookMetricProvenanceSchema,
+  source_ref: z.string().nullable().default(null),
+});
+export type CareerPlaybookMetricLedgerEntry = z.infer<typeof CareerPlaybookMetricLedgerEntrySchema>;
+
+/**
+ * One citable source. Filled deterministically by the application from the web
+ * research result, never by the model: the model previously wrote "research
+ * shows" with no traceable URL because sources stopped at the spec-builder
+ * prompt and never reached block generation.
+ */
+export const CareerPlaybookEvidenceEntrySchema = z.object({
+  id: z.string().min(1),
+  url: z.string().min(1),
+  title: z.string().min(1),
+  claim: z.string().min(1),
+  retrieved_at: z.string().min(1),
+});
+export type CareerPlaybookEvidenceEntry = z.infer<typeof CareerPlaybookEvidenceEntrySchema>;
 
 export const CareerPlaybookRoleProfileSpecSchema = z.object({
   position: z.object({
@@ -829,6 +901,16 @@ export const CareerPlaybookRoleProfileSpecSchema = z.object({
     anti_goals: z.array(z.string().min(1)).min(1),
     failure_patterns: z.array(z.string().min(1)).min(1),
   }),
+  // Canonical numeric ledger: the single source of truth for every repeated
+  // threshold in the guide. Defaults to empty so specs persisted before the
+  // quality contract still parse and round-trip.
+  metric_ledger: z.array(CareerPlaybookMetricLedgerEntrySchema).default([]),
+  // Citable sources, application-filled. Anything the model puts here is
+  // discarded and overwritten by the real research result.
+  evidence_ledger: z.array(CareerPlaybookEvidenceEntrySchema).default([]),
+  // Generation date, application-filled. Optional so legacy specs parse; when
+  // absent the stale-date check has no anchor and skips rather than guessing.
+  generated_on: z.string().min(1).optional(),
   research: z
     .object({
       kpis_insights: z.array(z.string().min(1)).default([]),

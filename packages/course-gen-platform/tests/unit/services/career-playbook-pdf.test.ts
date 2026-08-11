@@ -82,8 +82,12 @@ describe('career-playbook-pdf service', () => {
     expect(html).toContain('class="pdf-cover"');
     expect(html).toContain('Table of contents');
     expect(html).toContain('@page');
-    expect(html).toContain('break-before: page');
     expect(html).toContain('data-mermaid-source');
+    // Block headings must NOT force a page break. Doing so produced three fully
+    // blank pages in the 2026-08-11 export; the heading now merely refuses to be
+    // separated from the content it introduces.
+    expect(html).toMatch(/\.playbook-block-heading\s*\{[^}]*break-before:\s*auto/);
+    expect(html).toMatch(/\.playbook-block-heading\s*\{[^}]*break-after:\s*avoid/);
 
     for (let index = 1; index <= 26; index += 1) {
       expect(html).toContain(`Block ${index} Title`);
@@ -191,5 +195,129 @@ Revenue Operations Lead overview.`);
     const result = await renderCareerPlaybookPdf(input);
 
     expect(result.contentType).toBe('application/pdf');
+  }, 60_000);
+});
+
+/**
+ * Regression fixture for the Markdown constructs the hand-rolled renderer did
+ * not understand. Each one printed as raw text in the reviewed 60-page export
+ * (`#### Bucket ...` on page 14, nine `---` rules, 37 ordered-list lines split
+ * into paragraphs), and links were not rendered at all — which would have broken
+ * the source citations the quality contract now requires.
+ */
+const MARKDOWN_CONSTRUCT_FIXTURE = `## 1. Every supported construct
+
+### Third level
+
+#### Fourth level
+
+##### Fifth level
+
+Intro paragraph with **bold**, *italic*, \`inline code\` and a [source link](https://example.com/source).
+
+---
+
+1. First ordered item
+2. Second ordered item
+3. Third ordered item
+
+- Bullet item
+  - Nested bullet item
+- Another bullet
+
+> A block quote that must not print its marker.
+
+| Column A | Column B |
+| --- | --- |
+| Value ✅ | Value ⚠️ |
+
+\`\`\`mermaid
+flowchart LR
+  A["Start"] --> B["End"]
+\`\`\`
+
+\`\`\`ts
+const answer = 42;
+\`\`\`
+`;
+
+describe('career-playbook-pdf markdown fidelity', () => {
+  function fixtureInput(): CareerPlaybookPdfInput {
+    return {
+      playbookId: '44444444-4444-4444-8444-444444444444',
+      positionTitle: 'Markdown Fixture',
+      department: 'Quality',
+      level: 'Lead',
+      language: 'en',
+      generatedBlocks: { block_1: blockState(MARKDOWN_CONSTRUCT_FIXTURE) },
+      finalMarkdown: MARKDOWN_CONSTRUCT_FIXTURE,
+      completedAt: '2026-08-11T08:44:06.610Z',
+    };
+  }
+
+  it('renders every construct as HTML with no raw Markdown left in the body', () => {
+    const html = buildCareerPlaybookPdfHtml(fixtureInput());
+    const body = /<main class="pdf-content">([\s\S]*)<\/main>/.exec(html)?.[1] ?? '';
+
+    expect(body).toContain('<h3>Third level</h3>');
+    expect(body).toContain('<h4>Fourth level</h4>');
+    expect(body).toContain('<h5>Fifth level</h5>');
+    expect(body).toContain('<hr>');
+    expect(body).toContain('<ol>');
+    expect(body).toContain('<blockquote>');
+    expect(body).toContain('<table>');
+    expect(body).toContain('<a href="https://example.com/source">source link</a>');
+    expect(body).toContain('<strong>bold</strong>');
+    expect(body).toContain('<code>inline code</code>');
+    // Nested list survives as a real nesting rather than a flattened one.
+    expect(body).toMatch(/<ul>[\s\S]*<ul>/);
+
+    // The defect this fixture exists for: no construct may survive as literal text.
+    expect(body).not.toMatch(/^#{1,6}\s/m);
+    expect(body).not.toMatch(/^---\s*$/m);
+    expect(body).not.toMatch(/^\d+\.\s/m);
+    expect(body).not.toMatch(/\[[^\]]+\]\(https?:[^)]+\)/);
+  });
+
+  it('keeps the Mermaid fence as a figure and the plain fence as a code block', () => {
+    const html = buildCareerPlaybookPdfHtml(fixtureInput());
+
+    expect(html).toContain('data-mermaid-source');
+    expect(html).toContain('<pre class="code-block"><code data-language="ts">');
+    expect(html).not.toContain('data-language="mermaid"');
+  });
+
+  it('constrains diagram height so a tall diagram cannot be clipped across pages', () => {
+    const html = buildCareerPlaybookPdfHtml(fixtureInput());
+
+    expect(html).toMatch(/\.mermaid-diagram svg\s*\{[^}]*max-height:\s*200mm/);
+  });
+
+  it('declares a symbol-capable font so check and warning glyphs render', () => {
+    const html = buildCareerPlaybookPdfHtml(fixtureInput());
+
+    expect(html).toMatch(/font-family:[^;]*Noto Sans/);
+  });
+
+  it('produces a PDF with no fully blank page', async () => {
+    const result = await renderCareerPlaybookPdf(fixtureInput());
+    const parser = new PDFParse({ data: new Uint8Array(result.buffer) });
+
+    try {
+      const parsed = await parser.getText();
+      const pages = parsed.pages ?? [];
+
+      expect(pages.length).toBeGreaterThan(0);
+      // The cover is intentionally image-like but still carries the title; every
+      // other page must contain readable text. A page with nothing on it is the
+      // layout artefact this fixture guards against.
+      const blankPages = pages
+        .map((page, index) => ({ index, text: (page.text ?? '').trim() }))
+        .filter(page => page.text.length === 0);
+
+      expect(blankPages.map(page => page.index)).toEqual([]);
+    } finally {
+      await parser.destroy();
+    }
   }, 60_000);
 });

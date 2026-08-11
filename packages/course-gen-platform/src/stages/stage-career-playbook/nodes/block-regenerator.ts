@@ -7,7 +7,18 @@ import type {
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from './final-assembler';
-import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import {
+  buildCareerPlaybookAbortedAttemptCosts,
+  CareerPlaybookLLMCallError,
+  createCareerPlaybookRuntime,
+  type CareerPlaybookRuntime,
+} from './runtime';
+import {
+  formatCareerPlaybookEvidenceLedgerForPrompt,
+  formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookEvidenceLedger,
+  getCareerPlaybookMetricLedger,
+} from './quality-ledger';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 
 export const BLOCK_REGENERATOR_PROMPT_KEY = 'career_playbook_block_regenerator';
@@ -61,6 +72,8 @@ export interface RegenerateCareerPlaybookBlockResult {
   blockId: CareerPlaybookBlockId;
   block: CareerPlaybookBlockState;
   nodeCost: CareerPlaybookNodeCost;
+  /** Unknown-cost rows for attempts that never returned before this call succeeded. */
+  abortedCosts: CareerPlaybookNodeCost[];
 }
 
 export interface CareerPlaybookPendingRegeneration {
@@ -140,6 +153,15 @@ export function buildBlockRegeneratorPromptVariables(
     suggestion: input.issue.suggestion ?? 'none',
     user_instruction: input.userInstruction?.trim() || 'none',
     spec_json: JSON.stringify(input.roleProfileSpec, null, 2),
+    // Without the ledgers a regeneration prompted by a metric conflict simply
+    // invents a third value: it is told the block is wrong but not what right is.
+    metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
+      getCareerPlaybookMetricLedger(input.roleProfileSpec)
+    ),
+    evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
+      getCareerPlaybookEvidenceLedger(input.roleProfileSpec)
+    ),
+    generated_on: input.roleProfileSpec.generated_on ?? new Date().toISOString().slice(0, 10),
     other_blocks_brief:
       input.otherBlocksBrief ?? buildOtherBlocksBrief(input.otherBlocks, input.blockId),
     content_language: input.language,
@@ -162,6 +184,7 @@ function buildNodeCost(result: {
     cost_usd: result.costUsd,
     duration_ms: result.durationMs,
     attempts: result.attemptCount,
+    outcome: 'succeeded',
   };
 }
 
@@ -197,6 +220,10 @@ export async function regenerateCareerPlaybookBlock(
     blockId: input.blockId,
     block,
     nodeCost: buildNodeCost(llmResult),
+    abortedCosts: buildCareerPlaybookAbortedAttemptCosts(
+      'blockRegenerator',
+      llmResult.abortedAttempts
+    ),
   };
 }
 
@@ -350,8 +377,19 @@ export function createBlockRegeneratorNode(
 
       if (outcome.status === 'fulfilled') {
         generatedBlocks[pending.blockId] = outcome.value.block;
-        nodeCosts.push(outcome.value.nodeCost);
+        nodeCosts.push(outcome.value.nodeCost, ...outcome.value.abortedCosts);
         return;
+      }
+
+      // A regeneration that failed outright still consumed provider time; keep
+      // its attempts on the receipt rather than dropping the cost silently.
+      if (outcome.reason instanceof CareerPlaybookLLMCallError) {
+        nodeCosts.push(
+          ...buildCareerPlaybookAbortedAttemptCosts(
+            'blockRegenerator',
+            outcome.reason.abortedAttempts
+          )
+        );
       }
 
       warnings.push(

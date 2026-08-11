@@ -77,6 +77,11 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
     failure_patterns: ['Poor CRM hygiene'],
   },
   research: null,
+  // Quality-contract ledgers. The handler reads the spec through the schema, so
+  // the parsed value always carries these; an older fixture without them no
+  // longer deep-equals what the regenerator receives.
+  metric_ledger: [],
+  evidence_ledger: [],
   block_boundaries: {},
   content_language: 'ru',
 };

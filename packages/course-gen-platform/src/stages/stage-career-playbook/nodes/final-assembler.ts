@@ -327,6 +327,50 @@ export function normalizeCareerPlaybookFinalContent(
   return normalizedBlocks;
 }
 
+const SOURCES_HEADING = { en: 'Sources', ru: 'Источники' } as const;
+
+/**
+ * Append the sources section to the footer block, rendered straight from the
+ * evidence ledger.
+ *
+ * Generated here rather than by the model on purpose: a model-written source
+ * list drifts from the ledger, and a citation that resolves to nothing is worse
+ * than an honest absence. Only entries actually cited in the document are
+ * listed, so the section never advertises sources the guide did not use.
+ */
+export function appendCareerPlaybookSourcesSection(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  roleProfileSpec?: CareerPlaybookRoleProfileSpec
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  const evidence = roleProfileSpec?.evidence_ledger ?? [];
+  const footer = generatedBlocks.block_25;
+  if (evidence.length === 0 || !footer) return generatedBlocks;
+
+  const language = resolveContentLanguage(roleProfileSpec);
+  const heading = SOURCES_HEADING[language];
+  if (new RegExp(`^###\\s+${escapeRegExp(heading)}\\s*$`, 'im').test(footer.content)) {
+    return generatedBlocks;
+  }
+
+  const documentText = Object.values(generatedBlocks)
+    .map(block => block?.content ?? '')
+    .join('\n');
+  const cited = evidence.filter(entry =>
+    new RegExp(`\\[${escapeRegExp(entry.id)}\\]`).test(documentText)
+  );
+  if (cited.length === 0) return generatedBlocks;
+
+  const lines = cited.map(entry => `- [${entry.id}] ${entry.title} — ${entry.url}`);
+
+  return {
+    ...generatedBlocks,
+    block_25: {
+      ...footer,
+      content: `${footer.content.trim()}\n\n### ${heading}\n\n${lines.join('\n')}`,
+    },
+  };
+}
+
 export function prepareCareerPlaybookFinalBlocks(
   input: AssembleCareerPlaybookFinalMarkdownInput
 ): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
@@ -334,7 +378,8 @@ export function prepareCareerPlaybookFinalBlocks(
     input.generatedBlocks,
     input.roleProfileSpec
   );
-  return ensureRequiredMermaidSections(normalizedBlocks, input.roleProfileSpec);
+  const withSources = appendCareerPlaybookSourcesSection(normalizedBlocks, input.roleProfileSpec);
+  return ensureRequiredMermaidSections(withSources, input.roleProfileSpec);
 }
 
 export async function prepareCareerPlaybookFinalBlocksWithQuality(

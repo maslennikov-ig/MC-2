@@ -15,12 +15,32 @@ export interface CareerPlaybookSearchResult {
   content?: string;
 }
 
+/**
+ * A single retrieved result kept whole. The flat `*_insights` and `sources`
+ * arrays lose the link between a claim and the URL that supports it, which is
+ * why the reviewed output asserted precise statistics with no traceable source.
+ * Findings preserve that pairing so the evidence ledger can be built from them.
+ */
+export interface CareerPlaybookResearchFinding {
+  category: CareerPlaybookResearchCategory;
+  title: string;
+  url: string;
+  claim: string;
+}
+
 export interface CareerPlaybookWebResearchResult {
   kpis_insights: string[];
   trends_insights: string[];
   onboarding_insights: string[];
   sources: string[];
+  findings: CareerPlaybookResearchFinding[];
   errors: string[];
+  /**
+   * True when no external source is available for this run (no API key, or every
+   * query failed). Generation continues, but precise external statistics are then
+   * unsupportable and the deterministic sourcing check rejects them.
+   */
+  unavailable: boolean;
 }
 
 export type CareerPlaybookWebSearchClient = (
@@ -33,7 +53,13 @@ export interface RunCareerPlaybookWebResearchOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 5_000;
+// 5s was too tight for a real search round-trip and made the whole grounding
+// path fail open in normal conditions. One retry covers a transient failure
+// without turning research into a latency risk: worst case per category is
+// 2 x 20s, and the three categories run concurrently.
+const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_MAX_RESULTS = 8;
+const SEARCH_ATTEMPTS = 2;
 
 function getAnswerText(qaData: CareerPlaybookQAData, key: string): string | null {
   const fixedAnswer = qaData.fixed.find(answer => answer.question_key === key);
@@ -70,7 +96,9 @@ function createEmptyResearch(errors: string[] = []): CareerPlaybookWebResearchRe
     trends_insights: [],
     onboarding_insights: [],
     sources: [],
+    findings: [],
     errors,
+    unavailable: true,
   };
 }
 
@@ -90,6 +118,18 @@ function mergeResearchResult(
   if (category === 'trends') research.trends_insights.push(...insights);
   if (category === 'onboarding') research.onboarding_insights.push(...insights);
   research.sources.push(...urls);
+
+  for (const result of results) {
+    const claim = toInsight(result);
+    if (!result.url || !claim) continue;
+
+    research.findings.push({
+      category,
+      title: result.title || result.url,
+      url: result.url,
+      claim,
+    });
+  }
 }
 
 async function runWithTimeout<T>(
@@ -113,17 +153,30 @@ async function runWithTimeout<T>(
   }
 }
 
+export class CareerPlaybookResearchUnconfiguredError extends Error {
+  constructor() {
+    super('Career Playbook web research is unconfigured: TAVILY_API_KEY is empty or missing');
+    this.name = 'CareerPlaybookResearchUnconfiguredError';
+  }
+}
+
+/** True when a usable search key is configured. An empty string counts as absent. */
+export function isCareerPlaybookWebResearchConfigured(
+  value: string | undefined = process.env.TAVILY_API_KEY
+): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 export const tavilyCareerPlaybookWebSearchClient: CareerPlaybookWebSearchClient = async (
   researchQuery,
   { signal }
 ) => {
-  const apiKey = process.env.TAVILY_API_KEY;
+  const apiKey = process.env.TAVILY_API_KEY?.trim();
   if (!apiKey) {
-    logger.info(
-      { category: researchQuery.category },
-      'Career Playbook web research skipped: TAVILY_API_KEY is not configured'
-    );
-    return [];
+    // Previously this returned [] and logged at info, so a whole run silently
+    // lost its grounding while the guide kept asserting precise statistics.
+    // Throwing surfaces the condition as a research error the caller reports.
+    throw new CareerPlaybookResearchUnconfiguredError();
   }
 
   const response = await fetch('https://api.tavily.com/search', {
@@ -135,8 +188,8 @@ export const tavilyCareerPlaybookWebSearchClient: CareerPlaybookWebSearchClient 
     body: JSON.stringify({
       api_key: apiKey,
       query: researchQuery.query,
-      search_depth: 'basic',
-      max_results: 5,
+      search_depth: 'advanced',
+      max_results: DEFAULT_MAX_RESULTS,
       include_answer: false,
     }),
   });
@@ -159,6 +212,43 @@ export const tavilyCareerPlaybookWebSearchClient: CareerPlaybookWebSearchClient 
     }));
 };
 
+/**
+ * Run one category query with a bounded retry. A configuration error is not
+ * retried — a missing key will still be missing on the second attempt.
+ */
+async function searchCategoryWithRetry(
+  client: CareerPlaybookWebSearchClient,
+  query: CareerPlaybookResearchQuery,
+  timeoutMs: number
+): Promise<CareerPlaybookSearchResult[]> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < SEARCH_ATTEMPTS; attempt += 1) {
+    try {
+      return await runWithTimeout(
+        signal => client(query, { signal, timeoutMs }),
+        timeoutMs,
+        `Career Playbook web research timed out for ${query.category}`
+      );
+    } catch (error) {
+      if (error instanceof CareerPlaybookResearchUnconfiguredError) throw error;
+      lastError = error;
+      logger.warn(
+        {
+          category: query.category,
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Career Playbook web research attempt failed'
+      );
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Career Playbook web research failed for ${query.category}`);
+}
+
 export async function runCareerPlaybookWebResearch(
   qaData: CareerPlaybookQAData,
   options: RunCareerPlaybookWebResearchOptions = {}
@@ -170,11 +260,7 @@ export async function runCareerPlaybookWebResearch(
 
   const settledResults = await Promise.allSettled(
     queries.map(async query => {
-      const results = await runWithTimeout(
-        signal => client(query, { signal, timeoutMs }),
-        timeoutMs,
-        `Career Playbook web research timed out for ${query.category}`
-      );
+      const results = await searchCategoryWithRetry(client, query, timeoutMs);
       return { query, results };
     })
   );
@@ -190,5 +276,17 @@ export async function runCareerPlaybookWebResearch(
   }
 
   research.sources = Array.from(new Set(research.sources));
+  // Grounding is available only when at least one finding carries a URL. An
+  // empty result set is not a soft warning: it decides whether the generated
+  // guide may state precise external statistics at all.
+  research.unavailable = research.findings.length === 0;
+
+  if (research.unavailable) {
+    logger.warn(
+      { errors: research.errors },
+      'Career Playbook web research produced no sources; run continues without external statistics'
+    );
+  }
+
   return research;
 }

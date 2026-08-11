@@ -7,6 +7,7 @@ import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
 import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { logger } from '@/shared/logger';
+import type { CareerPlaybookNodeCost } from '@megacampus/shared-types';
 import type { z } from 'zod';
 
 export interface CareerPlaybookLLMCallOptions {
@@ -30,6 +31,19 @@ export interface CareerPlaybookLLMCallOptions {
   structuredOutputStrict?: boolean;
 }
 
+/**
+ * An attempt that never returned a usable response. It produced no usage record,
+ * so its cost is unknown rather than zero — the provider may still bill tokens
+ * generated before the abort. Recording these is what turns the cost receipt
+ * from "what we can see" into "what actually happened".
+ */
+export interface CareerPlaybookAbortedAttempt {
+  model: string;
+  attempt: number;
+  durationMs: number;
+  error: string;
+}
+
 export interface CareerPlaybookLLMResult {
   content: string;
   model: string;
@@ -41,6 +55,43 @@ export interface CareerPlaybookLLMResult {
   // always carry timing/attempt ground truth.
   durationMs: number;
   attemptCount: number;
+  /** Attempts that failed before this call eventually succeeded. */
+  abortedAttempts: CareerPlaybookAbortedAttempt[];
+}
+
+/** Thrown when every attempt failed, so the aborted attempts still reach the receipt. */
+export class CareerPlaybookLLMCallError extends Error {
+  constructor(
+    message: string,
+    readonly abortedAttempts: CareerPlaybookAbortedAttempt[],
+    readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = 'CareerPlaybookLLMCallError';
+  }
+}
+
+/**
+ * Convert aborted attempts into node-cost rows carrying an explicit unknown cost.
+ * They are never summed into the total; `unknown_cost_attempts` reports how many
+ * exist so a reader knows the total is a lower bound.
+ */
+export function buildCareerPlaybookAbortedAttemptCosts(
+  node: string,
+  abortedAttempts: readonly CareerPlaybookAbortedAttempt[] | undefined
+): CareerPlaybookNodeCost[] {
+  return (abortedAttempts ?? []).map(attempt => ({
+    node,
+    model: attempt.model,
+    input_tokens: 0,
+    output_tokens: 0,
+    cost_usd: 0,
+    duration_ms: attempt.durationMs,
+    attempts: attempt.attempt + 1,
+    outcome: 'aborted' as const,
+    cost_unknown: true,
+    error: attempt.error,
+  }));
 }
 
 export interface CareerPlaybookRuntime {
@@ -175,6 +226,7 @@ export function createCareerPlaybookRuntime(
       }
       let lastError: unknown = null;
       const callStartedAt = Date.now();
+      const abortedAttempts: CareerPlaybookAbortedAttempt[] = [];
 
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         const useFallback =
@@ -239,9 +291,18 @@ export function createCareerPlaybookRuntime(
             costUsd,
             durationMs: totalDurationMs,
             attemptCount: attempt + 1,
+            abortedAttempts,
           };
         } catch (error) {
           lastError = error;
+          const failedDurationMs = Date.now() - attemptStartedAt;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          abortedAttempts.push({
+            model: modelId,
+            attempt,
+            durationMs: failedDurationMs,
+            error: errorMessage,
+          });
           // The pre-instrumentation catch swallowed retries silently; the failed-attempt
           // warning is the single most valuable diagnostic line for latency/cost runaways.
           logger.warn(
@@ -251,15 +312,19 @@ export function createCareerPlaybookRuntime(
               promptKey: options.promptKey,
               modelId,
               attempt,
-              durationMs: Date.now() - attemptStartedAt,
-              error: error instanceof Error ? error.message : String(error),
+              durationMs: failedDurationMs,
+              error: errorMessage,
             },
             'Career Playbook LLM call attempt failed'
           );
         }
       }
 
-      throw lastError instanceof Error ? lastError : new Error('Career Playbook LLM call failed');
+      throw new CareerPlaybookLLMCallError(
+        lastError instanceof Error ? lastError.message : 'Career Playbook LLM call failed',
+        abortedAttempts,
+        lastError
+      );
     },
   };
 }

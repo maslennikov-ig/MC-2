@@ -4,6 +4,7 @@ import {
   CareerPlaybookRoleProfileSpecSchema,
   type CareerPlaybookNodeCost,
   type CareerPlaybookQAData,
+  type CareerPlaybookQualityIssue,
   type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import {
@@ -15,6 +16,7 @@ import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } fro
 import {
   buildCareerPlaybookResearchQueries,
   runCareerPlaybookWebResearch,
+  type CareerPlaybookWebResearchResult,
   type RunCareerPlaybookWebResearchOptions,
 } from '../rag/web-research';
 import {
@@ -23,7 +25,18 @@ import {
   getCareerPlaybookBusinessContext,
   loadCareerPlaybookBusinessContextSourceExcerpts,
 } from './business-context';
-import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
+import {
+  buildCareerPlaybookAbortedAttemptCosts,
+  CareerPlaybookLLMCallError,
+  createCareerPlaybookRuntime,
+  type CareerPlaybookAbortedAttempt,
+  type CareerPlaybookRuntime,
+} from './runtime';
+import {
+  buildCareerPlaybookEvidenceLedger,
+  normalizeCareerPlaybookMetricLedger,
+  reconcileMetricLedgerSourceRefs,
+} from './quality-ledger';
 
 export { buildCareerPlaybookResearchQueries, runCareerPlaybookWebResearch };
 
@@ -50,11 +63,43 @@ function buildNodeCost(result: {
     cost_usd: result.costUsd,
     duration_ms: result.durationMs,
     attempts: result.attemptCount,
+    outcome: 'succeeded',
   };
+}
+
+/** Success row plus one unknown-cost row per attempt that never returned. */
+function buildNodeCosts(result: {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  durationMs?: number;
+  attemptCount?: number;
+  abortedAttempts?: CareerPlaybookAbortedAttempt[];
+}): CareerPlaybookNodeCost[] {
+  return [
+    buildNodeCost(result),
+    ...buildCareerPlaybookAbortedAttemptCosts('specBuilder', result.abortedAttempts),
+  ];
 }
 
 function errorMessageFrom(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function buildResearchUnavailableQualityIssue(errors: string[]): CareerPlaybookQualityIssue {
+  const detail = errors.length > 0 ? ` Reasons: ${errors.join('; ')}.` : '';
+
+  return {
+    id: 'system:research:unavailable',
+    source: 'system',
+    severity: 'warning',
+    title: 'Внешние источники недоступны',
+    message: `Веб-исследование не вернуло ни одного источника, поэтому Role Guide сгенерирован без внешней статистики: точные рыночные цифры в тексте запрещены и заменены на ориентиры.${detail}`,
+    suggestion:
+      'Проверьте конфигурацию поиска и перегенерируйте блоки, где нужна отраслевая статистика со ссылками.',
+    action: 'review',
+  };
 }
 
 function buildRoleProfileSpecRepairPrompt(basePrompt: string, validationError: unknown): string {
@@ -134,9 +179,11 @@ export function buildSpecBuilderPromptVariables(
     onboarding_insights: string[];
     sources: string[];
     errors?: string[];
+    unavailable?: boolean;
   },
   contentLanguage: string,
-  businessContextSourceExcerpts = '- none'
+  businessContextSourceExcerpts = '- none',
+  generatedOn: string = new Date().toISOString().slice(0, 10)
 ): Record<string, string> {
   const businessContext = getCareerPlaybookBusinessContext(qaData);
 
@@ -151,6 +198,11 @@ export function buildSpecBuilderPromptVariables(
     trends_insights: joinInsights(research.trends_insights),
     onboarding_insights: joinInsights(research.onboarding_insights),
     source_urls: research.sources.length > 0 ? research.sources.join('\n') : 'none',
+    research_availability:
+      (research.unavailable ?? research.sources.length === 0)
+        ? 'unavailable — no external source was retrieved; every metric target must be provenance "assumption" or come from the user answers'
+        : 'available',
+    generated_on: generatedOn,
     content_language: contentLanguage,
   };
 }
@@ -159,7 +211,49 @@ export interface CreateSpecBuilderNodeOptions {
   runtime?: CareerPlaybookRuntime;
   webResearch?: RunCareerPlaybookWebResearchOptions;
   businessContextSourceExcerpts?: (state: CareerPlaybookGraphStateType) => Promise<string>;
+  /** Injectable clock so `generated_on` is deterministic under test. */
+  now?: () => Date;
 }
+
+/**
+ * Apply the application-owned parts of the spec contract on top of whatever the
+ * model returned.
+ *
+ * The model may propose a metric ledger; it may not own the evidence ledger or
+ * the generation date. Both are overwritten unconditionally, because a model
+ * that writes its own citations writes citations that do not resolve — which is
+ * precisely how the reviewed guide ended up asserting "research shows" with no
+ * retrievable source anywhere in the document.
+ */
+export function applyCareerPlaybookLedgers(
+  spec: CareerPlaybookRoleProfileSpec,
+  research: CareerPlaybookWebResearchResult | null,
+  generatedOn: Date
+): CareerPlaybookRoleProfileSpec {
+  const isoDate = generatedOn.toISOString().slice(0, 10);
+  const evidenceLedger = buildCareerPlaybookEvidenceLedger(research, isoDate);
+  const metricLedger = reconcileMetricLedgerSourceRefs(
+    normalizeCareerPlaybookMetricLedger(spec.metric_ledger),
+    evidenceLedger
+  );
+
+  return {
+    ...spec,
+    metric_ledger: metricLedger,
+    evidence_ledger: evidenceLedger,
+    generated_on: isoDate,
+  };
+}
+
+/**
+ * Output budget for the spec call. The previous 8_000 was below what the
+ * contract actually requires: 26 `block_boundaries` entries plus focus areas,
+ * research and the metric ledger. On 2026-08-11 the primary model returned
+ * exactly 8_000 tokens — the signature of a truncated response — the JSON failed
+ * validation, and the repair path forced the weakest model, burning 17.5 minutes
+ * and producing the degraded spec that all 26 blocks inherited.
+ */
+export const CAREER_PLAYBOOK_SPEC_MAX_TOKENS = 16_000;
 
 async function invokeRoleProfileSpecWithFallback(
   runtime: CareerPlaybookRuntime,
@@ -173,7 +267,7 @@ async function invokeRoleProfileSpecWithFallback(
     promptKey: SPEC_BUILDER_PROMPT_KEY,
     node: 'specBuilder',
     temperature: 0.3,
-    maxTokens: 8_000,
+    maxTokens: CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
   };
   const firstResult = await runtime.invokeLLM(prompt, baseOptions);
 
@@ -184,16 +278,43 @@ async function invokeRoleProfileSpecWithFallback(
     };
   } catch (validationError) {
     const repairPrompt = buildRoleProfileSpecRepairPrompt(prompt, validationError);
+    const llmResults = [firstResult];
+
+    // Repair on the SAME model first, with a larger budget. The dominant cause of
+    // a spec parse failure is truncation, and truncation is a budget problem, not
+    // a model-capability problem — downgrading to the fallback model made the
+    // artefact worse and slower at once. The fallback escalation below is kept as
+    // the genuine safety net for a model that cannot produce the shape at all.
+    try {
+      const retryResult = await runtime.invokeLLM(repairPrompt, {
+        ...baseOptions,
+        temperature: 0.2,
+        maxTokensMultiplier: 1.5,
+      });
+      llmResults.push(retryResult);
+
+      return {
+        roleProfileSpec: parseRoleProfileSpecFromLLM(retryResult.content),
+        llmResults,
+      };
+    } catch (retryError) {
+      logger.warn(
+        { error: errorMessageFrom(retryError) },
+        'career playbook spec repair on primary model failed; escalating to fallback model'
+      );
+    }
+
     const fallbackResult = await runtime.invokeLLM(repairPrompt, {
       ...baseOptions,
       temperature: 0.2,
       preferFallbackModel: true,
-      maxTokensMultiplier: 1.25,
+      maxTokensMultiplier: 1.5,
     });
+    llmResults.push(fallbackResult);
 
     return {
       roleProfileSpec: parseRoleProfileSpecFromLLM(fallbackResult.content),
-      llmResults: [firstResult, fallbackResult],
+      llmResults,
     };
   }
 }
@@ -235,7 +356,7 @@ async function enforceCanonicalBlockTopics(
         promptKey: SPEC_BUILDER_PROMPT_KEY,
         node: 'specBuilder',
         temperature: SPEC_TOPIC_RETRY_TEMPERATURE,
-        maxTokens: 8_000,
+        maxTokens: CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
       });
       extraLLMResults.push(retryResult);
       retried = true;
@@ -290,13 +411,15 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
             playbookId: state.playbookId,
             context: businessContext,
           });
+      const generatedOn = (options.now ?? (() => new Date()))();
       const prompt = await runtime.renderPrompt(
         SPEC_BUILDER_PROMPT_KEY,
         buildSpecBuilderPromptVariables(
           state.qaData,
           webResearch,
           state.language,
-          businessContextSourceExcerpts
+          businessContextSourceExcerpts,
+          generatedOn.toISOString().slice(0, 10)
         )
       );
       const { roleProfileSpec, llmResults } = await invokeRoleProfileSpecWithFallback(
@@ -308,16 +431,33 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
         prompt,
         roleProfileSpec
       );
+      const specWithLedgers = applyCareerPlaybookLedgers(canonicalSpec, webResearch, generatedOn);
 
       return {
-        roleProfileSpec: canonicalSpec,
+        roleProfileSpec: specWithLedgers,
         webResearch,
-        nodeCosts: [...llmResults, ...extraLLMResults].map(buildNodeCost),
+        // Losing grounding is a publication-blocking condition, not a log line:
+        // without it the guide may not state a single precise external figure.
+        ...(webResearch.unavailable
+          ? {
+              qualityIssues: [buildResearchUnavailableQualityIssue(webResearch.errors)],
+              warnings: [
+                'Career Playbook web research returned no sources; external statistics are disallowed for this run.',
+              ],
+            }
+          : {}),
+        nodeCosts: [...llmResults, ...extraLLMResults].flatMap(buildNodeCosts),
         currentNode: 'group1Generator',
       };
     } catch (error) {
       return {
         errors: [`specBuilder failed: ${errorMessageFrom(error)}`],
+        // A total failure still consumed provider time; keep its attempts on the
+        // receipt rather than losing the most expensive part of a failed run.
+        nodeCosts:
+          error instanceof CareerPlaybookLLMCallError
+            ? buildCareerPlaybookAbortedAttemptCosts('specBuilder', error.abortedAttempts)
+            : [],
         currentNode: 'specBuilder',
       };
     }

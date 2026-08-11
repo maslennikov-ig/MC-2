@@ -23,7 +23,8 @@
     "supabase:stop": "supabase stop",
     "supabase:migration:up": "supabase migration up",
     "supabase:migration:new": "supabase migration new",
-    "prepare": "husky"
+    "prepare": "husky",
+    "smoke:career-playbook:scorecard": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-scorecard.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

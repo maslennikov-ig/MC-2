@@ -1,3 +1,4 @@
+import { Marked, Renderer, type Tokens } from 'marked';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
@@ -65,13 +66,6 @@ function pdfChrome(language: Language): {
   };
 }
 
-function renderInlineMarkdown(value: string): string {
-  return escapeHtml(value)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-}
-
 function collectMarkdown(input: CareerPlaybookPdfInput): string {
   if (input.finalMarkdown?.trim()) return input.finalMarkdown.trim();
   return BLOCK_ORDER.map(blockId => input.generatedBlocks[blockId]?.content?.trim())
@@ -90,33 +84,6 @@ function extractBlockHeadings(markdown: string): Array<{ id: string; label: stri
   return headings.map((label, index) => ({ id: `block-${index + 1}`, label }));
 }
 
-function renderTable(rows: string[]): string {
-  const parsedRows = rows
-    .map(row =>
-      row
-        .trim()
-        .replace(/^\||\|$/g, '')
-        .split('|')
-        .map(cell => cell.trim())
-    )
-    .filter(row => row.length > 1);
-  if (parsedRows.length === 0) return '';
-
-  const [header, separator, ...body] = parsedRows;
-  const hasSeparator = separator?.every(cell => /^:?-{3,}:?$/.test(cell));
-  const bodyRows = hasSeparator ? body : parsedRows.slice(1);
-  return `<table><thead><tr>${header
-    .map(cell => `<th>${renderInlineMarkdown(cell)}</th>`)
-    .join('')}</tr></thead><tbody>${bodyRows
-    .map(row => `<tr>${row.map(cell => `<td>${renderInlineMarkdown(cell)}</td>`).join('')}</tr>`)
-    .join('')}</tbody></table>`;
-}
-
-function renderParagraph(lines: string[]): string {
-  const text = lines.join(' ').trim();
-  return text ? `<p>${renderInlineMarkdown(text)}</p>` : '';
-}
-
 function renderMermaidFigure(source: string, diagramIndex: number): string {
   const trimmedSource = source.trim();
   return `<figure class="mermaid-figure"><div class="mermaid-diagram" id="mermaid-diagram-${diagramIndex}" data-mermaid-source="${escapeAttribute(trimmedSource)}"><pre>${escapeHtml(trimmedSource)}</pre></div></figure>`;
@@ -126,124 +93,57 @@ function renderCodeBlock(codeLanguage: string, codeLines: string[]): string {
   return `<pre class="code-block"><code data-language="${escapeAttribute(codeLanguage)}">${escapeHtml(codeLines.join('\n'))}</code></pre>`;
 }
 
+/**
+ * Render the guide body to HTML.
+ *
+ * This used to be a hand-rolled line scanner that understood h1-h3, tables,
+ * `-`/`*` lists and code fences, and dropped everything else into a paragraph
+ * verbatim. The reviewed 60-page export therefore printed `#### Bucket ...` and
+ * nine `---` rules as literal text, and split 37 ordered-list lines into
+ * separate paragraphs. Links were not rendered at all, which would have broken
+ * the source citations outright.
+ *
+ * A real parser closes that class of defect rather than the six known instances
+ * of it. Three integrations are preserved through a custom renderer, because the
+ * rest of the pipeline depends on them:
+ *
+ * - a `mermaid` fence must emit `data-mermaid-source` for `renderMermaidDiagrams`
+ * - a block `##` heading must keep `id="block-N"` for the table of contents
+ * - everything else must stay inside the print stylesheet's expectations
+ */
 function renderMarkdownBody(markdown: string): string {
-  const htmlChunks: string[] = [];
-  const lines = markdown.split(/\r?\n/);
-  let paragraph: string[] = [];
-  let listItems: string[] = [];
-  let tableRows: string[] = [];
-  let inCodeFence = false;
-  let codeLanguage = '';
-  let codeLines: string[] = [];
   let blockNumber = 0;
   let diagramNumber = 0;
 
-  const flushParagraph = () => {
-    const rendered = renderParagraph(paragraph);
-    if (rendered) htmlChunks.push(rendered);
-    paragraph = [];
-  };
-  const flushList = () => {
-    if (listItems.length === 0) return;
-    htmlChunks.push(
-      `<ul>${listItems.map(item => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</ul>`
-    );
-    listItems = [];
-  };
-  const flushTable = () => {
-    if (tableRows.length > 0) htmlChunks.push(renderTable(tableRows));
-    tableRows = [];
-  };
-  const flushFlow = () => {
-    flushParagraph();
-    flushList();
-    flushTable();
-  };
-
-  for (const line of lines) {
-    const codeFence = /^```([a-zA-Z0-9_-]*)?\s*$/.exec(line);
-    if (codeFence) {
-      if (inCodeFence) {
-        if (codeLanguage.toLowerCase() === 'mermaid') {
+  const parser = new Marked({ gfm: true, breaks: false });
+  parser.use({
+    renderer: {
+      code(this: Renderer, token: Tokens.Code) {
+        if ((token.lang ?? '').toLowerCase() === 'mermaid') {
           diagramNumber += 1;
-          htmlChunks.push(renderMermaidFigure(codeLines.join('\n'), diagramNumber));
-        } else {
-          htmlChunks.push(renderCodeBlock(codeLanguage, codeLines));
+          return renderMermaidFigure(token.text, diagramNumber);
         }
-        inCodeFence = false;
-        codeLanguage = '';
-        codeLines = [];
-      } else {
-        flushFlow();
-        inCodeFence = true;
-        codeLanguage = codeFence[1] ?? '';
-      }
-      continue;
-    }
-    if (inCodeFence) {
-      codeLines.push(line);
-      continue;
-    }
+        return renderCodeBlock(token.lang ?? '', token.text.split('\n'));
+      },
+      heading(this: Renderer, token: Tokens.Heading) {
+        const inline = this.parser.parseInline(token.tokens);
 
-    const h1 = /^#\s+(.+)$/.exec(line);
-    if (h1) {
-      flushFlow();
-      htmlChunks.push(`<h1>${renderInlineMarkdown(stripMarkdownInline(h1[1] ?? ''))}</h1>`);
-      continue;
-    }
-    const h2 = /^##\s+(.+)$/.exec(line);
-    if (h2) {
-      flushFlow();
-      const label = stripMarkdownInline(h2[1] ?? '');
-      if (/^header$/i.test(label)) {
-        htmlChunks.push(`<h2>${renderInlineMarkdown(label)}</h2>`);
-        continue;
-      }
+        if (token.depth === 2) {
+          const label = stripMarkdownInline(token.text);
+          // The Header block is a title, not a numbered section: it carries no
+          // table-of-contents anchor, matching extractBlockHeadings below.
+          if (/^header$/i.test(label)) return `<h2>${inline}</h2>`;
 
-      blockNumber += 1;
-      htmlChunks.push(
-        `<h2 id="block-${blockNumber}" class="playbook-block-heading">${renderInlineMarkdown(label)}</h2>`
-      );
-      continue;
-    }
-    const h3 = /^###\s+(.+)$/.exec(line);
-    if (h3) {
-      flushFlow();
-      htmlChunks.push(`<h3>${renderInlineMarkdown(stripMarkdownInline(h3[1] ?? ''))}</h3>`);
-      continue;
-    }
-    if (/^\s*\|.+\|\s*$/.test(line)) {
-      flushParagraph();
-      flushList();
-      tableRows.push(line);
-      continue;
-    }
-    const listItem = /^\s*[-*]\s+(.+)$/.exec(line);
-    if (listItem) {
-      flushParagraph();
-      flushTable();
-      listItems.push(listItem[1] ?? '');
-      continue;
-    }
-    if (line.trim() === '') {
-      flushFlow();
-      continue;
-    }
-    flushList();
-    flushTable();
-    paragraph.push(line.trim());
-  }
+          blockNumber += 1;
+          return `<h2 id="block-${blockNumber}" class="playbook-block-heading">${inline}</h2>`;
+        }
 
-  if (inCodeFence) {
-    if (codeLanguage.toLowerCase() === 'mermaid') {
-      diagramNumber += 1;
-      htmlChunks.push(renderMermaidFigure(codeLines.join('\n'), diagramNumber));
-    } else {
-      htmlChunks.push(renderCodeBlock(codeLanguage, codeLines));
-    }
-  }
-  flushFlow();
-  return htmlChunks.join('\n');
+        return `<h${token.depth}>${inline}</h${token.depth}>`;
+      },
+    },
+  });
+
+  return parser.parse(markdown, { async: false });
 }
 
 function renderMetadata(input: CareerPlaybookPdfInput): string {
@@ -271,7 +171,11 @@ const PRINT_CSS = `
 * { box-sizing: border-box; }
 body {
   color: #172033;
-  font-family: Inter, Arial, sans-serif;
+  /* Noto/DejaVu carry the check and warning glyphs the guide uses in checklist
+     tables. Without a symbol-capable family they degraded to empty boxes on the
+     reviewed export, because the container ships neither Inter nor a fallback
+     that covers U+2705/U+26A0. */
+  font-family: Inter, "Noto Sans", "DejaVu Sans", "Noto Sans Symbols 2", Arial, sans-serif;
   font-size: 11pt;
   line-height: 1.55;
   margin: 0;
@@ -325,17 +229,41 @@ a { color: inherit; text-decoration: none; }
 .pdf-toc ol { columns: 2; column-gap: 12mm; margin: 0; padding-left: 6mm; }
 .pdf-toc li { break-inside: avoid; margin: 0 0 3mm; }
 .playbook-block-heading {
-  break-before: page;
+  /* Was break-before: page. Forcing 26 unconditional page breaks, combined with
+     break-inside: avoid on the figures below, produced three fully blank pages
+     (20, 34, 57) in the reviewed export. Keeping the heading with its first
+     paragraph achieves the same visual separation without the empty pages. */
+  break-before: auto;
+  break-after: avoid;
+  margin-top: 10mm;
   border-bottom: 1px solid #cbd5e1;
   padding-bottom: 4mm;
 }
-h1 { color: #0f172a; font-size: 24pt; line-height: 1.15; margin: 0 0 8mm; }
-h2 { color: #0f172a; font-size: 18pt; line-height: 1.2; margin: 0 0 5mm; }
-h3 { color: #1e293b; font-size: 14pt; margin: 8mm 0 3mm; }
-p, ul, table, .mermaid-figure, .code-block { margin: 0 0 4mm; }
-ul { padding-left: 6mm; }
+h1 { color: #0f172a; font-size: 24pt; line-height: 1.15; margin: 0 0 8mm; break-after: avoid; }
+h2 { color: #0f172a; font-size: 18pt; line-height: 1.2; margin: 0 0 5mm; break-after: avoid; }
+h3 { color: #1e293b; font-size: 14pt; margin: 8mm 0 3mm; break-after: avoid; }
+h4 { color: #1e293b; font-size: 12pt; margin: 6mm 0 2mm; break-after: avoid; }
+h5, h6 { color: #334155; font-size: 11pt; margin: 5mm 0 2mm; break-after: avoid; }
+p, ul, ol, table, .mermaid-figure, .code-block, blockquote { margin: 0 0 4mm; }
+/* Keep a lone first/last line from being stranded across a page boundary; the
+   reviewed export left the FMEA tail on a quarter page and the FAQ continuation
+   on a few lines. */
+p, ul, ol, blockquote { orphans: 3; widows: 3; }
+ul, ol { padding-left: 6mm; }
 li { margin-bottom: 1.5mm; }
-table { border-collapse: collapse; break-inside: avoid; width: 100%; }
+ul ul, ul ol, ol ul, ol ol { margin: 1.5mm 0 0; }
+blockquote {
+  border-left: 3px solid #cbd5e1;
+  color: #334155;
+  padding-left: 4mm;
+}
+hr { border: none; border-top: 1px solid #cbd5e1; margin: 6mm 0; }
+.pdf-content a { color: #0f766e; text-decoration: underline; }
+/* Long tables used to be pushed whole onto the next page. Break them by row and
+   repeat the header instead, which removes the pushed-page whitespace. */
+table { border-collapse: collapse; break-inside: auto; width: 100%; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
 th, td {
   border: 1px solid #cbd5e1;
   padding: 2.5mm;
@@ -360,7 +288,15 @@ th { background: #eef2f7; color: #0f172a; font-weight: 700; }
   padding: 4mm;
 }
 .mermaid-diagram { display: flex; justify-content: center; width: 100%; }
-.mermaid-diagram svg { height: auto !important; max-width: 100% !important; }
+/* max-height is what stops a tall diagram from being clipped across a page
+   boundary — the revision-flow diagram was split between pages 58 and 59 with
+   the bottom node cut off. 200mm leaves room for the figure padding inside the
+   A4 text block. */
+.mermaid-diagram svg {
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 200mm !important;
+}
 `;
 
 export function buildCareerPlaybookPdfHtml(input: CareerPlaybookPdfInput): string {
