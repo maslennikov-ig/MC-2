@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "sha256sum --check .codex/stages/mc2-db696.105/evidence/artifacts.sha256",
+      "duration_seconds": 0.006,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "sha256sum --check .codex/stages/mc2-db696.105/evidence/artifacts.sha256"
+  ],
+  "completed_at": "2026-08-11T09:00:01.342654+00:00",
+  "diff_digest": "ab1912d0ff8b784cf6884ccad6b27b57c16136983a5ae8fabe6edfff0cf2de67",
+  "environment_marker": "Linux-x86_64-python-3.14",
+  "git_head": "94eaac613a581a906769646b212823003f60e137",
+  "idempotency_key": "a0b51bd8bd227cb7cadfa49040e0e110dd9b17695f1c8fd376b1c2122bff47fd",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.105",
+  "started_at": "2026-08-11T09:00:01.183619+00:00",
+  "verification_fingerprint": "a0b51bd8bd227cb7cadfa49040e0e110dd9b17695f1c8fd376b1c2122bff47fd"
+}

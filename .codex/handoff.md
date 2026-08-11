@@ -1,17 +1,36 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-ve1eq`
+Updated: 2026-08-11. Effective kernel: `shared-orchestration/v1`.
+Current stage id: `mc2-db696.105`
 
 ## Current stage
 
-`mc2-ve1eq` is accepted locally. The repository and active CI now pin pnpm 10.34.5; frozen install
-and audit are clean under Node 24, the v9 lockfile migration is reproducible, and a clean temporary
-clone passed all reviewed dependency build scripts plus backend/web production builds. New
-unreviewed dependency build scripts fail closed. The pnpm 10 Docker delivery correction explicitly
-preserves the existing non-injected workspace deployment through `forceLegacyDeploy`; the real
-backend deploy command produces a portable package again. There are no delegated worktrees or live
-actions.
+`mc2-db696.105` is accepted locally on `codex/career-playbook-quality-review`. One isolated dev Career
+Playbook completed for USD 0.122550285 of application-recorded usage, below the USD 0.50 ceiling.
+The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cover. The technically
+complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
+and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
+
+The quality-v2 track is now specified and sliced, still on the same branch and still docs-only —
+no product code changed. The causes behind the 2.6/5 score were traced to ten structural defects
+in the generation tract, not to model noise, and are recorded with `file:line` evidence in
+`docs/career-playbook/quality-root-cause-2026-08-11.md`. Normative rules live in
+`docs/career-playbook/quality-contract.md`; the prompt specification was rewritten to v2 in
+`docs/plans/career-playbook/03-prompts-structure.md`; the PDF decision is `docs/ADR-008-career-playbook-pdf-rendering.md`;
+acceptance is `docs/plans/career-playbook/06-quality-acceptance.md`; the plan is
+`docs/plans/buzzing-jingling-oasis.md`; the Codex handoff prompt is
+`docs/plans/career-playbook/ORCHESTRATOR_PROMPT-quality-v2.md` (`orch-prompts prompt-check`: pass,
+one size warning).
+
+Nineteen tasks are open under the same epic with a wired, cycle-free dependency graph:
+`mc2-db696.107.1`-`.107.10` (spec contract, grounding, editorial), `mc2-db696.106.1`-`.106.3` (PDF),
+`mc2-db696.108.1`-`.108.3` (reliability and cost receipt), `mc2-db696.109` (acceptance harness),
+`mc2-db696.110` (authorized paid representative run), `mc2-db696.111` (cover). Currently unblocked:
+`.107.1`, `.107.6`, `.106.1`, `.108.1`, `.108.2`, `.108.3`. Targets: overall >= 4.0/5, cost <= USD 0.35,
+wall clock <= 25 min. `mc2-db696.110` needs explicit user authorization because it is a paid run.
+
+The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
+within budget with zero residue. It is not merged into `develop`; no deploy was performed.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -116,6 +135,14 @@ research, and owner-decision items remain explicitly deferred.
   active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
   build policy, explicit-script-only workspace behavior and legacy-compatible portable backend
   deploy pass focused clean-install/build/deploy proofs.
+- Career Playbook 10-concurrent acceptance completed 10/10 main jobs with 1,359 ms pickup spread,
+  64 readiness writes, USD 1.19633817 total cost, USD 0.160969265 max cost, and zero cleanup
+  residue. The original 9/10 report was an observer-token expiry, not a generation failure; the
+  refresh/retry path and the separately exposed image-client JSDOM guard now have focused coverage.
+- Career Playbook quality review completed one 27-block result for USD 0.122550285. Structural smoke
+  passed, but personal editorial/PDF review scored 2.6/5; blockers are `.106` through `.108`.
+- `graph-reviewed: updated` — Graphify 0.9.14 rebuilt the local-only graph without external
+  semantic backends to 61,733 nodes, 88,850 edges, and 7,352 communities.
 
 ## Live operational facts
 
@@ -137,7 +164,6 @@ research, and owner-decision items remain explicitly deferred.
 
 - `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
-- `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
 
 ## Safety boundary
 
@@ -164,7 +190,9 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
-- `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
+- `mc2-db696.61` — owner decision above.
+- `mc2-db696.106`/`.107`/`.108` — fix PDF fidelity, ground and normalize content, and bound
+  provider timeouts while making latency/cost receipts reliable.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
   reconsider only if another regular production operator appears.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -172,12 +200,11 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-ve1eq`
-Current stage id: `mc2-ve1eq`
-Next stage id: none without an owner/live/migration boundary decision
-Recommended action: preserve the accepted local commits, then request explicit authority before an
-ordinary push or any deploy. Remaining product work requires an owner decision, live spend, a
-forbidden schema migration, production observation, or a §9 reopen gate.
+Accepted stage id: `mc2-db696.105`
+Current stage id: `mc2-db696.105`
+Next stage id: `mc2-db696.107` when implementation is selected
+Recommended action: fix content grounding first, then PDF fidelity and timeouts. Do not run another
+paid generation before deterministic coverage and a new explicit budget.
 
 ## Starter prompt for next orchestrator
 

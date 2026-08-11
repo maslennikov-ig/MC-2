@@ -1,400 +1,425 @@
-# Career Playbook — Prompts Structure (Phase 2-3)
+# Career Playbook — Prompts Structure (v2)
 
-Все промпты регистрируются в `career-playbook-prompts.ts` и грузятся через существующий `PromptService.getPrompt()`. Каждый промпт имеет ru + en версии (плюс остальные content languages добавляются позже как fallback к en).
+Версия 2 от 2026-08-11. Заменяет v1 после представительного прогона качества.
+Причины изменений: [../../career-playbook/quality-root-cause-2026-08-11.md](../../career-playbook/quality-root-cause-2026-08-11.md).
+Нормативные правила: [../../career-playbook/quality-contract.md](../../career-playbook/quality-contract.md).
 
-## Prompt registry
+Все промпты живут в `packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts`
+как массив `HardcodedPrompt[]` и грузятся через `PromptService.renderPrompt()`.
 
-```typescript
-// packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts
+## Что изменилось в v2
 
-export const CAREER_PLAYBOOK_PROMPTS = {
-  // Phase A → Phase B bridge: генерация follow-up вопросов
-  career_playbook_followup_generator: {
-    /* ... */
-  },
+| #   | Изменение                                                                     | Закрывает                                                 |
+| --- | ----------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | `RoleProfileSpec` получает `metric_ledger`, `evidence_ledger`, `generated_on` | Конфликты метрик, отсутствие источников, устаревшие даты  |
+| 2   | Групповые промпты получают четыре новые переменные                            | То же + противоречия между блоками                        |
+| 3   | Правило «выдумай реалистичный пример» заменено правилом маркировки            | Выдуманное как корпоративная правда                       |
+| 4   | Таксономия судьи расширена четырьмя критичными категориями                    | Судья пропускал конфликты чисел и недоказанную статистику |
+| 5   | `contradiction` теперь покрывает противоречие **другому блоку**               | Возврат требования из v1, потерянного при реализации      |
+| 6   | Рубрика обратимости решений и правила карьерной лестницы                      | Завышенная классификация решений, дубль уровней           |
 
-  // Phase Q&A → spec
-  career_playbook_spec_builder: {
-    /* ... */
-  },
+## Реестр промптов
 
-  // Generation groups (1 промпт на группу × N языков; 26 блоков встроены в structured output spec)
-  career_playbook_group_1_foundation: {
-    /* Header + 1 Mission + 2 Anti-goals + 5 Decision Matrix */
-  },
-  career_playbook_group_2_operations: {
-    /* 3 Responsibility + 4 Duties + 6 KPI + 8 Tools */
-  },
-  career_playbook_group_3_people: {
-    /* 7 Competencies + 9 Human-AI + 12 Candidate + 13 Day */
-  },
-  career_playbook_group_4_growth: {
-    /* 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags */
-  },
-  career_playbook_group_5_system: {
-    /* 10 Dependencies + 16 Processes + 19 Industry + 20 Business + 21 Failure */
-  },
-  career_playbook_group_6_wrap: {
-    /* 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer */
-  },
+| `promptKey`                             | Назначение                                                                | Модель (фаза)                       |
+| --------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------- |
+| `career_playbook_department_classifier` | Классификация названия роли в функциональную область                      | `stage_career_playbook_followup`    |
+| `career_playbook_followup_generator`    | 3-7 адаптивных уточняющих вопросов                                        | `stage_career_playbook_followup`    |
+| `career_playbook_spec_builder`          | Q&A + research → `RoleProfileSpec`                                        | `stage_career_playbook_spec`        |
+| `career_playbook_group_1_foundation`    | Header + 1 Mission + 2 Anti-goals + 5 Decision Matrix                     | `stage_career_playbook_group_1`     |
+| `career_playbook_group_2_operations`    | 3 Responsibility + 4 Duties + 6 KPI + 8 Tools                             | `stage_career_playbook_group_2`     |
+| `career_playbook_group_3_people`        | 7 Competencies + 9 Human-AI + 12 Candidate + 13 Day                       | `stage_career_playbook_group_3`     |
+| `career_playbook_group_4_growth`        | 11 Career + 14 Onboarding + 15 Motivation + 17 Red flags                  | `stage_career_playbook_group_4`     |
+| `career_playbook_group_5_system`        | 10 Dependencies + 16 Processes + 19 Industry + 20 Business + 21 Failure   | `stage_career_playbook_group_5`     |
+| `career_playbook_group_6_wrap`          | 18 FAQ + 22 README + 23 Continuity + 24 Canvas + 25 Footer + 26 Checklist | `stage_career_playbook_group_6`     |
+| `career_playbook_cross_block_judge`     | Проверка согласованности группы                                           | `stage_career_playbook_judge`       |
+| `career_playbook_block_regenerator`     | Перегенерация одного блока по замечанию                                   | `stage_career_playbook_regenerator` |
+| `career_playbook_card`                  | Обложка (в БД, `stage_7`)                                                 | Image-модель                        |
 
-  // Cross-block judge
-  career_playbook_cross_block_judge: {
-    /* ... */
-  },
+Канонический список 26 блоков — единственный источник правды в
+`shared/prompts/career-playbook-block-topics.ts`; он же подставляется в промпт spec-builder через
+`formatCareerPlaybookCanonicalLayoutForPrompt()`. Не дублировать раскладку в текстах промптов.
 
-  // Block regenerator (с targeted instruction)
-  career_playbook_block_regenerator: {
-    /* ... */
-  },
+---
 
-  // Course bridge (для генерации course_brief из Role Guide)
-  career_playbook_course_brief_extractor: {
-    /* ... */
-  },
-} satisfies HardcodedPromptRegistry;
-```
+## RoleProfileSpec v2
 
-## RoleProfileSpec schema
-
-Контракт между Q&A и генерацией блоков. Заполняется `spec-builder` нодой.
+Контракт между Q&A и генерацией блоков. Схема:
+`packages/shared-types/src/career-playbook.ts`, `CareerPlaybookRoleProfileSpecSchema`.
 
 ```typescript
 interface RoleProfileSpec {
-  // Identity (из fixed answers)
   position: {
-    title: string; // "Менеджер по продажам B2B"
-    slug: string; // "sales-manager-b2b"
-    department: string; // 'sales'
-    specialization?: string; // "Enterprise sales" (опционально, из LLM или fixed Q)
+    title: string;
+    slug: string;
+    department: string;
+    specialization?: string;
     level: 'junior' | 'middle' | 'senior' | 'lead' | 'director' | 'c-level';
   };
 
-  // Context
   context: {
     company_stage?: 'pre-pmf' | 'growth' | 'scale' | 'mature';
     team_size: '1-10' | '11-50' | '51-200' | '201-1000' | '1000+';
-    reports_to: string; // "CRO"
+    reports_to: string;
     has_subordinates: boolean;
     subordinates_description?: string;
-    industry?: string; // выводится LLM из department + context
-    region?: string; // если в Q&A был указан
+    industry?: string;
+    region?: string;
   };
 
-  // Focus (LLM из всех ответов извлекает)
   focus_areas: {
-    primary_kpis: string[]; // 3-5 ключевых метрик роли
-    key_tools: string[]; // top 5-8 инструментов
-    critical_competencies: string[]; // 4-6 must-have навыков
-    anti_goals: string[]; // 4-6 чего эта роль НЕ делает (важно для блока 2)
-    failure_patterns: string[]; // 3-5 typical failure modes (для блока 21)
+    primary_kpis: string[]; // 3-5 названий метрик
+    key_tools: string[];
+    critical_competencies: string[];
+    anti_goals: string[];
+    failure_patterns: string[];
   };
 
-  // Research (от web-research ноды)
+  // ── НОВОЕ В v2 ──────────────────────────────────────────────────────────
+  // Канонический реестр чисел. Каждая метрика из primary_kpis обязана иметь
+  // здесь запись. Блоки цитируют значения дословно и не вводят своих.
+  metric_ledger: Array<{
+    key: string; // 'pipeline_coverage'
+    label: string; // как метрика называется в тексте
+    unit: string; // 'x' | '%' | 'дней' | ''
+    target: string; // '>=3x'
+    green: string;
+    yellow: string;
+    red: string;
+    review_period: string; // 'неделя' | 'месяц' | 'квартал' | 'год'
+    provenance: 'company_source' | 'user_answer' | 'benchmark' | 'assumption';
+    source_ref: string | null; // id из evidence_ledger
+  }>;
+
+  // Реестр источников. ЗАПОЛНЯЕТСЯ КОДОМ из результата web-research,
+  // не моделью. Любые записи из ответа LLM отбрасываются.
+  evidence_ledger: Array<{
+    id: string; // 'S1'
+    url: string;
+    title: string;
+    claim: string; // что именно подтверждает источник
+    retrieved_at: string;
+  }>;
+
+  // Дата генерации. Заполняется кодом из системного времени.
+  generated_on: string; // ISO-дата
+  // ────────────────────────────────────────────────────────────────────────
+
   research: {
-    kpis_insights: string[]; // факты из web search про KPI
-    trends_insights: string[]; // trends + AI impact
-    onboarding_insights: string[]; // onboarding best practices
-    sources: string[]; // URLs (для аудита)
+    kpis_insights: string[];
+    trends_insights: string[];
+    onboarding_insights: string[];
+    sources: string[];
   } | null;
 
-  // Boundaries (anti-repetition contract)
+  business_context?: {
+    mode: 'universal' | 'company_specific';
+    digest: BusinessContextDigest | null;
+    source_ids: string[];
+  };
+
   block_boundaries: {
-    // Какие темы упоминаются в каком блоке (чтобы другие не повторяли)
     [blockId: string]: {
-      primary_topics: string[]; // основные темы
-      do_not_repeat: string[]; // что уже сказано в других блоках
+      primary_topics: string[];
+      do_not_repeat: string[];
     };
   };
 
-  // Language (для контента)
-  content_language: string; // 'ru' | 'en' | 'es' | ...
+  content_language: string;
 }
 ```
 
-## Prompt templates
+### Разделение ответственности при заполнении
 
-### `career_playbook_followup_generator`
+| Поле               | Кто заполняет                             | Как обеспечивается                                                                   |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `block_boundaries` | LLM, затем детерминированная нормализация | `normalizeRoleProfileSpecToCanonicalBlockTopics` (`nodes/spec-builder-canonical.ts`) |
+| `metric_ledger`    | LLM, затем детерминированная нормализация | Схлопывание дубликатов по `key`, отбрасывание пустых `target`, нормализация `unit`   |
+| `evidence_ledger`  | **Только код**                            | Сборка из `runCareerPlaybookWebResearch`, id `S1..Sn` по порядку                     |
+| `generated_on`     | **Только код**                            | Системное время в момент построения спеки                                            |
 
-Цель: после Phase A — LLM генерирует 3-7 adaptive follow-up вопросов.
+Причина строгого разделения: в прогоне 2026-08-11 модель произвольно сочиняла обороты «Research
+shows» без привязки к реальным URL, потому что источники существовали только внутри промпта
+spec-builder и терялись дальше.
+
+---
+
+## Общие правила групповых промптов
+
+Все шесть промптов `career_playbook_group_*` получают одинаковый набор переменных:
+
+| Переменная                | Содержимое                                  |
+| ------------------------- | ------------------------------------------- |
+| `spec_json`               | Сериализованный `RoleProfileSpec`           |
+| `content_language`        | Код целевого языка                          |
+| `heading_*`               | Локализованные заголовки блоков этой группы |
+| **`metric_ledger_md`**    | Реестр метрик как markdown-таблица          |
+| **`evidence_ledger_md`**  | Список `[S1] title — url — claim`           |
+| **`generated_on`**        | Дата генерации                              |
+| **`prior_blocks_digest`** | Выжимка уже принятых блоков                 |
+
+Жирным — новое в v2.
+
+### Блок общих правил (одинаков во всех шести промптах)
 
 ```
-SYSTEM:
-Ты — HR-эксперт, который помогает создать operational role guide.
-Тебе дали ответы пользователя на стартовые вопросы. Сгенерируй 3-7 дополнительных
-вопросов, которые помогут собрать критичные данные для качественного Role Guide
-по методологиям Netflix/Amazon/Toyota/Spotify/Bridgewater.
+Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- For Russian output, translate user-facing framework labels and table labels.
+  Common KPI acronyms from user context may remain unchanged.
 
-Учитывай department-specific direction:
-- sales: ACV, типы сделок, цикл, воронка
-- engineering: стек, scale challenges, prod issues
-- ... (см. fixed-questions-seed.md "Department-specific")
+NUMBERS — canonical ledger:
+- The metric ledger below is the single source of numeric truth.
+  Reproduce every value and traffic-light threshold from it VERBATIM.
+- Never introduce a different number for a metric that appears in the ledger.
+- A metric absent from the ledger is described qualitatively, without a precise
+  threshold.
 
-Каждый вопрос:
-- Сфокусирован на ОДНОМ конкретном аспекте
-- Имеет clear value для Role Guide (не любопытство)
-- Mix форматов: предпочитай single_choice / multi_choice если можешь дать sensible options
+EXTERNAL CLAIMS — sourcing:
+- A precise statistic about the market, industry, competitors, or AI impact is
+  allowed ONLY with a [Sn] reference to the evidence ledger below.
+- With no matching evidence entry, rewrite the statement without a precise
+  number, as an explicit hypothesis to validate.
+- Never write "research shows", "studies indicate", or a dated study reference
+  without a [Sn] reference.
 
-Верни JSON:
-{
-  "questions": [
-    {
-      "question_id": "uuid_v4_string",
-      "question_text": "...",
-      "question_type": "open" | "single_choice" | "multi_choice",
-      "options": [{value, label}, ...] | null,
-      "rationale": "почему это важно для Role Guide"
-    }
-  ],
-  "completeness_score": 0.0-1.0,
-  "stop_recommendation": "ask_more" | "ready_to_generate"
-}
+EXAMPLES — marking:
+- A company-specific value not backed by the business context or the user's
+  answers (salary, bonus, ARR, budget, person name, internal tool) stays
+  concrete but MUST carry the marker "(example — replace)" immediately after
+  the value, in the same sentence or table cell.
+- Never leave raw bracket placeholders such as [Name] or {value}.
 
-completeness_score:
-- 0.0-0.4 — критически мало данных, точно нужны ещё вопросы
-- 0.4-0.7 — middle, желательны ещё 2-3
-- 0.7-0.95 — достаточно для generation, можно один уточняющий
-- 0.95+ — готовы генерировать
+DATES:
+- Today is {{generated_on}}.
+- Plans, schedules, and Gantt-style tables use relative labels only:
+  "Day 1-30", "Week 2", "Quarter 1", "Month 3".
+- An absolute calendar year is allowed only in the block 25 footer and must
+  equal the year of {{generated_on}}.
 
+CONSISTENCY WITH EARLIER BLOCKS:
+- The digest below lists anti-goals, numeric commitments, named parties, and
+  promised cadences already published in accepted blocks.
+- Do not contradict any of them. If a duty would violate a stated anti-goal,
+  restate the duty so both hold.
+
+BLOCK BOUNDARIES:
+- When RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a
+  block, define that topic only in the owning block and cross-reference it here.
+```
+
+Раздел USER во всех групповых промптах:
+
+```
 USER:
-Position: {{position}}
-Department: {{department}}
-Level: {{level}}
-Team size: {{team_size}}
-Company stage: {{company_stage}}
-Reports to / subordinates: {{reporting}}
-Content language: {{content_language}}
+RoleProfileSpec:
+{{spec_json}}
 
-Free-form context (если есть): {{freeform_text}}
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
 
-Previous follow-ups answered: {{previous_followups_json}}
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
+
+Already published content (do not contradict):
+{{prior_blocks_digest}}
 ```
 
-Output validation (Zod):
+### `prior_blocks_digest`
 
-```typescript
-const FollowupResponseSchema = z.object({
-  questions: z
-    .array(
-      z.object({
-        question_id: z.string(),
-        question_text: z.string(),
-        question_type: z.enum(['open', 'single_choice', 'multi_choice']),
-        options: z.array(z.object({ value: z.string(), label: z.string() })).nullable(),
-        rationale: z.string(),
-      })
-    )
-    .min(0)
-    .max(7),
-  completeness_score: z.number().min(0).max(1),
-  stop_recommendation: z.enum(['ask_more', 'ready_to_generate']),
-});
-```
+Строится детерминированно из `state.generatedBlocks` в `group-generator.ts` перед вызовом:
 
-### `career_playbook_spec_builder`
+- анти-цели из блока 2 — полным списком;
+- числовые обязательства из принятых блоков в формате `метрика: значение`;
+- названные роли, инструменты и лица;
+- обещанные ритмы взаимодействия (ежедневно / еженедельно / ежемесячно).
 
-Цель: из Q&A + web research → RoleProfileSpec.
+Лимит 1500 токенов; при усечении анти-цели и числовые обязательства сохраняются всегда.
+
+Для группы 1 значение — `none` (предыдущих блоков нет).
+
+---
+
+## Методологические блоки по группам
+
+Раздел `Methodology:` каждого промпта остаётся прежним, кроме двух групп.
+
+### Группа 1 — рубрика решений (блок 5)
+
+Заменяет единственную метку «one-way / two-way door»:
 
 ```
-SYSTEM:
-Из ответов пользователя на вопросы и web research результатов сформируй
-RoleProfileSpec. Это контракт, который будет использоваться при генерации
-26 блоков Role Guide. Качество спецификации напрямую влияет на качество
-всего документа.
-
-Особенно важно:
-- block_boundaries — что упоминается в каком блоке. Это предотвращает
-  повторы. Например, если competencies (block 7) уже упоминают "переговоры",
-  блок 4 (duties) НЕ должен повторять "переговоры" как competency, только
-  как activity.
-- anti_goals — что роль НЕ делает (для блока 2)
-- failure_patterns — типичные провалы (для блока 21)
-
-Верни JSON по схеме RoleProfileSpec.
-
-USER:
-Q&A answers: {{qa_data_json}}
-Web research:
-- KPI insights: {{kpi_insights}}
-- Trends: {{trends_insights}}
-- Onboarding: {{onboarding_insights}}
-
-Output language: {{content_language}}
+- Block 5: classify every decision on FOUR independent axes, not one label:
+  * Reversibility: reversible / reversible with cost / irreversible
+  * Blast radius: team / function / company / customer
+  * Contract commitment: none / has deadline / has penalty
+  * Approval level: act alone / notify / align / manager decides
+  Changing CRM stages and choosing a vendor are "reversible with cost", not
+  irreversible. Hiring and termination stay high-consequence.
+  At least 4 decisions, spanning different approval levels.
 ```
 
-### Group prompts (1-6)
-
-Шаблон для группы — каждый блок имеет explicit table/structure spec.
-
-Пример `career_playbook_group_1_foundation`:
+### Группа 4 — карьерная лестница (блок 11)
 
 ```
-SYSTEM:
-Сгенерируй Role Guide блоки группы 1 (Foundation): Header + Block 1 (Mission/KR) +
-Block 2 (Anti-goals) + Block 5 (Decision Matrix).
-
-Методология:
-- Block 1 — Job Scorecard (Geoff Smart "Who"): миссия 2-3 предложения + 3-5 measurable KR в таблице
-- Block 2 — Anti-goals (Charlie Munger inversion): таблица 4-6 explicit "что НЕ делает" + чья ответственность
-- Block 5 — Decision Authority Matrix (Management 3.0 + Amazon One-Way/Two-Way Door): таблица решение → автономия → действие, ≥4 решений
-
-Format requirements:
-- Markdown с tables, без HTML
-- Russian language: "По данным {source}..." natural citations
-- Для блока 1: обязательно North Star Metric в metadata
-- Для блока 2: min 4 anti-goals
-- Для блока 5: min 4 decisions, span autonomy levels
-
-USER:
-RoleProfileSpec: {{spec_json}}
-Content language: {{content_language}}
-
-Return markdown content for groups in this exact order:
-## Header
-{content}
-
-## 1. Миссия и ключевые результаты
-{content}
-
-## 2. Анти-цели: что эта роль НЕ делает
-{content}
-
-## 5. Матрица решений (Decision Authority)
-{content}
+- Block 11: dual IC/management tracks, promotion criteria, relative timelines,
+  and a Mermaid career diagram.
+  * The next level must differ in scope from the current one. Never emit a step
+    that renames the same level (e.g. "CRO -> Chief Revenue Officer /
+    President of Revenue").
+  * Do not label a people-management position as "Senior <role> (IC)".
+  * Every transition carries a promotion criterion and a relative timeline.
 ```
 
-Аналогично — для остальных групп. Они опираются на skill SKILL.md (lines 124-697 содержат detailed spec для каждого блока).
+### Формулировки метрик (все группы)
 
-### `career_playbook_cross_block_judge`
+Точность прогноза описывается через абсолютную ошибку. Формулировка вида
+«accuracy consistently >±20%» смешивает точность с отклонением и запрещена.
 
-Цель: проверить согласованность сгенерированной группы относительно предыдущих.
+---
 
-```
-SYSTEM:
-Проверь сгенерированную группу блоков {{group_id}} на согласованность с предыдущими
-группами и RoleProfileSpec.
+## `career_playbook_spec_builder`
 
-Checks:
-1. **No repetition**: темы не повторяются с другими блоками (см. block_boundaries)
-2. **Cross-references**: упомянутые элементы существуют в других блоках:
-   - competencies из блока 7 ↔ tools из блока 8
-   - KPI из блока 6 ↔ responsibilities из блока 3
-   - anti-goals из блока 2 не противоречат duties из блока 4
-3. **Format**: tables present where required, mermaid syntax valid, min items satisfied
-4. **Quality**: actionable, measurable, business-owner language (не HR jargon)
-
-Верни JSON:
-{
-  "pass": boolean,
-  "score": 0-100,
-  "issues": [
-    {
-      "block_id": "block_5",
-      "severity": "critical" | "warning" | "info",
-      "description": "...",
-      "suggestion": "..."
-    }
-  ],
-  "needs_regeneration": ["block_5", ...]  // которые нужно перегенерировать
-}
-
-USER:
-RoleProfileSpec: {{spec_json}}
-Previous groups output: {{prev_groups_content}}
-Current group output: {{current_group_content}}
-```
-
-### `career_playbook_block_regenerator`
-
-Цель: перегенерировать один блок с targeted instruction.
+Дополнения к промпту v1:
 
 ```
-SYSTEM:
-Перегенерируй блок {{block_id}} ({{block_name}}) с учётом замечания.
-
-Original block content:
-{{original_content}}
-
-Issue from judge:
-{{issue_description}}
-Suggestion:
-{{suggestion}}
-
-User edit instruction (если есть от пользователя — Edit с "Что изменить?"):
-{{user_instruction}}
-
-Контракт блока — см. RoleProfileSpec.block_boundaries[{{block_id}}] и
-оригинальный prompt для группы (preservation of format requirements).
-
-Верни только markdown для этого блока.
-
-USER:
-RoleProfileSpec: {{spec_json}}
-Other blocks summary (для cross-reference consistency): {{other_blocks_brief}}
-Content language: {{content_language}}
+- Build metric_ledger: one entry per metric in focus_areas.primary_kpis, with a
+  target and green/yellow/red thresholds. This ledger is the single source of
+  numeric truth for all 26 blocks, so every value must be internally coherent.
+- Set provenance for each metric:
+  * company_source — backed by the uploaded business context
+  * user_answer   — stated by the user in the wizard
+  * benchmark     — backed by a web research source
+  * assumption    — not backed by anything; the guide will present it as a
+                    hypothesis to agree internally
+- Do NOT populate evidence_ledger or generated_on. The application fills both
+  deterministically; any values you emit there are discarded.
 ```
 
-### `career_playbook_course_brief_extractor`
+Остальные требования v1 сохраняются: канонические `block_boundaries`, явные `anti_goals` и
+`failure_patterns`, разделение business context и web research, режим `universal` без выдумывания
+продуктовых и метрических фактов.
 
-Цель: извлечь course brief из Role Guide для генерации курса.
+### Ограничения вызова
 
-```
-SYSTEM:
-Из готового Role Guide извлеки course_brief — JSON структуру для генерации
-обучающего курса для этой роли. Также сгенерируй 5-10 web search queries
-для сбора synthetic source corpus.
+| Параметр              |                                        v1 |                                                v2 | Причина                                                                                                          |
+| --------------------- | ----------------------------------------: | ------------------------------------------------: | ---------------------------------------------------------------------------------------------------------------- |
+| `maxTokens`           |                                     8 000 |                                        **16 000** | 26 записей `block_boundaries` + `metric_ledger` не помещались; модель отдала ровно 8000 токенов и JSON оборвался |
+| Поведение при обрезке | принудительный переход на fallback-модель | повтор на **той же** модели с увеличенным лимитом | Понижение до flash стоило 17,5 минуты и дало спеку худшего качества                                              |
 
-Course brief:
-{
-  "position_title": "...",
-  "target_audience": "...",  // кто будет учиться
-  "learning_goals": [...],   // 4-6 целей из competencies + KPIs
-  "suggested_modules": [
-    {
-      "title": "...",
-      "based_on_block": "competencies" | "tools" | "kpi" | "processes",
-      "skills": [...],
-      "estimated_lessons": 3-7
-    }
-  ],
-  "course_size": "small" | "medium" | "large",  // S=5-7 lessons, M=10-15, L=20-30
-  "estimated_duration_hours": number,
-  "web_search_queries": [
-    "best practices {role} {competency} 2026",
-    "{tool} tutorial",
-    ...
-  ]
-}
+---
 
-USER:
-Role Guide markdown:
-{{role_guide_md}}
+## `career_playbook_cross_block_judge`
 
-Content language: {{content_language}}
-```
+### Таксономия v2
+
+Критичные категории, которые ведут к регенерации:
+
+| Категория                | Определение                                                                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contradiction`          | Блок противоречит `RoleProfileSpec`, **или противоречит другому блоку**, или повторяет тему, закреплённую `block_boundaries` за другим блоком |
+| `format_minimum`         | Не выполнен жёсткий формат-минимум: анти-целей < 4, строк матрицы решений < 4, режимов отказа < 3, отсутствует обязательная Mermaid-диаграмма |
+| `wrong_language`         | Пользовательский текст не на целевом языке                                                                                                    |
+| `unresolved_placeholder` | Остались сырые плейсхолдеры вида `[дата]`, `{fill}`                                                                                           |
+| `invented_number`        | Company-specific число, квота, бюджет или дедлайн заявлены как факт без подтверждения                                                         |
+| `metric_conflict`        | Значение метрики расходится с `metric_ledger`                                                                                                 |
+| `unsourced_claim`        | Точная внешняя статистика без ссылки `[Sn]`                                                                                                   |
+| `stale_date`             | Абсолютная дата вне года `generated_on`                                                                                                       |
+| `unmarked_example`       | Company-specific пример в universal-режиме без маркера                                                                                        |
+
+Всё остальное — тон, «слишком обобщённо», «недостаточно конкретно», стилистические предпочтения —
+это `style`, максимум `warning`, и **никогда** не основание для регенерации. Причина неизменна:
+детерминированный слой надёжно ловит жёсткие отказы, а маршрутизация стилистических мнений в
+регенерацию сжигает циклы без выигрыша в корректности.
+
+Новые переменные промпта судьи: `metric_ledger_md`, `evidence_ledger_md`, `generated_on` — иначе
+судья не может проверить `metric_conflict`, `unsourced_claim` и `stale_date`.
+
+### Соотношение с детерминированным слоем
+
+`metric_conflict`, `unsourced_claim`, `stale_date` и `unmarked_example` **сначала** проверяются
+детерминированно (см. следующий раздел). LLM-судья — второй контур для случаев, которые регулярное
+выражение не ловит: смысловое противоречие между блоками, конфликт обязанности с анти-целью,
+несогласованность формулировок.
+
+---
+
+## Детерминированные проверки
+
+Живут в `stages/stage-career-playbook/nodes/cross-block-judge-checks.ts`, подключаются в
+`runCareerPlaybookDeterministicChecks`.
+
+| Проверка                                | v1   | v2            |
+| --------------------------------------- | ---- | ------------- |
+| `validateAntiGoalsMinimum`              | есть | без изменений |
+| `validateDecisionMatrixMinimum`         | есть | без изменений |
+| `validateFailureModesMinimum`           | есть | без изменений |
+| `validateMermaidCoverage` + синтаксис   | есть | без изменений |
+| `validateBlockLanguageConsistency`      | есть | без изменений |
+| `validateFillablePlaceholderResolution` | есть | без изменений |
+| `validateMetricLedgerConsistency`       | —    | **новая**     |
+| `validateUnsourcedStatistics`           | —    | **новая**     |
+| `validateExampleMarking`                | —    | **новая**     |
+| `validateRelativeDates`                 | —    | **новая**     |
+| `validateAntiGoalConflict`              | —    | **новая**     |
+
+Семантика каждой — в [контракте качества](../../career-playbook/quality-contract.md), раздел 6.
+
+Требования к реализации: чистые функции без сети, юнит-тесты на позитивном и негативном примере из
+реального прогона (`packages/course-gen-platform/artifacts/career-playbook-quality/career-playbook.md`),
+никакого разбора внутри fenced-блоков Mermaid и кода.
+
+---
+
+## `career_playbook_block_regenerator`
+
+Дополнения к промпту v1:
+
+- Получает `metric_ledger_md`, `evidence_ledger_md`, `generated_on` — иначе перегенерация вводит
+  очередное новое число вместо исправления конфликта.
+- Явное правило: «если замечание относится к `metric_conflict`, приведи значение к реестру, не
+  придумывай третье».
+- Сохраняются существующие правила: улучшать имеющуюся Mermaid-диаграмму, а не добавлять вторую;
+  оборачивать метки узлов в двойные кавычки; не оставлять сырые плейсхолдеры.
+
+---
 
 ## Model selection
 
-Через `ModelConfigService`. Новые stage keys:
+Фактические значения из `llm_model_config` (миграции `20260523073000_...`,
+`20260704150000_...`) плюс изменения v2:
 
-- `stage_career_playbook_followup` — fast model (Sonnet/Haiku)
-- `stage_career_playbook_spec` — quality model (Sonnet/Opus)
-- `stage_career_playbook_group_1` ... `group_6` — quality model
-- `stage_career_playbook_judge` — quality model (Sonnet)
-- `stage_career_playbook_regenerator` — quality model
-- `stage_career_playbook_course_brief` — fast model
+| Фаза                                 | Модель   | Fallback | temp |    max_tokens | timeout_ms |
+| ------------------------------------ | -------- | -------- | ---: | ------------: | ---------: |
+| `stage_career_playbook_followup`     | v4-flash | v4-pro   | 0.40 |         4 000 | 120 000 ⬅ |
+| `stage_career_playbook_spec`         | v4-pro   | v4-flash | 0.30 | **16 000** ⬅ | 120 000 ⬅ |
+| `stage_career_playbook_group_1..4,6` | v4-flash | v4-pro   | 0.70 |        14 000 | 120 000 ⬅ |
+| `stage_career_playbook_group_5`      | v4-pro   | v4-flash | 0.70 |        14 000 | 120 000 ⬅ |
+| `stage_career_playbook_judge`        | v4-flash | v4-pro   | 0.20 |         4 000 | 120 000 ⬅ |
+| `stage_career_playbook_regenerator`  | v4-pro   | v4-flash | 0.40 |         6 000 | 120 000 ⬅ |
 
-Fallback model — `google/gemini-3-flash-preview` (как Stage 6).
+⬅ — меняется в v2. Снижение таймаута с 300 000 до 120 000 означает, что три неудачные попытки
+стоят 6 минут вместо 20; ретрай-сеть при этом не ослабляется.
+
+Крупные вызовы судьи по-прежнему стартуют сразу на fallback-модели при превышении
+`CAREER_PLAYBOOK_JUDGE_FALLBACK_TOKEN_THRESHOLD` (по умолчанию 28 000 токенов) —
+`nodes/cross-block-judge-structured.ts`.
+
+---
 
 ## Variable conventions
 
-- `{{position}}`, `{{department}}`, ... — простые скаляры
-- `{{qa_data_json}}`, `{{spec_json}}` — сериализованный JSON
-- `{{content_language}}` — целевой язык контента
-- `{{previous_followups_json}}` — массив объектов
+- `{{position}}`, `{{department}}`, … — простые скаляры.
+- `{{qa_data_json}}`, `{{spec_json}}` — сериализованный JSON.
+- `{{metric_ledger_md}}`, `{{evidence_ledger_md}}`, `{{prior_blocks_digest}}` — предрендеренный
+  markdown, а не JSON: он идёт в текстовый промпт и должен читаться моделью без разбора.
+- `{{generated_on}}` — ISO-дата.
+- `{{content_language}}` — код целевого языка.
 
-Все variables валидируются Zod через `PromptVariable[]` (паттерн `stage6-prompts.ts`).
+Все переменные объявляются в `variables: PromptVariable[]` рядом с шаблоном и валидируются
+`PromptService`.
 
 ## Caching
 
-`PromptService.getPrompt()` уже кеширует 5 мин TTL. Никакой доп. работы.
+`PromptService` кеширует шаблоны на 5 минут. Значения переменных не кешируются — `generated_on` и
+`prior_blocks_digest` вычисляются на каждый вызов.

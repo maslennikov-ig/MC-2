@@ -61,11 +61,15 @@ read -p "Supabase email: " SB_EMAIL; read -s -p "Supabase password: " SB_PW; ech
 ```
 
 ```bash
-export CAREER_PLAYBOOK_SMOKE_TOKEN=$(curl -s "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d "{\"email\":\"$SB_EMAIL\",\"password\":\"$SB_PW\"}" | jq -r .access_token); unset SB_PW
+SB_SESSION_JSON=$(curl -s "$SUPABASE_URL/auth/v1/token?grant_type=password" -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d "{\"email\":\"$SB_EMAIL\",\"password\":\"$SB_PW\"}")
+export CAREER_PLAYBOOK_SMOKE_TOKEN=$(jq -r .access_token <<<"$SB_SESSION_JSON")
+export CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN=$(jq -r .refresh_token <<<"$SB_SESSION_JSON")
+unset SB_PW SB_SESSION_JSON
 ```
 
 ```bash
 echo "token length: ${#CAREER_PLAYBOOK_SMOKE_TOKEN}"
+echo "refresh token configured: $([[ -n \"$CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN\" ]] && echo yes || echo no)"
 ```
 
 Длина ~600–1200 → ок, переходи к Шагу 2 (trpc-url/user-id/org-id/queue) и Шагу 4.
@@ -122,6 +126,8 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 - `--dir` задан абсолютным путём через `git rev-parse` — относительный путь ломается, если шелл не в корне репо.
 - Существующие playbook'и аккаунта не трогаются; курс не создаётся (нет `--include-course-bridge`).
 - Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked` / `fail`.
+- Если задан `CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN`, раннер при первом HTTP 401 один раз обновляет
+  Supabase-сессию и повторяет запрос. Новый access/refresh token остаётся только в памяти процесса.
 - **Cleanup ничего не удаляет — только описывает** (см. раздел «Cleanup-семантика» ниже).
 
 ## Артефакты прогона (A/B-сравнимость)
@@ -166,3 +172,52 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 - длительность `< 120 мин` (TTL-cap `mc2-db696.62`/P1)
 
 На этих реальных данных переоценивается `mc2-db696.61` (нужен ли source-evidence override ~24–32k для генератора follow-up-вопросов).
+
+## Нагрузочный прогон: ровно 10 генераций
+
+Команда `smoke:career-playbook:load` переиспользует тот же single-smoke и по умолчанию работает в
+неизменяющем `plan`-режиме. Она не запускает частичную нагрузку: live-режим разрешается только для
+ровно десяти генераций и только если одновременно заданы:
+
+- JWT одноразового пользователя и ожидаемые `user_id`/`organization_id`;
+- refresh token той же одноразовой сессии плюс `SUPABASE_URL`/`SUPABASE_ANON_KEY`: десять
+  параллельных генераций могут идти дольше часового TTL access token;
+- URL локального API, запущенного с тем же уникальным `BULLMQ_QUEUE_NAME`, что и отдельный worker;
+- точная область очистки;
+- потолок на один прогон и общий потолок не меньше `10 × потолок одного прогона`;
+- явный `--confirm-live-mutation`.
+
+Безопасная проверка плана, без Redis/API/LLM:
+
+```bash
+pnpm --dir packages/course-gen-platform smoke:career-playbook:load --mode plan --target dev --count 10 --queue-name career-playbook-load-YYYYMMDD --json
+```
+
+Live-шаблон намеренно не содержит секретов:
+
+```bash
+export CAREER_PLAYBOOK_SMOKE_TOKEN='<JWT только в текущем shell>'
+export CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN='<refresh_token только в текущем shell>'
+export CAREER_PLAYBOOK_SMOKE_USER_ID='<одноразовый user_id>'
+export CAREER_PLAYBOOK_SMOKE_ORGANIZATION_ID='<одноразовый organization_id>'
+export CAREER_PLAYBOOK_SMOKE_TRPC_URL='http://127.0.0.1:<порт>/trpc'
+export BULLMQ_QUEUE_NAME='career-playbook-load-YYYYMMDD'
+
+pnpm --dir packages/course-gen-platform smoke:career-playbook:load \
+  --mode mutation-load --target dev --count 10 \
+  --cleanup-scope playbook-only \
+  --max-cost-usd-per-run '<согласованный потолок одного прогона>' \
+  --max-total-cost-usd '<согласованный общий потолок>' \
+  --confirm-live-mutation --json
+```
+
+До команды API и worker должны быть запущены отдельно с одним и тем же уникальным именем очереди.
+Runner снимает состояния очереди до/после, стартует десять промисов до ожидания первого результата,
+сохраняет артефакт и точный cleanup-манифест каждого прогона и возвращает `fail`, если хотя бы один
+прогон не прошёл либо после пакета остались `active`/`waiting` jobs. Он не удаляет данные автоматически:
+после сохранения evidence оператор удаляет только точные ID из десяти манифестов и отдельно проверяет
+нулевой остаток перед закрытием задачи.
+
+Refresh token не передаётся аргументом командной строки и не попадает в отчёт. Динамический заголовок
+tRPC читает текущий access token для каждого HTTP-запроса; параллельные 401 используют один общий
+refresh-запрос, после чего каждая операция повторяется не более одного раза.

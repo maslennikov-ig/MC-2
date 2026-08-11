@@ -1,0 +1,64 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-db696.105",
+  "goal_id": "mc2-db696.105",
+  "epic_id": "mc2-db696",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "career-playbook-representative-quality-review",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "career-playbook-live-smoke",
+      "career-playbook-quality-review"
+    ],
+    "risk_models": [
+      "paid-live-call",
+      "content-quality",
+      "disposable-data-cleanup"
+    ],
+    "test_environments": [
+      "isolated-live-dev-queue"
+    ],
+    "rollback_boundary": "delete-only-exact-fixture-and-queue-identifiers-after-artifact-capture",
+    "acceptance_proofs": [
+      "one-terminal-live-generation",
+      "sanitized-markdown-and-cost-artifact",
+      "root-owned-quality-rubric",
+      "zero-residue-cleanup"
+    ]
+  },
+  "work_areas": [
+    "proof",
+    "quality_review",
+    "cleanup",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-db696.105",
+    "source_digest": "74c5198b71c7636c12d63d5c5e3794feab10e92e9e91fc10fc6b6d54f73b339a",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Exactly one disposable dev generation completes within a USD 0.50 cap; final Markdown and cost evidence are saved without secrets; the root agent reviews completeness, coherence, usefulness, grounding risk, Mermaid/PDF viability, anti-goals, decision matrices, and failure modes; exact cleanup leaves no fixture, queue, file, course, error, job, auth, or Qdrant residue.",
+        "text_digest": "71dc1dc7cafdca7f821a445bcaf7083dea976724f57574715b4245397208ddf9"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-db696.105/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "74c5198b71c7636c12d63d5c5e3794feab10e92e9e91fc10fc6b6d54f73b339a",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-db696.105/artifacts/mc2-db696.105.md",
+      "task_id": "mc2-db696.105",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

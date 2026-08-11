@@ -183,6 +183,9 @@ export async function generateImage(
         'X-Title': 'MegaCampus Course Generator',
       },
       timeout: API_TIMEOUT_MS,
+      // Mermaid validation installs a JSDOM window in this Node worker.
+      // The key remains server-side; allow the SDK to run in that browser-like process.
+      dangerouslyAllowBrowser: true,
     });
 
     // Build request options - only include image_config for models that support it

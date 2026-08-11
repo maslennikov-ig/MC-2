@@ -1,0 +1,55 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-db696.11.6",
+  "goal_id": "mc2-db696.11.6",
+  "epic_id": "mc2-db696.11",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "career-playbook-ten-concurrent-load",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": ["career-playbook-smoke", "bullmq-load-observability"],
+    "risk_models": ["paid-call-fanout", "queue-isolation", "partial-batch-failure", "cleanup-residue"],
+    "test_environments": ["vitest-node", "isolated-live-dev-queue"],
+    "rollback_boundary": "remove-load-harness-and-clean-live-resources-by-exact-run-manifests",
+    "acceptance_proofs": ["fail-closed-plan", "ten-concurrent-terminal-runs", "aggregate-cost-queue-cleanup-evidence"]
+  },
+  "work_areas": ["contract", "implementation", "tests", "proof", "docs_and_graph_review"],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-db696.11.6",
+    "source_digest": "2f35dbc2d49837356e3f848ceebc35ddfee21f5f67a5ac76778bb5cf38d14c99",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "A non-mutating plan proves the single-smoke prerequisite, requires exactly ten runs, a dedicated non-default queue, disposable user and organization identifiers, cleanup scope, explicit live confirmation, and a positive total USD budget before any mutation starts.",
+        "text_digest": "60b2cf95f589af379a98567b973994f0e3868560f7c49d28839cbd870f8b0930"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Mutation mode starts exactly ten isolated Career Playbook generations concurrently, gives every run a unique identifier, waits for every run to reach a terminal result, and records duration, status, playbook id, cost artifact availability, and exact cleanup manifest without exposing bearer tokens.",
+        "text_digest": "4e4598dbf6bd60daaf495a004d05f6affe13bff4a1794d2c53c1d658e53302cf"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The load report fails if any run fails or remains non-terminal, records aggregate duration, cost, failure, and queue-state evidence, and the focused unit test, pnpm type-check, and pnpm build pass without performing live paid work.",
+        "text_digest": "6ac61942759562d1d40363c1ecb9a4c6194f9fadf557cf4e8cd581567bfbe318"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-db696.11.6/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "2f35dbc2d49837356e3f848ceebc35ddfee21f5f67a5ac76778bb5cf38d14c99",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-db696.11.6/artifacts/mc2-db696.11.6.md",
+      "task_id": "mc2-db696.11.6",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}
