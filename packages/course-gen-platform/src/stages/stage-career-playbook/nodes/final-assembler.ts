@@ -419,7 +419,7 @@ const CALIBRATION_COLUMNS = {
 } as const;
 
 /** Marker forms the guide may use, matching the deterministic check. */
-const EXAMPLE_MARKER_GLOBAL = /\(\s*(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/gi;
+const EXAMPLE_MARKER_GLOBAL = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/gi;
 
 export interface CareerPlaybookCalibrationItem {
   blockId: CareerPlaybookBlockId;

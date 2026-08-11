@@ -108,7 +108,9 @@ function thresholdNumbers(metric: CareerPlaybookMetricLedgerEntry): Set<string> 
  * Requiring the bare form flagged correctly-marked values on the first clean run.
  */
 // The verb may follow the value: "(example: $100K — replace with your threshold)".
-const EXAMPLE_MARKER = /\(\s*(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/i;
+// The marker may sit anywhere inside the parentheses and use any separator:
+// "(e.g., >$50,000 — example, replace with your threshold)".
+const EXAMPLE_MARKER = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/i;
 
 type ThresholdDirection = 'floor' | 'ceiling' | 'range';
 
@@ -445,6 +447,10 @@ export function validateExampleMarking(
   for (const [blockId, blockState] of Object.entries(blocks)) {
     const content = blockState?.content;
     if (!content) continue;
+    // Block 26 hosts the application-built calibration table, which quotes each
+    // marked value with the marker stripped. Scanning it makes the instrument
+    // that lists unmarked values report itself.
+    if (blockId === 'block_26') continue;
 
     for (const line of proseLines(content)) {
       if (!COMPANY_VALUE.test(line)) continue;
@@ -828,7 +834,23 @@ const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp
  * cadence word in the line attributed "daily" to the pipeline review. The
  * nearest cadence word wins instead.
  */
-function cadenceNear(line: string, dutyIndex: number): string | null {
+/** Closest cadence word to any mention of the duty in this line. */
+function nearestCadenceAcrossMentions(line: string, pattern: RegExp): string | null {
+  const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+  let best: { name: string; distance: number } | null = null;
+
+  for (const mention of line.matchAll(global)) {
+    const found = cadenceNearWithDistance(line, mention.index ?? 0);
+    if (found && (!best || found.distance < best.distance)) best = found;
+  }
+
+  return best?.name ?? null;
+}
+
+function cadenceNearWithDistance(
+  line: string,
+  dutyIndex: number
+): { name: string; distance: number } | null {
   let best: { name: string; distance: number } | null = null;
 
   for (const [pattern, name] of CADENCE_WORDS) {
@@ -839,7 +861,7 @@ function cadenceNear(line: string, dutyIndex: number): string | null {
     }
   }
 
-  return best?.name ?? null;
+  return best;
 }
 
 /**
@@ -862,11 +884,12 @@ export function validateCadenceConsistency(
 
     for (const line of proseLines(content)) {
       for (const { pattern, duty, requires } of RECURRING_DUTIES) {
-        const mention = line.match(pattern);
-        if (!mention) continue;
         if (requires && !requires.test(line)) continue;
 
-        const cadence = cadenceNear(line, mention.index ?? 0);
+        // A line may name the duty twice — "Forecast call pack ... quarterly
+        // business review | Weekly forecast call" — so take the cadence that
+        // sits closest to any mention, not the one nearest the first.
+        const cadence = nearestCadenceAcrossMentions(line, pattern);
         if (!cadence) continue;
 
         const byCadence = stated.get(duty) ?? new Map<string, string[]>();
