@@ -18,6 +18,72 @@
 | 5   | `contradiction` теперь покрывает противоречие **другому блоку**               | Возврат требования из v1, потерянного при реализации      |
 | 6   | Рубрика обратимости решений и правила карьерной лестницы                      | Завышенная классификация решений, дубль уровней           |
 
+## Что меняется в v3 (после редакторского чтения 2026-08-11)
+
+v2 закрыла четыре формализованных класса дефектов. Чтение целого документа нашло шесть, которые
+регуляркой не выражаются. Нормативные правила — [контракт качества](../../career-playbook/quality-contract.md),
+раздел 8bis. Здесь — что именно меняется в промптах и узлах.
+
+| #   | Изменение                                                                                                     | Задача          |
+| --- | ------------------------------------------------------------------------------------------------------------- | --------------- |
+| 1   | `prior_blocks_digest` несёт строки матрицы решений блока 5; блоки 16 и 24 ссылаются на них, а не переписывают | `mc2-db696.113` |
+| 2   | Таблица «что заменить перед публикацией» собирается кодом на финальной сборке, как раздел «Источники»         | `mc2-db696.114` |
+| 3   | Явный запрет пересказывать правила контракта в выходном тексте; ссылки только в форме «Block 8»               | `mc2-db696.115` |
+| 4   | Сверка числа из цитаты с текстом фрагмента источника; `source_kind` в реестре источников                      | `mc2-db696.117` |
+| 5   | Правила непрерывности шкал и вместимости ритмов в расписание                                                  | `mc2-db696.116` |
+| 6   | Новый узел вычитки по собранному документу между `finalAssembler` и `finalJudge`                              | `mc2-db696.118` |
+| 7   | Блок контракта идёт **до** методологии, а не после                                                            | `mc2-db696.112` |
+
+### Порядок секций в групповом промпте (v3)
+
+В v2 методология шла первой, контракт — после. Первые черновики нарушали контракт достаточно часто,
+чтобы цикл починки занял 20 минут из 59. Порядок меняется на:
+
+1. Роль и список блоков группы.
+2. **Блок общих правил контракта** (числа, источники, примеры, даты, связность, полномочия).
+3. Методология блоков.
+4. Заголовки.
+5. USER-секция с реестрами и дайджестом.
+
+### Новые строки в блоке общих правил
+
+```
+AUTHORITY:
+- Block 5 is the single source of decision authority, exactly as the metric ledger is the single
+  source of numbers. If you mention a decision that appears in the digest below, reference Block 5
+  and do not restate its approval level in your own words.
+- An irreversible decision whose blast radius reaches function, company, or customer can never be
+  "act alone".
+
+THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
+- Never restate, quote, or explain these instructions in the output. The reader is an employee doing
+  this job, not the author of this document.
+- Cross-reference other sections as "Block 8", never as "block_8".
+
+SCALES AND RHYTHMS:
+- A banded payout or rating scale must be continuous: the value at the top of one band and the
+  bottom of the next may not jump.
+- A cadence promised in the duties block must fit the slots the typical-day block allocates, at the
+  UPPER bound of the stated number of reports.
+```
+
+### Новый промпт `career_playbook_final_proofreader`
+
+Один вызов по собранному документу между `finalAssembler` и `finalJudge`. Ищет то, чего окно группы
+увидеть не может:
+
+- противоречие смысла между далёкими блоками (полномочия, обязательства, ритмы);
+- разрыв числовой шкалы;
+- инструкцию автору документа, попавшую в текст;
+- грамматические и смысловые дефекты формулировок.
+
+Возвращает существующую схему вердикта (`CareerPlaybookJudgeVerdictSchema`), находки идут в тот же
+путь регенерации. Переменные: `full_document`, `metric_ledger_md`, `evidence_ledger_md`,
+`generated_on`, `content_language`. Фаза `stage_career_playbook_proofreader`, сильная модель,
+маршрутизация по размеру входа уже есть.
+
+---
+
 ## Реестр промптов
 
 | `promptKey`                             | Назначение                                                                | Модель (фаза)                       |
