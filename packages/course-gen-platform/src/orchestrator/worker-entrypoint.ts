@@ -21,7 +21,7 @@ import 'dotenv/config';
 import { initSentry, flushSentry } from '../shared/sentry/init.js';
 initSentry();
 import { setMaxListeners } from 'events';
-import { startWorker, stopWorker } from './worker';
+import { getWorkerStatus, startWorker, stopWorker } from './worker';
 import logger from '../shared/logger';
 import {
   createStage6Worker,
@@ -348,20 +348,16 @@ async function main() {
     // Start readiness heartbeat to keep Redis TTL fresh
     // This allows API server to detect if worker crashes
     startReadinessHeartbeat();
+    const workerStatus = getWorkerStatus();
+    if (!workerStatus) {
+      throw new Error('Worker status unavailable immediately after startup');
+    }
 
     logger.info(
       {
         concurrency,
-        queueName: 'course-generation',
-        registeredHandlers: [
-          'TEST_JOB',
-          'DOCUMENT_PROCESSING',
-          'DOCUMENT_CLASSIFICATION',
-          'STRUCTURE_ANALYSIS',
-          'STRUCTURE_GENERATION',
-          'LESSON_CONTENT',
-          'BLOCK_REGENERATION',
-        ],
+        queueName: workerStatus.queueName,
+        registeredHandlers: workerStatus.registeredHandlers,
       },
       'Worker started successfully'
     );

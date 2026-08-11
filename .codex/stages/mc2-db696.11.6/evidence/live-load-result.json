@@ -1,0 +1,130 @@
+{
+  "schema_version": "career-playbook-load-evidence/v1",
+  "stage_id": "mc2-db696.11.6",
+  "measured_at": "2026-08-11T05:42:47.839Z",
+  "target_environment": "dev",
+  "queue_name": "career-playbook-load-20260811-DEPpou",
+  "status": "pass",
+  "concurrency": {
+    "requested": 10,
+    "main_jobs_picked_up": 10,
+    "pickup_spread_ms": 1359,
+    "main_jobs_completed": 10,
+    "main_jobs_failed": 0,
+    "worker_readiness_writes": 64,
+    "worker_readiness_span_ms": 3780260
+  },
+  "budget": {
+    "approved_max_per_run_usd": 0.5,
+    "approved_max_total_usd": 5,
+    "measured_cost_count": 10,
+    "measured_total_usd": 1.19633817,
+    "measured_max_per_run_usd": 0.160969265
+  },
+  "runs": [
+    {
+      "playbook_id": "755196a5-b52e-40c8-8b45-430ac60e936e",
+      "status": "completed",
+      "duration_ms": 3639137,
+      "cost_usd": 0.112384585
+    },
+    {
+      "playbook_id": "02c26b34-15ab-4b29-96c0-e273e527e5b3",
+      "status": "completed",
+      "duration_ms": 3003369,
+      "cost_usd": 0.147406535
+    },
+    {
+      "playbook_id": "68830a3a-ae6d-4625-8661-ae205a4f747d",
+      "status": "completed",
+      "duration_ms": 2750208,
+      "cost_usd": 0.160969265
+    },
+    {
+      "playbook_id": "f1dc804b-80ad-4803-ac5f-2bc34820786c",
+      "status": "completed",
+      "duration_ms": 2719402,
+      "cost_usd": 0.106311945
+    },
+    {
+      "playbook_id": "0ef02efd-7149-4443-80ee-2ecfb69a48e9",
+      "status": "completed",
+      "duration_ms": 3193443,
+      "cost_usd": 0.11942326
+    },
+    {
+      "playbook_id": "84ccd188-664c-435f-88a5-a08314119edd",
+      "status": "completed",
+      "duration_ms": 2942962,
+      "cost_usd": 0.120296175
+    },
+    {
+      "playbook_id": "036f6535-fb79-48ba-87b0-383eea4649c6",
+      "status": "completed",
+      "duration_ms": 2870903,
+      "cost_usd": 0.12886816
+    },
+    {
+      "playbook_id": "085ba267-825c-4496-b8f0-b9ea3e321b4f",
+      "status": "completed",
+      "duration_ms": 3282340,
+      "cost_usd": 0.07973067
+    },
+    {
+      "playbook_id": "739bd98a-80fe-4ffa-8ab1-09455117f4af",
+      "status": "completed",
+      "duration_ms": 2797463,
+      "cost_usd": 0.11643666
+    },
+    {
+      "playbook_id": "84c673dc-9bf4-4d54-95b2-87f1c7c1072e",
+      "status": "completed",
+      "duration_ms": 3108634,
+      "cost_usd": 0.104510915
+    }
+  ],
+  "observer_recovery": {
+    "initial_report_status": "fail",
+    "initial_report_passed": 9,
+    "cause": "Disposable Supabase access token expired while the tenth main job was still generating.",
+    "recovery": "A refreshed-token resume read captured the already-running tenth result without enqueueing a second generation.",
+    "recovered_evidence_status": "pass"
+  },
+  "best_effort_image_children": {
+    "completed": 0,
+    "failed": 10,
+    "acceptance_impact": "none; main playbook status remained completed",
+    "root_cause": "The OpenAI SDK rejected the Node worker after Mermaid installed a JSDOM window.",
+    "local_fix": "The server-only image client now sets dangerouslyAllowBrowser=true and has deterministic unit coverage."
+  },
+  "cleanup": {
+    "queue_before_cleanup": {
+      "waiting": 0,
+      "active": 0,
+      "completed": 10,
+      "failed": 10,
+      "delayed": 0,
+      "paused": 0
+    },
+    "queue_after_cleanup": {
+      "waiting": 0,
+      "active": 0,
+      "completed": 0,
+      "failed": 0,
+      "delayed": 0,
+      "paused": 0
+    },
+    "database_residue": {
+      "playbooks": 0,
+      "jobs": 0,
+      "errors": 0,
+      "courses": 0,
+      "files": 0,
+      "public_users": 0,
+      "organizations": 0
+    },
+    "auth_user_present": false,
+    "qdrant_vectors": 0,
+    "status": "pass"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm type-check",
+      "duration_seconds": 50.261,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build",
+      "duration_seconds": 113.731,
+      "result": "passed"
+    },
+    {
+      "command": "pnpm test",
+      "duration_seconds": 564.039,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm type-check",
+    "pnpm build",
+    "pnpm test"
+  ],
+  "completed_at": "2026-08-11T06:48:19.902639+00:00",
+  "diff_digest": "fd8c4ea3d50e90e49023c406750491cf71f8e286f54dfecb4fcc37e34c8fceb1",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=10.34.5",
+  "git_head": "40fbaed285d02313d386328c319181711ddedc3c",
+  "idempotency_key": "13e16c77665596541f288092e454409c48b1d0c46c32f3dbcaefa4655cf5c2c4",
+  "orchestration_level": "release",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-db696.11.6",
+  "started_at": "2026-08-11T06:36:11.365599+00:00",
+  "verification_fingerprint": "13e16c77665596541f288092e454409c48b1d0c46c32f3dbcaefa4655cf5c2c4"
+}

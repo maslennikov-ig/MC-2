@@ -10,7 +10,7 @@ manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
-current_stage_id = "mc2-ve1eq"
+current_stage_id = "mc2-db696.11.6"
 
 [baseline]
 profile = "balanced-v2.19"
@@ -49,13 +49,13 @@ hard_limit_lines = 200
 tracked_in_git = true
 format = "frontmatter_plus_short_note"
 sensitivity = "internal_no_secrets"
-current_stage_summary = ".codex/stages/mc2-ve1eq/summary.md"
+current_stage_summary = ".codex/stages/mc2-db696.11.6/summary.md"
 
 [completion_inbox]
 scope = "repo_root"
 transport = "local_ndjson"
-events_file = ".codex/stages/mc2-ve1eq/completions.ndjson"
-review_state_file = ".codex/stages/mc2-ve1eq/review-state.json"
+events_file = ".codex/stages/mc2-db696.11.6/completions.ndjson"
+review_state_file = ".codex/stages/mc2-db696.11.6/review-state.json"
 report_entrypoint = "scripts/orchestration/report_child_completion.py"
 review_entrypoint = "scripts/orchestration/review_completion_inbox.py"
 

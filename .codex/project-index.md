@@ -104,6 +104,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Web targeted e2e: `pnpm --filter @megacampus/web exec playwright test <spec> --project=chromium`.
 - Career Playbook web e2e harness: `pnpm --filter @megacampus/web test:e2e:career-playbook`.
 - Career Playbook backend read-only preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target local`.
+- Career Playbook gated 10-run load harness: `pnpm --dir packages/course-gen-platform smoke:career-playbook:load --mode plan --target dev --count 10`.
 - Career Playbook ESCO role suggestion subset import: `scripts/career-playbook/import_esco_role_suggestions.py`.
 - Career Playbook Wikidata RU role suggestion subset import: `scripts/career-playbook/import_wikidata_role_suggestions.py`.
 - Artifact validation: `python3 scripts/orchestration/validate_artifact.py <artifact.md>`.

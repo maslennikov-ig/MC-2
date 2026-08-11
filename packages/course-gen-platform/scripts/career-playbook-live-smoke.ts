@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createClient } from '@supabase/supabase-js';
 import type { AppRouter } from '../src/server/app-router';
 import {
   type CareerPlaybookCleanupManifest,
@@ -278,6 +279,109 @@ export async function captureCareerPlaybookSmokeArtifact(
   );
 }
 
+export interface CareerPlaybookBearerTokenSource {
+  getAccessToken: () => string;
+  refreshAccessToken?: () => Promise<string>;
+}
+
+interface RefreshableCareerPlaybookBearerTokenOptions {
+  accessToken: string;
+  refreshToken: string;
+  refreshSession: (refreshToken: string) => Promise<{ accessToken: string; refreshToken: string }>;
+}
+
+export function createRefreshableCareerPlaybookBearerToken(
+  options: RefreshableCareerPlaybookBearerTokenOptions
+): Required<CareerPlaybookBearerTokenSource> {
+  let accessToken = options.accessToken;
+  let refreshToken = options.refreshToken;
+  let refreshInFlight: Promise<string> | null = null;
+
+  return {
+    getAccessToken: () => accessToken,
+    refreshAccessToken: () => {
+      if (!refreshInFlight) {
+        refreshInFlight = options
+          .refreshSession(refreshToken)
+          .then(session => {
+            if (!session.accessToken || !session.refreshToken) {
+              throw new Error('Supabase token refresh returned an incomplete session.');
+            }
+            accessToken = session.accessToken;
+            refreshToken = session.refreshToken;
+            return accessToken;
+          })
+          .finally(() => {
+            refreshInFlight = null;
+          });
+      }
+      return refreshInFlight;
+    },
+  };
+}
+
+export function createSupabaseCareerPlaybookBearerToken(input: {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  accessToken: string;
+  refreshToken: string;
+}): Required<CareerPlaybookBearerTokenSource> {
+  const supabase = createClient(input.supabaseUrl, input.supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  return createRefreshableCareerPlaybookBearerToken({
+    accessToken: input.accessToken,
+    refreshToken: input.refreshToken,
+    refreshSession: async refreshToken => {
+      const { data, error } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+      if (error) throw error;
+      const session = data.session;
+      if (!session) throw new Error('Supabase token refresh returned no session.');
+      return {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+      };
+    },
+  });
+}
+
+function isUnauthorizedTrpcError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const record = error as {
+    message?: unknown;
+    data?: { code?: unknown; httpStatus?: unknown };
+    shape?: { data?: { code?: unknown; httpStatus?: unknown } };
+    status?: unknown;
+  };
+  const code = record.data?.code ?? record.shape?.data?.code;
+  const status = record.status ?? record.data?.httpStatus ?? record.shape?.data?.httpStatus;
+  return (
+    code === 'UNAUTHORIZED' ||
+    status === 401 ||
+    record.message === 'Authentication required. Please provide a valid Bearer token.'
+  );
+}
+
+async function withBearerTokenRefresh<T>(
+  tokenSource: CareerPlaybookBearerTokenSource,
+  operation: () => Promise<T>
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!tokenSource.refreshAccessToken || !isUnauthorizedTrpcError(error)) throw error;
+    await tokenSource.refreshAccessToken();
+    return operation();
+  }
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm --dir packages/course-gen-platform smoke:career-playbook:live [options]
 
@@ -435,14 +539,19 @@ function parseArgs(argv: string[]): ParsedArgs {
   return parsed;
 }
 
-function createTrpcLiveSmokeClient(trpcUrl: string, token: string): CareerPlaybookLiveSmokeClient {
+export function createTrpcLiveSmokeClient(
+  trpcUrl: string,
+  token: string | CareerPlaybookBearerTokenSource
+): CareerPlaybookLiveSmokeClient {
+  const tokenSource: CareerPlaybookBearerTokenSource =
+    typeof token === 'string' ? { getAccessToken: () => token } : token;
   const trpc = createTRPCClient<AppRouter>({
     links: [
       httpBatchLink({
         url: trpcUrl,
         headers() {
           return {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${tokenSource.getAccessToken()}`,
           };
         },
       }),
@@ -450,18 +559,42 @@ function createTrpcLiveSmokeClient(trpcUrl: string, token: string): CareerPlaybo
   });
 
   return {
-    startSession: input => trpc.careerPlaybook.session.start.mutate(input),
-    submitAnswer: input => trpc.careerPlaybook.session.submitAnswer.mutate(input),
-    requestFollowups: input => trpc.careerPlaybook.generation.requestFollowups.mutate(input),
-    approveAndGenerate: input => trpc.careerPlaybook.generation.approveAndGenerate.mutate(input),
-    getStatus: input => trpc.careerPlaybook.generation.getStatus.query(input),
-    getLibraryDetail: input => trpc.careerPlaybook.library.get.query(input),
-    exportPdf: input => trpc.careerPlaybook.exportPdf.query(input),
-    toggleShare: input => trpc.careerPlaybook.share.shareToggle.mutate(input),
-    getPublicShare: input => trpc.careerPlaybook.share.getPublicBySlug.query(input),
+    startSession: input =>
+      withBearerTokenRefresh(tokenSource, () => trpc.careerPlaybook.session.start.mutate(input)),
+    submitAnswer: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.session.submitAnswer.mutate(input)
+      ),
+    requestFollowups: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.generation.requestFollowups.mutate(input)
+      ),
+    approveAndGenerate: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.generation.approveAndGenerate.mutate(input)
+      ),
+    getStatus: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.generation.getStatus.query(input)
+      ),
+    getLibraryDetail: input =>
+      withBearerTokenRefresh(tokenSource, () => trpc.careerPlaybook.library.get.query(input)),
+    exportPdf: input =>
+      withBearerTokenRefresh(tokenSource, () => trpc.careerPlaybook.exportPdf.query(input)),
+    toggleShare: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.share.shareToggle.mutate(input)
+      ),
+    getPublicShare: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.share.getPublicBySlug.query(input)
+      ),
     createCourseFromPlaybook: input =>
-      trpc.careerPlaybook.courseBridge.createCourseFromPlaybook.mutate(input),
-    getCourseStatus: input => trpc.generation.getStatus.query(input),
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.courseBridge.createCourseFromPlaybook.mutate(input)
+      ),
+    getCourseStatus: input =>
+      withBearerTokenRefresh(tokenSource, () => trpc.generation.getStatus.query(input)),
   };
 }
 
@@ -474,10 +607,20 @@ function exitCodeFor(status: string): number {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const token = process.env.TOKEN ?? process.env.CAREER_PLAYBOOK_SMOKE_TOKEN;
+  const refreshToken = process.env.CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN;
   const trpcUrl = args.trpcUrl ?? process.env.CAREER_PLAYBOOK_SMOKE_TRPC_URL;
+  const tokenSource =
+    token && refreshToken && process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+      ? createSupabaseCareerPlaybookBearerToken({
+          supabaseUrl: process.env.SUPABASE_URL,
+          supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+          accessToken: token,
+          refreshToken,
+        })
+      : token;
   const client =
-    args.mode === 'mutation-smoke' && token && trpcUrl
-      ? createTrpcLiveSmokeClient(trpcUrl, token)
+    args.mode === 'mutation-smoke' && tokenSource && trpcUrl
+      ? createTrpcLiveSmokeClient(trpcUrl, tokenSource)
       : undefined;
   const startedAt = new Date();
   const report = await runCareerPlaybookLiveSmoke(

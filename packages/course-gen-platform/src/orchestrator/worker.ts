@@ -141,6 +141,14 @@ const registeredJobTypes = [
   JobType.CAREER_PLAYBOOK,
 ];
 
+export interface WorkerStatus {
+  isRunning: boolean;
+  isPaused: boolean;
+  queueName: string;
+  useWorkerThreads: boolean;
+  registeredHandlers: JobType[];
+}
+
 /**
  * Extract error message from failed job, recovering from BullMQ sandbox serialization loss.
  *
@@ -783,7 +791,7 @@ export function isWorkerRunning(): boolean {
  *
  * @returns {object | null} Worker status information or null if not running
  */
-export function getWorkerStatus(): object | null {
+export function getWorkerStatus(): WorkerStatus | null {
   if (!worker) {
     return null;
   }
