@@ -5,47 +5,29 @@ Current stage id: `mc2-db696.110`
 
 ## Current stage
 
-`mc2-db696.110` closed the Career Playbook quality v2 track. `develop` is at `a3266aed1` and
-`master` at `4936d4231`; CI/CD run `31501779967` on the exact sha is green including Deploy to
-Production, with Rollback skipped. Staging is healthy afterwards: `https://ai.megacampus.ru/` returns
-200 and `/api/health` returns `{"status":"ok"}`. The stranded-commit check is clean.
+The Career Playbook quality track is **accepted**. `mc2-db696.110` closed on an editorial read of
+**4.4 / 5** against a 4.0 threshold — up from the 2.6 baseline and the 3.9 the v2 output scored when
+it was finally read end to end. Evidence: `.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`.
 
-The acceptance run of 2026-08-11 (`.codex/stages/mc2-db696.110/evidence/quality-review.md`) repeated
-the exact baseline fixture. The deterministic scorecard reports **zero criticals against fourteen on
-the baseline artifact**; the guide now carries 12 citations resolving to a Sources section with real
-URLs, four ledger metrics quoted consistently, thirteen marked examples, and no calendar year other
-than the generation year. The PDF has zero blank pages against three, and zero literal separators
-against nine. Cost was USD 0.234668095 against a USD 0.35 ceiling, and the receipt records one
-attempt whose cost it cannot account for rather than implying it was free.
+`develop` carries the work; CI/CD is green and the dev deployment verified. Cost of the accepting run
+was USD 0.352 against a USD 0.60 ceiling; latency is no longer an acceptance gate by owner decision.
 
-The acceptance was then corrected. What was recorded first was **mechanical only** — the checks
-verifying what had been formalized — while the plan's primary threshold is a seven-dimension manual
-rubric at >= 4.0 / 5. The full 1,118-line document was read end to end afterwards and scored
-**3.9 / 5**, below threshold, so `mc2-db696.110` is reopened. Coherence rose from 2 to 4 and
-grounding from 1 to 3; the metric ledger genuinely solved the worst baseline dimension, with the same
-four metrics carrying identical thresholds across blocks 1, 6, 17, 20 and 24.
+What moved between the two reads: authority now agrees across four blocks (it contradicted itself in
+three before), the calibrate-before-publishing table is assembled by code and names all nine marked
+values (it named none of seven), no contract instruction or internal block identifier reaches the
+reader, and a whole-document proofreading pass runs between assembly and the final judge. The metric
+ledger holds six metrics identically across five blocks.
 
-Reading found six defects no check can express, now tracked: hiring authority contradicting itself
-across blocks 5, 16 and 24 (`mc2-db696.113`); the calibrate-before-publishing table naming none of the
-seven marked money values (`mc2-db696.114`); generation-contract instructions and internal block ids
-leaking into reader-facing prose (`mc2-db696.115`); a discontinuous bonus schedule and a coaching
-cadence that does not fit the day (`mc2-db696.116`); citations verified as resolvable but never as
-supporting the claim (`mc2-db696.117`). The full-document proofreading pass is restored as
-`mc2-db696.118` — the owner has stated that generation time is not a constraint, which removes the
-budget reason it was deferred for, and drops the latency item `mc2-db696.112` to P3.
+Two process rules now hold and are written into `06-quality-acceptance.md`: read the artifact before
+calling a run accepted — an acceptance built only from checks the same author wrote is partly
+circular — and clean up **after** the editorial pass, since the v2 cover was never scored because
+storage was wiped first.
 
-Two process lessons: the cover was never reviewed because storage was cleaned before the editorial
-pass, so cleanup must follow the review; and an acceptance built only from checks the same author
-wrote is partly circular.
-
-The run also found three defects that no test had: a malformed `metric_ledger` from the model aborted
-an entire generation at spec validation (fixed by sanitizing before validation), successful calls
-preceding a spec failure were missing from the receipt (fixed), and status glyphs still drew as empty
-boxes after the font-family change because the container has no font covering U+2705 (fixed by ASCII
-substitution in the PDF template only).
-
-Disposable fixture cleanup reported zero residual rows across organizations, users, memberships,
-playbooks, job status, error logs, courses, auth users, and storage objects.
+Open follow-ups: `mc2-db696.119` (a vendor blog cited as Gartner research, with a figure absent from
+the source — the check caught it, the generator still produced it) and `mc2-db696.120` (1:1 cadence
+stated as weekly in two blocks and monthly in another; coaching volume exceeds the day at twelve
+reports). Also open: `mc2-s98bw`, the CI migration-drift gate that passes without reaching the
+database.
 
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.
