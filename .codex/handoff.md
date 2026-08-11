@@ -11,6 +11,24 @@ The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cove
 complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
 and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
 
+The quality-v2 track is now specified and sliced, still on the same branch and still docs-only —
+no product code changed. The causes behind the 2.6/5 score were traced to ten structural defects
+in the generation tract, not to model noise, and are recorded with `file:line` evidence in
+`docs/career-playbook/quality-root-cause-2026-08-11.md`. Normative rules live in
+`docs/career-playbook/quality-contract.md`; the prompt specification was rewritten to v2 in
+`docs/plans/career-playbook/03-prompts-structure.md`; the PDF decision is `docs/ADR-008-career-playbook-pdf-rendering.md`;
+acceptance is `docs/plans/career-playbook/06-quality-acceptance.md`; the plan is
+`docs/plans/buzzing-jingling-oasis.md`; the Codex handoff prompt is
+`docs/plans/career-playbook/ORCHESTRATOR_PROMPT-quality-v2.md` (`orch-prompts prompt-check`: pass,
+one size warning).
+
+Nineteen tasks are open under the same epic with a wired, cycle-free dependency graph:
+`mc2-db696.107.1`-`.107.10` (spec contract, grounding, editorial), `mc2-db696.106.1`-`.106.3` (PDF),
+`mc2-db696.108.1`-`.108.3` (reliability and cost receipt), `mc2-db696.109` (acceptance harness),
+`mc2-db696.110` (authorized paid representative run), `mc2-db696.111` (cover). Currently unblocked:
+`.107.1`, `.107.6`, `.106.1`, `.108.1`, `.108.2`, `.108.3`. Targets: overall >= 4.0/5, cost <= USD 0.35,
+wall clock <= 25 min. `mc2-db696.110` needs explicit user authorization because it is a paid run.
+
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.
 

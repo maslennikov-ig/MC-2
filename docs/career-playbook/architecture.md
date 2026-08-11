@@ -253,6 +253,42 @@ markdown fallback text and surfaced as block-level quality issues. Internal
 quality issues are returned to owner/private viewer payloads, not to public share
 responses.
 
+### Editorial Quality Contract (v2, in progress)
+
+The representative live run of 2026-08-11 scored 2.6 / 5 editorially and was not
+publication-ready. The measured causes are structural, not model noise, and are
+mapped file-by-file in
+[quality-root-cause-2026-08-11.md](./quality-root-cause-2026-08-11.md). The
+normative rules that close them live in
+[quality-contract.md](./quality-contract.md); the prompt-level specification is
+[../plans/career-playbook/03-prompts-structure.md](../plans/career-playbook/03-prompts-structure.md).
+
+Four structural additions define the target state:
+
+- `RoleProfileSpec` gains `metric_ledger` (the single source of numeric truth
+  for all 26 blocks), `evidence_ledger` (citable sources, filled by code from
+  the web-research result rather than by the model), and `generated_on`.
+- Every group generator receives `metric_ledger_md`, `evidence_ledger_md`,
+  `generated_on`, and `prior_blocks_digest`. Before v2 a generator saw only
+  `spec_json` and the localized headings, so it could not avoid contradicting an
+  earlier block — only the judge saw prior content.
+- Five deterministic checks join the existing minimums:
+  `validateMetricLedgerConsistency`, `validateUnsourcedStatistics`,
+  `validateExampleMarking`, `validateRelativeDates`, `validateAntiGoalConflict`.
+- The judge taxonomy gains `metric_conflict`, `unsourced_claim`, `stale_date`,
+  and `unmarked_example`, and `contradiction` widens to cover a conflict with
+  another block, not only with the spec. `style` still never drives
+  regeneration.
+
+Acceptance for the whole track is defined in
+[../plans/career-playbook/06-quality-acceptance.md](../plans/career-playbook/06-quality-acceptance.md):
+a deterministic scorecard in CI, an offline fixture pass, and one authorized
+live run that must reach at least 4.0 / 5.
+
+PDF export moves off the hand-rolled Markdown converter; the decision and the
+print-CSS rules are recorded in
+[../ADR-008-career-playbook-pdf-rendering.md](../ADR-008-career-playbook-pdf-rendering.md).
+
 ## Course Bridge Sources
 
 `careerPlaybook.courseBridge.previewCourseFromPlaybook` builds the editable
@@ -411,7 +447,9 @@ The endpoint validates each `cost_breakdown`, marks invalid cost payloads, aggre
 
 Operator evidence should include a screenshot or exported trace from `/admin/generation/career-playbooks/costs` showing at least one completed Career Playbook with per-node rows and aggregate totals. If staging does not expose `public.career_playbooks`, record the schema blocker instead of running mutation smoke. If the schema is present but live-smoke inputs are incomplete, record the missing auth, fixture, queue, cleanup, or cost-budget gate instead of running LLM-backed generation.
 
-Current runtime cost accounting estimates Career Playbook node costs as `0`, so the admin page proves `cost_breakdown` shape and access control but does not prove real OpenRouter spend. Operator evidence should include provider-side spend or improved runtime cost accounting when the acceptance criterion needs actual cost evidence.
+Runtime cost accounting now records real per-node USD amounts: the representative run of 2026-08-11 recorded `$0.122550285` across 31 node-cost rows. The remaining gap is different — `cost_breakdown` records only calls that **succeeded**. Attempts aborted by the 300-second timeout leave no usage row at all, so the application cannot show whether the provider later bills them. Operator evidence should still include provider-side spend when the acceptance criterion needs settled cost, and `cost_breakdown` is being extended to record aborted attempts with an explicit `unknown` cost (`mc2-db696.108`).
+
+Measured latency of that run was 56 minutes end to end, broken down as: spec builder ~19 min, group generators ~19 min, judges ~13 min, block regenerations ~7 min. The spec builder alone consumed a third of the run because its `max_tokens` of 8000 truncated the JSON and the repair path was hard-wired to the fallback model — see RC-7 in [quality-root-cause-2026-08-11.md](./quality-root-cause-2026-08-11.md). The v2 target is `max_tokens` 16000 for the spec phase and `timeout_ms` 120000 across phases, bringing a comparable run to roughly 25 minutes.
 
 Staging model routing for Career Playbook is moving to the DeepSeek V4 pair through migration `20260523073000_update_career_playbook_v4_pro_routing`: `deepseek/deepseek-v4-pro` for `stage_career_playbook_spec`, `stage_career_playbook_group_5`, `stage_career_playbook_judge`, and `stage_career_playbook_regenerator`; `deepseek/deepseek-v4-flash` for follow-up generation and groups 1-4/6. Migration `20260528193000_add_career_playbook_department_classifier` adds `stage_career_playbook_department_classifier` with Flash primary and Pro fallback. Fallbacks stay within the same V4 pair, with Pro backing Flash phases and Flash backing Pro phases.
 

@@ -21,6 +21,22 @@
 | 03  | [Prompts Structure](./03-prompts-structure.md)         | Phase 2-3 (все LLM prompts + RoleProfileSpec schema) |
 | 04  | [Course Bridge Flow](./04-course-bridge-flow.md)       | Phase 9 (JD → Course с auto WebSearch)               |
 | 05  | [Frontend Architecture](./05-frontend-architecture.md) | Phases 4-7 (компоненты, store, i18n, streaming)      |
+| 06  | [Quality Acceptance](./06-quality-acceptance.md)       | Трек качества v2 (приёмка L1/L2/L3)                  |
+
+## Трек качества v2 (после прогона 2026-08-11)
+
+Представительная живая генерация получила редакторскую оценку 2.6 / 5. Причины структурные и
+разобраны по коду; работы нарезаны в Beads под тем же эпиком `mc2-db696`.
+
+| Документ                                                               | Содержание                                                 |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [План работ](../buzzing-jingling-oasis.md)                             | Карта причин, целевая архитектура, нарезка задач           |
+| [Карта причин](../../career-playbook/quality-root-cause-2026-08-11.md) | RC-1…RC-10 с привязкой к `file:line`                       |
+| [Контракт качества](../../career-playbook/quality-contract.md)         | Нормативные правила: реестры, проверки, таксономия, пороги |
+| [03-prompts-structure v2](./03-prompts-structure.md)                   | Обновлённая спецификация промптов                          |
+| [ADR-008](../../ADR-008-career-playbook-pdf-rendering.md)              | Решение по PDF-рендереру и печатному CSS                   |
+| [06-quality-acceptance](./06-quality-acceptance.md)                    | Процедура приёмки                                          |
+| [Промпт для оркестратора](./ORCHESTRATOR_PROMPT-quality-v2.md)         | Handoff-пакет для реализации                               |
 
 ## Beads tracking
 
