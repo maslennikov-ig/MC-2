@@ -1,22 +1,18 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-11. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.11.6`
+Current stage id: `mc2-db696.105`
 
 ## Current stage
 
-`mc2-db696.11.6` is accepted on `codex/career-playbook-load-test`. One isolated dev batch picked
-up ten main generation jobs within 1,359 ms; all ten completed while worker readiness remained
-live. All durations and costs are tracked: total USD 1.19633817 and maximum single run USD
-0.160969265, below the approved USD 5.00/USD 0.50 limits. Exact cleanup removed the disposable
-auth/public user, organization, ten playbooks, job/error rows, and isolated queue; database, auth,
-queue, file, course, and Qdrant residue are zero.
+`mc2-db696.105` is accepted locally on `codex/career-playbook-quality-review`. One isolated dev Career
+Playbook completed for USD 0.122550285 of application-recorded usage, below the USD 0.50 ceiling.
+The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cover. The technically
+complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
+and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
 
-The initial observer lost the longest result when its access token expired near one hour. A
-refreshed resume read recovered it without another generation. The tRPC client now rotates the
-Supabase session on 401 and retries once. Ten separate best-effort image children exposed a
-Node/JSDOM OpenAI SDK guard; the server image client is corrected with focused coverage. No live
-resource remains.
+The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
+within budget with zero residue. It is not merged into `develop`; no deploy was performed.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -125,6 +121,8 @@ research, and owner-decision items remain explicitly deferred.
   64 readiness writes, USD 1.19633817 total cost, USD 0.160969265 max cost, and zero cleanup
   residue. The original 9/10 report was an observer-token expiry, not a generation failure; the
   refresh/retry path and the separately exposed image-client JSDOM guard now have focused coverage.
+- Career Playbook quality review completed one 27-block result for USD 0.122550285. Structural smoke
+  passed, but personal editorial/PDF review scored 2.6/5; blockers are `.106` through `.108`.
 - `graph-reviewed: updated` — Graphify 0.9.14 rebuilt the local-only graph without external
   semantic backends to 61,733 nodes, 88,850 edges, and 7,352 communities.
 
@@ -175,6 +173,8 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
 - `mc2-db696.61` — owner decision above.
+- `mc2-db696.106`/`.107`/`.108` — fix PDF fidelity, ground and normalize content, and bound
+  provider timeouts while making latency/cost receipts reliable.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
   reconsider only if another regular production operator appears.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -182,11 +182,11 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.11.6`
-Current stage id: `mc2-db696.11.6`
-Next stage id: `mc2-db696.61` only after a separate live-cost/quality decision
-Recommended action: preserve the accepted load result and zero-residue state. Do not start another
-paid run automatically; the remaining `mc2-db696.61` decision has its own live budget boundary.
+Accepted stage id: `mc2-db696.105`
+Current stage id: `mc2-db696.105`
+Next stage id: `mc2-db696.107` when implementation is selected
+Recommended action: fix content grounding first, then PDF fidelity and timeouts. Do not run another
+paid generation before deterministic coverage and a new explicit budget.
 
 ## Starter prompt for next orchestrator
 
