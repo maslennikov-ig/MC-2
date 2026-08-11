@@ -18,10 +18,25 @@ than the generation year. The PDF has zero blank pages against three, and zero l
 against nine. Cost was USD 0.234668095 against a USD 0.35 ceiling, and the receipt records one
 attempt whose cost it cannot account for rather than implying it was free.
 
-Two thresholds were missed and are tracked, not papered over: the run took 59 minutes against a
-25-minute target and needed 20 block regenerations against a target of 6. The checks and the judge
-are working; first drafts violate the contract often enough that the repair loop dominates the run.
-That is `mc2-db696.112`.
+The acceptance was then corrected. What was recorded first was **mechanical only** — the checks
+verifying what had been formalized — while the plan's primary threshold is a seven-dimension manual
+rubric at >= 4.0 / 5. The full 1,118-line document was read end to end afterwards and scored
+**3.9 / 5**, below threshold, so `mc2-db696.110` is reopened. Coherence rose from 2 to 4 and
+grounding from 1 to 3; the metric ledger genuinely solved the worst baseline dimension, with the same
+four metrics carrying identical thresholds across blocks 1, 6, 17, 20 and 24.
+
+Reading found six defects no check can express, now tracked: hiring authority contradicting itself
+across blocks 5, 16 and 24 (`mc2-db696.113`); the calibrate-before-publishing table naming none of the
+seven marked money values (`mc2-db696.114`); generation-contract instructions and internal block ids
+leaking into reader-facing prose (`mc2-db696.115`); a discontinuous bonus schedule and a coaching
+cadence that does not fit the day (`mc2-db696.116`); citations verified as resolvable but never as
+supporting the claim (`mc2-db696.117`). The full-document proofreading pass is restored as
+`mc2-db696.118` — the owner has stated that generation time is not a constraint, which removes the
+budget reason it was deferred for, and drops the latency item `mc2-db696.112` to P3.
+
+Two process lessons: the cover was never reviewed because storage was cleaned before the editorial
+pass, so cleanup must follow the review; and an acceptance built only from checks the same author
+wrote is partly circular.
 
 The run also found three defects that no test had: a malformed `metric_ledger` from the model aborted
 an entire generation at spec validation (fixed by sanitizing before validation), successful calls

@@ -99,6 +99,73 @@ between them. The generators are producing first drafts that violate the new con
 that the repair loop dominates the run. This is a prompt-adherence problem, not a check problem:
 the fix is to make first drafts comply, not to loosen the gate.
 
+## Editorial review (added after the fact — the acceptance above was mechanical only)
+
+The section above verified what had been formalized into checks. That is a partial acceptance, and
+recording it as the acceptance was wrong: the plan's primary threshold is a seven-dimension manual
+rubric at >= 4.0 / 5, and half the baseline findings are not expressible as a regex. The full
+1,118-line document was then read end to end.
+
+**Editorial score: 3.9 / 5 — below the 4.0 threshold.**
+
+| Dimension | Baseline | Now | Threshold | Note |
+|---|---:|---:|---:|---|
+| Completeness | 5 | 5 | >= 5 | 26 sections plus header, richer than the baseline |
+| Coherence | 2 | 4 | >= 4 | Metric consistency genuinely solved; one authority contradiction remains |
+| Practical usefulness | 3 | 4 | >= 4 | Docked: the calibration table is the reader's map and it is wrong |
+| Grounding and traceability | 1 | 3 | >= 3 | 12 citations to 4 real sources; content of the claims unverified |
+| Decision and risk guidance | 3 | 4 | >= 4 | Four-axis matrix is a real gain; one row is internally incoherent |
+| PDF fidelity | 2 | 4 | >= 4 | Docked: verified mechanically plus one screenshot, not all 60 pages by eye |
+| Cover image | 3 | **unscored** | >= 3 | Not reviewed; storage was cleaned before the editorial pass |
+
+### What the metric ledger actually delivered
+
+The four ledger metrics appear with identical targets and thresholds in blocks 1, 6, 17, 20 and 24.
+The baseline had four separate metrics carrying contradicting values across blocks, one pair inside a
+single generation call. This dimension was the worst in the baseline and is now the strongest.
+
+Relative dates hold throughout — "Day 1-14", "after 4 quarters", "(relative: Month 1)" — with the
+only absolute date in the footer. The four-axis decision matrix correctly classifies CRM stage
+changes and vendor selection as "reversible with cost". The career ladder has no duplicate level and
+keeps the IC and management tracks separate. All three are baseline findings closed properly.
+
+### Defects reading found that no check can see
+
+1. **Hiring authority contradicts itself across three blocks.** Block 5 line 90: "Act alone ... CRO is
+   notified for visibility - no approval required". Block 16 line 581: "culture-fit debrief -> CRO
+   sign-off -> offer". Block 24: "Full authority | CRO for exceptions". A reader cannot tell whether
+   they may hire without approval. Block 5 also classifies the same decision as *irreversible* with
+   function-level blast radius while granting act-alone authority, which is internally incoherent.
+2. **The calibration checklist misses every monetary example.** Block 26 "Calibrate before publishing"
+   lists six rows: a lead-response SLA, the field-to-fill templates, and the version number. The
+   document contains seven marked money values — $120,000 base, $100K and $50K in the GWC questions,
+   $5,000 offsite, $4,000 conference, EUR 200,000 and EUR 120,000 in the SBAR — and the table names
+   none of them. The instrument that makes marked examples actionable does not point at the values
+   that most need replacing.
+3. **Generation-contract instructions leaked into reader-facing text.** Block 6 anti-metrics: "Do not
+   use 'accuracy above +/-20%' language - always measure forecast quality as absolute error." That is
+   an instruction to the document's author, not guidance for a sales manager. Same class: "described
+   qualitatively - no precise target from ledger". This is a defect the prompt rules introduced.
+4. **Internal block identifiers leaked into prose**: 23 occurrences of `block_5`, `block_17`,
+   `Block_6` and similar in FAQ answers and the implementation checklist, alongside the correct
+   "Block 8" form elsewhere. One row mislabels block 6 as "(FAQ)".
+5. **The bonus schedule has a discontinuity.** Block 15 prorates the yellow band "from 50% at 75% to
+   90% at 89%", then pays 100% at 90%. One point of attainment is worth ten points of bonus at the
+   boundary — a comp reviewer would reject it.
+6. **Coaching capacity does not fit the schedule.** Block 4 requires a weekly 1:1 with each of 6-12
+   direct reports; block 13 allocates two 30-minute slots per day, which is ten per week. At the top
+   of the stated range the cadence is unachievable.
+
+### Limits of this review
+
+- **Citations are verified as resolvable, not as supporting.** The checks confirm a `[Sn]` exists and
+  resolves to a ledger entry; nothing confirms that the source says what the sentence claims. The
+  87% AI-adoption figure and the 2.6x quota claim rest on four vendor marketing posts, not research.
+- **The PDF was verified mechanically** (page count, blank pages, absence of raw Markdown, one
+  screenshot of a substituted glyph). The baseline reviewer rendered and inspected all 60 pages.
+- **The cover was never opened.** Storage was cleaned before the editorial pass, so it cannot be
+  scored now. Cleanup should follow the review, not precede it.
+
 ## Cleanup evidence
 
 Exact cleanup by fixture identifiers reported zero residual rows for organizations, users,
