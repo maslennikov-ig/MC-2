@@ -5,14 +5,22 @@ Current stage id: `mc2-db696.105`
 
 ## Current stage
 
-`mc2-db696.105` is accepted locally on `codex/career-playbook-quality-review`. One isolated dev Career
+`mc2-db696.105` is accepted and **delivered**. `develop` is at `00f627e1f` and `master` at
+`6f4a37f90`; CI/CD run `31481370434` for exact sha `6f4a37f90` is green across every job, including
+Deploy to Production, with Rollback skipped. Staging is healthy afterwards: `https://ai.megacampus.ru/`
+returns 200 and `/api/health` returns `{"status":"ok"}`. The stranded-commit check is clean, so the
+load stage `mc2-db696.11.6` and this review are no longer side-branch-only. One gate did not run:
+the migration drift check could not reach the database (`ESSLREQUIRED`) and skipped without blocking;
+this delivery carried no migration, so nothing is at risk from it, but the gate is currently blind.
+
+One isolated dev Career
 Playbook completed for USD 0.122550285 of application-recorded usage, below the USD 0.50 ceiling.
 The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cover. The technically
 complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
 and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
 
-The quality-v2 track is now specified and sliced, still on the same branch and still docs-only —
-no product code changed. The causes behind the 2.6/5 score were traced to ten structural defects
+The quality-v2 track is specified, sliced, and delivered as docs only — no product code changed.
+The causes behind the 2.6/5 score were traced to ten structural defects
 in the generation tract, not to model noise, and are recorded with `file:line` evidence in
 `docs/career-playbook/quality-root-cause-2026-08-11.md`. Normative rules live in
 `docs/career-playbook/quality-contract.md`; the prompt specification was rewritten to v2 in
@@ -27,7 +35,13 @@ Nineteen tasks are open under the same epic with a wired, cycle-free dependency 
 `mc2-db696.108.1`-`.108.3` (reliability and cost receipt), `mc2-db696.109` (acceptance harness),
 `mc2-db696.110` (authorized paid representative run), `mc2-db696.111` (cover). Currently unblocked:
 `.107.1`, `.107.6`, `.106.1`, `.108.1`, `.108.2`, `.108.3`. Targets: overall >= 4.0/5, cost <= USD 0.35,
-wall clock <= 25 min. `mc2-db696.110` needs explicit user authorization because it is a paid run.
+wall clock <= 25 min.
+
+The owner authorized the paid representative run on 2026-08-11. `mc2-db696.110` is therefore cleared
+to run, but only once its blockers land: repeating it against unchanged code would reproduce the
+same 2.6/5 result and spend money for nothing. Before that run, confirm the worker image actually
+carries the fixes (`docker inspect megacampus-worker-dev --format '{{.Created}}'` against the fix
+push time) — a 2026-07-04 paid A/B was invalidated by exactly this.
 
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.
