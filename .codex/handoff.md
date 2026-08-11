@@ -1,7 +1,7 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-11. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.105`
+Current stage id: `mc2-db696.110`
 
 ## Current stage
 
@@ -204,7 +204,7 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 ## Next recommended
 
 Accepted stage id: `mc2-db696.105`
-Current stage id: `mc2-db696.105`
+Current stage id: `mc2-db696.110`
 Next stage id: `mc2-db696.107` when implementation is selected
 Recommended action: fix content grounding first, then PDF fidelity and timeouts. Do not run another
 paid generation before deterministic coverage and a new explicit budget.
