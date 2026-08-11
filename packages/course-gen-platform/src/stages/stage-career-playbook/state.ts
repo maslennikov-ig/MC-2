@@ -28,7 +28,8 @@ export type CareerPlaybookGraphNode =
   | 'group6Generator'
   | 'crossBlockJudge'
   | 'blockRegenerator'
-  | 'finalAssembler';
+  | 'finalAssembler'
+  | 'finalProofreader';
 
 export interface CareerPlaybookGroupResult {
   groupKey: CareerPlaybookGroupKey;

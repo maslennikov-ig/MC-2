@@ -874,6 +874,10 @@ export const CareerPlaybookEvidenceEntrySchema = z.object({
   title: z.string().min(1),
   claim: z.string().min(1),
   retrieved_at: z.string().min(1),
+  // Lets a reader tell a study from a vendor blog. All four sources of the
+  // 2026-08-11 run were vendor marketing posts, which the guide presented
+  // exactly as it would have presented research. Optional for older specs.
+  source_kind: z.enum(['research', 'vendor', 'media', 'unknown']).optional(),
 });
 export type CareerPlaybookEvidenceEntry = z.infer<typeof CareerPlaybookEvidenceEntrySchema>;
 

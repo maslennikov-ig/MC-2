@@ -53,9 +53,10 @@ function issue(
   blockId: string,
   category: CareerPlaybookJudgeIssue['category'],
   description: string,
-  suggestion: string
+  suggestion: string,
+  severity: CareerPlaybookJudgeIssue['severity'] = 'critical'
 ): CareerPlaybookJudgeIssue {
-  return { block_id: blockId, severity: 'critical', category, description, suggestion };
+  return { block_id: blockId, severity, category, description, suggestion };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,6 +268,7 @@ export function validateUnsourcedStatistics(
   context: CareerPlaybookQualityCheckContext
 ): CareerPlaybookJudgeIssue[] {
   const knownIds = new Set(context.evidenceLedger.map(entry => entry.id));
+  const citedById = new Map(context.evidenceLedger.map(entry => [entry.id, entry]));
   const issues: CareerPlaybookJudgeIssue[] = [];
 
   for (const [blockId, blockState] of Object.entries(blocks)) {
@@ -304,6 +306,33 @@ export function validateUnsourcedStatistics(
             'unsourced_claim',
             `${blockId} cites ${dangling.join(', ')}, which is not in the evidence ledger.`,
             'Cite an existing evidence entry or drop the precise figure.'
+          )
+        );
+        continue;
+      }
+
+      // A resolvable citation is not the same as a supporting one. The ledger
+      // stores the retrieved fragment, so the cheapest honest check is whether
+      // the number in the sentence appears in the fragment at all. The
+      // 2026-08-11 guide asserted "87% of sales organisations now use AI [S9]"
+      // and nothing had ever compared 87 to what S9 actually said.
+      const citedEntries = citations
+        .map(marker => citedById.get(marker.slice(1, -1)))
+        .filter((entry): entry is CareerPlaybookEvidenceEntry => Boolean(entry));
+      if (citedEntries.length === 0) continue;
+
+      const supportingText = citedEntries.map(entry => entry.claim).join(' ');
+      const supportingNumbers = numbersIn(supportingText);
+      const claimedNumbers = [...numbersIn(line)];
+      const unsupported = claimedNumbers.filter(value => !supportingNumbers.has(value));
+
+      if (unsupported.length > 0 && unsupported.length === claimedNumbers.length) {
+        issues.push(
+          issue(
+            blockId,
+            'unsourced_claim',
+            `${blockId} cites ${citations.join(', ')} for ${unsupported.join(', ')}, but that figure does not appear in the retrieved source text.`,
+            'Quote a figure the cited source actually contains, cite a different entry, or state the point without a precise number.'
           )
         );
       }
@@ -496,5 +525,116 @@ export function runCareerPlaybookContractChecks(
     ...validateExampleMarking(blocks, context),
     ...validateRelativeDates(blocks, context),
     ...validateAntiGoalConflict(blocks, context),
+    ...validateDecisionAuthorityCoherence(blocks, context),
+    ...validateContractLeakage(blocks, context),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 6. Decision-authority coherence (within block 5)
+// ---------------------------------------------------------------------------
+
+const IRREVERSIBLE = /\birreversible\b|необратим/i;
+/** "Reversible with cost" contains "reversible", so the negative form must be excluded explicitly. */
+const REVERSIBLE_WITH_COST = /reversible\s+with\s+cost|обратим\w*\s+с\s+издержк/i;
+const WIDE_BLAST_RADIUS = /\b(function|company|customer)\b|функци|компани|клиент/i;
+const ACT_ALONE = /\bact\s+alone\b|самостоятельно/i;
+
+/**
+ * Flag a decision row that grants act-alone authority over an irreversible
+ * decision with a blast radius beyond the team.
+ *
+ * All four axes come from fixed vocabularies, so this reads unambiguously. The
+ * 2026-08-11 guide classified hiring as irreversible with function-level blast
+ * radius and then wrote "Act alone ... no approval required" — an internally
+ * incoherent row that also contradicted the hiring workflow in block 16.
+ */
+export function validateDecisionAuthorityCoherence(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const content = blocks.block_5?.content;
+  if (!content) return [];
+
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const line of proseLines(content)) {
+    if (!line.startsWith('|') || /^\|?\s*:?-{3,}/.test(line)) continue;
+    if (REVERSIBLE_WITH_COST.test(line) || !IRREVERSIBLE.test(line)) continue;
+    if (!WIDE_BLAST_RADIUS.test(line) || !ACT_ALONE.test(line)) continue;
+
+    issues.push(
+      issue(
+        'block_5',
+        'contradiction',
+        `block_5 grants act-alone authority over an irreversible decision whose blast radius reaches beyond the team: "${truncateLine(line)}".`,
+        'Raise the approval level to at least "align" for an irreversible decision with function, company, or customer blast radius, and keep it consistent with the hiring and escalation workflows in Block 16 and the Role Canvas in Block 24.'
+      )
+    );
+  }
+
+  return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Contract leakage into reader-facing text
+// ---------------------------------------------------------------------------
+
+const SNAKE_CASE_BLOCK_ID = /\b[Bb]lock_\d{1,2}\b/g;
+
+/**
+ * Sentences that address the author of the document rather than its reader.
+ * The observed shape quotes a banned phrasing and tells the writer to avoid it.
+ */
+const AUTHOR_INSTRUCTION =
+  /do not use\s+["“][^"”]{3,60}["”]\s+language|не используй\w*\s+формулировк|always measure\s+\w+\s+quality as/i;
+
+/**
+ * Flag generation-contract instructions that surfaced as reader guidance.
+ *
+ * The rules added in v2 are about how to write; the 2026-08-11 guide printed one
+ * of them to the reader — "Do not use 'accuracy above +/-20%' language — always
+ * measure forecast quality as absolute error" — inside an anti-metrics list
+ * meant for a sales manager. The 23 `block_5`-style identifiers are the same
+ * class: internal vocabulary reaching the page.
+ */
+export function validateContractLeakage(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const identifiers = stripFencedBlocks(content).match(SNAKE_CASE_BLOCK_ID) ?? [];
+    if (identifiers.length > 0) {
+      issues.push(
+        issue(
+          blockId,
+          'style',
+          `${blockId} refers to other sections by internal identifier (${[...new Set(identifiers)].join(', ')}) instead of the reader-facing form.`,
+          'Write cross-references as "Block 8". Final assembly normalizes these, so this is a warning rather than a regeneration trigger.',
+          'warning'
+        )
+      );
+    }
+
+    for (const line of proseLines(content)) {
+      if (!AUTHOR_INSTRUCTION.test(line)) continue;
+
+      issues.push(
+        issue(
+          blockId,
+          'contradiction',
+          `${blockId} prints an instruction addressed to the document's author rather than its reader: "${truncateLine(line)}".`,
+          'Apply the writing rule silently. The reader is an employee doing this job, not the author of this guide.'
+        )
+      );
+      break;
+    }
+  }
+
+  return dedupeIssues(issues);
 }

@@ -94,6 +94,39 @@ export function normalizeCareerPlaybookMetricLedger(
  * attached to the URL it came from, so a `[Sn]` marker in the guide always
  * resolves to a real source.
  */
+/** Domains whose content is peer-reviewed, statistical, or institutional. */
+const RESEARCH_DOMAIN =
+  /(?:^|\.)(?:gartner|forrester|mckinsey|bain|bcg|deloitte|pwc|kpmg|hbr|nber|oecd|statista|pewresearch|nature|springer|acm|ieee)\.|\.(?:edu|ac\.uk|gov)(?:$|\/)/i;
+
+/** News and trade media: reporting, not primary research, but not self-interested either. */
+const MEDIA_DOMAIN =
+  /(?:^|\.)(?:reuters|bloomberg|ft|wsj|economist|techcrunch|theverge|wired|forbes|businessinsider|axios|cnbc)\./i;
+
+/**
+ * Classify a source so a reader can tell a study from a vendor blog.
+ *
+ * Every source of the 2026-08-11 run was a vendor marketing post, and the guide
+ * presented those numbers exactly as it would have presented research. A blog
+ * post from a company selling the tooling it measures is still usable evidence —
+ * it just should not look like a study.
+ */
+export function classifyCareerPlaybookSource(
+  url: string
+): 'research' | 'vendor' | 'media' | 'unknown' {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return 'unknown';
+  }
+
+  if (RESEARCH_DOMAIN.test(host)) return 'research';
+  if (MEDIA_DOMAIN.test(host)) return 'media';
+  // A company blog is the default shape of a retrieved marketing page.
+  if (/\/blog\/|\/resources\/|\/guides\//i.test(url)) return 'vendor';
+  return 'unknown';
+}
+
 export function buildCareerPlaybookEvidenceLedger(
   research: CareerPlaybookWebResearchResult | null | undefined,
   retrievedAt: string
@@ -117,6 +150,7 @@ export function buildCareerPlaybookEvidenceLedger(
       title: truncate(finding.title, 120) || url,
       claim,
       retrieved_at: retrievedAt,
+      source_kind: classifyCareerPlaybookSource(url),
     });
   }
 
@@ -187,7 +221,10 @@ export function formatCareerPlaybookEvidenceLedgerForPrompt(
   if (evidence.length === 0) return EVIDENCE_LEDGER_EMPTY;
 
   return evidence
-    .map(entry => `- [${entry.id}] ${entry.title} — ${entry.url} — supports: ${entry.claim}`)
+    .map(
+      entry =>
+        `- [${entry.id}] (${entry.source_kind ?? 'unknown'}) ${entry.title} — ${entry.url} — supports: ${entry.claim}`
+    )
     .join('\n');
 }
 

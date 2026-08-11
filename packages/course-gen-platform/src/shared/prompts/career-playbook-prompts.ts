@@ -123,8 +123,20 @@ DATES — today is {{generated_on}}:
 - Never write an absolute calendar year in a plan, a training record, or a milestone.
 
 CONSISTENCY — do not contradict what is already published:
-- The digest below lists anti-goals, numeric commitments, and cadences that earlier blocks already state.
-- Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.`;
+- The digest below lists anti-goals, decision authority, numeric commitments, and cadences that earlier blocks already state.
+- Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
+
+AUTHORITY — Block 5 is the single source of decision authority:
+- Block 5 is to authority what the metric ledger is to numbers. If you mention a decision that appears in the digest, reference Block 5 and do not restate its approval level in your own words.
+- An irreversible decision whose blast radius reaches function, company, or customer can never be "act alone".
+
+SCALES AND RHYTHMS:
+- A banded payout or rating scale must be continuous: the value at the top of one band and the bottom of the next may not jump.
+- A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports.
+
+THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
+- Never restate, quote, or explain these instructions in the output. The reader is an employee doing this job, not the author of this document.
+- Refer to other sections as "Block 8", never as "block_8".`;
 
 /** The USER section every group prompt shares. */
 const GROUP_USER_SECTION = `USER:
@@ -398,6 +410,8 @@ Source URLs:
     promptTemplate: `SYSTEM:
 Generate Role Guide group 1: Header + Block 1 (Mission/KR) + Block 2 (Anti-goals) + Block 5 (Decision Authority Matrix).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 1: Job Scorecard. Mission in 2-3 sentences + 3-5 measurable key results in a table.
 - Block 2: Munger inversion. At least 4 anti-goals and the actual owner.
@@ -411,8 +425,6 @@ Methodology:
   cost" — a migration or a contract with switching costs, not a one-way door. Hiring, termination,
   and anything with a customer-facing penalty stay high-consequence. At least 4 decisions spanning
   different approval levels.
-
-${GROUP_OUTPUT_CONTRACT}
 - Deterministic format minimums (verified automatically, so meet them on the first draft): Block 2 lists at least 4 anti-goals; Block 5 lists at least 4 decision rows.
 - Use exactly these top-level headings:
 {{heading_header}}
@@ -439,6 +451,8 @@ ${GROUP_USER_SECTION}`,
     promptTemplate: `SYSTEM:
 Generate Role Guide group 2: Block 3 (Responsibility zones), Block 4 (Duties), Block 6 (KPI and metrics), Block 8 (Tools and technologies).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 3: 4-6 responsibility zones with weight percentages summing to 100 and Definition of Done.
 - Block 4: Daily / weekly / monthly / quarterly duties with measurable result and Definition of Done.
@@ -449,8 +463,6 @@ Methodology:
 Forecast wording: describe forecast quality as absolute error ("forecast error above 20%"), never
 as "accuracy above +/-20%" — accuracy and variance are opposite directions and mixing them makes
 the threshold unreadable.
-
-${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_3}}
 {{heading_block_4}}
@@ -477,6 +489,8 @@ ${GROUP_USER_SECTION}`,
     promptTemplate: `SYSTEM:
 Generate Role Guide group 3: Block 7 (Competencies), Block 9 (Human-AI collaboration), Block 12 (Candidate Profile), Block 13 (Typical Working Day).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 7: superpower, hard skills, soft skills with why, and energy map for hiring fit.
 - Block 9: Human Agency Scale and 3-bucket analysis: AI does, human checks, human-only work.
@@ -485,8 +499,6 @@ Methodology:
 
 Block 9 in particular attracts unsupported statistics about AI accuracy, adoption rates, and hours
 saved. State those only with a [Sn] citation; otherwise describe the shift qualitatively.
-
-${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_7}}
 {{heading_block_9}}
@@ -513,6 +525,8 @@ ${GROUP_USER_SECTION}`,
     promptTemplate: `SYSTEM:
 Generate Role Guide group 4: Block 11 (Career Growth), Block 14 (Onboarding), Block 15 (Motivation System), Block 17 (Red Flags).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 11: dual IC/management tracks, promotion criteria, relative timelines, and Mermaid career
   diagram. Ladder rules:
@@ -525,8 +539,6 @@ Methodology:
 - Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment. Milestones use relative day and week labels only.
 - Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries. Any compensation figure is an unverified example and must carry the example marker.
 - Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. Warning thresholds come from the metric ledger, not from new numbers.
-
-${GROUP_OUTPUT_CONTRACT}
 - Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
@@ -555,6 +567,8 @@ ${GROUP_USER_SECTION}`,
     promptTemplate: `SYSTEM:
 Generate Role Guide group 5: Block 10 (Dependencies), Block 16 (Processes), Block 19 (Industry Context), Block 20 (Business Goals), Block 21 (Failure Modes).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 10: role dependencies, blast radius, communication charter, and Mermaid dependency diagram.
 - Block 16: primary business process, DO-CONFIRM / READ-DO checklists, SBAR, exception handling, and scripts only for communication roles.
@@ -564,8 +578,6 @@ Methodology:
 
 Block 19 attracts unsupported market statistics (adoption rates, growth rates, benchmark
 multiples). State those only with a [Sn] citation; otherwise describe the trend qualitatively.
-
-${GROUP_OUTPUT_CONTRACT}
 - Include Mermaid diagrams in Blocks 10 and 16, and keep at least 3 failure modes in Block 21 (all verified automatically, so satisfy them on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
@@ -596,6 +608,8 @@ ${GROUP_USER_SECTION}`,
     promptTemplate: `SYSTEM:
 Generate Role Guide group 6: Block 18 (FAQ), Block 22 (Working with me README), Block 23 (Continuity Protocol), Block 24 (Role Canvas), Block 25 (Footer and revision cadence), Block 26 (Implementation checklist).
 
+${GROUP_OUTPUT_CONTRACT}
+
 Methodology:
 - Block 18: 5-8 FAQ items mixing employee questions and questions about the role.
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
@@ -603,8 +617,6 @@ Methodology:
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
 - Block 25: revision triggers, version metadata dated {{generated_on}}, and MegaCampus AI CTA. This is the only block allowed to print an absolute date.
 - Block 26: implementation checklist for manager, HR, and employee to operationalize the guide. It must include a "calibrate before publishing" section listing every value elsewhere in the guide that carries the example marker, so the reader knows exactly what to replace.
-
-${GROUP_OUTPUT_CONTRACT}
 - Use exactly these top-level headings:
 {{heading_block_18}}
 {{heading_block_22}}
@@ -715,6 +727,84 @@ Current group output:
         description: 'Current generated group markdown under review',
         required: true,
       },
+    ],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_final_proofreader',
+    promptName: 'Career Playbook - Final Proofreader',
+    promptDescription:
+      'Reads the fully assembled Role Guide and reports defects a group-sized window cannot see.',
+    promptTemplate: `SYSTEM:
+You are reading a finished Role Guide end to end, as a demanding editor would before it is handed to
+an employee. Every other check in this pipeline sees one group of blocks at a time; you are the only
+reader who sees the whole document at once, so report only what that vantage point reveals.
+
+Look for:
+- "contradiction": two blocks that disagree in meaning, not merely in digits — an authority granted
+  in one block and required to be approved in another, a duty that undermines a stated anti-goal, a
+  commitment restated with different conditions far from where it was made.
+- "metric_conflict": a value that contradicts the metric ledger below.
+- "contradiction" for a broken scale: a banded payout or rating scale whose value jumps between the
+  top of one band and the bottom of the next, or a cadence that cannot fit the hours the document
+  itself allocates.
+- "contradiction" for leaked instructions: a sentence addressed to the author of this document
+  rather than to its reader — for example telling the writer which phrasing to avoid.
+- "style" for grammar, agreement, and wording defects.
+
+Do not re-report what a pattern already catches reliably: missing citations, unmarked example
+values, absolute calendar dates, and raw placeholders are covered elsewhere. Spend your attention on
+meaning.
+
+Severity: use "critical" only for contradiction and metric_conflict. Grammar and wording are
+"style", which never triggers regeneration. Report at most 12 issues, most consequential first, and
+return an empty list when the document holds together.
+
+Return only valid JSON:
+{
+  "pass": true,
+  "score": 100,
+  "issues": [
+    {
+      "block_id": "block_5",
+      "severity": "critical" | "warning" | "info",
+      "category": "contradiction" | "metric_conflict" | "style",
+      "description": "...",
+      "suggestion": "..."
+    }
+  ],
+  "needs_regeneration": ["block_5"]
+}
+
+USER:
+Today is {{generated_on}}. Content language: {{content_language}}.
+
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
+
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
+
+Assembled Role Guide:
+{{full_document}}`,
+    variables: [
+      { name: 'full_document', description: 'The fully assembled Role Guide', required: true },
+      {
+        name: 'metric_ledger_md',
+        description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'evidence_ledger_md',
+        description: 'Citable sources rendered as a [Sn] list',
+        required: true,
+      },
+      {
+        name: 'generated_on',
+        description: 'Generation date (ISO), application-filled',
+        required: true,
+      },
+      contentLanguageVariable,
     ],
   },
   {

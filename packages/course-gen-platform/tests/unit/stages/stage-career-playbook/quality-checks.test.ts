@@ -20,6 +20,8 @@ import {
   runCareerPlaybookContractChecks,
   stripFencedBlocks,
   validateAntiGoalConflict,
+  validateContractLeakage,
+  validateDecisionAuthorityCoherence,
   validateExampleMarking,
   validateMetricLedgerConsistency,
   validateRelativeDates,
@@ -419,5 +421,124 @@ describe('runCareerPlaybookContractChecks', () => {
     );
 
     expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * v3 checks — every case is a line from the 2026-08-11 acceptance output, which
+ * the scorecard called clean and an end-to-end read did not.
+ */
+describe('validateDecisionAuthorityCoherence', () => {
+  it('flags the real hiring row that granted act-alone authority over an irreversible decision', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Hire a new SDR or AE** | Irreversible | Team; also function if the role is senior | None | Act alone – manager holds full hiring authority; CRO is notified for visibility – no approval required |',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('contradiction');
+    expect(issues[0].block_id).toBe('block_5');
+  });
+
+  it('accepts an irreversible decision that requires alignment', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Terminate a direct report** | Irreversible | Team; also company | Has penalty | Manager decides after documented process and HR alignment |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('does not mistake "reversible with cost" for irreversible', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Adjust a sales process step** | Reversible with cost | Team; also function if it affects handoffs | None | Act alone — document the change and notify CRO |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('leaves a team-only irreversible decision alone', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5: '| **Assign a stretch account** | Irreversible | Team | None | Act alone |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateContractLeakage', () => {
+  it('flags the real instruction addressed to the document author', () => {
+    const issues = validateContractLeakage(
+      blocks({
+        block_6:
+          '- Do not use “accuracy above +/-20%” language – always measure forecast quality as absolute error.',
+      }),
+      context()
+    );
+
+    expect(issues.some(item => item.severity === 'critical')).toBe(true);
+    expect(issues[0].category).toBe('contradiction');
+  });
+
+  it('reports internal identifiers as a warning, not a regeneration trigger', () => {
+    const issues = validateContractLeakage(
+      blocks({ block_18: 'Your scope is defined in the Decision Authority Matrix (block_5).' }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe('warning');
+  });
+
+  it('accepts the reader-facing cross-reference form', () => {
+    const issues = validateContractLeakage(
+      blocks({ block_18: 'Your scope is defined in the Decision Authority Matrix (Block 5).' }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateUnsourcedStatistics citation support', () => {
+  const supported = {
+    id: 'S1',
+    url: 'https://example.com/x',
+    title: 'T',
+    claim: '87% of sales organisations now use AI for prospecting and forecasting',
+    retrieved_at: '2026-08-11',
+  };
+
+  it('accepts a figure the cited source actually contains', () => {
+    const issues = validateUnsourcedStatistics(
+      blocks({ block_18: 'Research shows 87% of sales organisations now use AI [S1].' }),
+      context({ evidenceLedger: [supported] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('flags a figure absent from the retrieved source text', () => {
+    // A resolvable citation is not a supporting one; nothing checked this before.
+    const issues = validateUnsourcedStatistics(
+      blocks({ block_18: 'Research shows 96% of sales organisations now use AI [S1].' }),
+      context({ evidenceLedger: [supported] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('does not appear in the retrieved source text');
   });
 });
