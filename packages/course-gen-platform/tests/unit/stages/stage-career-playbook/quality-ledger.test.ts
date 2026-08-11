@@ -8,6 +8,7 @@ import {
   reconcileMetricLedgerSourceRefs,
 } from '@/stages/stage-career-playbook/nodes/quality-ledger';
 import { buildCareerPlaybookPriorBlocksDigest } from '@/stages/stage-career-playbook/nodes/prior-blocks-digest';
+import { parseRoleProfileSpecFromLLM } from '@/stages/stage-career-playbook/nodes/spec-builder';
 import type { CareerPlaybookWebResearchResult } from '@/stages/stage-career-playbook/rag/web-research';
 
 function metric(
@@ -188,5 +189,88 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
 
     expect(digest).toContain('Do not micromanage individual activity');
     expect(Math.ceil(digest.length / 4)).toBeLessThanOrEqual(120);
+  });
+});
+
+/**
+ * Spec-shape resilience.
+ *
+ * The first live run on the quality contract died here: the model returned
+ * metric_ledger rows with no key/label and provenance as an array, zod rejected
+ * the whole RoleProfileSpec, and 26 blocks were lost to a formatting slip in a
+ * secondary field. The ledger must degrade, never abort.
+ */
+describe('parseRoleProfileSpecFromLLM metric ledger resilience', () => {
+  const baseSpec = {
+    position: { title: 'Sales Manager B2B', slug: 'smb2b', department: 'sales', level: 'lead' },
+    context: { team_size: '51-200', reports_to: 'CRO', has_subordinates: true },
+    focus_areas: {
+      primary_kpis: ['Pipeline coverage'],
+      key_tools: ['CRM'],
+      critical_competencies: ['Coaching'],
+      anti_goals: ['Do not micromanage'],
+      failure_patterns: ['Pipeline neglect'],
+    },
+    research: null,
+    block_boundaries: {},
+    content_language: 'en',
+  };
+
+  it('coerces the exact malformed shape that failed the first live run', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...baseSpec,
+        metric_ledger: [
+          {
+            metric: 'Pipeline coverage',
+            target: '>=3x',
+            provenance: ['benchmark'],
+            cadence: 'quarter',
+          },
+        ],
+      })
+    );
+
+    expect(spec.metric_ledger).toHaveLength(1);
+    expect(spec.metric_ledger[0]).toMatchObject({
+      label: 'Pipeline coverage',
+      target: '>=3x',
+      provenance: 'benchmark',
+      review_period: 'quarter',
+    });
+    expect(spec.metric_ledger[0].key).toBeTruthy();
+  });
+
+  it('drops an unusable row instead of failing the whole spec', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({ ...baseSpec, metric_ledger: [{ note: 'no target here' }, 'garbage'] })
+    );
+
+    expect(spec.metric_ledger).toEqual([]);
+    expect(spec.position.title).toBe('Sales Manager B2B');
+  });
+
+  it('discards model-supplied evidence_ledger and generated_on', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...baseSpec,
+        evidence_ledger: [{ id: 'S1', url: 'invented', title: 't', claim: 'c', retrieved_at: 'x' }],
+        generated_on: '2019-01-01',
+      })
+    );
+
+    expect(spec.evidence_ledger).toEqual([]);
+    expect(spec.generated_on).toBeUndefined();
+  });
+
+  it('survives an unknown provenance by treating it as an assumption', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...baseSpec,
+        metric_ledger: [{ key: 'x', label: 'X', target: '10%', provenance: 'guesswork' }],
+      })
+    );
+
+    expect(spec.metric_ledger[0].provenance).toBe('assumption');
   });
 });

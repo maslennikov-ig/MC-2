@@ -113,6 +113,7 @@ Return ONLY valid JSON. It must be an object with this shape; replace placeholde
   "position": { "title": "...", "slug": "...", "department": "...", "level": "middle", "specialization": "..." },
   "context": { "company_stage": "growth", "team_size": "51-200", "reports_to": "...", "has_subordinates": false, "subordinates_description": "...", "industry": "...", "region": "..." },
   "focus_areas": { "primary_kpis": ["..."], "key_tools": ["..."], "critical_competencies": ["..."], "anti_goals": ["..."], "failure_patterns": ["..."] },
+  "metric_ledger": [{ "key": "pipeline_coverage", "label": "Pipeline coverage", "unit": "x", "target": ">=3x", "green": ">=3x", "yellow": "2-2.9x", "red": "<2x", "review_period": "quarter", "provenance": "assumption", "source_ref": null }],
   "research": { "kpis_insights": ["..."], "trends_insights": ["..."], "onboarding_insights": ["..."], "sources": ["..."] },
   "block_boundaries": { "block_1": { "primary_topics": ["..."], "do_not_repeat": ["..."] } },
   "content_language": "ru"
@@ -121,6 +122,9 @@ Return ONLY valid JSON. It must be an object with this shape; replace placeholde
 Allowed level values: junior, middle, senior, lead, director, c-level.
 Allowed company_stage values: pre-pmf, growth, scale, mature.
 Allowed team_size values: 1-10, 11-50, 51-200, 201-1000, 1000+.
+Allowed metric_ledger[].provenance values: company_source, user_answer, benchmark, assumption — a single string, never an array.
+Every metric_ledger entry needs a non-empty "key", "label" and "target".
+Do not emit evidence_ledger or generated_on; the application fills both.
 Do not use arrays for block_boundaries. Do not use strings where an object is required.`;
 }
 
@@ -137,10 +141,82 @@ function dropEmptyOptionalString(record: Record<string, unknown>, key: string): 
   }
 }
 
+const METRIC_PROVENANCE_VALUES = new Set([
+  'company_source',
+  'user_answer',
+  'benchmark',
+  'assumption',
+]);
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    if (Array.isArray(value)) {
+      const nested = firstString(...value);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Salvage whatever the model produced for `metric_ledger` instead of letting a
+ * malformed entry abort the whole generation.
+ *
+ * The first live run on this contract died at spec validation: the model emitted
+ * ledger rows with no `key`/`label` and `provenance` as an array, and zod
+ * rejected the entire RoleProfileSpec — losing 26 blocks and ~13 minutes over a
+ * secondary field. The ledger is a quality aid; failing closed on its shape
+ * trades a whole document for a formatting slip, which is the wrong trade. An
+ * unusable row is dropped, a recoverable one is coerced, and generation
+ * continues with whatever survives.
+ */
+function sanitizeMetricLedgerCandidate(value: unknown): unknown[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap(entry => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+
+    const label = firstString(row.label, row.name, row.metric, row.title, row.key);
+    const key = firstString(row.key, row.id, label);
+    const target = firstString(row.target, row.target_value, row.value, row.goal);
+    if (!label || !key || !target) return [];
+
+    const provenanceCandidate = firstString(row.provenance, row.source_type, row.origin);
+    const provenance =
+      provenanceCandidate && METRIC_PROVENANCE_VALUES.has(provenanceCandidate)
+        ? provenanceCandidate
+        : 'assumption';
+
+    return [
+      {
+        key,
+        label,
+        target,
+        unit: firstString(row.unit) ?? '',
+        green: firstString(row.green, row.green_threshold) ?? '',
+        yellow: firstString(row.yellow, row.yellow_threshold) ?? '',
+        red: firstString(row.red, row.red_threshold) ?? '',
+        review_period: firstString(row.review_period, row.cadence, row.period) ?? '',
+        provenance,
+        source_ref: firstString(row.source_ref, row.source) ?? null,
+      },
+    ];
+  });
+}
+
 function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
 
   const normalized = candidate as Record<string, unknown>;
+
+  normalized.metric_ledger = sanitizeMetricLedgerCandidate(normalized.metric_ledger);
+  // Both are application-owned and overwritten later; accepting the model's
+  // version only creates a chance for it to fail validation on data we discard.
+  delete normalized.evidence_ledger;
+  delete normalized.generated_on;
+
   if (
     normalized.position &&
     typeof normalized.position === 'object' &&
@@ -255,9 +331,28 @@ export function applyCareerPlaybookLedgers(
  */
 export const CAREER_PLAYBOOK_SPEC_MAX_TOKENS = 16_000;
 
+/**
+ * Carries the calls a failed spec build already paid for.
+ *
+ * The first live run on this contract threw a validation error after three
+ * successful LLM calls, and the receipt recorded none of them: the node reported
+ * only the error. Spend that happened is spend that must appear, especially on a
+ * failed run where it is otherwise invisible.
+ */
+export class CareerPlaybookSpecBuildError extends Error {
+  constructor(
+    message: string,
+    readonly nodeCosts: CareerPlaybookNodeCost[]
+  ) {
+    super(message);
+    this.name = 'CareerPlaybookSpecBuildError';
+  }
+}
+
 async function invokeRoleProfileSpecWithFallback(
   runtime: CareerPlaybookRuntime,
-  prompt: string
+  prompt: string,
+  spent: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[]
 ): Promise<{
   roleProfileSpec: CareerPlaybookRoleProfileSpec;
   llmResults: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[];
@@ -270,6 +365,7 @@ async function invokeRoleProfileSpecWithFallback(
     maxTokens: CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
   };
   const firstResult = await runtime.invokeLLM(prompt, baseOptions);
+  spent.push(firstResult);
 
   try {
     return {
@@ -292,6 +388,7 @@ async function invokeRoleProfileSpecWithFallback(
         maxTokensMultiplier: 1.5,
       });
       llmResults.push(retryResult);
+      spent.push(retryResult);
 
       return {
         roleProfileSpec: parseRoleProfileSpecFromLLM(retryResult.content),
@@ -311,6 +408,7 @@ async function invokeRoleProfileSpecWithFallback(
       maxTokensMultiplier: 1.5,
     });
     llmResults.push(fallbackResult);
+    spent.push(fallbackResult);
 
     return {
       roleProfileSpec: parseRoleProfileSpecFromLLM(fallbackResult.content),
@@ -402,6 +500,10 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
   return async function specBuilderNode(
     state: CareerPlaybookGraphStateType
   ): Promise<CareerPlaybookGraphStateUpdate> {
+    // Every completed call lands here immediately, so a later failure still
+    // reports what it already cost.
+    const spent: Awaited<ReturnType<CareerPlaybookRuntime['invokeLLM']>>[] = [];
+
     try {
       const webResearch = await runCareerPlaybookWebResearch(state.qaData, options.webResearch);
       const businessContext = getCareerPlaybookBusinessContext(state.qaData);
@@ -424,7 +526,8 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
       );
       const { roleProfileSpec, llmResults } = await invokeRoleProfileSpecWithFallback(
         runtime,
-        prompt
+        prompt,
+        spent
       );
       const { spec: canonicalSpec, extraLLMResults } = await enforceCanonicalBlockTopics(
         runtime,
@@ -452,12 +555,14 @@ export function createSpecBuilderNode(options: CreateSpecBuilderNodeOptions = {}
     } catch (error) {
       return {
         errors: [`specBuilder failed: ${errorMessageFrom(error)}`],
-        // A total failure still consumed provider time; keep its attempts on the
-        // receipt rather than losing the most expensive part of a failed run.
-        nodeCosts:
-          error instanceof CareerPlaybookLLMCallError
+        // A failed spec build still consumed provider time: successful calls that
+        // preceded the failure, plus attempts that never returned.
+        nodeCosts: [
+          ...spent.flatMap(buildNodeCosts),
+          ...(error instanceof CareerPlaybookLLMCallError
             ? buildCareerPlaybookAbortedAttemptCosts('specBuilder', error.abortedAttempts)
-            : [],
+            : []),
+        ],
         currentNode: 'specBuilder',
       };
     }
