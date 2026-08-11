@@ -599,6 +599,8 @@ export function runCareerPlaybookContractChecks(
     ...validateAntiGoalConflict(blocks, context),
     ...validateDecisionAuthorityCoherence(blocks, context),
     ...validateContractLeakage(blocks, context),
+    ...validateSourceAttribution(blocks, context),
+    ...validateCadenceConsistency(blocks, context),
   ];
 }
 
@@ -709,4 +711,194 @@ export function validateContractLeakage(
   }
 
   return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Attribution: a named research house needs a research source
+// ---------------------------------------------------------------------------
+
+/** Houses a reader treats as primary research, not as a vendor's own marketing. */
+const RESEARCH_HOUSE =
+  /\b(gartner|forrester|mckinsey|bain|bcg|boston consulting|deloitte|pwc|kpmg|idc|harvard business review|hbr|statista|nielsen|pew research)\b/i;
+
+/**
+ * Flag a claim attributed to a named research house while citing something else.
+ *
+ * The v3 acceptance output wrote "Gartner's research suggests that 61% of B2B
+ * buyers favour a rep-free experience [S9]" — but S9 is a vendor blog post, and
+ * the figure appears nowhere in it. The number check caught the missing digits;
+ * nothing caught the attribution itself, which is the more damaging half: a
+ * reader who trusts "Gartner" is being told a marketing page is analyst research.
+ */
+export function validateSourceAttribution(
+  blocks: BlockMap,
+  context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  if (context.evidenceLedger.length === 0) return [];
+
+  const byId = new Map(context.evidenceLedger.map(entry => [entry.id, entry]));
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    for (const line of proseLines(content)) {
+      const house = line.match(RESEARCH_HOUSE);
+      if (!house) continue;
+
+      const citations = line.match(/\[S\d+\]/g) ?? [];
+      // An unsourced house attribution is already caught as an unsourced claim
+      // when it carries a figure; here we only judge what it cites.
+      if (citations.length === 0) continue;
+
+      const cited = citations
+        .map(marker => byId.get(marker.slice(1, -1)))
+        .filter((entry): entry is CareerPlaybookEvidenceEntry => Boolean(entry));
+      if (cited.length === 0) continue;
+
+      // The named house may legitimately appear if a cited source is research, or
+      // if the source itself is that house.
+      const supported = cited.some(
+        entry =>
+          entry.source_kind === 'research' ||
+          new RegExp(house[0], 'i').test(entry.url) ||
+          new RegExp(house[0], 'i').test(entry.title)
+      );
+      if (supported) continue;
+
+      issues.push(
+        issue(
+          blockId,
+          'unsourced_claim',
+          `${blockId} attributes a claim to ${house[0]} while citing ${citations.join(', ')}, which is not that house and is not research: "${truncateLine(line)}".`,
+          `Cite the ${house[0]} publication directly, or drop the attribution and present the point as what the cited source actually is.`
+        )
+      );
+      break;
+    }
+  }
+
+  return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Cadence consistency across blocks
+// ---------------------------------------------------------------------------
+
+const CADENCE_WORDS: Array<[RegExp, string]> = [
+  [/\b(daily|every day)\b|ежедневн|каждый день/i, 'daily'],
+  [/\bweekly\b|еженедельн|каждую неделю/i, 'weekly'],
+  [/\b(biweekly|fortnightly|every two weeks)\b|раз в две недели/i, 'biweekly'],
+  [/\bmonthly\b|ежемесячн|раз в месяц/i, 'monthly'],
+  [/\bquarterly\b|ежекварт|раз в квартал/i, 'quarterly'],
+  [/\bannual(ly)?\b|ежегодн|раз в год/i, 'annual'],
+];
+
+/**
+ * Recurring commitments a reader plans their week around.
+ *
+ * `requires` disambiguates a phrase that names two different commitments. A 1:1
+ * with the CRO and a 1:1 with each report are both "1:1" and legitimately run on
+ * different rhythms, so only the report-facing one is compared.
+ */
+const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp }> = [
+  {
+    pattern: /\b1[:\s-]?on[:\s-]?1s?\b|\b1:1s?\b|один на один/i,
+    duty: 'one-to-one with reports',
+    requires: /\b(rep|reps|direct report|team member|SDR|AE)\b|подчинённ|сотрудник/i,
+  },
+  { pattern: /pipeline review|обзор воронки/i, duty: 'pipeline review' },
+  // A weekly handoff inspection and a monthly collaboration meeting are separate
+  // rituals that share the word "handoff"; grouping them invented a conflict.
+  { pattern: /handoff (huddle|audit)|аудит передач/i, duty: 'handoff inspection' },
+  { pattern: /(handoff|collaboration) sync|синхрон\w* по передач/i, duty: 'handoff sync meeting' },
+  {
+    pattern: /forecast (call|review|submission)|прогнозн\w* (звонок|обзор)/i,
+    duty: 'forecast review',
+  },
+  { pattern: /retrospective|ретроспектив/i, duty: 'retrospective' },
+];
+
+/**
+ * The cadence that governs a duty mentioned at `dutyIndex`.
+ *
+ * A communication-charter row packs several rhythms into one line — "Daily via
+ * CRM, dedicated weekly 1-on-1s, weekly pipeline review" — so taking the first
+ * cadence word in the line attributed "daily" to the pipeline review. The
+ * nearest cadence word wins instead.
+ */
+function cadenceNear(line: string, dutyIndex: number): string | null {
+  let best: { name: string; distance: number } | null = null;
+
+  for (const [pattern, name] of CADENCE_WORDS) {
+    const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+    for (const match of line.matchAll(global)) {
+      const distance = Math.abs((match.index ?? 0) - dutyIndex);
+      if (!best || distance < best.distance) best = { name, distance };
+    }
+  }
+
+  return best?.name ?? null;
+}
+
+/**
+ * Flag a recurring commitment stated with different cadences in different blocks.
+ *
+ * The v3 output listed rep 1:1 development sessions as monthly in the duties
+ * block, then described "weekly 1:1s with each direct report" in the motivation
+ * block and "two coaching 1:1s per rep" weekly in the FAQ. A reader cannot plan
+ * a week against three answers, and no window-sized reviewer sees all three.
+ */
+export function validateCadenceConsistency(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const stated = new Map<string, Map<string, string[]>>();
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    for (const line of proseLines(content)) {
+      for (const { pattern, duty, requires } of RECURRING_DUTIES) {
+        const mention = line.match(pattern);
+        if (!mention) continue;
+        if (requires && !requires.test(line)) continue;
+
+        const cadence = cadenceNear(line, mention.index ?? 0);
+        if (!cadence) continue;
+
+        const byCadence = stated.get(duty) ?? new Map<string, string[]>();
+        const blockIds = byCadence.get(cadence) ?? [];
+        if (!blockIds.includes(blockId)) blockIds.push(blockId);
+        byCadence.set(cadence, blockIds);
+        stated.set(duty, byCadence);
+      }
+    }
+  }
+
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [duty, byCadence] of stated) {
+    if (byCadence.size < 2) continue;
+
+    const summary = [...byCadence.entries()]
+      .map(([cadence, blockIds]) => `${cadence} (${blockIds.join(', ')})`)
+      .join(' vs ');
+    // Report against the block that mentions it last: the earlier statement is
+    // the published commitment, the later one is the deviation.
+    const lastBlock = [...byCadence.values()].flat().sort().at(-1) ?? 'block_4';
+
+    issues.push(
+      issue(
+        lastBlock,
+        'contradiction',
+        `The ${duty} cadence is stated inconsistently across blocks: ${summary}.`,
+        `Pick one cadence for the ${duty} and have every other block reference it rather than restate it.`
+      )
+    );
+  }
+
+  return issues;
 }

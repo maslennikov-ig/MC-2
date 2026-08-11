@@ -20,11 +20,13 @@ import {
   runCareerPlaybookContractChecks,
   stripFencedBlocks,
   validateAntiGoalConflict,
+  validateCadenceConsistency,
   validateContractLeakage,
   validateDecisionAuthorityCoherence,
   validateExampleMarking,
   validateMetricLedgerConsistency,
   validateRelativeDates,
+  validateSourceAttribution,
   validateUnsourcedStatistics,
   type CareerPlaybookQualityCheckContext,
 } from '@/stages/stage-career-playbook/nodes/quality-checks';
@@ -622,6 +624,97 @@ describe('external-claim precision', () => {
         block_6:
           '| Red | require sign-off above a value (example: $100K — replace with your threshold) |',
       }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * Cases from the v3 acceptance read — the two defects that survived a run the
+ * scorecard would otherwise have called clean.
+ */
+describe('validateSourceAttribution', () => {
+  const vendor: CareerPlaybookEvidenceEntry = {
+    id: 'S9',
+    url: 'https://saleshive.com/blog/b2b-sales-future-trends',
+    title: 'Future Trends in B2B Sales | SalesHive',
+    claim:
+      'A Gartner survey of 227 chief sales officers found AI-enabled next best actions lift quota attainment',
+    retrieved_at: '2026-08-11',
+    source_kind: 'vendor',
+  };
+
+  it('flags the real Gartner attribution to a vendor blog', () => {
+    const issues = validateSourceAttribution(
+      blocks({
+        block_19:
+          'Gartner’s research suggests that 61% of B2B buyers favour a rep‑free experience for most of the purchase process [S9].',
+      }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('unsourced_claim');
+    expect(issues[0].description).toContain('Gartner');
+  });
+
+  it('accepts the attribution when the cited source is that house', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_19: 'Gartner reports that buyers favour self-serve evaluation [S9].' }),
+      context({
+        evidenceLedger: [
+          { ...vendor, url: 'https://www.gartner.com/en/sales/insights', source_kind: 'research' },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a research source even when the house is named generically', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_19: 'McKinsey analysis points to hybrid selling as the default [S9].' }),
+      context({ evidenceLedger: [{ ...vendor, source_kind: 'research' }] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateCadenceConsistency', () => {
+  it('flags the real weekly/monthly 1:1 contradiction across blocks', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_4:
+          '| **Monthly** | Rep 1:1 development sessions – coaching on skills and career path. |',
+        block_15: 'Weekly 1:1s with each direct report (Block 4) are never reduced.',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('contradiction');
+    expect(issues[0].description).toContain('one-to-one');
+  });
+
+  it('accepts one cadence stated in several blocks', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_4: '| **Weekly** | 1:1 coaching with each direct report |',
+        block_15: 'Weekly 1:1s with each direct report (Block 4) are never reduced.',
+        block_18: 'You hold a weekly 1:1 with every rep.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('stays silent when a duty is mentioned in only one block', () => {
+    const issues = validateCadenceConsistency(
+      blocks({ block_4: '| **Quarterly** | Retrospective with the team |' }),
       context()
     );
 

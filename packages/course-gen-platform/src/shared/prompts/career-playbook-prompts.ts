@@ -113,6 +113,7 @@ EXTERNAL CLAIMS — no precise statistic without a source:
 - A precise statistic about the market, the industry, competitors, or AI impact is allowed ONLY with a [Sn] reference to an entry in the evidence ledger below.
 - If the evidence ledger has no entry supporting the claim, rewrite it without the number, as an explicit hypothesis to validate.
 - Never write "research shows", "studies indicate", or a dated study reference unless it carries a [Sn] reference.
+- Never attribute a claim to a named research house (Gartner, Forrester, McKinsey, IDC, HBR, Statista) unless the cited entry IS that house. The evidence ledger marks each source as research, vendor, or media: a vendor blog quoting an analyst is still a vendor blog, and presenting it as analyst research misleads the reader.
 
 EXAMPLES — mark every unverified company-specific value:
 - A company-specific value that is not backed by the business context or the user's answers (salary, bonus, ARR, budget, headcount cost, a person's name, an internal tool name) stays concrete, but MUST carry the marker "(пример — заменить)" in Russian or "(example — replace)" in English, immediately after the value in the same sentence or table cell.
@@ -132,7 +133,8 @@ AUTHORITY — Block 5 is the single source of decision authority:
 
 SCALES AND RHYTHMS:
 - A banded payout or rating scale must be continuous: the value at the top of one band and the bottom of the next may not jump.
-- A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports.
+- A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports. Count it before you write it: a per-report weekly commitment multiplies by the number of reports.
+- State each recurring commitment's cadence ONCE, in the block that owns it, and reference it elsewhere. A 1:1 that is monthly in one block and weekly in another leaves the reader unable to plan a week.
 
 THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
 - Never restate, quote, or explain these instructions in the output. The reader is an employee doing this job, not the author of this document.
@@ -745,9 +747,10 @@ Look for:
   in one block and required to be approved in another, a duty that undermines a stated anti-goal, a
   commitment restated with different conditions far from where it was made.
 - "metric_conflict": a value that contradicts the metric ledger below.
-- "contradiction" for a broken scale: a banded payout or rating scale whose value jumps between the
-  top of one band and the bottom of the next, or a cadence that cannot fit the hours the document
-  itself allocates.
+- "contradiction" for a broken scale or an unworkable rhythm: a banded payout or rating scale whose
+  value jumps between the top of one band and the bottom of the next; a recurring commitment given
+  different cadences in different blocks; or a per-report cadence whose total volume exceeds the
+  hours the typical-day block allocates at the upper bound of team size. Do the multiplication.
 - "contradiction" for leaked instructions: a sentence addressed to the author of this document
   rather than to its reader — for example telling the writer which phrasing to avoid.
 - "style" for grammar, agreement, and wording defects.

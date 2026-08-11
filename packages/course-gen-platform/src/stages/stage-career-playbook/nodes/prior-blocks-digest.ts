@@ -199,7 +199,7 @@ export function buildCareerPlaybookPriorBlocksDigest(
       authority,
     ],
     ['Numeric commitments already published (do not restate with a different value):', commitments],
-    ['Cadences already promised:', cadences],
+    ['Cadences already promised (restate none of these with a different frequency):', cadences],
   ];
 
   const lines: string[] = [];
