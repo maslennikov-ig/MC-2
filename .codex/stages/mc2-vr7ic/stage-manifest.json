@@ -1,0 +1,69 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-vr7ic",
+  "goal_id": "mc2-vr7ic",
+  "profile_at_creation": "balanced-v2.19",
+  "status": "accepted",
+  "sequence": 1,
+  "orchestration_level": "slice_acceptance",
+  "acceptance_boundary_id": "local-commit-and-closeout-safety",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "pre-commit-staged-file-classification",
+      "stage-closeout-debt-marker-scan"
+    ],
+    "risk_models": [
+      "false-positive-quality-gate",
+      "false-negative-production-debt",
+      "staged-scope-loss"
+    ],
+    "test_environments": [
+      "temporary-local-git-repository",
+      "python-focused-unit-tests"
+    ],
+    "rollback_boundary": "revert-hook-and-closeout-scanner-changes-together-without-touching-application-code",
+    "acceptance_proofs": [
+      "format-only-staged-file-pass-and-new-lint-error-block",
+      "tracked-ignored-goal-restage",
+      "test-fixture-marker-pass-and-production-marker-block"
+    ]
+  },
+  "work_areas": [
+    "contract",
+    "implementation",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-vr7ic",
+    "source_digest": "ff285990699479763999a71a9be9fdbed5067371918a8d2aa7fdf4d10ddf51b5",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "A formatting-only batch whose source files equal canonical Prettier output can commit through the normal hook; intentionally tracked .codex/goals snapshots are restaged successfully; real newly introduced lint errors remain blocking.",
+        "text_digest": "c65568296acfadeb18c9b60a4b96aab65c2b0ec2035aaa98e592805dd8f9cdb0"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "A formatting-only change to intentional debt-marker test literals does not block closeout; real new markers in production source still block; focused scanner tests cover both paths.",
+        "text_digest": "613a27505ac31fb7aedf59acf6a8d558286aba3630668f8eb027ef9bcea7e9ea"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-vr7ic/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "ff285990699479763999a71a9be9fdbed5067371918a8d2aa7fdf4d10ddf51b5",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-vr7ic/artifacts/mc2-vr7ic.md",
+      "task_id": "mc2-vr7ic",
+      "stream_owner": "root-owner",
+      "status": "accepted"
+    }
+  ]
+}

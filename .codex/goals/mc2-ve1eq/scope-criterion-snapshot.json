@@ -1,0 +1,14 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-ve1eq",
+  "source_kind": "beads",
+  "source_id": "mc2-ve1eq",
+  "source_digest": "f8fae05300bd17b35ab89cf4e00faa09f7eb4a5439586ad1820c0055a9e91403",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "pnpm install --frozen-lockfile and pnpm audit --json complete under the repository Node runtime without DEP0169; lockfile reproducibility, pnpm type-check, and pnpm build remain green.",
+      "text_digest": "ccd22ee269073864b672d6c9aabb4410d183d2b47a2747fc9919de7efc09e734"
+    }
+  ]
+}

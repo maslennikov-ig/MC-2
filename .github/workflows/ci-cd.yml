@@ -51,7 +51,7 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '8.15.0'
+  PNPM_VERSION: '10.34.5'
   DEPLOY_HOST: '95.81.98.230'
   DEPLOY_USER: 'claude-deploy'
   DEPLOY_PATH: '/opt/megacampus'

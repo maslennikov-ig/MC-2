@@ -70,7 +70,8 @@
     "benchmark-llm": "tsx scripts/benchmark-llm/index.ts",
     "benchmark:docling": "tsx scripts/docling-quality-benchmark.ts",
     "smoke:career-playbook:preflight": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-smoke-preflight.ts",
-    "smoke:career-playbook:live": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-live-smoke.ts"
+    "smoke:career-playbook:live": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-live-smoke.ts",
+    "smoke:career-playbook:load": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-load-test.ts"
   },
   "dependencies": {
     "@bull-board/api": "^5.14.0",
@@ -92,7 +93,7 @@
     "archiver": "^7",
     "axios": "^1.18.0",
     "bcrypt": "^6.0.0",
-    "bullmq": "5.66.3",
+    "bullmq": "5.80.4",
     "commander": "^14.0.2",
     "cors": "^2.8.5",
     "dompurify": "^3.4.13",
@@ -104,7 +105,7 @@
     "form-data": "^4.0.6",
     "fractional-indexing": "^3.2.0",
     "franc-min": "^6.2.0",
-    "ioredis": "^5.8.2",
+    "ioredis": "^5.11.1",
     "jsdom": "^29.1.1",
     "jsonrepair": "^3.13.1",
     "krippendorff": "^0.1.0",

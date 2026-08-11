@@ -1,0 +1,24 @@
+{
+  "command_results": [
+    {
+      "command": "probe_root=$(mktemp -d /tmp/mc2-ve1eq-closeout.XXXXXX); set +e; git diff --check && node scripts/ci/test_ci_cd_workflow_gates.mjs && pnpm --reporter=silent --filter @megacampus/course-gen-platform --prod deploy \"$probe_root/pruned\" && test -f \"$probe_root/pruned/package.json\" && test -d \"$probe_root/pruned/node_modules\" && node -e \"const p=require(process.argv[1]); if(p.name!==\\\"@megacampus/course-gen-platform\\\") process.exit(1)\" \"$probe_root/pruned/package.json\"; rc=$?; set -e; gio trash \"$probe_root\"; exit \"$rc\"",
+      "duration_seconds": 8.465,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "probe_root=$(mktemp -d /tmp/mc2-ve1eq-closeout.XXXXXX); set +e; git diff --check && node scripts/ci/test_ci_cd_workflow_gates.mjs && pnpm --reporter=silent --filter @megacampus/course-gen-platform --prod deploy \"$probe_root/pruned\" && test -f \"$probe_root/pruned/package.json\" && test -d \"$probe_root/pruned/node_modules\" && node -e \"const p=require(process.argv[1]); if(p.name!==\\\"@megacampus/course-gen-platform\\\") process.exit(1)\" \"$probe_root/pruned/package.json\"; rc=$?; set -e; gio trash \"$probe_root\"; exit \"$rc\""
+  ],
+  "completed_at": "2026-08-10T16:28:34.443801+00:00",
+  "diff_digest": "29faa1c1b1cb56193d7727efa5b16df7e10b6c44eab130d4e1e9df6d311c5382",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.18.0,pnpm=10.34.5",
+  "git_head": "50a42267dc3d26baa87e331a0f7acbb6fc9f8a45",
+  "idempotency_key": "2175b4a3ae9acf945c7f5e140940b80581ed8382c70294a8daf12a4f3f521983",
+  "orchestration_level": "slice_acceptance",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-ve1eq",
+  "started_at": "2026-08-10T16:28:25.756620+00:00",
+  "verification_fingerprint": "2175b4a3ae9acf945c7f5e140940b80581ed8382c70294a8daf12a4f3f521983"
+}

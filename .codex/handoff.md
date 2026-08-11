@@ -1,16 +1,36 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-10. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-3gz2m.3`
+Updated: 2026-08-11. Effective kernel: `shared-orchestration/v1`.
+Current stage id: `mc2-db696.105`
 
 ## Current stage
 
-`mc2-3gz2m.3` accepted the owner-authorized final tiled EasyOCR measurement. The exact current Docling
-image was OOM-killed before its first 768-pt direct-clip tile at a 6-GiB no-swap hard limit. This is
-already above both the 2.8-GiB fallback and 4-GiB service gates, so no tiled product fallback is
-admissible and `EmptyConversionError` remains unchanged. The parent capability closed by its
-pre-registered measured-rejection path. The local measurement used the unchanged
-36-label corpus and performed no cloud/paid OCR, production retry, reindex, migration or live action.
+`mc2-db696.105` is accepted locally on `codex/career-playbook-quality-review`. One isolated dev Career
+Playbook completed for USD 0.122550285 of application-recorded usage, below the USD 0.50 ceiling.
+The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cover. The technically
+complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
+and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
+
+The quality-v2 track is now specified and sliced, still on the same branch and still docs-only —
+no product code changed. The causes behind the 2.6/5 score were traced to ten structural defects
+in the generation tract, not to model noise, and are recorded with `file:line` evidence in
+`docs/career-playbook/quality-root-cause-2026-08-11.md`. Normative rules live in
+`docs/career-playbook/quality-contract.md`; the prompt specification was rewritten to v2 in
+`docs/plans/career-playbook/03-prompts-structure.md`; the PDF decision is `docs/ADR-008-career-playbook-pdf-rendering.md`;
+acceptance is `docs/plans/career-playbook/06-quality-acceptance.md`; the plan is
+`docs/plans/buzzing-jingling-oasis.md`; the Codex handoff prompt is
+`docs/plans/career-playbook/ORCHESTRATOR_PROMPT-quality-v2.md` (`orch-prompts prompt-check`: pass,
+one size warning).
+
+Nineteen tasks are open under the same epic with a wired, cycle-free dependency graph:
+`mc2-db696.107.1`-`.107.10` (spec contract, grounding, editorial), `mc2-db696.106.1`-`.106.3` (PDF),
+`mc2-db696.108.1`-`.108.3` (reliability and cost receipt), `mc2-db696.109` (acceptance harness),
+`mc2-db696.110` (authorized paid representative run), `mc2-db696.111` (cover). Currently unblocked:
+`.107.1`, `.107.6`, `.106.1`, `.108.1`, `.108.2`, `.108.3`. Targets: overall >= 4.0/5, cost <= USD 0.35,
+wall clock <= 25 min. `mc2-db696.110` needs explicit user authorization because it is a paid run.
+
+The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
+within budget with zero residue. It is not merged into `develop`; no deploy was performed.
 
 The accessible backlog, release audit, dependency remediation and CI-timeout correction are
 delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
@@ -108,6 +128,21 @@ research, and owner-decision items remain explicitly deferred.
 - The follow-up `mc2-3gz2m.2` proves the built-in official path is not the missing solution:
   Docling-native RapidOCR PP-OCRv5 Cyrillic finished in 87.78 seconds at 2,719,920 KiB process RSS
   and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
+- The web production build's Node `DEP0169` warning was traced to ioredis 5.8.2. Direct ioredis
+  dependencies and BullMQ are aligned on ioredis 5.11.1; `NODE_OPTIONS=--throw-deprecation` now
+  passes the complete web build.
+- The package-manager `DEP0169` warning is also removed: pnpm 10.34.5 is pinned in the manifest and
+  active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
+  build policy, explicit-script-only workspace behavior and legacy-compatible portable backend
+  deploy pass focused clean-install/build/deploy proofs.
+- Career Playbook 10-concurrent acceptance completed 10/10 main jobs with 1,359 ms pickup spread,
+  64 readiness writes, USD 1.19633817 total cost, USD 0.160969265 max cost, and zero cleanup
+  residue. The original 9/10 report was an observer-token expiry, not a generation failure; the
+  refresh/retry path and the separately exposed image-client JSDOM guard now have focused coverage.
+- Career Playbook quality review completed one 27-block result for USD 0.122550285. Structural smoke
+  passed, but personal editorial/PDF review scored 2.6/5; blockers are `.106` through `.108`.
+- `graph-reviewed: updated` — Graphify 0.9.14 rebuilt the local-only graph without external
+  semantic backends to 61,733 nodes, 88,850 edges, and 7,352 communities.
 
 ## Live operational facts
 
@@ -129,7 +164,6 @@ research, and owner-decision items remain explicitly deferred.
 
 - `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
-- `mc2-db696.11.6` — needs disposable staging resources and an approved LLM budget.
 
 ## Safety boundary
 
@@ -153,18 +187,12 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 - Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
   `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
   specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
-- Beads task `mc2-xq2w0` — make the closeout debt-marker scan distinguish intentional
-  `TODO`/`FIXME` test literals from new production debt; current formatting preserves those
-  validator fixtures unchanged in meaning.
-- Beads task `mc2-vr7ic` — make the pre-commit hook handle formatting-only legacy batches and
-  deliberately tracked `.codex/goals` snapshots without requiring unrelated lint cleanup or a
-  manual hook bypass.
 - `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
   require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
   active specification, so partial integration would not meet their acceptance boundary.
-- `mc2-db696.61`, `mc2-db696.11.6` — owner decisions above.
-- `mc2-p2908.1` — trace the existing Node `DEP0169 url.parse()` warning emitted by Next.js
-  page-data workers during an otherwise successful production build.
+- `mc2-db696.61` — owner decision above.
+- `mc2-db696.106`/`.107`/`.108` — fix PDF fidelity, ground and normalize content, and bound
+  provider timeouts while making latency/cost receipts reliable.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
   reconsider only if another regular production operator appears.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
@@ -172,18 +200,17 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 
 ## Next recommended
 
-Accepted stage id: `mc2-3gz2m.3`
-Current stage id: `mc2-3gz2m.3`
-Next stage id: selected only from an authorized owner/live/migration boundary.
-Recommended action: preserve the actionable rejection. A future GPU/managed OCR or editable-source
-policy is a new owner decision, not unfinished work in this accepted stage.
+Accepted stage id: `mc2-db696.105`
+Current stage id: `mc2-db696.105`
+Next stage id: `mc2-db696.107` when implementation is selected
+Recommended action: fix content grounding first, then PDF fidelity and timeouts. Do not run another
+paid generation before deterministic coverage and a new explicit budget.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage for the current Codex task. Select only an authorized live-budget,
-research or migration boundary.
-Do not enable the cohort, change its threshold, reindex, migrate, force-push or perform paid work
-without separate authorization.
+Use $orchestrator-stage only after the owner selects an explicit remaining boundary. Do not enable
+the cohort, change its threshold, reindex, migrate, force-push, deploy or perform paid work without
+separate current authorization.
 
 ## Read first
 

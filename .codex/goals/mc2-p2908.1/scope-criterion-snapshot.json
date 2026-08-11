@@ -1,0 +1,14 @@
+{
+  "schema_version": "scope-criterion-snapshot/v1",
+  "goal_id": "mc2-p2908.1",
+  "source_kind": "beads",
+  "source_id": "mc2-p2908.1",
+  "source_digest": "a9d7ae31eaf420431390f29e41ab66839399223adc871548da67cd0b2e470622",
+  "criteria": [
+    {
+      "criterion_id": "AC-1",
+      "text": "pnpm build completes without DEP0169 url.parse() warnings, or the warning is reclassified with traced package/call-site evidence and an explicit upstream/version gate.",
+      "text_digest": "577d85253d23f4a83d29081055ca3d8b39222cbb88aaf971ec18f2d5979a747b"
+    }
+  ]
+}

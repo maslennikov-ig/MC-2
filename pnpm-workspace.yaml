@@ -1,2 +1,14 @@
 packages:
   - 'packages/*'
+
+strictDepBuilds: true
+enablePrePostScripts: false
+forceLegacyDeploy: true
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  bcrypt: true
+  esbuild: true
+  msgpackr-extract: true
+  unrs-resolver: true

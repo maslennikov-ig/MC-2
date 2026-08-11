@@ -26,6 +26,11 @@ DEBT_POLICY_REFERENCE_PATTERNS = (
     "debt marker",
     "debt markers",
 )
+DEBT_MARKER_FIXTURE_PATHS = {
+    "packages/course-gen-platform/tests/unit/stages/stage5-generation/validators/placeholder-validator.test.ts",
+    "packages/course-gen-platform/tests/unit/validators/placeholder-validator.test.ts",
+    "scripts/orchestration/test_run_stage_closeout.py",
+}
 PROJECT_INDEX_REVIEW_MARKER = "project-index: reviewed-no-change"
 DOCS_REVIEW_MARKER = "docs-reviewed:"
 # Accepts the kernel's own `Documentation:` spelling as well as the explicit
@@ -914,6 +919,8 @@ def changed_line_debt_hits(repo_root: pathlib.Path) -> list[str]:
             continue
         if not line.startswith("+") or line.startswith("+++"):
             continue
+        if current_file in DEBT_MARKER_FIXTURE_PATHS:
+            continue
         content = line[1:].strip()
         if any(pattern in content for pattern in DEBT_POLICY_REFERENCE_PATTERNS):
             continue
@@ -930,6 +937,8 @@ def changed_line_debt_hits(repo_root: pathlib.Path) -> list[str]:
         return hits
 
     for raw_path in untracked.stdout.splitlines():
+        if raw_path in DEBT_MARKER_FIXTURE_PATHS:
+            continue
         path = repo_root / raw_path
         if not path.is_file():
             continue
