@@ -118,6 +118,9 @@ describe('Career Playbook block regenerator', () => {
       input_tokens: 120,
       output_tokens: 80,
       cost_usd: 0.02,
+      // Every recorded call now states whether it completed, so an aborted
+      // attempt is distinguishable from a genuinely free one on the receipt.
+      outcome: 'succeeded',
     });
   });
 
@@ -392,6 +395,7 @@ describe('Career Playbook block regenerator', () => {
       cost_usd: 0.02,
       duration_ms: 4321,
       attempts: 2,
+      outcome: 'succeeded',
     });
   });
 });

@@ -7,9 +7,20 @@ import {
 /**
  * Single source of truth for the Career Playbook "resum" step: total spend is
  * always the sum of every node cost's `cost_usd`.
+ *
+ * Aborted attempts carry `cost_usd: 0` and `cost_unknown: true`. They are not
+ * summed — a fabricated estimate would be worse than an honest gap — so the
+ * total is a lower bound whenever `unknown_cost_attempts` is non-zero.
  */
 export function sumCareerPlaybookNodeCosts(nodeCosts: CareerPlaybookNodeCost[]): number {
   return nodeCosts.reduce((sum, nodeCost) => sum + nodeCost.cost_usd, 0);
+}
+
+/** How many recorded attempts have a cost the application cannot account for. */
+export function countCareerPlaybookUnknownCostAttempts(
+  nodeCosts: CareerPlaybookNodeCost[]
+): number {
+  return nodeCosts.filter(nodeCost => nodeCost.cost_unknown === true).length;
 }
 
 /**
@@ -32,5 +43,6 @@ export function appendCareerPlaybookNodeCost(
     ...(priorBreakdown ?? {}),
     nodeCosts,
     total_cost_usd: sumCareerPlaybookNodeCosts(nodeCosts),
+    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(nodeCosts),
   };
 }

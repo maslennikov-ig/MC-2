@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CareerPlaybookQAData } from '@megacampus/shared-types';
 import {
+  applyCareerPlaybookLedgers,
+  CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
   buildSpecBuilderPromptVariables,
   buildCanonicalBlockTopicCorrectionPrompt,
   buildCareerPlaybookResearchQueries,
@@ -321,14 +323,19 @@ describe('Career Playbook spec builder', () => {
     expect(result.roleProfileSpec?.position.title).toBe('B2B Sales Manager');
     expect(result.currentNode).toBe('group1Generator');
     expect(invokeLLM).toHaveBeenCalledTimes(2);
+    // The repair now stays on the PRIMARY model with a larger budget. The
+    // dominant cause of a spec parse failure is truncation, which is a budget
+    // problem: on 2026-08-11 the forced downgrade to the fallback model cost
+    // 17.5 minutes and produced the degraded spec all 26 blocks inherited.
     expect(invokeLLM).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining('Previous RoleProfileSpec response failed validation'),
       expect.objectContaining({
-        preferFallbackModel: true,
-        maxTokensMultiplier: 1.25,
+        maxTokens: CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
+        maxTokensMultiplier: 1.5,
       })
     );
+    expect(invokeLLM.mock.calls[1][1]).not.toHaveProperty('preferFallbackModel');
   });
 
   it('exposes a single canonical layout of the header plus 26 boundary blocks', () => {

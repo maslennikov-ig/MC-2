@@ -37,6 +37,17 @@ import {
   validateMermaidCoverage,
   type ValidateMermaidCoverageOptions,
 } from './cross-block-judge-checks';
+import {
+  runCareerPlaybookContractChecks,
+  type CareerPlaybookQualityCheckContext,
+} from './quality-checks';
+import {
+  formatCareerPlaybookEvidenceLedgerForPrompt,
+  formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookEvidenceLedger,
+  getCareerPlaybookMetricLedger,
+} from './quality-ledger';
+import { getCareerPlaybookBusinessContext } from './business-context';
 
 export {
   CAREER_PLAYBOOK_MERMAID_REQUIREMENTS,
@@ -59,6 +70,12 @@ export interface RunDeterministicChecksInput {
    * are checked for target-language violations. Omit to skip the language check.
    */
   contentLanguage?: string;
+  /**
+   * Ledger context for the quality-contract checks (metric conflicts, unsourced
+   * statistics, unmarked examples, stale dates). Omit to skip them — legacy
+   * specs carry no ledgers and must still judge cleanly.
+   */
+  contract?: CareerPlaybookQualityCheckContext;
 }
 
 export interface CreateCrossBlockJudgeNodeOptions {
@@ -288,6 +305,10 @@ export async function runCareerPlaybookDeterministicChecks(
 
   issues.push(...validateFillablePlaceholderResolution(generatedBlocks));
 
+  if (input.contract) {
+    issues.push(...runCareerPlaybookContractChecks(generatedBlocks, input.contract));
+  }
+
   return verdictFromIssues(issues);
 }
 
@@ -483,9 +504,26 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         : selectGeneratedBlocks(state.generatedBlocks, scopedBlockIds);
     const currentBlockIds = Object.keys(currentBlocks);
 
+    // Anti-goals may live outside the current window (block 2 belongs to group 1),
+    // so the conflict check reads them from the full block set, not the delta.
+    const contractContext: CareerPlaybookQualityCheckContext | undefined = state.roleProfileSpec
+      ? {
+          metricLedger: getCareerPlaybookMetricLedger(state.roleProfileSpec),
+          evidenceLedger: getCareerPlaybookEvidenceLedger(state.roleProfileSpec),
+          generatedOn: state.roleProfileSpec.generated_on,
+          businessContextMode: state.qaData
+            ? getCareerPlaybookBusinessContext(state.qaData).mode
+            : undefined,
+          publishedAntiGoals: state.generatedBlocks.block_2?.content
+            ? [state.generatedBlocks.block_2.content]
+            : [],
+        }
+      : undefined;
+
     const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: currentBlocks,
       contentLanguage: state.language,
+      contract: contractContext,
     });
 
     let verdict = deterministicVerdict;
@@ -506,6 +544,13 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         const prompt = await runtime.renderPrompt(JUDGE_PROMPT_KEY, {
           group_id: currentBlockIds.join(', '),
           spec_json: JSON.stringify(state.roleProfileSpec, null, 2),
+          metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
+            getCareerPlaybookMetricLedger(state.roleProfileSpec)
+          ),
+          evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
+            getCareerPlaybookEvidenceLedger(state.roleProfileSpec)
+          ),
+          generated_on: state.roleProfileSpec.generated_on ?? new Date().toISOString().slice(0, 10),
           // Exclude the whole current window (not just the delta) from the previous-groups
           // context so a delta re-judge keeps the same prior-groups view as the first judge;
           // the delta block's accepted siblings are neither re-shown nor duplicated here.

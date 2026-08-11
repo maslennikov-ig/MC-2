@@ -252,7 +252,11 @@ describe('Career Playbook group generator', () => {
       input_tokens: 100,
       output_tokens: 200,
       cost_usd: 0.012,
+      // Every recorded call now states whether it completed, so an aborted
+      // attempt is distinguishable from a genuinely free one on the receipt.
+      outcome: 'succeeded',
     });
+    expect(result.abortedCosts).toEqual([]);
   });
 
   it('keeps generated numeric values as plain block content without review metadata', async () => {

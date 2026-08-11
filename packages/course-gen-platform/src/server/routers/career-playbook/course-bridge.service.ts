@@ -530,7 +530,9 @@ export async function createCourseFromPlaybook(
           trends_insights: [],
           onboarding_insights: [],
           sources: [],
+          findings: [],
           errors: [error instanceof Error ? error.message : String(error)],
+          unavailable: true,
         };
       }
     }

@@ -141,12 +141,18 @@ export function persistedWebResearch(
 
 function normalizeWebResearchResult(raw: unknown): CareerPlaybookWebResearchResult | null {
   const value = asRecord(raw);
+  const sources = readStringArray(value.sources);
   const research: CareerPlaybookWebResearchResult = {
     kpis_insights: readStringArray(value.kpis_insights),
     trends_insights: readStringArray(value.trends_insights),
     onboarding_insights: readStringArray(value.onboarding_insights),
-    sources: readStringArray(value.sources),
+    sources,
+    // A spec persisted before findings existed keeps its insight arrays but has
+    // no claim-to-URL pairing to recover, so the course bridge treats it as
+    // ungrounded rather than fabricating findings from loose URLs.
+    findings: [],
     errors: readStringArray(value.errors),
+    unavailable: sources.length === 0,
   };
   const hasResearch =
     research.kpis_insights.length > 0 ||
