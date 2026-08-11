@@ -5,43 +5,32 @@ Current stage id: `mc2-db696.105`
 
 ## Current stage
 
-`mc2-db696.105` is accepted and **delivered**. `develop` is at `00f627e1f` and `master` at
-`6f4a37f90`; CI/CD run `31481370434` for exact sha `6f4a37f90` is green across every job, including
-Deploy to Production, with Rollback skipped. Staging is healthy afterwards: `https://ai.megacampus.ru/`
-returns 200 and `/api/health` returns `{"status":"ok"}`. The stranded-commit check is clean, so the
-load stage `mc2-db696.11.6` and this review are no longer side-branch-only. One gate did not run:
-the migration drift check could not reach the database (`ESSLREQUIRED`) and skipped without blocking;
-this delivery carried no migration, so nothing is at risk from it, but the gate is currently blind.
+`mc2-db696.110` closed the Career Playbook quality v2 track. `develop` is at `a3266aed1` and
+`master` at `4936d4231`; CI/CD run `31501779967` on the exact sha is green including Deploy to
+Production, with Rollback skipped. Staging is healthy afterwards: `https://ai.megacampus.ru/` returns
+200 and `/api/health` returns `{"status":"ok"}`. The stranded-commit check is clean.
 
-One isolated dev Career
-Playbook completed for USD 0.122550285 of application-recorded usage, below the USD 0.50 ceiling.
-The root owner reviewed all 1,028 Markdown lines, all 60 PDF pages, and the cover. The technically
-complete result scored 2.6/5; blockers are `mc2-db696.106` through `.108`. Database, auth, storage,
-and queue cleanup is zero; no vectorization ran, and retired Qdrant Cloud remains owned by `mc2-jz6y0`.
+The acceptance run of 2026-08-11 (`.codex/stages/mc2-db696.110/evidence/quality-review.md`) repeated
+the exact baseline fixture. The deterministic scorecard reports **zero criticals against fourteen on
+the baseline artifact**; the guide now carries 12 citations resolving to a Sources section with real
+URLs, four ledger metrics quoted consistently, thirteen marked examples, and no calendar year other
+than the generation year. The PDF has zero blank pages against three, and zero literal separators
+against nine. Cost was USD 0.234668095 against a USD 0.35 ceiling, and the receipt records one
+attempt whose cost it cannot account for rather than implying it was free.
 
-The quality-v2 track is specified, sliced, and delivered as docs only — no product code changed.
-The causes behind the 2.6/5 score were traced to ten structural defects
-in the generation tract, not to model noise, and are recorded with `file:line` evidence in
-`docs/career-playbook/quality-root-cause-2026-08-11.md`. Normative rules live in
-`docs/career-playbook/quality-contract.md`; the prompt specification was rewritten to v2 in
-`docs/plans/career-playbook/03-prompts-structure.md`; the PDF decision is `docs/ADR-008-career-playbook-pdf-rendering.md`;
-acceptance is `docs/plans/career-playbook/06-quality-acceptance.md`; the plan is
-`docs/plans/buzzing-jingling-oasis.md`; the Codex handoff prompt is
-`docs/plans/career-playbook/ORCHESTRATOR_PROMPT-quality-v2.md` (`orch-prompts prompt-check`: pass,
-one size warning).
+Two thresholds were missed and are tracked, not papered over: the run took 59 minutes against a
+25-minute target and needed 20 block regenerations against a target of 6. The checks and the judge
+are working; first drafts violate the contract often enough that the repair loop dominates the run.
+That is `mc2-db696.112`.
 
-Nineteen tasks are open under the same epic with a wired, cycle-free dependency graph:
-`mc2-db696.107.1`-`.107.10` (spec contract, grounding, editorial), `mc2-db696.106.1`-`.106.3` (PDF),
-`mc2-db696.108.1`-`.108.3` (reliability and cost receipt), `mc2-db696.109` (acceptance harness),
-`mc2-db696.110` (authorized paid representative run), `mc2-db696.111` (cover). Currently unblocked:
-`.107.1`, `.107.6`, `.106.1`, `.108.1`, `.108.2`, `.108.3`. Targets: overall >= 4.0/5, cost <= USD 0.35,
-wall clock <= 25 min.
+The run also found three defects that no test had: a malformed `metric_ledger` from the model aborted
+an entire generation at spec validation (fixed by sanitizing before validation), successful calls
+preceding a spec failure were missing from the receipt (fixed), and status glyphs still drew as empty
+boxes after the font-family change because the container has no font covering U+2705 (fixed by ASCII
+substitution in the PDF template only).
 
-The owner authorized the paid representative run on 2026-08-11. `mc2-db696.110` is therefore cleared
-to run, but only once its blockers land: repeating it against unchanged code would reproduce the
-same 2.6/5 result and spend money for nothing. Before that run, confirm the worker image actually
-carries the fixes (`docker inspect megacampus-worker-dev --format '{{.Created}}'` against the fix
-push time) — a 2026-07-04 paid A/B was invalidated by exactly this.
+Disposable fixture cleanup reported zero residual rows across organizations, users, memberships,
+playbooks, job status, error logs, courses, auth users, and storage objects.
 
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.
