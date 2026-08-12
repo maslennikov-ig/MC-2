@@ -414,6 +414,71 @@ describe('Career Playbook live smoke mutation report', () => {
     );
   });
 
+  it('rides out transient status-read failures instead of abandoning the generation (mc2-1nots)', async () => {
+    // On 2026-07-03 the first getStatus after three successful mutations threw
+    // "Authentication required", the runner died, and neither evidence capture
+    // nor cleanup ran - a paid generation lost to one failed read. The work
+    // continues server-side whether or not the status can be read.
+    const getStatus = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('Authentication required. Please provide a valid Bearer token.')
+      )
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValue({
+        playbookId: '33333333-3333-3333-3333-333333333333',
+        status: 'completed',
+        progress: 100,
+      });
+    const client = buildLiveSmokeClient({ getStatus });
+
+    const report = await runCareerPlaybookLiveSmoke(
+      {
+        mode: 'mutation-smoke',
+        targetEnvironment: 'staging',
+        trpcUrl: 'https://staging.example.test/trpc',
+        expectedUserId: '11111111-1111-1111-1111-111111111111',
+        expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
+        cleanupScope: 'playbook-only',
+        maxCostUsd: 3,
+        confirmLiveMutation: true,
+        env: {
+          TOKEN: 'secret-token',
+          BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+        },
+      },
+      { client, sleep: vi.fn().mockResolvedValue(undefined) }
+    );
+
+    expect(getStatus).toHaveBeenCalledTimes(3);
+    expect(report.cleanupManifest).not.toBeNull();
+  });
+
+  it('gives up once status reads fail persistently', async () => {
+    const getStatus = vi.fn().mockRejectedValue(new Error('socket hang up'));
+    const client = buildLiveSmokeClient({ getStatus });
+
+    await expect(
+      runCareerPlaybookLiveSmoke(
+        {
+          mode: 'mutation-smoke',
+          targetEnvironment: 'staging',
+          trpcUrl: 'https://staging.example.test/trpc',
+          expectedUserId: '11111111-1111-1111-1111-111111111111',
+          expectedOrganizationId: '22222222-2222-2222-2222-222222222222',
+          cleanupScope: 'playbook-only',
+          maxCostUsd: 3,
+          confirmLiveMutation: true,
+          env: {
+            TOKEN: 'secret-token',
+            BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+          },
+        },
+        { client, sleep: vi.fn().mockResolvedValue(undefined) }
+      )
+    ).rejects.toThrow(/consecutive attempts/u);
+  });
+
   it('fails the live smoke report when collected PDF evidence is invalid', async () => {
     const client = buildLiveSmokeClient({
       exportPdf: vi.fn().mockResolvedValue({

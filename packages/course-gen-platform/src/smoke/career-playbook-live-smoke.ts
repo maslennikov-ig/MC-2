@@ -192,6 +192,13 @@ export interface CareerPlaybookCleanupManifest {
 const DEFAULT_QUEUE_NAME = 'course-generation';
 const DEFAULT_POLL_TIMEOUT_MS = 45 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
+/**
+ * Consecutive failed status reads tolerated before a poll loop gives up. At the
+ * default 5 s interval this rides out roughly half a minute of an unreachable
+ * or flaky API without abandoning a generation that is already running and paid
+ * for; a genuinely broken endpoint still fails the run promptly.
+ */
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
 const SALES_MANAGER_B2B_FIXED_ANSWERS: CareerPlaybookFixedAnswer[] = [
   { question_key: 'position', value: 'Sales Manager B2B' },
@@ -461,13 +468,45 @@ async function waitForCompletion(
   const intervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const startedAt = now().getTime();
 
+  // A poll error used to abort the whole run. On 2026-07-03 the first getStatus
+  // after three successful mutations returned "Authentication required", the
+  // runner threw, and because it threw neither evidence capture nor cleanup ran:
+  // a paid generation was thrown away and the playbook had to be removed by hand
+  // (mc2-1nots). The generation continues server-side regardless of whether we
+  // can read its status, so a transient read failure must not destroy the run.
+  // Permanent failures still surface, just after MAX_CONSECUTIVE_POLL_FAILURES
+  // attempts instead of one.
+  let consecutiveFailures = 0;
+  let lastPollError: unknown;
+
   while (now().getTime() - startedAt <= timeoutMs) {
-    const status = await client.getStatus({ playbookId });
-    if (status.status === 'completed' || status.status === 'failed') return status;
+    try {
+      const status = await client.getStatus({ playbookId });
+      consecutiveFailures = 0;
+      if (status.status === 'completed' || status.status === 'failed') return status;
+    } catch (error) {
+      lastPollError = error;
+      consecutiveFailures += 1;
+      if (consecutiveFailures > MAX_CONSECUTIVE_POLL_FAILURES) {
+        throw new Error(
+          `Career Playbook live smoke could not read status for ${playbookId} after ${consecutiveFailures} consecutive attempts: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          { cause: error }
+        );
+      }
+    }
     await sleep(intervalMs);
   }
 
-  throw new Error(`Career Playbook live smoke timed out waiting for ${playbookId}`);
+  const timedOut = `Career Playbook live smoke timed out waiting for ${playbookId}`;
+  throw new Error(
+    consecutiveFailures > 0
+      ? `${timedOut} (last ${consecutiveFailures} status read(s) failed: ${
+          lastPollError instanceof Error ? lastPollError.message : String(lastPollError)
+        })`
+      : timedOut
+  );
 }
 
 function isCourseDocumentProcessingDone(status: string): boolean {
@@ -496,8 +535,29 @@ async function waitForCourseDocumentProcessing(
   const startedAt = now().getTime();
   let lastStatus: CareerPlaybookLiveSmokeCourseGenerationStatus | null = null;
 
+  // Same transient-failure tolerance as waitForCompletion: a failed status read
+  // says nothing about the work, which continues server-side either way.
+  let consecutiveFailures = 0;
+
   while (now().getTime() - startedAt <= timeoutMs) {
-    const status = await client.getCourseStatus({ courseId });
+    let status: CareerPlaybookLiveSmokeCourseGenerationStatus;
+    try {
+      status = await client.getCourseStatus({ courseId });
+      consecutiveFailures = 0;
+    } catch (error) {
+      consecutiveFailures += 1;
+      if (consecutiveFailures > MAX_CONSECUTIVE_POLL_FAILURES) {
+        throw new Error(
+          `Course bridge status unreadable for ${courseId} after ${consecutiveFailures} consecutive attempts: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          { cause: error }
+        );
+      }
+      await sleep(intervalMs);
+      continue;
+    }
+
     lastStatus = status;
 
     if (status.status === 'failed' || status.status === 'cancelled') {
