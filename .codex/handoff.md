@@ -23,11 +23,39 @@ calling a run accepted — an acceptance built only from checks the same author 
 circular — and clean up **after** the editorial pass, since the v2 cover was never scored because
 storage was wiped first.
 
-Open follow-ups: `mc2-db696.119` (a vendor blog cited as Gartner research, with a figure absent from
-the source — the check caught it, the generator still produced it) and `mc2-db696.120` (1:1 cadence
-stated as weekly in two blocks and monthly in another; coaching volume exceeds the day at twelve
-reports). Also open: `mc2-s98bw`, the CI migration-drift gate that passes without reaching the
-database.
+`mc2-db696.119` and `mc2-db696.120` are closed: a verification generation produced no unproven or
+misattributed claim and no cadence contradiction, and both checks still catch the original defects on
+the old artifacts.
+
+## Routing migrations applied, drift gate made to see (2026-08-12)
+
+The migrations this track added had never reached the database, so every run — including the
+accepting one — used the old routing. All three are now applied and recorded, and a read-only probe
+inside `megacampus-worker-dev` confirms the deployed code resolves
+`stage_career_playbook_proofreader` to V4 Pro at 240000 ms with `source: "database"`, not the
+`global_default` fallback the 2026-08-11 logs showed. `mc2-db696.121` is closed.
+
+Three things had to be fixed for that to be true, each one a place where the repository said
+something the running system did not:
+
+- `20260811180000` would have failed on the `llm_model_config_phase_name_check` constraint, which
+  did not admit the proofreader phase. The migration now extends the list first.
+- `20260812090000` (new) brings `stage_career_playbook_department_classifier` under the same
+  120000 ms timeout; the 2026-08-11 migration listed ten phases and missed the eleventh.
+- The CI migration-drift gate never once reached the database: it did not enable TLS, Supavisor
+  rejects plaintext, and the catch branch annotated a warning and returned 0. It now fails closed on
+  a missing secret, an unreachable database, or real drift, and `tests/unit/ci/migration-drift-gate.test.ts`
+  pins that. `mc2-s98bw` is closed.
+
+Adjacent rot found while doing it, and fixed: `src/build/generate-config-seed.ts` — the script that
+refreshes the committed offline model-routing fallback from the database — was invisible to Git,
+Docker and ESLint because `build/` matched it, it threw on a bad import so it could not run, and its
+`prebuild` hook had never executed (pnpm dropped implicit pre/post scripts in v7). The seed is
+therefore a hand-maintained file, and the comments now say so. `mc2-zohi1` tracks the divergence it
+exposed between the seed and the database, in both directions.
+
+Also open: `mc2-tah42`, the Q12 document-evidence history anchor, which the three new history rows
+put behind live history.
 
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.

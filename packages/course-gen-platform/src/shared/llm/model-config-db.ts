@@ -575,7 +575,8 @@ function canonicalStage6EntryToPhaseConfig(
 }
 
 /**
- * Load DEFAULT_PHASE_CONFIGS from config-seed.json (auto-updated from DB during prebuild).
+ * Load DEFAULT_PHASE_CONFIGS from config-seed.json (refreshed from the DB by an
+ * explicit `generate:config-seed` run and committed; it is not auto-updated).
  * Falls back to minimal emergency configs if seed file is unavailable.
  *
  * NOTE: Uses synchronous fs.readFileSync() at module load time. This is intentional:
@@ -702,10 +703,11 @@ function loadDefaultPhaseConfigs(): Record<string, PhaseModelConfig> {
 /**
  * Default phase configurations loaded from config-seed.json.
  *
- * Auto-synced with database via prebuild step (generate-config-seed.ts).
+ * Synced with the database by running `pnpm generate:config-seed` and committing
+ * the result — a manual step, not a build hook.
  * Used as "last resort" fallback when DB, cache, and LKG file are all unavailable.
  *
- * @see src/build/generate-config-seed.ts - Prebuild script that refreshes the seed
+ * @see src/build/generate-config-seed.ts - Script that refreshes the seed
  * @see src/config/config-seed.json - Git-tracked seed file
  */
 export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = loadDefaultPhaseConfigs();

@@ -26,7 +26,6 @@
     "build:types": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --build --force --emitDeclarationOnly",
     "build:processor": "tsup",
     "generate:config-seed": "tsx src/build/generate-config-seed.ts",
-    "prebuild": "tsx src/build/generate-config-seed.ts",
     "start": "tsx dist/server/index.js",
     "start:worker": "node dist/orchestrator/worker-entrypoint.js",
     "start:worker:stage7": "node dist/stages/stage7-enrichments/worker-entrypoint.js",

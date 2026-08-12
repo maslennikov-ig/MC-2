@@ -37,6 +37,11 @@ node_modules/
 # --- Build Outputs & Cache ---
 dist/
 build/
+# `build/` is meant for build *outputs*. It also swallowed a build *input*:
+# src/build/generate-config-seed.ts, the script that refreshes the offline model
+# routing fallback from the database, was never in Git and so never reached CI
+# or a fresh clone. Found 2026-08-12 while chasing mc2-db696.121.
+!packages/course-gen-platform/src/build/
 .next/
 *.tsbuildinfo
 .eslintcache

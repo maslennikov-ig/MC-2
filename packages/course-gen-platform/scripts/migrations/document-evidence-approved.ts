@@ -519,15 +519,16 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
   },
 ] as const satisfies ReadonlyArray<{ version: string; name: string; apply: SourceSpec }>;
 
-// Re-pinned 2026-08-11 after adding
-// 20260811120000_career_playbook_quality_v2_routing.sql (spec output budget
-// 16000, phase timeouts 120000) and
-// 20260811180000_career_playbook_proofreader_phase.sql (routing for the
+// Re-pinned 2026-08-12 after adding
+// 20260812090000_career_playbook_classifier_timeout.sql, which brings the one
+// Career Playbook phase the 2026-08-11 routing migration missed under the same
+// 120000 ms timeout. The previous pin covered the two 2026-08-11 migrations
+// (spec output budget 16000, phase timeouts 120000, and routing for the
 // whole-document proofreading pass). The digest covers the sorted migration
 // filename list, so any added, renamed, or removed migration must be re-pinned
 // deliberately — that is the point of the guard.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'a29d94397b8c6128d623d61ce7d0ac15897d3469d328a209568ab7a6409b9c11';
+  'f8845dee38c500a8e20da6db1dbb4ad057184189424de66cb2e9b0bb183ae03b';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
