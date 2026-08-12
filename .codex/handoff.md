@@ -90,6 +90,25 @@ including reviewed migrations from this repository, so it could not survive ordi
 now checks whether the row matches a repository migration file — which is what "unknown history"
 always meant. The anchor is untouched and all five existing tests still pass.
 
+## The last two Career Playbook follow-ups (2026-08-12)
+
+`mc2-1nots` is closed. The runner's poll failure was never really about auth: a probe against the
+deployed dev API shows a query and a mutation given the same bogus token return byte-identical 401s,
+and `createContext` had five paths returning an unauthenticated context of which four were silent —
+including the one that discards the error from `supabase.auth.getUser`, a network call. A transient
+GoTrue failure and a bad token were indistinguishable to the caller. Those branches now say which one
+fired, never logging the token. The expensive part is fixed separately: both poll loops treated any
+read error as fatal, so one failed read abandoned a generation already running and paid for, and the
+throw skipped evidence capture and cleanup. They now tolerate five consecutive failures.
+
+`mc2-db696.61` is closed as unmeasurable rather than done. `career_playbook_sources` has never held a
+row and none of the nine playbooks use `company_specific`, so the 250k source-evidence budget has
+never been exercised and there is no history to compare. Rather than tune an unexercised path,
+`buildLoadedSourceEvidence` now logs the pack it built — sources, budget, actual tokens, truncation —
+labelled by consuming phase, so the first real company-specific run produces the measurement by
+itself. The one-line override remains the fix if the numbers justify it; the cost-versus-quality call
+stays with the owner.
+
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.
 
