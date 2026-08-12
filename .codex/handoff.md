@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-11. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-12. Effective kernel: `shared-orchestration/v1`.
 Current stage id: `mc2-db696.110`
 
 ## Current stage
@@ -26,6 +26,31 @@ storage was wiped first.
 `mc2-db696.119` and `mc2-db696.120` are closed: a verification generation produced no unproven or
 misattributed claim and no cadence contradiction, and both checks still catch the original defects on
 the old artifacts.
+
+## Model routing rebuilt against OpenRouter (2026-08-12)
+
+`d43be2460` on `develop`, CI `31592808930` green end to end including Migration Drift Check and
+Deploy to Dev; runtime probe on `megacampus-api-dev` confirms every phase resolves from the database.
+
+Twelve models cut to seven against the live catalogue: simple work on
+`~deepseek/deepseek-v4-flash-latest` (the `~` is part of the OpenRouter id), complex work on
+`openai/gpt-5.6-luna`, `z-ai/glm-5` upgraded to `glm-5.2`. Retired: `deepseek-v4-flash`,
+`deepseek-v4-pro`, `kimi-k2-thinking`, `kimi-k2.5`, `qwen3.7-plus`, `qwen3-235b-a22b-2507`,
+`gemini-3.5-flash`.
+
+Four invariants now hold and are worth preserving: judges keep three separate vendors (a single-model
+CLEV panel agrees with itself), `emergency` stays off OpenAI so one outage cannot take both the
+primary path and its fallback, every fallback crosses vendors, and the three escalation phases avoid
+the default model on both hops because by the time they run it has already failed.
+
+Two provider-limit violations are gone: `stage_5_escalation` asked for 30000 output tokens from a
+model capped at 16384, and `stage_7_cover` claimed a 128K input budget from a 32K-context model.
+`openai/gpt-5.6-luna` does not accept `temperature`; the client no longer sends it there.
+
+Open consequence: `stage_6_normal` and `stage_6_complex` are now the same model, so the Stage 6
+quality ladder is temporarily flat. It is restored by enabling reasoning on the complex tier
+(`mc2-v9xom`) — reasoning is not wired at all today, and OpenRouter bills reasoning tokens out of
+`max_tokens`, so budgets must rise in the same change.
 
 ## Routing migrations applied, drift gate made to see (2026-08-12)
 
