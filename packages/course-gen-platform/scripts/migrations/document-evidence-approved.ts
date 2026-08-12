@@ -527,8 +527,11 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // Career Playbook routing migrations. The digest covers the sorted migration
 // filename list, so any added, renamed, or removed migration must be re-pinned
 // deliberately — that is the point of the guard.
+// Re-pinned 2026-08-12 for the model routing refresh (mc2-t6iec): 229 files,
+// adding 20260812110912_model_routing_refresh_openrouter.sql and
+// 20260812111501_escalation_fallbacks_off_default_model.sql.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'cbac840f146e53dfbcaf3ca4e96d53cac7f851133bcadd2e51badf517d260fcb';
+  '62c3c6154cf3615ce2228d6a3b72dbd59ef21836f03e99f729a6819c153e9c59';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

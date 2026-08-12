@@ -12,6 +12,7 @@ import type {
   RefinementEvent,
 } from '@megacampus/shared-types';
 import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { LLMCallFn } from '../patcher';
 import type { IterationContext } from './types';
 import type { FixPromptContext } from '../fix-templates';
@@ -87,7 +88,7 @@ export async function executeLlmCall(
   const modelService = createModelConfigService();
   const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_patcher');
 
-  let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
+  let modelId = fallbackConfig?.modelId ?? DEFAULT_MODEL_ID;
   try {
     const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
     modelId = config.modelId || fallbackConfig?.modelId || modelId;

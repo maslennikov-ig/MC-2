@@ -32,13 +32,17 @@ describe('stage6 fallback topology', () => {
     const autoLastChance = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance;
     const manualRegeneration = STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration;
 
-    expect(autoLastChance.modelId).toBe('z-ai/glm-5');
+    // Both hops must stay off DEFAULT_MODEL_ID: escalation only runs after the
+    // default model has already failed on this lesson.
+    expect(autoLastChance.modelId).toBe('z-ai/glm-5.2');
     expect(autoLastChance.modelId).not.toBe(DEFAULT_MODEL_ID);
-    expect(autoLastChance.fallbackModelId).toBe('qwen/qwen3.7-plus');
+    expect(autoLastChance.fallbackModelId).not.toBe(DEFAULT_MODEL_ID);
+    expect(autoLastChance.fallbackModelId).not.toBe(autoLastChance.modelId);
 
-    expect(manualRegeneration.modelId).toBe('google/gemini-3.5-flash');
     expect(manualRegeneration.modelId).not.toBe(DEFAULT_MODEL_ID);
-    expect(manualRegeneration.fallbackModelId).toBe('z-ai/glm-5');
+    expect(manualRegeneration.fallbackModelId).toBe('z-ai/glm-5.2');
+    expect(manualRegeneration.fallbackModelId).not.toBe(DEFAULT_MODEL_ID);
+    expect(manualRegeneration.fallbackModelId).not.toBe(manualRegeneration.modelId);
   });
 
   it('aligns admin defaults and loader defaults with canonical Stage 6 mapping', () => {

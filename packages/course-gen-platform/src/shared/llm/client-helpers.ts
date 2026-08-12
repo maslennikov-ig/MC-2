@@ -49,6 +49,36 @@ function supportsExplicitCaching(model: string): boolean {
 }
 
 /**
+ * Models that reject or silently drop `temperature`.
+ *
+ * OpenAI's GPT-5.6 series exposes only reasoning-side sampling controls — its
+ * OpenRouter `supported_parameters` lists `reasoning` and `reasoning_effort`
+ * but not `temperature`. Sending it anyway makes the pipeline-admin screen lie:
+ * the row shows 0.7 while the request is served at the provider default.
+ *
+ * Kept as an explicit list rather than a live capability lookup so a request
+ * never depends on a catalogue fetch. Folding it into the single model source
+ * of truth is tracked in mc2-a2j1x.
+ */
+function supportsTemperature(model: string): boolean {
+  return !model.startsWith('openai/gpt-5.6-');
+}
+
+/**
+ * Apply `temperature` only where the model actually honours it.
+ */
+function withSamplingControls(
+  requestOptions: OpenRouterRequestOptions,
+  model: string,
+  temperature: number
+): OpenRouterRequestOptions {
+  if (supportsTemperature(model)) {
+    requestOptions.temperature = temperature;
+  }
+  return requestOptions;
+}
+
+/**
  * Build request options for a single-turn completion request.
  *
  * @param model - Model identifier
@@ -78,12 +108,15 @@ export function buildCompletionRequest(
     messages[0].cache_control = { type: 'ephemeral' };
   }
 
-  const requestOptions: OpenRouterRequestOptions = {
+  const requestOptions: OpenRouterRequestOptions = withSamplingControls(
+    {
+      model,
+      messages,
+      max_tokens: maxTokens,
+    },
     model,
-    messages,
-    max_tokens: maxTokens,
-    temperature,
-  };
+    temperature
+  );
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
@@ -122,12 +155,15 @@ export function buildChatCompletionRequest(
     return msg;
   });
 
-  const requestOptions: OpenRouterRequestOptions = {
+  const requestOptions: OpenRouterRequestOptions = withSamplingControls(
+    {
+      model,
+      messages: messagesWithCacheControl,
+      max_tokens: maxTokens,
+    },
     model,
-    messages: messagesWithCacheControl,
-    max_tokens: maxTokens,
-    temperature,
-  };
+    temperature
+  );
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {

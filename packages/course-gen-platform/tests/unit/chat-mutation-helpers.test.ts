@@ -17,6 +17,15 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
+// Read the hardcoded chat fallbacks from their single source rather than
+// restating the ids: these tests assert the wiring, not a particular vendor,
+// and literals here silently rot every time routing changes (mc2-t6iec).
+import {
+  CHAT_PRIMARY_MODEL_ID,
+  CHAT_FALLBACK_MODEL_ID,
+  CHAT_STAGE6_PRIMARY_MODEL_ID,
+  CHAT_STAGE6_FALLBACK_MODEL_ID,
+} from '@megacampus/shared-types';
 
 // ============================================================================
 // MOCKS - Define before imports
@@ -326,16 +335,16 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
       expect(llmClient.generateChatCompletion).toHaveBeenCalledTimes(3);
 
       // Third call should use hardcoded fallback for stage_5
-      // CHAT_STAGE_FALLBACK_MODELS.stage_5.fallback = 'moonshotai/kimi-k2.5'
+      // CHAT_STAGE_FALLBACK_MODELS.stage_5.fallback = CHAT_FALLBACK_MODEL_ID
       expect(llmClient.generateChatCompletion).toHaveBeenNthCalledWith(
         3,
         expect.any(Array),
         expect.objectContaining({
-          model: 'moonshotai/kimi-k2.5',
+          model: CHAT_FALLBACK_MODEL_ID,
         })
       );
 
-      expect(result.modelUsed).toBe('moonshotai/kimi-k2.5');
+      expect(result.modelUsed).toBe(CHAT_FALLBACK_MODEL_ID);
       expect(result.assistantMessage).toBeTruthy();
 
       // Verify warnings were logged for each failure
@@ -371,16 +380,16 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
 
       const result = await executeLegacyLLMFlow(params);
 
-      // CHAT_STAGE_FALLBACK_MODELS.stage_6.fallback = 'qwen/qwen3-235b-a22b-2507'
+      // CHAT_STAGE_FALLBACK_MODELS.stage_6.fallback = CHAT_STAGE6_FALLBACK_MODEL_ID
       expect(llmClient.generateChatCompletion).toHaveBeenNthCalledWith(
         3,
         expect.any(Array),
         expect.objectContaining({
-          model: 'qwen/qwen3-235b-a22b-2507',
+          model: CHAT_STAGE6_FALLBACK_MODEL_ID,
         })
       );
 
-      expect(result.modelUsed).toBe('qwen/qwen3-235b-a22b-2507');
+      expect(result.modelUsed).toBe(CHAT_STAGE6_FALLBACK_MODEL_ID);
     });
 
     it('should use DEFAULT fallback for unknown stageId', async () => {
@@ -400,16 +409,16 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
 
       const result = await executeLegacyLLMFlow(params);
 
-      // DEFAULT_CHAT_FALLBACK_MODELS.fallback = 'moonshotai/kimi-k2.5'
+      // DEFAULT_CHAT_FALLBACK_MODELS.fallback = CHAT_FALLBACK_MODEL_ID
       expect(llmClient.generateChatCompletion).toHaveBeenNthCalledWith(
         3,
         expect.any(Array),
         expect.objectContaining({
-          model: 'moonshotai/kimi-k2.5',
+          model: CHAT_FALLBACK_MODEL_ID,
         })
       );
 
-      expect(result.modelUsed).toBe('moonshotai/kimi-k2.5');
+      expect(result.modelUsed).toBe(CHAT_FALLBACK_MODEL_ID);
     });
   });
 
@@ -449,7 +458,7 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
         expect.objectContaining({
           primaryModel: 'openai/gpt-4o-mini',
           dbFallbackModel: 'anthropic/claude-3-5-sonnet',
-          hardcodedFallback: 'moonshotai/kimi-k2.5',
+          hardcodedFallback: CHAT_FALLBACK_MODEL_ID,
         }),
         expect.stringContaining('All models failed')
       );
@@ -480,7 +489,7 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
         expect.objectContaining({
           primaryModel: 'openai/gpt-4o-mini',
           dbFallbackModel: 'anthropic/claude-3-5-sonnet',
-          hardcodedFallback: 'qwen/qwen3-235b-a22b-2507', // stage_6 fallback
+          hardcodedFallback: CHAT_STAGE6_FALLBACK_MODEL_ID, // stage_6 fallback
           stageId: 'stage_6',
         }),
         expect.any(String)
@@ -699,15 +708,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // Should use CHAT_STAGE_FALLBACK_MODELS.stage_5.primary = 'moonshotai/kimi-k2-thinking'
+    // Should use CHAT_STAGE_FALLBACK_MODELS.stage_5.primary
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'moonshotai/kimi-k2-thinking',
+        model: CHAT_PRIMARY_MODEL_ID,
       })
     );
 
-    expect(result.modelUsed).toBe('moonshotai/kimi-k2-thinking');
+    expect(result.modelUsed).toBe(CHAT_PRIMARY_MODEL_ID);
 
     // Verify warning logged
     expect(logger.warn).toHaveBeenCalledWith(
@@ -733,15 +742,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // CHAT_STAGE_FALLBACK_MODELS.stage_6.primary = 'deepseek/deepseek-v4-flash'
+    // CHAT_STAGE_FALLBACK_MODELS.stage_6.primary
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'deepseek/deepseek-v4-flash',
+        model: CHAT_STAGE6_PRIMARY_MODEL_ID,
       })
     );
 
-    expect(result.modelUsed).toBe('deepseek/deepseek-v4-flash');
+    expect(result.modelUsed).toBe(CHAT_STAGE6_PRIMARY_MODEL_ID);
   });
 
   it('should use DEFAULT hardcoded models when DB unavailable and stageId unknown', async () => {
@@ -757,15 +766,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // DEFAULT_CHAT_FALLBACK_MODELS.primary = 'moonshotai/kimi-k2-thinking'
+    // DEFAULT_CHAT_FALLBACK_MODELS.primary
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'moonshotai/kimi-k2-thinking',
+        model: CHAT_PRIMARY_MODEL_ID,
       })
     );
 
-    expect(result.modelUsed).toBe('moonshotai/kimi-k2-thinking');
+    expect(result.modelUsed).toBe(CHAT_PRIMARY_MODEL_ID);
   });
 
   it('should use fallbackConfig temperature and maxTokens when DB unavailable', async () => {

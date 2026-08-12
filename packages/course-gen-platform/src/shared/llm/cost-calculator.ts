@@ -46,6 +46,43 @@ export interface ModelPricing {
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
  */
 export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
+  // --- Models on the live routing path (mc2-t6iec) ---------------------------
+  // Values read from the OpenRouter /models catalogue on 2026-08-12. An entry
+  // missing here does not fail loudly: the caller silently falls back to a
+  // $1/$3 default, so every routed model must appear in this block.
+  '~deepseek/deepseek-v4-flash-latest': {
+    // Simple tier. Alias that always resolves to the newest V4 Flash.
+    inputPricePerMillion: 0.08,
+    outputPricePerMillion: 0.252,
+  },
+  'openai/gpt-5.6-luna': {
+    // Complex tier. Doubles to $0.20/$0.90 above 272K prompt tokens —
+    // not modelled here, so extended-tier costs read low for huge prompts.
+    inputPricePerMillion: 0.1,
+    outputPricePerMillion: 0.6,
+  },
+  'z-ai/glm-5.2': {
+    // Stage 6 auto-last-chance and the secondary judge.
+    inputPricePerMillion: 0.5,
+    outputPricePerMillion: 3.15,
+  },
+  'minimax/minimax-m3': {
+    // Tiebreaker judge.
+    inputPricePerMillion: 0.3,
+    outputPricePerMillion: 1.2,
+  },
+  'openai/gpt-5-image-mini': {
+    // Stage 7 cards. Billed per image upstream; these token rates are the
+    // catalogue values and only approximate the real charge.
+    inputPricePerMillion: 2.5,
+    outputPricePerMillion: 2.0,
+  },
+  'google/gemini-2.5-flash-image': {
+    // Stage 7 covers. Same per-image caveat as gpt-5-image-mini.
+    inputPricePerMillion: 0.3,
+    outputPricePerMillion: 2.5,
+  },
+  // --- Legacy / retired models kept for historical cost reporting -----------
   'qwen/qwen3-max': {
     inputPricePerMillion: 1.2,
     outputPricePerMillion: 6.0,

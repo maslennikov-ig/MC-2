@@ -188,13 +188,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -208,7 +208,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
   },
   // Stage 4: Analysis
   stage_4_clarifying: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.5,
     maxTokens: 4000,
     fallbackModelId: 'anthropic/claude-sonnet-4',
@@ -250,13 +250,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -275,34 +275,34 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_tier1: {
-    modelId: 'deepseek/deepseek-v4-flash',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_escalation: {
-    modelId: 'moonshotai/kimi-k2-thinking',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_5_simple: {
-    modelId: 'deepseek/deepseek-v4-flash',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_normal: {
-    modelId: 'moonshotai/kimi-k2-thinking',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_5_complex: {
-    modelId: 'qwen/qwen3.7-plus',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_5_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -317,13 +317,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -396,16 +396,16 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_6_extended_en: {
-    modelId: 'deepseek/deepseek-v4-flash',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 15000,
-    fallbackModelId: DEFAULT_MODEL_ID,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   // Stage 6: Targeted Refinement phases
   stage_6_arbiter: {
@@ -478,10 +478,10 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
   },
   // Special phases
   emergency: {
-    modelId: 'deepseek/deepseek-v4-flash',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   quality_fallback: {
     modelId: DEFAULT_MODEL_ID,
@@ -531,12 +531,12 @@ export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultMode
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 2000,
-    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   inline_element_crud: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4000,
-    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
 };
