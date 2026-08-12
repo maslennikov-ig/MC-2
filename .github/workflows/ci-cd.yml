@@ -716,6 +716,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check migration drift
         run: pnpm -F course-gen-platform exec tsx scripts/check-migration-drift.ts
+      # config-seed.json is the routing table used when Supabase is unreachable.
+      # It is refreshed only by an explicit generate:config-seed run, and it
+      # silently fell twenty phases behind the database for two months because
+      # nothing compared the two.
+      - name: Check config seed drift
+        run: pnpm -F course-gen-platform exec tsx scripts/check-config-seed-drift.ts
 
   # ============================================
   # STAGE 6: Deploy to Production

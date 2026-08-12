@@ -23,6 +23,7 @@ import type {
 } from './search-types';
 import { generateSearchCacheKey, extractPayload } from './search-helpers';
 import { denseSearch, hybridSearchWithFallback } from './search-operations';
+import { getCollectionStats } from './upload';
 import { logger } from '../logger/index.js';
 
 /**
@@ -179,6 +180,28 @@ export async function searchChunks(
         fallback_used: fallbackUsed,
       },
     };
+
+    // An empty result set is indistinguishable from "no relevant content" at
+    // the call site, so say which one it is. The dev Qdrant has held zero
+    // points since the move to self-hosted, which means every RAG lookup there
+    // returns nothing at all while looking exactly like a legitimate miss.
+    if (results.length === 0) {
+      const pointsInCollection = await getCollectionStats(config.collection_name)
+        .then(stats => stats.points_count)
+        .catch(() => null);
+      logger.warn(
+        {
+          queryPreview: queryText.substring(0, 100),
+          filters: config.filters,
+          searchType: config.enable_hybrid ? 'hybrid' : 'dense',
+          pointsInCollection,
+          collection: config.collection_name,
+        },
+        pointsInCollection === 0
+          ? 'RAG search returned nothing because the collection is empty - embeddings were never uploaded to this environment'
+          : 'RAG search returned no results for a non-empty collection'
+      );
+    }
 
     // Cache the response if cacheable
     if (isCacheable) {
