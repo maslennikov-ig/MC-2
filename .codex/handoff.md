@@ -27,6 +27,38 @@ storage was wiped first.
 misattributed claim and no cadence contradiction, and both checks still catch the original defects on
 the old artifacts.
 
+## Routing follow-ups closed, reasoning shipped (2026-08-12)
+
+`43ab557d6` on `develop`, CI green including both drift gates and Deploy to Dev; runtime probe on
+`megacampus-api-dev` confirms every claim below.
+
+**The uniqueness guard never worked.** A unique index on the routing key has existed since 2025-12,
+but Postgres treats NULLs as distinct and `judge_role` is NULL for every non-judge phase, so it
+accepted identical rows. That is how two inline phases sat broken for six months, reporting a
+database outage while the database was healthy. Rebuilt with `NULLS NOT DISTINCT` (PG 17.6).
+Duplicates are deactivated, not deleted — the table is the audit trail.
+
+**Reasoning is configurable per phase now**, and the budget is the load-bearing part: OpenRouter
+bills reasoning tokens against `max_tokens`, so the reasoning budget is ADDED rather than shared,
+and both the database and the seed generator refuse `reasoning_enabled` without a reserved budget.
+On for `stage_6_complex`, `stage_5_escalation`, `stage_6_auto_last_chance` only. This restores the
+Stage 6 ladder, flat since normal and complex both moved to gpt-5.6-luna.
+
+**Models and prices have one source**, `MODEL_CATALOG` in shared-types. The four tables it replaced
+disagreed with the provider and with each other: glm-5 under-reported fourfold, Stage 4 over-reported
+deepseek-v4-flash tenfold, four production models had no price at all. Live models carry the current
+price; retired models keep the price previously recorded, because restating old runs at today's rates
+would falsify history.
+
+**Two gates now produce verdicts.** A config-seed drift gate compares the committed fallback table
+against the active rows and fails closed. pipeline-admin refuses a budget above the provider's
+ceiling — nothing had rejected the two impossible values that shipped. An empty RAG result now says
+whether the collection is empty or the query simply missed.
+
+Open: whether to backfill dev Qdrant embeddings (`mc2-lrav0`) — a paid write, owner's call. And the
+whole routing refresh is still unexercised by a real generation; the last course was created
+2026-06-28.
+
 ## Model routing rebuilt against OpenRouter (2026-08-12)
 
 `d43be2460` on `develop`, CI `31592808930` green end to end including Migration Drift Check and
