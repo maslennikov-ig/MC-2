@@ -312,6 +312,8 @@ export function buildLoadedSourceEvidence(
   options: {
     maxCharsPerSource?: number;
     maxAggregateTokens?: number;
+    /** Consuming phase, so the pack-size log line says which prompt paid for it. */
+    label?: string;
   } = {}
 ): FormattedCareerPlaybookBusinessContextSourceEvidence {
   if (sources.length === 0) {
@@ -377,6 +379,25 @@ export function buildLoadedSourceEvidence(
   }
 
   const sourceExcerpts = parts.join('\n\n');
+
+  // mc2-db696.61 asks whether the follow-up-questions phase should get a smaller
+  // evidence budget than spec-builder. It has been unanswerable since 2026-06
+  // for a reason nobody checked: as of 2026-08-12 career_playbook_sources has
+  // never held a single row, so the 250k default has never actually been
+  // exercised and there is no history to measure. This line makes the first real
+  // company_specific run produce that measurement instead of needing another
+  // deliberate experiment.
+  logger.info(
+    {
+      sources: sources.length,
+      maxAggregateTokens,
+      packTokens: estimateTokens(sourceExcerpts),
+      truncated: sourceExcerpts.includes(TRUNCATION_NOTICE),
+      label: options.label,
+    },
+    'Career Playbook business context source evidence pack built'
+  );
+
   return {
     sourceExcerpts,
     hasAuthoritativeEvidence: sourceExcerpts.includes('Authoritative source content ('),
@@ -388,6 +409,7 @@ function formatLoadedSourceEvidence(
   options: {
     maxCharsPerSource?: number;
     maxAggregateTokens?: number;
+    label?: string;
   } = {}
 ): string {
   return buildLoadedSourceEvidence(sources, options).sourceExcerpts;
@@ -512,6 +534,7 @@ export async function refreshCareerPlaybookBusinessContextDigest(
     sourceExcerpts: formatLoadedSourceEvidence(sources, {
       maxCharsPerSource: input.maxCharsPerSource,
       maxAggregateTokens: input.maxAggregateTokens,
+      label: 'followup_questions_refresh',
     }),
     hasPendingSources,
     hasFailedSources,
@@ -524,6 +547,7 @@ export async function loadCareerPlaybookBusinessContextSourceExcerpts(input: {
   maxSources?: number;
   maxCharsPerSource?: number;
   maxAggregateTokens?: number;
+  label?: string;
 }): Promise<string> {
   const sourceIds = Array.from(new Set(input.context.source_ids)).filter(Boolean);
   if (input.context.mode === 'universal' || sourceIds.length === 0) return '- none';
@@ -549,6 +573,7 @@ export async function loadCareerPlaybookBusinessContextSourceExcerpts(input: {
     return formatLoadedSourceEvidence(sources, {
       maxCharsPerSource: input.maxCharsPerSource,
       maxAggregateTokens: input.maxAggregateTokens,
+      label: input.label ?? 'source_excerpts',
     });
   } catch (error) {
     logger.warn(
