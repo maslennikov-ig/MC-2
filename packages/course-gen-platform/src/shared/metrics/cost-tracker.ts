@@ -10,6 +10,7 @@
  */
 
 import { logger } from '@/shared/logger';
+import { MODEL_CATALOG, UNKNOWN_MODEL_PRICING } from '@megacampus/shared-types';
 import { recordTrace } from '../../services/token-tracking-service';
 
 // ============================================================================
@@ -55,53 +56,25 @@ export interface CourseCostSummary {
 // ============================================================================
 
 /**
- * Model pricing per 1M tokens (USD)
+ * Model pricing per 1M tokens (USD), derived from the single MODEL_CATALOG.
  *
- * Pricing sourced from:
- * - OpenRouter API documentation (2025-11)
- * - docs/MODEL-SELECTION-DECISIONS.md
- *
- * @see https://openrouter.ai/docs#pricing
+ * The values used to be maintained here by hand and had drifted badly: z-ai/glm-5
+ * was recorded at $0.25/$1.00 against a real $0.95/$2.55, so every judge run it
+ * priced was under-reported by roughly a factor of four. Add models to
+ * MODEL_CATALOG in `@megacampus/shared-types` instead.
  */
 export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  // Primary generation models (language-aware routing)
-  'qwen/qwen3-235b-a22b-2507': { input: 0.11, output: 0.6 },
-  'deepseek/deepseek-v3.1-terminus': { input: 0.27, output: 1.1 },
-
-  // Fallback model
-  'moonshotai/kimi-k2-thinking': { input: 0.55, output: 2.25 },
-
-  // DeepSeek V4 routing
-  'deepseek/deepseek-v4-flash': { input: 0.1, output: 0.2 },
-  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
-
-  // Legacy/alternative models
-  'openrouter/kimi-k2-instruct': { input: 0.15, output: 0.6 },
-  'anthropic/claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
-  'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 },
-  // Legacy Gemini models (kept for historical cost tracking)
-  'google/gemini-2.0-flash-001': { input: 0.1, output: 0.4 },
-  'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },
-  'google/gemini-2.5-flash-preview': { input: 0.1, output: 0.4 },
-
-  // OSS models (unified pricing)
-  'openai/gpt-oss-20b': { input: 0.2, output: 0.2 },
-
-  // Stage 6 judge models
-  'minimax/minimax-m2': { input: 0.255, output: 1.02 }, // Legacy
-  'minimax/minimax-m2.1': { input: 0.3, output: 1.2 }, // New recommended
-  'z-ai/glm-4.6': { input: 0.2, output: 0.8 },
-  'minimax/minimax-m3': { input: 0.35, output: 1.4 },
-  'z-ai/glm-5': { input: 0.25, output: 1.0 },
-  'qwen/qwen3.7-plus': { input: 0.15, output: 0.7 },
-
-  // Legacy models
-  'qwen/qwen3-max': { input: 1.2, output: 6.0 },
-  'anthropic/claude-3.5-sonnet': { input: 3.0, output: 15.0 },
-  'openai/gpt-4-turbo': { input: 10.0, output: 30.0 },
-
-  // Default for unknown models (conservative estimate)
-  default: { input: 1.0, output: 3.0 },
+  ...Object.fromEntries(
+    Object.entries(MODEL_CATALOG).map(([modelId, capabilities]) => [
+      modelId,
+      { input: capabilities.inputPricePerMillion, output: capabilities.outputPricePerMillion },
+    ])
+  ),
+  // Conservative estimate applied to any model absent from the catalogue.
+  default: {
+    input: UNKNOWN_MODEL_PRICING.inputPricePerMillion,
+    output: UNKNOWN_MODEL_PRICING.outputPricePerMillion,
+  },
 };
 
 /**

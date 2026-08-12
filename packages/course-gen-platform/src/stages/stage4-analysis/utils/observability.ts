@@ -19,6 +19,7 @@
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@megacampus/shared-types';
+import { getModelCapabilities, UNKNOWN_MODEL_PRICING } from '@megacampus/shared-types';
 import { MetricEventType } from '../../../shared/types/system-metrics';
 import logger from '../../../shared/logger';
 
@@ -134,19 +135,6 @@ export interface RepairMetrics {
 }
 
 /**
- * OpenRouter pricing tiers (approximate, USD per 1M tokens)
- * Based on typical pricing as of 2025-01
- *
- * NOTE: For production, fetch real-time pricing from OpenRouter API
- * or maintain pricing table in Supabase
- */
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  'openai/gpt-oss-20b': { input: 0.2, output: 0.4 }, // 20B model (cheap)
-  'deepseek/deepseek-v4-flash': { input: 1.0, output: 2.0 }, // 120B model (expensive)
-  'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 }, // Emergency model
-};
-
-/**
  * Calculates cost in USD based on token usage and model ID
  *
  * @param modelId - OpenRouter model identifier
@@ -156,13 +144,14 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
  *
  * @example
  * calculateCost('openai/gpt-oss-20b', 1000, 500)
- * // Returns: 0.000400 USD (1000 * 0.2/1M + 500 * 0.4/1M)
  */
 function calculateCost(modelId: string, tokensInput: number, tokensOutput: number): number {
-  const pricing = MODEL_PRICING[modelId] || { input: 0.5, output: 1.0 }; // Default fallback
+  // Was a local table that put deepseek-v4-flash at $1.00/$2.00 against a real
+  // $0.14/$0.28, so Stage 4 over-reported its own cost roughly tenfold.
+  const pricing = getModelCapabilities(modelId) ?? UNKNOWN_MODEL_PRICING;
 
-  const inputCost = (tokensInput / 1_000_000) * pricing.input;
-  const outputCost = (tokensOutput / 1_000_000) * pricing.output;
+  const inputCost = (tokensInput / 1_000_000) * pricing.inputPricePerMillion;
+  const outputCost = (tokensOutput / 1_000_000) * pricing.outputPricePerMillion;
 
   return Number((inputCost + outputCost).toFixed(6));
 }
