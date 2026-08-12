@@ -3,180 +3,66 @@
 Updated: 2026-08-12. Effective kernel: `shared-orchestration/v1`.
 Current stage id: `mc2-db696.110`
 
+Current state only. History lives in commits, `bd` close reasons and
+`.codex/stages/<stage_id>/summary.md`; do not re-narrate it here.
+
 ## Current stage
 
 The Career Playbook quality track is **accepted**. `mc2-db696.110` closed on an editorial read of
-**4.4 / 5** against a 4.0 threshold — up from the 2.6 baseline and the 3.9 the v2 output scored when
-it was finally read end to end. Evidence: `.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`.
+**4.4 / 5** against a 4.0 threshold, up from a 2.6 baseline. Evidence:
+`.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`. Cost of the accepting run was USD 0.352
+against a USD 0.60 ceiling.
 
-`develop` carries the work; CI/CD is green and the dev deployment verified. Cost of the accepting run
-was USD 0.352 against a USD 0.60 ceiling; latency is no longer an acceptance gate by owner decision.
+Two process rules from it are written into `06-quality-acceptance.md` and still hold: read the
+artifact before calling a run accepted, and clean up **after** the editorial pass.
 
-What moved between the two reads: authority now agrees across four blocks (it contradicted itself in
-three before), the calibrate-before-publishing table is assembled by code and names all nine marked
-values (it named none of seven), no contract instruction or internal block identifier reaches the
-reader, and a whole-document proofreading pass runs between assembly and the final judge. The metric
-ledger holds six metrics identically across five blocks.
+## RAG retrieval repaired (2026-08-12, `54a5c5e44`)
 
-Two process rules now hold and are written into `06-quality-acceptance.md`: read the artifact before
-calling a run accepted — an acceptance built only from checks the same author wrote is partly
-circular — and clean up **after** the editorial pass, since the v2 cover was never scored because
-storage was wiped first.
+Two defects, both silent, both measured on the live production collection before and after.
+`mc2-pdmgu` and `mc2-7frdr` are closed; `mc2-lrav0` is closed on the owner's "no backfill".
 
-`mc2-db696.119` and `mc2-db696.120` are closed: a verification generation produced no unproven or
-misattributed claim and no cadence contradiction, and both checks still catch the original defects on
-the old artifacts.
+**The score threshold was unreachable.** Every RAG entry point carried its own `0.7` while the
+embeddings top out near 0.58 on this corpus. The threshold gates the dense branch of a hybrid query,
+so with it in place hybrid search was byte-for-byte identical to BM25-only — measured
+`hybridIsJustSparse=true` on three queries, `false` after. One source now:
+`src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 measured ceiling), and a test
+reads the RAG sources to reject any literal above that ceiling.
 
-## Routing follow-ups closed, reasoning shipped (2026-08-12)
+**Half the index was a copy of the other half.** Not reprocessing: point ids are deterministic and
+document-scoped, so a repeat inside a document is impossible. Hierarchical chunking is degenerate —
+parent groups break on every heading-path change and Docling already merges peers within a section,
+so all 6856 parents had exactly one child and therefore that child's exact text. Degenerate parents
+no longer reach the index (`selectIndexableChunks`), and search drops repeated text as a safety net.
+Follow-up `mc2-5fpaf`: decide whether to make the parent tier work or remove it, since it cannot
+work as written.
 
-`43ab557d6` on `develop`, CI green including both drift gates and Deploy to Dev; runtime probe on
-`megacampus-api-dev` confirms every claim below.
+Production data was cleaned separately: **13712 → 6856 points**, snapshot taken first, deletion
+conditional on a point with the same text provably remaining, and `file_catalog.chunk_count`
+corrected for 218 documents. The 50% drop fired `QdrantPointCountUnexpectedDrop`, correctly; it
+resolved on its own.
 
-**The uniqueness guard never worked.** A unique index on the routing key has existed since 2025-12,
-but Postgres treats NULLs as distinct and `judge_role` is NULL for every non-judge phase, so it
-accepted identical rows. That is how two inline phases sat broken for six months, reporting a
-database outage while the database was healthy. Rebuilt with `NULLS NOT DISTINCT` (PG 17.6).
-Duplicates are deactivated, not deleted — the table is the audit trail.
+**Not deployed to production.** The data fix is live; the code fix is on `develop` only, so
+production still runs the 0.7 threshold and its hybrid search is still sparse-only.
 
-**Reasoning is configurable per phase now**, and the budget is the load-bearing part: OpenRouter
-bills reasoning tokens against `max_tokens`, so the reasoning budget is ADDED rather than shared,
-and both the database and the seed generator refuse `reasoning_enabled` without a reserved budget.
-On for `stage_6_complex`, `stage_5_escalation`, `stage_6_auto_last_chance` only. This restores the
-Stage 6 ladder, flat since normal and complex both moved to gpt-5.6-luna.
+## Routing and models (2026-08-12, `43ab557d6`)
 
-**Models and prices have one source**, `MODEL_CATALOG` in shared-types. The four tables it replaced
-disagreed with the provider and with each other: glm-5 under-reported fourfold, Stage 4 over-reported
-deepseek-v4-flash tenfold, four production models had no price at all. Live models carry the current
-price; retired models keep the price previously recorded, because restating old runs at today's rates
-would falsify history.
+Twelve models cut to seven against the live OpenRouter catalogue: simple work on
+`~deepseek/deepseek-v4-flash-latest` (the `~` is part of the id), complex on `openai/gpt-5.6-luna`,
+`z-ai/glm-5.2`. Four invariants to preserve: judges keep three separate vendors, `emergency` stays
+off OpenAI, every fallback crosses vendors, and the three escalation phases avoid the default model
+on both hops because by the time they run it has already failed.
 
-**Two gates now produce verdicts.** A config-seed drift gate compares the committed fallback table
-against the active rows and fails closed. pipeline-admin refuses a budget above the provider's
-ceiling — nothing had rejected the two impossible values that shipped. An empty RAG result now says
-whether the collection is empty or the query simply missed.
+Reasoning is per-phase and the budget is the load-bearing part — OpenRouter bills reasoning tokens
+against `max_tokens`, so the budget is ADDED, and both the database and the seed generator refuse
+`reasoning_enabled` without one. On for `stage_6_complex`, `stage_5_escalation`,
+`stage_6_auto_last_chance` only.
 
-Open: whether to backfill dev Qdrant embeddings (`mc2-lrav0`) — a paid write, owner's call. And the
-whole routing refresh is still unexercised by a real generation; the last course was created
+Models and prices have one source, `MODEL_CATALOG` in shared-types. Live models carry the current
+price; retired models keep the price previously recorded, because restating old runs at today's
+rates would falsify history.
+
+The routing refresh is still unexercised by a real course generation; the last course was created
 2026-06-28.
-
-## Model routing rebuilt against OpenRouter (2026-08-12)
-
-`d43be2460` on `develop`, CI `31592808930` green end to end including Migration Drift Check and
-Deploy to Dev; runtime probe on `megacampus-api-dev` confirms every phase resolves from the database.
-
-Twelve models cut to seven against the live catalogue: simple work on
-`~deepseek/deepseek-v4-flash-latest` (the `~` is part of the OpenRouter id), complex work on
-`openai/gpt-5.6-luna`, `z-ai/glm-5` upgraded to `glm-5.2`. Retired: `deepseek-v4-flash`,
-`deepseek-v4-pro`, `kimi-k2-thinking`, `kimi-k2.5`, `qwen3.7-plus`, `qwen3-235b-a22b-2507`,
-`gemini-3.5-flash`.
-
-Four invariants now hold and are worth preserving: judges keep three separate vendors (a single-model
-CLEV panel agrees with itself), `emergency` stays off OpenAI so one outage cannot take both the
-primary path and its fallback, every fallback crosses vendors, and the three escalation phases avoid
-the default model on both hops because by the time they run it has already failed.
-
-Two provider-limit violations are gone: `stage_5_escalation` asked for 30000 output tokens from a
-model capped at 16384, and `stage_7_cover` claimed a 128K input budget from a 32K-context model.
-`openai/gpt-5.6-luna` does not accept `temperature`; the client no longer sends it there.
-
-Open consequence: `stage_6_normal` and `stage_6_complex` are now the same model, so the Stage 6
-quality ladder is temporarily flat. It is restored by enabling reasoning on the complex tier
-(`mc2-v9xom`) — reasoning is not wired at all today, and OpenRouter bills reasoning tokens out of
-`max_tokens`, so budgets must rise in the same change.
-
-## Routing migrations applied, drift gate made to see (2026-08-12)
-
-The migrations this track added had never reached the database, so every run — including the
-accepting one — used the old routing. All three are now applied and recorded, and a read-only probe
-inside `megacampus-worker-dev` confirms the deployed code resolves
-`stage_career_playbook_proofreader` to V4 Pro at 240000 ms with `source: "database"`, not the
-`global_default` fallback the 2026-08-11 logs showed. `mc2-db696.121` is closed.
-
-Three things had to be fixed for that to be true, each one a place where the repository said
-something the running system did not:
-
-- `20260811180000` would have failed on the `llm_model_config_phase_name_check` constraint, which
-  did not admit the proofreader phase. The migration now extends the list first.
-- `20260812090000` (new) brings `stage_career_playbook_department_classifier` under the same
-  120000 ms timeout; the 2026-08-11 migration listed ten phases and missed the eleventh.
-- The CI migration-drift gate never once reached the database: it did not enable TLS, Supavisor
-  rejects plaintext, and the catch branch annotated a warning and returned 0. It now fails closed on
-  a missing secret, an unreachable database, or real drift, and `tests/unit/ci/migration-drift-gate.test.ts`
-  pins that. `mc2-s98bw` is closed.
-
-The gate was blind twice over. Its first run with the fix reached TLS and then failed on
-`password authentication failed for user "postgres"`: the repo secret held a stale credential, which
-the TLS failure had been hiding. `SUPABASE_DB_URL` and the new `SUPABASE_DB_CA_CERT` were refreshed
-from `/opt/megacampus/secrets` (the latter is `prod-ca-2021.crt`, so the chain is now verified rather
-than merely encrypted). Run `31571328044` then reported `no unapplied tail migrations (latest
-applied: 20260812090000_career_playbook_classifier_timeout.sql)` and Deploy to Dev is green. The same
-staleness sits in the local `packages/course-gen-platform/.env`, whose `DATABASE_URL` still names the
-decommissioned `aws-0-eu-central-1` pooler with a dead password; nothing reads it, which is why it
-survived.
-
-Adjacent rot found while doing it, and fixed: `src/build/generate-config-seed.ts` — the script that
-refreshes the committed offline model-routing fallback from the database — was invisible to Git,
-Docker and ESLint because `build/` matched it, it threw on a bad import so it could not run, and its
-`prebuild` hook had never executed (pnpm dropped implicit pre/post scripts in v7).
-
-## Stage 2 was routing on a frozen file (2026-08-12, `mc2-zohi1`)
-
-Fixing the seed generator exposed a larger one. `phase-6-summarization.ts` builds its phase name at
-runtime as `stage_2_${tier}_${language}`, so the live names are `stage_2_standard_ru|en` and
-`stage_2_extended_ru|en` — which is why searching for literals never found them. None of the four had
-ever had a row in `llm_model_config`. A probe inside `megacampus-api-dev` resolved all four with
-`source: "hardcoded"` against a perfectly reachable database, so every Stage 2 summarization ran on
-whatever was frozen into the committed seed, and the pipeline-admin screen could not change Stage 2
-routing at all: its edits went to a table nothing read for those phases.
-
-`20260812100000_stage2_summarization_routing_rows.sql` adds the four rows with the values the seed was
-already serving, so no behaviour changes — only the source of truth moves to where the code looks
-first. The log line that hid this now distinguishes a missing row from an unreachable database; it
-had reported an outage that was not happening.
-
-Two of the phases in the generator's `REQUIRED_PHASES` (`stage_6_standard_en|ru`) were dead — Stage 6
-asks for `stage_6_${tier}` with tier simple|normal|complex — so every refresh since 2026-06 was
-refused, and the seed fell twenty phases behind. With that corrected the seed refreshes: 37 phases to
-57, gaining all of Career Playbook, all of Stage 7, chat, inline editing and the stage 4/5 phases. A
-database outage before today would have routed all of those through `global_default`.
-`tests/unit/offline-phase-coverage.test.ts` now fails if a phase the code resolves has no offline
-default.
-
-`mc2-tah42` is closed too: the Q12 history guard refused every non-chain row newer than its anchor,
-including reviewed migrations from this repository, so it could not survive ordinary development. It
-now checks whether the row matches a repository migration file — which is what "unknown history"
-always meant. The anchor is untouched and all five existing tests still pass.
-
-## The last two Career Playbook follow-ups (2026-08-12)
-
-`mc2-1nots` is closed. The runner's poll failure was never really about auth: a probe against the
-deployed dev API shows a query and a mutation given the same bogus token return byte-identical 401s,
-and `createContext` had five paths returning an unauthenticated context of which four were silent —
-including the one that discards the error from `supabase.auth.getUser`, a network call. A transient
-GoTrue failure and a bad token were indistinguishable to the caller. Those branches now say which one
-fired, never logging the token. The expensive part is fixed separately: both poll loops treated any
-read error as fatal, so one failed read abandoned a generation already running and paid for, and the
-throw skipped evidence capture and cleanup. They now tolerate five consecutive failures.
-
-`mc2-db696.61` is closed as unmeasurable rather than done. `career_playbook_sources` has never held a
-row and none of the nine playbooks use `company_specific`, so the 250k source-evidence budget has
-never been exercised and there is no history to compare. Rather than tune an unexercised path,
-`buildLoadedSourceEvidence` now logs the pack it built — sources, budget, actual tokens, truncation —
-labelled by consuming phase, so the first real company-specific run produces the measurement by
-itself. The one-line override remains the fix if the numbers justify it; the cost-versus-quality call
-stays with the owner.
-
-The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
-within budget with zero residue. It is not merged into `develop`; no deploy was performed.
-
-The accessible backlog, release audit, dependency remediation and CI-timeout correction are
-delivered at `567566726` and staged via merge `e498451e8`. Exact-SHA develop run `31370658686` and
-staging run `31371888070` are green; Blue/Green switching, public/active-color health and monitoring
-checks passed, and the API health endpoint plus homepage were healthy afterward.
-
-The previous off-host Qdrant stage is delivered and deployed through green pipelines. Production
-health is green, `helixa-new` retains three verified generations under the 14-day/14-copy bound,
-and both backup and restore timers remain enabled.
 
 ## Backlog truth and order
 
@@ -184,123 +70,39 @@ and both backup and restore timers remain enabled.
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
 measurement, and do not re-rank by tracker priority.
 
-Tier 1 is complete through `mc2-sznhi`; Tier 2 is complete through `mc2-3sz3d`; Tier 3 is complete
-through `mc2-jz6y0.13.6`; Tier 4 is complete through `mc2-iioip`. All accessible Tier 5 repository
-work is complete through the `mc2-wxun`/`mc2-vjbb` instrumentation boundary; live, migration,
-research, and owner-decision items remain explicitly deferred.
-
-## Verification facts
-
-- Release acceptance for `mc2-sshkz` passed via
-  `python3 scripts/orchestration/run_stage_closeout.py --stage mc2-sshkz --level release --process-check`:
-  `pnpm type-check`, `pnpm build`, `pnpm test`, process verification, stage readiness, and artifact
-  validation were green. The final web unit total was 1,272/1,272 with zero skips.
-- The 111 default backend skips are fully classified: 106 PostgreSQL 17 opt-ins, three pgcrypto
-  fixture tests, and two mutually exclusive environment branches. Their opt-in runs passed 309,
-  3, and 21 tests respectively with zero skips; the incompatible-Qdrant default runner exits 1
-  instead of producing a false green.
-- Develop exact-SHA run `31357791241` deployed `50208b60a` to dev. API health and the English
-  browser regression passed afterward with zero console messages and observed dynamic requests
-  returning HTTP 200.
-- Dependency-security remediation for `mc2-0ukr6` is accepted and delivered: the baseline 77
-  findings (9 low, 38 moderate, 29 high, 1 critical) are zero in full, production-only, and dev-only
-  audits. The Security Audit and aggregate `ci-success` gate now both fail closed. Canonical release
-  acceptance passed; exact-SHA run `31364905125` deployed `d18910ee4` to dev, whose API returned
-  `status: ok` and homepage returned HTTP 200. Closed `mc2-bwx1o` remains closed.
-- Staging deploy correction `mc2-n4cog` is accepted and delivered: the original master run
-  `31369687249` stopped safely before image build/deploy on a 30-second Stage 4 test timeout; the
-  same focused file passed 11/11 locally after the narrow 60-second per-test limit. Exact develop
-  run `31370658686` and exact master run `31371888070` then passed unit, integration, contract,
-  lint, type-check, security, build, all four image builds, Blue/Green deploy, public verification,
-  monitoring drift, and notification. Rollback was correctly skipped.
-- The migration-drift jobs concluded successfully, but their optional database probe was skipped
-  because the available connection required SSL. This release contains no schema migration and
-  does not use that skipped probe as migration evidence.
-- `graph-reviewed: updated` — the local-only Graphify refresh for `mc2-3gz2m` contains 61,555
-  nodes, 88,596 edges, and 7,344 communities; no external semantic backend was used.
-- The default backend Vitest command is now fail-closed: an unmet Qdrant precondition and an empty
-  run exit nonzero. It still requires the pinned Qdrant 1.18.2 precondition unless the operator
-  explicitly sets `SKIP_QDRANT_TEST_SETUP=1`; use `vitest.config.unit.ts` for focused unit tests.
-- Repository deploy/rollback entrypoints now fail with exit 75 when
-  `/opt/megacampus/.host-operation.lock` is held; manual infrastructure work must use
-  `scripts/with_host_operation_lock.sh` to participate.
-- `mc2-jsamu` reproduced 138 format mismatches plus 11 raw-capture parse blockers. Narrow ignores
-  removed all blockers; the 104 owned formatting files and global format/type/build acceptance are
-  green.
-- Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
-- Accepted child-workspace cleanup is dry-run first: `cleanup_stage_workspace.py` prunes the exact
-  Next cache only for clean, merged child worktrees and preserves dirty, unmerged, protected, and
-  primary worktrees.
-- The Career Playbook Business Context transition has a synthetic Chromium fixture that holds
-  session sync and follow-up responses independently, proving sync-before-request ordering without
-  a live generation call.
-- Development CSP now derives exact private-network HTTP/WebSocket origins from configured backend
-  and Supabase URLs; focused Chromium records no invalid CSP source console error.
-- Career Playbook source jobs pass an explicit Phase 6 title-language mode, so their ids are no
-  longer queried in `courses`; Russian title generation is covered by a deterministic unit test.
-- Stage 5 approval controls, output quality UI, and backend approval derive `critical`, `warning`,
-  or `pass` from one shared runtime helper; the three states have frontend unit coverage.
-- Career Playbook reader rails now use 220 ms transform/opacity exit and layout motion, retain URL
-  state and semantic removal, and disable motion for the reduced-motion preference. The focused
-  Chromium scenario is committed for CI; locally its global setup stopped before the test because
-  Supabase test credentials were absent.
-- Stage 6 main generation and self-review phase routing pass non-ru/en language codes unchanged;
-  the dead ru/en-normalizing model helper and language-keyed fallback map are removed. Deterministic
-  `de` coverage proves routing only; no paid multilingual quality run was performed.
-- Targeted refinement now counts budget-skipped work across the complete five-task selected set;
-  combined eight-available/five-selected/three-executed coverage proves the count is two, not a
-  negative cross-batch value.
-- The named Q12 capture/projection surfaces have a tracked name-versus-text coercion audit. No
-  second live hazard was found; a default structural guard and disposable PostgreSQL 17.10 test
-  preserve source-manifest identities longer than 63 bytes.
-- Qdrant reindex document-processing jobs skip all eight course-level Stage 2 progress writes by
-  their existing job-id origin; ordinary jobs retain the original updates. No reindex was run.
-- Tier 1 exits have a stable, zero-default shadow cohort. Complete `tier1_shadow` traces expose the
-  raw dense gate score and exact active-hybrid Tier 2 result count without content or result impact;
-  invalid rates fail closed and the active threshold remains 0.15.
-- The alternative OCR child `mc2-3gz2m.1` exhausts the safe local CPU candidates: EasyOCR and
-  PaddleOCR fail quality, Surya fails the load-memory gate, and PaddleOCR-VL fails whole-page
-  latency. This closes only the experiment by measurement; parent capability `mc2-3gz2m` remains
-  open and no fallback was shipped.
-- The follow-up `mc2-3gz2m.2` proves the built-in official path is not the missing solution:
-  Docling-native RapidOCR PP-OCRv5 Cyrillic finished in 87.78 seconds at 2,719,920 KiB process RSS
-  and a 3,759,906,816-byte cgroup peak, but recovered 0/36 labels with mean similarity 0.0289.
-- The web production build's Node `DEP0169` warning was traced to ioredis 5.8.2. Direct ioredis
-  dependencies and BullMQ are aligned on ioredis 5.11.1; `NODE_OPTIONS=--throw-deprecation` now
-  passes the complete web build.
-- The package-manager `DEP0169` warning is also removed: pnpm 10.34.5 is pinned in the manifest and
-  active CI. Its lockfile v9 format, explicit six-package build allowlist, fail-closed unreviewed
-  build policy, explicit-script-only workspace behavior and legacy-compatible portable backend
-  deploy pass focused clean-install/build/deploy proofs.
-- Career Playbook 10-concurrent acceptance completed 10/10 main jobs with 1,359 ms pickup spread,
-  64 readiness writes, USD 1.19633817 total cost, USD 0.160969265 max cost, and zero cleanup
-  residue. The original 9/10 report was an observer-token expiry, not a generation failure; the
-  refresh/retry path and the separately exposed image-client JSDOM guard now have focused coverage.
-- Career Playbook quality review completed one 27-block result for USD 0.122550285. Structural smoke
-  passed, but personal editorial/PDF review scored 2.6/5; blockers are `.106` through `.108`.
-- `graph-reviewed: updated` — Graphify 0.9.14 rebuilt the local-only graph without external
-  semantic backends to 61,733 nodes, 88,850 edges, and 7,352 communities.
+Tier 1 complete through `mc2-sznhi`; Tier 2 through `mc2-3sz3d`; Tier 3 through `mc2-jz6y0.13.6`;
+Tier 4 through `mc2-iioip`. All accessible Tier 5 repository work is complete through the
+`mc2-wxun`/`mc2-vjbb` instrumentation boundary; live, migration, research and owner-decision items
+remain explicitly deferred.
 
 ## Live operational facts
 
-- Uploads have a daily pull-based off-host copy on `helixa-new`; restore of one file matched
-  `file_catalog.hash`. It is a second machine, not full disaster recovery.
-- Qdrant now has a separate daily restricted pull to `helixa-new`: the measured generation is
-  142,585,344 bytes with matching SHA-256, 14-day/14-copy bounds, exact incoming-size reservation
-  above a 10 GiB free-space floor, and low CPU/I/O priority. Three generations occupy 409 MiB with
-  48 GiB free. The exact digest-pinned 1.18.2 restore returned all 13,712 points green; both timers
-  are enabled. Root-owned off-host metrics cannot be replaced by UID 1001. Production Prometheus
-  scrapes independent backup/restore timestamps, and both Telegram-routed rules are healthy.
-- Nine source documents are accepted as lost; do not reopen them.
 - Production Qdrant answers on host port 6335; 6333 is the empty dev instance.
-- Monitoring drift is a separate job and must never become a deploy step because that can trigger
+- `course_embeddings_v1` holds **6856 points** after the 2026-08-12 deduplication. Any restore of a
+  snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
+- Qdrant has a daily restricted pull to `helixa-new` with 14-day/14-copy bounds, a 10 GiB free-space
+  floor and low CPU/I/O priority; both backup and restore timers are enabled and Prometheus scrapes
+  independent timestamps. Roughly 75 snapshots at ~136 MB each currently sit on the host.
+- Uploads have a daily pull-based off-host copy on `helixa-new`; a restore of one file matched
+  `file_catalog.hash`. It is a second machine, not full disaster recovery.
+- Dev and staging share one Supabase project; CI does not auto-apply migrations.
+- Nine source documents are accepted as lost; do not reopen them.
+- Monitoring drift is a separate job and must never become a deploy step, because it can trigger
   rollback on configuration drift.
 - `AGENTS.md` is rewritten by a `bd` hook: stage and commit explicit paths, never `git add -A`.
+- Deploy/rollback entrypoints exit 75 when `/opt/megacampus/.host-operation.lock` is held; manual
+  infrastructure work must use `scripts/with_host_operation_lock.sh`.
+- The default backend Vitest command is fail-closed and requires the pinned Qdrant 1.18.2
+  precondition; use `vitest.config.unit.ts` for focused unit tests.
+- `graph-reviewed: updated` — local-only Graphify graph, 61,733 nodes, 88,850 edges, 7,352
+  communities; no external semantic backend was used.
 
 ## Owner decisions
 
-- `mc2-jz6y0.13.6` — answered: use pull-based off-host snapshots on `helixa-new`, 14-day bounded retention, and low resource priority.
+- `mc2-jz6y0.13.6` — answered: pull-based off-host snapshots on `helixa-new`, 14-day bounded
+  retention, low resource priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
+- `mc2-lrav0` — answered: do not backfill dev Qdrant embeddings.
 
 ## Safety boundary
 
@@ -312,26 +114,23 @@ budget/authority.
 Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`,
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
 
+Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
+
 ## Explicit defers
 
-- Beads task `mc2-v6fqp` — evaluate a live Stage 6 multilingual quality matrix only after the
-  owner approves a concrete LLM spend budget and disposable inputs; `mc2-mt07s` proves language
-  routing metadata but intentionally makes no output-quality claim.
-- Beads tasks `mc2-wxun` and `mc2-vjbb` — instrumentation is complete, disabled, and locally
-  accepted; enabling a cohort, observing capacity, collecting 1-2 weeks of complete production
-  traces, calculating false-positive/percentile results, staging a threshold, and deciding whether
-  to change 0.15 are live/owner actions outside this stage.
-- Beads task `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a truthful new
-  `metric_event_type` value (or a new table); both are schema migrations forbidden by the active
-  specification. Reusing an unrelated enum would corrupt existing monitoring semantics.
-- `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report, and data-table enrichments
-  require new PostgreSQL `enrichment_type` enum values; schema migrations are forbidden by the
-  active specification, so partial integration would not meet their acceptance boundary.
+- `mc2-v6fqp` — live Stage 6 multilingual quality matrix, only after the owner approves a concrete
+  LLM spend budget and disposable inputs.
+- `mc2-wxun`, `mc2-vjbb` — instrumentation complete, disabled and locally accepted; enabling a
+  cohort, collecting production traces and deciding whether to change 0.15 are live/owner actions.
+- `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a new `metric_event_type` value or a
+  new table; both are schema migrations forbidden by the active specification.
+- `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report and data-table enrichments
+  require new `enrichment_type` enum values; same migration prohibition.
 - `mc2-db696.61` — owner decision above.
-- `mc2-db696.106`/`.107`/`.108` — fix PDF fidelity, ground and normalize content, and bound
-  provider timeouts while making latency/cost receipts reliable.
-- Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`;
-  reconsider only if another regular production operator appears.
+- `mc2-db696.106`/`.107`/`.108` — PDF fidelity, content grounding, and bounded provider timeouts
+  with reliable latency/cost receipts.
+- `mc2-5fpaf` — parent chunk tier: make it work or remove it. Either choice reindexes.
+- Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
   `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
 
@@ -340,8 +139,10 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 Accepted stage id: `mc2-db696.105`
 Current stage id: `mc2-db696.110`
 Next stage id: `mc2-db696.107` when implementation is selected
-Recommended action: fix content grounding first, then PDF fidelity and timeouts. Do not run another
-paid generation before deterministic coverage and a new explicit budget.
+
+Recommended action: decide whether to deploy the RAG threshold fix to production — the data half is
+already live there and the code half is not. Then fix content grounding, then PDF fidelity and
+timeouts. Do not run another paid generation before deterministic coverage and a new explicit budget.
 
 ## Starter prompt for next orchestrator
 
