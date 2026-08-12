@@ -59,6 +59,17 @@ export interface SeedRow {
  */
 const SEED_ONLY_PHASES = new Set(['stage_6_content']);
 
+/**
+ * The seed carries global routing only.
+ *
+ * course_override rows are per-course settings, deliberately absent from the
+ * offline fallback: during an outage there is no course context to apply them
+ * to. Comparing them would report drift on every override that exists.
+ */
+function isGlobalRouting(row: { config_type: string }): boolean {
+  return row.config_type === 'global';
+}
+
 function routingKey(row: {
   config_type: string;
   course_id: string | null;
@@ -93,9 +104,12 @@ export interface SeedDriftResult {
  * testing is what counts as drift, not the connection.
  */
 export function compareSeedToDatabase(seed: SeedRow[], dbRows: SeedRow[]): SeedDriftResult {
-  const dbByKey = new Map(dbRows.map(row => [routingKey(row), row]));
+  const dbByKey = new Map(dbRows.filter(isGlobalRouting).map(row => [routingKey(row), row]));
   const seedByKey = new Map(
-    seed.filter(row => !SEED_ONLY_PHASES.has(row.phase_name)).map(row => [routingKey(row), row])
+    seed
+      .filter(isGlobalRouting)
+      .filter(row => !SEED_ONLY_PHASES.has(row.phase_name))
+      .map(row => [routingKey(row), row])
   );
 
   const missingFromSeed: string[] = [];

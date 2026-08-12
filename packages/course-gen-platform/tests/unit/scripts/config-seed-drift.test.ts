@@ -83,6 +83,18 @@ describe('config seed drift comparison', () => {
     expect(result.seedCount).toBe(3);
   });
 
+  it('ignores course overrides, which the offline seed deliberately does not carry', () => {
+    // During an outage there is no course context to apply an override to, so
+    // the generator emits global rows only. Comparing overrides reported drift
+    // on every one that existed.
+    const result = compareSeedToDatabase(
+      [row()],
+      [row(), row({ config_type: 'course_override', course_id: 'course-1' })]
+    );
+
+    expect(result.hasDrift).toBe(false);
+  });
+
   it('ignores stage_6_content, which the generator injects with no database row', () => {
     const result = compareSeedToDatabase([row(), row({ phase_name: 'stage_6_content' })], [row()]);
 
