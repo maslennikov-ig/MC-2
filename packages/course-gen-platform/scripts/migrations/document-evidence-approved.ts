@@ -527,11 +527,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // Career Playbook routing migrations. The digest covers the sorted migration
 // filename list, so any added, renamed, or removed migration must be re-pinned
 // deliberately — that is the point of the guard.
-// Re-pinned 2026-08-12 for the routing-row uniqueness fix (mc2-pqjgl): 230
-// files, adding 20260812124741_unique_active_routing_rows_nulls_not_distinct.sql
-// on top of the model routing refresh (mc2-t6iec).
+// Re-pinned 2026-08-12 for reasoning configuration (mc2-v9xom): 232 files,
+// adding 20260812131245_phase_reasoning_configuration.sql and
+// 20260812132356_refresh_model_display_names.sql on top of the routing refresh
+// (mc2-t6iec) and the uniqueness fix (mc2-pqjgl).
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '912d7fce63847fdd268ce02c2cd50953d300eab39291276c49e1ce738ae028b0';
+  '35f0a14547daa1d3e26656d3b70b5234cc1e27365c072bcd53ac675a9718a6ac';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

@@ -40,9 +40,11 @@ import { StaleWhileRevalidateCache } from './swr-cache';
 export type {
   ModelConfigResult,
   PhaseModelConfig,
+  PhaseReasoningConfig,
   JudgeModelConfig,
   JudgeModelsResult,
 } from './model-config-db';
+export { REASONING_DISABLED } from './model-config-db';
 
 import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
 

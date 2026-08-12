@@ -86,6 +86,26 @@ export interface ModelConfigResult {
 }
 
 /**
+ * Per-phase reasoning settings.
+ *
+ * `maxTokens` is a budget ADDED to the phase's answer budget, not carved out of
+ * it: OpenRouter bills reasoning tokens against the same `max_tokens` as the
+ * reply, so reusing that number would buy deliberation by truncating the answer.
+ */
+export interface PhaseReasoningConfig {
+  enabled: boolean;
+  effort: 'low' | 'medium' | 'high' | null;
+  maxTokens: number | null;
+}
+
+/** Reasoning off, which is the right default for all but a few hard phases. */
+export const REASONING_DISABLED: PhaseReasoningConfig = {
+  enabled: false,
+  effort: null,
+  maxTokens: null,
+};
+
+/**
  * Phase-based model configuration (legacy)
  */
 export interface PhaseModelConfig {
@@ -113,6 +133,8 @@ export interface PhaseModelConfig {
   source: 'database' | 'hardcoded';
   /** The language that was actually found in DB ('ru', 'en', or 'any') */
   actualLanguage?: string;
+  /** Reasoning settings; disabled unless the phase explicitly asks for it */
+  reasoning: PhaseReasoningConfig;
 }
 
 /**
@@ -239,6 +261,29 @@ export async function fetchStageConfigFromDb(
 /**
  * Fetches phase configuration from database with language and course override fallback
  */
+/**
+ * Read the reasoning settings off a config row, defaulting to disabled.
+ *
+ * A row with reasoning_enabled but no budget is treated as disabled rather than
+ * trusted: the database constraint forbids that combination, so seeing one here
+ * means the row predates the constraint or arrived from a stale seed.
+ */
+function readReasoningConfig(row: {
+  reasoning_enabled?: boolean | null;
+  reasoning_effort?: string | null;
+  reasoning_max_tokens?: number | null;
+}): PhaseReasoningConfig {
+  if (!row.reasoning_enabled || !row.reasoning_max_tokens) {
+    return REASONING_DISABLED;
+  }
+  const effort = row.reasoning_effort;
+  return {
+    enabled: true,
+    effort: effort === 'low' || effort === 'medium' || effort === 'high' ? effort : null,
+    maxTokens: row.reasoning_max_tokens,
+  };
+}
+
 export async function fetchPhaseConfigFromDb(
   phaseName: string,
   courseId: string | undefined,
@@ -253,7 +298,7 @@ export async function fetchPhaseConfigFromDb(
   // Build all queries in parallel (optimization: ~50-100ms saved per sequential query)
   // Priority order: course override (by language) > global config (by language)
   const selectFields =
-    'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier, cache_read_enabled';
+    'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier, cache_read_enabled, reasoning_enabled, reasoning_effort, reasoning_max_tokens';
 
   // Build course override queries (if courseId provided)
   const courseOverrideQueries = courseId
@@ -336,6 +381,7 @@ export async function fetchPhaseConfigFromDb(
         tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
         source: 'database',
         actualLanguage: langToTry,
+        reasoning: readReasoningConfig(courseOverride),
       };
     }
   }
@@ -385,6 +431,7 @@ export async function fetchPhaseConfigFromDb(
         tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
         source: 'database',
         actualLanguage: langToTry,
+        reasoning: readReasoningConfig(globalConfig),
       };
     }
   }
@@ -502,6 +549,7 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
     cacheReadEnabled: false,
     tier: 'standard',
     source: 'hardcoded',
+    reasoning: REASONING_DISABLED,
   },
   emergency: {
     modelId: 'google/gemini-3-flash-preview',
@@ -515,6 +563,7 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
     cacheReadEnabled: false,
     tier: 'standard',
     source: 'hardcoded',
+    reasoning: REASONING_DISABLED,
   },
 };
 
@@ -553,6 +602,7 @@ function seedEntryToPhaseConfig(entry: Record<string, unknown>): PhaseModelConfi
     cacheReadEnabled: (entry.cache_read_enabled as boolean) || false,
     tier: ((entry.context_tier as string) || 'standard') as 'standard' | 'extended',
     source: 'hardcoded',
+    reasoning: REASONING_DISABLED,
   };
 }
 
@@ -571,6 +621,7 @@ function canonicalStage6EntryToPhaseConfig(
     cacheReadEnabled: entry.cacheReadEnabled,
     tier: entry.tier,
     source: 'hardcoded',
+    reasoning: REASONING_DISABLED,
   };
 }
 

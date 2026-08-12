@@ -14,7 +14,11 @@
  * for best first impression quality.
  */
 
-import { createModelConfigService } from '@/shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  REASONING_DISABLED,
+  type PhaseReasoningConfig,
+} from '@/shared/llm/model-config-service';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
 import { STAGE6_TIER_MODELS, STAGE6_TIER_FALLBACKS } from './generator-constants';
@@ -27,6 +31,11 @@ export interface Stage6ModelTier {
   reason: string;
   phaseName: PhaseName;
   source: string;
+  /**
+   * Reasoning settings for the selected phase. The complex tier is where
+   * deliberation earns its tokens; simple and normal run without it.
+   */
+  reasoning: PhaseReasoningConfig;
 }
 
 /**
@@ -94,6 +103,7 @@ export async function selectStage6ModelTier(
       reason: `${tierReason} → ${modelId} (from ${config.source})`,
       phaseName,
       source: config.source,
+      reasoning: config.reasoning,
     };
   } catch (error) {
     logger.warn({
@@ -109,6 +119,9 @@ export async function selectStage6ModelTier(
       reason: `${tierReason} → ${STAGE6_TIER_MODELS[targetTier]} (hardcoded fallback)`,
       phaseName,
       source: 'hardcoded',
+      // No database row means no reasoning budget, and reasoning without a
+      // budget truncates the answer instead of improving it.
+      reasoning: REASONING_DISABLED,
     };
   }
 }

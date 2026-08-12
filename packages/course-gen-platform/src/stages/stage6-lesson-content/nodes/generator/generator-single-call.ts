@@ -46,6 +46,7 @@ import {
   validateIntroStructure,
 } from './generator-intro-guard';
 import { selectStage6ModelTier } from './model-selector';
+import { REASONING_DISABLED, type PhaseReasoningConfig } from '@/shared/llm/model-config-service';
 import { extractLessonDigest, stripUnwantedConclusionSections } from './generator-postprocess';
 
 /**
@@ -233,11 +234,15 @@ export async function generateLessonSingleCall(
   // Step 12: Get model (3-tier routing by difficulty_level)
   const temperature = getRecommendedTemperatureV2(lessonSpec.metadata.content_archetype);
   let modelId: string;
+  let reasoning: PhaseReasoningConfig = REASONING_DISABLED;
   if (modelOverride) {
     modelId = modelOverride;
   } else {
     const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
     modelId = tierResult.model;
+    // Defensive: a phase config without reasoning settings must degrade to
+    // no reasoning, never break generation over an optional setting.
+    reasoning = tierResult.reasoning ?? REASONING_DISABLED;
   }
 
   // Step 13: Invoke LLM
@@ -247,11 +252,12 @@ export async function generateLessonSingleCall(
       modelId,
       temperature,
       maxTokens,
+      reasoning: reasoning.enabled ? reasoning : undefined,
     },
     'Invoking LLM for single-call generation'
   );
 
-  const model = createOpenRouterModel(modelId, temperature, maxTokens);
+  const model = createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning);
   const response = await model.invoke(prompt);
   let responseContent =
     typeof response.content === 'string' ? response.content : JSON.stringify(response.content);

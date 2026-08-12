@@ -647,6 +647,9 @@ vi.mock('@/shared/llm/model-config-service', () => ({
   createModelConfigService: vi.fn(() => ({
     getModelForPhase: mockGetModelForPhase,
   })),
+  // Plain constant, not behaviour: the generator reads it when no phase row
+  // supplies a reasoning budget.
+  REASONING_DISABLED: { enabled: false, effort: null, maxTokens: null },
 }));
 
 vi.mock('@megacampus/shared-types/lesson-specification-v2', async importOriginal => {
@@ -1432,7 +1435,9 @@ ${marker}`;
       expect(createOpenRouterModel).toHaveBeenCalledWith(
         'custom-model-override',
         expect.any(Number),
-        expect.any(Number)
+        expect.any(Number),
+        undefined,
+        expect.objectContaining({ enabled: false })
       );
     });
 
@@ -1444,7 +1449,9 @@ ${marker}`;
       expect(createOpenRouterModel).toHaveBeenCalledWith(
         'test-model-id',
         expect.any(Number),
-        expect.any(Number)
+        expect.any(Number),
+        undefined,
+        expect.objectContaining({ enabled: false })
       );
     });
 
@@ -1460,7 +1467,9 @@ ${marker}`;
       expect(createOpenRouterModel).toHaveBeenCalledWith(
         expect.any(String),
         0.7, // Mocked return value
-        expect.any(Number)
+        expect.any(Number),
+        undefined,
+        expect.objectContaining({ enabled: false })
       );
     });
 
@@ -1476,7 +1485,9 @@ ${marker}`;
       expect(createOpenRouterModel).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(Number),
-        12000
+        12000,
+        undefined,
+        expect.objectContaining({ enabled: false })
       );
     });
   });

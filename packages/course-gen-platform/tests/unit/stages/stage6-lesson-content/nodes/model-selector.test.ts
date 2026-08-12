@@ -13,6 +13,8 @@ vi.mock('@/shared/llm/model-config-service', () => ({
   createModelConfigService: () => ({
     getModelForPhase: mockGetModelForPhase,
   }),
+  // Plain constant, not behaviour: the selector reads it on the fallback path.
+  REASONING_DISABLED: { enabled: false, effort: null, maxTokens: null },
 }));
 
 vi.mock('@/shared/logger', () => ({

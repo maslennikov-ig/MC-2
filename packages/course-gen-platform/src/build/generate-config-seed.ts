@@ -85,13 +85,22 @@ const REQUIRED_PHASES = [
 /**
  * Minimal schema for seed config validation
  */
-const SeedConfigSchema = z.object({
-  phase_name: z.string().min(1),
-  model_id: z.string().min(1),
-  context_tier: z.string().nullable(),
-  temperature: z.union([z.number(), z.string()]).nullable(),
-  max_tokens: z.number().nullable(),
-});
+const SeedConfigSchema = z
+  .object({
+    phase_name: z.string().min(1),
+    model_id: z.string().min(1),
+    context_tier: z.string().nullable(),
+    temperature: z.union([z.number(), z.string()]).nullable(),
+    max_tokens: z.number().nullable(),
+    reasoning_enabled: z.boolean().nullable().optional(),
+    reasoning_max_tokens: z.number().nullable().optional(),
+  })
+  // Reasoning without a reserved budget spends the answer's tokens on thinking
+  // and returns a stub. The database forbids it; refuse to seed it either.
+  .refine(row => !row.reasoning_enabled || Boolean(row.reasoning_max_tokens), {
+    message: 'reasoning_enabled requires reasoning_max_tokens',
+    path: ['reasoning_max_tokens'],
+  });
 
 /**
  * Full LLM model config as stored in database
@@ -123,6 +132,9 @@ interface LLMModelConfigFull {
   quality_threshold: string | null; // Stored as numeric string in DB
   max_retries: number | null;
   timeout_ms: number | null;
+  reasoning_enabled: boolean | null;
+  reasoning_effort: string | null;
+  reasoning_max_tokens: number | null;
 }
 
 /**
@@ -152,6 +164,9 @@ interface LLMModelConfigSeed {
   quality_threshold: string | null;
   max_retries: number | null;
   timeout_ms: number | null;
+  reasoning_enabled: boolean | null;
+  reasoning_effort: string | null;
+  reasoning_max_tokens: number | null;
 }
 
 /**
@@ -200,6 +215,9 @@ function withCanonicalStage6Rows(rows: LLMModelConfigFull[]): LLMModelConfigFull
       cache_read_enabled: canonical.cacheReadEnabled,
       stage_number: 6,
       max_context_tokens: canonical.maxContextTokens,
+      reasoning_enabled: false,
+      reasoning_effort: null,
+      reasoning_max_tokens: null,
       primary_display_name: null,
       fallback_display_name: null,
       judge_role: null,
@@ -248,6 +266,11 @@ function toSeedConfig(config: LLMModelConfigFull): LLMModelConfigSeed {
     quality_threshold: config.quality_threshold,
     max_retries: config.max_retries,
     timeout_ms: config.timeout_ms,
+    // Without these the offline seed silently drops reasoning, so a database
+    // outage would quietly downgrade the phases that need it most.
+    reasoning_enabled: config.reasoning_enabled ?? false,
+    reasoning_effort: config.reasoning_effort,
+    reasoning_max_tokens: config.reasoning_max_tokens,
   };
 }
 

@@ -25,6 +25,10 @@ interface SeedRow {
   course_id: string | null;
   model_id: string;
   fallback_model_id: string | null;
+  primary_display_name: string | null;
+  fallback_display_name: string | null;
+  reasoning_enabled: boolean | null;
+  reasoning_max_tokens: number | null;
 }
 
 const rows = seed as unknown as SeedRow[];
@@ -62,6 +66,32 @@ describe('routing seed integrity', () => {
       .map(row => `${row.phase_name}/${row.language}/${row.context_tier}`);
 
     expect(selfFallback).toEqual([]);
+  });
+
+  it('never enables reasoning without reserving a budget for it', () => {
+    // Reasoning tokens are billed out of max_tokens. Enabled with no reserved
+    // budget, the model spends the answer on thinking and returns a stub.
+    const unbudgeted = rows
+      .filter(row => row.reasoning_enabled && !row.reasoning_max_tokens)
+      .map(row => row.phase_name);
+
+    expect(unbudgeted).toEqual([]);
+  });
+
+  it('labels every row with the model it actually routes to', () => {
+    // pipeline-admin showed "Kimi K2 Thinking" on rows routing to gpt-5.6-luna
+    // for as long as the display names were maintained by hand.
+    const mismatched = rows
+      .filter(row => {
+        if (!row.primary_display_name) return false;
+        const label = row.primary_display_name.toLowerCase().replace(/[^a-z0-9]/gu, '');
+        const model = row.model_id.toLowerCase().replace(/[^a-z0-9]/gu, '');
+        const family = model.replace(/^[a-z]*(deepseek|openai|google|zai|minimax)/u, '');
+        return !family.includes(label.slice(0, 6)) && !label.includes(family.slice(0, 6));
+      })
+      .map(row => `${row.phase_name}: "${row.primary_display_name}" vs ${row.model_id}`);
+
+    expect(mismatched).toEqual([]);
   });
 
   it('keeps the three Stage 6 judges on three distinct models', () => {
