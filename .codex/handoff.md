@@ -47,6 +47,16 @@ something the running system did not:
   a missing secret, an unreachable database, or real drift, and `tests/unit/ci/migration-drift-gate.test.ts`
   pins that. `mc2-s98bw` is closed.
 
+The gate was blind twice over. Its first run with the fix reached TLS and then failed on
+`password authentication failed for user "postgres"`: the repo secret held a stale credential, which
+the TLS failure had been hiding. `SUPABASE_DB_URL` and the new `SUPABASE_DB_CA_CERT` were refreshed
+from `/opt/megacampus/secrets` (the latter is `prod-ca-2021.crt`, so the chain is now verified rather
+than merely encrypted). Run `31571328044` then reported `no unapplied tail migrations (latest
+applied: 20260812090000_career_playbook_classifier_timeout.sql)` and Deploy to Dev is green. The same
+staleness sits in the local `packages/course-gen-platform/.env`, whose `DATABASE_URL` still names the
+decommissioned `aws-0-eu-central-1` pooler with a dead password; nothing reads it, which is why it
+survived.
+
 Adjacent rot found while doing it, and fixed: `src/build/generate-config-seed.ts` — the script that
 refreshes the committed offline model-routing fallback from the database — was invisible to Git,
 Docker and ESLint because `build/` matched it, it threw on a bad import so it could not run, and its
