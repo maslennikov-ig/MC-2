@@ -29,6 +29,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import {
+  STAGE6_CANONICAL_PHASE_DEFAULTS,
+  STAGE6_EXPLICIT_PHASE_NAMES,
+} from '@megacampus/shared-types/stage6-model-config';
 // Not `import { logger } from '@megacampus/shared-logger'`: under the tsconfig
 // path alias that package resolves to its CommonJS build, whose named exports
 // Node's ESM layer does not see, so the import threw at load and this script
@@ -56,17 +60,26 @@ function normalizeRuntimeModelId(modelId: string | null): string | null {
 }
 
 /**
- * Required phases that MUST be present in the seed file
- * If any are missing, the build fails
+ * Required phases that MUST be present in the seed file.
+ * If any are missing, the refresh is refused and the committed seed is kept.
+ *
+ * `stage_6_standard_en` and `stage_6_standard_ru` used to be on this list and
+ * are dead: Stage 6 asks for `stage_6_${tier}` with tier simple|normal|complex
+ * (nodes/generator/model-selector.ts), never a language-suffixed name. They have
+ * no row in the database, so the list could never be satisfied and every
+ * refresh since has been refused — which is a large part of why the committed
+ * seed fell 20 phases behind. Replaced with the tier names Stage 6 really uses.
  */
 const REQUIRED_PHASES = [
   'global_default',
   'emergency',
   'stage_2_standard_en',
   'stage_2_standard_ru',
+  'stage_3_classification',
   'stage_4_classification',
-  'stage_6_standard_en',
-  'stage_6_standard_ru',
+  'stage_6_simple',
+  'stage_6_normal',
+  'stage_6_complex',
 ];
 
 /**
@@ -142,6 +155,73 @@ interface LLMModelConfigSeed {
 }
 
 /**
+ * Add the canonical Stage 6 phases the database does not carry.
+ *
+ * `loadDefaultPhaseConfigs` force-injects STAGE6_CANONICAL_PHASE_DEFAULTS over
+ * whatever the seed holds, because the Stage 6 quality ladder is pinned in code
+ * rather than in `llm_model_config`. The seed has to mirror that, and
+ * `stage6-fallback-topology.test.ts` requires a global/any/standard row for
+ * every explicit Stage 6 phase. `stage_6_content` has no database row at all,
+ * so a plain database dump silently drops it and the offline fallback loses the
+ * phase that generates lesson content.
+ *
+ * Rows already present in the database win: an operator who has tuned a Stage 6
+ * phase there keeps their values.
+ */
+function withCanonicalStage6Rows(rows: LLMModelConfigFull[]): LLMModelConfigFull[] {
+  const present = new Set(
+    rows
+      .filter(
+        row => row.language === 'any' && row.context_tier === 'standard' && row.judge_role == null
+      )
+      .map(row => row.phase_name)
+  );
+
+  const injected: LLMModelConfigFull[] = [];
+  for (const phaseName of STAGE6_EXPLICIT_PHASE_NAMES) {
+    if (present.has(phaseName)) continue;
+    const canonical =
+      STAGE6_CANONICAL_PHASE_DEFAULTS[phaseName as keyof typeof STAGE6_CANONICAL_PHASE_DEFAULTS];
+    if (!canonical) continue;
+
+    injected.push({
+      id: `canonical-${phaseName}`,
+      config_type: 'global',
+      course_id: null,
+      phase_name: phaseName,
+      model_id: canonical.modelId,
+      fallback_model_id: canonical.fallbackModelId,
+      temperature: canonical.temperature.toFixed(2),
+      max_tokens: canonical.maxTokens,
+      is_active: true,
+      language: 'any',
+      context_tier: 'standard',
+      threshold_tokens: null,
+      cache_read_enabled: canonical.cacheReadEnabled,
+      stage_number: 6,
+      max_context_tokens: canonical.maxContextTokens,
+      primary_display_name: null,
+      fallback_display_name: null,
+      judge_role: null,
+      weight: null,
+      quality_threshold: canonical.qualityThreshold?.toFixed(2) ?? null,
+      max_retries: canonical.maxRetries,
+      timeout_ms: canonical.timeoutMs,
+    } as LLMModelConfigFull);
+  }
+
+  if (injected.length > 0) {
+    logger.info(
+      `[Config Seed] Added ${injected.length} canonical Stage 6 phase(s) absent from the database: ${injected
+        .map(row => row.phase_name)
+        .join(', ')}`
+    );
+  }
+
+  return [...rows, ...injected];
+}
+
+/**
  * Extract only the essential fields needed for runtime config
  */
 function toSeedConfig(config: LLMModelConfigFull): LLMModelConfigSeed {
@@ -206,8 +286,10 @@ async function main(): Promise<void> {
     if (error) throw error;
     if (!data?.length) throw new Error('DB returned empty config list');
 
+    const rows = withCanonicalStage6Rows(data as LLMModelConfigFull[]);
+
     // VALIDATE: Check for required phases
-    const phases = new Set((data as Array<{ phase_name?: unknown }>).map(c => String(c.phase_name)));
+    const phases = new Set(rows.map(c => String(c.phase_name)));
     const missingPhases = REQUIRED_PHASES.filter(p => !phases.has(p));
 
     if (missingPhases.length > 0) {
@@ -219,7 +301,7 @@ async function main(): Promise<void> {
 
     // VALIDATE: Run schema validation on each config
     let invalidCount = 0;
-    for (const row of data as LLMModelConfigFull[]) {
+    for (const row of rows) {
       const result = SeedConfigSchema.safeParse(row);
       if (!result.success) {
         logger.error({ errors: result.error.errors }, `[Config Seed] Invalid config: ${row.phase_name}`);
@@ -231,10 +313,10 @@ async function main(): Promise<void> {
       throw new Error(`VALIDATION FAILED: ${invalidCount} invalid config(s) found`);
     }
 
-    logger.info(`[Config Seed] Validation passed: ${data.length} configs, all required phases present`);
+    logger.info(`[Config Seed] Validation passed: ${rows.length} configs, all required phases present`);
 
     // Sort by phase_name for consistent output
-    const sortedData = (data as LLMModelConfigFull[])
+    const sortedData = rows
       .sort((a, b) => a.phase_name.localeCompare(b.phase_name))
       .map(toSeedConfig);
 

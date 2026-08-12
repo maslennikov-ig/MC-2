@@ -60,12 +60,35 @@ survived.
 Adjacent rot found while doing it, and fixed: `src/build/generate-config-seed.ts` — the script that
 refreshes the committed offline model-routing fallback from the database — was invisible to Git,
 Docker and ESLint because `build/` matched it, it threw on a bad import so it could not run, and its
-`prebuild` hook had never executed (pnpm dropped implicit pre/post scripts in v7). The seed is
-therefore a hand-maintained file, and the comments now say so. `mc2-zohi1` tracks the divergence it
-exposed between the seed and the database, in both directions.
+`prebuild` hook had never executed (pnpm dropped implicit pre/post scripts in v7).
 
-Also open: `mc2-tah42`, the Q12 document-evidence history anchor, which the three new history rows
-put behind live history.
+## Stage 2 was routing on a frozen file (2026-08-12, `mc2-zohi1`)
+
+Fixing the seed generator exposed a larger one. `phase-6-summarization.ts` builds its phase name at
+runtime as `stage_2_${tier}_${language}`, so the live names are `stage_2_standard_ru|en` and
+`stage_2_extended_ru|en` — which is why searching for literals never found them. None of the four had
+ever had a row in `llm_model_config`. A probe inside `megacampus-api-dev` resolved all four with
+`source: "hardcoded"` against a perfectly reachable database, so every Stage 2 summarization ran on
+whatever was frozen into the committed seed, and the pipeline-admin screen could not change Stage 2
+routing at all: its edits went to a table nothing read for those phases.
+
+`20260812100000_stage2_summarization_routing_rows.sql` adds the four rows with the values the seed was
+already serving, so no behaviour changes — only the source of truth moves to where the code looks
+first. The log line that hid this now distinguishes a missing row from an unreachable database; it
+had reported an outage that was not happening.
+
+Two of the phases in the generator's `REQUIRED_PHASES` (`stage_6_standard_en|ru`) were dead — Stage 6
+asks for `stage_6_${tier}` with tier simple|normal|complex — so every refresh since 2026-06 was
+refused, and the seed fell twenty phases behind. With that corrected the seed refreshes: 37 phases to
+57, gaining all of Career Playbook, all of Stage 7, chat, inline editing and the stage 4/5 phases. A
+database outage before today would have routed all of those through `global_default`.
+`tests/unit/offline-phase-coverage.test.ts` now fails if a phase the code resolves has no offline
+default.
+
+`mc2-tah42` is closed too: the Q12 history guard refused every non-chain row newer than its anchor,
+including reviewed migrations from this repository, so it could not survive ordinary development. It
+now checks whether the row matches a repository migration file — which is what "unknown history"
+always meant. The anchor is untouched and all five existing tests still pass.
 
 The prerequisite load stage `mc2-db696.11.6` is pushed at `94eaac613`: ten generations completed
 within budget with zero residue. It is not merged into `develop`; no deploy was performed.

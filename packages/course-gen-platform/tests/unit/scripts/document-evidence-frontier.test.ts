@@ -46,6 +46,26 @@ describe('document-evidence approved migration frontier (round-16)', () => {
     );
   });
 
+  it('accepts later history that matches a repository migration (mc2-tah42)', async () => {
+    // Ordinary development after the Q12 cutover. The three Career Playbook routing
+    // migrations applied on 2026-08-12 are exactly this shape, and the pre-fix predicate
+    // refused them: it rejected every non-chain row above the frontier, whether or not the
+    // row was a reviewed migration from this repository. "Unknown" has to mean unknown.
+    //
+    // The name below must stay a real file in supabase/migrations; a rename should fail
+    // here loudly rather than quietly widen the guard.
+    const approved = await loadDocumentEvidenceApprovedMigrations();
+    const history: HistoryRow[] = [
+      { version: FRONTIER, name: 'mcp_apply_frontier', statements: [] },
+      {
+        version: '20260812055956',
+        name: '20260812090000_career_playbook_classifier_timeout',
+        statements: [],
+      },
+    ];
+    await expect(assertRepositoryMigrationFrontier(mockClient(history), approved)).resolves.toBe(0);
+  });
+
   it('refuses a version strictly BETWEEN the frontier and the first chain version', async () => {
     const approved = await loadDocumentEvidenceApprovedMigrations();
     const history: HistoryRow[] = [
