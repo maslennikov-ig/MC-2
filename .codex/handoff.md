@@ -41,8 +41,11 @@ conditional on a point with the same text provably remaining, and `file_catalog.
 corrected for 218 documents. The 50% drop fired `QdrantPointCountUnexpectedDrop`, correctly; it
 resolved on its own.
 
-**Not deployed to production.** The data fix is live; the code fix is on `develop` only, so
-production still runs the 0.7 threshold and its hybrid search is still sparse-only.
+**Delivered to production** on `c18e2a9ea` (25 commits, run `31627877149`, Blue/Green onto blue,
+Monitoring Config Drift green, rollback skipped). A probe inside the deployed `megacampus-worker`
+confirms `DENSE_SCORE_THRESHOLD 0.25` in the running bundle and hybrid top scores of 0.750 and 0.553
+— above the 0.500 ceiling that a single-source fusion produces — with five unique passages and no
+parent-level results.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -82,7 +85,10 @@ remain explicitly deferred.
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
 - Qdrant has a daily restricted pull to `helixa-new` with 14-day/14-copy bounds, a 10 GiB free-space
   floor and low CPU/I/O priority; both backup and restore timers are enabled and Prometheus scrapes
-  independent timestamps. Roughly 75 snapshots at ~136 MB each currently sit on the host.
+  independent timestamps.
+- On-host Qdrant snapshots are **10 GB, 75 files, unbounded**, and they live inside the same docker
+  volume as the live data (`megacampus_qdrant/_data/snapshots`). Losing that volume loses both.
+  Real rollback depth is the off-host pull, not the file count. Host disk is at 77%. `mc2-hfoh3`.
 - Uploads have a daily pull-based off-host copy on `helixa-new`; a restore of one file matched
   `file_catalog.hash`. It is a second machine, not full disaster recovery.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations.
@@ -94,8 +100,10 @@ remain explicitly deferred.
   infrastructure work must use `scripts/with_host_operation_lock.sh`.
 - The default backend Vitest command is fail-closed and requires the pinned Qdrant 1.18.2
   precondition; use `vitest.config.unit.ts` for focused unit tests.
-- `graph-reviewed: updated` — local-only Graphify graph, 61,733 nodes, 88,850 edges, 7,352
-  communities; no external semantic backend was used.
+- `graph-reviewed: blocked` (2026-08-12) — the graph was read, not refreshed. Graphify 0.9.14 CLI
+  exposes `path`, `explain`, `diagnose` and `merge` only; there is no `build`/refresh subcommand, so
+  a rebuild runs through the `/graphify` skill flow rather than from closeout. The last recorded
+  build holds 61,733 nodes, 88,850 edges and 7,352 communities, local-only, no external backend.
 
 ## Owner decisions
 
