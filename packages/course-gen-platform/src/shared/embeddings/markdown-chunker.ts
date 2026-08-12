@@ -454,6 +454,50 @@ export function getAllChunks(result: ChunkingResult): TextChunk[] {
   );
 }
 
+/** Normalizes chunk text for identity comparison; whitespace is not content. */
+function normalizedContent(chunk: TextChunk): string {
+  return chunk.content.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Selects the chunks worth embedding and storing in the vector index.
+ *
+ * A parent exists to give a retrieved child more surrounding context. When a
+ * parent group ended up holding exactly one child, the parent's text is that
+ * child's text and the parent adds nothing — but it still cost an embedding
+ * call, still occupied a point, and still surfaced in search results as a
+ * second copy of a hit the caller already had.
+ *
+ * That was not a rare edge case. Measured on production 2026-08-12: all 6856
+ * parents had exactly one child, so 6856 of 13712 indexed points — half the
+ * collection — were exact copies. Parents break on every heading-path change
+ * and Docling already merges peers within a section, so one child per parent is
+ * what this pipeline normally produces.
+ *
+ * Degenerate parents are dropped from indexing only. They stay in the chunking
+ * result, so parent lookup, sibling navigation and chunk counts are unchanged.
+ */
+export function selectIndexableChunks(result: ChunkingResult): TextChunk[] {
+  const childTextByParent = new Map<string, Set<string>>();
+  for (const child of result.child_chunks) {
+    if (!child.parent_chunk_id) continue;
+    const texts = childTextByParent.get(child.parent_chunk_id) ?? new Set<string>();
+    texts.add(normalizedContent(child));
+    childTextByParent.set(child.parent_chunk_id, texts);
+  }
+
+  const indexableParents = result.parent_chunks.filter(parent => {
+    const childTexts = childTextByParent.get(parent.chunk_id);
+    // A parent with no children carries text nothing else covers: keep it.
+    if (!childTexts || childTexts.size === 0) return true;
+    return !(childTexts.size === 1 && childTexts.has(normalizedContent(parent)));
+  });
+
+  return [...indexableParents, ...result.child_chunks].sort(
+    (a, b) => a.chunk_index - b.chunk_index
+  );
+}
+
 /**
  * Utility: Get child chunks for a specific parent
  *

@@ -10,6 +10,7 @@ import {
   type EvidenceSourceRef,
   type Stage5DocumentEvidenceEnrichment,
 } from '@megacampus/shared-types';
+import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
 import type { SearchResult } from '@/shared/qdrant/search-types';
 import { Stage5EvidenceEnrichmentFailure } from './types';
 import type {
@@ -575,7 +576,7 @@ export async function enrichBaselineWithDocumentEvidence(
         retrievalAttempts += 1;
         const response = await dependencies.search(query, {
           limit: MAX_RESULTS_PER_SECTION,
-          score_threshold: 0.7,
+          score_threshold: DENSE_SCORE_THRESHOLD,
           enable_hybrid: true,
           include_payload: true,
           enable_priority_boost: true,

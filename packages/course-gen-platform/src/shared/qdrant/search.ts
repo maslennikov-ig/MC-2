@@ -24,6 +24,7 @@ import type {
 import { generateSearchCacheKey, extractPayload } from './search-helpers';
 import { denseSearch, hybridSearchWithFallback } from './search-operations';
 import { getCollectionStats } from './upload';
+import { DENSE_SCORE_THRESHOLD } from './retrieval-thresholds';
 import { logger } from '../logger/index.js';
 
 /**
@@ -41,7 +42,7 @@ const MIN_CACHEABLE_QUERY_LENGTH = 3;
  */
 const DEFAULT_SEARCH_OPTIONS: ResolvedSearchOptions = {
   limit: 10,
-  score_threshold: 0.7,
+  score_threshold: DENSE_SCORE_THRESHOLD,
   collection_name: COLLECTION_CONFIG.name,
   enable_hybrid: false,
   include_payload: false,
@@ -86,6 +87,37 @@ function toSearchResult(point: QdrantPointOrScored, include_payload: boolean): S
 }
 
 /**
+ * Drops results whose text is already present, keeping the best-scoring copy.
+ *
+ * The same text legitimately exists at more than one point: a document reused
+ * across courses, and — until 2026-08-12 — every parent chunk, which carried a
+ * byte-identical copy of its only child. A caller asking for five chunks wants
+ * five different pieces of evidence, not one piece repeated five times, so the
+ * repeats are removed here rather than at each of the six call sites.
+ *
+ * Results arrive sorted by score, so the first occurrence is the one to keep.
+ */
+export function dedupeByContent(results: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>();
+  const unique: SearchResult[] = [];
+
+  for (const result of results) {
+    const key = result.content?.trim() ?? '';
+    // A chunk with no text carries no evidence, but it is not a duplicate of
+    // another empty one in any meaningful sense; leave those alone.
+    if (key.length === 0) {
+      unique.push(result);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(result);
+  }
+
+  return unique;
+}
+
+/**
  * Searches for relevant chunks using semantic or hybrid search
  *
  * Features:
@@ -107,7 +139,7 @@ function toSearchResult(point: QdrantPointOrScored, include_payload: boolean): S
  * // Basic semantic search
  * const response = await searchChunks('What is machine learning?', {
  *   limit: 10,
- *   score_threshold: 0.7,
+ *   score_threshold: DENSE_SCORE_THRESHOLD,
  *   filters: {
  *     course_id: '123e4567-e89b-12d3-a456-426614174000',
  *     organization_id: '987fbc97-4bed-5078-9f07-9141ba07c9f3',
@@ -165,7 +197,20 @@ export async function searchChunks(
     }
 
     // Convert to search results
-    const results = searchResults.map(point => toSearchResult(point, config.include_payload));
+    const rawResults = searchResults.map(point => toSearchResult(point, config.include_payload));
+    const results = dedupeByContent(rawResults);
+
+    if (results.length < rawResults.length) {
+      logger.debug(
+        {
+          returned: rawResults.length,
+          unique: results.length,
+          dropped: rawResults.length - results.length,
+          queryPreview: queryText.substring(0, 100),
+        },
+        'Dropped duplicate chunk text from search results'
+      );
+    }
 
     const totalTime = Date.now() - totalStartTime;
 

@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSearchDocumentsTool } from '@/stages/stage5-generation/utils/qdrant-search';
 import * as qdrantSearch from '@/shared/qdrant/search';
+import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
 
 // Mock dependencies
 vi.mock('@/shared/qdrant/search');
@@ -101,7 +102,9 @@ describe('qdrant-search', () => {
         'mass-energy equivalence formula',
         expect.objectContaining({
           limit: 3, // default
-          score_threshold: 0.7,
+          // Bound to the shared constant rather than restated: a copy of the
+          // number here is what let an unreachable 0.7 look verified.
+          score_threshold: DENSE_SCORE_THRESHOLD,
           enable_hybrid: true,
           filters: { course_id: courseId },
         })

@@ -16,6 +16,7 @@
  */
 
 import { searchChunks } from '@/shared/qdrant/search';
+import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
 import type { SearchOptions, SearchResult } from '@/shared/qdrant/search-types';
 import { logger } from '@/shared/logger';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
@@ -37,8 +38,8 @@ const SECTION_RAG_DEFAULTS = {
   MAX_CHUNKS: 30,
   /** Minimum chunks for acceptable coverage */
   MIN_CHUNKS: 20,
-  /** Minimum similarity score threshold */
-  SCORE_THRESHOLD: 0.7,
+  /** Minimum dense similarity score threshold */
+  SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD,
   /** Maximum token budget for RAG context */
   MAX_TOKENS: 40_000,
   /** Enable hybrid search (dense + sparse) - ENABLED: sparse vectors now uploaded + native Query API with server-side RRF */

@@ -74,7 +74,15 @@ export interface SearchFilters {
 export interface SearchOptions {
   /** Number of results to return (default: 10) */
   limit?: number;
-  /** Similarity score threshold (0-1, default: 0.7) */
+  /**
+   * Minimum dense cosine score, default {@link DENSE_SCORE_THRESHOLD}.
+   *
+   * Applies to dense candidates only — in a hybrid query it gates the dense
+   * branch before fusion, so a value the embeddings never reach turns hybrid
+   * search into BM25-only search. It is never compared against a fused RRF
+   * score, which lives on a different scale. See `retrieval-thresholds.ts` for
+   * the measured range.
+   */
   score_threshold?: number;
   /** Collection name (default: 'course_embeddings') */
   collection_name?: string;
