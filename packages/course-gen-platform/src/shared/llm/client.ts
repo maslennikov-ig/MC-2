@@ -25,6 +25,7 @@ import {
   handleApiError,
   handleUnknownError,
 } from './client-helpers';
+import type { ReasoningRequest } from './client-helpers';
 
 /**
  * Options for LLM completion requests
@@ -42,6 +43,12 @@ export interface LLMClientOptions {
   timeout?: number;
   /** Enable prompt caching (for Anthropic models via OpenRouter) */
   enableCaching?: boolean;
+  /**
+   * Reasoning settings for this call. Omit for the overwhelming majority of
+   * phases: deliberation costs tokens and latency, and only helps where the
+   * work is genuinely hard.
+   */
+  reasoning?: ReasoningRequest;
 }
 
 export interface LLMClientConstructionOptions {
@@ -205,10 +212,18 @@ export class LLMClient {
       systemPrompt = 'You are a helpful assistant that summarizes documents concisely while preserving key information.',
       timeout = 60000,
       enableCaching = false,
+      reasoning,
     } = options;
 
     logger.info(
-      { model, promptLength: prompt.length, maxTokens, temperature, enableCaching },
+      {
+        model,
+        promptLength: prompt.length,
+        maxTokens,
+        temperature,
+        enableCaching,
+        reasoning: reasoning?.enabled ? reasoning : undefined,
+      },
       'Generating LLM completion'
     );
 
@@ -218,7 +233,8 @@ export class LLMClient {
       systemPrompt,
       maxTokens,
       temperature,
-      enableCaching
+      enableCaching,
+      reasoning
     );
 
     const inputContentLength = systemPrompt.length + prompt.length;
@@ -250,6 +266,7 @@ export class LLMClient {
       temperature = 0.7,
       timeout = 60000,
       enableCaching = false,
+      reasoning,
     } = options;
 
     logger.info(
@@ -262,7 +279,8 @@ export class LLMClient {
       messages,
       maxTokens,
       temperature,
-      enableCaching
+      enableCaching,
+      reasoning
     );
 
     const inputContentLength = messages.reduce((sum, msg) => {

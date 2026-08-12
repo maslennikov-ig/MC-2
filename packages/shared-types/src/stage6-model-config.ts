@@ -32,8 +32,8 @@ function createStage6Config(
 
 export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
   stage_6_content: createStage6Config({
-    modelId: 'moonshotai/kimi-k2-thinking',
-    fallbackModelId: 'qwen/qwen3.7-plus',
+    modelId: 'openai/gpt-5.6-luna',
+    fallbackModelId: DEFAULT_MODEL_ID,
   }),
   stage_6_refinement: createStage6Config({
     modelId: DEFAULT_MODEL_ID,
@@ -48,24 +48,27 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
   }),
   stage_6_simple: createStage6Config({
     modelId: DEFAULT_MODEL_ID,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   }),
   stage_6_normal: createStage6Config({
-    modelId: 'moonshotai/kimi-k2-thinking',
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    modelId: 'openai/gpt-5.6-luna',
+    fallbackModelId: DEFAULT_MODEL_ID,
   }),
   stage_6_complex: createStage6Config({
-    modelId: 'qwen/qwen3.7-plus',
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    modelId: 'openai/gpt-5.6-luna',
+    fallbackModelId: DEFAULT_MODEL_ID,
   }),
+  // The two escalation phases deliberately avoid DEFAULT_MODEL_ID on BOTH the
+  // primary and the fallback: by the time either runs, the default model has
+  // already failed on this lesson, so retrying it is a wasted attempt.
   stage_6_auto_last_chance: createStage6Config({
-    modelId: 'z-ai/glm-5',
-    fallbackModelId: 'qwen/qwen3.7-plus',
+    modelId: 'z-ai/glm-5.2',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
     maxTokens: 12000,
   }),
   stage_6_manual_regeneration: createStage6Config({
-    modelId: 'google/gemini-3.5-flash',
-    fallbackModelId: 'z-ai/glm-5',
+    modelId: DEFAULT_FALLBACK_MODEL_ID,
+    fallbackModelId: 'z-ai/glm-5.2',
     maxTokens: 12000,
   }),
   stage_6_arbiter: createStage6Config({

@@ -40,9 +40,11 @@ import { StaleWhileRevalidateCache } from './swr-cache';
 export type {
   ModelConfigResult,
   PhaseModelConfig,
+  PhaseReasoningConfig,
   JudgeModelConfig,
   JudgeModelsResult,
 } from './model-config-db';
+export { REASONING_DISABLED } from './model-config-db';
 
 import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
 
@@ -572,12 +574,21 @@ class ModelConfigServiceImpl {
       throw new Error(chatErrorMsg);
     }
 
-    // Step 6: No cache, no database - try hardcoded fallback for non-chat phases
+    // Both fallbacks below used to say "database unavailable", which was wrong
+    // in the common case and cost real time: the four Stage 2 summarization
+    // phases had no row in llm_model_config for months and logged an outage
+    // that was not happening, so nobody read the line as "this phase is not
+    // configured". `dbReturnedNull` already distinguishes the two, so say which.
+    const reason = dbReturnedNull
+      ? 'no active config row for this phase (database was reachable)'
+      : 'database unavailable';
+
+    // Step 6: No cache, no database row - try hardcoded fallback for non-chat phases
     const hardcodedConfig = DEFAULT_PHASE_CONFIGS[phaseName];
     if (hardcodedConfig) {
       logger.warn(
-        { phaseName, courseId, tier, modelId: hardcodedConfig.modelId },
-        'Using HARDCODED fallback config - database unavailable and no cache'
+        { phaseName, courseId, tier, modelId: hardcodedConfig.modelId, dbReturnedNull },
+        `Using HARDCODED fallback config - ${reason} and no cache`
       );
       // Cache the hardcoded config to avoid repeated warnings
       this.phaseCache.set(cacheKey, hardcodedConfig);
@@ -588,8 +599,8 @@ class ModelConfigServiceImpl {
     const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
     if (globalDefault) {
       logger.warn(
-        { phaseName, courseId, tier, modelId: globalDefault.modelId },
-        'Using global_default HARDCODED fallback - unknown phase and no cache'
+        { phaseName, courseId, tier, modelId: globalDefault.modelId, dbReturnedNull },
+        `Using global_default HARDCODED fallback - unknown phase, ${reason} and no cache`
       );
       this.phaseCache.set(cacheKey, globalDefault);
       return globalDefault;

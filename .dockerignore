@@ -24,6 +24,8 @@ dist/
 .next/
 out/
 build/
+# Build input, not output: the config-seed refresh script the platform build runs.
+!packages/course-gen-platform/src/build/
 
 # Development
 .env

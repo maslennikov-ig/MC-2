@@ -683,9 +683,13 @@ jobs:
   # ============================================
   # Migration drift gate (read-only)
   # Fails the deploy if repo Supabase migrations are not applied to the shared
-  # database (dev + staging share one project). Skips (passes) until the repo
-  # secret SUPABASE_DB_URL is configured, so it is safe to merge before that
-  # secret is provisioned. See beads mc2-hnkmf.
+  # database (dev + staging share one project). See beads mc2-hnkmf.
+  #
+  # Fails closed. Until 2026-08-12 it passed whenever it could not reach the
+  # database — which was always, because it never enabled TLS and Supavisor
+  # rejects plaintext — so the gate had never actually checked anything. A
+  # missing secret, an unreachable database and real drift now all fail the job
+  # rather than annotate it. See beads mc2-s98bw.
   # ============================================
   migration-drift-check:
     name: Migration Drift Check
@@ -695,6 +699,10 @@ jobs:
     timeout-minutes: 10
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      # Optional. Supabase's pooler serves a chain rooted in its own CA, so
+      # without this the connection is encrypted but the chain is unverified and
+      # the job says so. Provide the CA PEM to get full verification.
+      SUPABASE_DB_CA_CERT: ${{ secrets.SUPABASE_DB_CA_CERT }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -706,12 +714,14 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Migration drift gate not configured
-        if: env.SUPABASE_DB_URL == ''
-        run: echo "::warning::SUPABASE_DB_URL not set; migration drift gate skipped. Add the repo secret to enable (mc2-hnkmf)."
       - name: Check migration drift
-        if: env.SUPABASE_DB_URL != ''
         run: pnpm -F course-gen-platform exec tsx scripts/check-migration-drift.ts
+      # config-seed.json is the routing table used when Supabase is unreachable.
+      # It is refreshed only by an explicit generate:config-seed run, and it
+      # silently fell twenty phases behind the database for two months because
+      # nothing compared the two.
+      - name: Check config seed drift
+        run: pnpm -F course-gen-platform exec tsx scripts/check-config-seed-drift.ts
 
   # ============================================
   # STAGE 6: Deploy to Production

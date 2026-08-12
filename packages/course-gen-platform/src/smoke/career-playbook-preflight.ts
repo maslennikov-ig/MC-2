@@ -120,6 +120,7 @@ const CAREER_PLAYBOOK_PRICED_PHASES = [
   'stage_career_playbook_spec',
   'stage_career_playbook_followup',
   'stage_career_playbook_judge',
+  'stage_career_playbook_proofreader',
   'stage_career_playbook_regenerator',
   'stage_career_playbook_group_1',
   'stage_career_playbook_group_2',

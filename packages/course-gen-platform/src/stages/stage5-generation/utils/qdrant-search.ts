@@ -15,6 +15,7 @@
  */
 
 import { searchChunks } from '@/shared/qdrant/search';
+import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
 import type { SearchOptions, SearchResult } from '@/shared/qdrant/search-types';
 import { logger } from '@/shared/logger';
 
@@ -27,7 +28,7 @@ import { logger } from '@/shared/logger';
  */
 const RAG_DEFAULTS = {
   CHUNK_LIMIT: 5, // Default number of chunks to retrieve
-  SCORE_THRESHOLD: 0.7, // Minimum similarity score
+  SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD, // Minimum dense similarity score
   ENABLE_HYBRID: true, // ENABLED: sparse vectors uploaded + native Query API with server-side RRF
 } as const;
 

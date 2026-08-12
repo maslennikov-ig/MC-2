@@ -36,7 +36,8 @@
 | [03-prompts-structure v2](./03-prompts-structure.md)                   | Обновлённая спецификация промптов                          |
 | [ADR-008](../../ADR-008-career-playbook-pdf-rendering.md)              | Решение по PDF-рендереру и печатному CSS                   |
 | [06-quality-acceptance](./06-quality-acceptance.md)                    | Процедура приёмки                                          |
-| [Промпт для оркестратора](./ORCHESTRATOR_PROMPT-quality-v2.md)         | Handoff-пакет для реализации                               |
+| [Промпт для оркестратора v2](./ORCHESTRATOR_PROMPT-quality-v2.md)      | Первая волна: реализована, принята механически             |
+| [Промпт для оркестратора v3](./ORCHESTRATOR_PROMPT-quality-v3.md)      | Вторая волна: шесть дефектов, найденных чтением документа  |
 
 ## Beads tracking
 

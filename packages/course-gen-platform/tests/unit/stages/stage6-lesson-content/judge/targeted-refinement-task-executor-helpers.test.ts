@@ -47,6 +47,9 @@ vi.mock('@/stages/stage6-lesson-content/nodes/generator/generator-content', () =
 }));
 
 import { executeLlmCall } from '@/stages/stage6-lesson-content/judge/targeted-refinement/task-executor-helpers';
+// Bound to the canonical config rather than a literal id so a routing change
+// cannot silently make this assertion test the wrong model (mc2-t6iec).
+import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
 
 describe('executeLlmCall config failures', () => {
   beforeEach(() => {
@@ -75,7 +78,7 @@ describe('executeLlmCall config failures', () => {
       tokensUsed: 321,
     });
     expect(mockGenerateCompletion).toHaveBeenCalledWith('prompt', {
-      model: 'deepseek/deepseek-v4-flash',
+      model: getStage6CanonicalPhaseConfig('stage_6_patcher')!.modelId,
       temperature: 0.1,
       maxTokens: 1200,
       systemPrompt: 'system prompt',

@@ -1750,6 +1750,9 @@ export type Database = {
           phase_name: string
           primary_display_name: string | null
           quality_threshold: number | null
+          reasoning_effort: string | null
+          reasoning_enabled: boolean
+          reasoning_max_tokens: number | null
           stage_number: number | null
           temperature: number | null
           threshold_tokens: number | null
@@ -1778,6 +1781,9 @@ export type Database = {
           phase_name: string
           primary_display_name?: string | null
           quality_threshold?: number | null
+          reasoning_effort?: string | null
+          reasoning_enabled?: boolean
+          reasoning_max_tokens?: number | null
           stage_number?: number | null
           temperature?: number | null
           threshold_tokens?: number | null
@@ -1806,6 +1812,9 @@ export type Database = {
           phase_name?: string
           primary_display_name?: string | null
           quality_threshold?: number | null
+          reasoning_effort?: string | null
+          reasoning_enabled?: boolean
+          reasoning_max_tokens?: number | null
           stage_number?: number | null
           temperature?: number | null
           threshold_tokens?: number | null

@@ -35,6 +35,14 @@ import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
+import { modelSupportsTemperature, modelSupportsReasoning } from '@megacampus/shared-types';
+
+/** Reasoning settings as a phase config supplies them. */
+export interface LangchainReasoningRequest {
+  enabled: boolean;
+  effort?: 'low' | 'medium' | 'high' | null;
+  maxTokens?: number | null;
+}
 
 /**
  * OpenRouter API base URL
@@ -401,11 +409,56 @@ const PHASE_FALLBACK_CONFIG: Record<
  * // Create 120B model for expert analysis
  * const expertModel = createOpenRouterModel('deepseek/deepseek-v4-flash', 0.5, 8000);
  */
+/**
+ * Build the provider-specific half of a ChatOpenAI config.
+ *
+ * Two provider facts are handled here rather than at every call site:
+ * `temperature` is silently ignored by models that do not accept it (OpenAI's
+ * GPT-5.6 series), and reasoning tokens are billed out of `maxTokens`, so a
+ * reasoning budget has to be added to the answer budget rather than shared
+ * with it.
+ */
+function buildProviderParams(
+  modelId: string,
+  temperature: number,
+  maxTokens: number,
+  reasoning?: LangchainReasoningRequest
+): {
+  temperature?: number;
+  maxTokens: number;
+  modelKwargs: Record<string, unknown>;
+} {
+  const modelKwargs: Record<string, unknown> = { usage: { include: true } };
+  let effectiveMaxTokens = maxTokens;
+
+  if (reasoning?.enabled) {
+    if (modelSupportsReasoning(modelId)) {
+      modelKwargs.reasoning = {
+        ...(reasoning.effort ? { effort: reasoning.effort } : {}),
+        ...(reasoning.maxTokens ? { max_tokens: reasoning.maxTokens } : {}),
+      };
+      if (reasoning.maxTokens) effectiveMaxTokens += reasoning.maxTokens;
+    } else {
+      logger.warn(
+        { modelId },
+        'Phase asks for reasoning but the model does not accept it - sending the request without it'
+      );
+    }
+  }
+
+  return {
+    ...(modelSupportsTemperature(modelId) ? { temperature } : {}),
+    maxTokens: effectiveMaxTokens,
+    modelKwargs,
+  };
+}
+
 export function createOpenRouterModel(
   modelId: string,
   temperature: number = 0.7,
   maxTokens: number = 4096,
-  timeoutMs?: number
+  timeoutMs?: number,
+  reasoning?: LangchainReasoningRequest
 ): ChatOpenAI {
   const apiKey = getApiKeySync('openrouter');
 
@@ -422,14 +475,8 @@ export function createOpenRouterModel(
       baseURL: OPENROUTER_BASE_URL,
     },
     apiKey: apiKey,
-    temperature,
-    maxTokens,
     ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    // Request token usage from OpenRouter (some providers don't return it by default)
-    // See: https://openrouter.ai/docs/api-reference/parameters
-    modelKwargs: {
-      usage: { include: true },
-    },
+    ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
   });
 }
 
@@ -452,7 +499,8 @@ export async function createOpenRouterModelAsync(
   modelId: string,
   temperature: number = 0.7,
   maxTokens: number = 4096,
-  timeoutMs?: number
+  timeoutMs?: number,
+  reasoning?: LangchainReasoningRequest
 ): Promise<ChatOpenAI> {
   const apiKey = await getOpenRouterApiKey();
 
@@ -468,14 +516,8 @@ export async function createOpenRouterModelAsync(
       baseURL: OPENROUTER_BASE_URL,
     },
     apiKey: apiKey,
-    temperature,
-    maxTokens,
     ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    // Request token usage from OpenRouter (some providers don't return it by default)
-    // See: https://openrouter.ai/docs/api-reference/parameters
-    modelKwargs: {
-      usage: { include: true },
-    },
+    ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
   });
 }
 

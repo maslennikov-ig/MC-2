@@ -10,6 +10,7 @@
 
 import { TRPCError } from '@trpc/server';
 import type { ModelConfigWithVersion, PhaseName } from '@megacampus/shared-types';
+import { assertBudgetFitsModel } from './model-budget-validation';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
@@ -282,6 +283,7 @@ function buildUpdatedConfigRow(
 /**
  * Handle the updateModelConfig mutation logic
  */
+
 export async function handleUpdateModelConfig(input: UpdateModelConfigInput, userId: string) {
   const supabase = getSupabaseAdmin();
 
@@ -309,6 +311,14 @@ export async function handleUpdateModelConfig(input: UpdateModelConfigInput, use
   if (input.modelId && input.modelId !== currentConfig.model_id) {
     await validateModelIdExists(input.modelId);
   }
+
+  // 3b. The budget must fit the model that will actually serve the request,
+  //     whether the model or the budget is the thing being changed.
+  assertBudgetFitsModel(
+    input.modelId ?? currentConfig.model_id,
+    input.maxTokens ?? currentConfig.max_tokens,
+    currentConfig.max_context_tokens
+  );
 
   // 4. Deactivate current version
   await deactivateConfig(input.id);

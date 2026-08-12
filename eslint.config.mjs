@@ -15,6 +15,10 @@ export default tseslint.config(
       '**/.next/**',
       '**/out/**',
       '**/build/**',
+      // ...except this one, which is source, not output: the script that
+      // refreshes the committed model-routing fallback from the database. The
+      // same `build/` blanket also hid it from Git and Docker (mc2-db696.121).
+      '!packages/course-gen-platform/src/build/**',
       '**/database.types.ts', // Auto-generated Supabase types
     ],
   },

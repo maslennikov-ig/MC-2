@@ -10,7 +10,7 @@
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
 import {
-  getAllChunks,
+  selectIndexableChunks,
   DEFAULT_CHUNKING_CONFIG,
 } from '../../../shared/embeddings/markdown-chunker.js';
 import {
@@ -81,8 +81,12 @@ export async function executeChunking(
     config: DEFAULT_CHUNKING_CONFIG,
   });
 
-  // Get all chunks (parent + child) for embedding
-  const allChunks = getAllChunks(chunkingResult);
+  // Chunks worth embedding: a parent whose text is exactly its only child's
+  // text is skipped, since indexing it would store and pay for the same vector
+  // twice and return the same passage twice in every search.
+  const allChunks = selectIndexableChunks(chunkingResult);
+  const skippedParents =
+    chunkingResult.parent_chunks.length + chunkingResult.child_chunks.length - allChunks.length;
 
   logger.info(
     {
@@ -91,6 +95,7 @@ export async function executeChunking(
       chunkingProfileId: chunkingResult.chunkingProfileId,
       parentChunks: chunkingResult.parent_chunks.length,
       childChunks: chunkingResult.child_chunks.length,
+      skippedDuplicateParents: skippedParents,
       totalChunks: allChunks.length,
       refCoverage: Number(chunkingResult.coverage.refCoverage.toFixed(4)),
       locationCoverage: Number(chunkingResult.coverage.locationCoverage.toFixed(4)),

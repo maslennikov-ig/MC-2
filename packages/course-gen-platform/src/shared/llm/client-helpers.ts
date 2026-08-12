@@ -14,6 +14,7 @@ import type {
 } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import type { LLMResponse } from './client';
+import { modelSupportsTemperature, modelSupportsReasoning } from '@megacampus/shared-types';
 
 /**
  * OpenRouter-specific extension for cache_control
@@ -33,7 +34,19 @@ export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & 
       cache_control?: boolean;
     };
   };
+  /** OpenRouter reasoning controls; omitted entirely when reasoning is off */
+  reasoning?: {
+    effort?: 'low' | 'medium' | 'high';
+    max_tokens?: number;
+  };
 };
+
+/** Reasoning settings as the caller supplies them, before provider checks. */
+export interface ReasoningRequest {
+  enabled: boolean;
+  effort?: 'low' | 'medium' | 'high' | null;
+  maxTokens?: number | null;
+}
 
 /**
  * Check if model supports explicit cache_control breakpoints via OpenRouter.
@@ -46,6 +59,50 @@ export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & 
  */
 function supportsExplicitCaching(model: string): boolean {
   return model.includes('anthropic');
+}
+
+/**
+ * Apply `temperature` only where the model actually honours it.
+ *
+ * OpenAI's GPT-5.6 series exposes reasoning-side controls instead — its
+ * OpenRouter `supported_parameters` lists `reasoning` and `reasoning_effort`
+ * but not `temperature`. Sending it anyway makes the pipeline-admin screen lie:
+ * the row shows 0.7 while the request is served at the provider default.
+ */
+function withSamplingControls(
+  requestOptions: OpenRouterRequestOptions,
+  model: string,
+  temperature: number,
+  reasoning?: ReasoningRequest
+): OpenRouterRequestOptions {
+  if (modelSupportsTemperature(model)) {
+    requestOptions.temperature = temperature;
+  }
+
+  if (!reasoning?.enabled) return requestOptions;
+
+  if (!modelSupportsReasoning(model)) {
+    logger.warn(
+      { model },
+      'Phase asks for reasoning but the model does not accept it - sending the request without it'
+    );
+    return requestOptions;
+  }
+
+  requestOptions.reasoning = {
+    ...(reasoning.effort ? { effort: reasoning.effort } : {}),
+    ...(reasoning.maxTokens ? { max_tokens: reasoning.maxTokens } : {}),
+  };
+
+  // OpenRouter bills reasoning tokens against max_tokens, so the reasoning
+  // budget is ADDED to the answer budget. Taking it out of the existing budget
+  // would buy deliberation by truncating the reply - the exact failure this
+  // feature is supposed to avoid.
+  if (reasoning.maxTokens && typeof requestOptions.max_tokens === 'number') {
+    requestOptions.max_tokens += reasoning.maxTokens;
+  }
+
+  return requestOptions;
 }
 
 /**
@@ -66,7 +123,8 @@ export function buildCompletionRequest(
   systemPrompt: string,
   maxTokens: number,
   temperature: number,
-  enableCaching: boolean
+  enableCaching: boolean,
+  reasoning?: ReasoningRequest
 ): [MessageWithCacheControl[], OpenRouterRequestOptions] {
   const messages: MessageWithCacheControl[] = [
     { role: 'system', content: systemPrompt },
@@ -78,12 +136,16 @@ export function buildCompletionRequest(
     messages[0].cache_control = { type: 'ephemeral' };
   }
 
-  const requestOptions: OpenRouterRequestOptions = {
+  const requestOptions: OpenRouterRequestOptions = withSamplingControls(
+    {
+      model,
+      messages,
+      max_tokens: maxTokens,
+    },
     model,
-    messages,
-    max_tokens: maxTokens,
     temperature,
-  };
+    reasoning
+  );
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
@@ -112,7 +174,8 @@ export function buildChatCompletionRequest(
   messages: ChatCompletionMessageParam[],
   maxTokens: number,
   temperature: number,
-  enableCaching: boolean
+  enableCaching: boolean,
+  reasoning?: ReasoningRequest
 ): [MessageWithCacheControl[], OpenRouterRequestOptions] {
   const messagesWithCacheControl: MessageWithCacheControl[] = messages.map((msg, idx) => {
     // Add cache_control to system message for Anthropic and Google models
@@ -122,12 +185,16 @@ export function buildChatCompletionRequest(
     return msg;
   });
 
-  const requestOptions: OpenRouterRequestOptions = {
+  const requestOptions: OpenRouterRequestOptions = withSamplingControls(
+    {
+      model,
+      messages: messagesWithCacheControl,
+      max_tokens: maxTokens,
+    },
     model,
-    messages: messagesWithCacheControl,
-    max_tokens: maxTokens,
     temperature,
-  };
+    reasoning
+  );
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {

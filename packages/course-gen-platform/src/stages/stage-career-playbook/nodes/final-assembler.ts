@@ -273,6 +273,31 @@ function normalizeFillablePlaceholders(content: string, language: string): strin
     .join('\n');
 }
 
+/**
+ * Normalize internal block identifiers to the reader-facing form.
+ *
+ * The 2026-08-11 guide mixed 23 `block_5`-style identifiers into FAQ answers and
+ * the implementation checklist alongside the correct "Block 8" form. This is
+ * vocabulary, not meaning, so it is cheaper and more reliable to fix here than
+ * to spend a regeneration on it.
+ */
+export function normalizeCareerPlaybookBlockReferences(content: string): string {
+  const lines = content.split('\n');
+  let insideFence = false;
+
+  return lines
+    .map(line => {
+      if (/^\s*```/.test(line)) {
+        insideFence = !insideFence;
+        return line;
+      }
+      if (insideFence) return line;
+
+      return line.replace(/\b[Bb]lock_(\d{1,2})\b/g, 'Block $1');
+    })
+    .join('\n');
+}
+
 function assertAllBlocksPresent(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): void {
@@ -320,7 +345,9 @@ export function normalizeCareerPlaybookFinalContent(
     if (!block) continue;
     normalizedBlocks[blockId] = {
       ...block,
-      content: normalizeFillablePlaceholders(block.content, language),
+      content: normalizeCareerPlaybookBlockReferences(
+        normalizeFillablePlaceholders(block.content, language)
+      ),
     };
   }
 
@@ -360,13 +387,172 @@ export function appendCareerPlaybookSourcesSection(
   );
   if (cited.length === 0) return generatedBlocks;
 
-  const lines = cited.map(entry => `- [${entry.id}] ${entry.title} — ${entry.url}`);
+  const lines = cited.map(
+    entry =>
+      `- [${entry.id}] ${entry.title} — ${entry.url}${
+        entry.source_kind && entry.source_kind !== 'unknown' ? ` (${entry.source_kind})` : ''
+      }`
+  );
 
   return {
     ...generatedBlocks,
     block_25: {
       ...footer,
       content: `${footer.content.trim()}\n\n### ${heading}\n\n${lines.join('\n')}`,
+    },
+  };
+}
+
+const CALIBRATION_HEADING = {
+  en: 'Calibrate before publishing',
+  ru: 'Что заменить перед публикацией',
+} as const;
+
+const CALIBRATION_INTRO = {
+  en: 'Every value below carries the example marker and must be replaced with real company data before this guide is published.',
+  ru: 'Каждое значение ниже помечено как пример и должно быть заменено реальными данными компании до публикации.',
+} as const;
+
+const CALIBRATION_COLUMNS = {
+  en: '| Block | Value to replace | Context |',
+  ru: '| Блок | Значение к замене | Контекст |',
+} as const;
+
+/** Marker forms the guide may use, matching the deterministic check. */
+const EXAMPLE_MARKER_GLOBAL = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/gi;
+
+export interface CareerPlaybookCalibrationItem {
+  blockId: CareerPlaybookBlockId;
+  value: string;
+  context: string;
+}
+
+/** Strip table pipes and emphasis so a captured fragment reads as plain text. */
+function toPlainFragment(line: string): string {
+  return line
+    .replace(/^\|\s*/, '')
+    .replace(/\s*\|$/, '')
+    .replace(/\s*\|\s*/g, ' — ')
+    .replace(/\*\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Extract the value a marker annotates: the text immediately before it, cut at
+ * the nearest sentence or cell boundary. "base $120,000 (example — replace)"
+ * yields "base $120,000".
+ */
+function valueBeforeMarker(line: string, markerIndex: number): string {
+  const before = line.slice(0, markerIndex);
+  const boundary = Math.max(
+    before.lastIndexOf('. '),
+    before.lastIndexOf('; '),
+    before.lastIndexOf(': '),
+    before.lastIndexOf('|')
+  );
+  const value = (boundary >= 0 ? before.slice(boundary + 1) : before).trim();
+  return value
+    .replace(/^[-*+\s]+/, '')
+    .replace(/\*\*/g, '')
+    .trim();
+}
+
+/**
+ * Collect every value carrying the example marker, in block order.
+ *
+ * The reviewed 2026-08-11 guide left this to the model, and block 26 listed six
+ * items while naming none of the seven money values in the document — the very
+ * figures most likely to be copied verbatim into an official role guide. A model
+ * cannot reliably recall what it marked 900 lines earlier, so the table is
+ * assembled here instead, exactly like the Sources section is assembled from the
+ * evidence ledger.
+ */
+export function collectCareerPlaybookCalibrationItems(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookCalibrationItem[] {
+  const items: CareerPlaybookCalibrationItem[] = [];
+
+  for (const blockId of CAREER_PLAYBOOK_FINAL_BLOCK_ORDER) {
+    // Block 26 hosts the table itself; scanning it would list its own rows.
+    if (blockId === 'block_26') continue;
+    const content = generatedBlocks[blockId]?.content;
+    if (!content) continue;
+
+    for (const rawLine of content.replace(/```[\s\S]*?```/g, '\n').split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      for (const match of line.matchAll(EXAMPLE_MARKER_GLOBAL)) {
+        const value = valueBeforeMarker(line, match.index ?? 0);
+        if (!value) continue;
+
+        items.push({
+          blockId,
+          value: value.length > 90 ? `…${value.slice(-89)}` : value,
+          context: toPlainFragment(line).slice(0, 120),
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+function blockLabel(blockId: CareerPlaybookBlockId): string {
+  return blockId === 'header' ? 'Header' : `Block ${blockId.replace('block_', '')}`;
+}
+
+/**
+ * Replace block 26's own attempt at a calibration list with one built from the
+ * assembled document. The model keeps authorship of everything else in the
+ * block; only the table is application-owned, because only the application can
+ * see every marker at once.
+ */
+export function appendCareerPlaybookCalibrationTable(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  roleProfileSpec?: CareerPlaybookRoleProfileSpec
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  const checklist = generatedBlocks.block_26;
+  if (!checklist) return generatedBlocks;
+
+  const items = collectCareerPlaybookCalibrationItems(generatedBlocks);
+  if (items.length === 0) return generatedBlocks;
+
+  const language = resolveContentLanguage(roleProfileSpec);
+  const heading = CALIBRATION_HEADING[language];
+
+  // Drop a model-written section with the same purpose so the document does not
+  // carry two lists that disagree, bounded by the next third-level heading or the
+  // end of the block. Built with String.raw because a template literal silently
+  // turns [\s\S] into [sS], which quietly removed only the heading line.
+  const modelSection = new RegExp(
+    String.raw`^###[ \t]+(?:` +
+      `${escapeRegExp(CALIBRATION_HEADING.en)}|${escapeRegExp(CALIBRATION_HEADING.ru)}` +
+      String.raw`)[^\n]*\n(?:(?!^###[ \t])[\s\S])*`,
+    'im'
+  );
+  const withoutModelSection = checklist.content.replace(modelSection, '').trim();
+
+  const rows = items.map(
+    item => `| ${blockLabel(item.blockId)} | ${item.value} | ${item.context} |`
+  );
+
+  return {
+    ...generatedBlocks,
+    block_26: {
+      ...checklist,
+      content: [
+        withoutModelSection,
+        '',
+        `### ${heading}`,
+        '',
+        CALIBRATION_INTRO[language],
+        '',
+        CALIBRATION_COLUMNS[language],
+        '| --- | --- | --- |',
+        ...rows,
+      ].join('\n'),
     },
   };
 }
@@ -379,7 +565,8 @@ export function prepareCareerPlaybookFinalBlocks(
     input.roleProfileSpec
   );
   const withSources = appendCareerPlaybookSourcesSection(normalizedBlocks, input.roleProfileSpec);
-  return ensureRequiredMermaidSections(withSources, input.roleProfileSpec);
+  const withCalibration = appendCareerPlaybookCalibrationTable(withSources, input.roleProfileSpec);
+  return ensureRequiredMermaidSections(withCalibration, input.roleProfileSpec);
 }
 
 export async function prepareCareerPlaybookFinalBlocksWithQuality(

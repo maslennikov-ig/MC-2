@@ -53,9 +53,10 @@ function issue(
   blockId: string,
   category: CareerPlaybookJudgeIssue['category'],
   description: string,
-  suggestion: string
+  suggestion: string,
+  severity: CareerPlaybookJudgeIssue['severity'] = 'critical'
 ): CareerPlaybookJudgeIssue {
-  return { block_id: blockId, severity: 'critical', category, description, suggestion };
+  return { block_id: blockId, severity, category, description, suggestion };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +107,75 @@ function thresholdNumbers(metric: CareerPlaybookMetricLedgerEntry): Set<string> 
  * "(example — replace)", "(example — replace: $4,000)", "(пример — заменить числа)".
  * Requiring the bare form flagged correctly-marked values on the first clean run.
  */
-const EXAMPLE_MARKER = /\(\s*(?:пример\s*[—–-]\s*заменит[ьи]|example\s*[—–-]\s*replace)[^)]*\)/i;
+// The verb may follow the value: "(example: $100K — replace with your threshold)".
+// The marker may sit anywhere inside the parentheses and use any separator:
+// "(e.g., >$50,000 — example, replace with your threshold)".
+const EXAMPLE_MARKER = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/i;
+
+type ThresholdDirection = 'floor' | 'ceiling' | 'range';
+
+const CEILING_CUE =
+  /(?:<|≤|below|under|less than|at most|no more than|drops? below|ниже|меньше|не более)\s*$/i;
+const FLOOR_CUE = /(?:>|≥|above|over|more than|at least|minimum|выше|больше|не менее)\s*$/i;
+
+/** Direction of the comparison attached to a number, read from the text before it. */
+function directionBefore(text: string, index: number): ThresholdDirection | null {
+  const lead = text.slice(Math.max(0, index - 24), index);
+  if (CEILING_CUE.test(lead)) return 'ceiling';
+  if (FLOOR_CUE.test(lead)) return 'floor';
+  return null;
+}
+
+/** Band values with the direction the ledger states them in. A range matches either way. */
+function directedBandValues(
+  metric: CareerPlaybookMetricLedgerEntry
+): Map<string, Set<ThresholdDirection>> {
+  const bands = new Map<string, Set<ThresholdDirection>>();
+
+  const record = (field: string, fallback: ThresholdDirection) => {
+    if (!field) return;
+    for (const match of field.matchAll(NUMBER_TOKEN)) {
+      const value = canonicalNumber(match[0]);
+      if (!value) continue;
+      const direction = directionBefore(field, match.index ?? 0) ?? fallback;
+      const existing = bands.get(value) ?? new Set<ThresholdDirection>();
+      existing.add(direction);
+      bands.set(value, existing);
+    }
+  };
+
+  record(metric.green, 'floor');
+  // A yellow band is a corridor: either side of it may be quoted.
+  record(metric.yellow, 'range');
+  record(metric.red, 'ceiling');
+
+  return bands;
+}
+
+/**
+ * Whether the line is quoting a traffic-light band rather than asserting a
+ * competing target. Requires the direction to agree: the red band "<2x" and a
+ * claim of "at least 2x" share digits and mean opposite things.
+ */
+function citesBand(
+  line: string,
+  value: string,
+  bands: Map<string, Set<ThresholdDirection>>
+): boolean {
+  const directions = bands.get(value);
+  if (!directions) return false;
+  if (directions.has('range')) return true;
+
+  for (const match of line.matchAll(NUMBER_TOKEN)) {
+    if (canonicalNumber(match[0]) !== value) continue;
+    const direction = directionBefore(line, match.index ?? 0);
+    // An undirected mention is ambiguous; treat it as quoting the band rather
+    // than spending a regeneration on a guess.
+    if (!direction || directions.has(direction)) return true;
+  }
+
+  return false;
+}
 
 const TRAFFIC_LIGHT_WORD = /\b(green|yellow|red|amber)\b|зелён|жёлт|желт|красн/i;
 
@@ -175,9 +244,9 @@ export function validateMetricLedgerConsistency(
         const targetNumbers = numbersIn(metric.target);
         if (targetNumbers.size === 0) continue;
 
-        // Compare like with like: a 25% responsibility weight on the same line as
-        // "pipeline coverage" is not a claim about coverage, so only numbers
-        // sharing a unit with the target are candidates.
+        // Compare like with like: a 25% responsibility weight beside "pipeline
+        // coverage" is not a claim about coverage, so only numbers sharing a
+        // unit with the target are candidates.
         const targetUnits = new Set([...targetNumbers].map(unitOf));
         const candidates = [...numbersIn(line)].filter(value => targetUnits.has(unitOf(value)));
         if (candidates.length === 0) continue;
@@ -187,6 +256,12 @@ export function validateMetricLedgerConsistency(
 
         const thresholds = thresholdNumbers(metric);
         if (isTrafficLightLine(line, thresholds)) continue;
+        // A line may legitimately quote a band: "if coverage drops below 2x,
+        // flag" restates the red threshold. Direction is what separates that
+        // from a competing target — "coverage is at least 2x" uses the same
+        // digits to mean the opposite of the red band "<2x".
+        const bands = directedBandValues(metric);
+        if (candidates.every(value => citesBand(line, value, bands))) continue;
         // A line the author already marked as an illustration is not claiming a
         // competing target: "target variable 50% of base (example — replace)"
         // is about compensation, not about the metric named beside it.
@@ -245,7 +320,7 @@ const EXTERNAL_POPULATION =
   /\b(b2b|saas|companies|organi[sz]ations|firms|respondents|buyers|professionals|marketers|vendors|enterprises|employers)\b|компани\w*\s+рынка|респондент/i;
 
 const EXTERNAL_SCOPE =
-  /\b(industry|market|sector|worldwide|globally|industry-wide|across the industry)\b|отраслев|рыночн\w*\s+(?:данн|показател)/i;
+  /\b(industry|sector|worldwide|globally|industry-wide|across the industry)\b|(?<![\w‐-―-])market\b|отраслев|рыночн\w*\s+(?:данн|показател)/i;
 
 const PRECISE_STATISTIC = /\b\d{1,3}(?:[.,]\d+)?\s*%|\b\d+(?:[.,]\d+)?\s*[x×]\b/i;
 
@@ -267,6 +342,7 @@ export function validateUnsourcedStatistics(
   context: CareerPlaybookQualityCheckContext
 ): CareerPlaybookJudgeIssue[] {
   const knownIds = new Set(context.evidenceLedger.map(entry => entry.id));
+  const citedById = new Map(context.evidenceLedger.map(entry => [entry.id, entry]));
   const issues: CareerPlaybookJudgeIssue[] = [];
 
   for (const [blockId, blockState] of Object.entries(blocks)) {
@@ -304,6 +380,33 @@ export function validateUnsourcedStatistics(
             'unsourced_claim',
             `${blockId} cites ${dangling.join(', ')}, which is not in the evidence ledger.`,
             'Cite an existing evidence entry or drop the precise figure.'
+          )
+        );
+        continue;
+      }
+
+      // A resolvable citation is not the same as a supporting one. The ledger
+      // stores the retrieved fragment, so the cheapest honest check is whether
+      // the number in the sentence appears in the fragment at all. The
+      // 2026-08-11 guide asserted "87% of sales organisations now use AI [S9]"
+      // and nothing had ever compared 87 to what S9 actually said.
+      const citedEntries = citations
+        .map(marker => citedById.get(marker.slice(1, -1)))
+        .filter((entry): entry is CareerPlaybookEvidenceEntry => Boolean(entry));
+      if (citedEntries.length === 0) continue;
+
+      const supportingText = citedEntries.map(entry => entry.claim).join(' ');
+      const supportingNumbers = numbersIn(supportingText);
+      const claimedNumbers = [...numbersIn(line)];
+      const unsupported = claimedNumbers.filter(value => !supportingNumbers.has(value));
+
+      if (unsupported.length > 0 && unsupported.length === claimedNumbers.length) {
+        issues.push(
+          issue(
+            blockId,
+            'unsourced_claim',
+            `${blockId} cites ${citations.join(', ')} for ${unsupported.join(', ')}, but that figure does not appear in the retrieved source text.`,
+            'Quote a figure the cited source actually contains, cite a different entry, or state the point without a precise number.'
           )
         );
       }
@@ -344,6 +447,10 @@ export function validateExampleMarking(
   for (const [blockId, blockState] of Object.entries(blocks)) {
     const content = blockState?.content;
     if (!content) continue;
+    // Block 26 hosts the application-built calibration table, which quotes each
+    // marked value with the marker stripped. Scanning it makes the instrument
+    // that lists unmarked values report itself.
+    if (blockId === 'block_26') continue;
 
     for (const line of proseLines(content)) {
       if (!COMPANY_VALUE.test(line)) continue;
@@ -496,5 +603,325 @@ export function runCareerPlaybookContractChecks(
     ...validateExampleMarking(blocks, context),
     ...validateRelativeDates(blocks, context),
     ...validateAntiGoalConflict(blocks, context),
+    ...validateDecisionAuthorityCoherence(blocks, context),
+    ...validateContractLeakage(blocks, context),
+    ...validateSourceAttribution(blocks, context),
+    ...validateCadenceConsistency(blocks, context),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 6. Decision-authority coherence (within block 5)
+// ---------------------------------------------------------------------------
+
+const IRREVERSIBLE = /\birreversible\b|необратим/i;
+/** "Reversible with cost" contains "reversible", so the negative form must be excluded explicitly. */
+const REVERSIBLE_WITH_COST = /reversible\s+with\s+cost|обратим\w*\s+с\s+издержк/i;
+const WIDE_BLAST_RADIUS = /\b(function|company|customer)\b|функци|компани|клиент/i;
+const ACT_ALONE = /\bact\s+alone\b|самостоятельно/i;
+
+/**
+ * Flag a decision row that grants act-alone authority over an irreversible
+ * decision with a blast radius beyond the team.
+ *
+ * All four axes come from fixed vocabularies, so this reads unambiguously. The
+ * 2026-08-11 guide classified hiring as irreversible with function-level blast
+ * radius and then wrote "Act alone ... no approval required" — an internally
+ * incoherent row that also contradicted the hiring workflow in block 16.
+ */
+export function validateDecisionAuthorityCoherence(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const content = blocks.block_5?.content;
+  if (!content) return [];
+
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const line of proseLines(content)) {
+    if (!line.startsWith('|') || /^\|?\s*:?-{3,}/.test(line)) continue;
+    if (REVERSIBLE_WITH_COST.test(line) || !IRREVERSIBLE.test(line)) continue;
+    if (!WIDE_BLAST_RADIUS.test(line) || !ACT_ALONE.test(line)) continue;
+
+    issues.push(
+      issue(
+        'block_5',
+        'contradiction',
+        `block_5 grants act-alone authority over an irreversible decision whose blast radius reaches beyond the team: "${truncateLine(line)}".`,
+        'Raise the approval level to at least "align" for an irreversible decision with function, company, or customer blast radius, and keep it consistent with the hiring and escalation workflows in Block 16 and the Role Canvas in Block 24.'
+      )
+    );
+  }
+
+  return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Contract leakage into reader-facing text
+// ---------------------------------------------------------------------------
+
+const SNAKE_CASE_BLOCK_ID = /\b[Bb]lock_\d{1,2}\b/g;
+
+/**
+ * Sentences that address the author of the document rather than its reader.
+ * The observed shape quotes a banned phrasing and tells the writer to avoid it.
+ */
+const AUTHOR_INSTRUCTION =
+  /do not use\s+["“][^"”]{3,60}["”]\s+language|не используй\w*\s+формулировк|always measure\s+\w+\s+quality as/i;
+
+/**
+ * Flag generation-contract instructions that surfaced as reader guidance.
+ *
+ * The rules added in v2 are about how to write; the 2026-08-11 guide printed one
+ * of them to the reader — "Do not use 'accuracy above +/-20%' language — always
+ * measure forecast quality as absolute error" — inside an anti-metrics list
+ * meant for a sales manager. The 23 `block_5`-style identifiers are the same
+ * class: internal vocabulary reaching the page.
+ */
+export function validateContractLeakage(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const identifiers = stripFencedBlocks(content).match(SNAKE_CASE_BLOCK_ID) ?? [];
+    if (identifiers.length > 0) {
+      issues.push(
+        issue(
+          blockId,
+          'style',
+          `${blockId} refers to other sections by internal identifier (${[...new Set(identifiers)].join(', ')}) instead of the reader-facing form.`,
+          'Write cross-references as "Block 8". Final assembly normalizes these, so this is a warning rather than a regeneration trigger.',
+          'warning'
+        )
+      );
+    }
+
+    for (const line of proseLines(content)) {
+      if (!AUTHOR_INSTRUCTION.test(line)) continue;
+
+      issues.push(
+        issue(
+          blockId,
+          'contradiction',
+          `${blockId} prints an instruction addressed to the document's author rather than its reader: "${truncateLine(line)}".`,
+          'Apply the writing rule silently. The reader is an employee doing this job, not the author of this guide.'
+        )
+      );
+      break;
+    }
+  }
+
+  return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Attribution: a named research house needs a research source
+// ---------------------------------------------------------------------------
+
+/** Houses a reader treats as primary research, not as a vendor's own marketing. */
+const RESEARCH_HOUSE =
+  /\b(gartner|forrester|mckinsey|bain|bcg|boston consulting|deloitte|pwc|kpmg|idc|harvard business review|hbr|statista|nielsen|pew research)\b/i;
+
+/**
+ * Flag a claim attributed to a named research house while citing something else.
+ *
+ * The v3 acceptance output wrote "Gartner's research suggests that 61% of B2B
+ * buyers favour a rep-free experience [S9]" — but S9 is a vendor blog post, and
+ * the figure appears nowhere in it. The number check caught the missing digits;
+ * nothing caught the attribution itself, which is the more damaging half: a
+ * reader who trusts "Gartner" is being told a marketing page is analyst research.
+ */
+export function validateSourceAttribution(
+  blocks: BlockMap,
+  context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  if (context.evidenceLedger.length === 0) return [];
+
+  const byId = new Map(context.evidenceLedger.map(entry => [entry.id, entry]));
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    for (const line of proseLines(content)) {
+      const house = line.match(RESEARCH_HOUSE);
+      if (!house) continue;
+
+      const citations = line.match(/\[S\d+\]/g) ?? [];
+      // An unsourced house attribution is already caught as an unsourced claim
+      // when it carries a figure; here we only judge what it cites.
+      if (citations.length === 0) continue;
+
+      const cited = citations
+        .map(marker => byId.get(marker.slice(1, -1)))
+        .filter((entry): entry is CareerPlaybookEvidenceEntry => Boolean(entry));
+      if (cited.length === 0) continue;
+
+      // The named house may legitimately appear if a cited source is research, or
+      // if the source itself is that house.
+      const supported = cited.some(
+        entry =>
+          entry.source_kind === 'research' ||
+          new RegExp(house[0], 'i').test(entry.url) ||
+          new RegExp(house[0], 'i').test(entry.title)
+      );
+      if (supported) continue;
+
+      issues.push(
+        issue(
+          blockId,
+          'unsourced_claim',
+          `${blockId} attributes a claim to ${house[0]} while citing ${citations.join(', ')}, which is not that house and is not research: "${truncateLine(line)}".`,
+          `Cite the ${house[0]} publication directly, or drop the attribution and present the point as what the cited source actually is.`
+        )
+      );
+      break;
+    }
+  }
+
+  return dedupeIssues(issues);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Cadence consistency across blocks
+// ---------------------------------------------------------------------------
+
+const CADENCE_WORDS: Array<[RegExp, string]> = [
+  [/\b(daily|every day)\b|ежедневн|каждый день/i, 'daily'],
+  [/\bweekly\b|еженедельн|каждую неделю/i, 'weekly'],
+  [/\b(biweekly|fortnightly|every two weeks)\b|раз в две недели/i, 'biweekly'],
+  [/\bmonthly\b|ежемесячн|раз в месяц/i, 'monthly'],
+  [/\bquarterly\b|ежекварт|раз в квартал/i, 'quarterly'],
+  [/\bannual(ly)?\b|ежегодн|раз в год/i, 'annual'],
+];
+
+/**
+ * Recurring commitments a reader plans their week around.
+ *
+ * `requires` disambiguates a phrase that names two different commitments. A 1:1
+ * with the CRO and a 1:1 with each report are both "1:1" and legitimately run on
+ * different rhythms, so only the report-facing one is compared.
+ */
+const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp }> = [
+  {
+    pattern: /\b1[:\s-]?on[:\s-]?1s?\b|\b1:1s?\b|один на один/i,
+    duty: 'one-to-one with reports',
+    requires: /\b(rep|reps|direct report|team member|SDR|AE)\b|подчинённ|сотрудник/i,
+  },
+  { pattern: /pipeline review|обзор воронки/i, duty: 'pipeline review' },
+  // A weekly handoff inspection and a monthly collaboration meeting are separate
+  // rituals that share the word "handoff"; grouping them invented a conflict.
+  { pattern: /handoff (huddle|audit)|аудит передач/i, duty: 'handoff inspection' },
+  { pattern: /(handoff|collaboration) sync|синхрон\w* по передач/i, duty: 'handoff sync meeting' },
+  {
+    pattern: /forecast (call|review|submission)|прогнозн\w* (звонок|обзор)/i,
+    duty: 'forecast review',
+  },
+  { pattern: /retrospective|ретроспектив/i, duty: 'retrospective' },
+];
+
+/**
+ * The cadence that governs a duty mentioned at `dutyIndex`.
+ *
+ * A communication-charter row packs several rhythms into one line — "Daily via
+ * CRM, dedicated weekly 1-on-1s, weekly pipeline review" — so taking the first
+ * cadence word in the line attributed "daily" to the pipeline review. The
+ * nearest cadence word wins instead.
+ */
+/** Closest cadence word to any mention of the duty in this line. */
+function nearestCadenceAcrossMentions(line: string, pattern: RegExp): string | null {
+  const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+  let best: { name: string; distance: number } | null = null;
+
+  for (const mention of line.matchAll(global)) {
+    const found = cadenceNearWithDistance(line, mention.index ?? 0);
+    if (found && (!best || found.distance < best.distance)) best = found;
+  }
+
+  return best?.name ?? null;
+}
+
+function cadenceNearWithDistance(
+  line: string,
+  dutyIndex: number
+): { name: string; distance: number } | null {
+  let best: { name: string; distance: number } | null = null;
+
+  for (const [pattern, name] of CADENCE_WORDS) {
+    const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+    for (const match of line.matchAll(global)) {
+      const distance = Math.abs((match.index ?? 0) - dutyIndex);
+      if (!best || distance < best.distance) best = { name, distance };
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Flag a recurring commitment stated with different cadences in different blocks.
+ *
+ * The v3 output listed rep 1:1 development sessions as monthly in the duties
+ * block, then described "weekly 1:1s with each direct report" in the motivation
+ * block and "two coaching 1:1s per rep" weekly in the FAQ. A reader cannot plan
+ * a week against three answers, and no window-sized reviewer sees all three.
+ */
+export function validateCadenceConsistency(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const stated = new Map<string, Map<string, string[]>>();
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    for (const line of proseLines(content)) {
+      for (const { pattern, duty, requires } of RECURRING_DUTIES) {
+        if (requires && !requires.test(line)) continue;
+
+        // A line may name the duty twice — "Forecast call pack ... quarterly
+        // business review | Weekly forecast call" — so take the cadence that
+        // sits closest to any mention, not the one nearest the first.
+        const cadence = nearestCadenceAcrossMentions(line, pattern);
+        if (!cadence) continue;
+
+        const byCadence = stated.get(duty) ?? new Map<string, string[]>();
+        const blockIds = byCadence.get(cadence) ?? [];
+        if (!blockIds.includes(blockId)) blockIds.push(blockId);
+        byCadence.set(cadence, blockIds);
+        stated.set(duty, byCadence);
+      }
+    }
+  }
+
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [duty, byCadence] of stated) {
+    if (byCadence.size < 2) continue;
+
+    const summary = [...byCadence.entries()]
+      .map(([cadence, blockIds]) => `${cadence} (${blockIds.join(', ')})`)
+      .join(' vs ');
+    // Report against the block that mentions it last: the earlier statement is
+    // the published commitment, the later one is the deviation.
+    const lastBlock = [...byCadence.values()].flat().sort().at(-1) ?? 'block_4';
+
+    issues.push(
+      issue(
+        lastBlock,
+        'contradiction',
+        `The ${duty} cadence is stated inconsistently across blocks: ${summary}.`,
+        `Pick one cadence for the ${duty} and have every other block reference it rather than restate it.`
+      )
+    );
+  }
+
+  return issues;
 }

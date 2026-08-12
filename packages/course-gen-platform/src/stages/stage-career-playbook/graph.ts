@@ -14,6 +14,7 @@ import {
   CAREER_PLAYBOOK_FINAL_BLOCK_ORDER,
   createFinalAssemblerNode,
 } from './nodes/final-assembler';
+import { createCareerPlaybookProofreaderNode } from './nodes/final-proofreader';
 import {
   createBlockRegeneratorNode,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
@@ -53,6 +54,7 @@ const NODE_PROGRESS: Record<
   group6Generator: { stage: 'generating_wrap', percent: 96 },
   group6Judge: { stage: 'reviewing_wrap', percent: 97 },
   finalAssembler: { stage: 'assembling', percent: 98 },
+  finalProofreader: { stage: 'final_review', percent: 98 },
   finalJudge: { stage: 'final_review', percent: 99 },
 };
 
@@ -123,7 +125,7 @@ type CareerPlaybookGroupJudgeNodeName = (typeof GROUP_PIPELINE)[number]['judgeNo
 const CAREER_PLAYBOOK_GRAPH_REGENERATION_STEP_COST = 2;
 const CAREER_PLAYBOOK_GRAPH_RECURSION_BUFFER_STEPS = 5;
 
-export const CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT = 1 + GROUP_PIPELINE.length * 2 + 2;
+export const CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT = 1 + GROUP_PIPELINE.length * 2 + 3;
 export const DEFAULT_CAREER_PLAYBOOK_GRAPH_RECURSION_LIMIT =
   CAREER_PLAYBOOK_GRAPH_BASE_STEP_COUNT +
   CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.length *
@@ -198,6 +200,23 @@ export function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType)
   return 'finalAssembler';
 }
 
+/**
+ * Route the whole-document proofreading pass.
+ *
+ * Findings go through the same regeneration path as any judge verdict; with no
+ * findings the document proceeds to the final judge unchanged. The pass is
+ * additive quality, so a failure to produce a verdict simply advances.
+ */
+export function routeAfterProofreader(state: CareerPlaybookGraphStateType) {
+  const pending = selectPendingCareerPlaybookRegeneration({
+    verdict: state.lastJudgeVerdict,
+    blockIds: CAREER_PLAYBOOK_FINAL_BLOCK_ORDER,
+    attempts: state.blockRegenerationAttempts,
+  });
+
+  return pending ? 'blockRegenerator' : 'finalJudge';
+}
+
 function routeAfterSpecBuilder(state: CareerPlaybookGraphStateType) {
   if ((state.errors?.length ?? 0) > 0 || !state.roleProfileSpec) {
     return END;
@@ -254,6 +273,14 @@ export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOpti
       'finalAssembler',
       withProgress('finalAssembler', createFinalAssemblerNode(), options.progressReporter)
     )
+    .addNode(
+      'finalProofreader',
+      withProgress(
+        'finalProofreader',
+        createCareerPlaybookProofreaderNode(runtime),
+        options.progressReporter
+      )
+    )
     .addNode(groupJudgeNodes)
     .addNode(
       'finalJudge',
@@ -267,7 +294,8 @@ export function createCareerPlaybookGraph(options: CreateCareerPlaybookGraphOpti
   builder
     .addEdge(START, 'specBuilder')
     .addConditionalEdges('specBuilder', routeAfterSpecBuilder)
-    .addEdge('finalAssembler', 'finalJudge')
+    .addEdge('finalAssembler', 'finalProofreader')
+    .addConditionalEdges('finalProofreader', routeAfterProofreader)
     .addConditionalEdges('finalJudge', routeAfterJudge(CAREER_PLAYBOOK_FINAL_BLOCK_ORDER, END))
     .addConditionalEdges('blockRegenerator', routeAfterBlockRegeneration);
 

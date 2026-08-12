@@ -10,6 +10,7 @@
  */
 
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
+import { MODEL_CATALOG } from '@megacampus/shared-types';
 import { baseLogger as logger } from '../logger/shared-logger-runtime';
 
 // ============================================================================
@@ -33,90 +34,24 @@ export interface ModelPricing {
 }
 
 /**
- * OpenRouter model pricing catalog
+ * OpenRouter model pricing, derived from the single MODEL_CATALOG.
  *
- * RT-001 Model Routing Decision:
- * - qwen/qwen3-max: $1.20/$6.00 per 1M tokens (metadata generation)
- *   ⚠️ WARNING: Context >128K triggers 2.5x price increase ($3.00/$15.00)
- *   Use validateQwen3MaxContext() before generation to prevent overflow
- * - openai/gpt-oss-20b: $0.08 per 1M tokens combined (section generation)
- * - deepseek/deepseek-v4-flash: $0.10/$0.20 per 1M tokens (section generation)
- * - google/gemini-3-flash-preview: $0.50/$3.00 per 1M tokens (validation)
- *
- * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
+ * Kept as an exported name and shape because callers already depend on it; the
+ * values are no longer maintained here. Add a model to MODEL_CATALOG in
+ * `@megacampus/shared-types` and every consumer sees it at once.
  */
-export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
-  'qwen/qwen3-max': {
-    inputPricePerMillion: 1.2,
-    outputPricePerMillion: 6.0,
-  },
-  'qwen/qwen3-235b-a22b-2507': {
-    // MODEL-SELECTION-SPECIFICATION.md: Primary model for metadata generation
-    // Pricing: $0.11/$0.60 per 1M tokens (input/output)
-    // Quality: 9/10 for both EN/RU, 100% success rate
-    inputPricePerMillion: 0.11,
-    outputPricePerMillion: 0.6,
-  },
-  'minimax/minimax-m2': {
-    // MODEL-SELECTION-SPECIFICATION.md: Legacy model (deprecated)
-    // Pricing: $0.255/$1.02 per 1M tokens (input/output)
-    inputPricePerMillion: 0.255,
-    outputPricePerMillion: 1.02,
-  },
-  'minimax/minimax-m2.1': {
-    // MODEL-SELECTION-SPECIFICATION.md: Primary model for lesson structure
-    // Pricing: $0.30/$1.20 per 1M tokens (input/output)
-    // Quality: 9.5-10/10, 100% success rate, reasoning tokens
-    // 10B activated params, 230B total, MoE architecture
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 1.2,
-  },
-  'deepseek/deepseek-v4-flash': {
-    // OpenRouter, 2026-05-23: Career Playbook high-volume generation model
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.2,
-  },
-  'deepseek/deepseek-v4-pro': {
-    // OpenRouter, 2026-05-23: Career Playbook complex planning/judging model
-    inputPricePerMillion: 0.435,
-    outputPricePerMillion: 0.87,
-  },
-  'moonshotai/kimi-k2-thinking': {
-    // MODEL-SELECTION-SPECIFICATION.md: Fallback model for lessons
-    // Pricing: $0.55/$2.25 per 1M tokens (input/output)
-    // Quality: 9-10/10, 91.7% success rate
-    inputPricePerMillion: 0.55,
-    outputPricePerMillion: 2.25,
-  },
-  'openai/gpt-oss-20b': {
-    combinedPricePerMillion: 0.08,
-    inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.08,
-  },
-  'google/gemini-3-flash-preview': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 3.0,
-  },
-  // Legacy Gemini models (kept for historical cost tracking)
-  'google/gemini-2.5-flash': {
-    combinedPricePerMillion: 0.15,
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.15,
-  },
-  'google/gemini-2.5-flash-preview': {
-    combinedPricePerMillion: 0.1,
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.4,
-  },
-  'anthropic/claude-3.5-sonnet': {
-    inputPricePerMillion: 3.0,
-    outputPricePerMillion: 15.0,
-  },
-  'openai/gpt-4-turbo': {
-    inputPricePerMillion: 10.0,
-    outputPricePerMillion: 30.0,
-  },
-};
+export const OPENROUTER_PRICING: Record<string, ModelPricing> = Object.fromEntries(
+  Object.entries(MODEL_CATALOG).map(([modelId, capabilities]) => [
+    modelId,
+    {
+      inputPricePerMillion: capabilities.inputPricePerMillion,
+      outputPricePerMillion: capabilities.outputPricePerMillion,
+      ...(capabilities.combinedPricePerMillion === undefined
+        ? {}
+        : { combinedPricePerMillion: capabilities.combinedPricePerMillion }),
+    },
+  ])
+);
 
 // ============================================================================
 // COST THRESHOLDS (RT-001, RT-004)

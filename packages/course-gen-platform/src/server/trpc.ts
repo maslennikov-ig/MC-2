@@ -57,6 +57,19 @@ function extractToken(req: Request): string | null {
 }
 
 /**
+ * Request path for log lines only. Never throws: a diagnostic must not be able
+ * to break authentication, and callers in tests pass hand-built requests whose
+ * url is not absolute.
+ */
+function pathForLog(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Verify JWT signature locally using HMAC-SHA256.
  * Used as a fallback in test environments when supabase.auth.getUser() fails
  * (e.g., mock JWTs without real sessions in auth.sessions).
@@ -115,6 +128,11 @@ export async function createContext(opts: FetchCreateContextFnOptions): Promise<
 
   // Return unauthenticated context if no token
   if (!token) {
+    // Debug, not warn: every anonymous request to a public procedure lands here.
+    logger.debug(
+      { path: pathForLog(req.url), reason: 'no_bearer_token' },
+      'tRPC context: request carries no usable Bearer token'
+    );
     return { user: null, req };
   }
 
@@ -142,6 +160,21 @@ export async function createContext(opts: FetchCreateContextFnOptions): Promise<
     }
 
     if (!userId) {
+      // This branch used to discard `error` and return an indistinguishable null
+      // user, so `Authentication required. Please provide a valid Bearer token.`
+      // stood for five different causes at once - among them a transient GoTrue
+      // failure, which is nothing like a bad token but reads identically to the
+      // caller. mc2-1nots spent two triage rounds on exactly that ambiguity.
+      // Never log the token itself.
+      logger.warn(
+        {
+          path: pathForLog(req.url),
+          reason: 'supabase_get_user_rejected',
+          authError: error?.message,
+          authStatus: error?.status,
+        },
+        'tRPC context: Supabase rejected the Bearer token'
+      );
       return { user: null, req };
     }
 
@@ -154,6 +187,17 @@ export async function createContext(opts: FetchCreateContextFnOptions): Promise<
 
     // Return unauthenticated context if user not found in database
     if (userError || !userData) {
+      // A valid JWT whose user row is missing is a different failure from a bad
+      // token, and the caller cannot tell them apart from the 401 alone.
+      logger.warn(
+        {
+          path: pathForLog(req.url),
+          reason: 'user_row_missing',
+          userId,
+          dbError: userError?.message,
+        },
+        'tRPC context: token validated but no matching user row'
+      );
       return { user: null, req };
     }
 

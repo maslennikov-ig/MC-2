@@ -516,12 +516,22 @@ describe('model pricing health check (IMP-4)', () => {
   });
 
   it('resolveDefaultPhaseConfig falls back to global_default for unseeded phases', () => {
-    expect(resolveDefaultPhaseConfig('stage_career_playbook_group_1')).toBe(
+    // This used to name stage_career_playbook_group_1, which was unseeded only
+    // because the seed refresh had been broken since 2026-06 (mc2-zohi1). All
+    // twelve Career Playbook phases are in the seed now, so a phase that is
+    // genuinely absent is needed to exercise the fallback at all.
+    expect(resolveDefaultPhaseConfig('stage_not_a_real_phase')).toBe(
       DEFAULT_PHASE_CONFIGS['global_default']
     );
-    // The offline default career-playbook fallback chain must stay priceable.
+  });
+
+  it('keeps the offline career-playbook chain priceable', () => {
+    // Whatever the seed serves offline must still be costable, or a database
+    // outage would silently bill generations at zero.
     const config = resolveDefaultPhaseConfig('stage_career_playbook_group_1');
+
     expect(config).not.toBeNull();
     expect(isModelPriced(config!.modelId)).toBe(true);
+    expect(isModelPriced(config!.fallbackModelId ?? config!.modelId)).toBe(true);
   });
 });

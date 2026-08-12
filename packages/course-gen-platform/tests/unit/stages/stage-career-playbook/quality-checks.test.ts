@@ -20,9 +20,13 @@ import {
   runCareerPlaybookContractChecks,
   stripFencedBlocks,
   validateAntiGoalConflict,
+  validateCadenceConsistency,
+  validateContractLeakage,
+  validateDecisionAuthorityCoherence,
   validateExampleMarking,
   validateMetricLedgerConsistency,
   validateRelativeDates,
+  validateSourceAttribution,
   validateUnsourcedStatistics,
   type CareerPlaybookQualityCheckContext,
 } from '@/stages/stage-career-playbook/nodes/quality-checks';
@@ -416,6 +420,302 @@ describe('runCareerPlaybookContractChecks', () => {
         block_15: '| Base salary | $120,000 (example — replace) | |',
       }),
       context({ evidenceLedger: [EVIDENCE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * v3 checks — every case is a line from the 2026-08-11 acceptance output, which
+ * the scorecard called clean and an end-to-end read did not.
+ */
+describe('validateDecisionAuthorityCoherence', () => {
+  it('flags the real hiring row that granted act-alone authority over an irreversible decision', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Hire a new SDR or AE** | Irreversible | Team; also function if the role is senior | None | Act alone – manager holds full hiring authority; CRO is notified for visibility – no approval required |',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('contradiction');
+    expect(issues[0].block_id).toBe('block_5');
+  });
+
+  it('accepts an irreversible decision that requires alignment', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Terminate a direct report** | Irreversible | Team; also company | Has penalty | Manager decides after documented process and HR alignment |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('does not mistake "reversible with cost" for irreversible', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5:
+          '| **Adjust a sales process step** | Reversible with cost | Team; also function if it affects handoffs | None | Act alone — document the change and notify CRO |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('leaves a team-only irreversible decision alone', () => {
+    const issues = validateDecisionAuthorityCoherence(
+      blocks({
+        block_5: '| **Assign a stretch account** | Irreversible | Team | None | Act alone |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateContractLeakage', () => {
+  it('flags the real instruction addressed to the document author', () => {
+    const issues = validateContractLeakage(
+      blocks({
+        block_6:
+          '- Do not use “accuracy above +/-20%” language – always measure forecast quality as absolute error.',
+      }),
+      context()
+    );
+
+    expect(issues.some(item => item.severity === 'critical')).toBe(true);
+    expect(issues[0].category).toBe('contradiction');
+  });
+
+  it('reports internal identifiers as a warning, not a regeneration trigger', () => {
+    const issues = validateContractLeakage(
+      blocks({ block_18: 'Your scope is defined in the Decision Authority Matrix (block_5).' }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe('warning');
+  });
+
+  it('accepts the reader-facing cross-reference form', () => {
+    const issues = validateContractLeakage(
+      blocks({ block_18: 'Your scope is defined in the Decision Authority Matrix (Block 5).' }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateUnsourcedStatistics citation support', () => {
+  const supported = {
+    id: 'S1',
+    url: 'https://example.com/x',
+    title: 'T',
+    claim: '87% of sales organisations now use AI for prospecting and forecasting',
+    retrieved_at: '2026-08-11',
+  };
+
+  it('accepts a figure the cited source actually contains', () => {
+    const issues = validateUnsourcedStatistics(
+      blocks({ block_18: 'Research shows 87% of sales organisations now use AI [S1].' }),
+      context({ evidenceLedger: [supported] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('flags a figure absent from the retrieved source text', () => {
+    // A resolvable citation is not a supporting one; nothing checked this before.
+    const issues = validateUnsourcedStatistics(
+      blocks({ block_18: 'Research shows 96% of sales organisations now use AI [S1].' }),
+      context({ evidenceLedger: [supported] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('does not appear in the retrieved source text');
+  });
+});
+
+/**
+ * Precision cases from the 2026-08-11 v3 acceptance run.
+ *
+ * The run produced seven scorecard criticals of which one was real. Six false
+ * positives is not a cosmetic problem: every one of them spends a paid
+ * regeneration, and that run hit the per-block cap on eleven blocks.
+ */
+describe('metric conflict precision', () => {
+  const WIN_RATE: CareerPlaybookMetricLedgerEntry = {
+    key: 'win_rate',
+    label: 'Win Rate',
+    unit: '%',
+    target: '>=25%',
+    green: '>=25%',
+    yellow: '15-24%',
+    red: '<15%',
+    review_period: 'month',
+    provenance: 'assumption',
+    source_ref: null,
+  };
+
+  it('accepts a line citing only a band value', () => {
+    // "- Pipeline Coverage Ratio – if <2x, flag." quotes the red band.
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_17: '- Pipeline Coverage Ratio – if **<2x**, flag.' }),
+      context({ metricLedger: [PIPELINE_COVERAGE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a number that belongs to another quantity in the same row — a known cost', () => {
+    // The 20% describes deal size, not the win rate whose row it sits in, so this
+    // finding is noise. Narrowing the comparison to the naming cell or clause
+    // removed it — and also disabled detection on the standard KPI table shape,
+    // where the metric is in column 1 and its target in column 3. Losing the
+    // core detection is worse than one extra regeneration, so the row stays the
+    // unit of comparison and this residue is accepted deliberately.
+    const issues = validateMetricLedgerConsistency(
+      blocks({
+        block_6:
+          '| Win Rate | Pushing cheap deals | Monitor average deal size alongside win rate; flag if average deal size drops >20% quarter over quarter. |',
+      }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+
+  it('still flags a genuine competing target', () => {
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_15: 'Bonus pays out when Win Rate reaches 40%.' }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+});
+
+describe('external-claim precision', () => {
+  it('does not read "mid-market" as a claim about the market', () => {
+    // The guide writes mid‑market with U+2011, which ASCII-only exclusion missed.
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_16:
+          '- **Situation:** Deal with a mid‑market prospect is stalled; the buyer demands a discount above the 15% authority threshold.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts the marker form that carries the value before the verb', () => {
+    const issues = validateExampleMarking(
+      blocks({
+        block_6:
+          '| Red | require sign-off above a value (example: $100K — replace with your threshold) |',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * Cases from the v3 acceptance read — the two defects that survived a run the
+ * scorecard would otherwise have called clean.
+ */
+describe('validateSourceAttribution', () => {
+  const vendor: CareerPlaybookEvidenceEntry = {
+    id: 'S9',
+    url: 'https://saleshive.com/blog/b2b-sales-future-trends',
+    title: 'Future Trends in B2B Sales | SalesHive',
+    claim:
+      'A Gartner survey of 227 chief sales officers found AI-enabled next best actions lift quota attainment',
+    retrieved_at: '2026-08-11',
+    source_kind: 'vendor',
+  };
+
+  it('flags the real Gartner attribution to a vendor blog', () => {
+    const issues = validateSourceAttribution(
+      blocks({
+        block_19:
+          'Gartner’s research suggests that 61% of B2B buyers favour a rep‑free experience for most of the purchase process [S9].',
+      }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('unsourced_claim');
+    expect(issues[0].description).toContain('Gartner');
+  });
+
+  it('accepts the attribution when the cited source is that house', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_19: 'Gartner reports that buyers favour self-serve evaluation [S9].' }),
+      context({
+        evidenceLedger: [
+          { ...vendor, url: 'https://www.gartner.com/en/sales/insights', source_kind: 'research' },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a research source even when the house is named generically', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_19: 'McKinsey analysis points to hybrid selling as the default [S9].' }),
+      context({ evidenceLedger: [{ ...vendor, source_kind: 'research' }] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('validateCadenceConsistency', () => {
+  it('flags the real weekly/monthly 1:1 contradiction across blocks', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_4:
+          '| **Monthly** | Rep 1:1 development sessions – coaching on skills and career path. |',
+        block_15: 'Weekly 1:1s with each direct report (Block 4) are never reduced.',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].category).toBe('contradiction');
+    expect(issues[0].description).toContain('one-to-one');
+  });
+
+  it('accepts one cadence stated in several blocks', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_4: '| **Weekly** | 1:1 coaching with each direct report |',
+        block_15: 'Weekly 1:1s with each direct report (Block 4) are never reduced.',
+        block_18: 'You hold a weekly 1:1 with every rep.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('stays silent when a duty is mentioned in only one block', () => {
+    const issues = validateCadenceConsistency(
+      blocks({ block_4: '| **Quarterly** | Retrospective with the team |' }),
+      context()
     );
 
     expect(issues).toEqual([]);

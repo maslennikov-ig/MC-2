@@ -33,6 +33,7 @@ import type { QualityCheckResult } from '../../../shared/validation/quality-vali
 import {
   createModelConfigService,
   getEffectiveStageConfig,
+  REASONING_DISABLED,
   type PhaseModelConfig,
 } from '../../../shared/llm/model-config-service';
 import logger from '../../../shared/logger';
@@ -666,6 +667,7 @@ async function getModelConfigForSummarization(
       cacheReadEnabled: false,
       tier,
       source: 'hardcoded' as const,
+      reasoning: REASONING_DISABLED,
     };
   }
 }

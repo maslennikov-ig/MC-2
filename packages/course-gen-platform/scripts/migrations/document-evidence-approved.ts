@@ -519,13 +519,20 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
   },
 ] as const satisfies ReadonlyArray<{ version: string; name: string; apply: SourceSpec }>;
 
-// Re-pinned 2026-08-11 after adding
-// 20260811120000_career_playbook_quality_v2_routing.sql (Career Playbook quality
-// v2: spec output budget 16000, phase timeouts 120000). The digest covers the
-// sorted migration filename list, so any added, renamed, or removed migration
-// must be re-pinned deliberately — that is the point of the guard.
+// Re-pinned 2026-08-12 after adding
+// 20260812100000_stage2_summarization_routing_rows.sql, which gives the four
+// live Stage 2 summarization phases the llm_model_config rows they had never
+// had. Earlier pins that day covered
+// 20260812090000_career_playbook_classifier_timeout.sql and the two 2026-08-11
+// Career Playbook routing migrations. The digest covers the sorted migration
+// filename list, so any added, renamed, or removed migration must be re-pinned
+// deliberately — that is the point of the guard.
+// Re-pinned 2026-08-12 for reasoning configuration (mc2-v9xom): 232 files,
+// adding 20260812131245_phase_reasoning_configuration.sql and
+// 20260812132356_refresh_model_display_names.sql on top of the routing refresh
+// (mc2-t6iec) and the uniqueness fix (mc2-pqjgl).
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '2848165a01cfe2790cf798a339b5ac2a52647d38a57a49a1e5e6ff728b9db317';
+  '35f0a14547daa1d3e26656d3b70b5234cc1e27365c072bcd53ac675a9718a6ac';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
@@ -775,6 +782,20 @@ export async function loadDocumentEvidenceApprovedMigrations(): Promise<LoadedMi
   );
 }
 
+/**
+ * Reduce a recorded history name to the descriptive slug `loadRepositoryMigrations`
+ * produces, so the two can be compared. Supabase MCP stamps the full file stem
+ * (`20260812100000_stage2_...`), older entries are double-stamped, and some are the bare
+ * slug already; strip every leading timestamp so all three shapes reduce alike.
+ */
+function repositoryMigrationSlug(name: string | null | undefined): string {
+  let slug = (name ?? '').replace(/\.sql$/iu, '');
+  while (/^\d{6,}_/u.test(slug)) {
+    slug = slug.replace(/^\d{6,}_/u, '');
+  }
+  return slug;
+}
+
 async function loadRepositoryMigrations(): Promise<RepositoryMigration[]> {
   const directory = new URL('../../supabase/migrations/', import.meta.url);
   const filenames = (await readdir(directory))
@@ -847,7 +868,8 @@ export async function assertRepositoryMigrationFrontier(
   // migration set against REPOSITORY_MIGRATION_MANIFEST_SHA256). It just no longer
   // cross-references DB history rows, which in this project are MCP apply-time versions
   // with no same-named repo file.
-  await loadRepositoryMigrations();
+  const repository = await loadRepositoryMigrations();
+  const repositorySlugs = new Set(repository.map(migration => migration.name));
   const downstream = await loadDownstreamMigrations();
   const chain = [...approved, ...downstream];
   const chainVersions = new Set(chain.map(migration => migration.version));
@@ -862,11 +884,23 @@ export async function assertRepositoryMigrationFrontier(
       throw new Error('Supabase migration history contains a duplicate version');
     }
     historyByVersion.set(row.version, row);
-    // Anti-drift anchor: no unknown history strictly NEWER than the reviewed frontier may
-    // precede our chain. Every non-chain history version must be at or before the frontier;
-    // this also forbids any version strictly between the frontier and the first chain
+    // Anti-drift anchor: no UNKNOWN history strictly NEWER than the reviewed frontier may
+    // precede our chain. Every non-chain history version must be at or before the frontier,
+    // which also forbids any version strictly between the frontier and the first chain
     // version (those are non-chain and above the frontier).
-    if (!chainVersions.has(row.version) && row.version > APPROVED_HISTORY_FRONTIER) {
+    //
+    // "Unknown" is the load-bearing word, and until 2026-08-12 the predicate ignored it:
+    // it refused every non-chain row above the frontier, including rows produced by
+    // ordinary reviewed migrations from this repository. That made the guard structurally
+    // unable to survive its own project - the first three migrations applied after the Q12
+    // cutover tripped it (mc2-tah42). A row whose name matches a repository migration file
+    // is by definition reviewed and in Git, so it is known and passes; a row that matches
+    // nothing on disk is the unreviewed history this anchor exists to catch, and still fails.
+    if (
+      !chainVersions.has(row.version) &&
+      row.version > APPROVED_HISTORY_FRONTIER &&
+      !repositorySlugs.has(repositoryMigrationSlug(row.name))
+    ) {
       throw new Error('Supabase repository migration frontier contains unknown history');
     }
   }

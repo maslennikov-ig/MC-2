@@ -1,10 +1,18 @@
+import {
+  DENSE_SCORE_THRESHOLD,
+  DENSE_SCORE_THRESHOLD_WIDENED,
+} from '@/shared/qdrant/retrieval-thresholds';
+
 /**
  * Lesson RAG retrieval configuration
  *
  * These values are optimized for lesson-level content generation:
- * - Higher score threshold (0.75) ensures more relevant chunks
  * - Lower chunk count (5-10) focuses context on lesson specifics
  * - Lower token budget (20K) vs section-level (40K)
+ *
+ * The score threshold was tuned here first, by measurement, while the rest of
+ * the codebase still carried an unreachable 0.7. It now comes from the shared
+ * constant so that tuning applies everywhere instead of only to Stage 6.
  */
 export const LESSON_RAG_CONFIG = {
   /** Target number of chunks (middle of 5-10 range) */
@@ -14,7 +22,7 @@ export const LESSON_RAG_CONFIG = {
   /** Maximum chunks to retrieve */
   MAX_CHUNKS: 10,
   /** Score threshold - lowered to capture all relevant chunks (reranker handles quality) */
-  SCORE_THRESHOLD: 0.25,
+  SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD,
   /** Enable hybrid search (dense + sparse) - ENABLED: sparse vectors now uploaded + native Query API with server-side RRF */
   ENABLE_HYBRID: true,
   /** Token budget for lesson-level context */
@@ -55,9 +63,9 @@ export const TWO_TIER_CONFIG = {
   /** Number of queries in Tier 1 (light gate) — "Strike-Two" policy */
   TIER1_QUERY_COUNT: 2,
   /** Score threshold for Tier 1 — very permissive to minimize false positives.
-   *  Must be LOWER than LESSON_RAG_CONFIG.SCORE_THRESHOLD (0.25) to create safety margin.
-   *  At 0.15, we only skip when there's truly nothing remotely relevant. */
-  TIER1_SCORE_THRESHOLD: 0.15,
+   *  Must be LOWER than LESSON_RAG_CONFIG.SCORE_THRESHOLD to create safety margin,
+   *  so that we only skip when there's truly nothing remotely relevant. */
+  TIER1_SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD_WIDENED,
   /** Enable two-tier retrieval (set RAG_TWO_TIER_ENABLED=false to disable) */
   enabled: process.env.RAG_TWO_TIER_ENABLED !== 'false',
 } as const;
