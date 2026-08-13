@@ -2,12 +2,16 @@
  * Which chunks reach the vector index (mc2-7frdr).
  *
  * Hierarchical chunking emitted a parent for every group and the pipeline
- * embedded parents and children alike. Because a parent group breaks on every
- * heading-path change and Docling merges peers within a section, every parent
- * ended up with exactly one child and therefore with that child's exact text:
- * on production, 6856 of 13712 indexed points were duplicates of the other
- * 6856. Search returned each passage twice and every embedding was paid for
- * twice.
+ * embedded parents and children alike. Every parent ended up with exactly one
+ * child and therefore with that child's exact text: on production, 6856 of
+ * 13712 indexed points were duplicates of the other 6856. Search returned each
+ * passage twice and every embedding was paid for twice.
+ *
+ * The cause was the legacy Markdown chunker's own sizing, not the Docling
+ * adapter — every one of those points carried `chunk_strategy:
+ * 'hierarchical_markdown'`. It is fixed in `markdown-chunker.ts`; this guard
+ * stays because a short section can still hold a single child, and because a
+ * chunker that regresses should not be able to do it silently.
  */
 import { describe, expect, it } from 'vitest';
 
