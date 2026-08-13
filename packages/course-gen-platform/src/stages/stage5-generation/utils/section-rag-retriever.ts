@@ -23,6 +23,7 @@ import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
 import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
 import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
+import { expandToSiblingContext } from '@/shared/qdrant/context-expansion';
 
 // ============================================================================
 // CONSTANTS
@@ -115,6 +116,44 @@ export interface RAGChunk {
   score: number;
   /** Query that retrieved this chunk */
   matchedQuery: string;
+  /** Other chunks of the same passage; empty for anything indexed before spec 027. */
+  siblingChunkIds?: string[];
+  /** Passage this chunk belongs to. */
+  parentChunkId?: string | null;
+  /** Tokens in this chunk, used to keep expansion inside the budget. */
+  tokenCount?: number;
+}
+
+/**
+ * Rebuilds the passage around each surviving chunk.
+ *
+ * Runs after reranking on purpose. The reranker fetches
+ * `candidateMultiplier` times more candidates than it keeps and scores them
+ * with a cross-encoder, so expanding first would pay to fetch context that is
+ * about to be discarded and would ask the reranker to judge a whole passage
+ * where a focused chunk was meant to be.
+ */
+async function expandSectionChunks(chunks: RAGChunk[]): Promise<RAGChunk[]> {
+  if (chunks.length === 0) return chunks;
+
+  const expanded = await expandToSiblingContext(
+    chunks.map(chunk => ({
+      ...chunk,
+      document_id: chunk.documentId,
+      chunk_id: chunk.chunkId,
+      parent_chunk_id: chunk.parentChunkId,
+      sibling_chunk_ids: chunk.siblingChunkIds,
+      token_count: chunk.tokenCount ?? estimateTokens(chunk.content),
+    })),
+    { maxTokens: SECTION_RAG_DEFAULTS.MAX_TOKENS }
+  );
+
+  return expanded.map(
+    ({ document_id, chunk_id, parent_chunk_id, sibling_chunk_ids, token_count, ...chunk }) => ({
+      ...chunk,
+      tokenCount: token_count,
+    })
+  );
 }
 
 /**
@@ -390,6 +429,12 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
       );
     }
 
+    // Expand only the survivors. Reranking fetches four candidates for every
+    // chunk it keeps and judges them with a cross-encoder, so widening before it
+    // would pay to fetch context about to be discarded and would hand the
+    // reranker a passage where a focused chunk was meant to be.
+    sortedChunks = await expandSectionChunks(sortedChunks);
+
     // Calculate coverage score
     const coverageScore = calculateCoverageScore(sortedChunks, ragPlan.expected_topics);
 
@@ -602,10 +647,6 @@ async function executeSearchQuery(params: {
     limit,
     score_threshold: scoreThreshold,
     enable_hybrid: SECTION_RAG_DEFAULTS.ENABLE_HYBRID,
-    // Answer with the passage around the match, not the match alone. The same
-    // budget the formatter enforces is the ceiling here, so expansion can never
-    // produce context that is only going to be truncated away.
-    expand_context: { max_tokens: SECTION_RAG_DEFAULTS.MAX_TOKENS },
     filters: {
       course_id: courseId,
       // Filter by primary documents if specified
@@ -624,6 +665,9 @@ async function executeSearchQuery(params: {
     content: result.content,
     headingPath: result.heading_path,
     score: result.score,
+    siblingChunkIds: result.sibling_chunk_ids,
+    parentChunkId: result.parent_chunk_id,
+    tokenCount: result.token_count,
   }));
 }
 

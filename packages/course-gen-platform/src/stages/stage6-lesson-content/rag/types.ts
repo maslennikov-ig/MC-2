@@ -21,6 +21,15 @@ export interface LessonRAGChunk {
   similarity_score: number;
   /** Query that retrieved this chunk */
   matched_query: string;
+  /**
+   * The other chunks of the same passage, used to rebuild the surrounding text
+   * after reranking. Empty for anything indexed before spec 027.
+   */
+  sibling_chunk_ids?: string[];
+  /** Passage this chunk belongs to; two hits from one passage collapse into one. */
+  parent_chunk_id?: string | null;
+  /** Tokens in this chunk, needed to keep expansion inside the caller's budget. */
+  token_count?: number;
   /** Document priority (optional, from chunk metadata) */
   document_priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
 }

@@ -13,6 +13,8 @@ import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { rerankChunks } from './reranking';
+import { estimateTokens } from './formatters';
+import { expandToSiblingContext } from '@/shared/qdrant/context-expansion';
 import { calculateLessonCoverage } from './coverage';
 import { resolveTier1ShadowSelection } from './shadow-retrieval';
 import {
@@ -444,6 +446,9 @@ async function retrieveLessonContextCore(
               heading_path: result.heading_path,
               similarity_score: result.score,
               matched_query: query,
+              sibling_chunk_ids: result.sibling_chunk_ids,
+              parent_chunk_id: result.parent_chunk_id,
+              token_count: result.token_count,
             });
             queriesUsed.push(query);
           }
@@ -625,6 +630,9 @@ async function retrieveLessonContextCore(
             heading_path: result.heading_path,
             similarity_score: result.score,
             matched_query: query,
+            sibling_chunk_ids: result.sibling_chunk_ids,
+            parent_chunk_id: result.parent_chunk_id,
+            token_count: result.token_count,
           });
           queriesUsed.push(query);
         }
@@ -680,6 +688,19 @@ async function retrieveLessonContextCore(
       .sort((a, b) => b.similarity_score - a.similarity_score)
       .slice(0, targetChunks);
   }
+
+  // Expand only what survived: reranking is a cross-encoder over the retrieved
+  // text and discards four candidates in five, so widening before it would pay
+  // to fetch context that is about to be thrown away and would hand the model
+  // that judges relevance a passage where a focused chunk was meant to be.
+  sortedChunks = await expandToSiblingContext(
+    sortedChunks.map(chunk => ({
+      ...chunk,
+      score: chunk.similarity_score,
+      token_count: chunk.token_count ?? estimateTokens(chunk.content),
+    })),
+    { maxTokens: LESSON_RAG_CONFIG.MAX_TOKENS }
+  );
 
   // Convert to RAGChunk format
   const ragChunks: RAGChunk[] = sortedChunks.map(chunk => ({

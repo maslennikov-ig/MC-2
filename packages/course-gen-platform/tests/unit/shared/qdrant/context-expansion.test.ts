@@ -222,6 +222,36 @@ describe('expandToSiblingContext', () => {
     expect(expanded.reduce((sum, r) => sum + r.token_count, 0)).toBe(411);
   });
 
+  it('expands anything carrying the passage fields, not only a SearchResult', async () => {
+    // Stage 6 reranks before expanding: the cross-encoder should judge the
+    // ~160-token chunk that matched, not a 1400-token passage, and four
+    // candidates in five are discarded there anyway. So expansion has to work
+    // on the reranked shape, which carries `similarity_score` and its own
+    // fields rather than a `SearchResult`.
+    retrieve.mockResolvedValue([record('c1', 'первая.', 0), record('c2', 'вторая.', 1)]);
+
+    const lessonChunk = {
+      chunk_id: 'c1',
+      document_id: 'doc-1',
+      document_name: 'law.docx',
+      parent_chunk_id: 'p1',
+      sibling_chunk_ids: ['c2'],
+      content: 'первая.',
+      heading_path: 'Статья 1',
+      matched_query: 'цели регулирования',
+      token_count: 100,
+      score: 0.8,
+    };
+
+    const [expanded] = await expandToSiblingContext([lessonChunk]);
+
+    expect(expanded.content).toBe('первая.\n\nвторая.');
+    // Fields the caller owns survive the round trip.
+    expect(expanded.heading_path).toBe('Статья 1');
+    expect(expanded.matched_query).toBe('цели регулирования');
+    expect(expanded.document_name).toBe('law.docx');
+  });
+
   it('returns the matched chunk when the sibling fetch fails', async () => {
     retrieve.mockRejectedValue(new Error('qdrant unavailable'));
 
