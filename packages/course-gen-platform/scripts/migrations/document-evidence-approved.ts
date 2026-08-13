@@ -531,8 +531,14 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // adding 20260812131245_phase_reasoning_configuration.sql and
 // 20260812132356_refresh_model_display_names.sql on top of the routing refresh
 // (mc2-t6iec) and the uniqueness fix (mc2-pqjgl).
+// Re-pinned 2026-08-13 for the conflict-checkpoint cascade exemption (mc2-ufpko):
+// 233 files, adding 20260813140000_conflict_checkpoint_cascade_delete.sql. That
+// migration replaces the body of a function inside the security manifest, so a
+// live re-run of the approved packet against a database that already carries it
+// would need a new `after-130000` digest; the packet is the 2026-07 cutover tool
+// and is not re-run in this flow.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '35f0a14547daa1d3e26656d3b70b5234cc1e27365c072bcd53ac675a9718a6ac';
+  'd7d0f174d53b3373d53b666753648629f6c157b86bf8113461942250ded8eebf';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

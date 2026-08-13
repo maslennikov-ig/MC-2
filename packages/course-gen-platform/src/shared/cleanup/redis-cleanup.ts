@@ -59,9 +59,11 @@ async function scanAndDelete(pattern: string): Promise<number> {
  * Clean up all Redis keys associated with a course
  *
  * Patterns cleaned:
- * - idempotency:generation-{courseId}-* (generation idempotency)
+ * - idempotency:*{courseId}* (every idempotency key naming the course)
  * - rag:{courseId}:* (RAG context cache)
  * - doc_class:v*:{courseId}:* (document classification cache)
+ * - file_cache:{courseId}:*, lesson_md:{courseId}:*
+ * - phase1_cache:{courseId} (Stage 4 phase-1 result)
  *
  * @param courseId - Course UUID to clean up
  * @returns Cleanup result with count of deleted keys
@@ -74,11 +76,17 @@ async function scanAndDelete(pattern: string): Promise<number> {
  */
 export async function cleanupRedisForCourse(courseId: string): Promise<RedisCleanupResult> {
   const patterns = [
-    `idempotency:generation-${courseId}-*`,
+    // The course id sits in the middle of most idempotency keys, not after a
+    // fixed `generation-` prefix: Stage 4 writes
+    // `idempotency:worker-fallback-stage4-auto-{courseId}-stage4` and Stage 6
+    // writes `idempotency:auto-{courseId}-stage6-lesson-{lessonId}`. Anchoring
+    // on that prefix left both behind on a deleted course.
+    `idempotency:*${courseId}*`,
     `rag:${courseId}:*`,
     `doc_class:v*:${courseId}:*`,
     `file_cache:${courseId}:*`,
     `lesson_md:${courseId}:*`,
+    `phase1_cache:${courseId}`,
   ];
 
   logger.info(
