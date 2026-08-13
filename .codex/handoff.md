@@ -1,7 +1,6 @@
 # Orchestrator Handoff
 
 Updated: 2026-08-13. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.110`
 
 Current state only. History lives in commits, `bd` close reasons and
 `.codex/stages/<stage_id>/summary.md`; do not re-narrate it here.
@@ -64,21 +63,21 @@ cached conversions: `strategy=docling_hybrid`, zero degenerate parents, siblings
 `docs/RAG-CHUNKING-STRATEGY.md` in October 2025 — search the small grain, answer with the large one.
 Its example separated `uploadChunksToQdrant(child_chunks)` from `storeParentChunks(parent_chunks)`;
 the second function was never written, so parents went into the same collection and the system paid
-to search a grain it never meant to search.
+to search a grain it never meant to search. The live A/B is in §7 of the spec: expanded won 3 of 3,
+grounding 3.33 → 4.00, on a corpus where every chunk has siblings.
 
 Only children are indexed now, plus any childless parent, the sole carrier of its text. The passage
 is rebuilt at retrieval time from siblings already indexed — parents carry no text of their own, 57
-of 57 fully reconstructible at word coverage 1.0000. Cheaper than the parent store the design asked
-for, no migration, and it avoids the +91.2% embedding cost the next processed document would have
-re-introduced silently.
+of 57 fully reconstructible at word coverage 1.0000. No migration, and it avoids the +91.2%
+embedding cost the next processed document would have re-introduced silently.
 
-`expandToSiblingContext` is opt-in through `SearchOptions.expand_context`, because only the caller
-knows its prompt budget, and that budget is a ceiling: a passage that does not fit falls back to the
-matched chunk. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; deliberately
-off for evidence retrieval, where a citation must point at the fragment that matched with its own
-page and provenance. `getParentChunk` is gone — it looked parents up as points and could only return
-null. Expansion is a no-op on the current collection (`sibling_chunk_ids: []`) and takes effect per
-document as documents are reprocessed, so the rollout is gradual by construction.
+Expansion runs **after reranking** in the two paths that rerank, because a cross-encoder should judge
+the ~160-token chunk that matched, not a 1400-token passage, and four candidates in five are
+discarded there. The budget is a ceiling on what expansion adds, never a reason to drop a retrieved
+chunk — truncation belongs to the formatter, which counts its own markup and runs last. On for
+Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off for evidence retrieval, where a
+citation must point at the fragment that matched. `getParentChunk` is gone. Expansion is a no-op on
+today's collection (`sibling_chunk_ids: []`) and takes effect per document as they are reprocessed.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -175,17 +174,18 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
   with reliable latency/cost receipts.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
-  `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
+  `mc2-5e4ek.1` — excluded by §9, gates already recorded.
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.105`
-Current stage id: `mc2-db696.110`
-Next stage id: `mc2-db696.107` when implementation is selected
+Accepted stage id: `mc2-db696.105` · Current stage id: `mc2-db696.110` · Next stage id:
+`mc2-db696.107` when implementation is selected
 
-Recommended action: decide whether to deploy the RAG threshold fix to production — the data half is
-already live there and the code half is not. Then fix content grounding, then PDF fidelity and
-timeouts. Do not run another paid generation before deterministic coverage and a new explicit budget.
+Recommended action: `mc2-o3s4r`, then `mc2-2pplo`, in that order by owner decision 2026-08-13. Audit
+the phase configs against what the models and OpenRouter accept — the seam that hid `mc2-see4m` for a
+week — then run one small real course end to end, authorized at USD 1–3 and the only thing that can
+find the next blocker. A prompt for a cold session is the first comment on `mc2-o3s4r`. After those:
+content grounding, PDF fidelity, timeouts.
 
 ## Starter prompt for next orchestrator
 
