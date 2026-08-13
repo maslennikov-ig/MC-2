@@ -10,7 +10,7 @@
  * @module shared/embeddings/markdown-chunker
  */
 
-import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { encoding_for_model } from 'tiktoken';
 import type { TiktokenModel } from 'tiktoken';
 import type {
@@ -225,26 +225,107 @@ export function createTokenCounter(model: TiktokenModel): {
 }
 
 /**
- * First pass: Split markdown by headings (#, ##, ###)
+ * Returns the text `next` repeats from the end of `previous`.
  *
- * Uses LangChain MarkdownTextSplitter to preserve document hierarchy
+ * The search is bounded by the configured overlap so it stays cheap: an overlap
+ * larger than that is not something the splitter can produce.
+ */
+function sharedBoundary(previous: string, next: string, config: ChunkingConfig): string {
+  // Four characters per token is a deliberate over-estimate here. It only sets
+  // how far back to look, and looking too far is free while looking too little
+  // would under-report a real overlap.
+  const window = Math.min(previous.length, next.length, config.child_chunk_overlap * 4);
+  for (let length = window; length > 0; length--) {
+    if (previous.endsWith(next.slice(0, length))) return next.slice(0, length);
+  }
+  return '';
+}
+
+/** Matches an ATX heading line and captures its level and text. */
+const HEADING_LINE = /^(#{1,3})\s+(.+?)\s*#*\s*$/;
+
+/** Matches a fenced code block delimiter, so `#` inside code is not a heading. */
+const CODE_FENCE = /^\s*(```|~~~)/;
+
+/**
+ * First pass: split Markdown at H1/H2/H3 boundaries.
+ *
+ * This used to be `new MarkdownTextSplitter({})`, which despite the name and
+ * the comment above it never split on headings and never produced heading
+ * metadata: it is a recursive character splitter whose only Markdown knowledge
+ * is its separator list. With no options it also took LangChain's default
+ * 1000-character window, and that default is what silently shaped the whole
+ * pipeline — see `tokenAwareSplit` for the duplication it caused and
+ * `buildHeadingPath` for the metadata that never arrived. Measured on
+ * production 2026-08-13: all 6856 points carried `heading_path: 'Root'` and a
+ * null chapter and section.
+ *
+ * Sections are returned whole. Sizing belongs to the token-aware second pass,
+ * which is the only place that knows the parent and child budgets.
  *
  * @param markdown - Markdown content
- * @returns Markdown sections with heading metadata
+ * @returns Markdown sections carrying the headings in scope
  */
-async function splitByHeadings(markdown: string): Promise<MarkdownDocument[]> {
-  const splitter = new MarkdownTextSplitter({
-    // Split by H1, H2, H3 headings
-    // This creates semantic boundaries at major topic changes
-  });
+function splitByHeadings(markdown: string): MarkdownDocument[] {
+  const sections: MarkdownDocument[] = [];
+  const headings: [string?, string?, string?] = [undefined, undefined, undefined];
+  let lines: string[] = [];
+  let inFence = false;
 
-  return await splitter.createDocuments([markdown]);
+  const flush = (): void => {
+    const pageContent = lines.join('\n').trim();
+    lines = [];
+    if (pageContent.length === 0) return;
+    sections.push({
+      pageContent,
+      metadata: {
+        ...(headings[0] ? { 'Header 1': headings[0] } : {}),
+        ...(headings[1] ? { 'Header 2': headings[1] } : {}),
+        ...(headings[2] ? { 'Header 3': headings[2] } : {}),
+      },
+    });
+  };
+
+  for (const line of markdown.split('\n')) {
+    if (CODE_FENCE.test(line)) inFence = !inFence;
+
+    const heading = inFence ? null : HEADING_LINE.exec(line);
+    if (!heading) {
+      lines.push(line);
+      continue;
+    }
+
+    // The heading opens a new section, so everything gathered so far belongs to
+    // the previous one and is emitted under the headings that were in scope.
+    flush();
+
+    const level = heading[1].length;
+    headings[level - 1] = heading[2];
+    // A deeper heading only narrows the path; anything below the new level is
+    // out of scope and must not leak into the next section's metadata.
+    for (let deeper = level; deeper < headings.length; deeper++) headings[deeper] = undefined;
+
+    lines.push(line);
+  }
+  flush();
+
+  return sections;
 }
 
 /**
  * Second pass: Token-aware splitting within heading sections
  *
- * Creates parent-child chunk hierarchy with sentence boundary preservation
+ * Creates parent-child chunk hierarchy with sentence boundary preservation.
+ *
+ * Both splitters measure in tokens. They used to measure in characters via a
+ * `tokens * 4` approximation, which is the second half of the duplication this
+ * module caused: Russian text runs about 2.33 characters per token, so a
+ * "400 token" child window was really a 1600-character window, while the first
+ * pass never emitted a section longer than its own 1000-character default. A
+ * parent therefore always fit inside one child, and `splitText` returned it
+ * unchanged — one child per parent, carrying the parent's exact text. Measured
+ * on production 2026-08-13 over 25 documents: 508 of 508 parents degenerate,
+ * zero children with siblings.
  *
  * @param sections - Markdown sections from first pass
  * @param config - Chunking configuration
@@ -256,21 +337,38 @@ async function tokenAwareSplit(
 ): Promise<ChunkingResult> {
   const parent_chunks: TextChunk[] = [];
   const child_chunks: TextChunk[] = [];
+  const counter = createTokenCounter(config.tiktoken_model);
 
+  try {
+    return await buildHierarchy(sections, config, parent_chunks, child_chunks, counter.count);
+  } finally {
+    counter.free();
+  }
+}
+
+async function buildHierarchy(
+  sections: MarkdownDocument[],
+  config: ChunkingConfig,
+  parent_chunks: TextChunk[],
+  child_chunks: TextChunk[],
+  tokensOf: (text: string) => number
+): Promise<ChunkingResult> {
   // Create parent splitter (1500 tokens)
   const parentSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: config.parent_chunk_size * 4, // Rough approximation: 1 token ≈ 4 chars
+    chunkSize: config.parent_chunk_size,
     chunkOverlap: 0, // No overlap for parent chunks
     separators: ['\n\n', '\n', '. ', ' '], // Sentence boundaries
     keepSeparator: true,
+    lengthFunction: tokensOf,
   });
 
   // Create child splitter (400 tokens, 50 token overlap)
   const childSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: config.child_chunk_size * 4, // Rough approximation
-    chunkOverlap: config.child_chunk_overlap * 4,
+    chunkSize: config.child_chunk_size,
+    chunkOverlap: config.child_chunk_overlap,
     separators: ['\n\n', '\n', '. ', ' '], // Sentence boundaries
     keepSeparator: true,
+    lengthFunction: tokensOf,
   });
 
   let parentIndex = 0;
@@ -285,7 +383,7 @@ async function tokenAwareSplit(
 
     for (const parentText of parentTexts) {
       // Count actual tokens (not character-based estimate)
-      const parentTokenCount = countTokens(parentText, config.tiktoken_model);
+      const parentTokenCount = tokensOf(parentText);
 
       // Skip chunks that are too small (less than 100 tokens)
       if (parentTokenCount < 100) continue;
@@ -320,7 +418,7 @@ async function tokenAwareSplit(
 
       for (let i = 0; i < childTexts.length; i++) {
         const childText = childTexts[i];
-        const childTokenCount = countTokens(childText, config.tiktoken_model);
+        const childTokenCount = tokensOf(childText);
 
         // Skip very small child chunks
         if (childTokenCount < 50) continue;
@@ -328,14 +426,12 @@ async function tokenAwareSplit(
         const childChunkId = generateChunkId(childText, child_chunks.length, 'child');
         childIds.push(childChunkId);
 
-        // Calculate overlap tokens with previous chunk
-        let overlapTokens = 0;
-        if (i > 0) {
-          const prevText = childTexts[i - 1];
-          const overlapLength = Math.min(prevText.length, config.child_chunk_overlap * 4);
-          const overlapText = prevText.substring(prevText.length - overlapLength);
-          overlapTokens = countTokens(overlapText, config.tiktoken_model);
-        }
+        // Measure the overlap that is actually there, rather than assuming the
+        // configured one: the splitter carries whole separator-delimited pieces
+        // across a boundary, so the real overlap is usually smaller and is zero
+        // whenever a chunk starts on a clean paragraph break.
+        const overlapTokens =
+          i > 0 ? tokensOf(sharedBoundary(childTexts[i - 1], childText, config)) : 0;
 
         // Create child chunk
         const childChunk: TextChunk = {
@@ -430,7 +526,7 @@ export async function chunkMarkdown(
   }
 
   // First pass: Split by headings
-  const sections = await splitByHeadings(markdown);
+  const sections = splitByHeadings(markdown);
 
   if (sections.length === 0) {
     throw new Error('No sections found in markdown content');
@@ -470,12 +566,19 @@ function normalizedContent(chunk: TextChunk): string {
  *
  * That was not a rare edge case. Measured on production 2026-08-12: all 6856
  * parents had exactly one child, so 6856 of 13712 indexed points — half the
- * collection — were exact copies. Parents break on every heading-path change
- * and Docling already merges peers within a section, so one child per parent is
- * what this pipeline normally produces.
+ * collection — were exact copies.
  *
- * Degenerate parents are dropped from indexing only. They stay in the chunking
- * result, so parent lookup, sibling navigation and chunk counts are unchanged.
+ * The cause was in this file's own two passes, not in the Docling adapter: the
+ * heading pass capped sections at LangChain's default 1000 characters and the
+ * sizing pass measured a 400-token child budget as 1600 characters, so a parent
+ * never reached the child window. Both are fixed above, and the 2026-08-13
+ * re-measurement over the same documents puts the remaining degenerate share at
+ * 29 of 178 parents — short sections that genuinely hold a single child.
+ *
+ * The guard stays, because a short section will always be able to produce one,
+ * and because it is what keeps a fixed chunker honest. Degenerate parents are
+ * dropped from indexing only. They stay in the chunking result, so parent
+ * lookup, sibling navigation and chunk counts are unchanged.
  */
 export function selectIndexableChunks(result: ChunkingResult): TextChunk[] {
   const childTextByParent = new Map<string, Set<string>>();
