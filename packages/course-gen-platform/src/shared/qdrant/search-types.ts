@@ -105,8 +105,10 @@ export interface SearchOptions {
    * Search runs on the small grain for precision; the caller is answered with
    * the large one for context, which is the split
    * `docs/RAG-CHUNKING-STRATEGY.md` specified. It is opt-in because only the
-   * caller knows its prompt budget, and `max_tokens` is a ceiling the expansion
-   * will not cross — it falls back to the matched chunk instead.
+   * caller knows its prompt budget. `max_tokens` bounds what expansion may
+   * add: past it the matched chunk comes back as retrieved. It does not
+   * truncate the result set — that stays with the formatter, which counts its
+   * own markup.
    */
   expand_context?: { max_tokens: number };
   /** Search filters */

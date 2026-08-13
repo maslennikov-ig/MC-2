@@ -33,9 +33,15 @@ export interface ExpansionOptions {
   /** Collection to read siblings from. */
   collectionName?: string;
   /**
-   * Hard ceiling on the total tokens of the returned set. Expansion stops
-   * before crossing it and leaves the remaining results unexpanded, because a
-   * caller's budget is a constraint, not a target.
+   * Ceiling on what expansion is allowed to *add*.
+   *
+   * When a passage would carry the running total past it, the matched chunk is
+   * returned as retrieved. Expansion never drops a result to stay under the
+   * number: the caller retrieved those chunks and truncating them belongs to
+   * the formatter, which counts its own markup and is the last thing before the
+   * prompt. Doing it in two places with two different accountings would be
+   * worse than doing it once. So the returned set can still exceed this value —
+   * it just will not exceed it *because of expansion*.
    */
   maxTokens?: number;
 }
