@@ -30,6 +30,15 @@ const RAG_DEFAULTS = {
   CHUNK_LIMIT: 5, // Default number of chunks to retrieve
   SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD, // Minimum dense similarity score
   ENABLE_HYBRID: true, // ENABLED: sparse vectors uploaded + native Query API with server-side RRF
+  /**
+   * Ceiling for one tool response after passage expansion.
+   *
+   * The tool caps at 10 chunks, and an expanded passage measured ~888 tokens
+   * against ~291 for a bare chunk, so a full result set lands near 8 900. This
+   * leaves headroom above that and still bounds what a single tool call can put
+   * into the conversation.
+   */
+  MAX_CONTEXT_TOKENS: 12_000,
 } as const;
 
 // ============================================================================
@@ -143,6 +152,9 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
           limit,
           score_threshold: RAG_DEFAULTS.SCORE_THRESHOLD,
           enable_hybrid: RAG_DEFAULTS.ENABLE_HYBRID,
+          // The model asked for evidence, so give it the passage rather than
+          // the fragment that happened to match.
+          expand_context: { max_tokens: RAG_DEFAULTS.MAX_CONTEXT_TOKENS },
           filters: {
             course_id: courseId,
             ...filter,

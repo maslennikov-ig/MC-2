@@ -121,6 +121,10 @@ async function retrieveSectionContextFresh(params: {
         limit: 3, // Fewer per query since we have multiple sections
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
+        // Answer with the passage around the match. The ceiling is the same
+        // budget `formatLessonChunksForPrompt` enforces, so expansion cannot
+        // build context that would only be truncated away.
+        expand_context: { max_tokens: LESSON_RAG_CONFIG.MAX_TOKENS },
         filters: {
           course_id: courseId,
           // Filter by primary documents if specified (empty array = search all)

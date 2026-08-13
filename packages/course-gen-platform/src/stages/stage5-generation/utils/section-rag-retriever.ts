@@ -602,6 +602,10 @@ async function executeSearchQuery(params: {
     limit,
     score_threshold: scoreThreshold,
     enable_hybrid: SECTION_RAG_DEFAULTS.ENABLE_HYBRID,
+    // Answer with the passage around the match, not the match alone. The same
+    // budget the formatter enforces is the ceiling here, so expansion can never
+    // produce context that is only going to be truncated away.
+    expand_context: { max_tokens: SECTION_RAG_DEFAULTS.MAX_TOKENS },
     filters: {
       course_id: courseId,
       // Filter by primary documents if specified
