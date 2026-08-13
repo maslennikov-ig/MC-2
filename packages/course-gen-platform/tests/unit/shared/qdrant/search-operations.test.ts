@@ -342,6 +342,21 @@ describe('search cache identity', () => {
     expect(filters.document_ids).toEqual(['b', 'a']);
   });
 
+  it('distinguishes expansion and its budget, which change the text returned', () => {
+    // Caught end-to-end on dev, not by the expansion unit tests: those never go
+    // through the cache, so an expanded and an unexpanded search shared one
+    // entry and whichever ran first won for the next five minutes.
+    const plain = createOptions({ filters });
+    const expanded = createOptions({ filters, expand_context: { max_tokens: 20_000 } });
+    const narrower = createOptions({ filters, expand_context: { max_tokens: 5_000 } });
+
+    const keys = [plain, expanded, narrower].map(options =>
+      generateSearchCacheKey('same query', options)
+    );
+
+    expect(new Set(keys).size).toBe(3);
+  });
+
   it('distinguishes payload shape and exact query text used by embeddings', () => {
     const base = createOptions({ include_payload: false });
 
