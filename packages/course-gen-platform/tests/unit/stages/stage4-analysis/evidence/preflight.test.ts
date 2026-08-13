@@ -416,71 +416,51 @@ describe('runDocumentEvidencePreflight', () => {
     expect(new Set(resumed.cards.map(card => card.document_id)).size).toBe(3);
   });
 
-  it('fingerprints semantic classification but ignores runtime Phase 1 metadata and prose', async () => {
+  it('keeps run identity on the sources alone, whatever classification the caller passes', async () => {
+    // This used to assert the opposite: that a changed semantic classification
+    // produced a new run. That pinned the shape which stranded a live course —
+    // the classification is an LLM output and differs between job attempts on
+    // identical documents, so every Stage 4 retry created a second accepted run
+    // and the user's answer stayed keyed to the first (mc2-fqbrj). Only the
+    // sources and their versions may change run identity.
     const repository = new MemoryRepository();
     const deps = {
       repository,
       generateCard: async (input: Parameters<typeof assessedCard>[0]) => assessedCard(input),
     };
+    const withClassification = (classification: Record<string, unknown>) =>
+      ({
+        ...baseOptions,
+        classificationContext: classification,
+        sources: [source(1)],
+      }) as typeof baseOptions & { sources: ReturnType<typeof source>[] };
 
     const first = await runDocumentEvidencePreflight(
-      {
-        ...baseOptions,
-        classificationContext: {
-          course_category: {
-            primary: 'professional',
-            confidence: 0.8,
-            reasoning: 'first runtime explanation',
-          },
-          topic_analysis: {
-            determined_topic: 'Procurement policy',
-            complexity: 'medium',
-            target_audience: 'advanced',
-          },
-          phase_metadata: { duration_ms: 10, model_used: 'model-a', tokens: { total: 100 } },
-        },
-        sources: [source(1)],
-      },
+      withClassification({
+        course_category: { primary: 'professional', confidence: 0.8, reasoning: 'first prose' },
+        topic_analysis: { determined_topic: 'Procurement policy', complexity: 'medium' },
+        phase_metadata: { duration_ms: 10, model_used: 'model-a' },
+      }),
       deps
     );
     const runtimeOnlyChange = await runDocumentEvidencePreflight(
-      {
-        ...baseOptions,
-        classificationContext: {
-          course_category: {
-            primary: 'professional',
-            confidence: 0.99,
-            reasoning: 'different model prose',
-          },
-          topic_analysis: {
-            determined_topic: 'Procurement policy',
-            complexity: 'medium',
-            target_audience: 'advanced',
-          },
-          phase_metadata: { duration_ms: 999, model_used: 'model-b', tokens: { total: 9999 } },
-        },
-        sources: [source(1)],
-      },
+      withClassification({
+        course_category: { primary: 'professional', confidence: 0.99, reasoning: 'other prose' },
+        topic_analysis: { determined_topic: 'Procurement policy', complexity: 'medium' },
+        phase_metadata: { duration_ms: 999, model_used: 'model-b' },
+      }),
       deps
     );
     const semanticChange = await runDocumentEvidencePreflight(
-      {
-        ...baseOptions,
-        classificationContext: {
-          course_category: { primary: 'academic' },
-          topic_analysis: {
-            determined_topic: 'Procurement policy',
-            complexity: 'medium',
-            target_audience: 'advanced',
-          },
-        },
-        sources: [source(1)],
-      },
+      withClassification({
+        course_category: { primary: 'academic' },
+        topic_analysis: { determined_topic: 'Procurement policy', complexity: 'medium' },
+      }),
       deps
     );
 
     expect(runtimeOnlyChange.runId).toBe(first.runId);
-    expect(semanticChange.runId).not.toBe(first.runId);
+    expect(semanticChange.runId).toBe(first.runId);
   });
 
   it('records disappeared or unrecoverable content as an explicit failed outcome', async () => {

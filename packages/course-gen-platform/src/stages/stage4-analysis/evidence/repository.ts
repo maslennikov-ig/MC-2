@@ -499,6 +499,36 @@ export class DocumentEvidenceRepository {
     }));
   }
 
+  /**
+   * Accepted runs of one course, newest first, with the manifest that produced
+   * them. Answers may only be carried between runs whose sources are identical,
+   * so the caller needs the manifest, not just the run id.
+   */
+  async listCourseAcceptedRuns(
+    courseId: string,
+    organizationId: string
+  ): Promise<Array<{ id: string; sourceManifest: DocumentEvidenceSourceManifestEntry[] }>> {
+    const result = await this.client
+      .from('document_evidence_runs')
+      .select('id,status,source_manifest,completed_at')
+      .eq('course_id', courseId)
+      .eq('organization_id', organizationId)
+      .order('completed_at', { ascending: false });
+    if (result.error) throwDatabaseError('list_course_runs', result.error);
+    if (!Array.isArray(result.data)) {
+      throw new DocumentEvidenceRepositoryError('list_course_runs:invalid_result');
+    }
+    return result.data
+      .map(value => assertRecord(value, 'list_course_runs'))
+      .filter(row => row.status === 'accepted' && typeof row.id === 'string')
+      .map(row => ({
+        id: row.id as string,
+        sourceManifest: normalizeSourceManifest(
+          DocumentEvidenceSourceManifestSchema.parse(row.source_manifest ?? [])
+        ),
+      }));
+  }
+
   async getOrCreateRun(
     input: GetOrCreateEvidenceRunInput
   ): Promise<{ run: Record<string, unknown>; reused: boolean }> {

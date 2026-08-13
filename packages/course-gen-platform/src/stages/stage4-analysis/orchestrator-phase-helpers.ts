@@ -394,7 +394,6 @@ async function runDocumentEvidencePhaseCore(
     language: context.input.language === 'en' ? 'en' : 'ru',
     evidenceVersion: 'document-evidence-v1',
     modelId: context.budgetAllocation?.modelSelection.modelId,
-    classificationContext: context.phase1Output,
     sources,
     modelContext: context.budgetAllocation?.modelSelection.maxContext ?? 700_000,
     promptReserve: 10_000,

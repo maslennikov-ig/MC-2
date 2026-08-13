@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
 import { tokenEstimator } from '@/shared/llm/token-estimator';
+import { logger } from '@/shared/logger';
 import type { EvidenceDocumentAllocation } from './budget';
 import type { DocumentEvidencePreflightSource } from './preflight';
 
@@ -825,6 +826,32 @@ function requireModelId(input: GenerateEvidenceCardInput): string {
   return input.modelId;
 }
 
+/**
+ * Identifies a failed generation without ever carrying document content: which
+ * document, which model, how much budget it had. Before this, both failure
+ * paths discarded the cause and the only survivor was a `coverage_reason` that
+ * reads the same whatever went wrong (mc2-s2x84).
+ */
+function evidenceFailureContext(input: GenerateEvidenceCardInput): Record<string, unknown> {
+  return {
+    documentId: input.source.documentId,
+    documentName: input.source.documentName,
+    sourceVersionHash: input.source.sourceVersionHash,
+    modelId: input.modelId,
+    allocatedTokens: input.allocatedTokens,
+    processingMode: input.processingMode,
+    language: input.language,
+  };
+}
+
+/** The error itself, flattened: name, message and cause chain, never content. */
+function describeEvidenceFailure(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) return { name: 'NonError', message: String(error) };
+  const described: Record<string, unknown> = { name: error.name, message: error.message };
+  if (error.cause !== undefined) described.cause = describeEvidenceFailure(error.cause);
+  return described;
+}
+
 function createCard(
   source: DocumentEvidencePreflightSource,
   input: Pick<GenerateEvidenceCardInput, 'allocatedTokens' | 'processingMode' | 'language'>,
@@ -947,6 +974,15 @@ export async function generateDocumentEvidenceCard(
     const excerpt = input.source.fullText
       .slice(0, Math.max(input.allocatedTokens, 1) * 4)
       .trimEnd();
+    // Never carries document content: the cause, not the source.
+    logger.warn(
+      {
+        ...evidenceFailureContext(input),
+        phase: 'hierarchical_structured_evidence',
+        error: describeEvidenceFailure(error),
+      },
+      '[Evidence] Hierarchical structured evidence failed, falling back to an excerpt'
+    );
     try {
       const extracted = await standaloneExtraction(input, excerpt);
       return {
@@ -968,6 +1004,15 @@ export async function generateDocumentEvidenceCard(
       };
     } catch (extractionError) {
       if (extractionError instanceof EvidenceExtractionScopeError) throw extractionError;
+      logger.error(
+        {
+          ...evidenceFailureContext(input),
+          phase: 'excerpt_fallback_extraction',
+          error: describeEvidenceFailure(extractionError),
+          hierarchicalError: describeEvidenceFailure(error),
+        },
+        '[Evidence] Both structured evidence paths failed; the card is marked failed'
+      );
       return {
         card: createFailedEvidenceCard(
           input.source,
