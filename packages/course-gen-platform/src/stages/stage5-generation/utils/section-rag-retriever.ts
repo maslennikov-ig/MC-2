@@ -138,22 +138,25 @@ async function expandSectionChunks(chunks: RAGChunk[]): Promise<RAGChunk[]> {
 
   const expanded = await expandToSiblingContext(
     chunks.map(chunk => ({
-      ...chunk,
+      source: chunk,
       document_id: chunk.documentId,
       chunk_id: chunk.chunkId,
       parent_chunk_id: chunk.parentChunkId,
       sibling_chunk_ids: chunk.siblingChunkIds,
+      content: chunk.content,
       token_count: chunk.tokenCount ?? estimateTokens(chunk.content),
+      score: chunk.score,
     })),
     { maxTokens: SECTION_RAG_DEFAULTS.MAX_TOKENS }
   );
 
-  return expanded.map(
-    ({ document_id, chunk_id, parent_chunk_id, sibling_chunk_ids, token_count, ...chunk }) => ({
-      ...chunk,
-      tokenCount: token_count,
-    })
-  );
+  // The chunk travels along as `source`, so the caller's own shape comes back
+  // untouched apart from the two fields expansion is allowed to change.
+  return expanded.map(entry => ({
+    ...entry.source,
+    content: entry.content,
+    tokenCount: entry.token_count,
+  }));
 }
 
 /**
