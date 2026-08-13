@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-12. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-13. Effective kernel: `shared-orchestration/v1`.
 Current stage id: `mc2-db696.110`
 
 Current state only. History lives in commits, `bd` close reasons and
@@ -29,12 +29,12 @@ so with it in place hybrid search was byte-for-byte identical to BM25-only — m
 reads the RAG sources to reject any literal above that ceiling.
 
 **Half the index was a copy of the other half.** Not reprocessing: point ids are deterministic and
-document-scoped, so a repeat inside a document is impossible. Hierarchical chunking is degenerate —
-parent groups break on every heading-path change and Docling already merges peers within a section,
-so all 6856 parents had exactly one child and therefore that child's exact text. Degenerate parents
-no longer reach the index (`selectIndexableChunks`), and search drops repeated text as a safety net.
-Follow-up `mc2-5fpaf`: decide whether to make the parent tier work or remove it, since it cannot
-work as written.
+document-scoped, so a repeat inside a document is impossible. Every parent held exactly one child
+and therefore that child's exact text. Degenerate parents no longer reach the index
+(`selectIndexableChunks`), and search drops repeated text as a safety net.
+
+The cause first recorded here — `groupIntoParents()` in the Docling adapter — was **wrong**, and is
+corrected in `mc2-7frdr`. See the chunker section below.
 
 Production data was cleaned separately: **13712 → 6856 points**, snapshot taken first, deletion
 conditional on a point with the same text provably remaining, and `file_catalog.chunk_count`
@@ -46,6 +46,31 @@ Monitoring Config Drift green, rollback skipped). A probe inside the deployed `m
 confirms `DENSE_SCORE_THRESHOLD 0.25` in the running bundle and hybrid top scores of 0.750 and 0.553
 — above the 0.500 ceiling that a single-source fusion produces — with five unique passages and no
 parent-level results.
+
+## Legacy chunker repaired (2026-08-13)
+
+`mc2-5fpaf` is closed by fixing the chunker, not by removing the parent tier. The tier was never
+unworkable; it was broken by two measurement errors in `markdown-chunker.ts` that hid each other.
+
+`splitByHeadings` was `new MarkdownTextSplitter({})`. Despite the name it never split on headings —
+it is a recursive character splitter — and with no options it took LangChain's default 1000-character
+window. `tokenAwareSplit` then sized both splitters as `tokens * 4`, but Russian runs 2.33 characters
+per token, so the 400-token child window was really 1600 characters. A section never reached that
+window, so `splitText` returned the parent unchanged: one child per parent, carrying the parent's
+exact text. Both passes are now token-aware and the heading pass is real.
+
+Measured on 25 production documents through the deployed code, before → after: parents 508 → 178,
+children 508 → 561, children per parent 1.00 → 3.15, degenerate parents 508 → 29, children with
+siblings 0 → 531, children with a heading path other than `Root` 0 → 475.
+
+**No reindex was needed or performed.** The fix applies to future chunking; existing points are
+untouched. All 87 source files behind the 218 indexed documents are present on the host, so a
+reindex is possible later — the earlier note that documents were unrecoverable does not apply to the
+indexed set.
+
+Two consequences are open, deliberately: `mc2-18ujf` (production holds no natively chunked point at
+all, despite `DOCLING_CHUNK_STRATEGY=docling_hybrid`) and `mc2-0fmnn` (`getParentChunk` and
+`getSiblingChunks` are exported, uncalled, and were structurally empty).
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -86,13 +111,20 @@ remain explicitly deferred.
 - Qdrant has a daily restricted pull to `helixa-new` with 14-day/14-copy bounds, a 10 GiB free-space
   floor and low CPU/I/O priority; both backup and restore timers are enabled and Prometheus scrapes
   independent timestamps.
-- On-host Qdrant snapshots are **10 GB, 75 files, unbounded**, and they live inside the same docker
-  volume as the live data (`megacampus_qdrant/_data/snapshots`). Losing that volume loses both.
-  Real rollback depth is the off-host pull, not the file count. Host disk is at 77%. `mc2-hfoh3`.
+- On-host Qdrant snapshots live inside the same docker volume as the live data
+  (`megacampus_qdrant/_data/snapshots`), so losing that volume loses both; the daily off-host pull is
+  the mitigation and it verified a post-deduplication snapshot on 2026-08-13. Local retention **is**
+  bounded — `snapshot.ts` applies `selectRetentionDeletions` at 30 days and it is unit-tested — but
+  nothing has aged out yet, so the first real deletion is due around 2026-08-30. Measured 2026-08-13:
+  78 snapshots, 78 manifests, 10.93 GB, ~17.7 GB at steady state, disk 109/148 GB. `mc2-hfoh3` closed.
 - Uploads have a daily pull-based off-host copy on `helixa-new`; a restore of one file matched
   `file_catalog.hash`. It is a second machine, not full disaster recovery.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations.
-- Nine source documents are accepted as lost; do not reopen them.
+- Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
+  set: all 87 distinct source files behind the 218 indexed documents are present under
+  `/opt/megacampus/data/uploads` (verified 2026-08-13, missing 0), so a reindex would not drop them.
+- Uploads live on the production host, not in Supabase Storage — the only bucket is
+  `course-enrichments` with 14 objects.
 - Monitoring drift is a separate job and must never become a deploy step, because it can trigger
   rollback on configuration drift.
 - `AGENTS.md` is rewritten by a `bd` hook: stage and commit explicit paths, never `git add -A`.
@@ -137,7 +169,10 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.61` — owner decision above.
 - `mc2-db696.106`/`.107`/`.108` — PDF fidelity, content grounding, and bounded provider timeouts
   with reliable latency/cost receipts.
-- `mc2-5fpaf` — parent chunk tier: make it work or remove it. Either choice reindexes.
+- `mc2-0fmnn` — wiring parent/sibling context expansion into retrieval changes Stage 5/6 prompts and
+  token budgets, so it needs a quality measurement rather than only code.
+- `mc2-18ujf` — proving which chunking strategy production actually applies needs one document run
+  through Stage 2 on dev.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
   `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
