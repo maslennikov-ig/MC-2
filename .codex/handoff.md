@@ -8,54 +8,28 @@ Current state only. History lives in commits, `bd` close reasons and
 ## Current stage
 
 The Career Playbook quality track is **accepted**. `mc2-db696.110` closed on an editorial read of
-**4.4 / 5** against a 4.0 threshold, up from a 2.6 baseline. Evidence:
-`.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`. Cost of the accepting run was USD 0.352
-against a USD 0.60 ceiling.
+**4.4 / 5** against a 4.0 threshold, up from a 2.6 baseline; the accepting run cost USD 0.352
+against a USD 0.60 ceiling. Evidence:
+`.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`. Two process rules from it are written
+into `06-quality-acceptance.md` and still hold: read the artifact before calling a run accepted, and
+clean up **after** the editorial pass.
 
-Two process rules from it are written into `06-quality-acceptance.md` and still hold: read the
-artifact before calling a run accepted, and clean up **after** the editorial pass.
+## RAG retrieval and chunking repaired (2026-08-12/13)
 
-## RAG retrieval repaired (2026-08-12, `54a5c5e44`)
+Closed: `mc2-pdmgu`, `mc2-7frdr`, `mc2-5fpaf`, `mc2-18ujf`; `mc2-lrav0` on the owner's "no backfill".
+Details in the commits (`54a5c5e44`, `c18e2a9ea`) and stage summaries. What still constrains work:
 
-Two defects, both silent, both measured on the live production collection before and after.
-`mc2-pdmgu` and `mc2-7frdr` are closed; `mc2-lrav0` is closed on the owner's "no backfill".
-
-**The score threshold was unreachable.** Every RAG entry point carried its own `0.7` while the
-embeddings top out near 0.58. The threshold gates the dense branch of a hybrid query, so hybrid
-search was byte-for-byte BM25-only — `hybridIsJustSparse=true` on three queries, `false` after. One
-source now: `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 ceiling), and a
-test reads the RAG sources to reject any literal above that ceiling.
-
-**Half the index was a copy of the other half.** Every parent held exactly one child and therefore
-that child's exact text. Degenerate parents no longer reach the index (`selectIndexableChunks`), and
-search drops repeated text as a safety net. The cause first recorded here — `groupIntoParents()` in
-the Docling adapter — was **wrong**; see the chunker section below. Production data was cleaned to
-**13712 → 6856 points**, snapshot first, deletion conditional on a same-text point provably
-remaining, `file_catalog.chunk_count` corrected for 218 documents. The 50% drop correctly fired
-`QdrantPointCountUnexpectedDrop` and resolved on its own.
-
-Delivered on `c18e2a9ea`. A probe in the deployed worker confirmed `DENSE_SCORE_THRESHOLD 0.25` and
-hybrid top scores of 0.750 and 0.553, above the 0.500 ceiling a single-source fusion produces.
-
-## Legacy chunker repaired (2026-08-13)
-
-`mc2-5fpaf` closed by fixing the chunker, not by removing the parent tier. Two measurement errors in
-`markdown-chunker.ts` hid each other: `splitByHeadings` was `new MarkdownTextSplitter({})`, which
-despite the name never splits on headings and with no options took LangChain's 1000-character
-default; `tokenAwareSplit` then sized both splitters as `tokens * 4` while Russian runs 2.33
-characters per token. A section never reached the child window, so every parent came back unsplit.
-Both passes are now token-aware and the heading pass is real.
-
-Measured on 25 production documents, before → after: children per parent 1.00 → 3.15, degenerate
-parents 508 → 29, children with siblings 0 → 531, children with a real heading path 0 → 475. No
-reindex needed; existing points are untouched, and all 87 source files behind the 218 indexed
-documents are present should one be wanted later.
-
-**The native path is healthy** (`mc2-18ujf`, closed). Production holds no natively chunked point only
-because the index was built 2026-07-31 and native chunking landed 2026-08-05. Exercised on three
-cached conversions: `strategy=docling_hybrid`, zero degenerate parents, siblings populated,
-`refCoverage`/`locationCoverage` both 1.000. No silent fallback, and a second disproof of the
-`groupIntoParents()` accusation.
+- Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6
+  ceiling), and a test rejects any literal above that ceiling in the RAG sources. The old `0.7` was
+  unreachable against embeddings topping out near 0.58, which made hybrid search BM25-only.
+- Degenerate parents no longer reach the index (`selectIndexableChunks`); search drops repeated text
+  as a safety net. Production was cleaned 13712 → 6856 points.
+- `markdown-chunker.ts` is token-aware on both passes and its heading pass is real. Measured on 25
+  production documents: children per parent 1.00 → 3.15, degenerate parents 508 → 29, children with
+  siblings 0 → 531. No reindex needed; existing points untouched.
+- The native path is healthy: `strategy=docling_hybrid`, zero degenerate parents, siblings
+  populated, `refCoverage`/`locationCoverage` both 1.000. `groupIntoParents()` was accused twice and
+  is not the cause of either defect.
 
 ## Parent context expansion (2026-08-13, `217e3d112`)
 
@@ -92,10 +66,34 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 `reasoning_enabled` without one. On for `stage_6_complex`, `stage_5_escalation`,
 `stage_6_auto_last_chance` only.
 
-Models and prices have one source, `MODEL_CATALOG` in shared-types. Live models carry the current
-price; retired models keep the price previously recorded, because restating old runs at today's
-rates would falsify history. The routing refresh is still unexercised by a real course generation;
-the last course was created 2026-06-28.
+Models and prices have one source, `MODEL_CATALOG` in shared-types; retired models keep the price
+previously recorded, because restating old runs at today's rates would falsify history. The routing
+refresh is still unexercised by a real course generation; the last course was created 2026-06-28.
+
+## Phase configs audited (2026-08-13, `7ad421986`)
+
+`mc2-o3s4r` closed. Stored configuration is clean on the checks that matter: no budget exceeds a
+model ceiling once the reasoning budget is added, no reasoning on a model that refuses it, no
+unbudgeted reasoning, every model catalogued and live, every fallback crossing vendors. The 104 → 57
+seed collapse is accounted for: 9 judge rows skipped, the rest keyed by phase name.
+
+What was open was the seam, not the data. Stage 5 read `temperature`/`maxTokens`/`reasoning` from
+the database and passed on only the model id, so the generator applied a hardcoded 0.7/30000 to
+every tier; metadata generation rebuilt an unconfigured model from an id it had just configured; and
+`getModelForPhase` dropped `config.reasoning` entirely. All three now go through
+`buildProviderParams`. The collision fallback was a retired model with the smallest ceiling in the
+catalogue (16384) and is now `google/gemini-3-flash-preview`.
+
+`tests/unit/phase-config-provider-contract.test.ts` states the provider contract and reads the
+configuration into it; it was verified against the defect, not just observed to pass. The 11 rows
+carrying both `reasoning_effort` and `reasoning_max_tokens` had the effort cleared on the owner's
+decision, and `config-seed.json` was regenerated from the database.
+
+Open from the audit: `mc2-hb8mn` (`fetchStageConfigFromDb` calls `.maybeSingle()` on a filter
+matching up to 14 rows; no production caller, so latent), `mc2-s1vg5` (`generate:config-seed` exits
+0 reporting success when the database is unreachable), `mc2-9yrgb` (`stage_5_escalation` configured
+and shown but requested by nothing — do not delete on that alone), `mc2-p6u8k` (Stage 5 last-resort
+constants still name models the routing cut retired).
 
 ## Backlog truth and order
 
@@ -181,11 +179,13 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 Accepted stage id: `mc2-db696.105` · Current stage id: `mc2-db696.110` · Next stage id:
 `mc2-db696.107` when implementation is selected
 
-Recommended action: `mc2-o3s4r`, then `mc2-2pplo`, in that order by owner decision 2026-08-13. Audit
-the phase configs against what the models and OpenRouter accept — the seam that hid `mc2-see4m` for a
-week — then run one small real course end to end, authorized at USD 1–3 and the only thing that can
-find the next blocker. A prompt for a cold session is the first comment on `mc2-o3s4r`. After those:
-content grounding, PDF fidelity, timeouts.
+Recommended action: `mc2-2pplo`, unblocked — `mc2-o3s4r` is closed. Run one small real course end to
+end on **dev** (`dev.ai.megacampus.ru`; the host carries a full `-dev` worker set and its own
+Qdrant), authorized at USD 1–3, and the only thing that can find the next blocker. `develop` at
+`7ad421986` auto-deploys there and the bundle was probed for today's fixes. Start it in a fresh
+session: the course pipeline is driven through authenticated tRPC with a document upload and staged
+approvals, and an abandoned half-run leaves paid artefacts in the shared dev/staging database. After
+that: content grounding, PDF fidelity, timeouts.
 
 ## Starter prompt for next orchestrator
 
