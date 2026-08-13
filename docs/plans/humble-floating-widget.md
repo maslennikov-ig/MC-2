@@ -296,9 +296,11 @@ Stage 7 в этот прогон **не входит** — решение по �
 
 ## Стартовое сообщение для новой сессии
 
-Проверено: `orch-prompts prompt-check --kind handoff --runtime claude --profile opus-5` — pass,
-с предупреждением о длине (2563 символа против ориентира 1500). Сокращать дальше нечего:
-оставшееся — две причины блокировок, три ловушки этого репозитория, потолок расхода и уборка.
+Промт хранится отдельным документом:
+`docs/superpowers/prompts/2026-08-13-pipeline-repair-and-cost-orchestrator.md`. Проверено:
+`orch-prompts prompt-check --kind handoff --runtime claude --profile opus-5` — pass, с
+предупреждением о длине (2563 символа против ориентира 1500). Сокращать дальше нечего: оставшееся —
+две причины блокировок, три ловушки этого репозитория, потолок расхода и уборка.
 
 > Target: Claude Code CLI, repo /home/me/code/mc2, branch develop.
 > Audience: engineering agent starting cold.
