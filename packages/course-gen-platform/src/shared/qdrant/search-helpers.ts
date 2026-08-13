@@ -28,6 +28,11 @@ export function generateSearchCacheKey(queryText: string, options: ResolvedSearc
     priority_boost_factor: options.priority_boost_factor,
     group_by_document: options.group_by_document,
     group_size: options.group_size,
+    // Expansion changes the returned text, and the budget changes how much of
+    // it comes back, so both belong to the identity of a cached response. Left
+    // out, a caller asking for expanded passages would be served whatever the
+    // previous caller happened to ask for.
+    expand: options.expand_context?.max_tokens ?? null,
     filters: {
       organization_id: options.filters.organization_id,
       course_id: options.filters.course_id,

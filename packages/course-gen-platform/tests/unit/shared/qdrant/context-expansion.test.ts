@@ -191,6 +191,37 @@ describe('expandToSiblingContext', () => {
     expect(expanded[1].content).toBe('b');
   });
 
+  it('never drops a retrieved chunk to stay under the budget', async () => {
+    // Measured on dev: three chunks totalling 411 tokens under a 250 budget came
+    // back whole and unexpanded. The budget bounds what expansion adds; dropping
+    // search hits belongs to the formatter, which counts its own markup and runs
+    // last. Enforcing it twice with two accountings would be worse.
+    retrieve.mockResolvedValue([record('c1', 'широкий отрывок', 0, 400)]);
+
+    const results = [
+      hit({
+        chunk_id: 'c1',
+        parent_chunk_id: 'pa',
+        content: 'a',
+        token_count: 220,
+        sibling_chunk_ids: ['c2'],
+      }),
+      hit({
+        chunk_id: 'b1',
+        parent_chunk_id: 'pb',
+        content: 'b',
+        token_count: 191,
+        sibling_chunk_ids: [],
+      }),
+    ];
+
+    const expanded = await expandToSiblingContext(results, { maxTokens: 250 });
+
+    expect(expanded).toHaveLength(2);
+    expect(expanded.map(r => r.content)).toEqual(['a', 'b']);
+    expect(expanded.reduce((sum, r) => sum + r.token_count, 0)).toBe(411);
+  });
+
   it('returns the matched chunk when the sibling fetch fails', async () => {
     retrieve.mockRejectedValue(new Error('qdrant unavailable'));
 

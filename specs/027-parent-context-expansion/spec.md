@@ -100,8 +100,14 @@ Given a search result carrying `document_id`, `chunk_id`, `sibling_chunk_ids` an
 
 Expansion multiplies context roughly threefold (measured 291 → 888 tokens per result). Consumers
 carry explicit budgets — `LESSON_RAG_CONFIG.MAX_TOKENS` 20 000, section-level 40 000. Expansion
-takes results in relevance order and stops when the next expanded result would exceed the budget,
-falling back to the unexpanded chunk for the remainder. A budget is never exceeded to expand.
+takes results in relevance order and stops when the next expanded result would carry the running
+total past the budget, falling back to the unexpanded chunk for the remainder.
+
+The budget bounds what expansion may **add**, not the size of the result set. Expansion never drops
+a retrieved chunk to stay under the number: truncation belongs to the formatter, which counts its
+own markup and runs last. Enforcing it in two places with two accountings would be worse than
+enforcing it once. So a returned set can exceed the budget — it cannot exceed it _because of
+expansion_.
 
 ### 3.4 Deduplication
 
@@ -117,7 +123,7 @@ so one passage never occupies two slots.
 | 1   | Uploading a chunking result sends zero points with `level: 'parent'`, except childless parents. |
 | 2   | Every parent's text remains reachable: union of indexed chunks covers all parent text.          |
 | 3   | Expanding a matched child returns its siblings' text in `chunk_index` order, overlap removed.   |
-| 4   | Expansion never exceeds the caller's token budget and degrades to unexpanded results instead.   |
+| 4   | Expansion adds nothing past the caller's budget and degrades to unexpanded results instead.     |
 | 5   | A failed sibling fetch still returns the matched chunk.                                         |
 | 6   | Two results sharing a parent yield one expanded passage, not two.                               |
 | 7   | `pnpm type-check`, `pnpm build`, and the backend unit suite pass.                               |
