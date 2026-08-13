@@ -26,6 +26,7 @@ import {
   handleUnknownError,
 } from './client-helpers';
 import type { ReasoningRequest } from './client-helpers';
+import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
 
 /**
  * Options for LLM completion requests
@@ -49,6 +50,12 @@ export interface LLMClientOptions {
    * work is genuinely hard.
    */
   reasoning?: ReasoningRequest;
+  /**
+   * Course, stage and phase this call belongs to. Supply it wherever the
+   * caller knows them: without it the call's cost cannot be attributed to a
+   * course and is only counted in the provider's own key total.
+   */
+  costContext?: LlmCostContext;
 }
 
 export interface LLMClientConstructionOptions {
@@ -213,6 +220,7 @@ export class LLMClient {
       timeout = 60000,
       enableCaching = false,
       reasoning,
+      costContext,
     } = options;
 
     logger.info(
@@ -239,11 +247,14 @@ export class LLMClient {
 
     const inputContentLength = systemPrompt.length + prompt.length;
 
-    return this.executeWithRetry(
+    const startedAt = Date.now();
+    const response = await this.executeWithRetry(
       () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
       model,
       'LLM'
     );
+    await this.recordCost(response, costContext, startedAt);
+    return response;
   }
 
   /**
@@ -267,6 +278,7 @@ export class LLMClient {
       timeout = 60000,
       enableCaching = false,
       reasoning,
+      costContext,
     } = options;
 
     logger.info(
@@ -287,10 +299,35 @@ export class LLMClient {
       return sum + (typeof msg.content === 'string' ? msg.content.length : 0);
     }, 0);
 
-    return this.executeWithRetry(
+    const startedAt = Date.now();
+    const response = await this.executeWithRetry(
       () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
       model,
       'Chat completion'
+    );
+    await this.recordCost(response, costContext, startedAt);
+    return response;
+  }
+
+  /**
+   * Prices the call from MODEL_CATALOG and records it against the course.
+   *
+   * `response.model` is what the provider actually served, which is not always
+   * what was asked for once a fallback fires, so the price follows the served
+   * model.
+   */
+  private async recordCost(
+    response: LLMResponse,
+    costContext: LlmCostContext | undefined,
+    startedAt: number
+  ): Promise<void> {
+    await recordLlmCallCost(
+      {
+        model: response.model,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+      },
+      costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
   }
 

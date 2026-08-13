@@ -440,6 +440,15 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       'Sandboxed processor: Job processing completed'
     );
 
+    // One stage job is the natural moment to refresh what the course has cost:
+    // the traces for that stage are written by now, and the column was
+    // otherwise never filled at all (mc2-o7740).
+    const completedCourseId = getJobCourseId(job.data);
+    if (completedCourseId) {
+      const { updateCourseEstimatedCost } = await import('../services/token-tracking-service');
+      await updateCourseEstimatedCost(completedCourseId);
+    }
+
     return result;
   } catch (error) {
     const durationMs = Date.now() - startTime;
