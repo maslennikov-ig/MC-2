@@ -24,7 +24,6 @@ import { COLLECTION_CONFIG } from './create-collection';
 import { extractPayload } from './search-helpers';
 import { generatePointId } from './upload-helpers';
 import { logger } from '../logger/index';
-import type { SearchResult } from './search-types';
 
 /** How far back to look for a repeated boundary between two adjacent chunks. */
 const MAX_OVERLAP_CHARS = 400;
@@ -75,8 +74,28 @@ export function stitch(pieces: readonly string[]): string {
   return out;
 }
 
+/**
+ * The minimum a chunk must carry to be expanded.
+ *
+ * Stated structurally rather than as `SearchResult` because expansion belongs
+ * at different points in different pipelines: where a reranker runs, it has to
+ * happen *after* it. Reranking is a cross-encoder over the retrieved text, so
+ * feeding it 1400-token passages instead of the ~160-token chunks that matched
+ * would both cost more and judge worse — and four out of five candidates are
+ * discarded there anyway.
+ */
+export interface ExpandablePassage {
+  document_id: string;
+  chunk_id: string;
+  parent_chunk_id?: string | null;
+  sibling_chunk_ids?: string[];
+  content: string;
+  token_count: number;
+  score: number;
+}
+
 /** Identity of the passage a result belongs to. */
-function passageKey(result: SearchResult): string {
+function passageKey(result: ExpandablePassage): string {
   return `${result.document_id}::${result.parent_chunk_id ?? result.chunk_id}`;
 }
 
@@ -128,24 +147,24 @@ async function fetchSiblings(
  * @param options - Collection and token budget
  * @returns One result per passage, expanded where the budget allowed
  */
-export async function expandToSiblingContext(
-  results: SearchResult[],
+export async function expandToSiblingContext<T extends ExpandablePassage>(
+  results: T[],
   options: ExpansionOptions = {}
-): Promise<SearchResult[]> {
+): Promise<T[]> {
   if (results.length === 0) return results;
 
   const collectionName = options.collectionName ?? COLLECTION_CONFIG.name;
   const budget = options.maxTokens ?? Number.POSITIVE_INFINITY;
 
   // Best score wins the passage, and relevance order is preserved.
-  const passages = new Map<string, SearchResult>();
+  const passages = new Map<string, T>();
   for (const result of results) {
     const key = passageKey(result);
     const existing = passages.get(key);
     if (!existing || result.score > existing.score) passages.set(key, result);
   }
 
-  const expanded: SearchResult[] = [];
+  const expanded: T[] = [];
   let spent = 0;
 
   for (const result of passages.values()) {
