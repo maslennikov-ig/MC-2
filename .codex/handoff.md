@@ -22,30 +22,21 @@ Two defects, both silent, both measured on the live production collection before
 `mc2-pdmgu` and `mc2-7frdr` are closed; `mc2-lrav0` is closed on the owner's "no backfill".
 
 **The score threshold was unreachable.** Every RAG entry point carried its own `0.7` while the
-embeddings top out near 0.58 on this corpus. The threshold gates the dense branch of a hybrid query,
-so with it in place hybrid search was byte-for-byte identical to BM25-only — measured
-`hybridIsJustSparse=true` on three queries, `false` after. One source now:
-`src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 measured ceiling), and a test
-reads the RAG sources to reject any literal above that ceiling.
+embeddings top out near 0.58. The threshold gates the dense branch of a hybrid query, so hybrid
+search was byte-for-byte BM25-only — `hybridIsJustSparse=true` on three queries, `false` after. One
+source now: `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 ceiling), and a
+test reads the RAG sources to reject any literal above that ceiling.
 
-**Half the index was a copy of the other half.** Not reprocessing: point ids are deterministic and
-document-scoped, so a repeat inside a document is impossible. Every parent held exactly one child
-and therefore that child's exact text. Degenerate parents no longer reach the index
-(`selectIndexableChunks`), and search drops repeated text as a safety net.
+**Half the index was a copy of the other half.** Every parent held exactly one child and therefore
+that child's exact text. Degenerate parents no longer reach the index (`selectIndexableChunks`), and
+search drops repeated text as a safety net. The cause first recorded here — `groupIntoParents()` in
+the Docling adapter — was **wrong**; see the chunker section below. Production data was cleaned to
+**13712 → 6856 points**, snapshot first, deletion conditional on a same-text point provably
+remaining, `file_catalog.chunk_count` corrected for 218 documents. The 50% drop correctly fired
+`QdrantPointCountUnexpectedDrop` and resolved on its own.
 
-The cause first recorded here — `groupIntoParents()` in the Docling adapter — was **wrong**, and is
-corrected in `mc2-7frdr`. See the chunker section below.
-
-Production data was cleaned separately: **13712 → 6856 points**, snapshot taken first, deletion
-conditional on a point with the same text provably remaining, and `file_catalog.chunk_count`
-corrected for 218 documents. The 50% drop fired `QdrantPointCountUnexpectedDrop`, correctly; it
-resolved on its own.
-
-**Delivered to production** on `c18e2a9ea` (25 commits, run `31627877149`, Blue/Green onto blue,
-Monitoring Config Drift green, rollback skipped). A probe inside the deployed `megacampus-worker`
-confirms `DENSE_SCORE_THRESHOLD 0.25` in the running bundle and hybrid top scores of 0.750 and 0.553
-— above the 0.500 ceiling that a single-source fusion produces — with five unique passages and no
-parent-level results.
+Delivered on `c18e2a9ea`. A probe in the deployed worker confirmed `DENSE_SCORE_THRESHOLD 0.25` and
+hybrid top scores of 0.750 and 0.553, above the 0.500 ceiling a single-source fusion produces.
 
 ## Legacy chunker repaired (2026-08-13)
 
@@ -64,9 +55,8 @@ children 508 → 561, children per parent 1.00 → 3.15, degenerate parents 508 
 siblings 0 → 531, children with a heading path other than `Root` 0 → 475.
 
 **No reindex was needed or performed.** The fix applies to future chunking; existing points are
-untouched. All 87 source files behind the 218 indexed documents are present on the host, so a
-reindex is possible later — the earlier note that documents were unrecoverable does not apply to the
-indexed set.
+untouched. All 87 source files behind the 218 indexed documents are present, so a reindex is
+possible later.
 
 **The native path is healthy** (`mc2-18ujf`, closed). Production holds no natively chunked point only
 because the index was built 2026-07-31 and native chunking landed 2026-08-05 — the index is older
