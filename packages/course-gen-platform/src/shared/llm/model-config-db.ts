@@ -17,18 +17,37 @@ import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspa
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
 
-const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
+/**
+ * Every replacement must itself be in `MODEL_CATALOG`, or the substitution
+ * trades a known-retired id for an unknown one: cost silently resolves to the
+ * pessimistic $1/$3 default and both capability predicates answer "unknown",
+ * which reads as "no reasoning, temperature accepted" whether or not that is
+ * true. `openai/gpt-5.4` pointed at `google/gemini-3.5-flash`, which is in no
+ * catalogue in this repo.
+ */
+export const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
   'xiaomi/mimo-v2-flash': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4.1-fast': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
   'qwen/qwen3.5-plus-02-15': 'qwen/qwen3.7-plus',
   'deepseek/deepseek-v3.2': 'deepseek/deepseek-v4-flash',
-  'openai/gpt-5.4': 'google/gemini-3.5-flash',
+  'openai/gpt-5.4': 'google/gemini-3-flash-preview',
   'minimax/minimax-m2.5': 'minimax/minimax-m3',
   'openai/gpt-oss-120b': 'deepseek/deepseek-v4-flash',
 };
 
-const COLLISION_FALLBACK_MODEL_ID = 'qwen/qwen3-235b-a22b-2507';
+/**
+ * Substituted when a row's fallback resolves to its own primary, so the rescue
+ * model is never the model being rescued.
+ *
+ * Must be a live-routed model. It was `qwen/qwen3-235b-a22b-2507`, which the
+ * 2026-08-12 routing cut retired, and which carries the smallest output ceiling
+ * in the catalogue at 16384 — the exact ceiling recorded in
+ * `pipeline-admin/model-budget-validation.ts` as having already refused
+ * `stage_5_escalation`'s 30000-token budget. A collision on any generous phase
+ * would have landed there.
+ */
+export const COLLISION_FALLBACK_MODEL_ID = 'google/gemini-3-flash-preview';
 
 function normalizeRuntimeModelId(modelId: string | null | undefined): string | null {
   if (!modelId) return null;

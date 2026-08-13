@@ -35,7 +35,11 @@ import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm
 import { zodToPromptSchema } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
-import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
+import {
+  getModelForPhase,
+  getTextContent,
+  buildProviderParams,
+} from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
@@ -185,8 +189,12 @@ export class MetadataGenerator {
     // Step 4: Generate metadata with hybrid routing
     // Updated 2025-11-14: Language-aware model selection based on quality testing
     // Now uses ModelConfigService with database lookup + hardcoded fallback
-    const primaryModelId = await this.selectModelForLanguage(language, false, estimatedInputTokens);
-    const model = this.createModel(primaryModelId);
+    const { modelId: primaryModelId, configured } = await this.selectModelForLanguage(
+      language,
+      false,
+      estimatedInputTokens
+    );
+    const model = configured ?? this.createModel(primaryModelId);
 
     logger.info({
       msg: 'Metadata generation: selected model',
@@ -484,9 +492,10 @@ export class MetadataGenerator {
     language: string,
     useFallback: boolean = false,
     estimatedTokens: number = 50000
-  ): Promise<string> {
+  ): Promise<{ modelId: string; configured: ChatOpenAI | null }> {
     if (useFallback) {
-      return MODELS.metadata_fallback; // Kimi K2-0905 (Gold for both)
+      // Kimi K2-0905 (Gold for both)
+      return { modelId: MODELS.metadata_fallback, configured: null };
     }
 
     // Use getModelForPhase for phase-specific model selection
@@ -507,7 +516,11 @@ export class MetadataGenerator {
         phase: 'stage_5_metadata',
       });
 
-      return modelId;
+      // Hand back the instance, not just its id. `getModelForPhase` already
+      // applied the phase's temperature, token budget and reasoning settings
+      // against what the provider accepts; rebuilding from the id alone threw
+      // all three away and silently substituted 0.7/8000.
+      return { modelId, configured: model };
     } catch (error) {
       logger.warn({
         msg: 'getModelForPhase failed, using hardcoded fallback',
@@ -517,9 +530,9 @@ export class MetadataGenerator {
 
       // Fallback to MODELS constant (safety net)
       if (language === 'ru' || language === 'russian') {
-        return MODELS.ru_metadata_primary;
+        return { modelId: MODELS.ru_metadata_primary, configured: null };
       }
-      return MODELS.en_metadata_primary;
+      return { modelId: MODELS.en_metadata_primary, configured: null };
     }
   }
 
@@ -841,8 +854,10 @@ ${schemaDescription}
         baseURL: OPENROUTER_BASE_URL,
       },
       apiKey: apiKey, // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
-      temperature, // From ModelConfigService or default
-      maxTokens, // From ModelConfigService or default
+      // Only reached on the hardcoded-fallback path now, but it still goes
+      // through the provider check: `temperature` is not accepted by every
+      // model this can fall back to.
+      ...buildProviderParams(modelId, temperature, maxTokens),
     });
   }
 

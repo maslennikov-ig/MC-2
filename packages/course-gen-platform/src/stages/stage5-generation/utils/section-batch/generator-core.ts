@@ -6,6 +6,7 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
+import { buildProviderParams } from '@/shared/llm/langchain-models';
 import { normalizeLanguageCode } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
@@ -16,13 +17,16 @@ import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
 import { estimateTokens } from './utils';
 
 /**
- * Create ChatOpenAI model instance for OpenRouter
+ * Create ChatOpenAI model instance for OpenRouter.
+ *
+ * Goes through `buildProviderParams` rather than setting `temperature` and
+ * `maxTokens` directly, because two provider facts decide whether the numbers
+ * the configuration carries are the numbers the request carries: GPT-5.6
+ * ignores `temperature`, and OpenRouter bills reasoning tokens against
+ * `max_tokens`, so a reasoning budget has to be added to the answer budget.
+ * Setting the fields here bypassed both checks.
  */
-function createModel(
-  modelId: string,
-  temperature: number = 0.7,
-  maxTokens: number = 30000
-): ChatOpenAI {
+function createModel(tier: ModelTier): ChatOpenAI {
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
@@ -30,14 +34,13 @@ function createModel(
   }
 
   return new ChatOpenAI({
-    modelName: modelId,
+    modelName: tier.model,
     configuration: {
       baseURL: OPENROUTER_BASE_URL,
     },
     apiKey: apiKey,
-    temperature,
-    maxTokens,
     timeout: 300000,
+    ...buildProviderParams(tier.model, tier.temperature, tier.maxTokens, tier.reasoning),
   });
 }
 
@@ -309,7 +312,7 @@ export async function generateWithRetry(
         previousSectionsDigest
       );
 
-      const model = createModel(currentModelTier.model);
+      const model = createModel(currentModelTier);
       const response = await model.invoke(prompt);
 
       let rawContent: string;
@@ -405,6 +408,14 @@ export async function generateWithRetry(
         const langCode = normalizeLanguageCode(language, 'en');
         let escalationModel: string;
         let escalationSource = 'database';
+        // The escalated phase brings its own sampling settings; falling back to
+        // the tier the escalation is leaving would carry the simple tier's
+        // budget into a model chosen because that budget was not enough.
+        let escalationSampling: Pick<ModelTier, 'temperature' | 'maxTokens' | 'reasoning'> = {
+          temperature: currentModelTier.temperature,
+          maxTokens: currentModelTier.maxTokens,
+          reasoning: currentModelTier.reasoning,
+        };
 
         try {
           const modelConfigService = createModelConfigService();
@@ -416,6 +427,11 @@ export async function generateWithRetry(
           );
           escalationModel = escalationConfig.modelId || MODELS.complex;
           escalationSource = escalationConfig.source;
+          escalationSampling = {
+            temperature: escalationConfig.temperature,
+            maxTokens: escalationConfig.maxTokens,
+            reasoning: escalationConfig.reasoning,
+          };
         } catch (configError) {
           logger.warn({
             msg: 'getModelForPhase failed for escalation, using hardcoded fallback',
@@ -429,6 +445,7 @@ export async function generateWithRetry(
           model: escalationModel,
           tier: 'complex',
           reason: `Quality escalation from simple tier - using complex model (${escalationSource})`,
+          ...escalationSampling,
         };
 
         logger.info({

@@ -419,7 +419,7 @@ const PHASE_FALLBACK_CONFIG: Record<
  * reasoning budget has to be added to the answer budget rather than shared
  * with it.
  */
-function buildProviderParams(
+export function buildProviderParams(
   modelId: string,
   temperature: number,
   maxTokens: number,
@@ -576,8 +576,17 @@ export async function getModelForPhase(
       );
     }
 
-    // Use async version for database-first API key resolution
-    return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
+    // Use async version for database-first API key resolution.
+    // `config.reasoning` has to travel with the rest of the phase config: a
+    // phase that reads its reasoning budget out of the database and then drops
+    // it before the request is a phase that thinks it deliberates and does not.
+    return await createOpenRouterModelAsync(
+      config.modelId,
+      config.temperature,
+      config.maxTokens,
+      undefined,
+      config.reasoning
+    );
   } catch (err) {
     logger.warn(
       { phase, error: err },
