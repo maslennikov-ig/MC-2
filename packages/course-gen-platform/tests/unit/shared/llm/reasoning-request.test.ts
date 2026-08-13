@@ -30,7 +30,9 @@ describe('reasoning request construction', () => {
       maxTokens: 8000,
     });
 
-    expect(options.reasoning).toEqual({ effort: 'high', max_tokens: 8000 });
+    // Only the budget goes out: OpenRouter answers 400 to a request carrying
+    // both controls, and this shape is what the phase config produces.
+    expect(options.reasoning).toEqual({ max_tokens: 8000 });
     // 8000 for the answer plus 8000 to think with — not 8000 shared between them.
     expect(options.max_tokens).toBe(16000);
   });
@@ -45,8 +47,45 @@ describe('reasoning request construction', () => {
       { enabled: true, effort: 'low', maxTokens: 4000 }
     );
 
-    expect(options.reasoning).toEqual({ effort: 'low', max_tokens: 4000 });
+    expect(options.reasoning).toEqual({ max_tokens: 4000 });
     expect(options.max_tokens).toBe(16000);
+  });
+
+  it('sends the effort when a phase configures one without a budget', () => {
+    const [, options] = buildCompletionRequest(REASONING_MODEL, 'p', 's', 8000, 0.7, false, {
+      enabled: true,
+      effort: 'medium',
+    });
+
+    expect(options.reasoning).toEqual({ effort: 'medium' });
+    // Nothing to add: there is no reasoning budget to grow the answer budget by.
+    expect(options.max_tokens).toBe(8000);
+  });
+
+  it('never sends both controls, which is what the provider rejects', () => {
+    // `stage_6_complex` and its two siblings carry an effort and a budget, so
+    // every complex-tier Stage 6 generation was answered with
+    // `400 Only one of "reasoning.effort" and "reasoning.max_tokens" can be
+    // specified`. Observed on a live run 2026-08-13.
+    const shapes = [
+      { enabled: true, effort: 'high' as const, maxTokens: 8000 },
+      { enabled: true, effort: 'low' as const, maxTokens: 1 },
+    ];
+
+    for (const reasoning of shapes) {
+      const [, options] = buildCompletionRequest(
+        REASONING_MODEL,
+        'p',
+        's',
+        8000,
+        0.7,
+        false,
+        reasoning
+      );
+      const sent = Object.keys(options.reasoning ?? {});
+      expect(sent).toHaveLength(1);
+      expect(sent).toEqual(['max_tokens']);
+    }
   });
 
   it('never sends reasoning to a model that does not accept it', () => {
