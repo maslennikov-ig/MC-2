@@ -68,9 +68,21 @@ untouched. All 87 source files behind the 218 indexed documents are present on t
 reindex is possible later — the earlier note that documents were unrecoverable does not apply to the
 indexed set.
 
-Two consequences are open, deliberately: `mc2-18ujf` (production holds no natively chunked point at
-all, despite `DOCLING_CHUNK_STRATEGY=docling_hybrid`) and `mc2-0fmnn` (`getParentChunk` and
-`getSiblingChunks` are exported, uncalled, and were structurally empty).
+**The native path is healthy** (`mc2-18ujf`, closed). Production holds no natively chunked point only
+because the index was built 2026-07-31 and native chunking landed 2026-08-05 — the index is older
+than the feature, and nothing has been processed since. Exercised 2026-08-13 in the production
+container on three cached Docling conversions: `strategy=docling_hybrid`, zero degenerate parents,
+siblings populated, and `refCoverage`/`locationCoverage` both 1.000. There is no silent fallback.
+This is also the second disproof of the `groupIntoParents()` accusation — that adapter groups
+correctly.
+
+**One decision is open and it is now latent** (`mc2-0fmnn`, P1). Because the native path produces no
+degenerate parents, the _first document processed from now on_ will start writing parent points into
+the index, silently. Measured over 6 conversions: parents are 26.2% of points and cost **91.2% extra
+embedding tokens** on top of the children, for the same material at a coarser grain, and
+`dedupeByContent` will not catch it because a parent contains a child rather than equalling it.
+Decide before the next document runs: keep parents out of the index and wire `getParentChunk` for
+context expansion, which is what the tier was built for, or index both grains deliberately.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -169,10 +181,8 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.61` — owner decision above.
 - `mc2-db696.106`/`.107`/`.108` — PDF fidelity, content grounding, and bounded provider timeouts
   with reliable latency/cost receipts.
-- `mc2-0fmnn` — wiring parent/sibling context expansion into retrieval changes Stage 5/6 prompts and
-  token budgets, so it needs a quality measurement rather than only code.
-- `mc2-18ujf` — proving which chunking strategy production actually applies needs one document run
-  through Stage 2 on dev.
+- `mc2-0fmnn` — whether to index the parent grain is a cost/quality decision, not a code change, and
+  wiring context expansion instead would move Stage 5/6 prompts and token budgets.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
   `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
