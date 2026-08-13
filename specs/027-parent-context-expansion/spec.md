@@ -1,6 +1,6 @@
 # 027 — Parent context expansion: search small, answer large
 
-**Status**: proposed
+**Status**: implemented — `217e3d112`, 2026-08-13
 **Owner decision**: taken 2026-08-13 — implement the design already recorded in
 `docs/RAG-CHUNKING-STRATEGY.md` (T075, 2025-10-24), with the context window set to the matched
 chunk's own siblings.
