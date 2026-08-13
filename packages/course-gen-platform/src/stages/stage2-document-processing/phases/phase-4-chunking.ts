@@ -81,11 +81,11 @@ export async function executeChunking(
     config: DEFAULT_CHUNKING_CONFIG,
   });
 
-  // Chunks worth embedding: a parent whose text is exactly its only child's
-  // text is skipped, since indexing it would store and pay for the same vector
-  // twice and return the same passage twice in every search.
+  // Only the child grain is indexed. Parents carry no text of their own — the
+  // surrounding passage is rebuilt at retrieval time from siblings that are
+  // already indexed, which is what the chunking strategy always specified.
   const allChunks = selectIndexableChunks(chunkingResult);
-  const skippedParents =
+  const parentsNotIndexed =
     chunkingResult.parent_chunks.length + chunkingResult.child_chunks.length - allChunks.length;
 
   logger.info(
@@ -95,7 +95,7 @@ export async function executeChunking(
       chunkingProfileId: chunkingResult.chunkingProfileId,
       parentChunks: chunkingResult.parent_chunks.length,
       childChunks: chunkingResult.child_chunks.length,
-      skippedDuplicateParents: skippedParents,
+      parentsNotIndexed,
       totalChunks: allChunks.length,
       refCoverage: Number(chunkingResult.coverage.refCoverage.toFixed(4)),
       locationCoverage: Number(chunkingResult.coverage.locationCoverage.toFixed(4)),

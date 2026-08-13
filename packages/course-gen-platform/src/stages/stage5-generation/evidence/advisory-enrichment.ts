@@ -574,6 +574,10 @@ export async function enrichBaselineWithDocumentEvidence(
       const query = buildSearchQuery(input.baseline, sectionIndex);
       try {
         retrievalAttempts += 1;
+        // Deliberately not expanded to the surrounding passage. Evidence cites
+        // a specific fragment and carries that fragment's page and provenance;
+        // widening the text would make the citation point at more than what was
+        // actually matched.
         const response = await dependencies.search(query, {
           limit: MAX_RESULTS_PER_SECTION,
           score_threshold: DENSE_SCORE_THRESHOLD,

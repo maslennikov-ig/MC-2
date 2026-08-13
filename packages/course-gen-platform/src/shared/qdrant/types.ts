@@ -68,6 +68,8 @@ export interface QdrantChunkPayload {
   has_tables?: boolean;
   has_images?: boolean;
   sibling_chunk_ids?: string[];
+  /** Position within the passage; orders siblings when a passage is stitched. */
+  chunk_index?: number;
   organization_id?: string;
   course_id?: string;
   [key: string]: unknown;

@@ -156,6 +156,7 @@ export function extractPayload(point: QdrantPointOrScored): QdrantChunkPayload {
     has_tables: payload.has_tables || false,
     has_images: payload.has_images || false,
     sibling_chunk_ids: payload.sibling_chunk_ids,
+    chunk_index: payload.chunk_index,
     organization_id: payload.organization_id,
     course_id: payload.course_id,
   };

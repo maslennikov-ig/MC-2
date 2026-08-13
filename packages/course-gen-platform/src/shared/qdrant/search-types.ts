@@ -32,6 +32,15 @@ export interface SearchResult {
   page_range: [number, number] | null | undefined;
   /** Token count */
   token_count: number;
+  /**
+   * The other chunks of the same passage.
+   *
+   * Populated for documents chunked after spec 027; empty for points indexed
+   * before it, where it is what makes expansion a no-op rather than a failure.
+   */
+  sibling_chunk_ids?: string[];
+  /** Position within the passage, used to order siblings when stitching. */
+  chunk_index?: number;
   /** Similarity score (0-1) */
   score: number;
   /** Content metadata */
@@ -90,6 +99,16 @@ export interface SearchOptions {
   enable_hybrid?: boolean;
   /** Return full payload (default: false) */
   include_payload?: boolean;
+  /**
+   * Expand each result into the passage around it before returning.
+   *
+   * Search runs on the small grain for precision; the caller is answered with
+   * the large one for context, which is the split
+   * `docs/RAG-CHUNKING-STRATEGY.md` specified. It is opt-in because only the
+   * caller knows its prompt budget, and `max_tokens` is a ceiling the expansion
+   * will not cross — it falls back to the matched chunk instead.
+   */
+  expand_context?: { max_tokens: number };
   /** Search filters */
   filters?: SearchFilters;
   /**
@@ -128,9 +147,16 @@ export interface SearchOptions {
   group_size?: number;
 }
 
-/** Search options after defaults have been resolved. */
-export type ResolvedSearchOptions = Required<Omit<SearchOptions, 'filters'>> & {
+/**
+ * Search options after defaults have been resolved.
+ *
+ * `expand_context` stays optional: absent means the caller wants the grain it
+ * searched, which is the right default for a caller that has no prompt budget
+ * to spend.
+ */
+export type ResolvedSearchOptions = Required<Omit<SearchOptions, 'filters' | 'expand_context'>> & {
   filters: SearchFilters;
+  expand_context?: SearchOptions['expand_context'];
 };
 
 /**

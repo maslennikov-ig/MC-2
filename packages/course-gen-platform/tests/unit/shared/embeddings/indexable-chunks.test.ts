@@ -1,17 +1,18 @@
 /**
- * Which chunks reach the vector index (mc2-7frdr).
+ * Which chunks reach the vector index (mc2-v7dod, spec 027).
  *
- * Hierarchical chunking emitted a parent for every group and the pipeline
- * embedded parents and children alike. Every parent ended up with exactly one
- * child and therefore with that child's exact text: on production, 6856 of
- * 13712 indexed points were duplicates of the other 6856. Search returned each
- * passage twice and every embedding was paid for twice.
+ * Only the child grain is indexed. `docs/RAG-CHUNKING-STRATEGY.md` always said
+ * so — it separates `uploadChunksToQdrant(child_chunks)` from
+ * `storeParentChunks(parent_chunks)` — but the second call was never written,
+ * so parents were uploaded alongside their children.
  *
- * The cause was the legacy Markdown chunker's own sizing, not the Docling
- * adapter — every one of those points carried `chunk_strategy:
- * 'hierarchical_markdown'`. It is fixed in `markdown-chunker.ts`; this guard
- * stays because a short section can still hold a single child, and because a
- * chunker that regresses should not be able to do it silently.
+ * Measured over six Docling conversions on 2026-08-13: parents were 26.2% of
+ * points and 91.2% extra embedding tokens, and carried no text of their own —
+ * 57 of 57 were fully reconstructible from their own children. The surrounding
+ * passage is rebuilt from siblings at retrieval time instead.
+ *
+ * The one thing this must never do is lose text, so a childless parent — the
+ * sole carrier of its content — is still indexed.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -34,7 +35,7 @@ function chunk(overrides: Partial<TextChunk> & Pick<TextChunk, 'chunk_id' | 'con
     heading_path: 'Root',
     chapter: null,
     section: null,
-    chunk_strategy: 'docling_hybrid',
+    chunk_strategy: 'hierarchical_markdown',
     overlap_tokens: 0,
     ...overrides,
   } as TextChunk;
@@ -61,86 +62,79 @@ function result(parents: TextChunk[], children: TextChunk[]): ChunkingResult {
 }
 
 describe('selectIndexableChunks', () => {
-  it('drops a parent that repeats its only child word for word', () => {
-    const text = 'Асинхронная коммуникация — основа работы распределённой команды.';
-    const input = result(
-      [chunk({ chunk_id: 'parent_0', level: 'parent', content: text })],
-      [chunk({ chunk_id: 'child_0', parent_chunk_id: 'parent_0', content: text })]
-    );
+  it('indexes the child grain and leaves the parent out of the index', () => {
+    const parent = chunk({
+      chunk_id: 'p1',
+      content: 'первая часть. вторая часть.',
+      level: 'parent',
+    });
+    const children = [
+      chunk({ chunk_id: 'c1', content: 'первая часть.', parent_chunk_id: 'p1', chunk_index: 0 }),
+      chunk({ chunk_id: 'c2', content: 'вторая часть.', parent_chunk_id: 'p1', chunk_index: 1 }),
+    ];
 
-    const indexable = selectIndexableChunks(input);
+    const selected = selectIndexableChunks(result([parent], children));
 
-    expect(indexable.map(c => c.chunk_id)).toEqual(['child_0']);
-    // The duplicate is removed from indexing only; the chunking result itself
-    // still carries the parent, so parent lookup keeps working.
-    expect(input.parent_chunks).toHaveLength(1);
+    expect(selected.map(c => c.chunk_id)).toEqual(['c1', 'c2']);
+    expect(selected.some(c => c.level === 'parent')).toBe(false);
   });
 
-  it('keeps a parent that spans more than one child', () => {
-    const input = result(
-      [chunk({ chunk_id: 'parent_0', level: 'parent', content: 'первый абзац\n\nвторой абзац' })],
-      [
-        chunk({ chunk_id: 'child_0', parent_chunk_id: 'parent_0', content: 'первый абзац' }),
-        chunk({ chunk_id: 'child_1', parent_chunk_id: 'parent_0', content: 'второй абзац' }),
-      ]
-    );
+  it('still leaves out a parent that holds exactly one child', () => {
+    // This was the shape that duplicated half the collection. It is no longer a
+    // special case: no parent is indexed, whatever its child count.
+    const parent = chunk({ chunk_id: 'p1', content: 'один и тот же текст', level: 'parent' });
+    const child = chunk({ chunk_id: 'c1', content: 'один и тот же текст', parent_chunk_id: 'p1' });
 
-    const indexable = selectIndexableChunks(input);
-
-    expect(indexable.map(c => c.chunk_id).sort()).toEqual(['child_0', 'child_1', 'parent_0']);
+    expect(selectIndexableChunks(result([parent], [child])).map(c => c.chunk_id)).toEqual(['c1']);
   });
 
-  it('keeps a parent whose single child covers only part of it', () => {
-    const input = result(
-      [chunk({ chunk_id: 'parent_0', level: 'parent', content: 'вступление и затем вывод' })],
-      [chunk({ chunk_id: 'child_0', parent_chunk_id: 'parent_0', content: 'вступление' })]
-    );
+  it('keeps a childless parent, because nothing else carries its text', () => {
+    const orphan = chunk({ chunk_id: 'p_orphan', content: 'только здесь', level: 'parent' });
+    const other = chunk({ chunk_id: 'p1', content: 'есть ребёнок', level: 'parent' });
+    const child = chunk({ chunk_id: 'c1', content: 'есть ребёнок', parent_chunk_id: 'p1' });
 
-    expect(selectIndexableChunks(input).map(c => c.chunk_id)).toContain('parent_0');
+    const selected = selectIndexableChunks(result([orphan, other], [child]));
+
+    expect(selected.map(c => c.chunk_id).sort()).toEqual(['c1', 'p_orphan']);
   });
 
-  it('treats whitespace-only differences as the same text', () => {
-    // The adapter trims parent content but not child content, so an otherwise
-    // identical pair can differ by a trailing newline.
-    const input = result(
-      [chunk({ chunk_id: 'parent_0', level: 'parent', content: 'один и тот же текст' })],
-      [
-        chunk({
-          chunk_id: 'child_0',
-          parent_chunk_id: 'parent_0',
-          content: '  один и тот  же текст\n',
-        }),
-      ]
+  it('loses no text: every parent word survives in what gets indexed', () => {
+    const parents = [
+      chunk({ chunk_id: 'p1', content: 'альфа бета гамма дельта', level: 'parent' }),
+      chunk({ chunk_id: 'p2', content: 'эпсилон дзета', level: 'parent' }),
+    ];
+    const children = [
+      chunk({ chunk_id: 'c1', content: 'альфа бета', parent_chunk_id: 'p1', chunk_index: 0 }),
+      chunk({ chunk_id: 'c2', content: 'гамма дельта', parent_chunk_id: 'p1', chunk_index: 1 }),
+      chunk({ chunk_id: 'c3', content: 'эпсилон дзета', parent_chunk_id: 'p2', chunk_index: 0 }),
+    ];
+
+    const indexedWords = new Set(
+      selectIndexableChunks(result(parents, children)).flatMap(c => c.content.split(' '))
     );
 
-    expect(selectIndexableChunks(input).map(c => c.chunk_id)).toEqual(['child_0']);
+    for (const parent of parents) {
+      for (const word of parent.content.split(' ')) {
+        expect(indexedWords, `"${word}" is only in a parent and would be lost`).toContain(word);
+      }
+    }
   });
 
-  it('keeps a childless parent, which nothing else covers', () => {
-    const input = result(
-      [chunk({ chunk_id: 'parent_0', level: 'parent', content: 'одинокий раздел' })],
-      []
-    );
+  it('returns chunks in index order', () => {
+    const children = [
+      chunk({ chunk_id: 'c2', content: 'второй', parent_chunk_id: 'p1', chunk_index: 1 }),
+      chunk({ chunk_id: 'c1', content: 'первый', parent_chunk_id: 'p1', chunk_index: 0 }),
+    ];
 
-    expect(selectIndexableChunks(input).map(c => c.chunk_id)).toEqual(['parent_0']);
+    expect(selectIndexableChunks(result([], children)).map(c => c.chunk_index)).toEqual([0, 1]);
   });
 
-  it('indexes strictly less than the unfiltered set on the degenerate shape', () => {
-    // The production shape: N parents, N children, one child each, same text.
-    const parents = Array.from({ length: 5 }, (_, i) =>
-      chunk({ chunk_id: `parent_${i}`, level: 'parent', content: `раздел ${i}`, chunk_index: i })
-    );
-    const children = parents.map((p, i) =>
-      chunk({
-        chunk_id: `child_${i}`,
-        parent_chunk_id: p.chunk_id,
-        content: `раздел ${i}`,
-        chunk_index: i,
-      })
-    );
-    const input = result(parents, children);
+  it('differs from getAllChunks, which is what the pipeline used to upload', () => {
+    const parent = chunk({ chunk_id: 'p1', content: 'a b', level: 'parent' });
+    const child = chunk({ chunk_id: 'c1', content: 'a b', parent_chunk_id: 'p1' });
+    const chunking = result([parent], [child]);
 
-    expect(getAllChunks(input)).toHaveLength(10);
-    expect(selectIndexableChunks(input)).toHaveLength(5);
+    expect(getAllChunks(chunking)).toHaveLength(2);
+    expect(selectIndexableChunks(chunking)).toHaveLength(1);
   });
 });

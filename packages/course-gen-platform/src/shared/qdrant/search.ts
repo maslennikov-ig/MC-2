@@ -13,6 +13,7 @@
 
 import { qdrantClient } from './client';
 import { COLLECTION_CONFIG } from './create-collection';
+import { expandToSiblingContext } from './context-expansion';
 import { cache } from '../cache/redis';
 import type { QdrantScoredPoint, QdrantPointOrScored, QdrantChunkPayload } from './types';
 import type {
@@ -75,6 +76,8 @@ function toSearchResult(point: QdrantPointOrScored, include_payload: boolean): S
     page_number: payload.page_number,
     page_range: payload.page_range,
     token_count: payload.token_count,
+    sibling_chunk_ids: payload.sibling_chunk_ids,
+    chunk_index: payload.chunk_index,
     score,
     metadata: {
       has_code: payload.has_code,
@@ -198,14 +201,23 @@ export async function searchChunks(
 
     // Convert to search results
     const rawResults = searchResults.map(point => toSearchResult(point, config.include_payload));
-    const results = dedupeByContent(rawResults);
+    const deduped = dedupeByContent(rawResults);
 
-    if (results.length < rawResults.length) {
+    // Search finds the small grain; the caller is answered with the large one.
+    // Opt-in, because only the caller knows its prompt budget.
+    const results = config.expand_context
+      ? await expandToSiblingContext(deduped, {
+          collectionName: config.collection_name,
+          maxTokens: config.expand_context.max_tokens,
+        })
+      : deduped;
+
+    if (deduped.length < rawResults.length) {
       logger.debug(
         {
           returned: rawResults.length,
-          unique: results.length,
-          dropped: rawResults.length - results.length,
+          unique: deduped.length,
+          dropped: rawResults.length - deduped.length,
           queryPreview: queryText.substring(0, 100),
         },
         'Dropped duplicate chunk text from search results'
@@ -271,56 +283,12 @@ export async function searchChunks(
 }
 
 /**
- * Gets parent chunk for a child chunk result
- */
-export async function getParentChunk(
-  childChunkId: string,
-  collectionName: string = COLLECTION_CONFIG.name
-): Promise<SearchResult | null> {
-  try {
-    // Search for child chunk
-    const childResults = await qdrantClient.scroll(collectionName, {
-      filter: {
-        must: [{ key: 'chunk_id', match: { value: childChunkId } }],
-      },
-      limit: 1,
-      with_payload: true,
-    });
-
-    if (!childResults.points || childResults.points.length === 0) {
-      return null;
-    }
-
-    const childPayload = childResults.points[0].payload as Partial<QdrantChunkPayload>;
-    const parentChunkId = childPayload?.parent_chunk_id;
-
-    if (!parentChunkId) {
-      return null;
-    }
-
-    // Search for parent chunk
-    const parentResults = await qdrantClient.scroll(collectionName, {
-      filter: {
-        must: [{ key: 'chunk_id', match: { value: parentChunkId } }],
-      },
-      limit: 1,
-      with_payload: true,
-    });
-
-    if (!parentResults.points || parentResults.points.length === 0) {
-      return null;
-    }
-
-    return toSearchResult(parentResults.points[0], true);
-  } catch (error) {
-    throw new Error(
-      `Failed to get parent chunk: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-
-/**
- * Gets sibling chunks for a chunk
+ * Gets the chunks that sit alongside a chunk in the same passage.
+ *
+ * `getParentChunk` used to live here. It looked the parent up as a point in
+ * Qdrant, and parents are no longer indexed (spec 027), so it could only ever
+ * return null — a trap for whoever called it first. Reconstructing the passage
+ * from siblings replaces it; see `expandToSiblingContext`.
  */
 export async function getSiblingChunks(
   chunkId: string,

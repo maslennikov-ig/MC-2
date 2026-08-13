@@ -32,9 +32,10 @@ export {
 } from './upload';
 
 // Search utilities
+export { expandToSiblingContext, type ExpansionOptions } from './context-expansion';
+
 export {
   searchChunks,
-  getParentChunk,
   getSiblingChunks,
   type SearchResult,
   type SearchFilters,

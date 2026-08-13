@@ -550,53 +550,47 @@ export function getAllChunks(result: ChunkingResult): TextChunk[] {
   );
 }
 
-/** Normalizes chunk text for identity comparison; whitespace is not content. */
-function normalizedContent(chunk: TextChunk): string {
-  return chunk.content.trim().replace(/\s+/g, ' ');
-}
-
 /**
  * Selects the chunks worth embedding and storing in the vector index.
  *
- * A parent exists to give a retrieved child more surrounding context. When a
- * parent group ended up holding exactly one child, the parent's text is that
- * child's text and the parent adds nothing — but it still cost an embedding
- * call, still occupied a point, and still surfaced in search results as a
- * second copy of a hit the caller already had.
+ * Only the child grain is indexed. That is the design this pipeline was built
+ * to: search the small grain for precision, then hand the model the larger
+ * surrounding passage for context — `docs/RAG-CHUNKING-STRATEGY.md`, which
+ * separates `uploadChunksToQdrant(child_chunks)` from
+ * `storeParentChunks(parent_chunks)`. The second call was never written, so
+ * parents went into the same collection as their children and the system paid
+ * to search a grain it never meant to search.
  *
- * That was not a rare edge case. Measured on production 2026-08-12: all 6856
- * parents had exactly one child, so 6856 of 13712 indexed points — half the
- * collection — were exact copies.
+ * Indexing parents costs a great deal for nothing. Measured over six Docling
+ * conversions on 2026-08-13: parents were 26.2% of points and **91.2% extra
+ * embedding tokens**, and they carry no text of their own — 57 of 57 parents
+ * were fully reconstructible from their own children. The surrounding passage
+ * is therefore rebuilt from siblings that are already indexed, which is cheaper
+ * than the parent store the original design asked for.
  *
- * The cause was in this file's own two passes, not in the Docling adapter: the
- * heading pass capped sections at LangChain's default 1000 characters and the
- * sizing pass measured a 400-token child budget as 1600 characters, so a parent
- * never reached the child window. Both are fixed above, and the 2026-08-13
- * re-measurement over the same documents puts the remaining degenerate share at
- * 29 of 178 parents — short sections that genuinely hold a single child.
+ * A parent with no children is the exception and is kept: it is the only
+ * carrier of its text, and dropping it would lose content outright.
  *
- * The guard stays, because a short section will always be able to produce one,
- * and because it is what keeps a fixed chunker honest. Degenerate parents are
- * dropped from indexing only. They stay in the chunking result, so parent
- * lookup, sibling navigation and chunk counts are unchanged.
+ * Parents stay in the chunking result. They are the grouping that defines
+ * sibling sets and aggregates provenance; they simply never become points.
+ *
+ * @see selectIndexableChunks tests and `expandToSiblingContext` in shared/qdrant
  */
 export function selectIndexableChunks(result: ChunkingResult): TextChunk[] {
-  const childTextByParent = new Map<string, Set<string>>();
+  const childCountByParent = new Map<string, number>();
   for (const child of result.child_chunks) {
     if (!child.parent_chunk_id) continue;
-    const texts = childTextByParent.get(child.parent_chunk_id) ?? new Set<string>();
-    texts.add(normalizedContent(child));
-    childTextByParent.set(child.parent_chunk_id, texts);
+    childCountByParent.set(
+      child.parent_chunk_id,
+      (childCountByParent.get(child.parent_chunk_id) ?? 0) + 1
+    );
   }
 
-  const indexableParents = result.parent_chunks.filter(parent => {
-    const childTexts = childTextByParent.get(parent.chunk_id);
-    // A parent with no children carries text nothing else covers: keep it.
-    if (!childTexts || childTexts.size === 0) return true;
-    return !(childTexts.size === 1 && childTexts.has(normalizedContent(parent)));
-  });
+  const childlessParents = result.parent_chunks.filter(
+    parent => (childCountByParent.get(parent.chunk_id) ?? 0) === 0
+  );
 
-  return [...indexableParents, ...result.child_chunks].sort(
+  return [...childlessParents, ...result.child_chunks].sort(
     (a, b) => a.chunk_index - b.chunk_index
   );
 }

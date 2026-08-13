@@ -22,55 +22,63 @@ Two defects, both silent, both measured on the live production collection before
 `mc2-pdmgu` and `mc2-7frdr` are closed; `mc2-lrav0` is closed on the owner's "no backfill".
 
 **The score threshold was unreachable.** Every RAG entry point carried its own `0.7` while the
-embeddings top out near 0.58 on this corpus. The threshold gates the dense branch of a hybrid query,
-so with it in place hybrid search was byte-for-byte identical to BM25-only — measured
-`hybridIsJustSparse=true` on three queries, `false` after. One source now:
-`src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 measured ceiling), and a test
-reads the RAG sources to reject any literal above that ceiling.
+embeddings top out near 0.58. The threshold gates the dense branch of a hybrid query, so hybrid
+search was byte-for-byte BM25-only — `hybridIsJustSparse=true` on three queries, `false` after. One
+source now: `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 ceiling), and a
+test reads the RAG sources to reject any literal above that ceiling.
 
-**Half the index was a copy of the other half.** Not reprocessing: point ids are deterministic and
-document-scoped, so a repeat inside a document is impossible. Every parent held exactly one child
-and therefore that child's exact text. Degenerate parents no longer reach the index
-(`selectIndexableChunks`), and search drops repeated text as a safety net.
+**Half the index was a copy of the other half.** Every parent held exactly one child and therefore
+that child's exact text. Degenerate parents no longer reach the index (`selectIndexableChunks`), and
+search drops repeated text as a safety net. The cause first recorded here — `groupIntoParents()` in
+the Docling adapter — was **wrong**; see the chunker section below. Production data was cleaned to
+**13712 → 6856 points**, snapshot first, deletion conditional on a same-text point provably
+remaining, `file_catalog.chunk_count` corrected for 218 documents. The 50% drop correctly fired
+`QdrantPointCountUnexpectedDrop` and resolved on its own.
 
-The cause first recorded here — `groupIntoParents()` in the Docling adapter — was **wrong**, and is
-corrected in `mc2-7frdr`. See the chunker section below.
-
-Production data was cleaned separately: **13712 → 6856 points**, snapshot taken first, deletion
-conditional on a point with the same text provably remaining, and `file_catalog.chunk_count`
-corrected for 218 documents. The 50% drop fired `QdrantPointCountUnexpectedDrop`, correctly; it
-resolved on its own.
-
-**Delivered to production** on `c18e2a9ea` (25 commits, run `31627877149`, Blue/Green onto blue,
-Monitoring Config Drift green, rollback skipped). A probe inside the deployed `megacampus-worker`
-confirms `DENSE_SCORE_THRESHOLD 0.25` in the running bundle and hybrid top scores of 0.750 and 0.553
-— above the 0.500 ceiling that a single-source fusion produces — with five unique passages and no
-parent-level results.
+Delivered on `c18e2a9ea`. A probe in the deployed worker confirmed `DENSE_SCORE_THRESHOLD 0.25` and
+hybrid top scores of 0.750 and 0.553, above the 0.500 ceiling a single-source fusion produces.
 
 ## Legacy chunker repaired (2026-08-13)
 
-`mc2-5fpaf` is closed by fixing the chunker, not by removing the parent tier. The tier was never
-unworkable; it was broken by two measurement errors in `markdown-chunker.ts` that hid each other.
+`mc2-5fpaf` closed by fixing the chunker, not by removing the parent tier. Two measurement errors in
+`markdown-chunker.ts` hid each other: `splitByHeadings` was `new MarkdownTextSplitter({})`, which
+despite the name never splits on headings and with no options took LangChain's 1000-character
+default; `tokenAwareSplit` then sized both splitters as `tokens * 4` while Russian runs 2.33
+characters per token. A section never reached the child window, so every parent came back unsplit.
+Both passes are now token-aware and the heading pass is real.
 
-`splitByHeadings` was `new MarkdownTextSplitter({})`. Despite the name it never split on headings —
-it is a recursive character splitter — and with no options it took LangChain's default 1000-character
-window. `tokenAwareSplit` then sized both splitters as `tokens * 4`, but Russian runs 2.33 characters
-per token, so the 400-token child window was really 1600 characters. A section never reached that
-window, so `splitText` returned the parent unchanged: one child per parent, carrying the parent's
-exact text. Both passes are now token-aware and the heading pass is real.
+Measured on 25 production documents, before → after: children per parent 1.00 → 3.15, degenerate
+parents 508 → 29, children with siblings 0 → 531, children with a real heading path 0 → 475. No
+reindex needed; existing points are untouched, and all 87 source files behind the 218 indexed
+documents are present should one be wanted later.
 
-Measured on 25 production documents through the deployed code, before → after: parents 508 → 178,
-children 508 → 561, children per parent 1.00 → 3.15, degenerate parents 508 → 29, children with
-siblings 0 → 531, children with a heading path other than `Root` 0 → 475.
+**The native path is healthy** (`mc2-18ujf`, closed). Production holds no natively chunked point only
+because the index was built 2026-07-31 and native chunking landed 2026-08-05. Exercised on three
+cached conversions: `strategy=docling_hybrid`, zero degenerate parents, siblings populated,
+`refCoverage`/`locationCoverage` both 1.000. No silent fallback, and a second disproof of the
+`groupIntoParents()` accusation.
 
-**No reindex was needed or performed.** The fix applies to future chunking; existing points are
-untouched. All 87 source files behind the 218 indexed documents are present on the host, so a
-reindex is possible later — the earlier note that documents were unrecoverable does not apply to the
-indexed set.
+## Parent context expansion (2026-08-13, `217e3d112`)
 
-Two consequences are open, deliberately: `mc2-18ujf` (production holds no natively chunked point at
-all, despite `DOCLING_CHUNK_STRATEGY=docling_hybrid`) and `mc2-0fmnn` (`getParentChunk` and
-`getSiblingChunks` are exported, uncalled, and were structurally empty).
+`specs/027-parent-context-expansion/spec.md`, implemented. This finishes the design recorded in
+`docs/RAG-CHUNKING-STRATEGY.md` in October 2025 — search the small grain, answer with the large one.
+Its example separated `uploadChunksToQdrant(child_chunks)` from `storeParentChunks(parent_chunks)`;
+the second function was never written, so parents went into the same collection and the system paid
+to search a grain it never meant to search.
+
+Only children are indexed now, plus any childless parent, the sole carrier of its text. The passage
+is rebuilt at retrieval time from siblings already indexed — parents carry no text of their own, 57
+of 57 fully reconstructible at word coverage 1.0000. Cheaper than the parent store the design asked
+for, no migration, and it avoids the +91.2% embedding cost the next processed document would have
+re-introduced silently.
+
+`expandToSiblingContext` is opt-in through `SearchOptions.expand_context`, because only the caller
+knows its prompt budget, and that budget is a ceiling: a passage that does not fit falls back to the
+matched chunk. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; deliberately
+off for evidence retrieval, where a citation must point at the fragment that matched with its own
+page and provenance. `getParentChunk` is gone — it looked parents up as points and could only return
+null. Expansion is a no-op on the current collection (`sibling_chunk_ids: []`) and takes effect per
+document as documents are reprocessed, so the rollout is gradual by construction.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -87,21 +95,17 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 
 Models and prices have one source, `MODEL_CATALOG` in shared-types. Live models carry the current
 price; retired models keep the price previously recorded, because restating old runs at today's
-rates would falsify history.
-
-The routing refresh is still unexercised by a real course generation; the last course was created
-2026-06-28.
+rates would falsify history. The routing refresh is still unexercised by a real course generation;
+the last course was created 2026-06-28.
 
 ## Backlog truth and order
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order. The checked backlog
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
-measurement, and do not re-rank by tracker priority.
-
-Tier 1 complete through `mc2-sznhi`; Tier 2 through `mc2-3sz3d`; Tier 3 through `mc2-jz6y0.13.6`;
-Tier 4 through `mc2-iioip`. All accessible Tier 5 repository work is complete through the
-`mc2-wxun`/`mc2-vjbb` instrumentation boundary; live, migration, research and owner-decision items
-remain explicitly deferred.
+measurement, and do not re-rank by tracker priority. Tier 1 complete through `mc2-sznhi`; Tier 2
+through `mc2-3sz3d`; Tier 3 through `mc2-jz6y0.13.6`; Tier 4 through `mc2-iioip`; accessible Tier 5
+work through the `mc2-wxun`/`mc2-vjbb` instrumentation boundary. Live, migration, research and
+owner-decision items remain explicitly deferred.
 
 ## Live operational facts
 
@@ -169,10 +173,6 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.61` — owner decision above.
 - `mc2-db696.106`/`.107`/`.108` — PDF fidelity, content grounding, and bounded provider timeouts
   with reliable latency/cost receipts.
-- `mc2-0fmnn` — wiring parent/sibling context expansion into retrieval changes Stage 5/6 prompts and
-  token budgets, so it needs a quality measurement rather than only code.
-- `mc2-18ujf` — proving which chunking strategy production actually applies needs one document run
-  through Stage 2 on dev.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
 - `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
   `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
