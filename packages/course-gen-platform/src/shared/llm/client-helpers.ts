@@ -62,6 +62,28 @@ function supportsExplicitCaching(model: string): boolean {
 }
 
 /**
+ * Builds the `reasoning` field OpenRouter accepts.
+ *
+ * OpenRouter rejects a request carrying both controls: `400 Only one of
+ * "reasoning.effort" and "reasoning.max_tokens" can be specified`. Sending both
+ * is what the phase configuration naturally produces, since `stage_6_complex`
+ * and its two siblings carry an effort *and* a budget, so every complex-tier
+ * Stage 6 generation failed at the provider.
+ *
+ * The budget wins. It is the load-bearing half: the database and the seed
+ * generator both refuse `reasoning_enabled` without one, and the answer budget
+ * below is grown by exactly this number. Dropping the budget and keeping the
+ * effort would leave that accounting describing a request that was never sent.
+ */
+export function buildReasoningPayload(reasoning: ReasoningRequest): {
+  effort?: 'low' | 'medium' | 'high';
+  max_tokens?: number;
+} {
+  if (reasoning.maxTokens) return { max_tokens: reasoning.maxTokens };
+  return reasoning.effort ? { effort: reasoning.effort } : {};
+}
+
+/**
  * Apply `temperature` only where the model actually honours it.
  *
  * OpenAI's GPT-5.6 series exposes reasoning-side controls instead — its
@@ -89,10 +111,7 @@ function withSamplingControls(
     return requestOptions;
   }
 
-  requestOptions.reasoning = {
-    ...(reasoning.effort ? { effort: reasoning.effort } : {}),
-    ...(reasoning.maxTokens ? { max_tokens: reasoning.maxTokens } : {}),
-  };
+  requestOptions.reasoning = buildReasoningPayload(reasoning);
 
   // OpenRouter bills reasoning tokens against max_tokens, so the reasoning
   // budget is ADDED to the answer budget. Taking it out of the existing budget

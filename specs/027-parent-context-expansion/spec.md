@@ -153,7 +153,34 @@ so one passage never occupies two slots.
 
 ---
 
-## 7. References
+## 7. Measured on a live run (2026-08-13)
+
+Three lessons of a 223-FZ procurement course, generated twice from the same specification and the
+same queries, differing only in `expand_context`. Corpus: three real legal documents reprocessed by
+the current chunker on dev, 919 chunks, **100% of them carrying siblings**, average passage 9.14
+chunks of 157 tokens. Judged blind by `z-ai/glm-5.2` with the arms alternating position.
+
+| Metric                 | Unexpanded | Expanded   |
+| ---------------------- | ---------- | ---------- |
+| RAG context, chars     | 6.6k–7.7k  | 40k–62k    |
+| Grounding (1–5)        | 3.33       | **4.00**   |
+| Specificity (1–5)      | 3.67       | **4.33**   |
+| Usefulness (1–5)       | 4.33       | 4.33       |
+| Suspect claims flagged | 4          | 5          |
+| Winner                 | —          | **3 of 3** |
+
+The judge's reasons name exactly what the mechanism predicts: the expanded arm cited article 1 of
+223-FZ, the 50% state-ownership threshold, the real list of exclusions and precise deadlines — the
+detail that lives in the surrounding article rather than in a 157-token fragment.
+
+Two honest caveats. Suspect claims did not fall; more detail is more surface for error. And the
+corpus is the best case for this change — dense legal text where every chunk has siblings. On a
+schedule-shaped document measured the same day, only 2 of 9 chunks had any, and expansion is a
+no-op there by construction.
+
+Cost of the whole run, including the judge and re-embedding: about USD 0.04.
+
+## 8. References
 
 - `docs/RAG-CHUNKING-STRATEGY.md` — the original design (its `docs/research/RAG1-ANALYSIS.md`
   reference is missing from the repository).

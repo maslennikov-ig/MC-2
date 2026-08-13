@@ -32,6 +32,7 @@ import {
 } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 import { createModelConfigService } from './model-config-service';
+import { buildReasoningPayload } from './client-helpers';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
@@ -433,10 +434,9 @@ function buildProviderParams(
 
   if (reasoning?.enabled) {
     if (modelSupportsReasoning(modelId)) {
-      modelKwargs.reasoning = {
-        ...(reasoning.effort ? { effort: reasoning.effort } : {}),
-        ...(reasoning.maxTokens ? { max_tokens: reasoning.maxTokens } : {}),
-      };
+      // OpenRouter rejects a request carrying both controls; the budget wins
+      // because the answer budget below is grown by exactly this number.
+      modelKwargs.reasoning = buildReasoningPayload(reasoning);
       if (reasoning.maxTokens) effectiveMaxTokens += reasoning.maxTokens;
     } else {
       logger.warn(
