@@ -10,7 +10,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '@/shared/logger';
-import { env } from '@/shared/config/env-validator';
+import { getUploadStorageRootPath } from '@/stages/stage1-document-upload/storage-paths';
 
 /**
  * UUID validation regex pattern
@@ -125,8 +125,14 @@ export async function deleteUploadedFiles(
     };
   }
 
-  // Use centralized config for consistent default across codebase
-  const uploadsDir = env.uploadsDir;
+  // Resolve the directory the way the upload wrote it: under
+  // `getUploadStorageRootPath()` (`DOCLING_UPLOADS_BASE_PATH` + `/uploads`),
+  // which is what `file_catalog.storage_path` is relative to. Cleanup used to
+  // read `UPLOADS_DIR`, an environment variable set in no deployment, so it
+  // looked under `/tmp/megacampus/uploads`, found nothing and reported success
+  // with `filesDeleted: 0` while the uploads stayed on disk. Seen deleting a
+  // dev course on 2026-08-13.
+  const uploadsDir = getUploadStorageRootPath();
   const courseDir = path.join(uploadsDir, organizationId, courseId);
 
   // H2: Additional safety - normalize and verify path is within uploads
@@ -244,8 +250,8 @@ export async function hasUploadedFiles(organizationId: string, courseId: string)
     return false;
   }
 
-  // Use centralized config for consistent default across codebase
-  const uploadsDir = env.uploadsDir;
+  // Same storage root as deleteUploadedFiles; see the note there.
+  const uploadsDir = getUploadStorageRootPath();
   const courseDir = path.join(uploadsDir, organizationId, courseId);
 
   // Additional safety - normalize and verify path is within uploads

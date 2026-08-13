@@ -391,6 +391,65 @@ describe('LLMClient', () => {
     });
   });
 
+  describe('request deadline', () => {
+    /**
+     * The provider may answer with headers at once and then hold the body open
+     * for as long as the model runs. The SDK's `timeout` option does not cover
+     * that: it clears its abort timer as soon as `fetch` resolves, which is at
+     * the headers. So the contract under test is the wall clock, not the
+     * option: a configured timeout must end the call even when the response
+     * body never arrives.
+     */
+    function stubProviderThatOnlyAnswersHeaders() {
+      const instance = vi.mocked(OpenAI).mock.instances.at(-1) as unknown as {
+        chat: { completions: { create: ReturnType<typeof vi.fn> } };
+      };
+      instance.chat.completions.create.mockImplementation(
+        (_params: unknown, options?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () =>
+              reject(new Error('Request was aborted'))
+            );
+          })
+      );
+      return instance;
+    }
+
+    it('ends a call whose response body never arrives', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+      const client = new LLMClient({ maxRetries: 0 });
+      stubProviderThatOnlyAnswersHeaders();
+
+      const outcome = await Promise.race([
+        client.generateCompletion('hello', { model: 'test-model', timeout: 50 }).then(
+          () => 'resolved',
+          () => 'rejected'
+        ),
+        new Promise(resolve => setTimeout(() => resolve('still running'), 1000)),
+      ]);
+
+      expect(outcome).toBe('rejected');
+    });
+
+    it('gives the call the configured budget and not the default one', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+      const client = new LLMClient({ maxRetries: 0 });
+      const instance = stubProviderThatOnlyAnswersHeaders();
+
+      await client
+        .generateCompletion('hello', { model: 'test-model', timeout: 50 })
+        .catch(() => undefined);
+
+      const [, requestOptions] = instance.chat.completions.create.mock.calls.at(-1) as [
+        unknown,
+        { timeout?: number; signal?: AbortSignal },
+      ];
+      expect(requestOptions.timeout).toBe(50);
+      expect(requestOptions.signal).toBeInstanceOf(AbortSignal);
+      expect(requestOptions.signal?.aborted).toBe(true);
+    });
+  });
+
   describe('createLLMClient factory', () => {
     it('should create and initialize client with database key', async () => {
       vi.mocked(getApiKeySync).mockReturnValue(undefined);

@@ -297,8 +297,18 @@ export class LLMClient {
   /**
    * Execute a single API request and parse the response.
    *
+   * The SDK's own `timeout` option does not bound the call: `fetchWithTimeout`
+   * clears its abort timer as soon as `fetch` resolves, and `fetch` resolves on
+   * response headers, so the body read runs unbounded. OpenRouter returns
+   * headers immediately and then holds the connection for as long as the model
+   * takes. Measured on dev 2026-08-13: a Stage 2 summarization call ran 620s
+   * against a 60s timeout, never timed out and never retried, and the job it
+   * belonged to stayed `active` the whole time. An explicit signal is what
+   * actually bounds it, so both are passed: the signal is the enforcement, the
+   * option stays for the connect/headers phase.
+   *
    * @param requestOptions - OpenRouter request options
-   * @param timeout - Request timeout in ms
+   * @param timeout - Wall-clock budget for the whole call in ms
    * @param model - Model identifier for logging/fallback
    * @param inputContentLength - Input content length for token estimation
    * @returns Parsed LLMResponse
@@ -317,6 +327,7 @@ export class LLMClient {
       // Non-streaming request always returns ChatCompletion (not Stream)
       const completion = (await this.client.chat.completions.create(requestOptions, {
         timeout,
+        signal: AbortSignal.timeout(timeout),
       })) as OpenAI.Chat.Completions.ChatCompletion;
 
       const response = parseCompletionResponse(completion, model, inputContentLength);
