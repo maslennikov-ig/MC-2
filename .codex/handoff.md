@@ -56,9 +56,9 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 `stage_6_auto_last_chance` only. Models and prices have one source, `MODEL_CATALOG` in shared-types.
 
 Still unexercised end to end: Stage 5, the judge panel, the refinement loops and the full Stage 6
-graph. Worth a look while doing `mc2-qrdkt`: `stage_6_simple` and `stage_6_normal` both point at
-`openai/gpt-5.6-luna`, so the cheap tier is not cheaper, and the priciest output in the catalogue
-(`z-ai/glm-5.2`, 5× luna) sits in the judges, which are 30% of all tokens.
+graph. Cost, by tokens (the only measure there is until `mc2-o7740`): **Stage 6 is ~90%** — 37.9%
+lesson generation, 30.0% judging, 20.2% section generation; Stage 5 ~5.5%, Stage 4 ~1.9%. Epic
+`mc2-4clyr` holds what follows from that.
 
 ## Phase configs audited (2026-08-13, `7ad421986`)
 
@@ -71,25 +71,23 @@ rebuilt an unconfigured model, and `getModelForPhase` dropped `config.reasoning`
 through `buildProviderParams`, and `tests/unit/phase-config-provider-contract.test.ts` states that
 contract against the defect. The collision fallback is now `google/gemini-3-flash-preview`.
 
-Open from the audit: `mc2-hb8mn` (`fetchStageConfigFromDb` calls `.maybeSingle()` on a filter
-matching up to 14 rows; no production caller, so latent), `mc2-s1vg5` (`generate:config-seed` exits
-0 reporting success when the database is unreachable), `mc2-9yrgb` (`stage_5_escalation` configured
-and shown but requested by nothing — do not delete on that alone), `mc2-p6u8k` (Stage 5 last-resort
-constants still name models the routing cut retired).
+Open from the audit, none in the current epics: `mc2-hb8mn` (`.maybeSingle()` on a filter matching up
+to 14 rows; latent, no production caller), `mc2-s1vg5` (`generate:config-seed` exits 0 on an
+unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
+delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
 ## Live course run (2026-08-13, `mc2-2pplo` — reached Stage 4, blocked)
 
-The first live run since 2026-06-28 went Stage 1 → Stage 4 on dev against image `2c4487b86` and cost
-**USD 0.0146** (read off the OpenRouter key counter; see below for why not from the database). It did
-not reach Stage 5, the judge panel, the refinement loops or the full Stage 6 graph — those remain
-unexercised. Plan and owner decisions: `docs/plans/humble-floating-widget.md`; epic `mc2-qrdkt`.
+The first live run since 2026-06-28 went Stage 1 → Stage 4 on dev and cost **USD 0.0146**, read off
+the OpenRouter key counter because the database records no cost. Plan and owner decisions:
+`docs/plans/humble-floating-widget.md`; epic `mc2-qrdkt`.
 
-Fixed and committed (`3351378c5`, not yet delivered to `develop`): a Stage 2 call ran **620s against
-a 60s timeout** because the SDK's `timeout` stops at the response headers and leaves the body read
-unbounded — an explicit `AbortSignal` is the only thing that bounds a provider call here, so apply
-that shape wherever a budget is claimed; documents shorter than one summarization window were
-chunked twice, the second chunk being the overlap; course cleanup resolved uploads through
-`UPLOADS_DIR`, which no deployment sets, so it deleted nothing and reported success.
+Fixed: a Stage 2 call ran **620s against a 60s timeout** because the SDK's `timeout` stops at the
+response headers and leaves the body read unbounded — an explicit `AbortSignal` is the only thing
+that bounds a provider call here, so apply that shape wherever a budget is claimed; documents shorter
+than one summarization window were chunked twice, the second chunk being the overlap; course cleanup
+resolved uploads through `UPLOADS_DIR`, which no deployment sets, so it deleted nothing and reported
+success.
 
 Open, all under `mc2-qrdkt`: `mc2-ufpko` (a course with document evidence cannot be deleted at all —
 `reject_document_evidence_conflict_checkpoint_mutation` lacks the `pg_trigger_depth() > 1` cascade
@@ -100,12 +98,14 @@ failed on an ordinary Russian DOCX and both catch blocks discard the cause), `mc
 recorded nowhere: `costTracker.recordStageCost` has zero production callers, `model_used` is null on
 89.8M of 118M traced tokens), `mc2-43c75` (prod and dev share `worker:readiness:status` in one Redis).
 
-Where the money goes, by tokens (the only measure available): **Stage 6 is ~90%** — 37.9% lesson
-generation, 30.0% the judge panel, 20.2% section generation. Stage 5 ~5.5%, Stage 4 ~1.9%.
-
 Course `08912e3b-4010-4719-89c8-e9c8e19d133e` could not be deleted (that is `mc2-ufpko`) and survives
 on the shared database marked `[ТЕСТ mc2-2pplo, удалить]`, `archived`; it is the acceptance case for
 that task. Its vectors, Redis keys and uploaded file are gone.
+
+Delivered to dev the same day: `3351378c5` the three fixes, `19ba489fe` plan and this file,
+`78b529e73` the `nanoid` override pinned the tree to the version an advisory then named — that gate
+skips every deploy — `8a7dfc1c7` fonts now ship in `app/fonts` because the build fetching them from
+Google had failed a run outright, `532f00cad` entrance easing.
 
 ## Backlog truth and order
 
@@ -121,11 +121,9 @@ owner-decision items remain explicitly deferred.
 - Production Qdrant answers on host port 6335; 6333 is the empty dev instance.
 - `course_embeddings_v1` holds **6856 points** after the 2026-08-12 deduplication. Any restore of a
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
-- Qdrant has a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB free-space floor,
-  low I/O priority); both timers enabled, Prometheus scrapes independent timestamps. On-host
-  snapshots share the docker volume with live data, so the off-host pull is the only real mitigation.
-  Local retention is bounded at 30 days by `selectRetentionDeletions`; nothing has aged out yet, so
-  the first real deletion is due around 2026-08-30. `mc2-hfoh3` closed.
+- Qdrant has a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB floor); on-host
+  snapshots share the docker volume with live data, so that pull is the only real mitigation. Local
+  retention is bounded at 30 days; the first deletion is due around 2026-08-30. `mc2-hfoh3` closed.
 - Uploads have a daily pull-based off-host copy on `helixa-new`. A second machine, not disaster
   recovery.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
@@ -185,6 +183,8 @@ Accepted stage id: `mc2-db696.105` · Current stage id: `mc2-db696.110` · Next 
 Recommended action: work `mc2-qrdkt` from `docs/plans/humble-floating-widget.md`, starting with
 `mc2-ufpko` — it is the only unblocked task and it unlocks the rest. The plan carries the owner's
 2026-08-13 decisions, the order of work, the verification and the exact reproduction of the run.
+Then epic `mc2-4clyr`, cost: Stage 6 is ~90% of tokens, judging a lesson costs more than writing it,
+and the cascade sends 80% of lessons to the full panel against a design target of 15-20%.
 
 ## Starter prompt for next orchestrator
 
