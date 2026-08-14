@@ -16,10 +16,14 @@ const REASONING_MODEL = 'openai/gpt-5.6-luna';
 const NON_REASONING_MODEL = 'qwen/qwen3-235b-a22b-2507';
 
 describe('reasoning request construction', () => {
-  it('omits reasoning entirely when the phase does not ask for it', () => {
+  it('turns reasoning off explicitly when the phase does not ask for it', () => {
+    // This used to assert that nothing was sent. Silence is not "off": several
+    // catalogued models deliberate by default and OpenRouter bills that against
+    // max_tokens, which stalled a live Stage 2 outright (mc2-5gdzw). The answer
+    // budget still must not grow.
     const [, options] = buildCompletionRequest(REASONING_MODEL, 'p', 's', 8000, 0.7, false);
 
-    expect(options.reasoning).toBeUndefined();
+    expect(options.reasoning).toEqual({ enabled: false });
     expect(options.max_tokens).toBe(8000);
   });
 
