@@ -142,6 +142,47 @@ describe('mapCompletedBatchResultsByPosition', () => {
     ]);
   });
 
+  it('splits the one batch-level cost by what each item is worth, not by headcount', () => {
+    // OpenRouter reports `cost` once for the whole batch and never per result,
+    // so a course of ten lessons would otherwise record ten identical prices.
+    const batch = {
+      status: 'completed',
+      model: 'google/gemini-3.7-flash',
+      usage: { cost: 0.03 },
+      results: [
+        { customId: 'lesson-0', promptTokens: 10_000, completionTokens: 1_000 },
+        { customId: 'lesson-1', promptTokens: 10_000, completionTokens: 3_000 },
+      ].map((item, index) => ({
+        custom_id: item.customId,
+        response: {
+          status_code: 200,
+          request_id: `request-${index}`,
+          body: {
+            choices: [{ message: { role: 'assistant', content: `Lesson ${index}` } }],
+            usage: {
+              prompt_tokens: item.promptTokens,
+              completion_tokens: item.completionTokens,
+              total_tokens: item.promptTokens + item.completionTokens,
+            },
+          },
+        },
+        error: null,
+      })),
+    } as unknown as OpenRouterBatch;
+
+    const results = mapCompletedBatchResultsByPosition(batch, ['lesson-0', 'lesson-1']);
+
+    // Priced at $0.375 in / $1.875 out per million: $0.005625 against $0.009375,
+    // so the longer answer carries 62.5% of the batch price.
+    expect(results).toEqual([
+      expect.objectContaining({ ok: true, costUsd: 0.01125 }),
+      expect.objectContaining({ ok: true, costUsd: 0.01875 }),
+    ]);
+    expect(results.reduce((sum, result) => sum + (result.ok ? (result.costUsd ?? 0) : 0), 0)).toBe(
+      0.03
+    );
+  });
+
   it('allocates provider-level usage when result bodies omit per-request usage', () => {
     const batch = {
       status: 'completed',

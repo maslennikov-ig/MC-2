@@ -1,3 +1,5 @@
+import { getModelCapabilities } from '@megacampus/shared-types';
+
 const OPENROUTER_BATCH_URL = 'https://openrouter.ai/api/beta/batches';
 
 export type OpenRouterBatchStatus =
@@ -272,12 +274,34 @@ export function mapCompletedBatchResultsByPosition(
         0
       );
       const remainingCost = Math.max(0, aggregateCost - knownCost);
-      const share = remainingCost / missingCost.length;
+
+      // The provider reports cost once for the whole batch and never per item,
+      // so every item lands here. Splitting it evenly would charge a short
+      // lesson the same as a long one; only the course total would be right.
+      // Weight each item by what its own tokens are worth at this model's two
+      // rates, which are what produced the aggregate in the first place.
+      const rates = getModelCapabilities(batch.model);
+      const weightOf = (candidate: SuccessfulCandidate): number =>
+        rates
+          ? (candidate.promptTokens * rates.inputPricePerMillion +
+              candidate.completionTokens * rates.outputPricePerMillion) /
+            1_000_000
+          : candidate.totalTokens;
+      const weights = missingCost.map(weightOf);
+      const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+
+      let distributed = 0;
       missingCost.forEach((candidate, index) => {
-        candidate.costUsd =
-          index === missingCost.length - 1
-            ? remainingCost - share * (missingCost.length - 1)
-            : share;
+        if (index === missingCost.length - 1) {
+          candidate.costUsd = remainingCost - distributed;
+          return;
+        }
+        const share =
+          totalWeight > 0
+            ? (remainingCost * weights[index]) / totalWeight
+            : remainingCost / missingCost.length;
+        candidate.costUsd = share;
+        distributed += share;
       });
     }
   }
