@@ -34,8 +34,13 @@ export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & 
       cache_control?: boolean;
     };
   };
-  /** OpenRouter reasoning controls; omitted entirely when reasoning is off */
+  /**
+   * OpenRouter reasoning controls. Always sent to a model that can reason:
+   * `{ enabled: false }` when the phase did not ask for it, because several
+   * models deliberate by default.
+   */
   reasoning?: {
+    enabled?: boolean;
     effort?: 'low' | 'medium' | 'high';
     max_tokens?: number;
   };
@@ -101,7 +106,18 @@ function withSamplingControls(
     requestOptions.temperature = temperature;
   }
 
-  if (!reasoning?.enabled) return requestOptions;
+  if (!reasoning?.enabled) {
+    // Silence is not "off". Several catalogued models — DeepSeek V4 Flash among
+    // them — deliberate by default, and OpenRouter bills that against
+    // max_tokens. A Stage 2 summarization spent its whole budget reasoning,
+    // returned no content, and ran past its 60s bound on every retry until the
+    // course stopped (mc2-2pplo, 2026-08-14). A phase that did not ask for
+    // reasoning has to say so.
+    if (modelSupportsReasoning(model)) {
+      requestOptions.reasoning = { enabled: false };
+    }
+    return requestOptions;
+  }
 
   if (!modelSupportsReasoning(model)) {
     logger.warn(

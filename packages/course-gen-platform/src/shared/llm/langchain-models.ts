@@ -445,6 +445,11 @@ export function buildProviderParams(
         'Phase asks for reasoning but the model does not accept it - sending the request without it'
       );
     }
+  } else if (modelSupportsReasoning(modelId)) {
+    // A phase that did not ask for deliberation has to say so: models that
+    // reason by default otherwise spend the answer budget on it (see
+    // client-helpers).
+    modelKwargs.reasoning = { enabled: false };
   }
 
   return {
