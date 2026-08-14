@@ -72,11 +72,29 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: true,
   },
+  /** Async Batch API tariff; never substitute this ID into the synchronous endpoint. */
+  'google/gemini-3.7-flash:batch': {
+    inputPricePerMillion: 0.1875,
+    outputPricePerMillion: 0.9375,
+    contextLength: 1048576,
+    maxOutputTokens: 65536,
+    supportsTemperature: false,
+    supportsReasoning: true,
+  },
   'minimax/minimax-m3': {
     inputPricePerMillion: 0.3,
     outputPricePerMillion: 1.2,
     contextLength: 1048576,
     maxOutputTokens: 512000,
+    supportsTemperature: true,
+    supportsReasoning: true,
+  },
+  /** Async Batch API tariff; currently half the base token rates. */
+  'minimax/minimax-m3:batch': {
+    inputPricePerMillion: 0.15,
+    outputPricePerMillion: 0.6,
+    contextLength: 524288,
+    maxOutputTokens: null,
     supportsTemperature: true,
     supportsReasoning: true,
   },
@@ -97,12 +115,30 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: false,
     supportsReasoning: true,
   },
+  /** Available through Batch API, but currently has no token-price discount. */
+  'openai/gpt-5.6-luna:batch': {
+    inputPricePerMillion: 0.1,
+    outputPricePerMillion: 0.6,
+    contextLength: 1050000,
+    maxOutputTokens: 128000,
+    supportsTemperature: false,
+    supportsReasoning: true,
+  },
   /** Re-read from the OpenRouter catalogue 2026-08-14; input rose, output fell. */
   'z-ai/glm-5.2': {
     inputPricePerMillion: 0.63,
     outputPricePerMillion: 1.98,
     contextLength: 1048576,
     maxOutputTokens: 131072,
+    supportsTemperature: true,
+    supportsReasoning: true,
+  },
+  /** Available through Batch API, but costs more and exposes a smaller context. */
+  'z-ai/glm-5.2:batch': {
+    inputPricePerMillion: 0.7,
+    outputPricePerMillion: 2.2,
+    contextLength: 512000,
+    maxOutputTokens: null,
     supportsTemperature: true,
     supportsReasoning: true,
   },

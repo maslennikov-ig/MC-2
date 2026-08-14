@@ -60,6 +60,8 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       selectedModelTierReason: input.selectedModelTierReason ?? null,
       selectedModelPhase: input.selectedModelPhase ?? null,
       selectedModelSource: input.selectedModelSource ?? null,
+      prefetchedGeneratorResponse: input.prefetchedGeneratorResponse ?? null,
+      prefetchedGeneratorResponseConsumed: false,
       currentNode: 'generator',
       errors: [],
       retryCount: 0,

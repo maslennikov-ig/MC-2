@@ -34,6 +34,33 @@ const seedModels = [
 ] as string[];
 
 describe('model catalogue coverage', () => {
+  it('keeps Batch API variants as separate billable models at their live rates', () => {
+    const verifiedBatchRates: Record<string, [input: number, output: number, context: number]> = {
+      'google/gemini-3.7-flash:batch': [0.1875, 0.9375, 1_048_576],
+      'minimax/minimax-m3:batch': [0.15, 0.6, 524_288],
+      'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
+      'z-ai/glm-5.2:batch': [0.7, 2.2, 512_000],
+    };
+
+    const actual = Object.fromEntries(
+      Object.keys(verifiedBatchRates).map(modelId => {
+        const capabilities = getModelCapabilities(modelId);
+        return [
+          modelId,
+          capabilities
+            ? [
+                capabilities.inputPricePerMillion,
+                capabilities.outputPricePerMillion,
+                capabilities.contextLength,
+              ]
+            : null,
+        ];
+      })
+    );
+
+    expect(actual).toEqual(verifiedBatchRates);
+  });
+
   it('prices listed retired models at the OpenRouter rates verified on 2026-08-14', () => {
     const verifiedRates: Record<string, [input: number, output: number]> = {
       'deepseek/deepseek-v3.1-terminus': [0.27, 0.95],

@@ -826,6 +826,51 @@ This lesson covered TypeScript basics including types and functions.`,
     });
   });
 
+  describe('prefetched Batch API response', () => {
+    it('consumes the saved initial response without issuing the synchronous first call', async () => {
+      const batchedContent = `## Introduction
+
+This introduction clearly explains why the lesson matters and what the learner will be able to do.
+
+## Section 1
+
+Content returned by the batch.
+
+## Exercises
+
+Exercise content.
+
+## Lesson Digest
+
+The batch generated this lesson.`;
+
+      const result = await generateLessonSingleCall(
+        mockLessonSpec,
+        [],
+        'en',
+        null,
+        null,
+        null,
+        undefined,
+        undefined,
+        {
+          content: batchedContent,
+          prompt: 'Prompt saved with the batch request',
+          tokensUsed: 321,
+          modelUsed: 'google/gemini-3.7-flash:batch',
+        }
+      );
+
+      expect(mockModelInvoke).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        content: expect.stringContaining('Content returned by the batch.'),
+        lessonDigest: 'The batch generated this lesson.',
+        tokensUsed: 321,
+        modelUsed: 'google/gemini-3.7-flash:batch',
+      });
+    });
+  });
+
   describe('RAG deduplication', () => {
     it('should deduplicate RAG chunks by chunk_id', async () => {
       // Create duplicate chunks

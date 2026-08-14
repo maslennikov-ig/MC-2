@@ -74,6 +74,40 @@ stage6-lesson-content/
 - **Targeted Refinement**: Surgical fixes to specific sections instead of full regeneration
 - **Best-Effort Fallback**: Returns highest-scoring iteration when max iterations reached
 
+## Optional OpenRouter batch generation
+
+`startStage6` can send the initial single-call generation for a course through
+OpenRouter's asynchronous Batch API. This path is explicitly opt-in with
+`FEATURE_STAGE6_BATCH_GENERATION=true`; missing or different values preserve the
+existing synchronous behavior.
+
+The coordinator checks OpenRouter's live model catalogue (cached for five
+minutes) before every course group. It batches only when an exact `:batch`
+sibling exists, at least one token rate is lower, neither token rate is higher,
+and the request fits the sibling's context, output, and parameter limits. A
+missing catalogue response, no discount, or any incompatibility routes the
+lesson to the ordinary synchronous path. The `:batch` ID is used for accounting;
+the provider's documented Batch API request uses the base model ID.
+
+One coordinator job owns the provider batch ID and status. It calls
+`moveToDelayed` between polls, so it does not hold a BullMQ worker or the
+45-minute processor TTL while OpenRouter works. Each lesson also has an ordinary
+delayed job as an independent safety net. Partial item failures resume only
+those lessons synchronously; terminal batch failure, three ambiguous submission
+attempts, missing credentials, or the two-hour deadline resumes every unresolved
+lesson synchronously. The rest of the lesson graph (review, judge, correction,
+and regeneration) remains synchronous.
+
+Runtime controls:
+
+- `STAGE6_BATCH_MAX_WAIT_MS` defaults to `7200000` (two hours) and is bounded to
+  five minutes through 24 hours.
+- `STAGE6_BATCH_POLL_INTERVAL_MS` defaults to `60000` and is bounded to five
+  seconds through five minutes.
+
+Rollback requires only setting `FEATURE_STAGE6_BATCH_GENERATION=false`; no data
+migration is involved.
+
 ## Language Handling
 
 Stage 6 implements explicit language handling to ensure content generation matches the course language.

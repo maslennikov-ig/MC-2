@@ -121,7 +121,10 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         style,
         analysisResult,
         courseId,
-        state.maxTokensOverride ?? undefined
+        state.maxTokensOverride ?? undefined,
+        state.prefetchedGeneratorResponseConsumed
+          ? undefined
+          : (state.prefetchedGeneratorResponse ?? undefined)
       );
       generatedContent = result.content;
       lessonDigest = result.lessonDigest;
@@ -275,6 +278,10 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       },
       modelUsed,
       tokensUsed: totalTokens,
+      costUsd:
+        state.prefetchedGeneratorResponseConsumed || !state.prefetchedGeneratorResponse
+          ? undefined
+          : state.prefetchedGeneratorResponse.costUsd,
       durationMs,
     });
 
@@ -286,6 +293,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       lastGenerationTokens: totalTokens,
       durationMs,
       currentNode: 'selfReviewer',
+      prefetchedGeneratorResponseConsumed:
+        state.prefetchedGeneratorResponseConsumed || Boolean(state.prefetchedGeneratorResponse),
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

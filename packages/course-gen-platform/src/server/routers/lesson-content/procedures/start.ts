@@ -9,7 +9,11 @@ import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { startStage6InputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
-import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
+import { enqueueStage6StartLessons } from '../../../../stages/stage6-lesson-content/batch/start-enqueue';
+import {
+  getStage6BatchMaxWaitMs,
+  isStage6BatchEnabled,
+} from '../../../../stages/stage6-lesson-content/batch/config';
 import type { CourseStyle } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 
@@ -84,27 +88,16 @@ export const startStage6 = protectedProcedure
       );
 
       // Step 2: Enqueue all lessons via canonical Stage 6 enqueue helper
-      const jobs = await Promise.all(
-        lessonSpecs.map(spec => {
-          const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
-
-          return enqueueStage6Lesson({
-            jobData: {
-              lessonSpec: spec,
-              courseId,
-              language: course.language,
-              style: (course.style as CourseStyle | null) ?? undefined,
-              ragChunks: [],
-              ragContextId: null,
-              executionContext: 'full_generation',
-            },
-            jobName: `lesson:${spec.lesson_id}`,
-            source: 'startStage6',
-            priority,
-            deduplication: { kind: 'jobId', jobId: deduplicationId },
-          });
-        })
-      );
+      const batchEnabled = isStage6BatchEnabled();
+      const jobs = await enqueueStage6StartLessons({
+        courseId,
+        lessonSpecs,
+        language: course.language,
+        style: (course.style as CourseStyle | null) ?? undefined,
+        priority,
+        batchEnabled,
+        batchMaxWaitMs: getStage6BatchMaxWaitMs(),
+      });
 
       // Step 3: Log success
       logger.info(
@@ -113,6 +106,7 @@ export const startStage6 = protectedProcedure
           courseId,
           lessonsEnqueued: jobs.length,
           jobIds: jobs.map(j => j.id),
+          batchEnabled,
         },
         'Stage 6 jobs enqueued'
       );
