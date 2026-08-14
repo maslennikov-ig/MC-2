@@ -124,16 +124,26 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: false,
     supportsReasoning: true,
   },
-  /** Re-read from the OpenRouter catalogue 2026-08-14; input rose, output fell. */
+  /**
+   * The `/models` base rate, re-read 2026-08-14. An earlier entry recorded
+   * $0.63/$1.98, which is one provider's rate (DigitalOcean), not the base one.
+   * This model is served by many providers and they disagree widely — on that
+   * date the endpoint list ran from $0.49/$1.54 to $1.40/$4.40 — so the base
+   * rate is the catalogue default, not a guarantee of what a call is charged.
+   */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 0.63,
-    outputPricePerMillion: 1.98,
+    inputPricePerMillion: 1.19,
+    outputPricePerMillion: 3.74,
     contextLength: 1048576,
-    maxOutputTokens: 131072,
+    maxOutputTokens: 262144,
     supportsTemperature: true,
     supportsReasoning: true,
   },
-  /** Available through Batch API, but costs more and exposes a smaller context. */
+  /**
+   * Async Batch API tariff: exactly half the first-party Z.AI rate ($1.40/$4.40),
+   * which is above the base rate above. Cheaper than the base on both legs, but
+   * with half the context window, so a long request stays synchronous.
+   */
   'z-ai/glm-5.2:batch': {
     inputPricePerMillion: 0.7,
     outputPricePerMillion: 2.2,
