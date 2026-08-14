@@ -14,7 +14,7 @@
 
 import { getModelCapabilities } from '@megacampus/shared-types';
 
-import { logger } from '../logger/index.js';
+import logger from '../logger';
 import { logTrace } from '../trace-logger';
 
 /** Where a call belongs, so its cost lands on the right course and stage. */

@@ -15,10 +15,10 @@ vi.mock('@/shared/trace-logger', () => ({ logTrace }));
 
 const debug = vi.fn();
 const warn = vi.fn();
-vi.mock('@/shared/logger/index.js', () => ({
-  logger: { debug, warn, info: vi.fn(), error: vi.fn() },
-  default: { debug, warn, info: vi.fn(), error: vi.fn() },
-}));
+vi.mock('@/shared/logger', () => {
+  const stub = { debug, warn, info: vi.fn(), error: vi.fn() };
+  return { logger: stub, default: stub };
+});
 
 const COURSE_ID = '20000000-0000-4000-8000-000000000001';
 
