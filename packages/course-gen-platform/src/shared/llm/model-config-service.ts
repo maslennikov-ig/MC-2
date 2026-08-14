@@ -28,7 +28,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
-import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+import { STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 import { getModelPricing } from './cost-calculator';
 
 /** Emergency universal fallback model when DB config is unavailable */
@@ -38,7 +38,6 @@ import { StaleWhileRevalidateCache } from './swr-cache';
 
 // Re-export types and constants from model-config-db for backward compatibility
 export type {
-  ModelConfigResult,
   PhaseModelConfig,
   PhaseReasoningConfig,
   JudgeModelConfig,
@@ -190,7 +189,6 @@ export function checkPhaseModelPricingHealth(
 // ============================================================================
 
 class ModelConfigServiceImpl {
-  private stageCache = new StaleWhileRevalidateCache<ModelConfigDB.ModelConfigResult>();
   private phaseCache = new StaleWhileRevalidateCache<ModelConfigDB.PhaseModelConfig>();
   private judgeCache = new StaleWhileRevalidateCache<ModelConfigDB.JudgeModelsResult>();
   // Reserve settings change rarely (admin action only) - use longer TTL
@@ -198,88 +196,6 @@ class ModelConfigServiceImpl {
     30 * 60 * 1000, // 30 minutes fresh TTL (vs 5 min for configs)
     24 * 60 * 60 * 1000 // 24 hours max age
   );
-
-  /**
-   * Get model configuration for stage-based routing (Stages 3-6)
-   *
-   * Uses Stale-While-Revalidate pattern:
-   * 1. Fresh cache → return immediately
-   * 2. Stale/miss → try database
-   * 3. DB success → update cache → return fresh
-   * 4. DB failure + stale cache → return stale with WARNING
-   * 5. DB failure + no cache → throw explicit error
-   *
-   * @param stageNumber - Stage number (3, 4, 5, 6)
-   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
-   * @param tokenCount - Total token count for tier selection
-   * @returns Model configuration with primary/fallback models
-   * @throws Error if database unavailable and no cached data exists
-   */
-  async getModelForStage(
-    stageNumber: number,
-    language: LanguageCode,
-    tokenCount: number
-  ): Promise<ModelConfigDB.ModelConfigResult> {
-    // Determine tier based on token count and stage-specific thresholds
-    const tier = await this.determineTierAsync(stageNumber, tokenCount, language);
-    const cacheKey = `stage:${stageNumber}:${language}:${tier}`;
-
-    // Step 1: Check cache - return fresh data immediately
-    const cached = this.stageCache.get(cacheKey);
-    if (cached && !cached.isStale) {
-      // Log extra info when cached data used fallback language
-      if (cached.data.actualLanguage && cached.data.actualLanguage !== language) {
-        logger.debug(
-          {
-            cacheKey,
-            age: cached.age,
-            requestedLanguage: language,
-            actualLanguage: cached.data.actualLanguage,
-          },
-          'Stage config cache hit with fallback language'
-        );
-      } else {
-        logger.debug({ cacheKey, age: cached.age }, 'Stage config cache hit (fresh)');
-      }
-      return cached.data;
-    }
-
-    // Step 2: Try database lookup
-    try {
-      const dbConfig = await ModelConfigDB.fetchStageConfigFromDb(stageNumber, language, tier);
-      if (dbConfig) {
-        logger.info(
-          {
-            stageNumber,
-            language,
-            tier,
-            primary: dbConfig.primary,
-            source: 'database',
-          },
-          'Using fresh database stage config'
-        );
-        this.stageCache.set(cacheKey, dbConfig);
-        return dbConfig;
-      }
-    } catch (err) {
-      logger.error({ stageNumber, language, tier, error: err }, 'Database stage lookup failed');
-    }
-
-    // Step 3: Use stale cache if available
-    if (cached) {
-      const ageMinutes = Math.round(cached.age / 60000);
-      logger.warn(
-        { stageNumber, language, tier, ageMinutes, primary: cached.data.primary },
-        'Using STALE stage config due to database error - DATA MAY BE OUTDATED'
-      );
-      return cached.data;
-    }
-
-    // Step 4: No cache, no database - explicit failure
-    const errorMsg = `Cannot get stage config for stage ${stageNumber}, language "${language}", tier "${tier}": database unavailable and no cached data`;
-    logger.fatal({ stageNumber, language, tier }, errorMsg);
-    throw new Error(errorMsg);
-  }
 
   /**
    * Determines tier for phase with dynamic threshold calculation
@@ -921,101 +837,10 @@ class ModelConfigServiceImpl {
    * Clear all caches (for testing/admin)
    */
   clearCache(): void {
-    this.stageCache.clear();
     this.phaseCache.clear();
     this.judgeCache.clear();
     this.reserveSettingsCache.clear();
     logger.info('Model config caches cleared');
-  }
-
-  // ==========================================================================
-  // PRIVATE METHODS - TIER DETERMINATION
-  // ==========================================================================
-
-  private determineTier(stageNumber: number, tokenCount: number): 'standard' | 'extended' {
-    // Stage 4 uses its own threshold (260K)
-    if (stageNumber === 4) {
-      return tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
-    }
-
-    // Other stages use general threshold (80K)
-    return tokenCount > DOCUMENT_SIZE_THRESHOLD ? 'extended' : 'standard';
-  }
-
-  /**
-   * Async tier determination using dynamic threshold calculation
-   *
-   * Uses language-specific context reserve percentages from database to calculate thresholds:
-   * - Stage 4: 200K max context (analysis models)
-   * - Other stages: 128K max context (standard models)
-   *
-   * Falls back to sync determineTier() if dynamic calculation fails.
-   *
-   * @param stageNumber - Stage number (3, 4, 5, 6)
-   * @param tokenCount - Total token count
-   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
-   * @returns Tier ('standard' or 'extended')
-   */
-  private async determineTierAsync(
-    stageNumber: number,
-    tokenCount: number,
-    language: LanguageCode
-  ): Promise<'standard' | 'extended'> {
-    // Stage 4 uses analysis models with larger context (200K)
-    // Other stages use standard models (128K)
-    const maxContext = stageNumber === 4 ? 200000 : 128000;
-
-    try {
-      const dynamicThreshold = await this.calculateDynamicThreshold(maxContext, language);
-
-      logger.debug(
-        {
-          stageNumber,
-          tokenCount,
-          language,
-          maxContext,
-          dynamicThreshold,
-          tier: tokenCount > dynamicThreshold ? 'extended' : 'standard',
-        },
-        'Dynamic tier determination'
-      );
-
-      return tokenCount > dynamicThreshold ? 'extended' : 'standard';
-    } catch (err) {
-      logger.warn(
-        { stageNumber, tokenCount, language, err },
-        'Dynamic threshold calculation failed, trying DEFAULT_CONTEXT_RESERVE fallback'
-      );
-
-      // Step 1: Try language-aware fallback using DEFAULT_CONTEXT_RESERVE
-      try {
-        const reserveLang = normalizeLanguageForReserve(language);
-        const reservePercent = DEFAULT_CONTEXT_RESERVE[reserveLang];
-        const fallbackThreshold = calculateContextThreshold(maxContext, reservePercent);
-
-        logger.info(
-          {
-            stageNumber,
-            tokenCount,
-            language,
-            maxContext,
-            reservePercent,
-            fallbackThreshold,
-            tier: tokenCount > fallbackThreshold ? 'extended' : 'standard',
-          },
-          'Using DEFAULT_CONTEXT_RESERVE for tier determination'
-        );
-
-        return tokenCount > fallbackThreshold ? 'extended' : 'standard';
-      } catch (fallbackErr) {
-        // Step 2: Last resort - use hardcoded thresholds
-        logger.error(
-          { stageNumber, tokenCount, language, fallbackErr },
-          'All fallbacks failed, using hardcoded thresholds as last resort'
-        );
-        return this.determineTier(stageNumber, tokenCount);
-      }
-    }
   }
 }
 

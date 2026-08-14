@@ -13,7 +13,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
-import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
+import { type LanguageCode } from '@/shared/workspace-utils';
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
 
@@ -83,26 +83,6 @@ export const DEFAULT_STAGE_CONFIG = {
   maxRetries: 3,
   timeoutMs: null as number | null, // null = no timeout
 } as const;
-
-/**
- * Model configuration result with primary/fallback models
- */
-export interface ModelConfigResult {
-  /** Primary model ID (OpenRouter format) */
-  primary: string;
-  /** Fallback model ID (OpenRouter format) */
-  fallback: string;
-  /** Maximum context tokens */
-  maxContext: number;
-  /** Whether cache read optimization is enabled */
-  cacheReadEnabled: boolean;
-  /** Context tier used (standard or extended) */
-  tier: 'standard' | 'extended';
-  /** Source of configuration (database or hardcoded fallback) */
-  source: 'database' | 'hardcoded';
-  /** The language that was actually found in DB ('ru', 'en', or 'any') */
-  actualLanguage?: string;
-}
 
 /**
  * Per-phase reasoning settings.
@@ -184,102 +164,6 @@ export interface JudgeModelsResult {
   source: 'database' | 'hardcoded';
 }
 
-/**
- * Fetches stage configuration from database with language fallback
- */
-export async function fetchStageConfigFromDb(
-  stageNumber: number,
-  language: LanguageCode,
-  tier: 'standard' | 'extended'
-): Promise<ModelConfigResult | null> {
-  const supabase = getSupabaseAdmin();
-
-  // Cascading language lookup: specific language -> 'any' fallback
-  // First normalize to reserve language (ru/en/any), then always try 'any' as fallback
-  const reserveLang = normalizeLanguageForReserve(language);
-  // Only try language-specific config if it's ru or en, otherwise directly use 'any'
-  const languagesToTry: Array<'ru' | 'en' | 'any'> =
-    reserveLang === 'any' ? ['any'] : [reserveLang, 'any'];
-
-  // Build parallel queries for all language variants (optimization: ~50-100ms saved per fallback)
-  const languageQueries = languagesToTry.map(langToTry =>
-    supabase
-      .from('llm_model_config')
-      .select()
-      .eq('config_type', 'global')
-      .eq('stage_number', stageNumber)
-      .eq('language', langToTry)
-      .eq('context_tier', tier)
-      .eq('is_active', true)
-      .maybeSingle()
-  );
-
-  // Execute all queries in parallel
-  const results = await Promise.all(languageQueries);
-
-  // Process results in priority order (first match wins)
-  for (let i = 0; i < results.length; i++) {
-    const { data, error } = results[i];
-    const langToTry = languagesToTry[i];
-
-    if (error) {
-      logger.warn(
-        { stageNumber, language: langToTry, tier, error: error.message },
-        'Error fetching stage config from DB'
-      );
-      continue; // Try next language variant
-    }
-
-    if (data) {
-      if (langToTry === 'any') {
-        logger.debug(
-          { stageNumber, requestedLanguage: language, foundLanguage: 'any', tier },
-          'Using universal (any) language config as fallback'
-        );
-      }
-      // Found a config - process it
-      const config = data as LLMModelConfigRow;
-
-      // Validate required fields - fail fast on incomplete data
-      if (!config.fallback_model_id) {
-        const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-        logger.error(
-          { stageNumber, language: langToTry, tier, modelId: config.model_id },
-          errorMsg
-        );
-        throw new Error(errorMsg);
-      }
-
-      if (!config.max_context_tokens) {
-        const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-        logger.error(
-          { stageNumber, language: langToTry, tier, modelId: config.model_id },
-          errorMsg
-        );
-        throw new Error(errorMsg);
-      }
-
-      const normalizedConfig = normalizeRuntimeModelPair(config.model_id, config.fallback_model_id);
-
-      return {
-        primary: normalizedConfig.modelId ?? config.model_id,
-        fallback: normalizedConfig.fallbackModelId ?? config.fallback_model_id,
-        maxContext: config.max_context_tokens,
-        cacheReadEnabled: config.cache_read_enabled || false,
-        tier,
-        source: 'database',
-        actualLanguage: langToTry,
-      };
-    }
-  }
-
-  // No config found for any language variant
-  return null;
-}
-
-/**
- * Fetches phase configuration from database with language and course override fallback
- */
 /**
  * Read the reasoning settings off a config row, defaulting to disabled.
  *
