@@ -699,6 +699,12 @@ fi
 set -euo pipefail
 printf 'context=%s %s\n' "\${DOCKER_CONTEXT:-unset}" "$*" >> "$COMPOSE_LOG"
 if [[ -n "\${SOURCE_RECOVERY_TEST_SLEEP:-}" ]]; then sleep "$SOURCE_RECOVERY_TEST_SLEEP"; fi
+if [[ -n "\${SOURCE_RECOVERY_TEST_READY_FILE:-}" ]]; then
+  printf 'ready\n' > "$SOURCE_RECOVERY_TEST_READY_FILE"
+fi
+if [[ -n "\${SOURCE_RECOVERY_TEST_RELEASE_FILE:-}" ]]; then
+  while [[ ! -e "$SOURCE_RECOVERY_TEST_RELEASE_FILE" ]]; do sleep 0.01; done
+fi
 if [[ -n "\${SOURCE_RECOVERY_TEST_FORBIDDEN_FD:-}" ]]; then
   [[ -z "\${Q12_EXTERNAL_QUIESCE_LEASE_FD:-}" ]]
   [[ ! -e "/proc/self/fd/$SOURCE_RECOVERY_TEST_FORBIDDEN_FD" ]]
@@ -7075,29 +7081,42 @@ describe.runIf(RUN_REAL_CONTROLLER)('Q12 root-executed publish discipline', () =
     expect(existsSync(fixture.composeLog)).toBe(false);
   });
 
-  it('holds the one host lock against the other identity', async () => {
+  it('holds the one host lock against the other identity until the command chain finishes', async () => {
     const forward = wrapperFixture();
     const quiesce = writerQuiesceFixture();
     const sharedLock = join(forward.directory, 'shared-identity.lock');
+    const holderReady = join(forward.directory, 'holder-ready');
+    const releaseHolder = join(forward.directory, 'release-holder');
 
     const holder = spawn('bash', [WRAPPER, ...forward.args], {
       env: {
         ...forward.env,
         SOURCE_RECOVERY_LOCK_FILE: sharedLock,
         SOURCE_RECOVERY_ROOT_UID: CURRENT_UID,
-        SOURCE_RECOVERY_TEST_SLEEP: '0.6',
+        SOURCE_RECOVERY_TEST_READY_FILE: holderReady,
+        SOURCE_RECOVERY_TEST_RELEASE_FILE: releaseHolder,
       },
       stdio: 'pipe',
     });
-    await new Promise(resolveWait => setTimeout(resolveWait, 250));
-    const contender = quiesce.quiesce({ SOURCE_RECOVERY_LOCK_FILE: sharedLock });
-
-    expect(contender.status).not.toBe(0);
-    expect(contender.stderr).toContain('another source-recovery run holds the host lock');
-    await new Promise<void>((resolveExit, reject) => {
+    const holderExit = new Promise<void>((resolveExit, reject) => {
       holder.once('error', reject);
       holder.once('exit', code => (code === 0 ? resolveExit() : reject(new Error(`exit ${code}`))));
     });
+    const readyDeadline = Date.now() + 5_000;
+    while (!existsSync(holderReady) && Date.now() < readyDeadline) {
+      await new Promise(resolveWait => setTimeout(resolveWait, 20));
+    }
+
+    try {
+      expect(existsSync(holderReady)).toBe(true);
+      const contender = quiesce.quiesce({ SOURCE_RECOVERY_LOCK_FILE: sharedLock });
+
+      expect(contender.status).not.toBe(0);
+      expect(contender.stderr).toContain('another source-recovery run holds the host lock');
+    } finally {
+      writeFileSync(releaseHolder, 'release\n');
+      await holderExit;
+    }
   }, 20_000);
 
   it('normalizes the host lock mode on the non-privileged branch', () => {
