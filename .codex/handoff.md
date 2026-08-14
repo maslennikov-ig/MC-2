@@ -76,36 +76,64 @@ to 14 rows; latent, no production caller), `mc2-s1vg5` (`generate:config-seed` e
 unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
 delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
-## Live course run (2026-08-13, `mc2-2pplo` — reached Stage 4, blocked)
+## Live course run (2026-08-14, `mc2-2pplo` — reached Stage 4 twice, blocked)
 
-The first live run since 2026-06-28 went Stage 1 → Stage 4 on dev and cost **USD 0.0146**, read off
-the OpenRouter key counter because the database records no cost. Plan and owner decisions:
-`docs/plans/humble-floating-widget.md`; epic `mc2-qrdkt`.
+Epic `mc2-qrdkt` is five of six done. Five fixes shipped and are live on dev;
+the run itself is blocked on one measured decision. Plan and owner decisions:
+`docs/plans/humble-floating-widget.md`.
 
-Fixed: a Stage 2 call ran **620s against a 60s timeout** because the SDK's `timeout` stops at the
-response headers and leaves the body read unbounded — an explicit `AbortSignal` is the only thing
-that bounds a provider call here, so apply that shape wherever a budget is claimed; documents shorter
-than one summarization window were chunked twice, the second chunk being the overlap; course cleanup
-resolved uploads through `UPLOADS_DIR`, which no deployment sets, so it deleted nothing and reported
-success.
+**Closed.** `mc2-ufpko` — the conflict-checkpoint immutability trigger got the
+`pg_trigger_depth() > 1` cascade exemption its four siblings already had
+(migration `20260813140000`, applied to the shared dev/staging database).
+Deleting a course works; the leftover was removed leaving no row, vector, file
+or key. `mc2-s2x84` — both evidence failure paths now record their cause,
+without the document's content. `mc2-fqbrj` — run identity no longer reads the
+classifier's own output, and an answer carries onto an equivalent subject of a
+later run while the sources are unchanged. `mc2-o7740` — cost is priced from
+`MODEL_CATALOG` at the two call sites and summed into
+`courses.estimated_cost_usd`. `mc2-43c75` — both worker readiness keys are
+scoped by queue name; every other cache key is course-scoped.
 
-Open, all under `mc2-qrdkt`: `mc2-ufpko` (a course with document evidence cannot be deleted at all —
-`reject_document_evidence_conflict_checkpoint_mutation` lacks the `pg_trigger_depth() > 1` cascade
-exemption every sibling trigger has), `mc2-fqbrj` (a course can stick in `stage_4_clarifying`
-forever: `input_fingerprint` is computed partly from an LLM output, so a job retry never reuses the
-accepted evidence run and the answer stays keyed to the older one), `mc2-s2x84` (structured evidence
-failed on an ordinary Russian DOCX and both catch blocks discard the cause), `mc2-o7740` (cost is
-recorded nowhere: `costTracker.recordStageCost` has zero production callers, `model_used` is null on
-89.8M of 118M traced tokens), `mc2-43c75` (prod and dev share `worker:readiness:status` in one Redis).
+**Found by the run and fixed.** `mc2-5gdzw`: several catalogued models
+deliberate by default and OpenRouter bills that against `max_tokens`. The code
+only ever _added_ a reasoning block and never turned it off, so silence read as
+consent. Measured live: the same 20-token request to DeepSeek V4 Flash returned
+19 reasoning tokens and no content in 11.1s unsaid, and "Париж" in 4 tokens and
+3.7s with `{enabled: false}`. Both request builders now say it.
 
-Course `08912e3b-4010-4719-89c8-e9c8e19d133e` could not be deleted (that is `mc2-ufpko`) and survives
-on the shared database marked `[ТЕСТ mc2-2pplo, удалить]`, `archived`; it is the acceptance case for
-that task. Its vectors, Redis keys and uploaded file are gone.
+**Open, and the blocker.** `mc2-wg60c`: the 60s per-call budget is smaller than
+the default model's real answer time. Measured through the same SDK from the
+same worker container, reasoning already off: a realistic Stage 4 request (8204
+input tokens, `max_tokens` 16000) took **119.0s** and returned 1050 tokens with
+`reasoning_tokens: 0`. A short request to the same model takes 1.1s;
+`google/gemini-3-flash-preview` answers the same 33k-character body in 2.4-3.2s.
+So every Stage 2 and Stage 4 call burns its retries and then escalates or fails.
+The abort bound is not the defect — it is what turned the 2026-08-13 620s hang
+into an honest failure. Owner decision: raise the budget off a measurement, or
+route Stage 2 and Stage 4 to a fast model (that changes database routing rows,
+outside the current scope).
 
-Delivered to dev the same day: `3351378c5` the three fixes, `19ba489fe` plan and this file,
-`78b529e73` the `nanoid` override pinned the tree to the version an advisory then named — that gate
-skips every deploy — `8a7dfc1c7` fonts now ship in `app/fonts` because the build fetching them from
-Google had failed a run outright, `532f00cad` entrance easing.
+**Proven live on 2026-08-14, not only in tests.** Cost lands in the trace
+(`stage_4_classification`, 14007 tokens, USD 0.001695). The new evidence logging
+named its cause on the first failure. Course cleanup deleted the `phase1_cache`
+and `idempotency` keys the old patterns missed, 106 vectors and a 27057-byte
+upload. `delete_course_cascade` runs and leaves nothing.
+
+Spend: **USD 0.2836** against a USD 2 ceiling the owner set today, below the
+plan's USD 5, because the shared key had only USD 10.04 of its USD 150 limit
+left. USD 9.758 remains. Both test courses are fully deleted: 0 rows, 0 vectors,
+0 files, 0 Redis keys.
+
+**A deploy can be skipped on a green pipeline.** Run 31775079909 carried the
+`src` reasoning fix and failed Unit Tests, so it never deployed; run 31776031693
+was fully green but contained only a test file, so `Detect Deploy-Relevant
+Changes` skipped `Deploy to Dev`. The pipeline read green and dev ran old code.
+Confirm the `Deploy to Dev` job's own conclusion, not the run's.
+
+**Two tests pinned broken shapes and were replaced, not worked around.**
+`preflight.test.ts` required a changed semantic classification to produce a new
+run — the shape that stranded a live course. `reasoning-request.test.ts`
+required the request to stay silent about reasoning.
 
 ## Backlog truth and order
 
@@ -177,14 +205,20 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.105` · Current stage id: `mc2-db696.110` · Next stage id: epic
-`mc2-qrdkt`
+Accepted stage id: `mc2-db696.110` · Current stage id: epic `mc2-qrdkt` · Next
+stage id: `mc2-wg60c`
 
-Recommended action: work `mc2-qrdkt` from `docs/plans/humble-floating-widget.md`, starting with
-`mc2-ufpko` — it is the only unblocked task and it unlocks the rest. The plan carries the owner's
-2026-08-13 decisions, the order of work, the verification and the exact reproduction of the run.
-Then epic `mc2-4clyr`, cost: Stage 6 is ~90% of tokens, judging a lesson costs more than writing it,
-and the cascade sends 80% of lessons to the full panel against a design target of 15-20%.
+Recommended action: answer `mc2-wg60c` — it is the only thing between the
+repository and a course that reaches Stage 6, and the measurement it needs is
+already taken. Then rerun `mc2-2pplo`; the driver is
+`live-run.mjs`, reproduced in the plan. After that, epic `mc2-4clyr`. Its
+headline number needs correcting first: measured on 2026-08-14 across all 1589
+judged lessons rather than the 490 that reached a judge, 69.2% are settled free
+by heuristics, 6.3% take one judge, 17.6% two and 6.9% three — so the full panel
+runs _below_ its 15-20% design target, not four times above it. The lever is
+real but smaller: the single-judge acceptance band decides 24.5% of lessons, not
+80%. `mc2-r31fw` step 1 cannot be done from history — `singleJudge` is null in
+every stored cascade row, so the score distribution has to come from a live run.
 
 ## Starter prompt for next orchestrator
 
