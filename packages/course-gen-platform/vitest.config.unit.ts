@@ -2,6 +2,19 @@ import { mergeConfig, defineConfig } from 'vitest/config';
 import path from 'path';
 import sharedConfig from '../../vitest.shared';
 
+// Codex Desktop can pass Windows TEMP/TMP paths through to WSL. Native Linux
+// tools such as tsx cannot create Unix-domain sockets on that mounted drive,
+// and permission-sensitive fixtures also cannot trust its directory modes.
+// Set the standard Linux temp root before Vitest forks workers, while
+// preserving any explicit TMPDIR supplied by the caller.
+if (
+  process.platform === 'linux' &&
+  process.env.TMPDIR === undefined &&
+  [process.env.TEMP, process.env.TMP].some(value => /^\/mnt\/[a-z]\//iu.test(value ?? ''))
+) {
+  process.env.TMPDIR = '/tmp';
+}
+
 /**
  * Vitest config for UNIT tests only
  * - No globalSetup (no BullMQ worker needed)
