@@ -29,6 +29,26 @@ import type { ReasoningRequest } from './client-helpers';
 import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
 
 /**
+ * Wall-clock budget for a single LLM call, in milliseconds.
+ *
+ * Derived from measurement, not chosen. Measured on dev 2026-08-14 from inside
+ * `megacampus-worker-dev`, through this same SDK, with reasoning already off:
+ * the real shape of a Stage 4 call (8204 input tokens, `max_tokens` 16000,
+ * temperature 0.7) against the default `~deepseek/deepseek-v4-flash-latest`
+ * took 119.0s. The previous budget was 60s, so every Stage 2 and Stage 4 call
+ * was aborted at roughly half the model's real answer time, burned all four
+ * attempts, and then escalated or failed the course. The 2026-08-14 run never
+ * left Stage 4 (mc2-wg60c).
+ *
+ * The value is twice the measurement. Twice, because the default model carries
+ * the `~` prefix — OpenRouter's cheapest provider for it, which is also its
+ * most variable — and one measurement of one shape is not a distribution.
+ * Still well under the 620s hang seen on 2026-08-13, so a genuine hang is
+ * still cut short rather than waited out.
+ */
+export const DEFAULT_LLM_TIMEOUT_MS = 238_000;
+
+/**
  * Options for LLM completion requests
  */
 export interface LLMClientOptions {
@@ -40,7 +60,7 @@ export interface LLMClientOptions {
   temperature?: number;
   /** System prompt for model behavior */
   systemPrompt?: string;
-  /** Request timeout in milliseconds (default: 60000) */
+  /** Request timeout in milliseconds (default: {@link DEFAULT_LLM_TIMEOUT_MS}) */
   timeout?: number;
   /** Enable prompt caching (for Anthropic models via OpenRouter) */
   enableCaching?: boolean;
@@ -136,7 +156,7 @@ export class LLMClient {
         'HTTP-Referer': appUrl,
         'X-Title': 'MegaCampus Course Generator',
       },
-      timeout: 60000, // 60s default timeout
+      timeout: DEFAULT_LLM_TIMEOUT_MS,
       // Allow browser-like environment (JSDOM for mermaid creates global.window)
       // This is safe because we're running in Node.js, not a real browser
       dangerouslyAllowBrowser: true,
@@ -217,7 +237,7 @@ export class LLMClient {
       maxTokens = 10000,
       temperature = 0.7,
       systemPrompt = 'You are a helpful assistant that summarizes documents concisely while preserving key information.',
-      timeout = 60000,
+      timeout = DEFAULT_LLM_TIMEOUT_MS,
       enableCaching = false,
       reasoning,
       costContext,
@@ -275,7 +295,7 @@ export class LLMClient {
       model,
       maxTokens = 10000,
       temperature = 0.7,
-      timeout = 60000,
+      timeout = DEFAULT_LLM_TIMEOUT_MS,
       enableCaching = false,
       reasoning,
       costContext,

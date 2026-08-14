@@ -73,7 +73,7 @@ vi.mock('@megacampus/shared-utils', async importOriginal => {
 });
 
 // Import after mocks are defined
-import { LLMClient, createLLMClient } from '@/shared/llm/client';
+import { LLMClient, createLLMClient, DEFAULT_LLM_TIMEOUT_MS } from '@/shared/llm/client';
 import { getOpenRouterApiKey, getApiKeySync } from '@/shared/services/api-key-service';
 import OpenAI from 'openai';
 import logger from '@/shared/logger';
@@ -384,6 +384,56 @@ describe('LLMClient', () => {
       vi.mocked(getOpenRouterApiKey).mockResolvedValue(null);
 
       await expect(createLLMClient()).rejects.toThrow('OpenRouter API key not configured');
+    });
+  });
+
+  describe('call budget', () => {
+    /**
+     * Longest real answer measured through this SDK on dev 2026-08-14: the
+     * actual shape of a Stage 4 call took 119.0s. A budget at or below this
+     * aborts the model mid-answer, which is what stalled Stage 2 and Stage 4
+     * (mc2-wg60c).
+     */
+    const MEASURED_SLOWEST_ANSWER_MS = 119_000;
+
+    function lastRequestOptions() {
+      const instance = vi.mocked(OpenAI).mock.instances.at(-1) as unknown as {
+        chat: { completions: { create: ReturnType<typeof vi.fn> } };
+      };
+      return instance.chat.completions.create.mock.calls.at(-1)?.[1];
+    }
+
+    it('gives a call more time than the slowest answer actually measured', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateCompletion('test prompt', { model: 'test-model' });
+
+      const options = lastRequestOptions();
+      expect(options?.timeout).toBe(DEFAULT_LLM_TIMEOUT_MS);
+      expect(options?.timeout).toBeGreaterThan(MEASURED_SLOWEST_ANSWER_MS);
+    });
+
+    it('bounds a chat call by the same budget', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateChatCompletion([{ role: 'user', content: 'test prompt' }], {
+        model: 'test-model',
+      });
+
+      const options = lastRequestOptions();
+      expect(options?.timeout).toBe(DEFAULT_LLM_TIMEOUT_MS);
+      expect(options?.timeout).toBeGreaterThan(MEASURED_SLOWEST_ANSWER_MS);
+    });
+
+    it('still lets a caller set its own budget', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateCompletion('test prompt', { model: 'test-model', timeout: 5_000 });
+
+      expect(lastRequestOptions()?.timeout).toBe(5_000);
     });
   });
 });
