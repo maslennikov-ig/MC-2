@@ -23,9 +23,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
-import type { LLMResult } from '@langchain/core/outputs';
-
-import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
+import { attachCostRecording } from './model-cost-callbacks';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   DEFAULT_MODEL_ID,
@@ -551,56 +549,6 @@ export async function createOpenRouterModelAsync(
  *   '550e8400-e29b-41d4-a716-446655440000'
  * );
  */
-/**
- * The stage a phase belongs to, read off the phase name.
- *
- * Phase names are built at runtime (`stage_6_${tier}`), so the prefix is the
- * only reliable link back to a stage.
- */
-function stageOfPhase(phase: string): LlmCostContext['stage'] | undefined {
-  const match = /^stage_([1-6])(?:_|$)/u.exec(phase);
-  return match ? (`stage_${match[1]}` as LlmCostContext['stage']) : undefined;
-}
-
-/**
- * Makes every call this model serves record its own price.
- *
- * The token split lives in the provider's response and is lost by the time the
- * calling node reports a single total, so pricing has to happen here. Without a
- * course id there is nothing to attribute the cost to, and the model is left
- * alone.
- */
-function attachCostRecording(
-  model: ChatOpenAI,
-  modelId: string,
-  phase: string,
-  courseId?: string
-): ChatOpenAI {
-  const stage = stageOfPhase(phase);
-  if (!courseId || !stage) return model;
-
-  model.callbacks = [
-    {
-      handleLLMEnd: async (output: LLMResult) => {
-        const usage = (output.llmOutput?.tokenUsage ?? {}) as {
-          promptTokens?: number;
-          completionTokens?: number;
-        };
-        if (usage.promptTokens === undefined && usage.completionTokens === undefined) return;
-        await recordLlmCallCost(
-          {
-            model: modelId,
-            inputTokens: usage.promptTokens ?? 0,
-            outputTokens: usage.completionTokens ?? 0,
-          },
-          { courseId, stage, phase }
-        );
-      },
-    },
-  ];
-  return model;
-}
-
 export async function getModelForPhase(
   phase: PhaseName,
   courseId?: string,
