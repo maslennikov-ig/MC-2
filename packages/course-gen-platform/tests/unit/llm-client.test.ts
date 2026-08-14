@@ -295,8 +295,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.03/1M input + $0.14/1M output = $0.17
-      expect(cost).toBeCloseTo(0.17, 4);
+      // $0.03/1M input + $0.13/1M output = $0.16
+      expect(cost).toBeCloseTo(0.16, 4);
     });
 
     it('should estimate cost for deepseek/deepseek-v4-flash', () => {
@@ -312,8 +312,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.10/1M input + $0.20/1M output = $0.30
-      expect(cost).toBeCloseTo(0.3, 4);
+      // $0.14/1M input + $0.28/1M output = $0.42
+      expect(cost).toBeCloseTo(0.42, 4);
     });
 
     it('should estimate cost for google/gemini-3.7-flash', () => {
@@ -363,8 +363,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // (5000/1M * 0.03) + (2000/1M * 0.14) = 0.00015 + 0.00028 = 0.00043
-      expect(cost).toBeCloseTo(0.00043, 6);
+      // (5000/1M * 0.03) + (2000/1M * 0.13) = 0.00015 + 0.00026 = 0.00041
+      expect(cost).toBeCloseTo(0.00041, 6);
     });
   });
 

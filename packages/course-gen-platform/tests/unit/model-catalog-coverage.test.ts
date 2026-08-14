@@ -34,6 +34,39 @@ const seedModels = [
 ] as string[];
 
 describe('model catalogue coverage', () => {
+  it('prices listed retired models at the OpenRouter rates verified on 2026-08-14', () => {
+    const verifiedRates: Record<string, [input: number, output: number]> = {
+      'deepseek/deepseek-v3.1-terminus': [0.27, 0.95],
+      'deepseek/deepseek-v4-flash': [0.14, 0.28],
+      'deepseek/deepseek-v4-pro': [1.168, 2.336],
+      'google/gemini-2.5-flash': [0.3, 2.5],
+      'moonshotai/kimi-k2-thinking': [0.6, 2.5],
+      'openai/gpt-oss-20b': [0.03, 0.13],
+      'qwen/qwen3-235b-a22b-2507': [0.09, 0.55],
+      'qwen/qwen3-max': [0.78, 3.9],
+      'qwen/qwen3.7-plus': [0.32, 1.28],
+      'z-ai/glm-4.6': [0.5, 2],
+      'z-ai/glm-5': [0.95, 2.55],
+    };
+
+    const actual = Object.fromEntries(
+      Object.keys(verifiedRates).map(modelId => {
+        const capabilities = getModelCapabilities(modelId);
+        return [
+          modelId,
+          capabilities
+            ? [capabilities.inputPricePerMillion, capabilities.outputPricePerMillion]
+            : null,
+        ];
+      })
+    );
+
+    expect(actual).toEqual(verifiedRates);
+    expect(
+      getModelCapabilities('google/gemini-2.5-flash')?.combinedPricePerMillion
+    ).toBeUndefined();
+  });
+
   it('prices every model the seed can route to', () => {
     const unpriced = seedModels.filter(modelId => !getModelCapabilities(modelId));
 

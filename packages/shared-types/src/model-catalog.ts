@@ -8,9 +8,19 @@
  * absent from every one of them, so their cost silently resolved to a $1/$3
  * default and reported a plausible wrong number.
  *
- * Numbers come from the OpenRouter /models catalogue, read 2026-08-12. Keep them
- * that way: a hand-typed price is indistinguishable from a correct one until an
- * invoice disagrees.
+ * Prices are the current OpenRouter /models base per-token list prices at the
+ * verification date below, not historical snapshots. Provider threshold
+ * overrides are not representable by this flat catalogue and require a
+ * model-specific routing guard (see Qwen 3 Max in cost-calculator.ts). A call is
+ * priced once and the USD amount is persisted in generation_trace, so changing
+ * this catalogue does not reprice old reports. Retired-but-still-listed models
+ * stay current so re-enabling one cannot silently revive an obsolete tariff. A
+ * `delisted` model has no current price; its last observed rate is retained only
+ * as an explicitly marked fallback.
+ *
+ * Pricing verified against https://openrouter.ai/api/v1/models on 2026-08-14.
+ * Keep it that way: a hand-typed price is indistinguishable from a correct one
+ * until an invoice disagrees.
  *
  * Refs mc2-a2j1x, mc2-0a47t
  */
@@ -126,23 +136,23 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
   'deepseek/deepseek-v3.1-terminus': {
     inputPricePerMillion: 0.27,
-    outputPricePerMillion: 1.1,
+    outputPricePerMillion: 0.95,
     contextLength: 163840,
     maxOutputTokens: 32768,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'deepseek/deepseek-v4-flash': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.2,
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.28,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'deepseek/deepseek-v4-pro': {
-    inputPricePerMillion: 0.435,
-    outputPricePerMillion: 0.87,
+    inputPricePerMillion: 1.168,
+    outputPricePerMillion: 2.336,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
@@ -158,13 +168,12 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     delisted: true,
   },
   'google/gemini-2.5-flash': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.15,
+    inputPricePerMillion: 0.3,
+    outputPricePerMillion: 2.5,
     contextLength: 1048576,
     maxOutputTokens: 65535,
     supportsTemperature: true,
     supportsReasoning: true,
-    combinedPricePerMillion: 0.15,
   },
   'google/gemini-2.5-flash-preview': {
     inputPricePerMillion: 0.1,
@@ -173,7 +182,6 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: null,
     supportsTemperature: true,
     supportsReasoning: false,
-    combinedPricePerMillion: 0.1,
     delisted: true,
   },
   /**
@@ -206,8 +214,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   'moonshotai/kimi-k2-thinking': {
-    inputPricePerMillion: 0.55,
-    outputPricePerMillion: 2.25,
+    inputPricePerMillion: 0.6,
+    outputPricePerMillion: 2.5,
     contextLength: 262144,
     maxOutputTokens: 100352,
     supportsTemperature: true,
@@ -222,13 +230,12 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: false,
   },
   'openai/gpt-oss-20b': {
-    inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.08,
+    inputPricePerMillion: 0.03,
+    outputPricePerMillion: 0.13,
     contextLength: 131072,
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
-    combinedPricePerMillion: 0.08,
   },
   'openrouter/kimi-k2-instruct': {
     inputPricePerMillion: 0.15,
@@ -240,40 +247,40 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     delisted: true,
   },
   'qwen/qwen3-235b-a22b-2507': {
-    inputPricePerMillion: 0.11,
-    outputPricePerMillion: 0.6,
+    inputPricePerMillion: 0.09,
+    outputPricePerMillion: 0.55,
     contextLength: 262144,
     maxOutputTokens: 16384,
     supportsTemperature: true,
     supportsReasoning: false,
   },
   'qwen/qwen3-max': {
-    inputPricePerMillion: 1.2,
-    outputPricePerMillion: 6,
+    inputPricePerMillion: 0.78,
+    outputPricePerMillion: 3.9,
     contextLength: 262144,
     maxOutputTokens: 65536,
     supportsTemperature: true,
     supportsReasoning: false,
   },
   'qwen/qwen3.7-plus': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.7,
+    inputPricePerMillion: 0.32,
+    outputPricePerMillion: 1.28,
     contextLength: 1000000,
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'z-ai/glm-4.6': {
-    inputPricePerMillion: 0.2,
-    outputPricePerMillion: 0.8,
+    inputPricePerMillion: 0.5,
+    outputPricePerMillion: 2,
     contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'z-ai/glm-5': {
-    inputPricePerMillion: 0.25,
-    outputPricePerMillion: 1,
+    inputPricePerMillion: 0.95,
+    outputPricePerMillion: 2.55,
     contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,
