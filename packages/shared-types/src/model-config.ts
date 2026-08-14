@@ -111,7 +111,7 @@ export type PhaseName =
  *   course_id: '550e8400-e29b-41d4-a716-446655440000',
  *   phase_name: 'stage_4_expert',
  *   model_id: 'deepseek/deepseek-v4-flash',
- *   fallback_model_id: 'google/gemini-3-flash-preview',
+ *   fallback_model_id: 'google/gemini-3.7-flash',
  *   temperature: 0.5,
  *   max_tokens: 8000
  * }
@@ -142,7 +142,7 @@ export interface ModelConfig {
    *
    * @example 'openai/gpt-oss-20b'
    * @example 'deepseek/deepseek-v4-flash'
-   * @example 'google/gemini-3-flash-preview'
+   * @example 'google/gemini-3.7-flash'
    */
   model_id: string;
 
@@ -151,7 +151,7 @@ export interface ModelConfig {
    * Used if primary model fails or produces low-quality output
    *
    * @example 'deepseek/deepseek-v4-flash'
-   * @example 'google/gemini-3-flash-preview'
+   * @example 'google/gemini-3.7-flash'
    */
   fallback_model_id?: string | null;
 

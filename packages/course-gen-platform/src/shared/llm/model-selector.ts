@@ -139,7 +139,7 @@ export const MODEL_TIERS = {
     /** English: Claude Sonnet 4 - 200K context */
     en: 'anthropic/claude-sonnet-4-20250514',
     /** Fallback: Gemini 3 Flash - 1M context */
-    fallback: 'google/gemini-3-flash-preview',
+    fallback: 'google/gemini-3.7-flash',
   },
 } as const;
 
@@ -161,7 +161,7 @@ export const MODELS: Record<string, ModelConfig> = {
   },
 
   'gemini-flash': {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     displayName: 'Gemini 3 Flash',
     maxContextTokens: 1_000_000,
     costPer1kInput: 0.0005,
@@ -220,7 +220,7 @@ export const MODELS: Record<string, ModelConfig> = {
 
   // Stage 4 Analysis Models
   'gemini-flash-preview': {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     displayName: 'Gemini 3 Flash Preview',
     maxContextTokens: 1_000_000,
     costPer1kInput: 0.000075,
@@ -307,7 +307,7 @@ export const ARCHETYPE_TEMPERATURES = CONTENT_ARCHETYPE_TEMPERATURES_V2;
  *
  * // Large context - uses Gemini Flash
  * const model = selectModelForAnalysis(100_000);
- * // model.modelId === 'google/gemini-3-flash-preview'
+ * // model.modelId === 'google/gemini-3.7-flash'
  * ```
  */
 export function selectModelForAnalysis(totalHighPriorityTokens: number): ModelConfig {
@@ -514,7 +514,7 @@ export function selectModelForGeneration(
  * // fallback.modelId === 'moonshotai/kimi-k2-thinking'
  *
  * const fallback = getFallbackModel('oss-120b');
- * // fallback.modelId === 'google/gemini-3-flash-preview'
+ * // fallback.modelId === 'google/gemini-3.7-flash'
  * ```
  */
 export function getFallbackModel(primaryModelKey: string): ModelConfig {

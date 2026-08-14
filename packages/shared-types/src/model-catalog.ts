@@ -54,9 +54,9 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: false,
     billedPerImage: true,
   },
-  'google/gemini-3-flash-preview': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 3,
+  'google/gemini-3.7-flash': {
+    inputPricePerMillion: 0.375,
+    outputPricePerMillion: 1.875,
     contextLength: 1048576,
     maxOutputTokens: 65536,
     supportsTemperature: true,
@@ -174,6 +174,19 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: false,
     combinedPricePerMillion: 0.1,
     delisted: true,
+  },
+  /**
+   * Superseded by `google/gemini-3.7-flash` on 2026-08-14: same context window
+   * and output ceiling, less money. Kept so cost reports written while this was
+   * routed still resolve to a price.
+   */
+  'google/gemini-3-flash-preview': {
+    inputPricePerMillion: 0.5,
+    outputPricePerMillion: 3,
+    contextLength: 1048576,
+    maxOutputTokens: 65536,
+    supportsTemperature: true,
+    supportsReasoning: true,
   },
   'minimax/minimax-m2': {
     inputPricePerMillion: 0.255,
@@ -294,7 +307,7 @@ export const LIVE_ROUTING_MODEL_IDS = [
   'openai/gpt-5.6-luna',
   'z-ai/glm-5.2',
   'minimax/minimax-m3',
-  'google/gemini-3-flash-preview',
+  'google/gemini-3.7-flash',
   'openai/gpt-5-image-mini',
   'google/gemini-2.5-flash-image',
 ] as const;

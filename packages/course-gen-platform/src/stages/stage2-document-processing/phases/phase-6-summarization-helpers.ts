@@ -76,7 +76,7 @@ Return ONLY the title, no explanations.`,
  * Default model for lightweight title generation
  * Uses fast, cheap model since title extraction is simple
  */
-const TITLE_GENERATION_MODEL = 'google/gemini-3-flash-preview';
+const TITLE_GENERATION_MODEL = 'google/gemini-3.7-flash';
 
 // ============================================================================
 // DOCUMENT LOADING

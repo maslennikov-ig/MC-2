@@ -75,7 +75,7 @@ describe('selectStage6ModelTier', () => {
   it('selects normal tier for intermediate lessons', async () => {
     mockGetModelForPhase.mockResolvedValue({
       modelId: 'moonshotai/kimi-k2-thinking',
-      fallbackModelId: 'google/gemini-3-flash-preview',
+      fallbackModelId: 'google/gemini-3.7-flash',
       source: 'database',
     });
 

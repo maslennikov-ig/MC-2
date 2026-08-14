@@ -32,7 +32,7 @@ import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selec
 import { getModelPricing } from './cost-calculator';
 
 /** Emergency universal fallback model when DB config is unavailable */
-export const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+export const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3.7-flash';
 import * as ModelConfigDB from './model-config-db';
 import { StaleWhileRevalidateCache } from './swr-cache';
 

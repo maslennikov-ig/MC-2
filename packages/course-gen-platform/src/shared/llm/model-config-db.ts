@@ -31,7 +31,7 @@ export const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
   'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
   'qwen/qwen3.5-plus-02-15': 'qwen/qwen3.7-plus',
   'deepseek/deepseek-v3.2': 'deepseek/deepseek-v4-flash',
-  'openai/gpt-5.4': 'google/gemini-3-flash-preview',
+  'openai/gpt-5.4': 'google/gemini-3.7-flash',
   'minimax/minimax-m2.5': 'minimax/minimax-m3',
   'openai/gpt-oss-120b': 'deepseek/deepseek-v4-flash',
 };
@@ -47,7 +47,7 @@ export const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
  * `stage_5_escalation`'s 30000-token budget. A collision on any generous phase
  * would have landed there.
  */
-export const COLLISION_FALLBACK_MODEL_ID = 'google/gemini-3-flash-preview';
+export const COLLISION_FALLBACK_MODEL_ID = 'google/gemini-3.7-flash';
 
 function normalizeRuntimeModelId(modelId: string | null | undefined): string | null {
   if (!modelId) return null;
@@ -558,7 +558,7 @@ function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
 const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
   global_default: {
     modelId: 'deepseek/deepseek-v4-flash',
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: 'google/gemini-3.7-flash',
     temperature: 0.7,
     maxTokens: 4096,
     maxContextTokens: 128000,
@@ -571,7 +571,7 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
     reasoning: REASONING_DISABLED,
   },
   emergency: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     fallbackModelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 4096,

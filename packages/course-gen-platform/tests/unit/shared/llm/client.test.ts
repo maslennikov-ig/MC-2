@@ -339,21 +339,21 @@ describe('LLMClient', () => {
       expect(cost).toBeCloseTo(0.3, 4);
     });
 
-    it('should estimate cost for google/gemini-3-flash-preview', () => {
+    it('should estimate cost for google/gemini-3.7-flash', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.7-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // $0.50/1M input + $3.00/1M output = $3.50
-      expect(cost).toBeCloseTo(3.5, 4);
+      // $0.375/1M input + $1.875/1M output = $2.25
+      expect(cost).toBeCloseTo(2.25, 4);
     });
 
     it('should use fallback pricing for unknown models', () => {

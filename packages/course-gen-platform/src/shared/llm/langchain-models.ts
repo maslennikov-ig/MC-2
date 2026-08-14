@@ -117,12 +117,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -173,12 +173,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -199,12 +199,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 10000,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -285,7 +285,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },

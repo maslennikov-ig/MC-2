@@ -22,11 +22,11 @@ import type { Stage4TierConfig } from '../../src/stages/stage4-analysis/phases/s
 const ruTierConfig: Stage4TierConfig = {
   standard: {
     modelId: 'deepseek/deepseek-v4-flash',
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: 'google/gemini-3.7-flash',
     maxContext: 128_000,
   },
   extended: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     fallbackModelId: 'deepseek/deepseek-v4-flash',
     maxContext: 1_000_000,
     cacheReadEnabled: false,
@@ -36,11 +36,11 @@ const ruTierConfig: Stage4TierConfig = {
 const enTierConfig: Stage4TierConfig = {
   standard: {
     modelId: 'deepseek/deepseek-v4-flash',
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: 'google/gemini-3.7-flash',
     maxContext: 128_000,
   },
   extended: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     fallbackModelId: 'deepseek/deepseek-v4-flash',
     maxContext: 1_000_000,
     cacheReadEnabled: false,
@@ -114,16 +114,12 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru', ruTierConfig);
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should escalate from standard fallback to extended primary (RU)', () => {
-      const fallback = getContextOverflowFallback(
-        'google/gemini-3-flash-preview',
-        'ru',
-        ruTierConfig
-      );
+      const fallback = getContextOverflowFallback('google/gemini-3.7-flash', 'ru', ruTierConfig);
 
       // standard.fallback === extended.modelId, so tries extended fallback
       expect(fallback).not.toBeNull();
@@ -135,16 +131,12 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'en', enTierConfig);
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should escalate from extended primary to extended fallback (EN)', () => {
-      const fallback = getContextOverflowFallback(
-        'google/gemini-3-flash-preview',
-        'en',
-        enTierConfig
-      );
+      const fallback = getContextOverflowFallback('google/gemini-3.7-flash', 'en', enTierConfig);
 
       expect(fallback).not.toBeNull();
       expect(fallback!.modelId).toBe('deepseek/deepseek-v4-flash');
@@ -175,12 +167,12 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('deepseek/deepseek-v4-flash', 'ru');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should return null when already on Gemini 2.5 Flash', () => {
-      const fallback = getContextOverflowFallback('google/gemini-3-flash-preview', 'ru');
+      const fallback = getContextOverflowFallback('google/gemini-3.7-flash', 'ru');
       expect(fallback).toBeNull();
     });
 
@@ -188,13 +180,13 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('unknown/model', 'en');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
     });
 
     it('should return null for empty model ID (not Gemini)', () => {
       const fallback = getContextOverflowFallback('', 'ru');
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
     });
   });
 
@@ -229,7 +221,7 @@ describe('Context Overflow Handler', () => {
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
     });
 
     it('should detect context error and provide generic fallback without tierConfig', () => {
@@ -241,7 +233,7 @@ describe('Context Overflow Handler', () => {
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
+      expect(fallback!.modelId).toBe('google/gemini-3.7-flash');
     });
 
     it('should not provide fallback for non-context errors', () => {
@@ -324,7 +316,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should include initialModel and finalModel in exhaustion error', async () => {
-      // No tierConfig → generic fallback to gemini-3-flash-preview, then no more options
+      // No tierConfig → generic fallback to gemini-3.7-flash, then no more options
       const operation = async (_modelId: string): Promise<never> => {
         await Promise.resolve(); // Satisfy eslint require-await
         throw new Error('context_length_exceeded');

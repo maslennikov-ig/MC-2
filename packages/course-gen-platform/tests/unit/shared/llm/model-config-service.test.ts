@@ -411,8 +411,8 @@ describe('model-config-service', () => {
         vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockRejectedValue(new Error('DB down'));
 
         const configs = await service.getStage4TierConfigs('en');
-        expect(configs.standard.modelId).toBe('google/gemini-3-flash-preview');
-        expect(configs.extended.modelId).toBe('google/gemini-3-flash-preview');
+        expect(configs.standard.modelId).toBe('google/gemini-3.7-flash');
+        expect(configs.extended.modelId).toBe('google/gemini-3.7-flash');
       });
     });
   });

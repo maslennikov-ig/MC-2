@@ -307,7 +307,7 @@ describe('Career Playbook runtime', () => {
       modelConfigService: {
         getModelForPhase: vi.fn().mockResolvedValue({
           modelId: 'deepseek/deepseek-v4-flash',
-          fallbackModelId: 'google/gemini-3-flash-preview',
+          fallbackModelId: 'google/gemini-3.7-flash',
           temperature: 0.3,
           maxTokens: 1000,
           maxRetries: 0,
@@ -337,7 +337,7 @@ describe('Career Playbook runtime', () => {
       modelConfigService: {
         getModelForPhase: vi.fn().mockResolvedValue({
           modelId: 'deepseek/deepseek-v4-flash',
-          fallbackModelId: 'google/gemini-3-flash-preview',
+          fallbackModelId: 'google/gemini-3.7-flash',
           temperature: 0.3,
           maxTokens: 1000,
           maxRetries: 0,
