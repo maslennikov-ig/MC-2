@@ -52,14 +52,14 @@ describe('recordLlmCallCost', () => {
   it('charges input and output at their own rates', async () => {
     const { calculateLlmCostUsd } = await import('@/shared/metrics/llm-cost');
 
-    // glm-5.2 is $0.50 in and $3.15 out per million: judging reads a lesson and
+    // glm-5.2 is $0.63 in and $1.98 out per million: judging reads a lesson and
     // writes little, so the two rates are not interchangeable.
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 1_000_000, outputTokens: 0 })
-    ).toBeCloseTo(0.5, 10);
+    ).toBeCloseTo(0.63, 10);
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 0, outputTokens: 1_000_000 })
-    ).toBeCloseTo(3.15, 10);
+    ).toBeCloseTo(1.98, 10);
   });
 
   it('reports a call it cannot attribute instead of dropping it silently', async () => {

@@ -87,9 +87,10 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: false,
     supportsReasoning: true,
   },
+  /** Re-read from the OpenRouter catalogue 2026-08-14; input rose, output fell. */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 3.15,
+    inputPricePerMillion: 0.63,
+    outputPricePerMillion: 1.98,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
