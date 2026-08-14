@@ -34,6 +34,7 @@ import {
   Stage6QualityRecoveryAttemptHistory,
   Stage6QualityRecoveryHistory,
   Stage6ModelTierName,
+  Stage6PrefetchedGeneratorResponse,
 } from '../types';
 import { MODEL_FALLBACK } from '../config';
 import {
@@ -234,6 +235,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     selectedModelTierReason,
     selectedModelPhase,
     selectedModelSource,
+    prefetchedGeneratorResponse,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -257,6 +259,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     selectedModelTierReason: selectedModelTierReason ?? null,
     selectedModelPhase: selectedModelPhase ?? null,
     selectedModelSource: selectedModelSource ?? null,
+    prefetchedGeneratorResponse,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -305,10 +308,21 @@ export async function processWithFallback(
     selectedModelPhase: string | null;
     selectedModelSource: string | null;
     maxTokensOverride?: number | null;
-  }
+  },
+  prefetchedGeneratorResponse?: Stage6PrefetchedGeneratorResponse | null
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
   const jobId = job.id ?? 'unknown';
+  let pendingPrefetchedResponse =
+    prefetchedGeneratorResponse === undefined
+      ? (job.data.prefetchedGeneratorResponse ?? null)
+      : prefetchedGeneratorResponse;
+
+  const consumePrefetchedResponse = (): Stage6PrefetchedGeneratorResponse | undefined => {
+    const response = pendingPrefetchedResponse ?? undefined;
+    pendingPrefetchedResponse = null;
+    return response;
+  };
 
   for (let attempt = 1; attempt <= MODEL_FALLBACK.maxPrimaryAttempts; attempt++) {
     try {
@@ -335,6 +349,7 @@ export async function processWithFallback(
         selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
         selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
         selectedModelSource: modelSelection?.selectedModelSource ?? null,
+        prefetchedGeneratorResponse: consumePrefetchedResponse(),
       });
 
       if (result.success) {
@@ -448,6 +463,7 @@ export async function processWithFallback(
       selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
       selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
       selectedModelSource: modelSelection?.selectedModelSource ?? null,
+      prefetchedGeneratorResponse: consumePrefetchedResponse(),
     });
 
     if (result.success) {
@@ -532,7 +548,7 @@ export async function processWithFallback(
  *
  * Mutates lessonSpec.lesson_context.previous_lesson.summary_preview in place.
  */
-async function enrichSummaryPreviewFromDB(
+export async function enrichSummaryPreviewFromDB(
   courseId: string,
   lessonSpec: Stage6JobInput['lessonSpec']
 ): Promise<void> {
@@ -1029,6 +1045,7 @@ export async function processStage6Job(
 
     let result: Stage6Output | null = null;
     let lastReviewResult: Stage6Output | null = null;
+    let pendingPrefetchedResponse = job.data.prefetchedGeneratorResponse ?? null;
 
     outer: for (const rung of plannedRungs) {
       const totalRungAttempts = rung.max_regeneration_retries + 1;
@@ -1067,6 +1084,8 @@ export async function processStage6Job(
         );
 
         try {
+          const prefetchedResponseForRung = pendingPrefetchedResponse;
+          pendingPrefetchedResponse = null;
           const rungResult = await processWithFallback(
             job,
             {
@@ -1084,7 +1103,8 @@ export async function processStage6Job(
               selectedModelPhase: rung.phase_name,
               selectedModelSource: rungModelConfig.source,
               maxTokensOverride: rungModelConfig.maxTokens,
-            }
+            },
+            prefetchedResponseForRung
           );
 
           const needsQualityPromotion = rungResult.reviewInfo?.needsReview === true;

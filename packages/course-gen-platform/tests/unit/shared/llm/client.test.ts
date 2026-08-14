@@ -318,8 +318,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.03/1M input + $0.14/1M output = $0.17
-      expect(cost).toBeCloseTo(0.17, 4);
+      // $0.03/1M input + $0.13/1M output = $0.16
+      expect(cost).toBeCloseTo(0.16, 4);
     });
 
     it('should estimate cost for deepseek/deepseek-v4-flash', () => {
@@ -335,25 +335,25 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.10/1M input + $0.20/1M output = $0.30
-      expect(cost).toBeCloseTo(0.3, 4);
+      // $0.14/1M input + $0.28/1M output = $0.42
+      expect(cost).toBeCloseTo(0.42, 4);
     });
 
-    it('should estimate cost for google/gemini-3-flash-preview', () => {
+    it('should estimate cost for google/gemini-3.7-flash', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.7-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // $0.50/1M input + $3.00/1M output = $3.50
-      expect(cost).toBeCloseTo(3.5, 4);
+      // $0.375/1M input + $1.875/1M output = $2.25
+      expect(cost).toBeCloseTo(2.25, 4);
     });
 
     it('should use fallback pricing for unknown models', () => {
@@ -386,8 +386,67 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // (5000/1M * 0.03) + (2000/1M * 0.14) = 0.00015 + 0.00028 = 0.00043
-      expect(cost).toBeCloseTo(0.00043, 6);
+      // (5000/1M * 0.03) + (2000/1M * 0.13) = 0.00015 + 0.00026 = 0.00041
+      expect(cost).toBeCloseTo(0.00041, 6);
+    });
+  });
+
+  describe('request deadline', () => {
+    /**
+     * The provider may answer with headers at once and then hold the body open
+     * for as long as the model runs. The SDK's `timeout` option does not cover
+     * that: it clears its abort timer as soon as `fetch` resolves, which is at
+     * the headers. So the contract under test is the wall clock, not the
+     * option: a configured timeout must end the call even when the response
+     * body never arrives.
+     */
+    function stubProviderThatOnlyAnswersHeaders() {
+      const instance = vi.mocked(OpenAI).mock.instances.at(-1) as unknown as {
+        chat: { completions: { create: ReturnType<typeof vi.fn> } };
+      };
+      instance.chat.completions.create.mockImplementation(
+        (_params: unknown, options?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () =>
+              reject(new Error('Request was aborted'))
+            );
+          })
+      );
+      return instance;
+    }
+
+    it('ends a call whose response body never arrives', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+      const client = new LLMClient({ maxRetries: 0 });
+      stubProviderThatOnlyAnswersHeaders();
+
+      const outcome = await Promise.race([
+        client.generateCompletion('hello', { model: 'test-model', timeout: 50 }).then(
+          () => 'resolved',
+          () => 'rejected'
+        ),
+        new Promise(resolve => setTimeout(() => resolve('still running'), 1000)),
+      ]);
+
+      expect(outcome).toBe('rejected');
+    });
+
+    it('gives the call the configured budget and not the default one', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+      const client = new LLMClient({ maxRetries: 0 });
+      const instance = stubProviderThatOnlyAnswersHeaders();
+
+      await client
+        .generateCompletion('hello', { model: 'test-model', timeout: 50 })
+        .catch(() => undefined);
+
+      const [, requestOptions] = instance.chat.completions.create.mock.calls.at(-1) as [
+        unknown,
+        { timeout?: number; signal?: AbortSignal },
+      ];
+      expect(requestOptions.timeout).toBe(50);
+      expect(requestOptions.signal).toBeInstanceOf(AbortSignal);
+      expect(requestOptions.signal?.aborted).toBe(true);
     });
   });
 

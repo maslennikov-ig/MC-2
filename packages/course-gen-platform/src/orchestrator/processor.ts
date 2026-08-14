@@ -425,6 +425,17 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
     'Sandboxed processor: Starting job processing'
   );
 
+  // A stage job ending is the natural moment to refresh what the course has
+  // cost: its traces are written by now, and the column was otherwise never
+  // filled at all (mc2-o7740). A job that FAILED still spent money — often more
+  // than one that succeeded — so this runs on both paths.
+  const refreshCourseCost = async (): Promise<void> => {
+    const courseId = getJobCourseId(job.data);
+    if (!courseId) return;
+    const { updateCourseEstimatedCost } = await import('../services/token-tracking-service');
+    await updateCourseEstimatedCost(courseId);
+  };
+
   try {
     // Process the job using the handler, passing token for pause/delay
     const result = await handler.process(job, token);
@@ -440,8 +451,11 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       'Sandboxed processor: Job processing completed'
     );
 
+    await refreshCourseCost();
+
     return result;
   } catch (error) {
+    await refreshCourseCost();
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;

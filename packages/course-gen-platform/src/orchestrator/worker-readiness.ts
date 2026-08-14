@@ -12,12 +12,18 @@ import path from 'path';
 import logger from '../shared/logger';
 import { CHECK_NAMES, WORKER_MESSAGES } from '../shared/constants/messages';
 import { cache } from '../shared/cache/redis';
+import { QUEUE_NAME } from './queue';
 
 /**
  * Redis key for worker readiness status
  * Used for cross-process synchronization between worker and API server
+ *
+ * Scoped by queue name because dev and production share one Redis instance with
+ * no database separation. The queues are told apart by name; this key was not,
+ * so `generation.initiate` on dev could read production's readiness and start a
+ * generation on the strength of it (mc2-43c75).
  */
-const REDIS_READINESS_KEY = 'worker:readiness:status';
+const REDIS_READINESS_KEY = `${QUEUE_NAME}:worker:readiness:status`;
 
 /**
  * TTL for readiness status in Redis (seconds)

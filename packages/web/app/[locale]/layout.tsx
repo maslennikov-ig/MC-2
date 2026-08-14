@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Suspense } from 'react'
-import { Manrope, JetBrains_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import { NextIntlClientProvider, hasLocale } from 'next-intl'
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
@@ -51,17 +51,22 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }))
 }
 
-const manrope = Manrope({
+// Fonts are served from this repository, not from Google. `next/font/google`
+// downloads them at build time, so an outage or a blocked egress on the runner
+// fails the build and, with it, the deploy — that happened on 2026-08-13.
+// The files are the upstream variable fonts subset to the same latin+cyrillic
+// ranges Google served; see app/fonts/README.md for how to regenerate them.
+const manrope = localFont({
+  src: '../fonts/manrope-latin-cyrillic.woff2',
   variable: '--font-manrope',
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500', '600', '700'], // Only weights actually used
+  weight: '400 700', // Variable axis, covers the 400/500/600/700 the UI uses
   display: 'swap',
 })
 
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
+  src: '../fonts/jetbrains-mono-latin-cyrillic.woff2',
   variable: '--font-jetbrains-mono',
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500'], // Only weights for code blocks
+  weight: '400 500', // Only weights for code blocks
   display: 'swap',
   preload: false, // Don't preload - only used in code blocks
 })

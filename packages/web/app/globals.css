@@ -167,6 +167,11 @@
     --duration-fast: 150ms;
     --duration-base: 300ms;
     --duration-slow: 500ms;
+
+    /* Entrance easing: fast start, smooth settle, no overshoot. Things that
+       arrive on screen decelerate the way real objects do; a curve that
+       overshoots and springs back reads as decoration. */
+    --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark {
@@ -587,7 +592,7 @@
   }
 
   .animate-slide-up {
-    animation: slide-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: slide-up 0.6s var(--ease-entrance);
   }
 
   .animate-tab-fade-in {
@@ -850,7 +855,7 @@
 
   /* Admin stagger animation */
   .admin-stagger-item {
-    animation: stagger-reveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: stagger-reveal 0.6s var(--ease-entrance) forwards;
     opacity: 0;
   }
 

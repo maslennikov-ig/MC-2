@@ -16,6 +16,7 @@ import { createStage6Queue } from './factory';
 import { HANDLER_CONFIG } from './config';
 import type { Stage6JobInput, Stage6JobResult } from './types';
 import { logger } from '@/shared/logger';
+import type { Stage6BatchCoordinatorInput } from './batch/batch-processor';
 
 // ── Source producer identifiers ──
 
@@ -140,6 +141,82 @@ export async function enqueueStage6Lessons(
   optsList: EnqueueStage6LessonOptions[]
 ): Promise<Job<Stage6JobInput, Stage6JobResult>[]> {
   return Promise.all(optsList.map(enqueueStage6Lesson));
+}
+
+export interface EnqueueStage6CourseBatchResult {
+  lessonJobs: Job<Stage6JobInput, Stage6JobResult>[];
+  coordinatorJob: Job<Stage6BatchCoordinatorInput, Stage6JobResult>;
+}
+
+/**
+ * Create delayed synchronous fallbacks for every lesson, then a coordinator
+ * that may promote them early with prefetched Batch API responses.
+ *
+ * The delay is the reliability backstop: if the coordinator disappears, each
+ * ordinary lesson job wakes by itself and follows the established sync path.
+ */
+export async function enqueueStage6CourseBatch(
+  optsList: EnqueueStage6LessonOptions[],
+  options: { maxWaitMs: number }
+): Promise<EnqueueStage6CourseBatchResult> {
+  if (optsList.length === 0) throw new Error('Stage 6 course batch must contain lessons');
+
+  const courseId = optsList[0].jobData.courseId;
+  const language = optsList[0].jobData.language;
+  if (
+    optsList.some(opts => opts.jobData.courseId !== courseId || opts.jobData.language !== language)
+  ) {
+    throw new Error('Stage 6 course batch lessons must share course and language');
+  }
+
+  const lessonJobs = await Promise.all(
+    optsList.map(opts =>
+      enqueueStage6Lesson({
+        ...opts,
+        extraJobOptions: {
+          ...opts.extraJobOptions,
+          delay: options.maxWaitMs,
+        },
+      })
+    )
+  );
+
+  const coordinatorData: Stage6BatchCoordinatorInput = {
+    kind: 'stage6_batch_coordinator',
+    courseId,
+    language,
+    lessonJobs: lessonJobs.map((job, position) => {
+      if (!job.id) throw new Error('Stage 6 delayed lesson job has no identifier');
+      return {
+        position,
+        lessonJobId: job.id,
+        jobData: optsList[position].jobData,
+      };
+    }),
+    state: null,
+  };
+
+  const queue = getStage6Queue();
+  const coordinatorQueue = queue as unknown as import('bullmq').Queue<
+    Stage6BatchCoordinatorInput,
+    Stage6JobResult
+  >;
+  const coordinatorJob = await coordinatorQueue.add(`course-batch:${courseId}`, coordinatorData, {
+    jobId: `stage6-batch:${courseId}`,
+    priority: Math.min(...optsList.map(opts => opts.priority ?? 5)),
+  });
+
+  logger.info(
+    {
+      courseId,
+      coordinatorJobId: coordinatorJob.id,
+      lessonCount: lessonJobs.length,
+      maxWaitMs: options.maxWaitMs,
+    },
+    'Stage 6 Batch coordinator enqueued with delayed synchronous fallbacks'
+  );
+
+  return { lessonJobs, coordinatorJob };
 }
 
 /**

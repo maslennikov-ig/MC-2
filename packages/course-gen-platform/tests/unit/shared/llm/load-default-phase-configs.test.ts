@@ -314,7 +314,7 @@ describe('DEFAULT_PHASE_CONFIGS emergency fallback behavior', () => {
     //
     // EMERGENCY_FALLBACK_CONFIGS contains only two entries:
     // - global_default: { modelId: 'deepseek/deepseek-v4-flash', ... }
-    // - emergency: { modelId: 'google/gemini-3-flash-preview', ... }
+    // - emergency: { modelId: 'google/gemini-3.7-flash', ... }
     //
     // This test documents the expected behavior, which is validated via:
     // 1. Code review

@@ -23,6 +23,7 @@ import {
   getModelPricing,
   hasUnifiedPricing,
   estimateCost,
+  validateQwen3MaxContext,
 } from '@/shared/llm/cost-calculator';
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
 
@@ -35,32 +36,32 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should have pricing for qwen/qwen3-max with split pricing', () => {
       const pricing = OPENROUTER_PRICING['qwen/qwen3-max'];
       expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(1.2);
-      expect(pricing.outputPricePerMillion).toBe(6.0);
+      expect(pricing.inputPricePerMillion).toBe(0.78);
+      expect(pricing.outputPricePerMillion).toBe(3.9);
       expect(pricing.combinedPricePerMillion).toBeUndefined();
     });
 
-    it('should have pricing for openai/gpt-oss-20b with unified pricing', () => {
+    it('should have split pricing for openai/gpt-oss-20b', () => {
       const pricing = OPENROUTER_PRICING['openai/gpt-oss-20b'];
       expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBe(0.08);
-      expect(pricing.inputPricePerMillion).toBe(0.08);
-      expect(pricing.outputPricePerMillion).toBe(0.08);
+      expect(pricing.combinedPricePerMillion).toBeUndefined();
+      expect(pricing.inputPricePerMillion).toBe(0.03);
+      expect(pricing.outputPricePerMillion).toBe(0.13);
     });
 
     it('should have pricing for deepseek/deepseek-v4-flash with split pricing', () => {
       const pricing = OPENROUTER_PRICING['deepseek/deepseek-v4-flash'];
       expect(pricing).toBeDefined();
       expect(pricing.combinedPricePerMillion).toBeUndefined();
-      expect(pricing.inputPricePerMillion).toBe(0.1);
-      expect(pricing.outputPricePerMillion).toBe(0.2);
+      expect(pricing.inputPricePerMillion).toBe(0.14);
+      expect(pricing.outputPricePerMillion).toBe(0.28);
     });
 
-    it('should have pricing for google/gemini-3-flash-preview with split pricing', () => {
-      const pricing = OPENROUTER_PRICING['google/gemini-3-flash-preview'];
+    it('should have pricing for google/gemini-3.7-flash with split pricing', () => {
+      const pricing = OPENROUTER_PRICING['google/gemini-3.7-flash'];
       expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(0.5);
-      expect(pricing.outputPricePerMillion).toBe(3.0);
+      expect(pricing.inputPricePerMillion).toBe(0.375);
+      expect(pricing.outputPricePerMillion).toBe(1.875);
     });
 
     it('should have positive pricing values for all models', () => {
@@ -68,6 +69,13 @@ describe('Stage 5 Cost Calculator Service', () => {
         expect(pricing.inputPricePerMillion).toBeGreaterThan(0);
         expect(pricing.outputPricePerMillion).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe('qwen3-max base-rate guard', () => {
+    it('allows the base tier and rejects the first token in the higher-price tier', () => {
+      expect(() => validateQwen3MaxContext(31_999)).not.toThrow();
+      expect(() => validateQwen3MaxContext(32_000)).toThrow(/32,000/u);
     });
   });
 
@@ -117,17 +125,17 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 1.20) + (2500/1M * 6.00) = 0.003 + 0.015 = 0.018
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.018, 6);
+      // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 0.78) + (2500/1M * 3.90) = 0.0117
+      expect(cost.metadata_cost_usd).toBeCloseTo(0.0117, 6);
 
-      // Sections cost (deepseek-v4-flash, 50/50 split): (22500/1M * 0.10) + (22500/1M * 0.20) = 0.00675
-      expect(cost.sections_cost_usd).toBeCloseTo(0.00675, 6);
+      // Sections cost (deepseek-v4-flash, 50/50 split): (22500/1M * 0.14) + (22500/1M * 0.28) = 0.00945
+      expect(cost.sections_cost_usd).toBeCloseTo(0.00945, 6);
 
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.018 + 0.00675 = 0.02475
-      expect(cost.total_cost_usd).toBeCloseTo(0.02475, 6);
+      // Total cost: 0.0117 + 0.00945 = 0.02115
+      expect(cost.total_cost_usd).toBeCloseTo(0.02115, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);
@@ -146,7 +154,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'openai/gpt-oss-20b',
-          validation: 'google/gemini-3-flash-preview',
+          validation: 'google/gemini-3.7-flash',
         },
         total_tokens: {
           metadata: 10000,
@@ -168,20 +176,20 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50): (5000/1M * 1.20) + (5000/1M * 6.00) = 0.006 + 0.030 = 0.036
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.036, 6);
+      // Metadata cost (qwen3-max, 50/50): (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
+      expect(cost.metadata_cost_usd).toBeCloseTo(0.0234, 6);
 
-      // Sections cost (gpt-oss-20b, unified): 50000/1M * 0.08 = 0.004
+      // Sections cost (gpt-oss-20b, 50/50): (25000/1M * 0.03) + (25000/1M * 0.13) = 0.004
       expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
 
-      // Validation cost (gemini-3-flash-preview, split, 50/50): (2500/1M * 0.50) + (2500/1M * 3.00) = 0.00125 + 0.0075 = 0.00875
-      expect(cost.validation_cost_usd).toBeCloseTo(0.00875, 6);
+      // Validation cost (gemini-3.7-flash, split, 50/50): (2500/1M * 0.375) + (2500/1M * 1.875) = 0.0009375 + 0.0046875 = 0.005625
+      expect(cost.validation_cost_usd).toBeCloseTo(0.005625, 6);
 
-      // Total cost: 0.036 + 0.004 + 0.00875 = 0.04875
-      expect(cost.total_cost_usd).toBeCloseTo(0.04875, 6);
+      // Total cost: 0.0234 + 0.004 + 0.005625 = 0.033025
+      expect(cost.total_cost_usd).toBeCloseTo(0.033025, 6);
 
       // Model breakdown
-      expect(cost.model_breakdown.validation_model).toBe('google/gemini-3-flash-preview');
+      expect(cost.model_breakdown.validation_model).toBe('google/gemini-3.7-flash');
     });
 
     it('should handle zero tokens gracefully', () => {
@@ -343,8 +351,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       const pricing = getModelPricing('qwen/qwen3-max');
 
       expect(pricing).not.toBeNull();
-      expect(pricing?.inputPricePerMillion).toBe(1.2);
-      expect(pricing?.outputPricePerMillion).toBe(6.0);
+      expect(pricing?.inputPricePerMillion).toBe(0.78);
+      expect(pricing?.outputPricePerMillion).toBe(3.9);
     });
 
     it('should return null for unknown models', () => {
@@ -355,11 +363,8 @@ describe('Stage 5 Cost Calculator Service', () => {
   });
 
   describe('hasUnifiedPricing()', () => {
-    it('should return true for OSS models with unified pricing', () => {
-      expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(true);
-    });
-
     it('should return false for models with split pricing', () => {
+      expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(false);
       expect(hasUnifiedPricing('qwen/qwen3-max')).toBe(false);
       expect(hasUnifiedPricing('deepseek/deepseek-v4-flash')).toBe(false);
     });
@@ -370,18 +375,18 @@ describe('Stage 5 Cost Calculator Service', () => {
   });
 
   describe('estimateCost()', () => {
-    it('should estimate cost for unified pricing model', () => {
+    it('should estimate cost for gpt-oss-20b split pricing', () => {
       const cost = estimateCost('openai/gpt-oss-20b', 10000, 0);
 
-      // 10000/1M * 0.08 = 0.0008
+      // 50/50 split: (5000/1M * 0.03) + (5000/1M * 0.13) = 0.0008
       expect(cost).toBeCloseTo(0.0008, 6);
     });
 
     it('should estimate cost for split pricing model with 50/50 assumption', () => {
       const cost = estimateCost('qwen/qwen3-max', 10000, 0);
 
-      // 50/50 split: (5000/1M * 1.20) + (5000/1M * 6.00) = 0.006 + 0.030 = 0.036
-      expect(cost).toBeCloseTo(0.036, 6);
+      // 50/50 split: (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
+      expect(cost).toBeCloseTo(0.0234, 6);
     });
 
     it('should handle unknown model by returning $0', () => {
@@ -439,7 +444,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'deepseek/deepseek-v4-flash',
-          validation: 'google/gemini-3-flash-preview',
+          validation: 'google/gemini-3.7-flash',
         },
         total_tokens: {
           metadata: 8000, // +60% due to retries

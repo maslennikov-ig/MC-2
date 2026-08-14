@@ -1,4 +1,4 @@
-import { Worker, Queue } from 'bullmq';
+import { Worker, Queue, type Job } from 'bullmq';
 import { getRedisClient } from '@/shared/cache/redis';
 import { logger } from '@/shared/logger';
 import {
@@ -10,16 +10,65 @@ import type { JobData } from '@megacampus/shared-types';
 import { HANDLER_CONFIG } from './config';
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate } from './types';
 import { processStage6Job } from './services/job-processor';
+import {
+  type Stage6BatchCoordinatorInput,
+  type Stage6BatchProcessorResult,
+} from './batch/batch-processor';
+import { createProductionStage6BatchProcessor } from './batch/production';
+
+type Stage6QueueJobInput = Stage6JobInput | Stage6BatchCoordinatorInput;
+const batchLookupQueues = new WeakMap<
+  Worker<Stage6QueueJobInput, Stage6JobResult>,
+  Queue<Stage6QueueJobInput, Stage6JobResult>
+>();
+
+function batchResult(courseId: string, result: Stage6BatchProcessorResult): Stage6JobResult {
+  return {
+    lessonId: `batch:${courseId}`,
+    success: true,
+    lessonContent: null,
+    errors: [],
+    metrics: {
+      tokensUsed: 0,
+      durationMs: 0,
+      modelUsed: null,
+      selectedModel: null,
+      fallbackModel: null,
+      selectedModelTier: null,
+      selectedModelTierReason: `Released ${result.releasedLessons} lessons (${result.syncFallbacks} sync fallbacks)`,
+      selectedModelPhase: 'stage_6_batch_coordinator',
+      selectedModelSource: 'openrouter_live_catalog',
+      qualityScore: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      regenerationMode: null,
+      attemptLadder: [],
+    },
+  };
+}
 
 /**
  * Create and configure the Stage 6 BullMQ worker
  */
-export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, Stage6JobResult> {
+export function createStage6Worker(
+  redisUrl?: string
+): Worker<Stage6QueueJobInput, Stage6JobResult> {
   const connection = redisUrl ? { url: redisUrl } : getRedisClient();
+  const lookupQueue = createStage6Queue(redisUrl) as unknown as Queue<
+    Stage6QueueJobInput,
+    Stage6JobResult
+  >;
+  const processBatch = createProductionStage6BatchProcessor(lookupQueue);
 
-  const worker = new Worker<Stage6JobInput, Stage6JobResult>(
+  const worker = new Worker<Stage6QueueJobInput, Stage6JobResult>(
     HANDLER_CONFIG.QUEUE_NAME,
-    processStage6Job,
+    async (job, token) => {
+      if ('kind' in job.data && job.data.kind === 'stage6_batch_coordinator') {
+        return batchResult(job.data.courseId, await processBatch(job as never, token));
+      }
+      return processStage6Job(job as Job<Stage6JobInput, Stage6JobResult>, token);
+    },
     {
       connection,
       concurrency: HANDLER_CONFIG.CONCURRENCY,
@@ -33,6 +82,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
       maxStalledCount: HANDLER_CONFIG.MAX_STALLED_COUNT,
     }
   );
+  batchLookupQueues.set(worker, lookupQueue);
 
   worker.on('completed', (job, result) => {
     logger.info(
@@ -45,7 +95,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
       'Stage 6 job completed'
     );
     // Track in job_status table for frontend polling
-    if (job) {
+    if (job && !('kind' in job.data && job.data.kind === 'stage6_batch_coordinator')) {
       markJobCompleted(job as unknown as import('bullmq').Job<JobData>).catch(err => {
         logger.warn({ jobId: job.id, error: err }, 'Failed to mark job completed in job_status');
       });
@@ -62,7 +112,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
       'Stage 6 job failed'
     );
     // Track in job_status table for frontend polling
-    if (job) {
+    if (job && !('kind' in job.data && job.data.kind === 'stage6_batch_coordinator')) {
       markJobFailed(job as unknown as import('bullmq').Job<JobData>, error).catch(err => {
         logger.warn({ jobId: job.id, error: err }, 'Failed to mark job failed in job_status');
       });
@@ -71,7 +121,7 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
 
   worker.on('active', job => {
     // Track in job_status table for frontend polling
-    if (job?.data?.organizationId) {
+    if (job && 'organizationId' in job.data && job.data.organizationId) {
       createJobStatus(job as unknown as import('bullmq').Job<JobData>).catch(err => {
         logger.warn({ jobId: job.id, error: err }, 'Failed to create job status');
       });
@@ -161,12 +211,17 @@ export function createStage6Queue(redisUrl?: string): Queue<Stage6JobInput, Stag
  * Graceful shutdown handler for Stage 6 worker
  */
 export async function gracefulShutdown(
-  worker: Worker<Stage6JobInput, Stage6JobResult>
+  worker: Worker<Stage6QueueJobInput, Stage6JobResult>
 ): Promise<void> {
   logger.info('Shutting down Stage 6 worker gracefully...');
 
   try {
     await worker.close();
+    const lookupQueue = batchLookupQueues.get(worker);
+    if (lookupQueue) {
+      await lookupQueue.close();
+      batchLookupQueues.delete(worker);
+    }
     logger.info('Stage 6 worker closed successfully');
   } catch (error) {
     logger.error(

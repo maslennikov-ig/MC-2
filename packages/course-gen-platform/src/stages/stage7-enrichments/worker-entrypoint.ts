@@ -29,8 +29,12 @@ let worker: Worker<Stage7JobInput, Stage7JobResult> | null = null;
 
 /**
  * Redis key for Stage 7 worker readiness status
+ *
+ * Scoped by queue name for the same reason as the main worker's: dev and
+ * production share one Redis instance and only the queue names tell them apart
+ * (mc2-43c75).
  */
-const REDIS_READINESS_KEY = 'worker-stage7:readiness:status';
+const REDIS_READINESS_KEY = `${STAGE7_CONFIG.QUEUE_NAME}:worker-stage7:readiness:status`;
 
 /**
  * TTL for readiness status in Redis (seconds)

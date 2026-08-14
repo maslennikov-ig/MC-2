@@ -59,7 +59,7 @@ describe('runLLMReview modelUsed tracking', () => {
   it('returns selected model id on successful LLM review', async () => {
     mockGetModelForPhase.mockResolvedValue({
       modelId: 'moonshotai/kimi-k2-thinking',
-      fallbackModelId: 'google/gemini-3-flash-preview',
+      fallbackModelId: 'google/gemini-3.7-flash',
     });
 
     mockGenerateCompletion.mockResolvedValue({

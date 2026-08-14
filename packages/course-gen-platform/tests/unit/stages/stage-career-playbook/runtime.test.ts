@@ -307,7 +307,7 @@ describe('Career Playbook runtime', () => {
       modelConfigService: {
         getModelForPhase: vi.fn().mockResolvedValue({
           modelId: 'deepseek/deepseek-v4-flash',
-          fallbackModelId: 'google/gemini-3-flash-preview',
+          fallbackModelId: 'google/gemini-3.7-flash',
           temperature: 0.3,
           maxTokens: 1000,
           maxRetries: 0,
@@ -324,9 +324,9 @@ describe('Career Playbook runtime', () => {
 
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(500);
-    // deepseek/deepseek-v4-flash: $0.10/1M input + $0.20/1M output
-    // 1000 * 0.10/1e6 + 500 * 0.20/1e6 = 0.0001 + 0.0001 = 0.0002
-    expect(result.costUsd).toBeCloseTo(0.0002, 10);
+    // deepseek/deepseek-v4-flash: $0.14/1M input + $0.28/1M output
+    // 1000 * 0.14/1e6 + 500 * 0.28/1e6 = 0.00014 + 0.00014 = 0.00028
+    expect(result.costUsd).toBeCloseTo(0.00028, 10);
   });
 
   it('falls back to token estimates and still prices when usage is absent', async () => {
@@ -337,7 +337,7 @@ describe('Career Playbook runtime', () => {
       modelConfigService: {
         getModelForPhase: vi.fn().mockResolvedValue({
           modelId: 'deepseek/deepseek-v4-flash',
-          fallbackModelId: 'google/gemini-3-flash-preview',
+          fallbackModelId: 'google/gemini-3.7-flash',
           temperature: 0.3,
           maxTokens: 1000,
           maxRetries: 0,

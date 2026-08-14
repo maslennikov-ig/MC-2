@@ -162,3 +162,37 @@ export async function getCourseTokenSummary(courseId: string): Promise<CourseTok
     return { totalTokens: 0, totalCostUsd: 0, byStage: [] };
   }
 }
+
+/**
+ * Writes the course's traced spend into `courses.estimated_cost_usd`.
+ *
+ * The column was null for every course, so the only way to answer "what did
+ * this course cost" was the provider's key counter, which knows nothing about
+ * courses (mc2-o7740). The traces are the source; this is their sum, refreshed
+ * as the course progresses.
+ *
+ * Never throws: accounting must not be able to fail a generation.
+ */
+export async function updateCourseEstimatedCost(courseId: string): Promise<number | undefined> {
+  try {
+    const summary = await getCourseTokenSummary(courseId);
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('courses')
+      .update({ estimated_cost_usd: summary.totalCostUsd })
+      .eq('id', courseId);
+
+    if (error) {
+      logger.warn({ courseId, error }, 'Failed to write the course estimated cost');
+      return undefined;
+    }
+    logger.info(
+      { courseId, estimatedCostUsd: summary.totalCostUsd, totalTokens: summary.totalTokens },
+      'Course estimated cost updated'
+    );
+    return summary.totalCostUsd;
+  } catch (error) {
+    logger.warn({ courseId, error }, 'Error writing the course estimated cost');
+    return undefined;
+  }
+}

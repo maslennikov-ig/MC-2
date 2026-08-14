@@ -97,17 +97,17 @@ export function getContextOverflowFallback(
 ): ContextOverflowFallback | null {
   if (!tierConfig) {
     // Without tier config, use generic Gemini Flash as universal large-context fallback
-    if (currentModelId !== 'google/gemini-3-flash-preview') {
+    if (currentModelId !== 'google/gemini-3.7-flash') {
       logger.info(
         {
           currentModel: currentModelId,
-          fallbackModel: 'google/gemini-3-flash-preview',
+          fallbackModel: 'google/gemini-3.7-flash',
           reason: 'context_overflow_no_tier_config',
         },
         '[ContextOverflow] Escalating to Gemini 3 Flash (no tier config available)'
       );
       return {
-        modelId: 'google/gemini-3-flash-preview',
+        modelId: 'google/gemini-3.7-flash',
         maxContext: 1_000_000,
       };
     }

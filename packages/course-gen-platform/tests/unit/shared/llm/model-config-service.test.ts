@@ -35,7 +35,6 @@ vi.mock('@/shared/llm/model-config-db', async importOriginal => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    fetchStageConfigFromDb: vi.fn(),
     PhaseConfigRow: undefined,
     StageConfigRow: undefined,
     fetchPhaseConfigFromDb: vi.fn(),
@@ -43,14 +42,6 @@ vi.mock('@/shared/llm/model-config-db', async importOriginal => {
   };
 });
 
-type MockStageConfig = {
-  modelId?: string;
-  qualityThreshold?: number | null;
-  maxRetries?: number | null;
-  timeoutMs?: number | null;
-  primary?: string;
-  fallback?: string;
-};
 type MockPhaseConfig = { modelId?: string; maxContextTokens?: number; cacheReadEnabled?: boolean };
 
 describe('model-config-service', () => {
@@ -129,58 +120,6 @@ describe('model-config-service', () => {
   });
 
   describe('ModelConfigServiceImpl', () => {
-    describe('getModelForStage', () => {
-      it('fetches from DB and sets cache', async () => {
-        const mockConfig: MockStageConfig = { primary: 'test-model', fallback: 'test-fallback' };
-        vi.mocked(ModelConfigDB.fetchStageConfigFromDb).mockResolvedValueOnce(mockConfig as any);
-
-        const config = await service.getModelForStage(3, 'ru', 1000);
-
-        expect(config.primary).toBe('test-model');
-        expect(ModelConfigDB.fetchStageConfigFromDb).toHaveBeenCalledTimes(1);
-
-        // Next call should use cache
-        const config2 = await service.getModelForStage(3, 'ru', 1000);
-        expect(config2.primary).toBe('test-model');
-        expect(ModelConfigDB.fetchStageConfigFromDb).toHaveBeenCalledTimes(1); // STILL 1
-      });
-
-      it('returns stale cache on DB failure', async () => {
-        vi.useFakeTimers();
-
-        const mockConfig: MockStageConfig = { primary: 'test-model' };
-        vi.mocked(ModelConfigDB.fetchStageConfigFromDb).mockResolvedValueOnce(mockConfig as any);
-
-        await service.getModelForStage(3, 'ru', 1000); // Prime cache
-
-        // Fast forward 10 minutes (past fresh TTL, within max age)
-        vi.advanceTimersByTime(10 * 60 * 1000);
-
-        // DB fails
-        vi.mocked(ModelConfigDB.fetchStageConfigFromDb).mockRejectedValueOnce(new Error('DB Down'));
-
-        const config = await service.getModelForStage(3, 'ru', 1000);
-        expect(config.primary).toBe('test-model'); // Kept stale cache
-        expect(mockLogger.warn).toHaveBeenCalled(); // Logged warning
-      });
-
-      it('throws when no cache and no DB', async () => {
-        vi.mocked(ModelConfigDB.fetchStageConfigFromDb).mockRejectedValueOnce(new Error('DB Down'));
-
-        await expect(service.getModelForStage(3, 'ru', 1000)).rejects.toThrow(
-          'Cannot get stage config'
-        );
-      });
-
-      it('chooses extended tier for stage 4 above threshold', async () => {
-        const mockConfig: MockStageConfig = { primary: 'test-model' };
-        vi.mocked(ModelConfigDB.fetchStageConfigFromDb).mockResolvedValue(mockConfig as any);
-        // Stage 4 threshold is 260K
-        await service.getModelForStage(4, 'ru', 280000);
-        expect(ModelConfigDB.fetchStageConfigFromDb).toHaveBeenCalledWith(4, 'ru', 'extended');
-      });
-    });
-
     describe('getModelForPhase', () => {
       it('fetches from DB into cache', async () => {
         const mockConfig: MockPhaseConfig = { modelId: 'test-model', maxContextTokens: 100000 };
@@ -411,8 +350,8 @@ describe('model-config-service', () => {
         vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockRejectedValue(new Error('DB down'));
 
         const configs = await service.getStage4TierConfigs('en');
-        expect(configs.standard.modelId).toBe('google/gemini-3-flash-preview');
-        expect(configs.extended.modelId).toBe('google/gemini-3-flash-preview');
+        expect(configs.standard.modelId).toBe('google/gemini-3.7-flash');
+        expect(configs.extended.modelId).toBe('google/gemini-3.7-flash');
       });
     });
   });

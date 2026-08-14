@@ -15,6 +15,7 @@
 
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { getModelCapabilities } from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { retryWithBackoff } from '@/shared/workspace-utils';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
@@ -26,12 +27,33 @@ import {
   handleUnknownError,
 } from './client-helpers';
 import type { ReasoningRequest } from './client-helpers';
+import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
+
+/**
+ * Wall-clock budget for a single LLM call, in milliseconds.
+ *
+ * Derived from measurement, not chosen. Measured on dev 2026-08-14 from inside
+ * `megacampus-worker-dev`, through this same SDK, with reasoning already off:
+ * the real shape of a Stage 4 call (8204 input tokens, `max_tokens` 16000,
+ * temperature 0.7) against the default `~deepseek/deepseek-v4-flash-latest`
+ * took 119.0s. The previous budget was 60s, so every Stage 2 and Stage 4 call
+ * was aborted at roughly half the model's real answer time, burned all four
+ * attempts, and then escalated or failed the course. The 2026-08-14 run never
+ * left Stage 4 (mc2-wg60c).
+ *
+ * The value is twice the measurement. Twice, because the default model carries
+ * the `~` prefix — OpenRouter's cheapest provider for it, which is also its
+ * most variable — and one measurement of one shape is not a distribution.
+ * Still well under the 620s hang seen on 2026-08-13, so a genuine hang is
+ * still cut short rather than waited out.
+ */
+export const DEFAULT_LLM_TIMEOUT_MS = 238_000;
 
 /**
  * Options for LLM completion requests
  */
 export interface LLMClientOptions {
-  /** Model identifier (e.g., 'openai/gpt-oss-20b', 'google/gemini-3-flash-preview') */
+  /** Model identifier (e.g., 'openai/gpt-oss-20b', 'google/gemini-3.7-flash') */
   model: string;
   /** Maximum output tokens to generate */
   maxTokens?: number;
@@ -39,7 +61,7 @@ export interface LLMClientOptions {
   temperature?: number;
   /** System prompt for model behavior */
   systemPrompt?: string;
-  /** Request timeout in milliseconds (default: 60000) */
+  /** Request timeout in milliseconds (default: {@link DEFAULT_LLM_TIMEOUT_MS}) */
   timeout?: number;
   /** Enable prompt caching (for Anthropic models via OpenRouter) */
   enableCaching?: boolean;
@@ -49,6 +71,12 @@ export interface LLMClientOptions {
    * work is genuinely hard.
    */
   reasoning?: ReasoningRequest;
+  /**
+   * Course, stage and phase this call belongs to. Supply it wherever the
+   * caller knows them: without it the call's cost cannot be attributed to a
+   * course and is only counted in the provider's own key total.
+   */
+  costContext?: LlmCostContext;
 }
 
 export interface LLMClientConstructionOptions {
@@ -129,7 +157,7 @@ export class LLMClient {
         'HTTP-Referer': appUrl,
         'X-Title': 'MegaCampus Course Generator',
       },
-      timeout: 60000, // 60s default timeout
+      timeout: DEFAULT_LLM_TIMEOUT_MS,
       // Allow browser-like environment (JSDOM for mermaid creates global.window)
       // This is safe because we're running in Node.js, not a real browser
       dangerouslyAllowBrowser: true,
@@ -210,9 +238,10 @@ export class LLMClient {
       maxTokens = 10000,
       temperature = 0.7,
       systemPrompt = 'You are a helpful assistant that summarizes documents concisely while preserving key information.',
-      timeout = 60000,
+      timeout = DEFAULT_LLM_TIMEOUT_MS,
       enableCaching = false,
       reasoning,
+      costContext,
     } = options;
 
     logger.info(
@@ -239,11 +268,14 @@ export class LLMClient {
 
     const inputContentLength = systemPrompt.length + prompt.length;
 
-    return this.executeWithRetry(
+    const startedAt = Date.now();
+    const response = await this.executeWithRetry(
       () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
       model,
       'LLM'
     );
+    await this.recordCost(response, costContext, startedAt);
+    return response;
   }
 
   /**
@@ -264,9 +296,10 @@ export class LLMClient {
       model,
       maxTokens = 10000,
       temperature = 0.7,
-      timeout = 60000,
+      timeout = DEFAULT_LLM_TIMEOUT_MS,
       enableCaching = false,
       reasoning,
+      costContext,
     } = options;
 
     logger.info(
@@ -287,18 +320,53 @@ export class LLMClient {
       return sum + (typeof msg.content === 'string' ? msg.content.length : 0);
     }, 0);
 
-    return this.executeWithRetry(
+    const startedAt = Date.now();
+    const response = await this.executeWithRetry(
       () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
       model,
       'Chat completion'
+    );
+    await this.recordCost(response, costContext, startedAt);
+    return response;
+  }
+
+  /**
+   * Prices the call from MODEL_CATALOG and records it against the course.
+   *
+   * `response.model` is what the provider actually served, which is not always
+   * what was asked for once a fallback fires, so the price follows the served
+   * model.
+   */
+  private async recordCost(
+    response: LLMResponse,
+    costContext: LlmCostContext | undefined,
+    startedAt: number
+  ): Promise<void> {
+    await recordLlmCallCost(
+      {
+        model: response.model,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+      },
+      costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
   }
 
   /**
    * Execute a single API request and parse the response.
    *
+   * The SDK's own `timeout` option does not bound the call: `fetchWithTimeout`
+   * clears its abort timer as soon as `fetch` resolves, and `fetch` resolves on
+   * response headers, so the body read runs unbounded. OpenRouter returns
+   * headers immediately and then holds the connection for as long as the model
+   * takes. Measured on dev 2026-08-13: a Stage 2 summarization call ran 620s
+   * against a 60s timeout, never timed out and never retried, and the job it
+   * belonged to stayed `active` the whole time. An explicit signal is what
+   * actually bounds it, so both are passed: the signal is the enforcement, the
+   * option stays for the connect/headers phase.
+   *
    * @param requestOptions - OpenRouter request options
-   * @param timeout - Request timeout in ms
+   * @param timeout - Wall-clock budget for the whole call in ms
    * @param model - Model identifier for logging/fallback
    * @param inputContentLength - Input content length for token estimation
    * @returns Parsed LLMResponse
@@ -317,6 +385,7 @@ export class LLMClient {
       // Non-streaming request always returns ChatCompletion (not Stream)
       const completion = (await this.client.chat.completions.create(requestOptions, {
         timeout,
+        signal: AbortSignal.timeout(timeout),
       })) as OpenAI.Chat.Completions.ChatCompletion;
 
       const response = parseCompletionResponse(completion, model, inputContentLength);
@@ -416,15 +485,13 @@ Create a summary that someone could use to understand the core content without r
    */
   estimateCost(response: LLMResponse): number {
     const model = response.model;
-
-    // Pricing per 1M tokens (USD)
-    const pricing: Record<string, { input: number; output: number }> = {
-      'openai/gpt-oss-20b': { input: 0.03, output: 0.14 },
-      'deepseek/deepseek-v4-flash': { input: 0.1, output: 0.2 },
-      'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 },
-    };
-
-    const modelPricing = pricing[model] || { input: 0.05, output: 0.15 }; // Default fallback
+    const capabilities = getModelCapabilities(model);
+    const modelPricing = capabilities
+      ? {
+          input: capabilities.inputPricePerMillion,
+          output: capabilities.outputPricePerMillion,
+        }
+      : { input: 0.05, output: 0.15 }; // Preserve the legacy unknown-model fallback.
 
     const inputCost = (response.inputTokens / 1_000_000) * modelPricing.input;
     const outputCost = (response.outputTokens / 1_000_000) * modelPricing.output;

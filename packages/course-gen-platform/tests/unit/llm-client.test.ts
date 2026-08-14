@@ -73,7 +73,7 @@ vi.mock('@megacampus/shared-utils', async importOriginal => {
 });
 
 // Import after mocks are defined
-import { LLMClient, createLLMClient } from '@/shared/llm/client';
+import { LLMClient, createLLMClient, DEFAULT_LLM_TIMEOUT_MS } from '@/shared/llm/client';
 import { getOpenRouterApiKey, getApiKeySync } from '@/shared/services/api-key-service';
 import OpenAI from 'openai';
 import logger from '@/shared/logger';
@@ -295,8 +295,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.03/1M input + $0.14/1M output = $0.17
-      expect(cost).toBeCloseTo(0.17, 4);
+      // $0.03/1M input + $0.13/1M output = $0.16
+      expect(cost).toBeCloseTo(0.16, 4);
     });
 
     it('should estimate cost for deepseek/deepseek-v4-flash', () => {
@@ -312,25 +312,25 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.10/1M input + $0.20/1M output = $0.30
-      expect(cost).toBeCloseTo(0.3, 4);
+      // $0.14/1M input + $0.28/1M output = $0.42
+      expect(cost).toBeCloseTo(0.42, 4);
     });
 
-    it('should estimate cost for google/gemini-3-flash-preview', () => {
+    it('should estimate cost for google/gemini-3.7-flash', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-3.7-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // $0.50/1M input + $3.00/1M output = $3.50
-      expect(cost).toBeCloseTo(3.5, 4);
+      // $0.375/1M input + $1.875/1M output = $2.25
+      expect(cost).toBeCloseTo(2.25, 4);
     });
 
     it('should use fallback pricing for unknown models', () => {
@@ -363,8 +363,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // (5000/1M * 0.03) + (2000/1M * 0.14) = 0.00015 + 0.00028 = 0.00043
-      expect(cost).toBeCloseTo(0.00043, 6);
+      // (5000/1M * 0.03) + (2000/1M * 0.13) = 0.00015 + 0.00026 = 0.00041
+      expect(cost).toBeCloseTo(0.00041, 6);
     });
   });
 
@@ -384,6 +384,56 @@ describe('LLMClient', () => {
       vi.mocked(getOpenRouterApiKey).mockResolvedValue(null);
 
       await expect(createLLMClient()).rejects.toThrow('OpenRouter API key not configured');
+    });
+  });
+
+  describe('call budget', () => {
+    /**
+     * Longest real answer measured through this SDK on dev 2026-08-14: the
+     * actual shape of a Stage 4 call took 119.0s. A budget at or below this
+     * aborts the model mid-answer, which is what stalled Stage 2 and Stage 4
+     * (mc2-wg60c).
+     */
+    const MEASURED_SLOWEST_ANSWER_MS = 119_000;
+
+    function lastRequestOptions() {
+      const instance = vi.mocked(OpenAI).mock.instances.at(-1) as unknown as {
+        chat: { completions: { create: ReturnType<typeof vi.fn> } };
+      };
+      return instance.chat.completions.create.mock.calls.at(-1)?.[1];
+    }
+
+    it('gives a call more time than the slowest answer actually measured', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateCompletion('test prompt', { model: 'test-model' });
+
+      const options = lastRequestOptions();
+      expect(options?.timeout).toBe(DEFAULT_LLM_TIMEOUT_MS);
+      expect(options?.timeout).toBeGreaterThan(MEASURED_SLOWEST_ANSWER_MS);
+    });
+
+    it('bounds a chat call by the same budget', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateChatCompletion([{ role: 'user', content: 'test prompt' }], {
+        model: 'test-model',
+      });
+
+      const options = lastRequestOptions();
+      expect(options?.timeout).toBe(DEFAULT_LLM_TIMEOUT_MS);
+      expect(options?.timeout).toBeGreaterThan(MEASURED_SLOWEST_ANSWER_MS);
+    });
+
+    it('still lets a caller set its own budget', async () => {
+      vi.mocked(getApiKeySync).mockReturnValue('test-key');
+
+      const client = new LLMClient();
+      await client.generateCompletion('test prompt', { model: 'test-model', timeout: 5_000 });
+
+      expect(lastRequestOptions()?.timeout).toBe(5_000);
     });
   });
 });

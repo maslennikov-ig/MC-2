@@ -23,6 +23,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
+import { attachCostRecording } from './model-cost-callbacks';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   DEFAULT_MODEL_ID,
@@ -116,12 +117,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -172,12 +173,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -198,12 +199,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 10000,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -284,7 +285,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-3-flash-preview', // Extended context
+    modelId: 'google/gemini-3.7-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -419,7 +420,7 @@ const PHASE_FALLBACK_CONFIG: Record<
  * reasoning budget has to be added to the answer budget rather than shared
  * with it.
  */
-function buildProviderParams(
+export function buildProviderParams(
   modelId: string,
   temperature: number,
   maxTokens: number,
@@ -444,6 +445,11 @@ function buildProviderParams(
         'Phase asks for reasoning but the model does not accept it - sending the request without it'
       );
     }
+  } else if (modelSupportsReasoning(modelId)) {
+    // A phase that did not ask for deliberation has to say so: models that
+    // reason by default otherwise spend the answer budget on it (see
+    // client-helpers).
+    modelKwargs.reasoning = { enabled: false };
   }
 
   return {
@@ -576,8 +582,18 @@ export async function getModelForPhase(
       );
     }
 
-    // Use async version for database-first API key resolution
-    return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
+    // Use async version for database-first API key resolution.
+    // `config.reasoning` has to travel with the rest of the phase config: a
+    // phase that reads its reasoning budget out of the database and then drops
+    // it before the request is a phase that thinks it deliberates and does not.
+    const model = await createOpenRouterModelAsync(
+      config.modelId,
+      config.temperature,
+      config.maxTokens,
+      undefined,
+      config.reasoning
+    );
+    return attachCostRecording(model, config.modelId, phase, courseId);
   } catch (err) {
     logger.warn(
       { phase, error: err },

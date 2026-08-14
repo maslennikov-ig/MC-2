@@ -9,6 +9,15 @@ import { MODELS, TOKEN_BUDGET } from './constants';
 import { normalizeLanguageCode } from '@/shared/workspace-utils';
 
 /**
+ * Sampling settings for the two paths that never reach `llm_model_config`:
+ * a context overflow routed straight to the large-context model, and a database
+ * lookup that failed. They match the previous hardcoded generator defaults, so
+ * the last-resort path behaves exactly as before; every other path now carries
+ * the configured values instead.
+ */
+const LAST_RESORT_SAMPLING = { temperature: 0.7, maxTokens: 30000 } as const;
+
+/**
  * Estimate context length for Tier 3 routing
  */
 export async function estimateContextLength(
@@ -53,6 +62,7 @@ export async function selectModelTier(
       model: MODELS.tier3_gemini,
       tier: 'tier3_gemini',
       reason: `Context overflow: ${estimatedContextLength} tokens > ${TOKEN_BUDGET.GEMINI_TRIGGER_INPUT} threshold`,
+      ...LAST_RESORT_SAMPLING,
     };
   }
 
@@ -111,6 +121,9 @@ export async function selectModelTier(
       model: modelId,
       tier: targetTier,
       reason: `${tierReason} → ${modelId} (from ${config.source})`,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      reasoning: config.reasoning,
     };
   } catch (error) {
     logger.warn({
@@ -123,6 +136,7 @@ export async function selectModelTier(
       model: MODELS[targetTier],
       tier: targetTier,
       reason: `${tierReason} → ${MODELS[targetTier]} (hardcoded fallback)`,
+      ...LAST_RESORT_SAMPLING,
     };
   }
 }

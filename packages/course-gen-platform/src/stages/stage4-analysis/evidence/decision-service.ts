@@ -6,6 +6,7 @@ import {
   type DocumentConflict,
   type DocumentEvidenceCard,
   type DocumentEvidenceQuestionMetadata,
+  type DocumentEvidenceSourceManifestEntry,
   type EvidenceSourceRef,
 } from '@megacampus/shared-types';
 import type { DetectorCapacityIssue } from './conflict-detector';
@@ -69,6 +70,46 @@ export interface DocumentDecisionRepository {
     questions: DocumentEvidenceQuestion[];
     gateIdempotencyKey: string;
   }): Promise<{ question_ids: string[]; decision_ids: string[]; reused: boolean }>;
+  listCourseAcceptedRuns?(
+    courseId: string,
+    organizationId: string
+  ): Promise<Array<{ id: string; sourceManifest: DocumentEvidenceSourceManifestEntry[] }>>;
+  getLatestDecisions?(runId: string): Promise<Array<Record<string, unknown>>>;
+  answerDocumentConflictAtomic?(input: {
+    courseId: string;
+    actorUserId: string;
+    answers: Array<{
+      questionId: string;
+      answer: string;
+      answerSource: 'suggested' | 'modified' | 'custom';
+      selectedSuggestionIndex?: number;
+      expectedCurrentDecisionId?: string;
+      idempotencyKey: string;
+    }>;
+  }): Promise<Record<string, unknown>>;
+}
+
+/**
+ * What identifies a decision subject across runs.
+ *
+ * `subject_key` is derived from `run_id`, so it cannot be compared between two
+ * runs of the same course. A conflict is the same conflict when its fingerprint
+ * matches; a degraded document is the same subject when it is the same
+ * document. Detector-capacity issues describe one run's detector budget and are
+ * deliberately not portable.
+ */
+function portableSubjectIdentity(
+  subject: DocumentEvidenceDecisionSubject,
+  conflictFingerprints: Map<string, string>
+): string | undefined {
+  if (subject.kind === 'claim_conflict') {
+    const fingerprint =
+      subject.conflict.conflict_fingerprint ??
+      conflictFingerprints.get(subject.conflict.conflict_id);
+    return fingerprint ? `conflict:${fingerprint}` : undefined;
+  }
+  if (subject.kind === 'degraded_evidence') return `degraded:${subject.card.document_id}`;
+  return undefined;
 }
 
 interface DecisionLogger {
@@ -430,6 +471,134 @@ export function buildDocumentEvidenceQuestion(input: {
   };
 }
 
+/**
+ * Replays an answer the user already gave onto an equivalent subject in a newer
+ * run of the same course.
+ *
+ * A Stage 4 job retry could produce a second accepted run; the guard trigger
+ * checks the newest one, so an answer that belonged to the older run left the
+ * course stuck in `stage_4_clarifying` with no way out — the question's attempt
+ * budget was already spent, so no new question would ever appear (mc2-fqbrj).
+ *
+ * Carrying is allowed only while the source set is unchanged, and only onto a
+ * choice the new question actually offers. Anything else is left unanswered:
+ * the user is asked again, which is the old behaviour, not a new failure.
+ */
+async function carryOverPriorAnswers(
+  input: {
+    runId: string;
+    courseId: string;
+    organizationId: string;
+    pending: Array<{ question: DocumentEvidenceQuestion; identity: string }>;
+  },
+  dependencies: ResolveDocumentEvidenceDecisionsDependencies
+): Promise<{ carriedQuestionIds: string[]; carriedDecisionIds: string[] }> {
+  const empty = { carriedQuestionIds: [], carriedDecisionIds: [] };
+  const { repository } = dependencies;
+  if (
+    input.pending.length === 0 ||
+    !repository.listCourseAcceptedRuns ||
+    !repository.getLatestDecisions ||
+    !repository.answerDocumentConflictAtomic
+  ) {
+    return empty;
+  }
+
+  const runs = await repository.listCourseAcceptedRuns(input.courseId, input.organizationId);
+  const current = runs.find(run => run.id === input.runId);
+  if (!current) return empty;
+  const sameSources = JSON.stringify(current.sourceManifest);
+  const priorRuns = runs.filter(
+    run => run.id !== input.runId && JSON.stringify(run.sourceManifest) === sameSources
+  );
+  if (priorRuns.length === 0) return empty;
+
+  // Newest prior run wins; within a run, the newest decision that nothing
+  // supersedes is the current one.
+  const answers = new Map<string, { value: string; actorUserId: string }>();
+  for (const run of priorRuns) {
+    const decisions = await repository.getLatestDecisions(run.id);
+    const superseded = new Set(
+      decisions
+        .map(decision => decision.supersedes_decision_id)
+        .filter((value): value is string => typeof value === 'string')
+    );
+    const fingerprints = new Map(
+      (await repository.listConflicts(run.id)).map(conflict => [
+        conflict.conflict_id,
+        conflict.conflict_fingerprint,
+      ])
+    );
+    for (const decision of decisions) {
+      if (superseded.has(String(decision.id))) continue;
+      if (decision.resolved_by !== 'user') continue;
+      const value = decision.selected_recommendation_value;
+      const actorUserId = decision.actor_user_id;
+      if (typeof value !== 'string' || typeof actorUserId !== 'string') continue;
+      const identity =
+        decision.subject_kind === 'claim_conflict'
+          ? fingerprints.has(String(decision.conflict_id))
+            ? `conflict:${fingerprints.get(String(decision.conflict_id))}`
+            : undefined
+          : decision.subject_kind === 'degraded_evidence' &&
+              typeof decision.document_id === 'string'
+            ? `degraded:${decision.document_id}`
+            : undefined;
+      if (!identity || answers.has(identity)) continue;
+      answers.set(identity, { value, actorUserId });
+    }
+  }
+
+  const carriedQuestionIds: string[] = [];
+  const carriedDecisionIds: string[] = [];
+  for (const { question, identity } of input.pending) {
+    const prior = answers.get(identity);
+    if (!prior) continue;
+    const index = question.suggestedAnswers.findIndex(answer => answer.value === prior.value);
+    if (index < 0) continue;
+    try {
+      const result = await repository.answerDocumentConflictAtomic({
+        courseId: input.courseId,
+        actorUserId: prior.actorUserId,
+        answers: [
+          {
+            questionId: question.questionId,
+            answer: prior.value,
+            answerSource: 'suggested',
+            selectedSuggestionIndex: index,
+            idempotencyKey: stableUuidV8(
+              `document-evidence-carried-answer-v1:${input.runId}:${question.subjectKey}:${prior.value}`
+            ),
+          },
+        ],
+      });
+      carriedQuestionIds.push(question.questionId);
+      const decisionIds = (result as { decision_ids?: unknown }).decision_ids;
+      if (Array.isArray(decisionIds)) {
+        for (const id of decisionIds) if (typeof id === 'string') carriedDecisionIds.push(id);
+      }
+      dependencies.log?.info(
+        {
+          runId: input.runId,
+          questionId: question.questionId,
+          subjectKind: question.subjectKind,
+        },
+        'Carried an answered document evidence decision onto the current run'
+      );
+    } catch (error) {
+      dependencies.log?.info(
+        {
+          runId: input.runId,
+          questionId: question.questionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Could not carry an answered document evidence decision; asking again'
+      );
+    }
+  }
+  return { carriedQuestionIds, carriedDecisionIds };
+}
+
 export async function resolveDocumentEvidenceDecisions(
   input: ResolveDocumentEvidenceDecisionsInput,
   dependencies: ResolveDocumentEvidenceDecisionsDependencies
@@ -531,22 +700,52 @@ export async function resolveDocumentEvidenceDecisions(
       `document-decision-gate-v1:${input.runId}:${sha256(JSON.stringify(questions))}`
     ),
   });
+  const conflictFingerprints = new Map(
+    conflicts.map(conflict => [conflict.conflict_id, conflict.conflict_fingerprint])
+  );
+  const materializedQuestionIds = new Set(materialized.question_ids);
+  const carried =
+    input.mode === 'manual'
+      ? await carryOverPriorAnswers(
+          {
+            runId: input.runId,
+            courseId: input.courseId,
+            organizationId: input.organizationId,
+            pending: questions.flatMap((question, index) => {
+              if (!materializedQuestionIds.has(question.questionId)) return [];
+              const identity = portableSubjectIdentity(subjects[index], conflictFingerprints);
+              return identity ? [{ question, identity }] : [];
+            }),
+          },
+          dependencies
+        )
+      : { carriedQuestionIds: [], carriedDecisionIds: [] };
+  const carriedQuestionIds = new Set(carried.carriedQuestionIds);
+  const outstandingQuestionIds = materialized.question_ids.filter(
+    id => !carriedQuestionIds.has(id)
+  );
+
   const decisionIds = [
-    ...new Set([...current.map(value => value.id), ...materialized.decision_ids]),
+    ...new Set([
+      ...current.map(value => value.id),
+      ...materialized.decision_ids,
+      ...carried.carriedDecisionIds,
+    ]),
   ].sort();
   const automaticQuestions = input.mode === 'automatic' ? questions : [];
   dependencies.log?.info(
     {
       mode: input.mode,
-      requiredQuestionCount: materialized.question_ids.length,
+      requiredQuestionCount: outstandingQuestionIds.length,
+      carriedQuestionCount: carried.carriedQuestionIds.length,
       currentDecisionCount: decisionIds.length,
       unresolvedInformationalCount: unresolvedInformationalConflictIds.length,
     },
     'Document evidence decision gate complete'
   );
   return {
-    pauseRequired: input.mode === 'manual' && materialized.question_ids.length > 0,
-    requiredQuestionIds: [...materialized.question_ids].sort(),
+    pauseRequired: input.mode === 'manual' && outstandingQuestionIds.length > 0,
+    requiredQuestionIds: [...outstandingQuestionIds].sort(),
     currentDecisionIds: decisionIds,
     unresolvedInformationalConflictIds: unresolvedInformationalConflictIds.sort(),
     decisionSummary: {

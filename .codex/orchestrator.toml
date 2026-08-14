@@ -43,7 +43,7 @@ ask_before = [
 mode = "current_state_plus_stages"
 current_state_max_lines = 200
 legacy_archive_dir = ".codex/agent-reports"
-hard_limit_lines = 200
+hard_limit_lines = 500
 
 [artifacts]
 tracked_in_git = true

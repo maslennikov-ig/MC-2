@@ -297,10 +297,20 @@ for blocked in (pathlib.Path("tasks.json"), pathlib.Path(".codex/tasks.json")):
 handoff_text = handoff_file.read_text()
 handoff_lines = len(handoff_text.splitlines())
 handoff = contract.get("handoff", {})
-max_lines = handoff.get("hard_limit_lines") or handoff.get("current_state_max_lines")
-if isinstance(max_lines, int) and handoff_lines > max_lines:
+current_state_max_lines = handoff.get("current_state_max_lines", 200)
+hard_limit_lines = handoff.get("hard_limit_lines", 500)
+if type(hard_limit_lines) is not int or not 1 <= hard_limit_lines <= 500:
+    raise SystemExit("handoff.hard_limit_lines must be a non-bool integer from 1 to 500")
+if type(current_state_max_lines) is not int or not 1 <= current_state_max_lines <= hard_limit_lines:
     raise SystemExit(
-        f"{handoff_file} has {handoff_lines} lines, exceeds configured limit {max_lines}"
+        "handoff.current_state_max_lines must be a non-bool integer from 1 through "
+        f"the configured hard ceiling {hard_limit_lines}"
+    )
+if handoff_lines > current_state_max_lines:
+    raise SystemExit(
+        f"{handoff_file} has {handoff_lines} lines, exceeds configured current-state "
+        f"limit {current_state_max_lines}; compact it or explicitly raise "
+        "handoff.current_state_max_lines up to 500"
     )
 
 agents = contract.get("agents", {})

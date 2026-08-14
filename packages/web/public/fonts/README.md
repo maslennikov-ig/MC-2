@@ -1,12 +1,8 @@
 # Font Files
 
-This directory is intentionally kept for potential future use of local fonts.
+Empty on purpose. The application's fonts live in `packages/web/app/fonts/` and
+are declared with `next/font/local`, which hashes and serves them itself — a
+font placed here would be served twice, once by Next and once as a static file.
 
-Currently, the application uses Google Fonts through Next.js's `next/font/google` package:
-
-- Inter (variable font)
-- JetBrains Mono (variable font)
-
-The font files `inter-var.woff2` and `jetbrains-mono-var.woff2` are not needed as fonts are loaded from Google's CDN.
-
-If you see 404 errors for these files in the browser console, they can be safely ignored as the fonts are properly loaded through Next.js font optimization.
+See `packages/web/app/fonts/README.md` for what is bundled and how to
+regenerate it.

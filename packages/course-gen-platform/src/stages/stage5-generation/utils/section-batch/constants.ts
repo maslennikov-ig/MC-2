@@ -22,7 +22,7 @@ export const MODELS = {
   /** Complex tier: premium model for hardest sections + first section */
   complex: 'qwen/qwen3.7-plus',
   /** Context overflow: large context model */
-  tier3_gemini: 'google/gemini-3-flash-preview',
+  tier3_gemini: 'google/gemini-3.7-flash',
 } as const;
 
 /**

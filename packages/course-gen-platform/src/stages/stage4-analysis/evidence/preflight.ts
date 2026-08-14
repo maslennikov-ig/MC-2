@@ -59,7 +59,6 @@ export interface DocumentEvidencePreflightInput extends EvidenceBudgetOptions {
   language?: 'ru' | 'en';
   evidenceVersion: string;
   modelId?: string;
-  classificationContext?: unknown;
   sources: DocumentEvidencePreflightSource[];
   maxRetries: number;
   maxVerificationDocumentIds?: number;
@@ -225,36 +224,6 @@ function manifest(
   }));
 }
 
-function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function semanticClassificationProjection(value: unknown): Record<string, unknown> | null {
-  const classification = objectValue(value);
-  if (!classification) return null;
-  const category = objectValue(classification.course_category);
-  const topic = objectValue(classification.topic_analysis);
-  const projection = {
-    course_category: category
-      ? {
-          primary: typeof category.primary === 'string' ? category.primary : null,
-          secondary: typeof category.secondary === 'string' ? category.secondary : null,
-        }
-      : null,
-    topic_analysis: topic
-      ? {
-          determined_topic:
-            typeof topic.determined_topic === 'string' ? topic.determined_topic : null,
-          complexity: typeof topic.complexity === 'string' ? topic.complexity : null,
-          target_audience: typeof topic.target_audience === 'string' ? topic.target_audience : null,
-        }
-      : null,
-  };
-  return projection.course_category || projection.topic_analysis ? projection : null;
-}
-
 function inputFingerprint(
   input: DocumentEvidencePreflightInput,
   sources: DocumentEvidencePreflightSource[],
@@ -264,11 +233,16 @@ function inputFingerprint(
     ...(input.retryDirectives ?? []),
     ...(input.retryDirective ? [input.retryDirective] : []),
   ].sort((left, right) => left.documentId.localeCompare(right.documentId));
+  // The classification projection is deliberately absent. It is an LLM output,
+  // so it varies between job attempts on identical inputs; including it gave a
+  // retry a different fingerprint, which created a second accepted run instead
+  // of reusing the first, and left the user's answer keyed to the older run
+  // (mc2-fqbrj). Run identity now covers only what evidence generation reads:
+  // the sources, their versions and the evidence schema.
   return sha256(
     JSON.stringify({
       topic: input.topic,
       language: input.language,
-      classification: semanticClassificationProjection(input.classificationContext),
       source_manifest: sourceManifest,
       evidence_shape: sources.map(source => ({
         document_id: source.documentId,

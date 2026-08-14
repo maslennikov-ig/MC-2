@@ -1,11 +1,12 @@
-import { Manrope } from 'next/font/google'
+import localFont from 'next/font/local'
 import { AppThemeProvider } from '@/components/common/app-theme-provider'
 import '../globals.css'
 
-const manrope = Manrope({
+// Served from this repository; see app/fonts/README.md.
+const manrope = localFont({
+  src: '../fonts/manrope-latin-cyrillic.woff2',
   variable: '--font-manrope',
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500', '600', '700'],
+  weight: '400 700',
   display: 'swap',
 })
 

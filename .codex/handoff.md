@@ -1,159 +1,159 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-13. Effective kernel: `shared-orchestration/v1`.
-Current stage id: `mc2-db696.110`
+Updated: 2026-08-14. Effective kernel: `shared-orchestration/v1`.
 
-Current state only. History lives in commits, `bd` close reasons and
-`.codex/stages/<stage_id>/summary.md`; do not re-narrate it here.
+Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
 ## Current stage
 
-The Career Playbook quality track is **accepted**. `mc2-db696.110` closed on an editorial read of
-**4.4 / 5** against a 4.0 threshold, up from a 2.6 baseline. Evidence:
-`.codex/stages/mc2-db696.110/evidence/quality-review-v3.md`. Cost of the accepting run was USD 0.352
-against a USD 0.60 ceiling.
+The Career Playbook quality track is **accepted** (`mc2-db696.110`, editorial read 4.4 / 5 against a
+4.0 threshold, run cost USD 0.352; evidence in `.codex/stages/mc2-db696.110/evidence/`). Its two
+process rules are in `06-quality-acceptance.md` and still hold: read the artifact before calling a
+run accepted, and clean up **after** the editorial pass. Active work is now epic `mc2-qrdkt`.
 
-Two process rules from it are written into `06-quality-acceptance.md` and still hold: read the
-artifact before calling a run accepted, and clean up **after** the editorial pass.
+## RAG retrieval and chunking repaired (2026-08-12/13)
 
-## RAG retrieval repaired (2026-08-12, `54a5c5e44`)
+Closed: `mc2-pdmgu`, `mc2-7frdr`, `mc2-5fpaf`, `mc2-18ujf`; `mc2-lrav0` on the owner's "no backfill".
+Details in `54a5c5e44`, `c18e2a9ea` and the stage summaries. What still constrains work:
 
-Two defects, both silent, both measured on the live production collection before and after.
-`mc2-pdmgu` and `mc2-7frdr` are closed; `mc2-lrav0` is closed on the owner's "no backfill".
-
-**The score threshold was unreachable.** Every RAG entry point carried its own `0.7` while the
-embeddings top out near 0.58. The threshold gates the dense branch of a hybrid query, so hybrid
-search was byte-for-byte BM25-only — `hybridIsJustSparse=true` on three queries, `false` after. One
-source now: `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6 ceiling), and a
-test reads the RAG sources to reject any literal above that ceiling.
-
-**Half the index was a copy of the other half.** Every parent held exactly one child and therefore
-that child's exact text. Degenerate parents no longer reach the index (`selectIndexableChunks`), and
-search drops repeated text as a safety net. The cause first recorded here — `groupIntoParents()` in
-the Docling adapter — was **wrong**; see the chunker section below. Production data was cleaned to
-**13712 → 6856 points**, snapshot first, deletion conditional on a same-text point provably
-remaining, `file_catalog.chunk_count` corrected for 218 documents. The 50% drop correctly fired
-`QdrantPointCountUnexpectedDrop` and resolved on its own.
-
-Delivered on `c18e2a9ea`. A probe in the deployed worker confirmed `DENSE_SCORE_THRESHOLD 0.25` and
-hybrid top scores of 0.750 and 0.553, above the 0.500 ceiling a single-source fusion produces.
-
-## Legacy chunker repaired (2026-08-13)
-
-`mc2-5fpaf` closed by fixing the chunker, not by removing the parent tier. Two measurement errors in
-`markdown-chunker.ts` hid each other: `splitByHeadings` was `new MarkdownTextSplitter({})`, which
-despite the name never splits on headings and with no options took LangChain's 1000-character
-default; `tokenAwareSplit` then sized both splitters as `tokens * 4` while Russian runs 2.33
-characters per token. A section never reached the child window, so every parent came back unsplit.
-Both passes are now token-aware and the heading pass is real.
-
-Measured on 25 production documents, before → after: children per parent 1.00 → 3.15, degenerate
-parents 508 → 29, children with siblings 0 → 531, children with a real heading path 0 → 475. No
-reindex needed; existing points are untouched, and all 87 source files behind the 218 indexed
-documents are present should one be wanted later.
-
-**The native path is healthy** (`mc2-18ujf`, closed). Production holds no natively chunked point only
-because the index was built 2026-07-31 and native chunking landed 2026-08-05. Exercised on three
-cached conversions: `strategy=docling_hybrid`, zero degenerate parents, siblings populated,
-`refCoverage`/`locationCoverage` both 1.000. No silent fallback, and a second disproof of the
-`groupIntoParents()` accusation.
+- Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6
+  ceiling), and a test rejects any literal above that ceiling. The old `0.7` was unreachable against
+  embeddings topping out near 0.58, which made hybrid search BM25-only.
+- Degenerate parents no longer reach the index (`selectIndexableChunks`); search drops repeated text
+  as a safety net. Production was cleaned 13712 → 6856 points. Both chunking paths were measured and
+  are healthy; `groupIntoParents()` was accused twice and caused neither defect.
 
 ## Parent context expansion (2026-08-13, `217e3d112`)
 
-`specs/027-parent-context-expansion/spec.md`, implemented. This finishes the design recorded in
-`docs/RAG-CHUNKING-STRATEGY.md` in October 2025 — search the small grain, answer with the large one.
-Its example separated `uploadChunksToQdrant(child_chunks)` from `storeParentChunks(parent_chunks)`;
-the second function was never written, so parents went into the same collection and the system paid
-to search a grain it never meant to search.
+`specs/027-parent-context-expansion/spec.md`, implemented. Only children are indexed, plus any
+childless parent; the passage is rebuilt at retrieval time from siblings. Expansion runs **after
+reranking** in the two paths that rerank, and the budget is a ceiling on what it adds, never a reason
+to drop a retrieved chunk. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off
+for evidence retrieval, where a citation must point at the fragment that matched. `getParentChunk` is
+gone. It is a no-op on points indexed before it and takes effect per document as they are reprocessed.
 
-Only children are indexed now, plus any childless parent, the sole carrier of its text. The passage
-is rebuilt at retrieval time from siblings already indexed — parents carry no text of their own, 57
-of 57 fully reconstructible at word coverage 1.0000. Cheaper than the parent store the design asked
-for, no migration, and it avoids the +91.2% embedding cost the next processed document would have
-re-introduced silently.
-
-`expandToSiblingContext` is opt-in through `SearchOptions.expand_context`, because only the caller
-knows its prompt budget, and that budget is a ceiling: a passage that does not fit falls back to the
-matched chunk. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; deliberately
-off for evidence retrieval, where a citation must point at the fragment that matched with its own
-page and provenance. `getParentChunk` is gone — it looked parents up as points and could only return
-null. Expansion is a no-op on the current collection (`sibling_chunk_ids: []`) and takes effect per
-document as documents are reprocessed, so the rollout is gradual by construction.
+Measured on ordinary teaching material (2026-08-13): siblings on **105 of 110 indexed children
+(95.5%)**, average expansion 5.5×, median rebuilt passage 529 tokens against 180 for the chunk that
+matched, no broken or one-sided links. Resulting quality is **not** measured: Stage 5-6 never ran.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
-Twelve models cut to seven against the live OpenRouter catalogue: simple work on
-`~deepseek/deepseek-v4-flash-latest` (the `~` is part of the id), complex on `openai/gpt-5.6-luna`,
-`z-ai/glm-5.2`. Four invariants to preserve: judges keep three separate vendors, `emergency` stays
-off OpenAI, every fallback crosses vendors, and the three escalation phases avoid the default model
-on both hops because by the time they run it has already failed.
+Seven live models (`LIVE_ROUTING_MODEL_IDS`): simple work on `~deepseek/deepseek-v4-flash-latest`
+(the `~` is part of the id), complex on `openai/gpt-5.6-luna` and `z-ai/glm-5.2`, plus
+`google/gemini-3.7-flash`, `minimax/minimax-m3` and the two image models. Four invariants to
+preserve: judges keep three separate vendors, `emergency` stays off OpenAI, every fallback crosses
+vendors, and the three escalation phases avoid the default model on both hops because by the time
+they run it has already failed.
 
 Reasoning is per-phase and the budget is the load-bearing part — OpenRouter bills reasoning tokens
 against `max_tokens`, so the budget is ADDED, and both the database and the seed generator refuse
 `reasoning_enabled` without one. On for `stage_6_complex`, `stage_5_escalation`,
-`stage_6_auto_last_chance` only.
+`stage_6_auto_last_chance` only. Models and prices have one source, `MODEL_CATALOG` in shared-types.
 
-Models and prices have one source, `MODEL_CATALOG` in shared-types. Live models carry the current
-price; retired models keep the price previously recorded, because restating old runs at today's
-rates would falsify history. The routing refresh is still unexercised by a real course generation;
-the last course was created 2026-06-28.
+Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
+generation; Stage 5 ~5.5%, Stage 4 ~1.9%. Epic `mc2-4clyr` holds what follows from that.
+
+## Phase configs audited (2026-08-13, `7ad421986`)
+
+`mc2-o3s4r` closed. Stored configuration is clean on the checks that matter: no budget exceeds a
+model ceiling once the reasoning budget is added, no reasoning on a model that refuses it, every
+model catalogued and live, every fallback crossing vendors. What was open was the seam, not the data:
+Stage 5 passed on only the model id, metadata generation rebuilt an unconfigured model, and
+`getModelForPhase` dropped `config.reasoning`. All three now go through `buildProviderParams`, and
+`tests/unit/phase-config-provider-contract.test.ts` states that contract against the defect. The
+collision fallback is now `google/gemini-3.7-flash`.
+
+Open from the audit, none in the current epics: `mc2-s1vg5` (`generate:config-seed` exits 0 on an
+unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
+delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
+
+## Live course run (2026-08-14, `mc2-2pplo` — reached Stage 4 twice, then unblocked)
+
+Epic `mc2-qrdkt` is done. Plan and owner decisions: `docs/plans/humble-floating-widget.md`.
+The run itself has not been repeated since the blocker was cleared, so Stage 5, the judge panel and
+the full Stage 6 graph are still unexercised end to end. Spend so far **USD 0.2836**; the shared
+OpenRouter key had USD 9.758 left, so check its credit before and during any rerun.
+
+**The blocker, closed.** `mc2-wg60c`: the 60s per-call budget was smaller than the default model's
+real answer time — a realistic Stage 4 request (8204 input tokens, `max_tokens` 16000) took **119.0s**
+measured through the same SDK from the same worker container with reasoning already off. The budget is
+now `DEFAULT_LLM_TIMEOUT_MS` = 238s, twice the measurement, and still far under the 620s hang the
+abort bound turned into an honest failure on 2026-08-13. Routing rows were left alone.
+
+**Closed with it.** `mc2-ufpko` (cascade exemption for the conflict-checkpoint trigger, migration
+`20260813140000`), `mc2-s2x84` (evidence failures record their cause, not the document),
+`mc2-fqbrj` (run identity no longer reads the classifier's own output), `mc2-o7740` (cost priced from
+`MODEL_CATALOG` and summed into `courses.estimated_cost_usd`), `mc2-43c75` (readiness keys scoped by
+queue), `mc2-5gdzw` (reasoning is now switched off explicitly; silence read as consent and OpenRouter
+bills deliberation against `max_tokens`), `mc2-hb8mn` (the stage-level config layer was deleted, not
+repaired — there is no stage config entity, every row is phase-bound).
+
+**Proven live, not only in tests.** Cost lands in the trace (`stage_4_classification`, 14007 tokens,
+USD 0.001695). `delete_course_cascade` leaves no row, vector, file or Redis key.
+
+**A deploy can be skipped on a green pipeline.** Run 31776031693 was fully green but touched only a
+test file, so `Detect Deploy-Relevant Changes` skipped `Deploy to Dev` and dev kept running old code.
+Confirm the `Deploy to Dev` job's own conclusion, not the run's.
+
+## Stage 6 Batch API (2026-08-14, off by default)
+
+`FEATURE_STAGE6_BATCH_GENERATION` sends a course's initial lesson generation as one asynchronous
+OpenRouter batch (`/api/beta/batches`, plain model slug, 24h window). A coordinator polls and releases
+its worker between checks; each lesson is also enqueued with a `STAGE6_BATCH_MAX_WAIT_MS` delay, so it
+generates synchronously by itself if the batch never lands. Eligibility is decided per call against
+the **live** catalogue: the `:batch` sibling must exist, be cheaper on both legs and fit the request.
+Not a config switch — a `:batch` id posted to the synchronous endpoint breaks the caller.
+
+`MODEL_CATALOG` prices are the `/models` base rate, verified 2026-08-14. With many providers that rate
+is a default, not a promise: `z-ai/glm-5.2` ran from $0.49 to $1.40 per million input on that day, and
+one provider's rate had been recorded as the base one.
 
 ## Backlog truth and order
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order. The checked backlog
 contains 49 work items plus 5 epics; do not re-open the 27 already closed with a commit or a
-measurement, and do not re-rank by tracker priority. Tier 1 complete through `mc2-sznhi`; Tier 2
-through `mc2-3sz3d`; Tier 3 through `mc2-jz6y0.13.6`; Tier 4 through `mc2-iioip`; accessible Tier 5
-work through the `mc2-wxun`/`mc2-vjbb` instrumentation boundary. Live, migration, research and
-owner-decision items remain explicitly deferred.
+measurement, and do not re-rank by tracker priority. Complete: Tier 1 through `mc2-sznhi`, Tier 2
+through `mc2-3sz3d`, Tier 3 through `mc2-jz6y0.13.6`, Tier 4 through `mc2-iioip`, accessible Tier 5
+through the `mc2-wxun`/`mc2-vjbb` boundary. Live, migration, research and owner-decision items
+remain explicitly deferred.
 
 ## Live operational facts
 
 - Production Qdrant answers on host port 6335; 6333 is the empty dev instance.
 - `course_embeddings_v1` holds **6856 points** after the 2026-08-12 deduplication. Any restore of a
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
-- Qdrant has a daily restricted pull to `helixa-new` with 14-day/14-copy bounds, a 10 GiB free-space
-  floor and low CPU/I/O priority; both backup and restore timers are enabled and Prometheus scrapes
-  independent timestamps.
-- On-host Qdrant snapshots live inside the same docker volume as the live data
-  (`megacampus_qdrant/_data/snapshots`), so losing that volume loses both; the daily off-host pull is
-  the mitigation and it verified a post-deduplication snapshot on 2026-08-13. Local retention **is**
-  bounded — `snapshot.ts` applies `selectRetentionDeletions` at 30 days and it is unit-tested — but
-  nothing has aged out yet, so the first real deletion is due around 2026-08-30. Measured 2026-08-13:
-  78 snapshots, 78 manifests, 10.93 GB, ~17.7 GB at steady state, disk 109/148 GB. `mc2-hfoh3` closed.
-- Uploads have a daily pull-based off-host copy on `helixa-new`; a restore of one file matched
-  `file_catalog.hash`. It is a second machine, not full disaster recovery.
-- Dev and staging share one Supabase project; CI does not auto-apply migrations.
+- Qdrant and uploads have a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB
+  floor, 30-day local retention, first deletion around 2026-08-30). On-host snapshots share the
+  docker volume with live data, so that pull is the only real mitigation. A second machine, not
+  disaster recovery. `mc2-hfoh3` closed.
+- Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
+  Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
 - Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
-  set: all 87 distinct source files behind the 218 indexed documents are present under
-  `/opt/megacampus/data/uploads` (verified 2026-08-13, missing 0), so a reindex would not drop them.
-- Uploads live on the production host, not in Supabase Storage — the only bucket is
+  set (all 87 files behind the 218 indexed documents are present on disk, verified 2026-08-13).
+  Uploads live on the production host, not in Supabase Storage — the only bucket is
   `course-enrichments` with 14 objects.
-- Monitoring drift is a separate job and must never become a deploy step, because it can trigger
-  rollback on configuration drift.
+- Monitoring drift is a separate job and must never become a deploy step: it can trigger rollback.
 - `AGENTS.md` is rewritten by a `bd` hook: stage and commit explicit paths, never `git add -A`.
 - Deploy/rollback entrypoints exit 75 when `/opt/megacampus/.host-operation.lock` is held; manual
   infrastructure work must use `scripts/with_host_operation_lock.sh`.
-- The default backend Vitest command is fail-closed and requires the pinned Qdrant 1.18.2
-  precondition; use `vitest.config.unit.ts` for focused unit tests.
-- `graph-reviewed: blocked` (2026-08-12) — the graph was read, not refreshed. Graphify 0.9.14 CLI
-  exposes `path`, `explain`, `diagnose` and `merge` only; there is no `build`/refresh subcommand, so
-  a rebuild runs through the `/graphify` skill flow rather than from closeout. The last recorded
-  build holds 61,733 nodes, 88,850 edges and 7,352 communities, local-only, no external backend.
+- The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
+  `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` suites run on uid 1000
+  only, so they are exercised locally and skipped on CI runners.
+- `graph-reviewed: blocked` — the graph is read, not refreshed. Graphify 0.9.14 has no `build`
+  subcommand, so a rebuild runs through the `/graphify` skill flow, not from closeout.
 
 ## Owner decisions
 
-- `mc2-jz6y0.13.6` — answered: pull-based off-host snapshots on `helixa-new`, 14-day bounded
-  retention, low resource priority.
+- `mc2-jz6y0.13.6` — answered: pull-based off-host snapshots, 14-day retention, low priority.
 - `mc2-db696.61` — needs a live run and a cost/quality decision.
 - `mc2-lrav0` — answered: do not backfill dev Qdrant embeddings.
 
 ## Safety boundary
 
-Do not perform reindex, schema migrations, force-push, or any secrets/access change outside the
-explicitly authorized `mc2-2vtmk` GHCR credential repair. Deploy only under the standing
-authorization and only on a green pipeline. Do not run live paid work without a specific current
-budget/authority.
+No reindex, force-push, or secrets/access change. Schema migrations stay forbidden except the one
+the owner approved on 2026-08-13 for `mc2-ufpko`. Deploy only under the standing authorization and
+only on a green pipeline. Live paid work only within the USD 5 ceiling set for `mc2-2pplo`; the
+OpenRouter key is shared with production, so check its remaining credit before and during a run.
 
 Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`,
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
@@ -165,36 +165,36 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-v6fqp` — live Stage 6 multilingual quality matrix, only after the owner approves a concrete
   LLM spend budget and disposable inputs.
 - `mc2-wxun`, `mc2-vjbb` — instrumentation complete, disabled and locally accepted; enabling a
-  cohort, collecting production traces and deciding whether to change 0.15 are live/owner actions.
-- `mc2-r7udy` — worker lifecycle/heartbeat persistence needs a new `metric_event_type` value or a
-  new table; both are schema migrations forbidden by the active specification.
-- `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — slide deck, report and data-table enrichments
-  require new `enrichment_type` enum values; same migration prohibition.
+  cohort and deciding whether to change 0.15 are live/owner actions.
+- `mc2-r7udy`, `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — each needs a new enum value or table.
+  The owner approved a migration on 2026-08-13 **only** for `mc2-ufpko`; these stay deferred.
 - `mc2-db696.61` — owner decision above.
-- `mc2-db696.106`/`.107`/`.108` — PDF fidelity, content grounding, and bounded provider timeouts
-  with reliable latency/cost receipts.
+- `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
+  transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`, `mc2-1nots`,
-  `mc2-5e4ek.1` — excluded by §9, with repository or owner gates already recorded.
+- The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.105`
-Current stage id: `mc2-db696.110`
-Next stage id: `mc2-db696.107` when implementation is selected
+Accepted stage id: `mc2-db696.110` · Current stage id: epic `mc2-qrdkt`
+Next stage id: `mc2-2pplo`
 
-Recommended action: decide whether to deploy the RAG threshold fix to production — the data half is
-already live there and the code half is not. Then fix content grounding, then PDF fidelity and
-timeouts. Do not run another paid generation before deterministic coverage and a new explicit budget.
+Recommended action: rerun `mc2-2pplo` — nothing in the repository blocks a course from reaching
+Stage 6 any more, and only a paid run can show whether it does. The driver is `live-run.mjs`,
+reproduced in the plan; it needs a fresh spend ceiling from the owner. After that, epic `mc2-4clyr`,
+whose headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
+reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
+so the full panel runs _below_ its 15-20% design target, not four times above it. `mc2-r31fw` step 1
+cannot be done from history — `singleJudge` is null in every stored cascade row.
 
 ## Starter prompt for next orchestrator
 
-Use $orchestrator-stage only after the owner selects an explicit remaining boundary. Do not enable
-the cohort, change its threshold, reindex, migrate, force-push, deploy or perform paid work without
-separate current authorization.
+The starter prompt lives at the end of `docs/plans/humble-floating-widget.md`. Use $orchestrator-stage
+for the epic itself; single tasks are ordinary local work. Do not enable the cohort, change its
+threshold, reindex, force-push, deploy, migrate beyond `mc2-ufpko`, or spend beyond the USD 5 ceiling
+without separate current authorization.
 
 ## Read first
 
 `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, and
-`specs/026-post-triage-priorities/spec.md`.
+`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.

@@ -356,7 +356,7 @@ function getCompressionLevel(iteration: number): CompressionLevel {
  * // Overlap ≈ 18,400 characters
  * ```
  */
-function createChunks(
+export function createChunks(
   text: string,
   options: {
     chunkSize: number;
@@ -413,6 +413,24 @@ function createChunks(
     // Skip empty chunks
     if (chunk.trim().length > 0) {
       chunks.push(chunk);
+    }
+
+    // The window already reached the end of the text, so there is nothing left
+    // to cover. Stepping back by the overlap here would emit the tail a second
+    // time as its own chunk: every document shorter than one window was
+    // summarized twice, once whole and once as its last `overlapCharSize`
+    // characters, and both summaries went into the merge. Measured on dev
+    // 2026-08-13 on a 33238-character document under a 460000-character
+    // window: 2 chunks, 11537 input tokens billed against 8310 in the text.
+    // The window already reached the end of the text, so there is nothing left
+    // to cover. Stepping back by the overlap here would emit the tail a second
+    // time as its own chunk: every document shorter than one window was
+    // summarized twice, once whole and once as its last `overlapCharSize`
+    // characters, and both summaries went into the merge. Measured on dev
+    // 2026-08-13 on a 33238-character document under a 460000-character
+    // window: 2 chunks, 11537 input tokens billed against 8310 in the text.
+    if (end >= text.length) {
+      break;
     }
 
     // Move start position (subtract overlap for next chunk)

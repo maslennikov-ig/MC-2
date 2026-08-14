@@ -18,7 +18,7 @@ import {
 import logger from '../../../shared/logger';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3.7-flash';
 
 // ============================================================================
 // TYPE DEFINITIONS

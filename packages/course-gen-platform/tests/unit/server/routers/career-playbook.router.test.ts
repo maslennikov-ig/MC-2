@@ -65,6 +65,9 @@ vi.mock('@/server/routers/career-playbook/course-bridge.service', () => ({
 }));
 
 vi.mock('@/orchestrator/queue', () => ({
+  // Worker readiness scopes its Redis key by queue name (mc2-43c75), so the
+  // mock has to carry it.
+  QUEUE_NAME: 'course-generation-test',
   addJob: mocks.addJob,
   removeTerminalJobById: mocks.removeTerminalJobById,
   getQueue: vi.fn(() => ({

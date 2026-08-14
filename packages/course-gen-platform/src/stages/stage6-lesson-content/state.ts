@@ -28,6 +28,7 @@ import type {
   ProgressSummary,
 } from '@megacampus/shared-types/judge-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import type { Stage6PrefetchedGeneratorResponse } from './types';
 
 /**
  * Graph node names for state tracking
@@ -174,6 +175,18 @@ export const LessonGraphState = Annotation.Root({
   analysisResult: Annotation<AnalysisResult | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
+  }),
+
+  /** Initial generator response returned asynchronously by OpenRouter Batch API. */
+  prefetchedGeneratorResponse: Annotation<Stage6PrefetchedGeneratorResponse | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /** Prevents graph regeneration loops from reusing the same initial response. */
+  prefetchedGeneratorResponseConsumed: Annotation<boolean>({
+    reducer: (x, y) => y ?? x,
+    default: () => false,
   }),
 
   // ============================================================================

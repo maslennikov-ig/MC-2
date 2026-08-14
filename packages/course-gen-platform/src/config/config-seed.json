@@ -166,7 +166,7 @@
     "config_type": "global",
     "course_id": null,
     "phase_name": "emergency",
-    "model_id": "google/gemini-3-flash-preview",
+    "model_id": "google/gemini-3.7-flash",
     "fallback_model_id": null,
     "temperature": 0.7,
     "max_tokens": 4096,
@@ -1157,7 +1157,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1184,7 +1184,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1211,7 +1211,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1238,7 +1238,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1265,7 +1265,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1292,7 +1292,7 @@
     "max_retries": 3,
     "timeout_ms": null,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1535,7 +1535,7 @@
     "max_retries": 0,
     "timeout_ms": 300000,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1562,7 +1562,7 @@
     "max_retries": 0,
     "timeout_ms": 300000,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1589,7 +1589,7 @@
     "max_retries": 3,
     "timeout_ms": 300000,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {
@@ -1616,7 +1616,7 @@
     "max_retries": 3,
     "timeout_ms": 300000,
     "reasoning_enabled": true,
-    "reasoning_effort": "high",
+    "reasoning_effort": null,
     "reasoning_max_tokens": 8000
   },
   {

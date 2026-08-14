@@ -448,6 +448,43 @@ describe('stage6/services/job-processor', () => {
       expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(3);
     });
 
+    it('consumes a prefetched Batch response only on the first outer attempt', async () => {
+      const prefetchedGeneratorResponse = {
+        content: 'Batch content',
+        prompt: 'Batch prompt',
+        tokensUsed: 100,
+        modelUsed: 'google/gemini-3.7-flash:batch',
+        baseModelUsed: 'google/gemini-3.7-flash',
+      };
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createFailOutput())
+        .mockResolvedValueOnce(createFailOutput())
+        .mockResolvedValueOnce(createSuccessOutput());
+      const job = createMockJob({ prefetchedGeneratorResponse });
+
+      const resultPromise = processWithFallback(
+        job,
+        { primary: 'google/gemini-3.7-flash', fallback: 'test-fallback' },
+        'lesson-uuid-123',
+        [],
+        null,
+        undefined,
+        prefetchedGeneratorResponse
+      );
+      await vi.advanceTimersByTimeAsync(5_000);
+      await resultPromise;
+
+      expect(mockExecuteStage6Orchestrator.mock.calls[0][0].prefetchedGeneratorResponse).toEqual(
+        prefetchedGeneratorResponse
+      );
+      expect(
+        mockExecuteStage6Orchestrator.mock.calls[1][0].prefetchedGeneratorResponse
+      ).toBeUndefined();
+      expect(
+        mockExecuteStage6Orchestrator.mock.calls[2][0].prefetchedGeneratorResponse
+      ).toBeUndefined();
+    });
+
     it('should throw when both primary and fallback fail', async () => {
       const fail = createFailOutput();
       // All fail

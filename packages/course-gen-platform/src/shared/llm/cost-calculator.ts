@@ -60,7 +60,7 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = Object.fromEntri
 /**
  * Cost threshold configuration
  *
- * RT-001 Cost Tracking (UPDATED 2025-11-13 for Qwen 3 Max $1.20/$6.00 pricing):
+ * RT-001 Cost Tracking baseline (recorded 2025-11-13):
  *
  * Cost Breakdown (per course):
  * - Phase 1 (Validation, OSS 20B): $0.001-0.002
@@ -78,8 +78,9 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = Object.fromEntri
  * - WITH_RETRIES_MAX: $0.76 (with RT-004 retry strategy ~20%, +49% from old $0.51)
  * - HARD_LIMIT: $0.90 (maximum acceptable cost, +50% from old $0.60)
  *
- * ⚠️ NOTE: Qwen 3 Max price increase ($0.60→$1.20 input, $1.80→$6.00 output)
- * increases per-course cost by ~$0.28 (+70%). Primary impact is Phase 3 sections.
+ * These are historical business guardrails, not a provider price table. A
+ * MODEL_CATALOG refresh does not automatically change an accepted course
+ * budget; that remains a separate product decision.
  *
  * Costs exceeding HARD_LIMIT require investigation and optimization.
  *
@@ -98,19 +99,19 @@ export const COST_THRESHOLDS = {
 // ============================================================================
 
 /**
- * Validates that Qwen 3 Max context doesn't exceed 128K tokens
- * to avoid 2.5x price increase (128K-256K tier).
+ * Validates that Qwen 3 Max input stays in its base price tier.
  *
- * Qwen 3 Max pricing tiers:
- * - 0-128K tokens: $1.20/$6.00 per 1M tokens (standard)
- * - 128K-256K tokens: $3.00/$15.00 per 1M tokens (2.5x more expensive!)
+ * OpenRouter pricing tiers verified 2026-08-14:
+ * - below 32K input tokens: $0.78/$3.90 per 1M tokens
+ * - from 32K: $1.56/$7.80 per 1M tokens
+ * - from 128K: $1.95/$9.75 per 1M tokens
  *
  * Usage patterns from RT-001:
- * - Metadata generation: ~45K input + ~7K output = ~52K total (SAFE)
- * - Section generation: ~70K input + ~20K output = ~90K total (SAFE)
+ * Longer requests need tier-aware pricing before this retired model can safely
+ * return to routing.
  *
  * @param inputTokens - Number of input tokens for Qwen 3 Max generation
- * @throws Error if context exceeds 128K tokens (triggers 2.5x price increase)
+ * @throws Error if input reaches the 32K higher-price tier
  *
  * @example
  * ```typescript
@@ -120,12 +121,12 @@ export const COST_THRESHOLDS = {
  * ```
  */
 export function validateQwen3MaxContext(inputTokens: number): void {
-  const QWEN3_MAX_SAFE_LIMIT = 128000;
+  const QWEN3_MAX_BASE_RATE_LIMIT = 31_999;
 
-  if (inputTokens > QWEN3_MAX_SAFE_LIMIT) {
+  if (inputTokens > QWEN3_MAX_BASE_RATE_LIMIT) {
     throw new Error(
-      `Qwen 3 Max context (${inputTokens.toLocaleString()} tokens) exceeds safe limit (${QWEN3_MAX_SAFE_LIMIT.toLocaleString()}). ` +
-        `This triggers 2.5x price increase ($3.00/$15.00 per 1M tokens). ` +
+      `Qwen 3 Max input (${inputTokens.toLocaleString()} tokens) reaches the higher-price tier at 32,000 tokens. ` +
+        `The base MODEL_CATALOG rate no longer applies. ` +
         `Consider splitting prompt or using Gemini 2.5 Flash for overflow.`
     );
   }
@@ -178,7 +179,7 @@ export interface CostStatus {
  * Calculate cost for a single generation phase
  *
  * Supports both split pricing (input/output) and unified pricing models.
- * For unified pricing models (gpt-oss-20b, gemini-2.5-flash), uses combinedPricePerMillion.
+ * For a model with a unified provider rate, uses combinedPricePerMillion.
  * For split-pricing models, uses input/output pricing with 50/50 assumption if not specified.
  *
  * @param modelName - OpenRouter model identifier (e.g., "qwen/qwen3-max")
@@ -227,7 +228,7 @@ function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens:
  *
  * // IMPORTANT: Validate Qwen 3 Max context before generation
  * const estimatedInputTokens = 45000;
- * validateQwen3MaxContext(estimatedInputTokens); // Throws if >128K
+ * validateQwen3MaxContext(estimatedInputTokens); // Throws at 32K
  *
  * const metadata: GenerationMetadata = {
  *   model_used: {
@@ -246,7 +247,7 @@ function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens:
  *
  * const cost = calculateGenerationCost(metadata);
  * console.log(`Total cost: $${cost.total_cost_usd.toFixed(4)}`);
- * // Expected: ~$0.53-0.63 (updated for Qwen 3 Max $1.20/$6.00 pricing)
+ * // Compare against the configured course budget guardrails.
  *
  * const status = assessCostStatus(cost.total_cost_usd);
  * if (status.status !== "WITHIN_TARGET") {
@@ -407,7 +408,7 @@ export function hasUnifiedPricing(modelName: string): boolean {
  * const totalTokens = inputTokens + outputTokens;
  *
  * // Validate context limit before estimating
- * validateQwen3MaxContext(inputTokens); // Throws if >128K
+ * validateQwen3MaxContext(inputTokens); // Throws at 32K
  *
  * const estimatedCost = estimateCost("qwen/qwen3-max", totalTokens, inputTokens);
  * console.log(`Estimated cost: ${formatCost(estimatedCost)}`);

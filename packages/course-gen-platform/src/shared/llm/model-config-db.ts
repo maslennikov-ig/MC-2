@@ -13,22 +13,41 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
-import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
+import { type LanguageCode } from '@/shared/workspace-utils';
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
 
-const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
+/**
+ * Every replacement must itself be in `MODEL_CATALOG`, or the substitution
+ * trades a known-retired id for an unknown one: cost silently resolves to the
+ * pessimistic $1/$3 default and both capability predicates answer "unknown",
+ * which reads as "no reasoning, temperature accepted" whether or not that is
+ * true. `openai/gpt-5.4` pointed at `google/gemini-3.5-flash`, which is in no
+ * catalogue in this repo.
+ */
+export const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
   'xiaomi/mimo-v2-flash': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4.1-fast': 'deepseek/deepseek-v4-flash',
   'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
   'qwen/qwen3.5-plus-02-15': 'qwen/qwen3.7-plus',
   'deepseek/deepseek-v3.2': 'deepseek/deepseek-v4-flash',
-  'openai/gpt-5.4': 'google/gemini-3.5-flash',
+  'openai/gpt-5.4': 'google/gemini-3.7-flash',
   'minimax/minimax-m2.5': 'minimax/minimax-m3',
   'openai/gpt-oss-120b': 'deepseek/deepseek-v4-flash',
 };
 
-const COLLISION_FALLBACK_MODEL_ID = 'qwen/qwen3-235b-a22b-2507';
+/**
+ * Substituted when a row's fallback resolves to its own primary, so the rescue
+ * model is never the model being rescued.
+ *
+ * Must be a live-routed model. It was `qwen/qwen3-235b-a22b-2507`, which the
+ * 2026-08-12 routing cut retired, and which carries the smallest output ceiling
+ * in the catalogue at 16384 — the exact ceiling recorded in
+ * `pipeline-admin/model-budget-validation.ts` as having already refused
+ * `stage_5_escalation`'s 30000-token budget. A collision on any generous phase
+ * would have landed there.
+ */
+export const COLLISION_FALLBACK_MODEL_ID = 'google/gemini-3.7-flash';
 
 function normalizeRuntimeModelId(modelId: string | null | undefined): string | null {
   if (!modelId) return null;
@@ -64,26 +83,6 @@ export const DEFAULT_STAGE_CONFIG = {
   maxRetries: 3,
   timeoutMs: null as number | null, // null = no timeout
 } as const;
-
-/**
- * Model configuration result with primary/fallback models
- */
-export interface ModelConfigResult {
-  /** Primary model ID (OpenRouter format) */
-  primary: string;
-  /** Fallback model ID (OpenRouter format) */
-  fallback: string;
-  /** Maximum context tokens */
-  maxContext: number;
-  /** Whether cache read optimization is enabled */
-  cacheReadEnabled: boolean;
-  /** Context tier used (standard or extended) */
-  tier: 'standard' | 'extended';
-  /** Source of configuration (database or hardcoded fallback) */
-  source: 'database' | 'hardcoded';
-  /** The language that was actually found in DB ('ru', 'en', or 'any') */
-  actualLanguage?: string;
-}
 
 /**
  * Per-phase reasoning settings.
@@ -165,102 +164,6 @@ export interface JudgeModelsResult {
   source: 'database' | 'hardcoded';
 }
 
-/**
- * Fetches stage configuration from database with language fallback
- */
-export async function fetchStageConfigFromDb(
-  stageNumber: number,
-  language: LanguageCode,
-  tier: 'standard' | 'extended'
-): Promise<ModelConfigResult | null> {
-  const supabase = getSupabaseAdmin();
-
-  // Cascading language lookup: specific language -> 'any' fallback
-  // First normalize to reserve language (ru/en/any), then always try 'any' as fallback
-  const reserveLang = normalizeLanguageForReserve(language);
-  // Only try language-specific config if it's ru or en, otherwise directly use 'any'
-  const languagesToTry: Array<'ru' | 'en' | 'any'> =
-    reserveLang === 'any' ? ['any'] : [reserveLang, 'any'];
-
-  // Build parallel queries for all language variants (optimization: ~50-100ms saved per fallback)
-  const languageQueries = languagesToTry.map(langToTry =>
-    supabase
-      .from('llm_model_config')
-      .select()
-      .eq('config_type', 'global')
-      .eq('stage_number', stageNumber)
-      .eq('language', langToTry)
-      .eq('context_tier', tier)
-      .eq('is_active', true)
-      .maybeSingle()
-  );
-
-  // Execute all queries in parallel
-  const results = await Promise.all(languageQueries);
-
-  // Process results in priority order (first match wins)
-  for (let i = 0; i < results.length; i++) {
-    const { data, error } = results[i];
-    const langToTry = languagesToTry[i];
-
-    if (error) {
-      logger.warn(
-        { stageNumber, language: langToTry, tier, error: error.message },
-        'Error fetching stage config from DB'
-      );
-      continue; // Try next language variant
-    }
-
-    if (data) {
-      if (langToTry === 'any') {
-        logger.debug(
-          { stageNumber, requestedLanguage: language, foundLanguage: 'any', tier },
-          'Using universal (any) language config as fallback'
-        );
-      }
-      // Found a config - process it
-      const config = data as LLMModelConfigRow;
-
-      // Validate required fields - fail fast on incomplete data
-      if (!config.fallback_model_id) {
-        const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-        logger.error(
-          { stageNumber, language: langToTry, tier, modelId: config.model_id },
-          errorMsg
-        );
-        throw new Error(errorMsg);
-      }
-
-      if (!config.max_context_tokens) {
-        const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-        logger.error(
-          { stageNumber, language: langToTry, tier, modelId: config.model_id },
-          errorMsg
-        );
-        throw new Error(errorMsg);
-      }
-
-      const normalizedConfig = normalizeRuntimeModelPair(config.model_id, config.fallback_model_id);
-
-      return {
-        primary: normalizedConfig.modelId ?? config.model_id,
-        fallback: normalizedConfig.fallbackModelId ?? config.fallback_model_id,
-        maxContext: config.max_context_tokens,
-        cacheReadEnabled: config.cache_read_enabled || false,
-        tier,
-        source: 'database',
-        actualLanguage: langToTry,
-      };
-    }
-  }
-
-  // No config found for any language variant
-  return null;
-}
-
-/**
- * Fetches phase configuration from database with language and course override fallback
- */
 /**
  * Read the reasoning settings off a config row, defaulting to disabled.
  *
@@ -539,7 +442,7 @@ function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
 const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
   global_default: {
     modelId: 'deepseek/deepseek-v4-flash',
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: 'google/gemini-3.7-flash',
     temperature: 0.7,
     maxTokens: 4096,
     maxContextTokens: 128000,
@@ -552,7 +455,7 @@ const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
     reasoning: REASONING_DISABLED,
   },
   emergency: {
-    modelId: 'google/gemini-3-flash-preview',
+    modelId: 'google/gemini-3.7-flash',
     fallbackModelId: 'deepseek/deepseek-v4-flash',
     temperature: 0.7,
     maxTokens: 4096,

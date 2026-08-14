@@ -47,10 +47,12 @@ vi.mock('@/shared/logger', () => ({
 }));
 
 import {
+  enqueueStage6CourseBatch,
   enqueueStage6Lesson,
   enqueueStage6Lessons,
   type EnqueueStage6LessonOptions,
 } from '@/stages/stage6-lesson-content/enqueue';
+import { isStage6BatchEnabled } from '@/stages/stage6-lesson-content/batch/config';
 import type { Stage6JobInput } from '@/stages/stage6-lesson-content/types';
 import { logger } from '@/shared/logger';
 
@@ -253,6 +255,73 @@ describe('enqueueStage6Lessons', () => {
 
     expect(jobs[0].id).toBe('job-1');
     expect(jobs[1].id).toBe('job-2');
+  });
+});
+
+describe('enqueueStage6CourseBatch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdd.mockImplementation((name: string) =>
+      Promise.resolve({ id: name.startsWith('course-batch:') ? 'coordinator-id' : `job:${name}` })
+    );
+  });
+
+  it('creates delayed lesson fallbacks plus one coordinator and returns the ten lesson jobs', async () => {
+    const opts = Array.from({ length: 10 }, (_, index) =>
+      makeOpts({
+        jobName: `lesson:2.${index + 1}`,
+        jobData: {
+          ...baseJobData,
+          lessonSpec: {
+            ...baseJobData.lessonSpec,
+            lesson_id: `2.${index + 1}`,
+          },
+        },
+        source: 'startStage6',
+        deduplication: {
+          kind: 'jobId',
+          jobId: `stage6:course-uuid-123:2.${index + 1}`,
+        },
+      })
+    );
+
+    const result = await enqueueStage6CourseBatch(opts, { maxWaitMs: 7_200_000 });
+
+    expect(result.lessonJobs).toHaveLength(10);
+    expect(result.coordinatorJob.id).toBe('coordinator-id');
+    expect(mockAdd).toHaveBeenCalledTimes(11);
+    for (const call of mockAdd.mock.calls.slice(0, 10)) {
+      expect(call[2]).toMatchObject({ delay: 7_200_000 });
+    }
+    const [name, data, options] = mockAdd.mock.calls[10];
+    expect(name).toBe('course-batch:course-uuid-123');
+    expect(data).toMatchObject({
+      kind: 'stage6_batch_coordinator',
+      courseId: 'course-uuid-123',
+      state: null,
+      lessonJobs: expect.arrayContaining([
+        expect.objectContaining({ position: 0, lessonJobId: 'job:lesson:2.1' }),
+      ]),
+    });
+    expect(data.lessonJobs).toHaveLength(10);
+    expect(options).toMatchObject({ jobId: 'stage6-batch:course-uuid-123' });
+  });
+});
+
+describe('Stage 6 Batch feature flag', () => {
+  it('is disabled by default and only accepts the explicit true value', () => {
+    const previous = process.env.FEATURE_STAGE6_BATCH_GENERATION;
+    try {
+      delete process.env.FEATURE_STAGE6_BATCH_GENERATION;
+      expect(isStage6BatchEnabled()).toBe(false);
+      process.env.FEATURE_STAGE6_BATCH_GENERATION = 'false';
+      expect(isStage6BatchEnabled()).toBe(false);
+      process.env.FEATURE_STAGE6_BATCH_GENERATION = 'true';
+      expect(isStage6BatchEnabled()).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.FEATURE_STAGE6_BATCH_GENERATION;
+      else process.env.FEATURE_STAGE6_BATCH_GENERATION = previous;
+    }
   });
 });
 

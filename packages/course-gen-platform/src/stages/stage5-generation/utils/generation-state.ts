@@ -364,7 +364,7 @@ export interface GenerateSectionsResult {
    * Possible values:
    * - "deepseek/deepseek-v4-flash" (80% of batches)
    * - "qwen/qwen3-max" (20% escalation)
-   * - "google/gemini-3-flash-preview" (rate limit overflow)
+   * - "google/gemini-3.7-flash" (rate limit overflow)
    */
   model: string;
 

@@ -34,6 +34,96 @@ const seedModels = [
 ] as string[];
 
 describe('model catalogue coverage', () => {
+  it('keeps Batch API variants as separate billable models at their live rates', () => {
+    const verifiedBatchRates: Record<string, [input: number, output: number, context: number]> = {
+      'google/gemini-3.7-flash:batch': [0.1875, 0.9375, 1_048_576],
+      'minimax/minimax-m3:batch': [0.15, 0.6, 524_288],
+      'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
+      'z-ai/glm-5.2:batch': [0.7, 2.2, 512_000],
+    };
+
+    const actual = Object.fromEntries(
+      Object.keys(verifiedBatchRates).map(modelId => {
+        const capabilities = getModelCapabilities(modelId);
+        return [
+          modelId,
+          capabilities
+            ? [
+                capabilities.inputPricePerMillion,
+                capabilities.outputPricePerMillion,
+                capabilities.contextLength,
+              ]
+            : null,
+        ];
+      })
+    );
+
+    expect(actual).toEqual(verifiedBatchRates);
+  });
+
+  it('prices every live routing model at the OpenRouter base rates verified on 2026-08-14', () => {
+    // The models a course actually runs on. One of them, z-ai/glm-5.2, had a
+    // single provider's rate ($0.63/$1.98) recorded as the base rate and was
+    // priced at roughly half of the real one until 2026-08-14.
+    const verifiedRates: Record<string, [input: number, output: number]> = {
+      '~deepseek/deepseek-v4-flash-latest': [0.08, 0.252],
+      'openai/gpt-5.6-luna': [0.1, 0.6],
+      'z-ai/glm-5.2': [1.19, 3.74],
+      'minimax/minimax-m3': [0.3, 1.2],
+      'google/gemini-3.7-flash': [0.375, 1.875],
+      'openai/gpt-5-image-mini': [2.5, 2],
+      'google/gemini-2.5-flash-image': [0.3, 2.5],
+    };
+
+    expect([...LIVE_ROUTING_MODEL_IDS].sort()).toEqual(Object.keys(verifiedRates).sort());
+    const actual = Object.fromEntries(
+      Object.keys(verifiedRates).map(modelId => {
+        const capabilities = getModelCapabilities(modelId);
+        return [
+          modelId,
+          capabilities
+            ? [capabilities.inputPricePerMillion, capabilities.outputPricePerMillion]
+            : null,
+        ];
+      })
+    );
+
+    expect(actual).toEqual(verifiedRates);
+  });
+
+  it('prices listed retired models at the OpenRouter rates verified on 2026-08-14', () => {
+    const verifiedRates: Record<string, [input: number, output: number]> = {
+      'deepseek/deepseek-v3.1-terminus': [0.27, 0.95],
+      'deepseek/deepseek-v4-flash': [0.14, 0.28],
+      'deepseek/deepseek-v4-pro': [1.168, 2.336],
+      'google/gemini-2.5-flash': [0.3, 2.5],
+      'moonshotai/kimi-k2-thinking': [0.6, 2.5],
+      'openai/gpt-oss-20b': [0.03, 0.13],
+      'qwen/qwen3-235b-a22b-2507': [0.09, 0.55],
+      'qwen/qwen3-max': [0.78, 3.9],
+      'qwen/qwen3.7-plus': [0.32, 1.28],
+      'z-ai/glm-4.6': [0.5, 2],
+      'z-ai/glm-5': [0.95, 2.55],
+    };
+
+    const actual = Object.fromEntries(
+      Object.keys(verifiedRates).map(modelId => {
+        const capabilities = getModelCapabilities(modelId);
+        return [
+          modelId,
+          capabilities
+            ? [capabilities.inputPricePerMillion, capabilities.outputPricePerMillion]
+            : null,
+        ];
+      })
+    );
+
+    expect(actual).toEqual(verifiedRates);
+    expect(
+      getModelCapabilities('google/gemini-2.5-flash')?.combinedPricePerMillion
+    ).toBeUndefined();
+  });
+
   it('prices every model the seed can route to', () => {
     const unpriced = seedModels.filter(modelId => !getModelCapabilities(modelId));
 

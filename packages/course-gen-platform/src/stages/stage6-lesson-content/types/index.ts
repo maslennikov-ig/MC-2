@@ -14,6 +14,21 @@ export type Stage6QualityRungName = Stage6QualityRungPhaseName;
 export type Stage6ExecutionPolicyMode = 'manual_top_regeneration';
 export type Stage6QualityAttemptOutcome = 'accepted' | 'quality_retryable' | 'failed';
 
+export interface Stage6PrefetchedGeneratorResponse {
+  /** Raw assistant text returned for this lesson by OpenRouter Batch API. */
+  content: string;
+  /** Exact prompt submitted in the batch, retained for an intro corrective retry. */
+  prompt: string;
+  /** Provider-reported aggregate token count for this batch item. */
+  tokensUsed: number;
+  /** Billable `:batch` model ID used for cost attribution. */
+  modelUsed: string;
+  /** Base model for any synchronous corrective retry. */
+  baseModelUsed: string;
+  /** Provider-reported actual cost for diagnostics, when present. */
+  costUsd?: number | null;
+}
+
 /**
  * Execution context for Stage 6 jobs.
  *
@@ -161,6 +176,9 @@ export interface Stage6JobInput {
 
   /** Job type identifier (for job status tracking, optional) */
   jobType?: string;
+
+  /** Saved initial generator response supplied by the Batch API coordinator. */
+  prefetchedGeneratorResponse?: Stage6PrefetchedGeneratorResponse;
 }
 
 /**
@@ -319,6 +337,9 @@ export interface Stage6Input {
 
   /** Effective config source for the selected model */
   selectedModelSource?: string | null;
+
+  /** Saved initial generator response supplied by the Batch API coordinator. */
+  prefetchedGeneratorResponse?: Stage6PrefetchedGeneratorResponse;
 }
 
 /**
