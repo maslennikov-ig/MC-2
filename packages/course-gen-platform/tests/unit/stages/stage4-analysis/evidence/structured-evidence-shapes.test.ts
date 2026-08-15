@@ -35,16 +35,27 @@ const unit = {
   inputHash: 'sha256:input',
 };
 
-function respond(terminology: unknown, constraints: unknown = [], limitations: unknown = []) {
+function respond(
+  terminology: unknown,
+  constraints: unknown = [],
+  limitations: unknown = [],
+  scores: { confidence?: unknown; courseRelevance?: unknown } = {}
+) {
   generateCompletion.mockResolvedValueOnce({
     content: JSON.stringify({
       unit_id: 'unit-1',
       summary: 'Краткое содержание фрагмента.',
-      claims: [{ statement: 'Растения используют свет.', confidence: 0.9, unit_ids: ['unit-1'] }],
+      claims: [
+        {
+          statement: 'Растения используют свет.',
+          confidence: scores.confidence ?? 0.9,
+          unit_ids: ['unit-1'],
+        },
+      ],
       terminology,
       constraints,
       limitations,
-      course_relevance: 0.8,
+      course_relevance: scores.courseRelevance ?? 0.8,
     }),
     inputTokens: 100,
     outputTokens: 50,
@@ -114,6 +125,28 @@ describe('structured evidence payload shapes', () => {
     await expect(extract()).rejects.toThrow();
   });
 
+  it('accepts a score written as a numeric string', async () => {
+    // The second live attempt, once terminology was accepted: "0.8".
+    respond(['Фотосинтез'], [], [], { confidence: '0.9', courseRelevance: '0.8' });
+
+    const { value } = await extract();
+
+    expect(value.courseRelevance).toBe(0.8);
+    expect(value.claims[0].confidence).toBe(0.9);
+  });
+
+  it('still rejects a score that is not a number at all', async () => {
+    respond(['Фотосинтез'], [], [], { courseRelevance: 'высокая' });
+
+    await expect(extract()).rejects.toThrow();
+  });
+
+  it('still rejects a score outside the allowed range', async () => {
+    respond(['Фотосинтез'], [], [], { courseRelevance: '1.4' });
+
+    await expect(extract()).rejects.toThrow();
+  });
+
   it('tells the model the shape instead of leaving it to guess', async () => {
     respond(['Фотосинтез']);
 
@@ -123,5 +156,6 @@ describe('structured evidence payload shapes', () => {
     expect(options.systemPrompt).toContain('terminology (array of strings');
     expect(options.systemPrompt).toContain('constraints (array of strings)');
     expect(options.systemPrompt).toContain('limitations (array of strings)');
+    expect(options.systemPrompt).toContain('never a string');
   });
 });
