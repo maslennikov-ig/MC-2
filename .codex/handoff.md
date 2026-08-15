@@ -123,9 +123,8 @@ remain explicitly deferred.
 - `course_embeddings_v1` holds **6856 points** after the 2026-08-12 deduplication. Any restore of a
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
 - Qdrant and uploads have a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB
-  floor, 30-day local retention, first deletion around 2026-08-30). On-host snapshots share the
-  docker volume with live data, so that pull is the only real mitigation. A second machine, not
-  disaster recovery. `mc2-hfoh3` closed.
+  floor, 30-day local retention). On-host snapshots share the docker volume with live data, so that
+  pull is the only real mitigation — a second machine, not disaster recovery. `mc2-hfoh3` closed.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
 - Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
@@ -138,7 +137,8 @@ remain explicitly deferred.
   infrastructure work must use `scripts/with_host_operation_lock.sh`.
 - The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
   `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` suites run on uid 1000
-  only, so they are exercised locally and skipped on CI runners.
+  only — exercised locally, skipped on CI runners — and carry a 120s budget because their wall clock
+  is four concurrent real subprocess chains, not their own work (mc2-bvynv).
 - `graph-reviewed: blocked` — the graph is read, not refreshed. Graphify 0.9.14 has no `build`
   subcommand, so a rebuild runs through the `/graphify` skill flow, not from closeout.
 
