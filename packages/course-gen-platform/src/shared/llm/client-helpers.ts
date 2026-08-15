@@ -14,7 +14,13 @@ import type {
 } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import type { LLMResponse } from './client';
-import { modelSupportsTemperature, modelSupportsReasoning } from '@megacampus/shared-types';
+import {
+  modelSupportsTemperature,
+  modelSupportsReasoning,
+  modelRequiresReasoning,
+  getModelCapabilities,
+  MANDATORY_REASONING_RESERVE_TOKENS,
+} from '@megacampus/shared-types';
 
 /**
  * OpenRouter-specific extension for cache_control
@@ -89,6 +95,26 @@ export function buildReasoningPayload(reasoning: ReasoningRequest): {
 }
 
 /**
+ * Ask for the least deliberation a model will accept, and pay for it.
+ *
+ * Saying "no reasoning" to a mandatory thinker is a 400 on every call, not a
+ * degraded answer: `google/gemini-3.7-flash` refused three title generations in
+ * a row during a live run (mc2-2pplo, 2026-08-15). The lowest effort is the
+ * nearest thing to off, and the answer budget grows to cover the thinking the
+ * provider is going to bill against it either way.
+ */
+function applyMandatoryReasoningFloor(
+  requestOptions: OpenRouterRequestOptions,
+  model: string
+): void {
+  requestOptions.reasoning = { effort: 'low' };
+  if (typeof requestOptions.max_tokens !== 'number') return;
+  const ceiling = getModelCapabilities(model)?.maxOutputTokens ?? null;
+  const grown = requestOptions.max_tokens + MANDATORY_REASONING_RESERVE_TOKENS;
+  requestOptions.max_tokens = ceiling === null ? grown : Math.min(grown, ceiling);
+}
+
+/**
  * Apply `temperature` only where the model actually honours it.
  *
  * OpenAI's GPT-5.6 series exposes reasoning-side controls instead — its
@@ -113,7 +139,9 @@ function withSamplingControls(
     // returned no content, and ran past its 60s bound on every retry until the
     // course stopped (mc2-2pplo, 2026-08-14). A phase that did not ask for
     // reasoning has to say so.
-    if (modelSupportsReasoning(model)) {
+    if (modelRequiresReasoning(model)) {
+      applyMandatoryReasoningFloor(requestOptions, model);
+    } else if (modelSupportsReasoning(model)) {
       requestOptions.reasoning = { enabled: false };
     }
     return requestOptions;
