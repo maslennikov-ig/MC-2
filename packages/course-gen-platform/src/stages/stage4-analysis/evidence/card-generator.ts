@@ -312,7 +312,9 @@ function coerceStringList(value: unknown): unknown {
   };
 
   if (Array.isArray(value)) {
-    return value.map(entry =>
+    // `Array.isArray` narrows an `unknown` to `any[]`; keep the members unknown.
+    const entries: unknown[] = value;
+    return entries.map(entry =>
       entry && typeof entry === 'object' && !Array.isArray(entry)
         ? fromRecord(entry as Record<string, unknown>)
         : entry
