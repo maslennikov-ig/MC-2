@@ -1,4 +1,5 @@
 import type { CourseMetadata, GenerationJobInput, Section } from '@megacampus/shared-types';
+import { getCourseSizePreset } from '@megacampus/shared-types';
 import {
   resolveCourseStructureProfile,
   isCareerPlaybookBridgeSettings,
@@ -43,10 +44,28 @@ function getFrontendSettings(input: GenerationJobInput): unknown {
   return (input.frontend_parameters as { settings?: unknown }).settings;
 }
 
+/**
+ * Judge the structure against the profile it was built to.
+ *
+ * `resolveCourseStructureProfile` only reaches its explicit-size branch when it
+ * is given the size bounds, and Stage 4 gives them: it sizes and normalises the
+ * structure from the `course_size` preset. This validator passed the size name
+ * alone, silently fell through to `general_auto`, and then called the result
+ * critical for obeying Stage 4. A live micro course (mc2-2pplo, 2026-08-15)
+ * came out as 1 section and 3 lessons - exactly the micro preset - and was
+ * marked `section_count_out_of_bounds` because `general_auto` wants 4-8
+ * sections, which hard-blocks Stage 6.
+ */
 function resolveProfile(input: GenerationJobInput): CourseStructureProfile {
+  const courseSize = input.frontend_parameters?.course_size;
+  const preset = courseSize ? getCourseSizePreset(courseSize) : undefined;
   return resolveCourseStructureProfile({
-    courseSize: input.frontend_parameters?.course_size,
+    courseSize,
     settings: getFrontendSettings(input),
+    minLessons: preset?.minLessons,
+    maxLessons: preset?.maxLessons,
+    targetLessons: preset?.targetLessons,
+    targetSections: preset?.targetSections,
   });
 }
 

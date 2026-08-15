@@ -124,4 +124,26 @@ describe('Stage 5 structural quality validator', () => {
     expect(result.passed).toBe(true);
     expect(result.criticalIssues).toHaveLength(0);
   });
+
+  it('judges a micro course against the micro preset, not the auto profile', () => {
+    // A live micro course (mc2-2pplo, 2026-08-15) came out of Stage 4 as the
+    // preset asks - 1 section, 3 lessons - and this validator called it
+    // critical because it had silently fallen through to `general_auto`, which
+    // wants 4-8 sections. `hasCriticalIssues` hard-blocks Stage 6, so no micro
+    // course could ever reach lesson generation.
+    const input = makeInput();
+    input.frontend_parameters.course_size = 'micro';
+    input.frontend_parameters.settings = undefined;
+
+    const result = validateStructuralQuality({
+      input,
+      metadata: { estimated_duration_hours: 0.75, difficulty_level: 'intermediate' },
+      sections: [makeSection(1, 3)],
+    });
+
+    expect(result.profileId).toBe('explicit_size');
+    expect(result.criticalIssues.map(issue => issue.code)).not.toContain(
+      'section_count_out_of_bounds'
+    );
+  });
 });
