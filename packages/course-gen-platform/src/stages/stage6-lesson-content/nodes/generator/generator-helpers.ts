@@ -100,6 +100,37 @@ export function extractTokenUsage(response: Awaited<ReturnType<ChatOpenAI['invok
 }
 
 /**
+ * Split a response's tokens into the two legs a price is made of.
+ *
+ * A total is enough to report how much was generated and useless for what it
+ * cost: input and output are billed at different rates, five-fold apart on some
+ * models. Returns null when the provider reported no split, so a caller prices
+ * nothing rather than pricing a guess.
+ */
+export function extractTokenSplit(
+  response: Awaited<ReturnType<ChatOpenAI['invoke']>>
+): { inputTokens: number; outputTokens: number } | null {
+  const langchain = response.usage_metadata;
+  if (
+    langchain &&
+    typeof langchain.input_tokens === 'number' &&
+    typeof langchain.output_tokens === 'number'
+  ) {
+    return { inputTokens: langchain.input_tokens, outputTokens: langchain.output_tokens };
+  }
+
+  const usage = (response.response_metadata as Record<string, unknown> | undefined)?.usage;
+  if (usage && typeof usage === 'object') {
+    const raw = usage as Record<string, unknown>;
+    if (typeof raw.prompt_tokens === 'number' && typeof raw.completion_tokens === 'number') {
+      return { inputTokens: raw.prompt_tokens, outputTokens: raw.completion_tokens };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Extract token usage with fallback estimation
  *
  * First tries to get actual token count from model response metadata.

@@ -15,7 +15,8 @@ import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import { extractTokenUsageWithFallback } from './generator-helpers';
+import { extractTokenSplit, extractTokenUsageWithFallback } from './generator-helpers';
+import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
 import {
   buildIntroCorrectivePrompt,
   INTRO_STRUCTURE_GUARD_ERROR_CODE,
@@ -58,6 +59,8 @@ export async function generateLessonSingleCall(
   lessonDigest: string;
   tokensUsed: number;
   modelUsed: string;
+  /** What this lesson actually cost, when it can be known. */
+  costUsd?: number | null;
 }> {
   logger.info(
     {
@@ -111,12 +114,14 @@ export async function generateLessonSingleCall(
   let totalTokensUsed: number;
   let modelUsedForAccounting: string;
   let effectivePrompt = prompt;
+  let costUsd: number | null | undefined;
 
   if (prefetchedResponse) {
     responseContent = prefetchedResponse.content;
     totalTokensUsed = prefetchedResponse.tokensUsed;
     modelUsedForAccounting = prefetchedResponse.modelUsed;
     effectivePrompt = prefetchedResponse.prompt;
+    costUsd = prefetchedResponse.costUsd;
     logger.info(
       {
         lessonId: lessonSpec.lesson_id,
@@ -182,6 +187,27 @@ export async function generateLessonSingleCall(
       language
     );
     totalTokensUsed += retryTokenResult.tokens;
+
+    // The retry is a full synchronous call at the base tariff, and the content
+    // that ships is now its content, not the batch's. Leaving both facts on the
+    // `:batch` model would bill this half price and credit a model that did not
+    // write the lesson (mc2-jv7pc).
+    if (prefetchedResponse) {
+      modelUsedForAccounting = modelId;
+      const retrySplit = extractTokenSplit(retryResponse);
+      const retryCost = retrySplit
+        ? calculateLlmCostUsd({ model: modelId, ...retrySplit })
+        : undefined;
+      if (retryCost === undefined) {
+        logger.warn(
+          { lessonId: lessonSpec.lesson_id, modelId, hasSplit: retrySplit !== null },
+          'Intro corrective retry could not be priced; lesson cost covers the batch attempt only'
+        );
+      } else {
+        costUsd = (costUsd ?? 0) + retryCost;
+      }
+    }
+
     if (retryTokenResult.isEstimated) {
       logger.debug(
         { lessonId: lessonSpec.lesson_id, estimatedTokens: retryTokenResult.tokens },
@@ -227,6 +253,7 @@ export async function generateLessonSingleCall(
     lessonDigest: digest,
     tokensUsed: totalTokensUsed,
     modelUsed: modelUsedForAccounting,
+    costUsd,
   };
 }
 export { generateTruncationContinuation, mergeContinuationContent } from './generator-truncation';

@@ -869,6 +869,78 @@ The batch generated this lesson.`;
         modelUsed: 'google/gemini-3.7-flash:batch',
       });
     });
+
+    it('bills a corrective retry at the synchronous tariff it actually ran at', async () => {
+      // The retry is a full call at the base price. Reporting it under the
+      // `:batch` model would halve its price and credit a model that did not
+      // write the lesson that shipped (mc2-jv7pc).
+      const oversizedIntro = Array.from({ length: 190 }, () => 'word').join(' ');
+      mockModelInvoke.mockResolvedValueOnce({
+        content: validEnglishLessonContent,
+        response_metadata: {
+          usage: { prompt_tokens: 10_000, completion_tokens: 2_000, total_tokens: 12_000 },
+        },
+      });
+
+      const result = await generateLessonSingleCall(
+        mockLessonSpec,
+        [],
+        'en',
+        null,
+        null,
+        null,
+        undefined,
+        undefined,
+        {
+          content: `## Introduction
+
+${oversizedIntro} In the next lesson, we will cover advanced decorators.
+
+## Section 1
+
+Main section.`,
+          prompt: 'Prompt saved with the batch request',
+          tokensUsed: 321,
+          modelUsed: 'google/gemini-3.7-flash:batch',
+          baseModelUsed: 'google/gemini-3.7-flash',
+          costUsd: 0.004,
+        }
+      );
+
+      expect(mockModelInvoke).toHaveBeenCalledTimes(1);
+      // gemini-3.7-flash is $0.375 in and $1.875 out per million:
+      // 10k in = $0.00375, 2k out = $0.00375, on top of the batch's own $0.004.
+      expect(result).toMatchObject({
+        modelUsed: 'google/gemini-3.7-flash',
+        tokensUsed: 12_321,
+      });
+      expect(result.costUsd).toBeCloseTo(0.0115, 10);
+    });
+
+    it('reports the batch price unchanged when no corrective retry runs', async () => {
+      const result = await generateLessonSingleCall(
+        mockLessonSpec,
+        [],
+        'en',
+        null,
+        null,
+        null,
+        undefined,
+        undefined,
+        {
+          content: validEnglishLessonContent,
+          prompt: 'Prompt saved with the batch request',
+          tokensUsed: 321,
+          modelUsed: 'google/gemini-3.7-flash:batch',
+          baseModelUsed: 'google/gemini-3.7-flash',
+          costUsd: 0.004,
+        }
+      );
+
+      expect(mockModelInvoke).not.toHaveBeenCalled();
+      expect(result.modelUsed).toBe('google/gemini-3.7-flash:batch');
+      expect(result.costUsd).toBeCloseTo(0.004, 10);
+    });
   });
 
   describe('RAG deduplication', () => {
