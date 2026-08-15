@@ -398,39 +398,48 @@ export class Stage5GenerationHandler {
 
     // Save structure + sync LLM-generated title/description back to courses table
     // This ensures courses.title matches the target language even when user input was in a different language
-    const structureUpdate = supabaseAdmin
-      .from('courses')
-      .update({
-        course_structure: structureWithIds,
-        generation_metadata: result.generation_metadata,
-        ...(evidencePersistence.analysisResultUpdate
-          ? { analysis_result: evidencePersistence.analysisResultUpdate }
-          : {}),
-        ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
-        ...(structureWithIds.course_description
-          ? { course_description: structureWithIds.course_description }
-          : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', courseId);
-
-    let structureError: { message: string } | null;
-    if (evidencePersistence.expectedAnalysisResultJson) {
-      const result = await structureUpdate
-        .filter('analysis_result', 'eq', evidencePersistence.expectedAnalysisResultJson)
-        .select('id')
-        .maybeSingle();
-      structureError = result.error;
-      if (!result.data && !structureError) {
+    let structureError: { message: string; code?: string; details?: string } | null;
+    if (evidencePersistence.expectedAnalysisResult) {
+      // The guard compares the previous snapshot in the database, not in the
+      // URL: matching the whole `analysis_result` through PostgREST put ten
+      // kilobytes of JSON in the request line and every commit came back
+      // `400 Bad Request` (mc2-2pplo, 2026-08-15).
+      const committed = await supabaseAdmin.rpc('commit_course_structure_guarded', {
+        p_course_id: courseId,
+        p_expected_analysis_result: evidencePersistence.expectedAnalysisResult,
+        p_course_structure: structureWithIds,
+        p_generation_metadata: result.generation_metadata,
+        p_analysis_result: evidencePersistence.analysisResultUpdate,
+        p_title: structureWithIds.course_title ?? null,
+        p_course_description: structureWithIds.course_description ?? null,
+      });
+      structureError = committed.error;
+      if (!committed.data && !structureError) {
         throw new Error('Failed to save structure: document evidence snapshot changed');
       }
     } else {
-      const result = await structureUpdate;
-      structureError = result.error;
+      // No evidence snapshot to protect, so an ordinary update is enough.
+      const updated = await supabaseAdmin
+        .from('courses')
+        .update({
+          course_structure: structureWithIds,
+          generation_metadata: result.generation_metadata,
+          ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
+          ...(structureWithIds.course_description
+            ? { course_description: structureWithIds.course_description }
+            : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', courseId);
+      structureError = updated.error;
     }
 
     if (structureError) {
-      throw new Error(`Failed to save structure: ${structureError.message}`);
+      // "Bad Request" on its own tells the next reader nothing.
+      const said = [structureError.code, structureError.details].filter(Boolean).join(' ');
+      throw new Error(
+        `Failed to save structure: ${structureError.message}${said ? ` (${said})` : ''}`
+      );
     }
 
     // Materialize sections and lessons to DB tables (non-fatal on failure)
