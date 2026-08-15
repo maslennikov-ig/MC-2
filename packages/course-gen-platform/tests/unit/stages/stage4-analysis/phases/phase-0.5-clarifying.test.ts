@@ -279,6 +279,27 @@ describe('Phase 0.5: Clarifying Questions', () => {
         'Failed to auto-answer questions'
       );
     });
+
+    it('repeats what the database said instead of its own sentence', async () => {
+      // A live run (mc2-2pplo, 2026-08-15) failed three attempts on a bare
+      // `23514`, and the constraint it broke stayed invisible until the schema
+      // was read by hand.
+      mockSupabase.rpc.mockResolvedValueOnce({
+        data: {
+          success: false,
+          error: 'Automatic answer transaction failed',
+          code: '23514',
+          message:
+            'new row for relation "clarifying_questions" violates check constraint "clarifying_questions_answer_source_check"',
+          total_pending: 13,
+        },
+        error: null,
+      });
+
+      await expect(clarifyingPhase.autoAnswerAllQuestions('c-1')).rejects.toThrow(
+        /clarifying_questions_answer_source_check/
+      );
+    });
   });
 
   describe('analyzeSufficiency', () => {

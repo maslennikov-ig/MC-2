@@ -279,7 +279,11 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
       },
       'Auto-answer atomic operation failed'
     );
-    throw new Error(`Auto-answer failed: ${result.error || 'Unknown error'}`);
+    // The function's own sentence says nothing; what the database said does.
+    const said = [result.code, result.message].filter(Boolean).join(' ');
+    throw new Error(
+      `Auto-answer failed: ${result.error || 'Unknown error'}${said ? ` (database said: ${said})` : ''}`
+    );
   }
 
   // Log success with statistics

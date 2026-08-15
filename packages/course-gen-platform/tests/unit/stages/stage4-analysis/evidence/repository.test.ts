@@ -400,6 +400,32 @@ describe('DocumentEvidenceRepository', () => {
     });
   });
 
+  it('sends the cost the column will actually hold', async () => {
+    // `total_cost_usd` is NUMERIC(14,6) and run metrics may never decrease, so
+    // a float that rounds up on storage makes the next commit of the same
+    // total look like a decrease. It cost a live run its first Stage 4 attempt.
+    const { client, rpc } = createScriptedClient({ rpc: [{ data: { id: ids.run }, error: null }] });
+    const repository = createDocumentEvidenceRepository(client as never);
+
+    await repository.commitBatch({
+      runId: ids.run,
+      courseId: ids.course,
+      organizationId: ids.organization,
+      cards: [card],
+      batchKey: 'document-a:map:unit-1',
+      inputHash: 'sha256:unit-1',
+      structuredCheckpoint: { document_id: ids.documentA },
+      cursor: { document_id: ids.documentA, sequence: 1 },
+      batchCount: 1,
+      modelCalls: 1,
+      inputTokens: 10_099,
+      outputTokens: 2_425,
+      totalCostUsd: 0.0008685,
+    });
+
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_total_cost_usd: 0.000869 });
+  });
+
   it('reuses an immutable conflict when its run fingerprint already exists', async () => {
     const existing = {
       id: ids.conflict,
