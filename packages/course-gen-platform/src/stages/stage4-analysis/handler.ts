@@ -188,6 +188,13 @@ class Stage4AnalysisHandler {
         // Track tokens
         await trackStage4Tokens(course_id, analysisResult.metadata?.total_tokens?.total, jobLogger);
 
+        // Let go of the course before handing it on. Stage 5 is queued by the
+        // next line and a worker picks it up at once; releasing only in the
+        // `finally` below left it colliding with this job's own lock and
+        // failing all three attempts in under two seconds, because a lock
+        // conflict is retried without any delay (mc2-2pplo, 2026-08-15).
+        await lockGuard.release();
+
         // STEP 4: Handle stage completion
         await this.handleStageCompletion(course_id, jobLogger);
 

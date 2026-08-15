@@ -472,6 +472,11 @@ export class Stage5GenerationHandler {
     const stage5Tokens = result.generation_metadata?.total_tokens?.total;
     await trackStage5Tokens(courseId, stage5Tokens, jobLogger);
 
+    // Let go of the course before Stage 6 is queued, for the same reason
+    // Stage 4 does: the next stage starts immediately and a lock conflict is
+    // retried without any delay. Releasing twice is free.
+    await lockGuard.release();
+
     // Handle stage completion (checks generation_mode)
     const { autoApproved } = await handleStageCompletion(courseId, 5);
     jobLogger.info(

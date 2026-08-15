@@ -85,11 +85,18 @@ export async function acquireGenerationLock(
     })();
   }, HEARTBEAT_INTERVAL_MS);
 
+  // A stage releases the lock before it queues the next one, and again in its
+  // `finally`. Releasing twice must be free, or the second call would report a
+  // lock it no longer holds.
+  let released = false;
+
   return {
     heartbeatInterval,
     lockId,
     release: async () => {
       clearInterval(heartbeatInterval);
+      if (released) return;
+      released = true;
       await generationLockService.releaseLock(courseId, lockId);
     },
   };
