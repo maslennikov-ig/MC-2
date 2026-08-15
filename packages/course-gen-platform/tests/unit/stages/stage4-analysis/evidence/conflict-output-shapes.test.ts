@@ -129,6 +129,50 @@ describe('conflict detection output shapes', () => {
     ).resolves.toMatchObject({ conflicts: [] });
   });
 
+  it('retries a mapping that skips a claim instead of ending the stage', async () => {
+    // The bijection used to be checked after the port returned, outside the
+    // retry budget built for exactly this. One dropped claim id killed a live
+    // run at Stage 4 with two unused attempts in hand.
+    const input = {
+      ...mapInput(),
+      claims: [mapInput().claims[0], { ...mapInput().claims[0], claim_id: CLAIM_B }],
+    };
+    const invoke = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify([{ claim_id: CLAIM_A, proposition_key: 'p', value_key: 'v' }]),
+        usage: usage(),
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify([
+          { claim_id: CLAIM_A, proposition_key: 'p', value_key: 'v' },
+          { claim_id: CLAIM_B, proposition_key: 'p', value_key: 'w' },
+        ]),
+        usage: usage(),
+      });
+    const port = createProductionConflictDetectionPort({ invoke, maxRetries: 1 });
+
+    const result = await port.mapBatch(input);
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(result.propositions.map(item => item.claim_id).sort()).toEqual(
+      [CLAIM_A, CLAIM_B].sort()
+    );
+  });
+
+  it('refuses a mapping that repeats a claim', async () => {
+    const invoke = vi.fn(async () => ({
+      content: JSON.stringify([
+        { claim_id: CLAIM_A, proposition_key: 'p', value_key: 'v' },
+        { claim_id: CLAIM_A, proposition_key: 'p', value_key: 'w' },
+      ]),
+      usage: usage(),
+    }));
+    const port = createProductionConflictDetectionPort({ invoke, maxRetries: 0 });
+
+    await expect(port.mapBatch(mapInput())).rejects.toThrow(/bounded retry policy/);
+  });
+
   it('still rejects an item that is wrong inside the envelope', async () => {
     const invoke = vi.fn(async () => ({
       content: JSON.stringify([{ claim_id: 'not-a-uuid', proposition_key: 'x', value_key: 'y' }]),
