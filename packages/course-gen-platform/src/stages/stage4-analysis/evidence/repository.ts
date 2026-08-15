@@ -131,12 +131,27 @@ export interface EvidenceDecisionRow {
   [key: string]: unknown;
 }
 
+/**
+ * A repository failure that says what the database said.
+ *
+ * The operation name alone was not enough to act on: a live run (mc2-2pplo,
+ * 2026-08-15) failed here and the only way to learn why was another paid run.
+ * The database code and message now travel in the message itself, because a
+ * `cause` is dropped by the logger and never reaches the console.
+ *
+ * Only `code` and `message` are carried. Postgres puts offending values in
+ * `details`, and stored JSON bodies still never appear in a message here.
+ */
 export class DocumentEvidenceRepositoryError extends Error {
   constructor(
     operation: string,
-    readonly databaseCode?: string
+    readonly databaseCode?: string,
+    databaseMessage?: string
   ) {
-    super(`Document evidence repository operation failed: ${operation}`);
+    const said = [databaseCode, databaseMessage].filter(Boolean).join(' ');
+    super(
+      `Document evidence repository operation failed: ${operation}${said ? ` (database said: ${said})` : ''}`
+    );
     this.name = 'DocumentEvidenceRepositoryError';
   }
 }
@@ -149,7 +164,7 @@ function assertRecord(value: unknown, operation: string): Record<string, unknown
 }
 
 function throwDatabaseError(operation: string, error: DatabaseError): never {
-  throw new DocumentEvidenceRepositoryError(operation, error.code);
+  throw new DocumentEvidenceRepositoryError(operation, error.code, error.message);
 }
 
 function normalizeSourceManifest(
