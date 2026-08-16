@@ -92,8 +92,11 @@ with the places checked (`mc2-qrdkt.4` through `.7`).
 
 **Stage 6 and Stage 7 spend now reaches the course.** `courses.estimated_cost_usd` stopped at
 Stage 5 because the refresh lives in the general sandboxed processor and those two stages run on
-their own queues in their own containers; Stage 7 was worse off still, its phases falling outside
-`stageOfPhase` so its calls were never priced at all (`mc2-gmab0`).
+their own queues in their own containers. Stage 7 was unpriced for a second, separate reason, and
+the first attempt named the wrong one: widening `stageOfPhase` to `stage_7` priced nothing, because
+Stage 7 does not use the LangChain path that function belongs to. Its six calls go through the
+OpenAI SDK client and none passed a `costContext`, so they left no trace row at all. All six now do,
+and a guard reads the sources so the next call site cannot forget (`mc2-gmab0`).
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
