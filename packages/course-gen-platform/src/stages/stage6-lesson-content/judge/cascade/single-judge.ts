@@ -148,10 +148,7 @@ AVOID using "sec_global" when possible. Instead:
 Evaluate objectively, focusing on educational quality and alignment with objectives.`;
 }
 
-/**
- * Parse single judge JSON response
- */
-function parseSingleJudgeResponse(content: string): {
+interface ParsedSingleJudgeResponse {
   overallScore: number;
   passed: boolean;
   confidence: JudgeConfidence;
@@ -164,7 +161,18 @@ function parseSingleJudgeResponse(content: string): {
     suggestedFix: string;
   }>;
   strengths: string[];
-} | null {
+}
+
+/**
+ * Parse single judge JSON response, or say why it could not be read.
+ *
+ * The parser knew which field was wrong and the caller logged only how many
+ * bytes came back, so a judge answering in the wrong shape was indistinguishable
+ * from a judge that did not answer at all.
+ */
+function parseSingleJudgeResponse(
+  content: string
+): { ok: true; value: ParsedSingleJudgeResponse } | { ok: false; reason: string } {
   try {
     // Use safeJSONParse which handles:
     // - Markdown code blocks extraction
@@ -173,25 +181,29 @@ function parseSingleJudgeResponse(content: string): {
     const parsed = safeJSONParse(content) as RawJudgeResponse;
 
     // Validate required fields
-    if (
-      typeof parsed.overallScore !== 'number' ||
-      typeof parsed.passed !== 'boolean' ||
-      typeof parsed.confidence !== 'string' ||
-      !parsed.criteriaScores
-    ) {
-      return null;
+    const wrong = [
+      typeof parsed.overallScore !== 'number' ? 'overallScore is not a number' : '',
+      typeof parsed.passed !== 'boolean' ? 'passed is not a boolean' : '',
+      typeof parsed.confidence !== 'string' ? 'confidence is not a string' : '',
+      !parsed.criteriaScores ? 'criteriaScores is missing' : '',
+    ].filter(Boolean);
+    if (wrong.length > 0) {
+      return { ok: false, reason: wrong.join('; ') };
     }
 
     return {
-      overallScore: parsed.overallScore,
-      passed: parsed.passed,
-      confidence: parsed.confidence as JudgeConfidence,
-      criteriaScores: parsed.criteriaScores,
-      issues: parsed.issues || [],
-      strengths: parsed.strengths || [],
+      ok: true,
+      value: {
+        overallScore: parsed.overallScore,
+        passed: parsed.passed,
+        confidence: parsed.confidence as JudgeConfidence,
+        criteriaScores: parsed.criteriaScores,
+        issues: parsed.issues || [],
+        strengths: parsed.strengths || [],
+      },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -239,16 +251,18 @@ export async function executeSingleJudge(
     const durationMs = Date.now() - startTime;
 
     // Parse JSON response
-    const parsed = parseSingleJudgeResponse(response.content);
+    const parseResult = parseSingleJudgeResponse(response.content);
 
-    if (!parsed) {
+    if (!parseResult.ok) {
       logger.warn({
         msg: 'Failed to parse single judge response',
         judge: modelConfig.displayName,
         responseLength: response.content.length,
+        reason: parseResult.reason,
       });
       return null;
     }
+    const parsed = parseResult.value;
 
     // Build verdict
     const verdict: JudgeVerdict = {
