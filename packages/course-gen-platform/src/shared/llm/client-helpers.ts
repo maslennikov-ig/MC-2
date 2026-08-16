@@ -14,10 +14,10 @@ import type {
 } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import type { LLMResponse } from './client';
+import { requiresReasoningNow } from './mandatory-reasoning-recovery';
 import {
   modelSupportsTemperature,
   modelSupportsReasoning,
-  modelRequiresReasoning,
   getModelCapabilities,
   MANDATORY_REASONING_RESERVE_TOKENS,
 } from '@megacampus/shared-types';
@@ -103,7 +103,7 @@ export function buildReasoningPayload(reasoning: ReasoningRequest): {
  * nearest thing to off, and the answer budget grows to cover the thinking the
  * provider is going to bill against it either way.
  */
-function applyMandatoryReasoningFloor(
+export function applyMandatoryReasoningFloor(
   requestOptions: OpenRouterRequestOptions,
   model: string
 ): void {
@@ -139,7 +139,7 @@ function withSamplingControls(
     // returned no content, and ran past its 60s bound on every retry until the
     // course stopped (mc2-2pplo, 2026-08-14). A phase that did not ask for
     // reasoning has to say so.
-    if (modelRequiresReasoning(model)) {
+    if (requiresReasoningNow(model)) {
       applyMandatoryReasoningFloor(requestOptions, model);
     } else if (modelSupportsReasoning(model)) {
       requestOptions.reasoning = { enabled: false };

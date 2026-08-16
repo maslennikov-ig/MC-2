@@ -25,8 +25,13 @@ import {
   parseCompletionResponse,
   handleApiError,
   handleUnknownError,
+  applyMandatoryReasoningFloor,
 } from './client-helpers';
-import type { ReasoningRequest } from './client-helpers';
+import type { ReasoningRequest, OpenRouterRequestOptions } from './client-helpers';
+import {
+  isMandatoryReasoningRejection,
+  rememberMandatoryReasoning,
+} from './mandatory-reasoning-recovery';
 import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
 
 /**
@@ -404,6 +409,13 @@ export class LLMClient {
 
       return response;
     } catch (error) {
+      // A model that refuses to stop thinking answers 400 to every call, so the
+      // retries would all fail the same way. Teach the request instead: the
+      // options object is the one the next attempt sends.
+      if (isMandatoryReasoningRejection(error) && rememberMandatoryReasoning(model)) {
+        applyMandatoryReasoningFloor(requestOptions as OpenRouterRequestOptions, model);
+        throw error;
+      }
       if (error instanceof OpenAI.APIError) {
         handleApiError(error as InstanceType<typeof OpenAI.APIError>, { model });
       }

@@ -1,12 +1,9 @@
+import { requiresReasoningNow } from '@/shared/llm/mandatory-reasoning-recovery';
 import { DelayedError, type Job } from 'bullmq';
 import { logger } from '@/shared/logger';
 import type { PhaseReasoningConfig } from '@/shared/llm/model-config-service';
 import { buildReasoningPayload } from '@/shared/llm/client-helpers';
-import {
-  modelRequiresReasoning,
-  getModelCapabilities,
-  MANDATORY_REASONING_RESERVE_TOKENS,
-} from '@megacampus/shared-types';
+import { getModelCapabilities, MANDATORY_REASONING_RESERVE_TOKENS } from '@megacampus/shared-types';
 import { estimateTokensFromText } from '../nodes/generator/generator-helpers';
 import type { Stage6JobInput, Stage6PrefetchedGeneratorResponse } from '../types';
 import type {
@@ -121,7 +118,7 @@ function buildRequest(
   if (supportedParameters.has('reasoning')) {
     if (item.reasoning.enabled) {
       body.reasoning = buildReasoningPayload(item.reasoning);
-    } else if (modelRequiresReasoning(modelId)) {
+    } else if (requiresReasoningNow(modelId)) {
       // A model that refuses to stop deliberating rejects the whole request,
       // and here that would waste a 24h batch window rather than one call.
       body.reasoning = { effort: 'low' };
