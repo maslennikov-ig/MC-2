@@ -261,7 +261,12 @@ async function handleSmallDocument(
   );
 
   options?.onProgress?.(85, 'Generating document title');
-  const generatedTitle = await generateDocumentTitle(extractedText, titleLanguage);
+  const generatedTitle = await generateDocumentTitle(
+    extractedText,
+    titleLanguage,
+    undefined,
+    courseId
+  );
 
   options?.onProgress?.(90, 'Storing full text');
   const result = await storeFullText(
@@ -318,7 +323,7 @@ async function executeSummarizationWithRetry(
         currentAttempt,
         maxRetries,
         effectiveQualityThreshold,
-        options
+        { ...options, courseId }
       );
 
       // If quality passed, store and return
@@ -396,7 +401,12 @@ async function executeSummarizationWithRetry(
 
   // Should never reach here, but fallback to full text
   logger.error({ fileId }, '[Phase 6] Unexpected retry loop exit, falling back to full text');
-  const fallbackTitle = await generateDocumentTitle(extractedText, titleLanguage);
+  const fallbackTitle = await generateDocumentTitle(
+    extractedText,
+    titleLanguage,
+    undefined,
+    courseId
+  );
   return await storeFullText(
     courseId,
     fileId,
@@ -473,7 +483,12 @@ async function handleQualityPassed(
   const { chunkingResult, qualityCheck, progressBase } = attemptResult;
 
   options?.onProgress?.(progressBase + 12, 'Generating document title');
-  const generatedTitle = await generateDocumentTitle(chunkingResult.summary, titleLanguage);
+  const generatedTitle = await generateDocumentTitle(
+    chunkingResult.summary,
+    titleLanguage,
+    undefined,
+    courseId
+  );
 
   options?.onProgress?.(progressBase + 15, 'Storing summary');
   const result = await storeSummary(
@@ -527,7 +542,12 @@ async function handleMaxRetriesReached(
   );
 
   options?.onProgress?.(progressBase + 12, 'Generating document title');
-  const generatedTitle = await generateDocumentTitle(chunkingResult.summary, titleLanguage);
+  const generatedTitle = await generateDocumentTitle(
+    chunkingResult.summary,
+    titleLanguage,
+    undefined,
+    courseId
+  );
 
   options?.onProgress?.(progressBase + 15, 'Storing best-effort summary');
   return await storeSummary(
@@ -566,7 +586,12 @@ async function handleAllAttemptsFailed(
   );
 
   options?.onProgress?.(85, 'Generating document title');
-  const generatedTitle = await generateDocumentTitle(extractedText, titleLanguage);
+  const generatedTitle = await generateDocumentTitle(
+    extractedText,
+    titleLanguage,
+    undefined,
+    courseId
+  );
 
   options?.onProgress?.(90, 'Storing full text (fallback)');
   return await storeFullText(

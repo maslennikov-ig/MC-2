@@ -138,7 +138,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     // 2. MERMAID FIX PIPELINE (on full content, single pass)
     // ========================================================================
     try {
-      const pipelineResult = await runMermaidFixPipeline(generatedContent);
+      const pipelineResult = await runMermaidFixPipeline(generatedContent, { courseId });
       if (pipelineResult.modified) {
         logger.debug(
           {

@@ -135,7 +135,9 @@ export async function sectionRegeneratorNode(
     // broken mermaid syntax (escaped quotes, bad arrows, etc.)
     let finalContent = result.content;
     try {
-      const pipelineResult = await runMermaidFixPipeline(finalContent);
+      const pipelineResult = await runMermaidFixPipeline(finalContent, {
+        courseId: state.courseId,
+      });
       if (pipelineResult.modified) {
         logger.debug(
           {

@@ -1,5 +1,6 @@
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
 import { logger } from '@/shared/logger';
 import { STAGE6_TIER_MODELS } from '../nodes/generator/generator-constants';
 import { QualityRemediationAction } from './remediation';
@@ -35,8 +36,14 @@ Rules:
 export async function runPresentationCritic(args: {
   markdown: string;
   lessonSpec: LessonSpecificationV2;
+  courseId?: string;
 }): Promise<PresentationCriticResult> {
-  const model = createOpenRouterModel(STAGE6_TIER_MODELS.simple, 0.1, 400);
+  const model = attachCostRecording(
+    createOpenRouterModel(STAGE6_TIER_MODELS.simple, 0.1, 400),
+    STAGE6_TIER_MODELS.simple,
+    'stage_6_simple',
+    args.courseId
+  );
   const prompt = `${PRESENTATION_CRITIC_PROMPT}
 
 Audience: ${args.lessonSpec.metadata?.target_audience ?? 'unspecified'}

@@ -188,7 +188,7 @@ export async function generateLessonSingleCall(
     // Reusing the live model reuses its cost callback, so the retry prices
     // itself. `model` is null only on the Batch path, where the fresh instance
     // is deliberately left unpriced and the retry is added to the batch item's
-    // own figure below.
+    // own figure below - cost-exempt: priced into the batch item's costUsd.
     const correctiveModel =
       model ?? createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning);
     const retryResponse = await correctiveModel.invoke(correctivePrompt);

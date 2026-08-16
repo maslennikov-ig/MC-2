@@ -169,7 +169,8 @@ class Stage4AnalysisHandler {
         const visualStyle = await this.generateVisualStyleSafe(
           analysisInput,
           analysisResult,
-          jobLogger
+          jobLogger,
+          course_id
         );
 
         // STEP 3: Store result in database
@@ -259,7 +260,8 @@ class Stage4AnalysisHandler {
   private async generateVisualStyleSafe(
     analysisInput: import('@megacampus/shared-types').StructureAnalysisInput,
     analysisResult: AnalysisResult,
-    jobLogger: pino.Logger
+    jobLogger: pino.Logger,
+    courseId: string
   ): Promise<Awaited<ReturnType<typeof generateVisualStyle>> | null> {
     try {
       jobLogger.info({}, 'Generating visual style for course imagery');
@@ -268,6 +270,7 @@ class Stage4AnalysisHandler {
         courseTopic: analysisResult.topic_analysis.determined_topic || analysisInput.topic,
         language: analysisInput.language,
         category: analysisResult.course_category.primary,
+        courseId,
       });
       jobLogger.info(
         {

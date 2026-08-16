@@ -195,7 +195,9 @@ export async function executePatcherTask(
 
     // Run full mermaid fix pipeline on patched content (regex → validate → LLM fix → revalidate → fallback)
     try {
-      const mermaidResult = await runMermaidFixPipeline(patchedContent);
+      const mermaidResult = await runMermaidFixPipeline(patchedContent, {
+        courseId: iterationContext.courseId,
+      });
       if (mermaidResult.modified) {
         patchedContent = mermaidResult.content;
         logger.debug(
@@ -459,7 +461,7 @@ export async function executeExpanderTask(
     // Run full mermaid fix pipeline on expanded content (regex → validate → LLM fix → revalidate → fallback)
     let expandedContent = expandResult.regeneratedContent;
     try {
-      const mermaidResult = await runMermaidFixPipeline(expandedContent);
+      const mermaidResult = await runMermaidFixPipeline(expandedContent, { courseId });
       if (mermaidResult.modified) {
         expandedContent = mermaidResult.content;
         logger.debug(

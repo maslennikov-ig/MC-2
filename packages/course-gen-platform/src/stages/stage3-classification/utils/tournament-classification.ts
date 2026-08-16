@@ -18,6 +18,7 @@
 import { logger } from '../../../shared/logger/index.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { createOpenRouterModel } from '../../../shared/llm/langchain-models';
+import { attachCostRecording } from '../../../shared/llm/model-cost-callbacks';
 import { z } from 'zod';
 import { DocumentPriorityLevelSchema } from '@megacampus/shared-types';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
@@ -245,7 +246,8 @@ export function planTournamentClassification(
  */
 export async function executeTournamentClassification(
   plan: TournamentPlan,
-  courseContext: { title: string; description: string }
+  courseContext: { title: string; description: string },
+  courseId?: string
 ): Promise<TournamentClassificationResult> {
   logger.info(
     {
@@ -258,7 +260,11 @@ export async function executeTournamentClassification(
   // Single-stage classification (all documents fit)
   if (!plan.requiresTwoStage) {
     logger.debug('[Tournament] Executing single-stage classification');
-    return await executeSingleStageClassification(plan.groups[0].documents, courseContext);
+    return await executeSingleStageClassification(
+      plan.groups[0].documents,
+      courseContext,
+      courseId
+    );
   }
 
   // Two-stage classification
@@ -284,7 +290,7 @@ export async function executeTournamentClassification(
       `[Tournament] Classifying group ${i + 1}/${plan.groups.length}`
     );
 
-    const groupResults = await classifyDocumentGroup(group.documents, courseContext, i);
+    const groupResults = await classifyDocumentGroup(group.documents, courseContext, i, courseId);
 
     allGroupResults.push(...groupResults);
   }
@@ -305,7 +311,11 @@ export async function executeTournamentClassification(
     f => plan.groups.flatMap(g => g.documents).find(d => d.id === f.id)!
   );
 
-  const finalResults = await executeSingleStageClassification(finalistDocuments, courseContext);
+  const finalResults = await executeSingleStageClassification(
+    finalistDocuments,
+    courseContext,
+    courseId
+  );
 
   // Merge final results with non-finalists
   const finalClassifications = mergeResults(
@@ -333,13 +343,15 @@ export async function executeTournamentClassification(
  */
 async function executeSingleStageClassification(
   documents: DocumentForClassification[],
-  courseContext: { title: string; description: string }
+  courseContext: { title: string; description: string },
+  courseId?: string
 ): Promise<TournamentClassificationResult> {
   const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
+  const model = attachCostRecording(
+    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
     modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
+    'stage_3_classification',
+    courseId
   );
 
   const structuredModel = model.withStructuredOutput(GroupClassificationResponseSchema);
@@ -369,13 +381,15 @@ async function executeSingleStageClassification(
 async function classifyDocumentGroup(
   documents: DocumentForClassification[],
   courseContext: { title: string; description: string },
-  groupIndex: number
+  groupIndex: number,
+  courseId?: string
 ): Promise<GroupClassificationResult[]> {
   const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
+  const model = attachCostRecording(
+    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
     modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
+    'stage_3_classification',
+    courseId
   );
 
   const structuredModel = model.withStructuredOutput(GroupClassificationResponseSchema);

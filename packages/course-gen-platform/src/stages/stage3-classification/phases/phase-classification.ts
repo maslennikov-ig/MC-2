@@ -178,13 +178,17 @@ export async function executeDocumentClassificationComparative(
       }));
 
       const plan = planTournamentClassification(documents, CLASSIFICATION_INPUT_BUDGET);
-      comparativeResults = await executeTournamentClassification(plan, courseContext);
+      comparativeResults = await executeTournamentClassification(plan, courseContext, courseId);
     } else {
       logger.debug(
         { fileCount: fileMetadataList.length },
         'Using single-stage comparative classification (summaries fit in budget)'
       );
-      comparativeResults = await classifyDocumentsComparatively(fileMetadataList, courseContext);
+      comparativeResults = await classifyDocumentsComparatively(
+        fileMetadataList,
+        courseContext,
+        courseId
+      );
     }
   } catch (error) {
     logger.error(
@@ -304,7 +308,7 @@ export async function executeDocumentClassification(
     try {
       logger.debug({ fileId: fileMeta.id, filename: fileMeta.filename }, 'Classifying document');
 
-      const response = await classifyDocument(fileMeta, courseContext);
+      const response = await classifyDocument(fileMeta, courseContext, courseId);
       classificationResults.push({ fileId: fileMeta.id, response });
 
       logger.info(

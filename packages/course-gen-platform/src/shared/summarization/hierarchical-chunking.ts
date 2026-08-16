@@ -18,6 +18,7 @@
  */
 
 import { llmClient } from '../llm/client';
+import type { LlmCostContext } from '../metrics/llm-cost';
 import { tokenEstimator } from '../llm/token-estimator';
 import logger from '../logger';
 
@@ -44,6 +45,12 @@ export interface HierarchicalChunkingOptions {
   temperature?: number;
   /** Max output tokens per chunk (default: 10000) */
   maxTokensPerChunk?: number;
+  /**
+   * Where to charge the summarization. Stage 2 is the pipeline's quietest
+   * spender: it summarizes every uploaded document and, without this, left no
+   * priced row at all (mc2-b7olk.2).
+   */
+  costContext?: LlmCostContext;
 }
 
 /**
@@ -152,6 +159,7 @@ export async function hierarchicalChunking(
     model = 'openai/gpt-oss-20b',
     temperature = 0.7,
     maxTokensPerChunk = 10000,
+    costContext,
   } = options;
 
   logger.info(
@@ -259,7 +267,8 @@ export async function hierarchicalChunking(
           temperature,
           maxTokensPerChunk,
           index,
-          chunks.length
+          chunks.length,
+          costContext
         )
       )
     );
@@ -479,7 +488,8 @@ async function summarizeChunk(
   temperature: number,
   maxTokens: number,
   chunkIndex: number,
-  totalChunks: number
+  totalChunks: number,
+  costContext?: LlmCostContext
 ): Promise<ChunkSummary> {
   const systemPrompt = COMPRESSION_PROMPTS[compressionLevel];
 
@@ -508,6 +518,7 @@ ${chunk}`;
       temperature,
       maxTokens,
       systemPrompt,
+      ...(costContext ? { costContext } : {}),
     });
 
     logger.debug(

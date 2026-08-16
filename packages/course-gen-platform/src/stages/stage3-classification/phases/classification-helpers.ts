@@ -7,6 +7,7 @@
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { createOpenRouterModel } from '../../../shared/llm/langchain-models';
+import { attachCostRecording } from '../../../shared/llm/model-cost-callbacks';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { DocumentPriority } from '@megacampus/shared-types';
@@ -185,13 +186,15 @@ export async function fetchCourseContext(
  */
 export async function classifyDocument(
   fileMeta: FileMetadata,
-  courseContext: { title: string; description: string }
+  courseContext: { title: string; description: string },
+  courseId?: string
 ): Promise<ClassificationResponse> {
   const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
+  const model = attachCostRecording(
+    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
     modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
+    'stage_3_classification',
+    courseId
   );
 
   const [systemMsg, humanMsg] = await buildClassificationPrompt(fileMeta, courseContext);
@@ -228,13 +231,15 @@ export async function classifyDocument(
  */
 export async function classifyDocumentsComparatively(
   fileMetadataList: FileMetadata[],
-  courseContext: { title: string; description: string }
+  courseContext: { title: string; description: string },
+  courseId?: string
 ): Promise<ComparativeClassificationResponse> {
   const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
+  const model = attachCostRecording(
+    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
     modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
+    'stage_3_classification',
+    courseId
   );
 
   const structuredModel = model.withStructuredOutput(ComparativeClassificationResponseSchema);

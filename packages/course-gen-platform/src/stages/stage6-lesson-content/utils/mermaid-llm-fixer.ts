@@ -39,6 +39,7 @@
  */
 
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
 import { logger } from '@/shared/logger';
 import { HumanMessage } from '@langchain/core/messages';
 
@@ -268,6 +269,8 @@ export interface MermaidLLMFixResult {
 export interface MermaidLLMFixContext {
   /** Number of LLM fixes used in current lesson */
   llmFixCount: number;
+  /** Course to charge the repair to; without it the repair is unpriced. */
+  courseId?: string;
 }
 
 // ============================================================================
@@ -363,7 +366,12 @@ export async function fixMermaidWithLLM(
 
     // Create LLM instance with selected model tier
     const selectedModel = LLM_MODELS[modelTier];
-    const model = createOpenRouterModel(selectedModel, LLM_TEMPERATURE, LLM_MAX_TOKENS);
+    const model = attachCostRecording(
+      createOpenRouterModel(selectedModel, LLM_TEMPERATURE, LLM_MAX_TOKENS),
+      selectedModel,
+      'stage_6_refinement',
+      context.courseId
+    );
 
     // Configure timeout
     model.timeout = LLM_TIMEOUT;

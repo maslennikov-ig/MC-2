@@ -167,7 +167,11 @@ export async function executeSummarizationAttempt(
   currentAttempt: number,
   maxRetries: number,
   effectiveQualityThreshold: number,
-  options?: { onProgress?: (progress: number, message: string) => void }
+  options?: {
+    onProgress?: (progress: number, message: string) => void;
+    /** Course to charge the summarization to; without it Stage 2 spends silently. */
+    courseId?: string;
+  }
 ): Promise<SummarizationAttemptResult> {
   logger.info(
     {
@@ -195,6 +199,15 @@ export async function executeSummarizationAttempt(
       model: config.model,
       temperature: DEFAULT_SUMMARIZATION_CONFIG.temperature,
       maxTokensPerChunk: DEFAULT_SUMMARIZATION_CONFIG.maxTokensPerChunk,
+      ...(options?.courseId
+        ? {
+            costContext: {
+              courseId: options.courseId,
+              stage: 'stage_2' as const,
+              phase: 'stage_2_summarization',
+            },
+          }
+        : {}),
     }
   );
 
@@ -306,7 +319,8 @@ export function applyEscalation(config: SummarizationConfig, retryAttempt: numbe
 export async function generateDocumentTitle(
   text: string,
   language: string,
-  model: string = TITLE_GENERATION_MODEL
+  model: string = TITLE_GENERATION_MODEL,
+  courseId?: string
 ): Promise<string> {
   const textForTitle = text.slice(0, 2000);
   const langKey = language === 'rus' || language === 'ru' ? 'rus' : 'eng';
@@ -318,6 +332,15 @@ export async function generateDocumentTitle(
       systemPrompt,
       maxTokens: 50,
       temperature: 0.3,
+      ...(courseId
+        ? {
+            costContext: {
+              courseId,
+              stage: 'stage_2' as const,
+              phase: 'stage_2_summarization',
+            },
+          }
+        : {}),
     });
 
     const generatedTitle = response.content
