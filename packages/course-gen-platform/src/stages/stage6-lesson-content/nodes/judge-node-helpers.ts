@@ -27,7 +27,6 @@ import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { actionToRecommendation } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
-import { costTracker, createTokenUsage } from '@/shared/metrics/cost-tracker';
 import { buildLessonContent } from '../judge/judge-helpers';
 import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
@@ -159,6 +158,8 @@ export async function runCascadeEvaluation(context: JudgeContext): Promise<Judge
     lessonSpec: state.lessonSpec,
     ragChunks: state.ragChunks,
     language: state.language,
+    courseId: state.courseId,
+    lessonUuid: state.lessonUuid || undefined,
   };
 
   logger.info(
@@ -819,31 +820,12 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
         ? judgeModelsUsed[0]
         : judgeModelsUsed.join(', ');
 
-  // Calculate cost from per-model token usage
-  let costUsd = 0;
-  if (judgeModelsUsed.length > 0 && totalInputTokens > 0) {
-    // We have per-model breakdown from verdicts — split tokens proportionally
-    const perModelInput = Math.round(totalInputTokens / judgeModelsUsed.length);
-    const perModelOutput = Math.round(totalOutputTokens / judgeModelsUsed.length);
-    for (const modelId of judgeModelsUsed) {
-      costUsd += costTracker.calculateCost(
-        modelId,
-        createTokenUsage(perModelInput, perModelOutput)
-      );
-    }
-  } else if (judgeModelsUsed.length > 0 && totalTokensUsed > 0) {
-    // Fallback: no input/output breakdown, estimate 80/20 split
-    const estInput = Math.round(totalTokensUsed * 0.8);
-    const estOutput = totalTokensUsed - estInput;
-    const perModelInput = Math.round(estInput / judgeModelsUsed.length);
-    const perModelOutput = Math.round(estOutput / judgeModelsUsed.length);
-    for (const modelId of judgeModelsUsed) {
-      costUsd += costTracker.calculateCost(
-        modelId,
-        createTokenUsage(perModelInput, perModelOutput)
-      );
-    }
-  }
+  // This row carries no price on purpose. It used to estimate one: the whole
+  // cascade's tokens split evenly across the judges, falling back to an assumed
+  // 80/20 input/output ratio, and the tokens of targeted refinement charged at
+  // judge rates although a different, cheaper model did that work. Every one of
+  // those calls now prices itself where it is made, from its own split and its
+  // own model, so estimating here would count them a second time (mc2-b7olk.1).
 
   // Log trace
   await logTrace({
@@ -916,7 +898,6 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     },
     modelUsed,
     tokensUsed: totalTokensUsed,
-    costUsd: costUsd > 0 ? costUsd : undefined,
     durationMs,
   });
 

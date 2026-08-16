@@ -390,6 +390,8 @@ export async function executeCascadeEvaluation(
     lessonSpec: input.lessonSpec,
     ragChunks: input.ragChunks,
     language: input.language,
+    courseId: input.courseId,
+    lessonUuid: input.lessonUuid,
   };
 
   const clevResult = await executeCLEVVoting(clevInput, {

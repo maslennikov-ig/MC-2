@@ -186,6 +186,15 @@ export async function executeExpansion(
       temperature,
       maxTokens,
       systemPrompt,
+      ...(input.courseId
+        ? {
+            costContext: {
+              courseId: input.courseId,
+              stage: 'stage_6' as const,
+              phase: 'stage_6_section_expander',
+            },
+          }
+        : {}),
     });
 
     const regeneratedContent = response.content.trim();

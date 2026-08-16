@@ -138,6 +138,10 @@ export interface CascadeEvaluationInput {
   ragChunks: RAGChunk[];
   /** Content language for judge selection */
   language?: string;
+  /** Course the evaluation is charged to; without it a judge call is unpriced. */
+  courseId?: string;
+  /** Lesson row the evaluation belongs to, for per-lesson cost. */
+  lessonUuid?: string;
 }
 
 /**

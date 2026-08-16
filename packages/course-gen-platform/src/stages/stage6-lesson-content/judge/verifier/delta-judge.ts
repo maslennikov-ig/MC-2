@@ -179,6 +179,15 @@ export async function verifyPatch(
       temperature,
       maxTokens,
       systemPrompt,
+      ...(input.courseId
+        ? {
+            costContext: {
+              courseId: input.courseId,
+              stage: 'stage_6' as const,
+              phase: 'stage_6_delta_judge',
+            },
+          }
+        : {}),
     });
 
     logger.info(
