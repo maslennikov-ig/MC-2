@@ -16,8 +16,11 @@ import type { CascadeEvaluationInput, CascadeConfig, RawJudgeResponse } from './
 
 /**
  * Build evaluation prompt for single judge
+ *
+ * Exported so a test can read what the judge is actually told, the way the
+ * conflict-detector prompts are.
  */
-function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubric): string {
+export function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubric): string {
   const { lessonContent, lessonSpec, ragChunks } = input;
   const labels = getContentLabels(input.language || 'en');
 

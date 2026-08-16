@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 
 import { buildJudgePrompt } from '@/stages/stage6-lesson-content/judge/clev-voter-helpers';
+import { buildSingleJudgePrompt } from '@/stages/stage6-lesson-content/judge/cascade/single-judge';
 import { DEFAULT_OSCQR_RUBRIC } from '@megacampus/shared-types';
 
 function lesson(examples: LessonContentBody['examples']): LessonContentBody {
@@ -35,6 +36,21 @@ function lesson(examples: LessonContentBody['examples']): LessonContentBody {
     exercises: [
       { question: 'Назовите место, где идёт световая фаза', solution: 'Тилакоидная мембрана' },
     ],
+  };
+}
+
+function inputFor(examples: LessonContentBody['examples']) {
+  return {
+    lessonContent: lesson(examples),
+    lessonSpec: {
+      title: 'Фотосинтез',
+      description: 'Как растение делает питание из света',
+      difficulty_level: 'beginner',
+      learning_objectives: [{ objective: 'Объяснить световую фазу', bloom_level: 'understand' }],
+      metadata: { target_audience: 'школьники', content_archetype: 'concept' },
+    } as never,
+    ragChunks: [],
+    language: 'ru',
   };
 }
 
@@ -78,5 +94,18 @@ describe('judge prompt and empty examples', () => {
 
     expect(prompt).toContain('## Sections (1 total)');
     expect(prompt).toContain('Назовите место, где идёт световая фаза');
+  });
+
+  it('says the same nothing in the single-judge prompt, which is the other one', () => {
+    const empty = buildSingleJudgePrompt(inputFor([]) as never, DEFAULT_OSCQR_RUBRIC);
+    const filled = buildSingleJudgePrompt(
+      inputFor([
+        { title: 'Лист комнатного растения', content: 'Зелёный из-за хлорофилла' },
+      ] as LessonContentBody['examples']) as never,
+      DEFAULT_OSCQR_RUBRIC
+    );
+
+    expect(empty).not.toContain('(0 total)');
+    expect(filled).toContain('Примеры (1 total)');
   });
 });
