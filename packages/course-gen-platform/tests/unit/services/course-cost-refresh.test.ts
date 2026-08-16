@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- stub processors mirror async production */
 /**
  * Contract: every worker that spends money on a course refreshes what the
  * course has cost.
