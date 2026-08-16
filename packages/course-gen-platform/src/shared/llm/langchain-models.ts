@@ -23,6 +23,10 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
+import {
+  requiresReasoningNow,
+  withMandatoryReasoningRecovery,
+} from './mandatory-reasoning-recovery';
 import { attachCostRecording } from './model-cost-callbacks';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
@@ -37,7 +41,12 @@ import { buildReasoningPayload } from './client-helpers';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
-import { modelSupportsTemperature, modelSupportsReasoning } from '@megacampus/shared-types';
+import {
+  modelSupportsTemperature,
+  modelSupportsReasoning,
+  getModelCapabilities,
+  MANDATORY_REASONING_RESERVE_TOKENS,
+} from '@megacampus/shared-types';
 
 /** Reasoning settings as a phase config supplies them. */
 export interface LangchainReasoningRequest {
@@ -445,6 +454,14 @@ export function buildProviderParams(
         'Phase asks for reasoning but the model does not accept it - sending the request without it'
       );
     }
+  } else if (requiresReasoningNow(modelId)) {
+    // Some models refuse to switch it off at all and answer 400 to the attempt.
+    // Ask for the least of it and grow the budget it will be billed against
+    // (see applyMandatoryReasoningFloor in client-helpers).
+    modelKwargs.reasoning = { effort: 'low' };
+    const ceiling = getModelCapabilities(modelId)?.maxOutputTokens ?? null;
+    const grown = effectiveMaxTokens + MANDATORY_REASONING_RESERVE_TOKENS;
+    effectiveMaxTokens = ceiling === null ? grown : Math.min(grown, ceiling);
   } else if (modelSupportsReasoning(modelId)) {
     // A phase that did not ask for deliberation has to say so: models that
     // reason by default otherwise spend the answer budget on it (see
@@ -475,15 +492,18 @@ export function createOpenRouterModel(
     );
   }
 
-  return new ChatOpenAI({
-    model: modelId,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-    },
-    apiKey: apiKey,
-    ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
-  });
+  const build = (): ChatOpenAI =>
+    new ChatOpenAI({
+      model: modelId,
+      configuration: {
+        baseURL: OPENROUTER_BASE_URL,
+      },
+      apiKey: apiKey,
+      ...(timeoutMs ? { timeout: timeoutMs } : {}),
+      ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
+    });
+
+  return withMandatoryReasoningRecovery(build(), modelId, build);
 }
 
 /**
@@ -516,15 +536,18 @@ export async function createOpenRouterModelAsync(
     );
   }
 
-  return new ChatOpenAI({
-    model: modelId,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-    },
-    apiKey: apiKey,
-    ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
-  });
+  const build = (): ChatOpenAI =>
+    new ChatOpenAI({
+      model: modelId,
+      configuration: {
+        baseURL: OPENROUTER_BASE_URL,
+      },
+      apiKey: apiKey,
+      ...(timeoutMs ? { timeout: timeoutMs } : {}),
+      ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
+    });
+
+  return withMandatoryReasoningRecovery(build(), modelId, build);
 }
 
 /**

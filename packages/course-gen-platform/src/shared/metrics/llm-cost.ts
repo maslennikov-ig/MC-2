@@ -21,7 +21,7 @@ import { logTrace } from '../trace-logger';
 export interface LlmCostContext {
   courseId: string;
   /** Trace `stage` value, e.g. `stage_6`. */
-  stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+  stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6' | 'stage_7';
   /** Trace `phase` value, e.g. `stage_6_complex`. */
   phase: string;
   lessonId?: string;

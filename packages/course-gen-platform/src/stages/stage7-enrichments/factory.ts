@@ -13,6 +13,7 @@ import { logger } from '@/shared/logger';
 import { retryWithBackoff } from '@/shared/workspace-utils';
 import { STAGE7_CONFIG } from './config';
 import type { Stage7JobInput, Stage7JobResult, Stage7ProgressUpdate } from './types';
+import { updateCourseEstimatedCost } from '@/services/token-tracking-service';
 import { processStage7Job } from './services/job-processor';
 import { updateEnrichmentStatus } from './services/database-service';
 
@@ -76,7 +77,16 @@ export function createStage7Worker(redisUrl?: string): Worker<Stage7JobInput, St
 
   const worker = new Worker<Stage7JobInput, Stage7JobResult>(
     STAGE7_CONFIG.QUEUE_NAME,
-    processStage7Job,
+    // Stage 7 has its own queue and worker, so the refresh in the general
+    // processor never sees it and enrichment spend never reached the course's
+    // cost (mc2-gmab0). A job that FAILED still spent money, so both paths.
+    async job => {
+      try {
+        return await processStage7Job(job);
+      } finally {
+        await updateCourseEstimatedCost(job.data.courseId);
+      }
+    },
     {
       connection,
       concurrency: STAGE7_CONFIG.CONCURRENCY,

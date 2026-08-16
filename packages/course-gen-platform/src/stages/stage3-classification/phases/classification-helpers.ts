@@ -14,6 +14,7 @@ import { tokenEstimator } from '../../../shared/llm/token-estimator';
 import { createPromptService } from '../../../shared/prompts/prompt-service';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
 import { formatFileSize } from '@/shared/workspace-utils';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 import {
   getCachedFileProcessedContent,
   getCachedFileMarkdown,
@@ -92,7 +93,7 @@ export async function fetchFileMetadata(
 
   if (error) {
     logger.error({ error, fileIds }, 'Failed to fetch file metadata');
-    throw new Error(`Failed to fetch file metadata: ${error.message}`);
+    throw new Error(`Failed to fetch file metadata: ${describeDatabaseError(error)}`);
   }
 
   if (!data || data.length === 0) {

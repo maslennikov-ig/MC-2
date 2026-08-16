@@ -225,36 +225,18 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
   });
 
   it('aborts every Stage 5 write when the evidence CAS update matches zero rows', async () => {
-    const updatePayloads: Record<string, unknown>[] = [];
+    // The compare-and-swap happens in the database now. Sending the previous
+    // `analysis_result` as a PostgREST URL filter put ten kilobytes of JSON in
+    // the request line and every commit came back `400 Bad Request`
+    // (mc2-2pplo, 2026-08-15).
     const persisted = {
       course_structure: { existing: true },
       generation_metadata: { existing: true },
       analysis_result: analysis(),
     };
-    let pendingUpdate: Record<string, unknown> | undefined;
-    const casMatched = false;
-    const query = {
-      eq: vi.fn(),
-      filter: vi.fn(),
-      select: vi.fn(),
-      maybeSingle: vi.fn(async () => {
-        // A zero-row PostgREST CAS response never applies the pending atomic update.
-        if (casMatched && pendingUpdate) Object.assign(persisted, pendingUpdate);
-        return { data: null, error: null };
-      }),
-    };
-    query.eq.mockReturnValue(query);
-    query.filter.mockReturnValue(query);
-    query.select.mockReturnValue(query);
-    const database = {
-      from: vi.fn(() => ({
-        update: vi.fn((payload: Record<string, unknown>) => {
-          updatePayloads.push(payload);
-          pendingUpdate = payload;
-          return query;
-        }),
-      })),
-    };
+    // A null return is the guard reporting that the snapshot had moved.
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    const database = { from: vi.fn(), rpc };
     mocks.getSupabaseAdmin.mockReturnValue(database);
     const handler = new Stage5GenerationHandler();
     const originalAnalysis = analysis();
@@ -273,24 +255,23 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
       )
     ).rejects.toThrow('document evidence snapshot changed');
 
-    expect(query.filter).toHaveBeenCalledWith(
-      'analysis_result',
-      'eq',
-      JSON.stringify(originalAnalysis)
-    );
-    expect(updatePayloads[0]).toEqual(
+    expect(rpc).toHaveBeenCalledWith(
+      'commit_course_structure_guarded',
       expect.objectContaining({
-        course_structure: expect.any(Object),
-        generation_metadata: expect.any(Object),
-        analysis_result: expect.any(Object),
+        p_course_id: courseId,
+        p_expected_analysis_result: originalAnalysis,
+        p_course_structure: expect.any(Object),
+        p_generation_metadata: expect.any(Object),
+        p_analysis_result: expect.any(Object),
       })
     );
+    // The snapshot travels as an object, not as a serialised URL parameter.
+    expect(typeof rpc.mock.calls[0][1].p_expected_analysis_result).toBe('object');
     expect(persisted).toEqual({
       course_structure: { existing: true },
       generation_metadata: { existing: true },
       analysis_result: analysis(),
     });
-    expect(database.from).toHaveBeenCalledTimes(1);
     expect(mocks.materializeSectionsAndLessons).not.toHaveBeenCalled();
     expect(mocks.writeCourseNodes).not.toHaveBeenCalled();
     expect(mocks.trackStage5Tokens).not.toHaveBeenCalled();

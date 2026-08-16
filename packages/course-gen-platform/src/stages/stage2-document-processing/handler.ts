@@ -28,6 +28,7 @@ import { DoclingError, DoclingErrorCode } from './docling/types.js';
 import { getTranslator } from '../../shared/i18n/translator';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 import { notifyCourseError } from '../../shared/notifications';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 import {
   getQdrantRecoveryDecision,
   isQdrantUploadNonRetryableError,
@@ -523,7 +524,7 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
 
     if (error) {
       logger.error({ err: error, fileId }, 'Failed to update vector status to failed');
-      throw new Error(`Failed to update vector status: ${error.message}`);
+      throw new Error(`Failed to update vector status: ${describeDatabaseError(error)}`);
     }
 
     logger.info(

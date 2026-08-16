@@ -25,6 +25,7 @@ import {
 } from '../../../shared/validation/quality-validator';
 import { llmClient } from '../../../shared/llm/client';
 import logger from '../../../shared/logger';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 import type {
   Phase6Result,
   SummarizationConfig,
@@ -423,7 +424,7 @@ export async function storeSummary(
 
   if (error) {
     logger.error({ fileId, error }, '[Phase 6] Failed to store summary');
-    throw new Error(`Failed to store summary: ${error.message}`);
+    throw new Error(`Failed to store summary: ${describeDatabaseError(error)}`);
   }
 
   void cacheFileProcessedContent(courseId, fileId, summary);
@@ -501,7 +502,7 @@ export async function storeFullText(
 
   if (error) {
     logger.error({ fileId, error }, '[Phase 6] Failed to store full text');
-    throw new Error(`Failed to store full text: ${error.message}`);
+    throw new Error(`Failed to store full text: ${describeDatabaseError(error)}`);
   }
 
   void cacheFileProcessedContent(courseId, fileId, fullText);

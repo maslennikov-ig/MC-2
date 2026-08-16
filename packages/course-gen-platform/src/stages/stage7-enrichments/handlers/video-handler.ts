@@ -214,6 +214,12 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       systemPrompt,
       maxTokens: MAX_OUTPUT_TOKENS,
       temperature: SCRIPT_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_video',
+        lessonId: enrichmentContext.lesson.id,
+      },
     });
 
     // Parse and validate response

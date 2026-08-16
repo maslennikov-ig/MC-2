@@ -537,8 +537,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // live re-run of the approved packet against a database that already carries it
 // would need a new `after-130000` digest; the packet is the 2026-07 cutover tool
 // and is not re-run in this flow.
+// Re-pinned 2026-08-15 for the two Stage 4/5 live-run fixes (mc2-2pplo): 235
+// files, adding 20260815150000_auto_answer_system_source.sql and
+// 20260815160000_guarded_course_structure_commit.sql. Neither touches a
+// function inside the security manifest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'd7d0f174d53b3373d53b666753648629f6c157b86bf8113461942250ded8eebf';
+  '457d00fb17e334f42ffdd760daa696ff220678cf8922b81dc483286b2ca507f7';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

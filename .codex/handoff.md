@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-14. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-16. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -9,7 +9,8 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 The Career Playbook quality track is **accepted** (`mc2-db696.110`, editorial read 4.4 / 5 against a
 4.0 threshold, run cost USD 0.352; evidence in `.codex/stages/mc2-db696.110/evidence/`). Its two
 process rules are in `06-quality-acceptance.md` and still hold: read the artifact before calling a
-run accepted, and clean up **after** the editorial pass. Active work is now epic `mc2-qrdkt`.
+run accepted, and clean up **after** the editorial pass. Epic `mc2-qrdkt` is closed; no stage is
+active.
 
 ## RAG retrieval and chunking repaired (2026-08-12/13)
 
@@ -67,12 +68,45 @@ Open from the audit, none in the current epics: `mc2-s1vg5` (`generate:config-se
 unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
 delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
-## Live course run (2026-08-14, `mc2-2pplo` — reached Stage 4 twice, then unblocked)
+## Live course run (2026-08-15, `mc2-2pplo` — a course reached Stage 6 and published)
 
-Epic `mc2-qrdkt` is done. Plan and owner decisions: `docs/plans/humble-floating-widget.md`.
-The run itself has not been repeated since the blocker was cleared, so Stage 5, the judge panel and
-the full Stage 6 graph are still unexercised end to end. Spend so far **USD 0.2836**; the shared
-OpenRouter key had USD 9.758 left, so check its credit before and during any rerun.
+Epic `mc2-qrdkt` is complete, 17 of 17. Course `8a174ee7` finished: `published`, 3 lessons,
+quality 0.93, 18-22 KB of real Russian content per lesson on `openai/gpt-5.6-luna`. Total spend
+across every attempt **USD 0.222333** of the USD 5 ceiling; the successful course itself cost
+USD 0.042368 (stage_4 0.0118, stage_5 0.0013, stage_6 0.0293). Test data was removed in full.
+
+Eight defects, each of which alone stopped a course, were found and fixed during the run: the shape
+of Stage 4's lists, a number sent as a string, the conflict detector's envelope, mandatory reasoning
+on five models rather than one, `answer_source='system'` against a CHECK plus a cost-rounding guard,
+10 KB of JSON in a PostgREST URL, a micro course judged against `general_auto`, and a generation
+lock held across a stage handoff. Details in the `bd` close reasons.
+
+**What the run taught, beyond the fixes (2026-08-16).** Most causes were known to the code and never
+printed. Four blindness sites were repaired during the run and the sweep afterwards found more:
+twelve pipeline sites reduced a PostgREST error to `message` alone (`describeDatabaseError` now
+appends `code`/`details`/`hint`), the downstream reducer checked its unit set outside the retry
+budget written for it, the Stage 6 judge parser said how many bytes came back instead of which field
+was wrong. Audits of the other three failure families — envelope fragility, validation outside a
+retry budget, a lock held across a handoff — found one real instance each and are recorded closed
+with the places checked (`mc2-qrdkt.4` through `.7`).
+
+**Stage 6 and Stage 7 spend now reaches the course.** `courses.estimated_cost_usd` stopped at
+Stage 5 because the refresh lives in the general sandboxed processor and those two stages run on
+their own queues in their own containers. Stage 7 was unpriced for a second, separate reason, and
+the first attempt named the wrong one: widening `stageOfPhase` to `stage_7` priced nothing, because
+Stage 7 does not use the LangChain path that function belongs to. Its six calls go through the
+OpenAI SDK client and none passed a `costContext`, so they left no trace row at all. All six now do,
+and a guard reads the sources so the next call site cannot forget (`mc2-gmab0`).
+
+**`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
+recognised by what the provider says, remembered for the life of the process, and retried asking for
+the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
+primary; the remembering is logged at warn so it gets added.
+
+**A log line says which deployment it came from.** Every dev container runs `NODE_ENV=production`, so
+every dev log line claimed to be production. The pino base now uses `detectEnvironment()` — the same
+vocabulary as `error_logs.environment` — and the backend image carries `APP_VERSION` from `VCS_REF`
+instead of `0.0.0`.
 
 **The blocker, closed.** `mc2-wg60c`: the 60s per-call budget was smaller than the default model's
 real answer time — a realistic Stage 4 request (8204 input tokens, `max_tokens` 16000) took **119.0s**
@@ -123,9 +157,8 @@ remain explicitly deferred.
 - `course_embeddings_v1` holds **6856 points** after the 2026-08-12 deduplication. Any restore of a
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
 - Qdrant and uploads have a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB
-  floor, 30-day local retention, first deletion around 2026-08-30). On-host snapshots share the
-  docker volume with live data, so that pull is the only real mitigation. A second machine, not
-  disaster recovery. `mc2-hfoh3` closed.
+  floor, 30-day local retention). On-host snapshots share the docker volume with live data, so that
+  pull is the only real mitigation — a second machine, not disaster recovery. `mc2-hfoh3` closed.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
 - Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
@@ -138,7 +171,8 @@ remain explicitly deferred.
   infrastructure work must use `scripts/with_host_operation_lock.sh`.
 - The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
   `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` suites run on uid 1000
-  only, so they are exercised locally and skipped on CI runners.
+  only — exercised locally, skipped on CI runners — and carry a 120s budget because their wall clock
+  is four concurrent real subprocess chains, not their own work (mc2-bvynv).
 - `graph-reviewed: blocked` — the graph is read, not refreshed. Graphify 0.9.14 has no `build`
   subcommand, so a rebuild runs through the `/graphify` skill flow, not from closeout.
 
@@ -172,17 +206,22 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
+- `mc2-gmab0` live confirmation — the Stage 6/Stage 7 cost fixes and the mandatory-reasoning
+  recovery are held by unit tests only. Confirming them needs a paid course, so they ride along with
+  whatever run the owner authorizes next rather than asking for one of their own.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.110` · Current stage id: epic `mc2-qrdkt`
-Next stage id: `mc2-2pplo`
+Accepted stage id: `mc2-qrdkt` · Current stage id: none
+Next stage id: epic `mc2-4clyr`
 
-Recommended action: rerun `mc2-2pplo` — nothing in the repository blocks a course from reaching
-Stage 6 any more, and only a paid run can show whether it does. The driver is `live-run.mjs`,
-reproduced in the plan; it needs a fresh spend ceiling from the owner. After that, epic `mc2-4clyr`,
-whose headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
+Recommended action: epic `mc2-4clyr`, generation cost. Note what is **not** proven: the Stage 6 and
+Stage 7 cost fixes are held by unit tests and have not been seen on a live course, and neither has
+the mandatory-reasoning recovery — both would be confirmed for free by whatever paid run happens
+next, not by a run of their own.
+
+`mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
 so the full panel runs _below_ its 15-20% design target, not four times above it. `mc2-r31fw` step 1
 cannot be done from history — `singleJudge` is null in every stored cascade row.

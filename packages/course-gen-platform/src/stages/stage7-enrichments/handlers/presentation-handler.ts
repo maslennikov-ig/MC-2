@@ -108,12 +108,28 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
 }
 
 /**
+ * A parsed answer, or why it could not be parsed.
+ *
+ * The reason used to go to a `warn` line while the throw said only "invalid
+ * JSON structure" — and it is the throw that lands in
+ * `lesson_enrichments.error_message`, which is what a person reads.
+ */
+type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+function describeZodFailure(issues: Array<{ path: PropertyKey[]; message: string }>): string {
+  return issues
+    .slice(0, 3)
+    .map(issue => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+    .join('; ');
+}
+
+/**
  * Parse and validate LLM response as presentation draft outline
  *
  * @param content - Raw LLM response content
- * @returns Parsed PresentationDraft or null if invalid
+ * @returns The draft, or the reason it could not be read
  */
-function parseDraftResponse(content: string): PresentationDraft | null {
+function parseDraftResponse(content: string): ParseResult<PresentationDraft> {
   try {
     // Clean up potential markdown code blocks
     let jsonContent = content.trim();
@@ -127,17 +143,16 @@ function parseDraftResponse(content: string): PresentationDraft | null {
     const result = presentationDraftSchema.safeParse(parsed);
 
     if (result.success) {
-      return result.data;
+      return { ok: true, value: result.data };
     }
 
+    const reason = describeZodFailure(result.error.errors);
     logger.warn({ errors: result.error.errors }, 'Presentation draft validation failed');
-    return null;
+    return { ok: false, reason };
   } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
-      'Failed to parse presentation draft response as JSON'
-    );
-    return null;
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.warn({ error: reason }, 'Failed to parse presentation draft response as JSON');
+    return { ok: false, reason };
   }
 }
 
@@ -145,9 +160,9 @@ function parseDraftResponse(content: string): PresentationDraft | null {
  * Parse and validate LLM response as final presentation output
  *
  * @param content - Raw LLM response content
- * @returns Parsed PresentationOutput or null if invalid
+ * @returns The slides, or the reason they could not be read
  */
-function parseFinalResponse(content: string): PresentationOutput | null {
+function parseFinalResponse(content: string): ParseResult<PresentationOutput> {
   try {
     // Clean up potential markdown code blocks
     let jsonContent = content.trim();
@@ -161,17 +176,16 @@ function parseFinalResponse(content: string): PresentationOutput | null {
     const result = presentationOutputSchema.safeParse(parsed);
 
     if (result.success) {
-      return result.data;
+      return { ok: true, value: result.data };
     }
 
+    const reason = describeZodFailure(result.error.errors);
     logger.warn({ errors: result.error.errors }, 'Presentation final output validation failed');
-    return null;
+    return { ok: false, reason };
   } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
-      'Failed to parse presentation final output response as JSON'
-    );
-    return null;
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.warn({ error: reason }, 'Failed to parse presentation final output response as JSON');
+    return { ok: false, reason };
   }
 }
 
@@ -253,14 +267,22 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       systemPrompt,
       maxTokens: MAX_DRAFT_TOKENS,
       temperature: DRAFT_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_presentation',
+        lessonId: enrichmentContext.lesson.id,
+        stepName: 'draft',
+      },
     });
 
     // Parse and validate response
-    const draftOutput = parseDraftResponse(response.content);
+    const draftResult = parseDraftResponse(response.content);
 
-    if (!draftOutput) {
-      throw new Error('Failed to parse presentation draft output - invalid JSON structure');
+    if (!draftResult.ok) {
+      throw new Error(`Failed to parse presentation draft output: ${draftResult.reason}`);
     }
+    const draftOutput = draftResult.value;
 
     const durationMs = Date.now() - startTime;
 
@@ -423,14 +445,22 @@ async function generateFinal(
       systemPrompt,
       maxTokens: MAX_FINAL_TOKENS,
       temperature: FINAL_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_presentation',
+        lessonId: enrichmentContext.lesson.id,
+        stepName: 'final',
+      },
     });
 
     // Parse and validate response
-    const presentationOutput = parseFinalResponse(response.content);
+    const finalResult = parseFinalResponse(response.content);
 
-    if (!presentationOutput) {
-      throw new Error('Failed to parse presentation final output - invalid JSON structure');
+    if (!finalResult.ok) {
+      throw new Error(`Failed to parse presentation final output: ${finalResult.reason}`);
     }
+    const presentationOutput = finalResult.value;
 
     const durationMs = Date.now() - startTime;
     const totalDurationMs = (draft.metadata.durationMs || 0) + durationMs;

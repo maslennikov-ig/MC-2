@@ -42,6 +42,16 @@ export interface ModelCapabilities {
   supportsTemperature: boolean;
   /** Whether the provider accepts the OpenRouter `reasoning` parameter */
   supportsReasoning: boolean;
+  /**
+   * Whether the provider refuses to switch deliberation off. Accepting
+   * `reasoning` and allowing `reasoning: {enabled: false}` are different
+   * questions, and OpenRouter's `supported_parameters` only answers the first:
+   * it lists `reasoning` for every model below, and five of them answer
+   * `400 Reasoning is mandatory for this endpoint and cannot be disabled`.
+   *
+   * Measured against the live API on 2026-08-15 for the whole catalogue.
+   */
+  requiresReasoning?: true;
   /** Unified rate for models that charge the same for input and output */
   combinedPricePerMillion?: number;
   /**
@@ -71,6 +81,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 65536,
     supportsTemperature: true,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   /** Async Batch API tariff; never substitute this ID into the synchronous endpoint. */
   'google/gemini-3.7-flash:batch': {
@@ -80,6 +91,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 65536,
     supportsTemperature: false,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   'minimax/minimax-m3': {
     inputPricePerMillion: 0.3,
@@ -250,6 +262,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   'minimax/minimax-m2.1': {
     inputPricePerMillion: 0.3,
@@ -258,6 +271,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   'moonshotai/kimi-k2-thinking': {
     inputPricePerMillion: 0.6,
@@ -266,6 +280,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 100352,
     supportsTemperature: true,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   'openai/gpt-4-turbo': {
     inputPricePerMillion: 10,
@@ -282,6 +297,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
+    requiresReasoning: true,
   },
   'openrouter/kimi-k2-instruct': {
     inputPricePerMillion: 0.15,
@@ -375,3 +391,25 @@ export function modelSupportsTemperature(modelId: string): boolean {
 export function modelSupportsReasoning(modelId: string): boolean {
   return getModelCapabilities(modelId)?.supportsReasoning ?? false;
 }
+
+/**
+ * True when the provider rejects `reasoning: {enabled: false}` outright.
+ *
+ * Callers that do not want deliberation must ask such a model for the least of
+ * it rather than for none, or every call is a 400.
+ */
+export function modelRequiresReasoning(modelId: string): boolean {
+  return getModelCapabilities(modelId)?.requiresReasoning ?? false;
+}
+
+/**
+ * Extra answer budget given to a model that cannot stop deliberating.
+ *
+ * OpenRouter bills reasoning tokens against `max_tokens`, so a mandatory
+ * thinker spends the answer's budget on thinking and the reply is truncated.
+ * The ceiling costs nothing unless it is used; `effort: 'low'` is what bounds
+ * the real spend. Measured on 2026-08-15 with a short prompt at that effort:
+ * gemini-3.7-flash 0, gpt-oss-20b 14, minimax-m2.1 296, minimax-m2 1241,
+ * kimi-k2-thinking 2428 reasoning tokens.
+ */
+export const MANDATORY_REASONING_RESERVE_TOKENS = 4096;

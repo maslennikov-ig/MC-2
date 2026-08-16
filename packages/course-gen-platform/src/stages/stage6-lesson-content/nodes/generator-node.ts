@@ -94,6 +94,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     let lessonDigest: string;
     let totalTokens: number;
     let modelUsed: string;
+    let generationCostUsd: number | null | undefined;
 
     if (useContinuation) {
       const continuationResult = await generateTruncationContinuation(
@@ -130,6 +131,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       lessonDigest = result.lessonDigest;
       totalTokens = result.tokensUsed;
       modelUsed = result.modelUsed;
+      generationCostUsd = result.costUsd;
     }
 
     // ========================================================================
@@ -278,10 +280,9 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       },
       modelUsed,
       tokensUsed: totalTokens,
-      costUsd:
-        state.prefetchedGeneratorResponseConsumed || !state.prefetchedGeneratorResponse
-          ? undefined
-          : state.prefetchedGeneratorResponse.costUsd,
+      // Whatever the generation itself could price: the batch item's provider
+      // figure, plus a synchronous corrective retry when one ran.
+      costUsd: generationCostUsd ?? undefined,
       durationMs,
     });
 

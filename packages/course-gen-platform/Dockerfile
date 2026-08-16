@@ -151,6 +151,13 @@ EXPOSE 4000
 ENV NODE_ENV=production
 ENV PORT=4000
 
+# Which build this is, so a log line can be traced back to a commit. Without it
+# every backend log line was stamped version "0.0.0"; the web image has carried
+# its version since it was built, the backend never did. CI already passes
+# VCS_REF to every image.
+ARG VCS_REF=unknown
+ENV APP_VERSION=${VCS_REF}
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"

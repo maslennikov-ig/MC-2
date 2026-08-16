@@ -20,6 +20,7 @@
 import pino, { Logger, DestinationStream, LoggerOptions } from 'pino';
 import { getTransportConfig } from './transports';
 import type { ChildLoggerContext } from './types';
+import { detectEnvironment } from './utils';
 
 /**
  * Creates the appropriate destination for logging.
@@ -74,7 +75,16 @@ const loggerOptions: LoggerOptions = {
   level: process.env.LOG_LEVEL || 'info',
   base: {
     service: process.env.SERVICE_NAME || 'megacampus',
-    environment: process.env.NODE_ENV || 'development',
+    // Which deployment this is, not which mode Node was built in. Every dev
+    // container runs with NODE_ENV=production — correctly, that is Node's build
+    // mode — so every dev log line used to be stamped "production" and was
+    // indistinguishable from a real one. `detectEnvironment` reads the app URL
+    // and is already what `error_logs.environment` records, so both now speak
+    // the same vocabulary.
+    environment: detectEnvironment() || process.env.NODE_ENV || 'development',
+    // Kept, because "which build was this" is a separate question from "which
+    // deployment".
+    nodeEnv: process.env.NODE_ENV || 'development',
     version: process.env.APP_VERSION || '0.0.0',
   },
   redact: {

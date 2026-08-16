@@ -69,7 +69,11 @@ describe('Stage 5 evidence persistence snapshot', () => {
     const plan = buildEvidencePersistencePlan(original, enrichment());
 
     expect(plan.analysisResultUpdate?.document_evidence?.enrichment_status).toBe('applied');
-    expect(plan.expectedAnalysisResultJson).toBe(JSON.stringify(original));
+    // The snapshot stays an object. Serialising it here is what put ten
+    // kilobytes of JSON into a PostgREST URL and made every Stage 5 commit
+    // come back `400 Bad Request` (mc2-2pplo, 2026-08-15).
+    expect(plan.expectedAnalysisResult).toEqual(original);
+    expect(typeof plan.expectedAnalysisResult).toBe('object');
   });
 
   it.each([

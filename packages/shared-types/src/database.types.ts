@@ -3030,6 +3030,18 @@ export type Database = {
       cleanup_old_outbox_entries: { Args: never; Returns: undefined }
       cleanup_stale_push_subscriptions: { Args: never; Returns: number }
       clear_proceed_job_id: { Args: { p_course_id: string }; Returns: boolean }
+      commit_course_structure_guarded: {
+        Args: {
+          p_analysis_result: Json
+          p_course_description?: string | null
+          p_course_id: string
+          p_course_structure: Json
+          p_expected_analysis_result: Json
+          p_generation_metadata: Json
+          p_title?: string | null
+        }
+        Returns: string
+      }
       course_belongs_to_org: {
         Args: { p_course_id: string; p_org_id: string }
         Returns: boolean

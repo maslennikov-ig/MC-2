@@ -207,6 +207,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       systemPrompt,
       maxTokens: MAX_OUTPUT_TOKENS,
       temperature: QUIZ_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_quiz',
+        lessonId: enrichmentContext.lesson.id,
+      },
     });
 
     // Parse and validate response

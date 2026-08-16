@@ -431,4 +431,43 @@ describe('Stage 6 Batch processor', () => {
     expect(submitChatBatch).toHaveBeenCalledTimes(1);
     expect(job.moveToDelayed).not.toHaveBeenCalled();
   });
+
+  it('asks a mandatory-reasoning model for the lowest effort rather than none', async () => {
+    // `google/gemini-3.7-flash` answers 400 to `reasoning: {enabled: false}`,
+    // and here that would waste a whole 24h window instead of one call.
+    const job = createCoordinatorJob();
+    const submitChatBatch = vi.fn().mockResolvedValue(validatingBatch());
+    const processor = createStage6BatchProcessor({
+      prepareLesson: vi.fn(async item => ({
+        ...item,
+        prompt: `Prompt ${item.position}`,
+        baseModelId: 'google/gemini-3.7-flash',
+        maxTokens: 8_000,
+        reasoning: { enabled: false, effort: null, maxTokens: null },
+      })),
+      eligibilityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          eligible: true,
+          baseModelId: 'google/gemini-3.7-flash',
+          batchModelId: 'google/gemini-3.7-flash:batch',
+          inputDiscountRatio: 0.5,
+          outputDiscountRatio: 0.5,
+          supportedParameters: new Set(['max_tokens', 'reasoning']),
+        }),
+      },
+      createClient: vi.fn().mockResolvedValue({ submitChatBatch, getBatch: vi.fn() }),
+      getLessonJob: vi.fn(),
+      now: () => 1_000,
+      pollIntervalMs: 60_000,
+      maxWaitMs: 2 * 60 * 60 * 1000,
+    });
+
+    await expect(processor(job as unknown as Job, 'lock-token')).rejects.toBeInstanceOf(
+      DelayedError
+    );
+
+    const [request] = submitChatBatch.mock.calls[0][0].requests;
+    expect(request.body.reasoning).toEqual({ effort: 'low' });
+    expect(request.body.max_tokens).toBe(8_000 + 4_096);
+  });
 });

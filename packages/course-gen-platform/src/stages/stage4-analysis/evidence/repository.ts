@@ -131,14 +131,46 @@ export interface EvidenceDecisionRow {
   [key: string]: unknown;
 }
 
+/**
+ * A repository failure that says what the database said.
+ *
+ * The operation name alone was not enough to act on: a live run (mc2-2pplo,
+ * 2026-08-15) failed here and the only way to learn why was another paid run.
+ * The database code and message now travel in the message itself, because a
+ * `cause` is dropped by the logger and never reaches the console.
+ *
+ * Only `code` and `message` are carried. Postgres puts offending values in
+ * `details`, and stored JSON bodies still never appear in a message here.
+ */
 export class DocumentEvidenceRepositoryError extends Error {
   constructor(
     operation: string,
-    readonly databaseCode?: string
+    readonly databaseCode?: string,
+    databaseMessage?: string
   ) {
-    super(`Document evidence repository operation failed: ${operation}`);
+    const said = [databaseCode, databaseMessage].filter(Boolean).join(' ');
+    super(
+      `Document evidence repository operation failed: ${operation}${said ? ` (database said: ${said})` : ''}`
+    );
     this.name = 'DocumentEvidenceRepositoryError';
   }
+}
+
+/**
+ * Send the cost the column will actually hold.
+ *
+ * `total_cost_usd` is `NUMERIC(14,6)` and the run's metrics may never decrease.
+ * A float that rounds *up* on storage - 0.0008685 kept as 0.000869 - is larger
+ * than the number we still hold, so the very next commit of the same total
+ * reads as a decrease and the batch is rejected with `23514`. It cost the first
+ * Stage 4 attempt of a live run (mc2-2pplo, 2026-08-15); the retry passed
+ * because by then it was reading the rounded figure back.
+ *
+ * Rounding here makes what we send and what is stored the same number, and
+ * rounding a non-decreasing sequence keeps it non-decreasing.
+ */
+function toStoredCost(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 function assertRecord(value: unknown, operation: string): Record<string, unknown> {
@@ -149,7 +181,7 @@ function assertRecord(value: unknown, operation: string): Record<string, unknown
 }
 
 function throwDatabaseError(operation: string, error: DatabaseError): never {
-  throw new DocumentEvidenceRepositoryError(operation, error.code);
+  throw new DocumentEvidenceRepositoryError(operation, error.code, error.message);
 }
 
 function normalizeSourceManifest(
@@ -645,7 +677,7 @@ export class DocumentEvidenceRepository {
       p_model_calls: input.modelCalls,
       p_input_tokens: input.inputTokens,
       p_output_tokens: input.outputTokens,
-      p_total_cost_usd: input.totalCostUsd,
+      p_total_cost_usd: toStoredCost(input.totalCostUsd),
     });
     if (error) throwDatabaseError('commit_batch', error);
     return assertRecord(data, 'commit_batch');

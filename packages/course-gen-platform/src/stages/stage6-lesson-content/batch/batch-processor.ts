@@ -1,7 +1,9 @@
+import { requiresReasoningNow } from '@/shared/llm/mandatory-reasoning-recovery';
 import { DelayedError, type Job } from 'bullmq';
 import { logger } from '@/shared/logger';
 import type { PhaseReasoningConfig } from '@/shared/llm/model-config-service';
 import { buildReasoningPayload } from '@/shared/llm/client-helpers';
+import { getModelCapabilities, MANDATORY_REASONING_RESERVE_TOKENS } from '@megacampus/shared-types';
 import { estimateTokensFromText } from '../nodes/generator/generator-helpers';
 import type { Stage6JobInput, Stage6PrefetchedGeneratorResponse } from '../types';
 import type {
@@ -105,7 +107,8 @@ function requiredParameters(item: PreparedStage6BatchLesson): string[] {
 
 function buildRequest(
   item: Stage6BatchGroupItem,
-  supportedParameters: ReadonlySet<string>
+  supportedParameters: ReadonlySet<string>,
+  modelId: string
 ): OpenRouterChatBatchRequest {
   const body: OpenRouterChatBatchRequest['body'] = {
     messages: [{ role: 'user', content: item.prompt }],
@@ -113,9 +116,18 @@ function buildRequest(
   };
 
   if (supportedParameters.has('reasoning')) {
-    body.reasoning = item.reasoning.enabled
-      ? buildReasoningPayload(item.reasoning)
-      : { enabled: false };
+    if (item.reasoning.enabled) {
+      body.reasoning = buildReasoningPayload(item.reasoning);
+    } else if (requiresReasoningNow(modelId)) {
+      // A model that refuses to stop deliberating rejects the whole request,
+      // and here that would waste a 24h batch window rather than one call.
+      body.reasoning = { effort: 'low' };
+      const ceiling = getModelCapabilities(modelId)?.maxOutputTokens ?? null;
+      const grown = (body.max_tokens ?? 0) + MANDATORY_REASONING_RESERVE_TOKENS;
+      body.max_tokens = ceiling === null ? grown : Math.min(grown, ceiling);
+    } else {
+      body.reasoning = { enabled: false };
+    }
   }
   if (supportedParameters.has('temperature') && typeof item.temperature === 'number') {
     body.temperature = item.temperature;
@@ -356,7 +368,11 @@ export function createStage6BatchProcessor(dependencies: Stage6BatchProcessorDep
           // but its Batch API examples submit the ordinary model slug.
           model: group.baseModelId,
           requests: group.items.map(item =>
-            buildRequest(item, new Set(group.supportedParameters ?? ['max_tokens', 'reasoning']))
+            buildRequest(
+              item,
+              new Set(group.supportedParameters ?? ['max_tokens', 'reasoning']),
+              group.baseModelId
+            )
           ),
         });
         group.batchId = submitted.id;
