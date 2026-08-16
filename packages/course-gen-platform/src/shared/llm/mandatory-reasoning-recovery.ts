@@ -79,6 +79,15 @@ export function forgetLearnedMandatoryReasoning(): void {
  * call with the same 400, so retrying the same request cannot help. The refusal
  * is remembered, the model is rebuilt — `buildProviderParams` then asks for the
  * least deliberation instead of none — and the call is made once more.
+ *
+ * The retry is allowed once per invocation, not once per model. Under
+ * concurrency several calls to the same model are refused at once and only the
+ * first of them is news; gating the retry on being first would let every other
+ * in-flight call fail on a request nobody fixed.
+ *
+ * Only `invoke` is wrapped, which is what this codebase calls — directly and
+ * through `withStructuredOutput`, whose binding delegates to it. `stream` and
+ * `batch` would not be covered.
  */
 export function withMandatoryReasoningRecovery(
   model: ChatOpenAI,
@@ -90,8 +99,8 @@ export function withMandatoryReasoningRecovery(
     try {
       return await invoke(...args);
     } catch (error) {
-      if (!isMandatoryReasoningRejection(error) || !rememberMandatoryReasoning(modelId))
-        throw error;
+      if (!isMandatoryReasoningRejection(error)) throw error;
+      rememberMandatoryReasoning(modelId);
       return await rebuild().invoke(...args);
     }
   }) as ChatOpenAI['invoke'];

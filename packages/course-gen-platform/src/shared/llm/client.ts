@@ -412,8 +412,17 @@ export class LLMClient {
       // A model that refuses to stop thinking answers 400 to every call, so the
       // retries would all fail the same way. Teach the request instead: the
       // options object is the one the next attempt sends.
-      if (isMandatoryReasoningRejection(error) && rememberMandatoryReasoning(model)) {
-        applyMandatoryReasoningFloor(requestOptions as OpenRouterRequestOptions, model);
+      //
+      // The condition is "this request has not been fixed yet", not "this model
+      // is news". Under concurrency several calls to the same model are refused
+      // at once, only the first of them is news, and gating on that would leave
+      // every other in-flight request re-sending the body that was just
+      // refused. A request that already carries the floor and is still refused
+      // falls through to normal error handling.
+      const options = requestOptions as OpenRouterRequestOptions;
+      if (isMandatoryReasoningRejection(error) && options.reasoning?.effort !== 'low') {
+        rememberMandatoryReasoning(model);
+        applyMandatoryReasoningFloor(options, model);
         throw error;
       }
       if (error instanceof OpenAI.APIError) {

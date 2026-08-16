@@ -83,7 +83,7 @@ lock held across a stage handoff. Details in the `bd` close reasons.
 
 **What the run taught, beyond the fixes (2026-08-16).** Most causes were known to the code and never
 printed. Four blindness sites were repaired during the run and the sweep afterwards found more:
-thirteen pipeline sites reduced a PostgREST error to `message` alone (`describeDatabaseError` now
+twelve pipeline sites reduced a PostgREST error to `message` alone (`describeDatabaseError` now
 appends `code`/`details`/`hint`), the downstream reducer checked its unit set outside the retry
 budget written for it, the Stage 6 judge parser said how many bytes came back instead of which field
 was wrong. Audits of the other three failure families — envelope fragility, validation outside a
