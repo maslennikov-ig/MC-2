@@ -42,16 +42,25 @@ export function buildJudgePrompt(input: CLEVEvaluationInput, rubric: OSCQRRubric
 
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
+  //
+  // Empty examples are left unsaid rather than reported as "(0 total)"; nothing
+  // fills that array, and the examples are inside the sections above. See the
+  // same block in single-judge.ts.
+  const examplesBlock =
+    lessonContent.examples.length > 0
+      ? `
+## ${labels.examples} (${lessonContent.examples.length} total)
+${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
+`
+      : '';
+
   const contentSummary = `
 ## ${labels.introduction}
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
 ${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
-
-## ${labels.examples} (${lessonContent.examples.length} total)
-${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
-
+${examplesBlock}
 ## ${labels.exercises} (${lessonContent.exercises.length} total)
 ${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;

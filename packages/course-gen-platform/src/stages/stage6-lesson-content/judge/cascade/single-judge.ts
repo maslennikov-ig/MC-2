@@ -37,16 +37,29 @@ function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubr
 
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
+  //
+  // The examples block is omitted when the array is empty rather than shown as
+  // "(0 total)". Nothing fills that array: the generator writes markdown and the
+  // structured body is rebuilt from it with `examples: []` hard-coded, which is
+  // why the heuristic's own minExamples sits at 0 marked "not implemented yet".
+  // Telling a judge "Examples (0 total)" while it scores engagement_examples at
+  // 15% of the rubric asks it to mark down a lesson for a field the pipeline
+  // never fills — the examples themselves are in the sections above.
+  const examplesBlock =
+    lessonContent.examples.length > 0
+      ? `
+## ${labels.examples} (${lessonContent.examples.length} total)
+${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
+`
+      : '';
+
   const contentSummary = `
 ## ${labels.introduction}
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
 ${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
-
-## ${labels.examples} (${lessonContent.examples.length} total)
-${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
-
+${examplesBlock}
 ## ${labels.exercises} (${lessonContent.exercises.length} total)
 ${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
