@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-14. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-16. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -9,7 +9,8 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 The Career Playbook quality track is **accepted** (`mc2-db696.110`, editorial read 4.4 / 5 against a
 4.0 threshold, run cost USD 0.352; evidence in `.codex/stages/mc2-db696.110/evidence/`). Its two
 process rules are in `06-quality-acceptance.md` and still hold: read the artifact before calling a
-run accepted, and clean up **after** the editorial pass. Active work is now epic `mc2-qrdkt`.
+run accepted, and clean up **after** the editorial pass. Epic `mc2-qrdkt` is closed; no stage is
+active.
 
 ## RAG retrieval and chunking repaired (2026-08-12/13)
 
