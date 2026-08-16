@@ -202,6 +202,9 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
+- `mc2-gmab0` live confirmation — the Stage 6/Stage 7 cost fixes and the mandatory-reasoning
+  recovery are held by unit tests only. Confirming them needs a paid course, so they ride along with
+  whatever run the owner authorizes next rather than asking for one of their own.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
