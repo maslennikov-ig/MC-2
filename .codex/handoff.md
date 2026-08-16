@@ -98,6 +98,23 @@ Stage 7 does not use the LangChain path that function belongs to. Its six calls 
 OpenAI SDK client and none passed a `costContext`, so they left no trace row at all. All six now do,
 and a guard reads the sources so the next call site cannot forget (`mc2-gmab0`).
 
+**Live confirmation run (2026-08-16, course `944e6795` on dev, USD 0.0646 billed).** A micro course
+ran end to end plus one Stage 7 quiz, with no other traffic on the key in the window. Two of the three
+`mc2-gmab0` fixes are now proven on real data, and the run found what the tests could not:
+
+- Confirmed: the Stage 6 container itself refreshes the course total (`0.003264 → 0.020332 →
+0.027658`), and Stage 7 SDK calls now write priced `stage_7` trace rows — including the two that
+  failed, which is the failed-stage-spend fix working.
+- Not confirmed: the mandatory-reasoning recovery never fired. No model refused, so it stays held by
+  unit tests alone.
+- **The course total is still wrong, for a reason the fix did not touch.** Recorded 0.0310 against
+  0.0646 actually billed. Stage 6 lesson generation carries no price at all on the synchronous path
+  (`mc2-4wiot`, P0: `generationCostUsd` is only set from a Batch prefetch or a retry, and Batch is off
+  by default), and the card image's USD 0.007 lives only in the enrichment metadata (`mc2-acjgd`).
+  About a cent beyond those two is still unexplained — `mc2-z0xr3` is the reconciliation.
+- Also found: quiz generation dies whenever the model answers `time_limit_minutes: null`, and pays
+  for both attempts (`mc2-d3726`); the Stage 6 finalize progress warning names no field (`mc2-g3v9c`).
+
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
 the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
@@ -210,9 +227,9 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-gmab0` live confirmation — the Stage 6/Stage 7 cost fixes and the mandatory-reasoning
-  recovery are held by unit tests only. Confirming them needs a paid course, so they ride along with
-  whatever run the owner authorizes next rather than asking for one of their own.
+- `mc2-gmab0` mandatory-reasoning recovery — the 2026-08-16 run did not exercise it, because no model
+  refused to disable reasoning. Still held by unit tests only; it rides along with the next paid run.
+  The two cost fixes in that issue are confirmed live and no longer deferred.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
@@ -220,10 +237,10 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
 Next stage id: epic `mc2-4clyr`
 
-Recommended action: epic `mc2-4clyr`, generation cost. Note what is **not** proven: the Stage 6 and
-Stage 7 cost fixes are held by unit tests and have not been seen on a live course, and neither has
-the mandatory-reasoning recovery — both would be confirmed for free by whatever paid run happens
-next, not by a run of their own.
+Recommended action: `mc2-4wiot` first — epic `mc2-4clyr` is about generation cost, and after the
+2026-08-16 run we know the recorded cost is roughly half the real one, with lesson generation the
+missing half. Costing the epic on today's numbers would cost it on a number that is wrong. Then
+`mc2-acjgd`, then `mc2-z0xr3` to prove the total reconciles.
 
 `mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
