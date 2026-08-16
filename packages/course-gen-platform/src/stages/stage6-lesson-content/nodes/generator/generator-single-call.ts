@@ -12,6 +12,7 @@
 
 import { logger } from '@/shared/logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
@@ -88,6 +89,7 @@ export async function generateLessonSingleCall(
   const {
     prompt,
     modelId,
+    phaseName,
     temperature,
     maxTokens,
     reasoning,
@@ -131,7 +133,17 @@ export async function generateLessonSingleCall(
       'Using prefetched Batch API response for single-call generation'
     );
   } else {
-    model = createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning);
+    // The largest cost line in the pipeline. It priced itself only when a Batch
+    // API response arrived pre-priced, which is off by default, so every
+    // ordinary run wrote a trace row with tokens and no price and the course
+    // total silently omitted lesson generation (mc2-4wiot). Pricing happens at
+    // the call because that is the only place holding the input/output split.
+    model = attachCostRecording(
+      createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning),
+      modelId,
+      phaseName,
+      courseId
+    );
     const response = await model.invoke(prompt);
     responseContent =
       typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
@@ -173,6 +185,10 @@ export async function generateLessonSingleCall(
       outputLanguage,
       introValidation.issues
     );
+    // Reusing the live model reuses its cost callback, so the retry prices
+    // itself. `model` is null only on the Batch path, where the fresh instance
+    // is deliberately left unpriced and the retry is added to the batch item's
+    // own figure below.
     const correctiveModel =
       model ?? createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning);
     const retryResponse = await correctiveModel.invoke(correctivePrompt);

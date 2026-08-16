@@ -12,6 +12,7 @@ import {
 } from '@megacampus/shared-types';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import type { PhaseName } from '@megacampus/shared-types/model-config';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML } from '@/shared/prompts';
 import { REASONING_DISABLED, type PhaseReasoningConfig } from '@/shared/llm/model-config-service';
@@ -29,6 +30,13 @@ import { selectStage6ModelTier } from './model-selector';
 export interface PreparedLessonSingleCallRequest {
   prompt: string;
   modelId: string;
+  /**
+   * Which Stage 6 phase this request belongs to, so the call can price itself
+   * against the course. An overridden model skips tier selection and has no
+   * tier phase of its own; it is still Stage 6 content generation, which is
+   * what `stage_6_content` names.
+   */
+  phaseName: PhaseName;
   temperature: number;
   maxTokens: number;
   reasoning: PhaseReasoningConfig;
@@ -169,18 +177,21 @@ export async function prepareLessonSingleCallRequest(
 
   const temperature = getRecommendedTemperatureV2(lessonSpec.metadata.content_archetype);
   let modelId: string;
+  let phaseName: PhaseName = 'stage_6_content';
   let reasoning: PhaseReasoningConfig = REASONING_DISABLED;
   if (modelOverride) {
     modelId = modelOverride;
   } else {
     const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
     modelId = tierResult.model;
+    phaseName = tierResult.phaseName;
     reasoning = tierResult.reasoning ?? REASONING_DISABLED;
   }
 
   return {
     prompt,
     modelId,
+    phaseName,
     temperature,
     maxTokens,
     reasoning,
