@@ -115,6 +115,25 @@ ran end to end plus one Stage 7 quiz, with no other traffic on the key in the wi
 - Also found: quiz generation dies whenever the model answers `time_limit_minutes: null`, and pays
   for both attempts (`mc2-d3726`); the Stage 6 finalize progress warning names no field (`mc2-g3v9c`).
 
+**Everything that run exposed is fixed and merged, except the count itself (`mc2-b7olk`).** One rule
+replaced four half-conventions: a paid call prices itself at the call, from its own token split and
+the model the provider actually served; a node-level summary row keeps tokens and carries no price.
+Writing lessons, continuing a truncated one, regenerating a section, self-review, both judge paths,
+the patcher, the delta judge, the expander, image generation, Stage 2 summarization, Stage 3
+classification, the Stage 4 visual style, the mermaid repair and the presentation critic all do this
+now. `judge_complete` stopped estimating — it split the whole cascade's tokens evenly across judges
+and charged refinement tokens at judge rates — because pricing the calls while it still estimated
+would have counted the same tokens twice.
+
+Two holes are named rather than closed, both found by the guard while writing it: document evidence
+prices itself into its own coverage ledger and never reaches the course total (`mc2-b7olk.4`), and
+editing a course — chat, inline blocks, element CRUD — has no stage in `generation_trace` to charge
+at all (`mc2-b7olk.5`). They are in the guard's exception list with those ids, so the list can shrink
+but not grow in silence.
+
+What is still unproven is the sum. `mc2-z0xr3` needs one paid run whose recorded total matches the
+`/credits` delta; until then the arithmetic is only argued, and this area has been wrong four times.
+
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
 the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
@@ -230,17 +249,22 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-gmab0` mandatory-reasoning recovery — the 2026-08-16 run did not exercise it, because no model
   refused to disable reasoning. Still held by unit tests only; it rides along with the next paid run.
   The two cost fixes in that issue are confirmed live and no longer deferred.
+- `mc2-b7olk.4`, `mc2-b7olk.5` — document evidence keeps its own cost ledger, and course editing has
+  no stage to charge. Both need a decision about where that money belongs, not a forgotten argument.
+- `mc2-z0xr3` — the one paid run that proves the total. Needs current authorization to spend; the
+  fixes it verifies are merged and deployed.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: epic `mc2-4clyr`
+Next stage id: `mc2-z0xr3`, then epic `mc2-4clyr`
 
-Recommended action: `mc2-4wiot` first — epic `mc2-4clyr` is about generation cost, and after the
-2026-08-16 run we know the recorded cost is roughly half the real one, with lesson generation the
-missing half. Costing the epic on today's numbers would cost it on a number that is wrong. Then
-`mc2-acjgd`, then `mc2-z0xr3` to prove the total reconciles.
+Recommended action: `mc2-z0xr3` — one paid micro course, `/credits` read before and after, recorded
+total compared against the delta. Every fix it verifies is merged; what is not verified is that they
+add up. Do not start `mc2-4clyr` before that number holds: the epic is about cutting generation cost,
+and on 2026-08-16 the recorded cost was roughly half the real one. Costing it on today's numbers
+would cost it on a number we already know is wrong.
 
 `mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
