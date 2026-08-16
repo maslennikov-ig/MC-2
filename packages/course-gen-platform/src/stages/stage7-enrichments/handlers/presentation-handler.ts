@@ -267,6 +267,13 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       systemPrompt,
       maxTokens: MAX_DRAFT_TOKENS,
       temperature: DRAFT_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_presentation',
+        lessonId: enrichmentContext.lesson.id,
+        stepName: 'draft',
+      },
     });
 
     // Parse and validate response
@@ -438,6 +445,13 @@ async function generateFinal(
       systemPrompt,
       maxTokens: MAX_FINAL_TOKENS,
       temperature: FINAL_TEMPERATURE,
+      costContext: {
+        courseId: enrichmentContext.course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_presentation',
+        lessonId: enrichmentContext.lesson.id,
+        stepName: 'final',
+      },
     });
 
     // Parse and validate response

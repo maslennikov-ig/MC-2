@@ -546,6 +546,12 @@ export async function generateImagePromptViaLLM(
       systemPrompt,
       maxTokens: MAX_PROMPT_TOKENS,
       temperature: PROMPT_TEMPERATURE,
+      costContext: {
+        courseId: course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_cover',
+        lessonId: lesson.id,
+      },
     });
 
     const courseTitle = course.title ?? 'Educational Content';

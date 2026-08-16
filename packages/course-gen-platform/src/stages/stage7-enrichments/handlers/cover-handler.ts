@@ -131,6 +131,13 @@ async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResul
       systemPrompt,
       maxTokens: MAX_PROMPT_TOKENS * 3,
       temperature: PROMPT_TEMPERATURE,
+      costContext: {
+        courseId: course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_cover',
+        lessonId: lesson.id,
+        stepName: 'variants',
+      },
     });
 
     const inputTokens = llmResponse.inputTokens;
