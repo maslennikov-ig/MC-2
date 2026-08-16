@@ -161,6 +161,10 @@ remain explicitly deferred.
   pull is the only real mitigation — a second machine, not disaster recovery. `mc2-hfoh3` closed.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
+- Both environments carry the live-run fixes as of 2026-08-16: dev on `857c3f05e`, staging on
+  `b065399dc` (29 commits, Blue/Green switched to green, all CI jobs green). Staging worker logs now
+  read `environment: "stage"`, which is the label fix working — before it, the staging host called
+  itself `production` and was indistinguishable from it in a log search.
 - Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
   set (all 87 files behind the 218 indexed documents are present on disk, verified 2026-08-13).
   Uploads live on the production host, not in Supabase Storage — the only bucket is
