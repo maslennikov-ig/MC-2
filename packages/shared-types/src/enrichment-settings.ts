@@ -16,6 +16,7 @@ import {
   questionDifficultySchema,
   presentationThemeSchema,
 } from './enrichment-content';
+import { llmOptional } from './analysis-schemas';
 
 // ============================================================================
 // AUDIO SETTINGS
@@ -83,7 +84,7 @@ export const quizSettingsSchema = z.object({
   passing_score: z.number().int().min(0).max(100).default(70),
 
   /** Optional time limit in minutes */
-  time_limit_minutes: z.number().int().positive().optional(),
+  time_limit_minutes: llmOptional(z.number().int().positive()),
 
   /** Shuffle questions in quiz */
   shuffle_questions: z.boolean().default(true),

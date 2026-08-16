@@ -87,6 +87,30 @@ function createSoftEnumArraySchema<T extends string>(
 }
 
 /**
+ * Makes an optional field survive a model that answers `null`.
+ *
+ * `.optional()` accepts a missing key and rejects an explicit `null`, but a
+ * model asked for "no time limit" writes `"time_limit_minutes": null` — that is
+ * what JSON has for the idea. The whole quiz was then discarded and paid for
+ * twice, once per retry, over a field nobody needed (mc2-d3726).
+ *
+ * A `null` in a required field still fails, as it should: this only says that
+ * "no value" and "no key" are the same thing.
+ */
+export function llmOptional<T extends z.ZodTypeAny>(
+  schema: T
+): z.ZodEffects<
+  z.ZodNullable<z.ZodOptional<T>>,
+  z.output<T> | undefined,
+  z.input<T> | null | undefined
+> {
+  return schema
+    .optional()
+    .nullable()
+    .transform(value => value ?? undefined);
+}
+
+/**
  * Helper to create an LLM-tolerant enum schema using .transform().pipe().
  * Maps LLM-generated synonyms to canonical values before strict validation.
  *

@@ -96,37 +96,42 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
 }
 
 /**
- * Parse and validate LLM response as quiz content
+ * Parse and validate LLM response as quiz content.
+ *
+ * Throws with the reason. The reason used to be logged at warn and dropped from
+ * the error, which said 'invalid JSON structure' for output that was valid JSON
+ * failing one field - and both paid attempts were spent chasing it (mc2-d3726).
  *
  * @param content - Raw LLM response content
- * @returns Parsed QuizEnrichmentContent or null if invalid
+ * @returns Parsed QuizEnrichmentContent
  */
-function parseQuizResponse(content: string): QuizEnrichmentContent | null {
-  try {
-    // Clean up potential markdown code blocks
-    let jsonContent = content.trim();
-    if (jsonContent.startsWith('```json')) {
-      jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (jsonContent.startsWith('```')) {
-      jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-
-    const parsed = JSON.parse(jsonContent) as unknown;
-    const result = quizOutputSchema.safeParse(parsed);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    logger.warn({ errors: result.error.errors }, 'Quiz validation failed');
-    return null;
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
-      'Failed to parse quiz response as JSON'
-    );
-    return null;
+function parseQuizResponse(content: string): QuizEnrichmentContent {
+  // Clean up potential markdown code blocks
+  let jsonContent = content.trim();
+  if (jsonContent.startsWith('```json')) {
+    jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+  } else if (jsonContent.startsWith('```')) {
+    jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonContent);
+  } catch (error) {
+    throw new Error(
+      `Quiz output is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  const result = quizOutputSchema.safeParse(parsed);
+  if (result.success) {
+    return result.data;
+  }
+
+  const reasons = result.error.errors
+    .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .join('; ');
+  throw new Error(`Quiz output failed validation - ${reasons}`);
 }
 
 // ============================================================================
@@ -217,10 +222,6 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
     // Parse and validate response
     const quizContent = parseQuizResponse(response.content);
-
-    if (!quizContent) {
-      throw new Error('Failed to parse quiz output - invalid JSON structure');
-    }
 
     const durationMs = Date.now() - startTime;
 

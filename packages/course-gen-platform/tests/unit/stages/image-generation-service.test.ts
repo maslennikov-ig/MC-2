@@ -23,14 +23,12 @@ vi.mock('@/shared/services/api-key-service', () => ({
   getApiKey: mocks.getApiKey,
 }));
 
-vi.mock('@/shared/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('@/shared/logger', () => {
+  const noop = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+  // Cost recording reaches for the default export; without it an unattributed
+  // image throws inside accounting, which must never fail a generation.
+  return { logger: noop, default: noop };
+});
 
 const { generateImage } = await import(
   '@/stages/stage7-enrichments/services/image-generation-service'
