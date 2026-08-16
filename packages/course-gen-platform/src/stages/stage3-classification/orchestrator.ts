@@ -21,6 +21,7 @@ import { executeDocumentClassificationComparative } from './phases/phase-classif
 import { logTrace } from '../../shared/trace-logger';
 import type { Stage3Input, Stage3Output } from './types';
 import type { DocumentPriority, DocumentPriorityLevel } from '@megacampus/shared-types';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 
 /**
  * Feature flag to disable LLM-based Stage 3 classification
@@ -252,7 +253,7 @@ export class Stage3ClassificationOrchestrator {
 
     if (error) {
       logger.error({ error, courseId }, 'Failed to load document IDs');
-      throw new Error(`Failed to load document IDs: ${error.message}`);
+      throw new Error(`Failed to load document IDs: ${describeDatabaseError(error)}`);
     }
 
     if (!data || data.length === 0) {
@@ -428,7 +429,7 @@ export class Stage3ClassificationOrchestrator {
 
     if (error) {
       logger.error({ error, courseId }, 'Failed to load documents for skip classification');
-      throw new Error(`Failed to load documents: ${error.message}`);
+      throw new Error(`Failed to load documents: ${describeDatabaseError(error)}`);
     }
 
     const documents = data || [];

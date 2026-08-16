@@ -17,6 +17,7 @@ import { logger } from '../../shared/logger/index.js';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator, type Locale } from '../../shared/i18n';
 import { cacheFileMarkdown } from '../../shared/cache/file-content-cache';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 
 // Re-export PhaseContext for backward compatibility
 export type { PhaseContext } from './orchestrator-phase-helpers';
@@ -188,7 +189,7 @@ export async function storeProcessedDocument(
 
   if (error) {
     logger.error({ err: error, fileId }, 'Failed to store processed document');
-    throw new Error(`Failed to store processed document: ${error.message}`);
+    throw new Error(`Failed to store processed document: ${describeDatabaseError(error)}`);
   }
 
   void cacheFileMarkdown(courseId, fileId, processingResult.markdown);
@@ -219,7 +220,7 @@ export async function updateVectorStatus(
 
   if (error) {
     logger.error({ err: error, fileId, status }, 'Failed to update vector status');
-    throw new Error(`Failed to update vector status: ${error.message}`);
+    throw new Error(`Failed to update vector status: ${describeDatabaseError(error)}`);
   }
 
   logger.info({ fileId, status }, 'Vector status updated');

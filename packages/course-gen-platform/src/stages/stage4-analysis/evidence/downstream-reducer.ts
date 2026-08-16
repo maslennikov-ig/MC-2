@@ -105,12 +105,41 @@ function metrics(
   };
 }
 
+/**
+ * Says which unit ids a reduction added or dropped, or nothing when it kept
+ * exactly the set it was given.
+ */
+function describeUnitSetDrift(expected: string[], actual: string[]): string | null {
+  const expectedSet = new Set(expected);
+  const actualSet = new Set(actual);
+  const dropped = expected.filter(id => !actualSet.has(id));
+  const invented = actual.filter(id => !expectedSet.has(id));
+  const repeated = actual.length !== actualSet.size;
+  if (!dropped.length && !invented.length && !repeated) return null;
+  return [
+    dropped.length ? `dropped ${dropped.join(', ')}` : '',
+    invented.length ? `invented ${invented.join(', ')}` : '',
+    repeated ? 'repeated a unit' : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
+/**
+ * A reduction that loses a unit is a bad answer, not a bad stage.
+ *
+ * The set check used to run after this function returned, outside the retry
+ * budget written for exactly this kind of answer, so one dropped id ended the
+ * stage with attempts still in hand — the same shape as the conflict detector's
+ * allowlist check (mc2-2pplo, f05fd9435).
+ */
 async function reduceWithRetry(
   input: BuildDownstreamEvidenceRepresentationInput,
   units: DownstreamSummaryUnit[],
   level: number,
   topic: string
 ) {
+  const expectedIds = units.map(unit => unit.unitId).sort();
   const attempts = input.port.retryOwner === 'port' ? 1 : input.maxRetries + 1;
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -122,6 +151,10 @@ async function reduceWithRetry(
         level,
         maxOutputTokens: Math.max(64, Math.floor(input.maxBatchTokens / 2)),
       });
+      const drift = describeUnitSetDrift(expectedIds, [...result.value.unitIds].sort());
+      if (drift) {
+        throw new Error(`Downstream reduction changed the allowlisted unit set: ${drift}`);
+      }
       return { result, attempts: attempt };
     } catch (error) {
       lastError = error;
@@ -189,17 +222,15 @@ export async function reduceDownstreamGroup(
   const prior = restored.reductions.get(`${batchKey}\n${inputHash}`);
   let summary: string;
   if (prior) {
-    if (JSON.stringify(prior.unitIds) !== JSON.stringify(unitIds)) {
-      throw new Error('Stored downstream reduction changed the allowlisted unit set');
+    // A stored reduction cannot be retried into shape, so this one stays here.
+    const drift = describeUnitSetDrift(unitIds, [...prior.unitIds].sort());
+    if (drift) {
+      throw new Error(`Stored downstream reduction changed the allowlisted unit set: ${drift}`);
     }
     summary = prior.summary;
   } else {
     const topic = stage === 'card' ? CARD_REDUCE_TOPIC : CROSS_DOCUMENT_REDUCE_TOPIC;
     const called = await reduceWithRetry(input, group, level, topic);
-    const returnedIds = [...called.result.value.unitIds].sort();
-    if (JSON.stringify(returnedIds) !== JSON.stringify(unitIds)) {
-      throw new Error('Downstream reduction changed the allowlisted unit set');
-    }
     summary = called.result.value.summary;
     try {
       await input.onCheckpoint?.({

@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '../../../../shared/supabase/admin.js';
 import logger from '../../../../shared/logger/index.js';
 import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import type { ClarifyingQuestion } from './types.js';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 
 /**
  * LLM timeout for clarifying questions generation in milliseconds.
@@ -123,7 +124,7 @@ export async function storeQuestions(
   const { error } = await supabase.from('clarifying_questions').insert(rows);
 
   if (error) {
-    throw new Error(`Failed to store clarifying questions: ${error.message}`);
+    throw new Error(`Failed to store clarifying questions: ${describeDatabaseError(error)}`);
   }
 
   logger.info(
@@ -156,7 +157,7 @@ export async function getPendingQuestions(courseId: string): Promise<ClarifyingQ
     .order('order_index');
 
   if (error) {
-    throw new Error(`Failed to fetch pending questions: ${error.message}`);
+    throw new Error(`Failed to fetch pending questions: ${describeDatabaseError(error)}`);
   }
 
   return (data || []) as ClarifyingQuestionRow[];
@@ -182,7 +183,7 @@ export async function getAnsweredQuestions(courseId: string): Promise<Clarifying
     .order('order_index');
 
   if (error) {
-    throw new Error(`Failed to fetch answered questions: ${error.message}`);
+    throw new Error(`Failed to fetch answered questions: ${describeDatabaseError(error)}`);
   }
 
   return (data || []) as ClarifyingQuestionRow[];

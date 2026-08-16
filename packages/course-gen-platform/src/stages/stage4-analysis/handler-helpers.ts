@@ -35,6 +35,7 @@ import {
   getCachedFileMarkdownBatch,
 } from '../../shared/cache/file-content-cache';
 import { resolveCourseStructureProfile } from '../../shared/course-structure-policy';
+import { describeDatabaseError } from '@/shared/supabase/describe-error';
 import {
   parseAuditedSourceFailure,
   type AuditedDocumentSourceFailure,
@@ -713,7 +714,7 @@ async function updateCourseStatus(
   const result = organizationId ? await query.eq('organization_id', organizationId) : await query;
 
   if (result.error) {
-    throw new Error(`Failed to update status to ${status}: ${result.error.message}`);
+    throw new Error(`Failed to update status to ${status}: ${describeDatabaseError(result.error)}`);
   }
 }
 
