@@ -67,12 +67,42 @@ Open from the audit, none in the current epics: `mc2-s1vg5` (`generate:config-se
 unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
 delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
-## Live course run (2026-08-14, `mc2-2pplo` — reached Stage 4 twice, then unblocked)
+## Live course run (2026-08-15, `mc2-2pplo` — a course reached Stage 6 and published)
 
-Epic `mc2-qrdkt` is done. Plan and owner decisions: `docs/plans/humble-floating-widget.md`.
-The run itself has not been repeated since the blocker was cleared, so Stage 5, the judge panel and
-the full Stage 6 graph are still unexercised end to end. Spend so far **USD 0.2836**; the shared
-OpenRouter key had USD 9.758 left, so check its credit before and during any rerun.
+Epic `mc2-qrdkt` is complete, 17 of 17. Course `8a174ee7` finished: `published`, 3 lessons,
+quality 0.93, 18-22 KB of real Russian content per lesson on `openai/gpt-5.6-luna`. Total spend
+across every attempt **USD 0.222333** of the USD 5 ceiling; the successful course itself cost
+USD 0.042368 (stage_4 0.0118, stage_5 0.0013, stage_6 0.0293). Test data was removed in full.
+
+Eight defects, each of which alone stopped a course, were found and fixed during the run: the shape
+of Stage 4's lists, a number sent as a string, the conflict detector's envelope, mandatory reasoning
+on five models rather than one, `answer_source='system'` against a CHECK plus a cost-rounding guard,
+10 KB of JSON in a PostgREST URL, a micro course judged against `general_auto`, and a generation
+lock held across a stage handoff. Details in the `bd` close reasons.
+
+**What the run taught, beyond the fixes (2026-08-16).** Most causes were known to the code and never
+printed. Four blindness sites were repaired during the run and the sweep afterwards found more:
+thirteen pipeline sites reduced a PostgREST error to `message` alone (`describeDatabaseError` now
+appends `code`/`details`/`hint`), the downstream reducer checked its unit set outside the retry
+budget written for it, the Stage 6 judge parser said how many bytes came back instead of which field
+was wrong. Audits of the other three failure families — envelope fragility, validation outside a
+retry budget, a lock held across a handoff — found one real instance each and are recorded closed
+with the places checked (`mc2-qrdkt.4` through `.7`).
+
+**Stage 6 and Stage 7 spend now reaches the course.** `courses.estimated_cost_usd` stopped at
+Stage 5 because the refresh lives in the general sandboxed processor and those two stages run on
+their own queues in their own containers; Stage 7 was worse off still, its phases falling outside
+`stageOfPhase` so its calls were never priced at all (`mc2-gmab0`).
+
+**`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
+recognised by what the provider says, remembered for the life of the process, and retried asking for
+the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
+primary; the remembering is logged at warn so it gets added.
+
+**A log line says which deployment it came from.** Every dev container runs `NODE_ENV=production`, so
+every dev log line claimed to be production. The pino base now uses `detectEnvironment()` — the same
+vocabulary as `error_logs.environment` — and the backend image carries `APP_VERSION` from `VCS_REF`
+instead of `0.0.0`.
 
 **The blocker, closed.** `mc2-wg60c`: the 60s per-call budget was smaller than the default model's
 real answer time — a realistic Stage 4 request (8204 input tokens, `max_tokens` 16000) took **119.0s**
@@ -176,13 +206,15 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 
 ## Next recommended
 
-Accepted stage id: `mc2-db696.110` · Current stage id: epic `mc2-qrdkt`
-Next stage id: `mc2-2pplo`
+Accepted stage id: `mc2-qrdkt` · Current stage id: none
+Next stage id: epic `mc2-4clyr`
 
-Recommended action: rerun `mc2-2pplo` — nothing in the repository blocks a course from reaching
-Stage 6 any more, and only a paid run can show whether it does. The driver is `live-run.mjs`,
-reproduced in the plan; it needs a fresh spend ceiling from the owner. After that, epic `mc2-4clyr`,
-whose headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
+Recommended action: epic `mc2-4clyr`, generation cost. Note what is **not** proven: the Stage 6 and
+Stage 7 cost fixes are held by unit tests and have not been seen on a live course, and neither has
+the mandatory-reasoning recovery — both would be confirmed for free by whatever paid run happens
+next, not by a run of their own.
+
+`mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
 so the full panel runs _below_ its 15-20% design target, not four times above it. `mc2-r31fw` step 1
 cannot be done from history — `singleJudge` is null in every stored cascade row.
