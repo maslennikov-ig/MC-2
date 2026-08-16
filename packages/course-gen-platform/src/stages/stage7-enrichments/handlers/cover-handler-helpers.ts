@@ -371,7 +371,9 @@ export async function processImagePipeline(
   lessonId: string,
   enrichmentId: string
 ): Promise<ImagePipelineResult> {
-  const imageResult = await generateImage(imagePrompt);
+  const imageResult = await generateImage(imagePrompt, {
+    costContext: { courseId, stage: 'stage_7', phase: 'stage_7_cover', lessonId },
+  });
   logger.info(
     { enrichmentId, mimeType: imageResult.mimeType, costUsd: imageResult.costUsd },
     'Cover handler: image generated'

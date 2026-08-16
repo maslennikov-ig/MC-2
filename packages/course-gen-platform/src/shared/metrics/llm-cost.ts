@@ -53,6 +53,47 @@ export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
 }
 
 /**
+ * Records one image generation against a course.
+ *
+ * An image is billed per picture, not per token, so its price comes from the
+ * provider's own figure rather than from `MODEL_CATALOG`. It still belongs in
+ * the trace: the course total is a sum over that table, and a card image that
+ * recorded its price only in `lesson_enrichments.metadata` was 18% of the
+ * course it was billed to and invisible in the total (mc2-acjgd).
+ */
+export async function recordImageCallCost(
+  usage: { model: string; costUsd: number },
+  context?: LlmCostContext
+): Promise<void> {
+  if (!context) {
+    logger.debug(
+      { model: usage.model, costUsd: usage.costUsd },
+      '[Cost] Image generated without a course context; its cost is not attributed'
+    );
+    return;
+  }
+
+  try {
+    await logTrace({
+      courseId: context.courseId,
+      stage: context.stage,
+      phase: context.phase,
+      stepName: context.stepName ?? 'image_call',
+      ...(context.lessonId ? { lessonId: context.lessonId } : {}),
+      modelUsed: usage.model,
+      costUsd: usage.costUsd,
+      durationMs: context.durationMs ?? 0,
+      inputData: { billedPerImage: true },
+    });
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error), model: usage.model },
+      '[Cost] Could not record an image generation cost'
+    );
+  }
+}
+
+/**
  * Records one call's tokens, model and price against a course.
  *
  * Never throws and never blocks the caller: accounting must not be able to fail

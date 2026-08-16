@@ -255,7 +255,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     );
 
     // Generate image using GPT-5 Image Mini (1024x1024)
-    const imageResult = await generateCardImage(imagePrompt);
+    const imageResult = await generateCardImage(imagePrompt, {
+      courseId: course.id,
+      stage: 'stage_7',
+      phase: 'stage_7_card',
+      lessonId: lesson.id,
+    });
     imageCostUsd = imageResult.costUsd;
 
     logger.info(
