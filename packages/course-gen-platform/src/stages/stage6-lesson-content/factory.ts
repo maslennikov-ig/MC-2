@@ -9,6 +9,7 @@ import {
 import type { JobData } from '@megacampus/shared-types';
 import { HANDLER_CONFIG } from './config';
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate } from './types';
+import { updateCourseEstimatedCost } from '@/services/token-tracking-service';
 import { processStage6Job } from './services/job-processor';
 import {
   type Stage6BatchCoordinatorInput,
@@ -64,10 +65,18 @@ export function createStage6Worker(
   const worker = new Worker<Stage6QueueJobInput, Stage6JobResult>(
     HANDLER_CONFIG.QUEUE_NAME,
     async (job, token) => {
-      if ('kind' in job.data && job.data.kind === 'stage6_batch_coordinator') {
-        return batchResult(job.data.courseId, await processBatch(job as never, token));
+      // Stage 6 runs on its own queue and its own worker, so the refresh in the
+      // general processor never sees it. Without this the course's cost stops
+      // at Stage 5 and hides the most expensive stage there is (mc2-gmab0).
+      // A job that FAILED still spent money, so it runs on both paths.
+      try {
+        if ('kind' in job.data && job.data.kind === 'stage6_batch_coordinator') {
+          return batchResult(job.data.courseId, await processBatch(job as never, token));
+        }
+        return await processStage6Job(job as Job<Stage6JobInput, Stage6JobResult>, token);
+      } finally {
+        await updateCourseEstimatedCost(job.data.courseId);
       }
-      return processStage6Job(job as Job<Stage6JobInput, Stage6JobResult>, token);
     },
     {
       connection,

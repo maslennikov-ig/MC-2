@@ -18,9 +18,13 @@ import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
  *
  * Phase names are built at runtime (`stage_6_${tier}`), so the prefix is the
  * only reliable link back to a stage.
+ *
+ * Stage 7 was outside this range until 2026-08-16, so every enrichment call —
+ * covers, cards, quizzes, video scripts — was priced by nobody and left no
+ * trace row at all.
  */
 export function stageOfPhase(phase: string): LlmCostContext['stage'] | undefined {
-  const match = /^stage_([1-6])(?:_|$)/u.exec(phase);
+  const match = /^stage_([1-7])(?:_|$)/u.exec(phase);
   return match ? (`stage_${match[1]}` as LlmCostContext['stage']) : undefined;
 }
 
