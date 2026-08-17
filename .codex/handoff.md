@@ -151,8 +151,12 @@ attempts died on a 4-minute timeout and left no row at all, because the price is
 a successful response (`mc2-b7olk.7`); the timeouts themselves are `mc2-b7olk.8`, and they cost the
 course its quiz. Those three come to roughly 0.013 of the 0.0419; about 0.029 is still unaccounted.
 
-`mc2-z0xr3` stays open, and the next run belongs after `mc2-b7olk.6` and `.7` — otherwise the gap is
-again a sum of several causes and again impossible to split.
+All three are now fixed: self-review is handed the course, a served variant is priced from the model it
+is a variant of (with a warning naming the id the catalogue should gain, because a snapshot's own
+tariff is higher), and a failed call leaves an `llm_call_failed` row carrying the reason and a
+`spentButUnpriced` marker rather than nothing. `mc2-z0xr3` stays open: the next paid run is the one
+that can finally split the remaining gap, because every known cause of it now either prices itself or
+says out loud that it could not.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
