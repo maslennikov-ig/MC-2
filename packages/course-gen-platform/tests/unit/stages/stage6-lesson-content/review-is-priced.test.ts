@@ -15,6 +15,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const { logTraceMock, generateCompletionMock } = vi.hoisted(() => ({
   logTraceMock: vi.fn(),
@@ -92,6 +94,21 @@ describe('Stage 6 review pays for itself', () => {
     });
 
     expect(generateCompletionMock.mock.calls[0][1].costContext).toBeUndefined();
+  });
+
+  it('is handed the course by the node that runs it', () => {
+    // The option existed and the one caller never filled it, so the context was
+    // built from an always-undefined courseId and five calls went unattributed
+    // on the 2026-08-17 paid run. The source-level guard cannot see this: the
+    // call site does pass a costContext, it is just empty. Read the caller.
+    const node = readFileSync(
+      join(__dirname, '../../../../src/stages/stage6-lesson-content/nodes/self-reviewer-node.ts'),
+      'utf8'
+    );
+    const call = node.slice(node.indexOf('runLLMReview({'));
+    const options = call.slice(0, call.indexOf('});'));
+
+    expect(options).toContain('courseId: state.courseId');
   });
 
   it('leaves the judge summary row unpriced, so nothing is counted twice', async () => {

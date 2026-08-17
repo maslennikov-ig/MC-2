@@ -131,8 +131,28 @@ editing a course — chat, inline blocks, element CRUD — has no stage in `gene
 at all (`mc2-b7olk.5`). They are in the guard's exception list with those ids, so the list can shrink
 but not grow in silence.
 
-What is still unproven is the sum. `mc2-z0xr3` needs one paid run whose recorded total matches the
-`/credits` delta; until then the arithmetic is only argued, and this area has been wrong four times.
+**Second confirmation run (2026-08-17, course `b0b2efde` on dev, USD 0.092839 billed).** No other
+traffic on the key: the baseline read equalled the previous run's closing figure to the cent, and all
+production containers were silent through the window.
+
+- The recompute is exact: `estimated_cost_usd` 0.0509 == `sum(generation_trace.cost_usd)` 0.050911.
+- Newly visible, and previously worth nothing: lesson generation (`stage_6_content`, 5 calls, 29544
+  tokens, 0.012492), the section expander (0.002745), the card image (`image_call`, 0.007).
+- Nothing is double-counted: `generator_complete` and `judge_complete` carry tokens and no price.
+- The recorded share of the bill went from 48% (0.0310 of 0.0646) to 55% (0.0509 of 0.0928).
+
+**The sum still does not reconcile — 0.0419 unexplained — but the run named three reasons instead of
+leaving a mystery.** Self-review passed no `courseId`, so five calls and 37159 tokens were
+unattributed; that is fixed here, and it is the class the source guard cannot see, because the call
+site does pass a context and the context is simply empty. The provider served
+`deepseek-v4-flash-0731`, a dated snapshot that is not a catalogue key, so that row was written with
+no price at all — and its real tariff is 1.7× the alias it was asked for (`mc2-b7olk.6`). Three quiz
+attempts died on a 4-minute timeout and left no row at all, because the price is recorded only after
+a successful response (`mc2-b7olk.7`); the timeouts themselves are `mc2-b7olk.8`, and they cost the
+course its quiz. Those three come to roughly 0.013 of the 0.0419; about 0.029 is still unaccounted.
+
+`mc2-z0xr3` stays open, and the next run belongs after `mc2-b7olk.6` and `.7` — otherwise the gap is
+again a sum of several causes and again impossible to split.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
