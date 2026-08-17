@@ -12,7 +12,11 @@
  * models.
  */
 
-import { getModelCapabilities } from '@megacampus/shared-types';
+import {
+  getModelCapabilities,
+  hasExactModelPricing,
+  normalizeModelId,
+} from '@megacampus/shared-types';
 
 import logger from '../logger';
 import { logTrace } from '../trace-logger';
@@ -117,6 +121,18 @@ export async function recordLlmCallCost(
     logger.warn(
       { model: usage.model, courseId: context.courseId, stage: context.stage },
       '[Cost] Model is not in MODEL_CATALOG; the call is traced without a price'
+    );
+  } else if (!hasExactModelPricing(usage.model)) {
+    // The provider served a variant of a catalogued model - a dated snapshot or
+    // a router alias. Its own tariff can be higher, so this price is a floor and
+    // the catalogue wants the entry (mc2-b7olk.6).
+    logger.warn(
+      {
+        model: usage.model,
+        pricedAs: normalizeModelId(usage.model),
+        courseId: context.courseId,
+      },
+      '[Cost] Priced from the base model; add the served variant to MODEL_CATALOG'
     );
   }
 
