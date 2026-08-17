@@ -319,8 +319,8 @@ export function applyEscalation(config: SummarizationConfig, retryAttempt: numbe
 export async function generateDocumentTitle(
   text: string,
   language: string,
-  model: string = TITLE_GENERATION_MODEL,
-  courseId?: string
+  courseId?: string,
+  model: string = TITLE_GENERATION_MODEL
 ): Promise<string> {
   const textForTitle = text.slice(0, 2000);
   const langKey = language === 'rus' || language === 'ru' ? 'rus' : 'eng';
