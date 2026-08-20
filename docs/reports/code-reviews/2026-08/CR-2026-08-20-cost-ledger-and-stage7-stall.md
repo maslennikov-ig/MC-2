@@ -237,3 +237,166 @@ nothing behind. `generation_trace` currently holds zero `stage_edit` rows.
 
 An earlier build run reported exit 137; it was OOM-killed for sharing the machine with
 the test suite, and passed on its own.
+
+---
+
+# Second pass — 2026-08-20
+
+The first pass left seven observations recorded but not ticketed, on the grounds that
+none had been asked for. This pass filed them and fixed them. Verifying them against
+the running database rather than the source turned two of them into something larger,
+and turned up one defect that had nothing to do with cost.
+
+## What the observations turned out to be
+
+### mc2-hjhy5 — the trace page walked the primary key (P2)
+
+Recorded in the first pass as "`ORDER BY id` with a `course_id` filter may push the
+planner onto `generation_trace_pkey`; noise at 37k rows, not forever." Measured, it was
+already worse than that. There is no `(course_id, id)` index, so with a literal course id
+the planner does not use `idx_generation_trace_course_id` at all:
+
+|        | plan                               | rows filtered | buffers | warm time |
+| ------ | ---------------------------------- | ------------- | ------- | --------- |
+| before | Index Scan `generation_trace_pkey` | 11,352        | 12,973  | 85 ms     |
+| after  | Index Scan `(course_id, id)`       | 0             | 1,009   | 1.5 ms    |
+
+Measured against course `c8ffafbd`, 3,067 rows of 37,224, one 1000-row page.
+
+The work scales with the size of the **whole table**, not the course: a course holding
+1% of the rows reads roughly a hundred rows per row returned. `updateCourseEstimatedCost`
+runs on every stage-6 lesson completion and after every edit.
+
+The single-column index was dropped in the same transaction — a b-tree answers a prefix
+of its columns, so `(course_id, id)` serves everything `(course_id)` served and the index
+count stays flat.
+
+### mc2-y452l — a measured zero was recorded as "not measured" (P2)
+
+`trace-logger.ts` built its insert with `||`, and 0 is falsy. Four numeric columns have a
+meaningful zero: a call that genuinely cost $0, a call that produced no tokens, a
+deterministic call at temperature 0, a judge verdict of 0. All four were written as NULL.
+
+This corrupted the metric used to find pricing holes: the 12,491 rows counted as "tokens
+but no price" could not distinguish a free call from an unpriced one. Commit `c554da79c`
+— "record a call that was paid for and produced nothing" — made zero-output calls a live
+case rather than a hypothetical one.
+
+`retry_attempt` and `was_cached` keep `||`: their falsy value is their default.
+
+### mc2-fyn4f — a restart kept the cost of the run it discarded (P3)
+
+`restart_from_stage` deleted traces for `stage_2%`..`stage_6%`. Stage 7 survived, so a
+restart from stage 2 — which re-runs the pipeline through enrichments — counted the
+previous run's stage-7 spend alongside the new one. `courses.estimated_cost_usd` is the
+cached SUM of exactly the rows the DELETE removed and was never resynced.
+
+`stage_edit` rows deliberately survive: that money was really spent on chat and inline
+edits and is not being redone. The first pass flagged that nobody had explicitly decided
+it. It is now decided, and written in the migration where the next reader will find it.
+
+### mc2-6kmfx, mc2-3vxbe, mc2-bo2f4 — the three small ones (P3/P4)
+
+`recordImageCallCost` did not schedule the course-total refresh that `recordLlmCallCost`
+does. Latent — stage 7's job refreshes at completion — but the first edit path to
+generate an image would have reproduced the silent-zero shape the feature exists to
+remove. One line.
+
+The lost update between two concurrent re-sums is documented rather than fixed, with the
+reason the obvious guard is wrong: "only write if greater" would permanently block the
+legitimate **decrease** that `restart_from_stage` now produces.
+
+`getCourseTokenSummary`'s docstring still described the pre-editing shape. `byStage` no
+longer sums to `totalCostUsd`; the invariant is now stated where someone building a
+breakdown UI will read it.
+
+## What was not an observation — mc2-wxvyr (P1)
+
+Reading the live definition of `restart_from_stage` before editing it showed **two**
+functions:
+
+```
+restart_from_stage(p_course_id uuid, p_stage_number integer, p_user_id uuid)  -- SET search_path=public
+restart_from_stage(p_course_id uuid, p_user_id uuid, p_stage_number integer)  -- no search_path
+```
+
+Same name, same parameter _names_, different order. Both callers pass named arguments, and
+a named call matches both candidates exactly:
+
+```
+ERROR 42725: function public.restart_from_stage(p_course_id => uuid,
+             p_stage_number => integer, p_user_id => uuid) is not unique
+HINT: Could not choose a best candidate function.
+```
+
+Supabase's own documentation is blunt: "make the name of the function unique as overloaded
+functions are not supported." So `restartStage` in the lifecycle router and FULL_REGENERATE
+from chat have both been failing since `20260321090724_add_admin_bypass_to_restart_from_stage`
+created the second one — five months.
+
+The secondary finding is that the legacy overload is `SECURITY DEFINER`, owned by
+`postgres`, with a **mutable** `search_path` (Supabase linter `0011_function_search_path_mutable`),
+and silently carries a _different authorization rule_ — it lets an admin restart a course
+they do not own.
+
+`20260413120000_drop_legacy_restart_from_stage_overload.sql` was written to fix this on
+2026-04-13 and never reached the database.
+
+**The repair that shipped is not that migration.** Dropping the overload alone would also
+have dropped the admin bypass someone deliberately added, five months after anyone
+remembered adding it. The bypass is folded into the canonical signature instead, so the
+capability survives and the ambiguity does not. Confirmed with the owner before applying.
+
+## Why nobody knew — mc2-y23na (P2, filed not fixed)
+
+`check-migration-drift.ts` takes a **watermark** — the newest repo migration recorded as
+applied — and reports only migrations after it. Anything unapplied _before_ the watermark
+is invisible, permanently; the next applied migration moves the watermark past it and it
+can never be reported again.
+
+That is how a committed repair sat unapplied for four months under a green gate, including
+on both runs shipped earlier today.
+
+Measured: **86 of 279** repo migrations have no history row by slug.
+
+The tail-only design is deliberate and its stated reason is real — a naive full check
+produced dozens of false positives from reassigned versions and renames. So the fix is to
+widen the check _and_ grandfather what exists, in the shape of
+`.codex/stranded-commit-allowlist.txt`: keep the watermark rule for the tail, add a second
+pass for pre-watermark gaps, and fail only on a gap that is not allowlisted with a reason.
+
+Building that allowlist means deciding, for each of the 86, whether it was applied under
+another name or genuinely skipped. That is an audit, not a patch — so it is filed and
+explicitly **not** fixed here.
+
+## Migrations
+
+Both applied to the shared dev/staging database, owner-authorized:
+
+| history                                                 | slug matches repo file |
+| ------------------------------------------------------- | ---------------------- |
+| `20260820101647 \| generation_trace_course_id_id_index` | yes                    |
+| `20260820101717 \| restart_from_stage_single_signature` | yes                    |
+
+Verified against the database, not the files:
+
+- exactly one `restart_from_stage` signature remains, `(uuid,integer,uuid)`, with
+  `search_path=public` pinned — asserted inside the migration itself, because the
+  ambiguity survived five months precisely because nothing checked;
+- the named-argument call that produced `42725` now resolves and returns `NOT_FOUND`
+  for a nonexistent course;
+- `generation_trace` carries `idx_generation_trace_course_id_id` and no longer carries
+  `idx_generation_trace_course_id`;
+- the page plan is an ordered index scan with zero rows filtered.
+
+## Acceptance
+
+- Unit suite: **459 files, 7315 tests, 0 failures** (111 skipped)
+- Type Check: **PASS**
+- Build: **PASS**
+
+The zero-is-not-NULL guard was checked against the defect it exists to catch: reverting
+`??` to `||` fails 4 of its 6 assertions.
+
+**Verdict**: PASS. One P2 (`mc2-y23na`) filed and deliberately deferred, with the reason
+above.

@@ -262,6 +262,17 @@ function summarizeTraceRows(rows: TraceCostRow[]): CourseTokenSummary {
  * wrong way round. A stale number beats a wrong one; the next edit or stage
  * refreshes it.
  *
+ * Two refreshes overlapping on one course — a stage refresh racing an edit
+ * refresh, or a blue/green window — each read the whole table and each write the
+ * whole figure, so the later write wins even when it carries the older sum. That
+ * bound is accepted: the trace rows are never at risk, and the next refresh
+ * reads the table again and puts the number right.
+ *
+ * Do not "fix" it by writing only when the new sum is larger. That guard would
+ * permanently block the legitimate decrease `restart_from_stage` produces when
+ * it deletes the traces of the stages being redone (mc2-fyn4f), and a course
+ * would keep claiming the cost of a run that no longer exists (mc2-3vxbe).
+ *
  * Never throws: accounting must not be able to fail a generation.
  */
 export async function updateCourseEstimatedCost(courseId: string): Promise<number | undefined> {

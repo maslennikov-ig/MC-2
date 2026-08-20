@@ -112,6 +112,13 @@ export async function recordImageCallCost(
       '[Cost] Could not record an image generation cost'
     );
   }
+
+  // Same refresh as a token call. Today every image comes from stage 7, whose
+  // job refreshes the total when it finishes, so this changes nothing — but the
+  // asymmetry was a trap: the first edit path to generate an image would have
+  // written its trace row and left `courses.estimated_cost_usd` untouched, which
+  // is the silent-zero shape this whole feature exists to remove (mc2-6kmfx).
+  refreshCourseTotalAfterEdit(context);
 }
 
 /**
