@@ -1,12 +1,16 @@
 [Unit]
 Description=Publish MegaCampus host filesystem capacity as Prometheus textfile metrics
-Documentation=https://github.com/maslennikov-ig/MC-2 mc2-adb6y
+Documentation=https://github.com/maslennikov-ig/MC-2
 
 [Service]
 Type=oneshot
 UMask=0022
 Environment=QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
-ExecStart=/opt/megacampus/ops/qdrant/textfile/publish-disk-metrics.sh \
+# Invoked through bash on purpose. install-monitoring-config.sh lands everything
+# under /opt/megacampus/ops/qdrant as root-owned 0444 — the same hardening that
+# publish-metrics.sh sits under — so executing the script directly fails with
+# 203/EXEC. Reading it and running it is what the permissions allow.
+ExecStart=/bin/bash /opt/megacampus/ops/qdrant/textfile/publish-disk-metrics.sh \
   ${QDRANT_METRICS_TEXTFILE_DIR}/megacampus_host_disk.prom /
 # Reads df and writes one small file. Nothing here needs privilege beyond write
 # access to the textfile directory, which is group-owned by megacampus-metrics.
