@@ -485,6 +485,15 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
   const hardcodedFallback = CHAT_STAGE_FALLBACK_MODELS[stageId] || DEFAULT_CHAT_FALLBACK_MODELS;
   let modelUsed = modelConfig.modelId;
 
+  // Chat about a course is paid work on that course. Its phases are named after
+  // the edit rather than a stage, so nothing recorded them and a user could talk
+  // to a course all day for a cost of zero (mc2-b7olk.5).
+  const costContext = {
+    courseId,
+    stage: 'stage_edit' as const,
+    phase: modelConfig.phaseName,
+  };
+
   // Generate LLM response with primary model (from DB or fallback config)
   let llmResponse;
   try {
@@ -492,6 +501,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
       model: modelConfig.modelId,
       temperature: modelConfig.temperature,
       maxTokens: modelConfig.maxTokens,
+      costContext,
     });
   } catch (primaryError) {
     logger.warn(
@@ -513,6 +523,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
         model: modelConfig.fallbackModelId,
         temperature: modelConfig.temperature,
         maxTokens: modelConfig.maxTokens,
+        costContext,
       });
     } catch (dbFallbackError) {
       logger.warn(
@@ -535,6 +546,7 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
           model: hardcodedFallback.fallback,
           temperature: modelConfig.temperature,
           maxTokens: modelConfig.maxTokens,
+          costContext,
         });
       } catch (hardcodedFallbackError) {
         logger.error(

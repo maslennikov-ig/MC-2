@@ -215,6 +215,9 @@ export async function generateImage(
       };
     }
 
+    // cost-exempt: an image is billed per picture, not per token, so this call
+    // prices itself with `recordImageCallCost` below rather than through either
+    // LLM wrapper — the provider's own figure is the only correct one.
     // @ts-expect-error - OpenRouter extensions not in OpenAI types
     const response = await client.chat.completions.create(requestOptions, {
       signal: abortController.signal,

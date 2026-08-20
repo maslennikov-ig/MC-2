@@ -58,11 +58,23 @@ export function categorizeError(error: Error): ErrorCategory {
     return 'rate_limit';
   }
 
-  // Timeout errors
+  // Timeout errors.
+  //
+  // A call bounded by `AbortSignal.timeout` reports "This operation was
+  // aborted" and never says "timeout", so the only wall-clock failure the
+  // pipeline actually produces was landing in 'unknown'. On 2026-08-17 that
+  // sent six identical quiz calls to a route that was not answering, held a
+  // worker for 32 minutes and never reached the fallback model (mc2-b7olk.8).
+  //
+  // The full wording, not the bare word "abort": a deliberate cancellation is
+  // not a timeout, and nothing should be retried merely for saying "aborted".
   if (
     message.includes('timeout') ||
     message.includes('timed out') ||
-    message.includes('etimedout')
+    message.includes('etimedout') ||
+    message.includes('operation was aborted') ||
+    error.name === 'AbortError' ||
+    error.name === 'TimeoutError'
   ) {
     return 'timeout';
   }
@@ -195,54 +207,55 @@ export function getRetryDelay(ctx: RetryContext): number {
 /**
  * Get fallback model for retry
  *
+ * Asks {@link getModelForAttempt} rather than reading `maxPrimaryAttempts` a
+ * second time. The two used to compare the same constant in opposite directions
+ * — `>=` here, `<=` there — so with one primary attempt this reported a fallback
+ * for attempt 1 while `getModelForAttempt` was returning null by design
+ * (mc2-qp7dl). One rule, one place to change it.
+ *
  * @param ctx - Retry context
  * @returns Fallback model name or null if no fallback available
  */
 export function getFallbackModel(ctx: RetryContext): string | null {
-  // Only LLM-based enrichments have model fallback
-  if (ctx.enrichmentType !== 'quiz' && ctx.enrichmentType !== 'presentation') {
-    return null;
-  }
-
-  const modelConfig = ctx.enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
+  const fallback = getModelForAttempt(ctx.enrichmentType, ctx.attempt);
 
   // If already on fallback, no further fallback
-  if (ctx.currentModel === modelConfig.fallback) {
+  if (fallback === null || ctx.currentModel === fallback) {
     return null;
   }
 
-  // After max primary attempts, switch to fallback
-  if (ctx.attempt >= MODEL_CONFIG.maxPrimaryAttempts) {
-    return modelConfig.fallback;
-  }
-
-  return null;
+  return fallback;
 }
 
 /**
- * Get model for current attempt
+ * Get the model override for the current attempt, or `null` to use the phase config.
+ *
+ * The first attempt returns `null` deliberately: the handler then resolves
+ * `llm_model_config` like every other stage, so the model an administrator
+ * configured is the model that runs. A later attempt overrides it with the
+ * fallback, because the previous one already failed on the configured route.
  *
  * @param enrichmentType - Type of enrichment
  * @param attempt - Current attempt number (1-based)
- * @returns Model name to use
+ * @param configuredFallbackModel - `fallback_model_id` from the phase config, when it has one
+ * @returns Model to force for this attempt, or null to let the phase config decide
  */
 export function getModelForAttempt(
   enrichmentType: Stage7EnrichmentType,
-  attempt: number
+  attempt: number,
+  configuredFallbackModel?: string | null
 ): string | null {
   // Only LLM-based enrichments need model selection
   if (enrichmentType !== 'quiz' && enrichmentType !== 'presentation') {
     return null;
   }
 
-  const modelConfig = enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
-
-  // Use fallback after max primary attempts
-  if (attempt > MODEL_CONFIG.maxPrimaryAttempts) {
-    return modelConfig.fallback;
+  if (attempt <= MODEL_CONFIG.maxPrimaryAttempts) {
+    return null;
   }
 
-  return modelConfig.primary;
+  const modelConfig = enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
+  return configuredFallbackModel || modelConfig.fallback;
 }
 
 /**

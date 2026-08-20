@@ -20,6 +20,7 @@ import {
   createModelConfigService,
   isMissingChatPhaseConfigError,
 } from '../llm/model-config-service.js';
+import { recordLlmCallCost } from '../metrics/llm-cost';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
@@ -178,6 +179,11 @@ export interface NodeContextForClassification {
 /**
  * Classify user message intent using the configured cheap, fast model.
  *
+ * The course comes first because the two parameters after it are optional, and
+ * a required argument cannot follow an optional one — the same shape the Stage 2
+ * title call was given for the same reason.
+ *
+ * @param courseId - Course this chat turn belongs to, so the call can be charged
  * @param userMessage - User's chat message
  * @param nodeContext - Optional context about the currently selected node
  * @param client - Optional OpenAI client (for testing)
@@ -185,11 +191,12 @@ export interface NodeContextForClassification {
  *
  * @example
  * ```typescript
- * const intent = await classifyIntent("удали урок 2.3");
+ * const intent = await classifyIntent(courseId, "удали урок 2.3");
  * // { intent: 'DELETE_LESSON', confidence: 0.95, target: { identifier: 'урок 2.3' } }
  * ```
  */
 export async function classifyIntent(
+  courseId: string,
   userMessage: string,
   nodeContext?: NodeContextForClassification,
   client?: OpenAI
@@ -234,6 +241,12 @@ export async function classifyIntent(
     // Note: We use chat.completions.create() instead of chat.completions.parse()
     // because parse() is an OpenAI-specific extension that may not work with OpenRouter.
     // zodResponseFormat() is just a helper that converts Zod to JSON Schema - fully compatible.
+    //
+    // cost-exempt: this call goes to the SDK directly rather than through either
+    // LLM wrapper, so it prices itself with `recordLlmCallCost` below. It had no
+    // course to charge and recorded nothing at all, which made every cache miss
+    // in a chat turn spend money that left no row (mc2-b5a2r).
+    const startedAt = Date.now();
     const response = await openai.chat.completions.create({
       model: modelId,
       messages: [
@@ -244,6 +257,24 @@ export async function classifyIntent(
       temperature,
       response_format: zodResponseFormat(IntentSchema, 'intent_classification'),
     });
+
+    // Priced before the answer is read, because the returns just below — a
+    // truncated response, an empty one — cost exactly what a usable one costs.
+    // `stage_edit` and a `chat_*` phase are what the cost path already
+    // understands, so this needs no new plumbing.
+    await recordLlmCallCost(
+      {
+        model: response.model || modelId,
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+      },
+      {
+        courseId,
+        stage: 'stage_edit',
+        phase: 'chat_intent_classification',
+        durationMs: Date.now() - startedAt,
+      }
+    );
 
     // Check for length truncation (response cut off due to max_tokens)
     const finishReason = response.choices[0]?.finish_reason;

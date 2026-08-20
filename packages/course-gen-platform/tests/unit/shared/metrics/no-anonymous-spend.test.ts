@@ -33,19 +33,19 @@ const EXCEPTIONS: Record<string, string> = {
     'a playbook is not a course, and generation_trace has no row to charge (mc2-b7olk.2)',
   'stages/stage-career-playbook/image-generation.ts':
     'a playbook is not a course, and generation_trace has no row to charge (mc2-b7olk.2)',
-  'stages/stage4-analysis/evidence/card-generator.ts':
-    'document evidence prices itself into its own coverage ledger; folding it into the course total is mc2-b7olk.4',
-  'stages/stage4-analysis/evidence/conflict-detector.ts':
-    'document evidence prices itself into its own coverage ledger; folding it into the course total is mc2-b7olk.4',
-  'orchestrator/handlers/block-regeneration-handler.ts':
-    'editing a course has no stage in generation_trace to charge; giving it one is mc2-b7olk.5',
 };
 
 /** An inline opt-out for a call the surrounding code prices some other way. */
 const EXEMPT_MARK = 'cost-exempt:';
 
-/** Directories that are pipeline code: everything a course generation runs. */
-const SCANNED = ['stages', 'shared', 'orchestrator'];
+/**
+ * Directories whose calls are spend on a course.
+ *
+ * `server/routers/generation/editing` joined the list once editing had a stage
+ * to be charged to: until then its calls could not have been priced, and the
+ * check would only have measured that (mc2-b7olk.5).
+ */
+const SCANNED = ['stages', 'shared', 'orchestrator', 'server/routers/generation/editing'];
 
 function sources(): Array<{ path: string; text: string }> {
   const files: string[] = [];
@@ -101,6 +101,32 @@ function completionOptions(text: string): string[] {
   return calls;
 }
 
+/**
+ * Every position where the provider SDK is called directly.
+ *
+ * The first two detectors read the two wrappers this repository built, and a
+ * call that uses neither was invisible to both: `shared/intent/classifier.ts`
+ * built its own `new OpenAI()` and called `chat.completions.create`, so every
+ * chat turn that missed the intent cache spent money that left no row — while
+ * the file sat inside a scanned directory and this guard stayed green
+ * (mc2-b5a2r). A guard the whole cost epic leans on has to see the raw call.
+ */
+function rawSdkCompletions(text: string): number[] {
+  const found: number[] = [];
+  const pattern = /\.completions\.create\(/gu;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, match.index - 400), match.index);
+    // A call the surrounding code says it prices itself, with the reason.
+    if (before.includes(EXEMPT_MARK)) continue;
+    // Prose about a call is not a call: the classifier's own comment explains
+    // which SDK method it uses and why.
+    if (/^\s*(?:\/\/|\*|\/\*)/u.test(before.split('\n').pop() ?? '')) continue;
+    found.push(match.index);
+  }
+  return found;
+}
+
 describe('no paid call spends anonymously', () => {
   const files = sources();
 
@@ -136,6 +162,43 @@ describe('no paid call spends anonymously', () => {
     }
 
     expect(anonymous).toEqual([]);
+  });
+
+  it('sees a raw SDK completion, which neither wrapper would report', () => {
+    const anonymous: string[] = [];
+    for (const { path, text } of files) {
+      if (EXCEPTIONS[path]) continue;
+      for (const at of rawSdkCompletions(text)) {
+        const line = text.slice(0, at).split('\n').length;
+        anonymous.push(`${path}:${line}`);
+      }
+    }
+
+    expect(anonymous).toEqual([]);
+  });
+
+  it('would have caught the classifier, which both older detectors missed', () => {
+    // The shape that was invisible: its own client, the SDK method called
+    // directly, nothing recorded. It sat in a scanned directory for the whole
+    // cost epic while this file reported no anonymous spend.
+    const raw = `
+      const openai = new OpenAI({ baseURL: 'https://openrouter.ai/api/v1' });
+      const response = await openai.chat.completions.create({ model, messages });
+    `;
+
+    expect(rawModelBuilds(raw)).toEqual([]);
+    expect(completionOptions(raw)).toEqual([]);
+    expect(rawSdkCompletions(raw)).toHaveLength(1);
+  });
+
+  it('lets a call that prices itself say so, with the reason', () => {
+    const marked = `
+      // ${EXEMPT_MARK} an image is billed per picture, so it is priced by
+      // recordImageCallCost from the provider's own figure.
+      const response = await client.chat.completions.create(requestOptions);
+    `;
+
+    expect(rawSdkCompletions(marked)).toEqual([]);
   });
 
   it('keeps the exception list to calls that genuinely have no course', () => {

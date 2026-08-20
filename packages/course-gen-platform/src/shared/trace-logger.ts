@@ -13,7 +13,20 @@ interface TraceLogParams {
   lessonId?: string;
   /** Human-readable lesson identifier like "1.1" - stored in input_data if lessonId not provided */
   lessonLabel?: string;
-  stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6' | 'stage_7';
+  /**
+   * Pipeline stage, or `stage_edit` for what a user spends after generation:
+   * chat, inline block edits, element CRUD. The column is text, so this union is
+   * the only thing keeping the values consistent.
+   */
+  stage:
+    | 'stage_1'
+    | 'stage_2'
+    | 'stage_3'
+    | 'stage_4'
+    | 'stage_5'
+    | 'stage_6'
+    | 'stage_7'
+    | 'stage_edit';
   phase: string;
   stepName: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects (Date, enums, etc.) that Supabase serializes

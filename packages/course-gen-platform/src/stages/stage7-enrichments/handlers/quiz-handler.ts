@@ -15,6 +15,7 @@
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { resolveModelWithFallback } from '@/shared/llm/model-config-service';
+import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
 import type { QuizEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
@@ -26,6 +27,7 @@ import {
   type QuizSettings,
 } from '../prompts/quiz-prompt';
 import { getLessonContent } from '../services/database-service';
+import { LLM_CALL_BUDGET } from '../config';
 
 // ============================================================================
 // CONFIGURATION
@@ -212,6 +214,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       systemPrompt,
       maxTokens: MAX_OUTPUT_TOKENS,
       temperature: QUIZ_TEMPERATURE,
+      timeout: LLM_CALL_BUDGET.timeoutMs,
+      maxRetries: LLM_CALL_BUDGET.transportRetries,
       costContext: {
         courseId: enrichmentContext.course.id,
         stage: 'stage_7',
@@ -243,7 +247,14 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       input_tokens: response.inputTokens,
       output_tokens: response.outputTokens,
       total_tokens: response.totalTokens,
-      estimated_cost_usd: 0, // Would need pricing info to calculate
+      // The trace row written by the call itself is the money; this is the same
+      // figure for whoever reads the enrichment alone. It used to be a flat 0.
+      estimated_cost_usd:
+        calculateLlmCostUsd({
+          model: response.model,
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+        }) ?? 0,
       model_used: response.model,
       quality_score: 1.0, // Default - would be set by quality validation
       retry_attempts: 0,

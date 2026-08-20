@@ -237,6 +237,7 @@ ${dynamicContextContent}
           maxTokens: regenMaxTokens,
           systemPrompt,
           enableCaching: true,
+          costContext: { courseId, stage: 'stage_edit', phase: 'inline_block_regeneration' },
         });
 
         let regenerationData: RegenerationResponse;

@@ -84,6 +84,15 @@ export interface LLMClientOptions {
    * course and is only counted in the provider's own key total.
    */
   costContext?: LlmCostContext;
+  /**
+   * Transport retries for this call, overriding the client's own count.
+   *
+   * Set it low where the caller has a better answer than trying again: a route
+   * that holds the connection open until the timeout fails identically on every
+   * retry, and each one costs a full timeout and real money. Stage 7 quiz spent
+   * six such waits — 32 minutes — before giving up (mc2-b7olk.8).
+   */
+  maxRetries?: number;
 }
 
 export interface LLMClientConstructionOptions {
@@ -249,6 +258,7 @@ export class LLMClient {
       enableCaching = false,
       reasoning,
       costContext,
+      maxRetries,
     } = options;
 
     logger.info(
@@ -280,7 +290,8 @@ export class LLMClient {
       const response = await this.executeWithRetry(
         () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
         model,
-        'LLM'
+        'LLM',
+        maxRetries
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -312,6 +323,7 @@ export class LLMClient {
       enableCaching = false,
       reasoning,
       costContext,
+      maxRetries,
     } = options;
 
     logger.info(
@@ -337,7 +349,8 @@ export class LLMClient {
       const response = await this.executeWithRetry(
         () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
         model,
-        'Chat completion'
+        'Chat completion',
+        maxRetries
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -508,17 +521,16 @@ export class LLMClient {
   private async executeWithRetry(
     requestFn: () => Promise<LLMResponse>,
     model: string,
-    label: string
+    label: string,
+    callMaxRetries?: number
   ): Promise<LLMResponse> {
+    const maxRetries = callMaxRetries ?? this.maxRetries;
     try {
       return await retryWithBackoff(requestFn, {
-        maxRetries: this.maxRetries,
+        maxRetries,
         delays: this.retryDelays,
         onRetry: (attempt, error) => {
-          logger.warn(
-            { attempt, maxRetries: this.maxRetries, error: error.message },
-            `Retrying ${label} request`
-          );
+          logger.warn({ attempt, maxRetries, error: error.message }, `Retrying ${label} request`);
         },
       });
     } catch (error) {

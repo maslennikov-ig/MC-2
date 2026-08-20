@@ -245,6 +245,12 @@ export interface ProductionConflictInvokeResult {
 
 export interface ProductionConflictPortOptions {
   modelId?: string;
+  /**
+   * Course this detection belongs to, so its calls price themselves into
+   * `generation_trace` instead of only the document-evidence ledger
+   * (mc2-b7olk.4). Absent in tests that supply their own `invoke`.
+   */
+  courseId?: string;
   maxRetries: number;
   invoke?: (input: ProductionConflictInvokeInput) => Promise<ProductionConflictInvokeResult>;
 }
@@ -923,6 +929,15 @@ export function createProductionConflictDetectionPort(
         temperature: 0,
         maxTokens: input.maxOutputTokens,
         systemPrompt: input.systemPrompt,
+        ...(options.courseId
+          ? {
+              costContext: {
+                courseId: options.courseId,
+                stage: 'stage_4' as const,
+                phase: 'stage_4_conflict_detection',
+              },
+            }
+          : {}),
       });
       return {
         content: response.content,

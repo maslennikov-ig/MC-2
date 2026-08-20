@@ -329,6 +329,7 @@ Return ONLY valid JSON matching this structure:
     maxTokens: lessonMaxTokens,
     systemPrompt:
       'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
+    costContext: { courseId, stage: 'stage_edit', phase: 'inline_element_crud' },
   });
 
   try {
@@ -430,6 +431,7 @@ Return ONLY valid JSON matching this structure:
     maxTokens: sectionMaxTokens,
     systemPrompt:
       'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
+    costContext: { courseId, stage: 'stage_edit', phase: 'inline_element_crud' },
   });
 
   try {

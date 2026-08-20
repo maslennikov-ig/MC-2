@@ -60,6 +60,14 @@ vi.mock('openai', () => {
   };
 });
 
+const { mockRecordLlmCallCost } = vi.hoisted(() => ({
+  mockRecordLlmCallCost: vi.fn(() => Promise.resolve(undefined)),
+}));
+
+vi.mock('@/shared/metrics/llm-cost', () => ({
+  recordLlmCallCost: mockRecordLlmCallCost,
+}));
+
 vi.mock('openai/helpers/zod', () => ({
   zodResponseFormat: vi.fn((schema: any, name: string) => ({
     type: 'json_schema',
@@ -80,6 +88,9 @@ import {
 import { logger } from '@/shared/logger/index.js';
 import { createModelConfigService } from '@/shared/llm/model-config-service.js';
 import OpenAI from 'openai';
+
+/** The course the chat turn belongs to, and the one its classification is charged to. */
+const COURSE_ID = '20000000-0000-4000-8000-000000000001';
 
 describe('classifyIntent', () => {
   let mockOpenAIClient: any;
@@ -116,7 +127,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('удали урок 2.3', undefined, mockOpenAIClient);
+    const result = await classifyIntent(COURSE_ID, 'удали урок 2.3', undefined, mockOpenAIClient);
 
     expect(result.intent).toBe('DELETE_LESSON');
     expect(result.confidence).toBe(0.95);
@@ -158,6 +169,7 @@ describe('classifyIntent', () => {
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
     const result = await classifyIntent(
+      COURSE_ID,
       'перенеси урок 1.2 в секцию 2',
       undefined,
       mockOpenAIClient
@@ -182,7 +194,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('some message', undefined, mockOpenAIClient);
+    const result = await classifyIntent(COURSE_ID, 'some message', undefined, mockOpenAIClient);
 
     expect(result.intent).toBe('UNKNOWN');
     expect(result.confidence).toBe(0);
@@ -216,7 +228,12 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('может быть что-то', undefined, mockOpenAIClient);
+    const result = await classifyIntent(
+      COURSE_ID,
+      'может быть что-то',
+      undefined,
+      mockOpenAIClient
+    );
 
     expect(result.intent).toBe('UNKNOWN');
     expect(result.confidence).toBe(0.2);
@@ -253,7 +270,12 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('удали этот урок', nodeContext, mockOpenAIClient);
+    const result = await classifyIntent(
+      COURSE_ID,
+      'удали этот урок',
+      nodeContext,
+      mockOpenAIClient
+    );
 
     expect(result.intent).toBe('DELETE_LESSON');
     expect(result.target?.path).toBe('sections[0].lessons[2]');
@@ -301,7 +323,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    await classifyIntent('сколько уроков?', undefined, mockOpenAIClient);
+    await classifyIntent(COURSE_ID, 'сколько уроков?', undefined, mockOpenAIClient);
 
     expect(mockOpenAIClient.chat.completions.create).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'custom/model-from-config' })
@@ -334,6 +356,7 @@ describe('classifyIntent', () => {
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
     const result = await classifyIntent(
+      COURSE_ID,
       'измени длительность урока 1.1 на 45 минут',
       undefined,
       mockOpenAIClient
@@ -357,7 +380,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('test message', undefined, mockOpenAIClient);
+    const result = await classifyIntent(COURSE_ID, 'test message', undefined, mockOpenAIClient);
 
     expect(result.intent).toBe('UNKNOWN');
     expect(result.confidence).toBe(0);
@@ -372,7 +395,7 @@ describe('classifyIntent', () => {
       new Error('API connection failed')
     );
 
-    const result = await classifyIntent('test message', undefined, mockOpenAIClient);
+    const result = await classifyIntent(COURSE_ID, 'test message', undefined, mockOpenAIClient);
 
     expect(result.intent).toBe('UNKNOWN');
     expect(result.confidence).toBe(0);
@@ -394,9 +417,9 @@ describe('classifyIntent', () => {
       getModelForPhase: vi.fn().mockRejectedValue(missingConfigError),
     } as any);
 
-    await expect(classifyIntent('test message', undefined, mockOpenAIClient)).rejects.toThrow(
-      'has no active config'
-    );
+    await expect(
+      classifyIntent(COURSE_ID, 'test message', undefined, mockOpenAIClient)
+    ).rejects.toThrow('has no active config');
     expect(mockOpenAIClient.chat.completions.create).not.toHaveBeenCalled();
   });
 
@@ -414,7 +437,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('complex message', undefined, mockOpenAIClient);
+    const result = await classifyIntent(COURSE_ID, 'complex message', undefined, mockOpenAIClient);
 
     expect(result.intent).toBe('UNKNOWN');
     expect(result.confidence).toBe(0);
@@ -452,7 +475,12 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    const result = await classifyIntent('перепиши урок 1.2 проще', undefined, mockOpenAIClient);
+    const result = await classifyIntent(
+      COURSE_ID,
+      'перепиши урок 1.2 проще',
+      undefined,
+      mockOpenAIClient
+    );
 
     expect(result.intent).toBe('REWRITE_CONTENT');
     expect(result.confidence).toBe(0.88);
@@ -481,7 +509,7 @@ describe('classifyIntent', () => {
 
     vi.mocked(mockOpenAIClient.chat.completions.create).mockResolvedValue(mockResponse);
 
-    await classifyIntent(longMessage, undefined, mockOpenAIClient);
+    await classifyIntent(COURSE_ID, longMessage, undefined, mockOpenAIClient);
 
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -25,7 +25,13 @@ import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
  */
 export function stageOfPhase(phase: string): LlmCostContext['stage'] | undefined {
   const match = /^stage_([1-7])(?:_|$)/u.exec(phase);
-  return match ? (`stage_${match[1]}` as LlmCostContext['stage']) : undefined;
+  if (match) return `stage_${match[1]}` as LlmCostContext['stage'];
+  // Editing phases are named after what the user did, not after a stage:
+  // `chat_stage_6_refinement`, `inline_element_crud`. They had no stage, so this
+  // returned undefined and the model was handed back with no cost recording at
+  // all (mc2-b7olk.5).
+  if (/^(chat|inline)_/u.test(phase)) return 'stage_edit';
+  return undefined;
 }
 
 /**
