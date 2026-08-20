@@ -20,6 +20,8 @@ node_modules/
 !.codex/project-index.md
 !.codex/report-template.md
 !.codex/stage-artifact-template.md
+!.codex/verification-manifest.json
+!.codex/verification-manifest-template.json
 !.codex/subagent-task-contract.md
 !.codex/subagent-spawn-template.md
 !.codex/manual-agent-prompt-template.md

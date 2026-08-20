@@ -1,7 +1,11 @@
 # Native Subagent Prompt
 
-Use this four-field shape for a visible same-session Codex subagent. Add a task
-reference, selected skill/docs, or artifact path only when the stream needs it.
+Use this four-field shape for a visible same-session Codex subagent. When the
+stream touches external or versioned behavior, the Verification field carries
+one compact `Documentation:` decision — the exact `docs-resolve` result. Omit
+it for a local stream: an absent decision already means the spawned agent stops
+before relying on external claims. Add a task reference, selected skill/docs, or
+artifact path only when the stream needs it.
 
 ```md
 Goal: <one finished outcome>

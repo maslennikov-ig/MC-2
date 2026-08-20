@@ -10,10 +10,10 @@ manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
-current_stage_id = "mc2-db696.105"
+current_stage_id = "none"
 
 [baseline]
-profile = "balanced-v2.19"
+profile = "balanced-v2.20"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -41,7 +41,7 @@ ask_before = [
 
 [handoff]
 mode = "current_state_plus_stages"
-current_state_max_lines = 200
+current_state_max_lines = 308
 legacy_archive_dir = ".codex/agent-reports"
 hard_limit_lines = 500
 
@@ -123,10 +123,9 @@ push_after_closeout = "ask"
 launcher = "codex_subagents"
 subagent_visibility = "separate_spawned_threads"
 inline_subagents_allowed = false
-subagents_preauthorized_for_complex = true
-medium_execution_default = "local_owner"
+medium_execution_default = "delegated_worker"
 simple_checks_owner = "orchestrator"
-delegation_gate = "complex_and_material_benefit"
+delegation_gate = "medium_complex_required"
 independence_alone_sufficient = false
 require_base_branch_and_commit = true
 require_dedicated_worktree = true
@@ -137,20 +136,39 @@ artifact_fields = ["task_id", "stage_id", "branch", "base_branch", "base_commit"
 write_heavy_requires_dedicated_worktree = true
 worker_isolation = "dedicated_branch_worktree"
 parallel_decomposition_matrix = "required_for_complex_candidates"
-parallel_execution_default = "spawn_eligible_complex_streams"
+parallel_execution_default = "spawn_eligible_streams"
 sequential_requires_reason = true
 max_concurrent_subagents = 4
 max_parallel_write_streams = 3
 critical_path_priority = true
 write_heavy_isolation_default = "dedicated_branch_or_worktree"
+subagents_preauthorized_for_medium_complex = true
+root_execution_scope = "simple_quick_only"
+complex_execution_default = "delegated_streams"
+delegation_unavailable_action = "block_medium_complex"
 
 [subagent_model_policy]
 default_model = "inherit_orchestrator"
 default_reasoning_effort = "inherit_orchestrator"
-reasoning_policy = "complexity_based"
-model_override_requires_current_user_authorization = true
+reasoning_policy = "task_shape_proportional"
+model_override_requires_current_user_authorization = false
 record_model_reasoning_rationale = true
 high_reasoning_triggers = ["architecture", "security", "migrations", "cross-module", "critical-bugs", "reviews", "ambiguity"]
+mechanical_model = "gpt-5.6-luna"
+mechanical_reasoning_effort = "low"
+repetitive_model = "gpt-5.6-luna"
+repetitive_reasoning_effort = "medium"
+read_heavy_model = "gpt-5.6-terra"
+read_heavy_reasoning_effort = "medium"
+parallel_support_model = "gpt-5.6-terra"
+parallel_support_reasoning_effort = "medium"
+implementation_model = "gpt-5.6-sol"
+implementation_reasoning_effort = "medium"
+high_risk_model = "gpt-5.6-sol"
+high_risk_reasoning_effort = "high"
+fallback_model = "inherit_orchestrator"
+fallback_reasoning_effort = "inherit_orchestrator"
+record_spawn_decision_fields = ["role", "model", "reasoning_effort", "rationale"]
 
 [review]
 require_findings_first = true
@@ -218,6 +236,8 @@ required_steps = [
 [exceptions]
 shared_types_import_policy = "@megacampus/shared-types only"
 manual_launch_is_default = true
+cleanup_workspace_preserves_mc2_delivery_guards = true
+closeout_debt_fixture_allowlist = "placeholder-validator fixture tests only"
 
 [orchestration_levels]
 default = "slice_acceptance"
@@ -237,13 +257,19 @@ allowed_split_reasons = ["unresolved_public_ownership_or_public_contract", "hard
 scope_preservation_ledger_required_on_replan = true
 accepted_history_immutable = true
 migration_scope = "future_work_only"
+legacy_active_stage_id = ""
 
 [evidence]
-schema = "verification-evidence/v1"
+schema = "verification-evidence/v2"
 source_paths_are_repo_relative = true
 reject_symlinks_and_path_escape = true
 exact_identity_required_for_reuse = true
 release_requires_release_level_evidence = true
+level = "release"
+manifest_path = ".codex/verification-manifest.json"
+manifest_template = ".codex/verification-manifest-template.json"
+report_dir = "orchestration-evidence/v2"
+kill_switch_env = "ORCHESTRATION_EVIDENCE_REUSE_DISABLED"
 
 [cost_guard]
 enabled = true
