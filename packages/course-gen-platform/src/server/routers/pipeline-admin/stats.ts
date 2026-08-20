@@ -27,9 +27,17 @@ export const statsRouter = router({
    *
    * Output:
    * - CourseTokenSummary object with:
-   *   - totalTokens: Total tokens used across all stages
-   *   - totalCostUsd: Total cost in USD
-   *   - byStage: Array of { stage, tokens, cost } per stage
+   *   - totalTokens: Total tokens used, generation and editing together
+   *   - totalCostUsd: Total cost in USD, generation and editing together
+   *   - byStage: Array of { stage, tokens, cost } per pipeline stage
+   *   - editing: { tokens, cost } spent after generation — chat, inline block
+   *     edits, element CRUD
+   *
+   * byStage does NOT sum to totalCostUsd. Editing has no pipeline stage, so it
+   * is counted in the total and reported on its own; filing it under a number
+   * would have made it stage 0, next to rows whose stage could not be read. A
+   * cost breakdown built from byStage alone shows rows that do not add up to
+   * their own total (mc2-bo2f4).
    *
    * Data Source:
    * - generation_trace table (tokens_used, cost_usd, stage columns)
@@ -41,7 +49,12 @@ export const statsRouter = router({
    * @example
    * ```typescript
    * const summary = await trpc.pipelineAdmin.getCourseTokenSummary.query({ courseId: 'uuid' });
-   * // { totalTokens: 125000, totalCostUsd: 0.45, byStage: [...] }
+   * // {
+   * //   totalTokens: 125000,
+   * //   totalCostUsd: 0.45,
+   * //   byStage: [{ stage: 6, tokens: 120000, cost: 0.42 }],  // 0.42, not 0.45
+   * //   editing: { tokens: 5000, cost: 0.03 },
+   * // }
    * ```
    */
   getCourseTokenSummary: superadminProcedure

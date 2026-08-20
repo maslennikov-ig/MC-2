@@ -546,8 +546,14 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // the CHECK constraint on generation_trace.stage to accept 'stage_edit', so it
 // touches no function inside the security manifest and needs no new `after-*`
 // digest.
+// Re-pinned 2026-08-20 for the cost-ledger follow-ups: 238 files, adding
+// 20260820140000_generation_trace_course_id_id_index.sql (index swap on
+// generation_trace, mc2-hjhy5) and 20260820140100_restart_from_stage_single_signature.sql
+// (mc2-wxvyr, mc2-fyn4f). The second one does replace a function body, but
+// `restart_from_stage` is not part of the document-evidence security manifest —
+// it appears nowhere in this file — so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '62c3576db51c5aa23c59c8f0d344de47095ab19c7fae9d6db691cc37720abc68';
+  'a6f557ad0ef84a5eb65976d5021fdaf820e8644b1f5c3a0c4eb77db2b5b161c9';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

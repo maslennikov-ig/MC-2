@@ -143,13 +143,21 @@ export async function logTrace(params: TraceLogParams): Promise<void> {
       model_used: params.modelUsed || null,
       prompt_text: STORE_PROMPTS_IN_DB ? params.promptText || null : null,
       completion_text: STORE_PROMPTS_IN_DB ? params.completionText || null : null,
-      tokens_used: params.tokensUsed || null,
-      cost_usd: params.costUsd || null,
-      temperature: params.temperature || null,
+      // `??`, not `||`. 0 is falsy, and every one of these columns has a
+      // meaningful zero: a call that genuinely cost $0, a call that produced no
+      // tokens, a deterministic call at temperature 0, a judge that scored 0.
+      // `||` filed all four as NULL — "not measured" — which is the same value
+      // an unrecorded call leaves behind. That corrupted the one metric used to
+      // find pricing holes: the rows counted as "tokens but no price" could not
+      // tell a free call from an unpriced one (mc2-y452l).
+      tokens_used: params.tokensUsed ?? null,
+      cost_usd: params.costUsd ?? null,
+      temperature: params.temperature ?? null,
       duration_ms: params.durationMs,
+      // These two keep `||` on purpose: their falsy value *is* the default.
       retry_attempt: params.retryAttempt || 0,
       was_cached: params.wasCached || false,
-      quality_score: params.qualityScore || null,
+      quality_score: params.qualityScore ?? null,
     };
 
     const { error } = await supabase.from('generation_trace').insert(insertPayload);
