@@ -101,7 +101,13 @@ export function withMandatoryReasoningRecovery(
     } catch (error) {
       if (!isMandatoryReasoningRejection(error)) throw error;
       rememberMandatoryReasoning(modelId);
-      return await rebuild().invoke(...args);
+      const retryModel = rebuild();
+      // The rebuild is a fresh instance, and everything attached to the model
+      // after it was wrapped - cost recording above all - lives on the old one.
+      // Read the callbacks now rather than at wrap time: `attachCostRecording`
+      // runs after this function returns, so at wrap time there are none.
+      retryModel.callbacks = model.callbacks;
+      return await retryModel.invoke(...args);
     }
   }) as ChatOpenAI['invoke'];
   return model;

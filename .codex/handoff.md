@@ -98,6 +98,66 @@ Stage 7 does not use the LangChain path that function belongs to. Its six calls 
 OpenAI SDK client and none passed a `costContext`, so they left no trace row at all. All six now do,
 and a guard reads the sources so the next call site cannot forget (`mc2-gmab0`).
 
+**Live confirmation run (2026-08-16, course `944e6795` on dev, USD 0.0646 billed).** A micro course
+ran end to end plus one Stage 7 quiz, with no other traffic on the key in the window. Two of the three
+`mc2-gmab0` fixes are now proven on real data, and the run found what the tests could not:
+
+- Confirmed: the Stage 6 container itself refreshes the course total (`0.003264 → 0.020332 →
+0.027658`), and Stage 7 SDK calls now write priced `stage_7` trace rows — including the two that
+  failed, which is the failed-stage-spend fix working.
+- Not confirmed: the mandatory-reasoning recovery never fired. No model refused, so it stays held by
+  unit tests alone.
+- **The course total is still wrong, for a reason the fix did not touch.** Recorded 0.0310 against
+  0.0646 actually billed. Stage 6 lesson generation carries no price at all on the synchronous path
+  (`mc2-4wiot`, P0: `generationCostUsd` is only set from a Batch prefetch or a retry, and Batch is off
+  by default), and the card image's USD 0.007 lives only in the enrichment metadata (`mc2-acjgd`).
+  About a cent beyond those two is still unexplained — `mc2-z0xr3` is the reconciliation.
+- Also found: quiz generation dies whenever the model answers `time_limit_minutes: null`, and pays
+  for both attempts (`mc2-d3726`); the Stage 6 finalize progress warning names no field (`mc2-g3v9c`).
+
+**Everything that run exposed is fixed and merged, except the count itself (`mc2-b7olk`).** One rule
+replaced four half-conventions: a paid call prices itself at the call, from its own token split and
+the model the provider actually served; a node-level summary row keeps tokens and carries no price.
+Writing lessons, continuing a truncated one, regenerating a section, self-review, both judge paths,
+the patcher, the delta judge, the expander, image generation, Stage 2 summarization, Stage 3
+classification, the Stage 4 visual style, the mermaid repair and the presentation critic all do this
+now. `judge_complete` stopped estimating — it split the whole cascade's tokens evenly across judges
+and charged refinement tokens at judge rates — because pricing the calls while it still estimated
+would have counted the same tokens twice.
+
+Two holes are named rather than closed, both found by the guard while writing it: document evidence
+prices itself into its own coverage ledger and never reaches the course total (`mc2-b7olk.4`), and
+editing a course — chat, inline blocks, element CRUD — has no stage in `generation_trace` to charge
+at all (`mc2-b7olk.5`). They are in the guard's exception list with those ids, so the list can shrink
+but not grow in silence.
+
+**Second confirmation run (2026-08-17, course `b0b2efde` on dev, USD 0.092839 billed).** No other
+traffic on the key: the baseline read equalled the previous run's closing figure to the cent, and all
+production containers were silent through the window.
+
+- The recompute is exact: `estimated_cost_usd` 0.0509 == `sum(generation_trace.cost_usd)` 0.050911.
+- Newly visible, and previously worth nothing: lesson generation (`stage_6_content`, 5 calls, 29544
+  tokens, 0.012492), the section expander (0.002745), the card image (`image_call`, 0.007).
+- Nothing is double-counted: `generator_complete` and `judge_complete` carry tokens and no price.
+- The recorded share of the bill went from 48% (0.0310 of 0.0646) to 55% (0.0509 of 0.0928).
+
+**The sum still does not reconcile — 0.0419 unexplained — but the run named three reasons instead of
+leaving a mystery.** Self-review passed no `courseId`, so five calls and 37159 tokens were
+unattributed; that is fixed here, and it is the class the source guard cannot see, because the call
+site does pass a context and the context is simply empty. The provider served
+`deepseek-v4-flash-0731`, a dated snapshot that is not a catalogue key, so that row was written with
+no price at all — and its real tariff is 1.7× the alias it was asked for (`mc2-b7olk.6`). Three quiz
+attempts died on a 4-minute timeout and left no row at all, because the price is recorded only after
+a successful response (`mc2-b7olk.7`); the timeouts themselves are `mc2-b7olk.8`, and they cost the
+course its quiz. Those three come to roughly 0.013 of the 0.0419; about 0.029 is still unaccounted.
+
+All three are now fixed: self-review is handed the course, a served variant is priced from the model it
+is a variant of (with a warning naming the id the catalogue should gain, because a snapshot's own
+tariff is higher), and a failed call leaves an `llm_call_failed` row carrying the reason and a
+`spentButUnpriced` marker rather than nothing. `mc2-z0xr3` stays open: the next paid run is the one
+that can finally split the remaining gap, because every known cause of it now either prices itself or
+says out loud that it could not.
+
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
 the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
@@ -161,6 +221,10 @@ remain explicitly deferred.
   pull is the only real mitigation — a second machine, not disaster recovery. `mc2-hfoh3` closed.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
+- Both environments carry the live-run fixes as of 2026-08-16: dev on `857c3f05e`, staging on
+  `b065399dc` (29 commits, Blue/Green switched to green, all CI jobs green). Staging worker logs now
+  read `environment: "stage"`, which is the label fix working — before it, the staging host called
+  itself `production` and was indistinguishable from it in a log search.
 - Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
   set (all 87 files behind the 218 indexed documents are present on disk, verified 2026-08-13).
   Uploads live on the production host, not in Supabase Storage — the only bucket is
@@ -206,20 +270,25 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-gmab0` live confirmation — the Stage 6/Stage 7 cost fixes and the mandatory-reasoning
-  recovery are held by unit tests only. Confirming them needs a paid course, so they ride along with
-  whatever run the owner authorizes next rather than asking for one of their own.
+- `mc2-gmab0` mandatory-reasoning recovery — the 2026-08-16 run did not exercise it, because no model
+  refused to disable reasoning. Still held by unit tests only; it rides along with the next paid run.
+  The two cost fixes in that issue are confirmed live and no longer deferred.
+- `mc2-b7olk.4`, `mc2-b7olk.5` — document evidence keeps its own cost ledger, and course editing has
+  no stage to charge. Both need a decision about where that money belongs, not a forgotten argument.
+- `mc2-z0xr3` — the one paid run that proves the total. Needs current authorization to spend; the
+  fixes it verifies are merged and deployed.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: epic `mc2-4clyr`
+Next stage id: `mc2-z0xr3`, then epic `mc2-4clyr`
 
-Recommended action: epic `mc2-4clyr`, generation cost. Note what is **not** proven: the Stage 6 and
-Stage 7 cost fixes are held by unit tests and have not been seen on a live course, and neither has
-the mandatory-reasoning recovery — both would be confirmed for free by whatever paid run happens
-next, not by a run of their own.
+Recommended action: `mc2-z0xr3` — one paid micro course, `/credits` read before and after, recorded
+total compared against the delta. Every fix it verifies is merged; what is not verified is that they
+add up. Do not start `mc2-4clyr` before that number holds: the epic is about cutting generation cost,
+and on 2026-08-16 the recorded cost was roughly half the real one. Costing it on today's numbers
+would cost it on a number we already know is wrong.
 
 `mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,

@@ -138,7 +138,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     // 2. MERMAID FIX PIPELINE (on full content, single pass)
     // ========================================================================
     try {
-      const pipelineResult = await runMermaidFixPipeline(generatedContent);
+      const pipelineResult = await runMermaidFixPipeline(generatedContent, { courseId });
       if (pipelineResult.modified) {
         logger.debug(
           {
@@ -280,8 +280,11 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       },
       modelUsed,
       tokensUsed: totalTokens,
-      // Whatever the generation itself could price: the batch item's provider
-      // figure, plus a synchronous corrective retry when one ran.
+      // Only the Batch path lands here: its provider figure arrives with the
+      // prefetched response, plus a synchronous corrective retry when one ran.
+      // A live call prices itself at the call, where the token split is, and
+      // leaves its own `llm_call` row - so this row must not price it again
+      // (mc2-4wiot).
       costUsd: generationCostUsd ?? undefined,
       durationMs,
     });

@@ -33,3 +33,16 @@ export function parseGenerationProgress(data: unknown): GenerationProgressData |
   const result = GenerationProgressSchema.safeParse(data);
   return result.success ? result.data : null;
 }
+
+/**
+ * Why the data was rejected, one line per field.
+ *
+ * The caller used to log the whole object and leave the reader to guess which
+ * key the validator disliked - a validator that knows the answer and prints the
+ * question instead (mc2-g3v9c). Empty when the data is valid.
+ */
+export function explainGenerationProgress(data: unknown): string[] {
+  const result = GenerationProgressSchema.safeParse(data);
+  if (result.success) return [];
+  return result.error.issues.map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`);
+}

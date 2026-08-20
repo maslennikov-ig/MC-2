@@ -274,6 +274,7 @@ ${dynamicContext.content}
       maxTokens,
       systemPrompt,
       enableCaching: true,
+      costContext: { courseId, stage: 'stage_edit', phase: 'inline_block_regeneration' },
     });
 
     // Step 8: Parse LLM response

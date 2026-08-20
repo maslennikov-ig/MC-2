@@ -196,16 +196,16 @@ describe('retry-strategy.ts - Pure Functions', () => {
   });
 
   describe('getModelForAttempt()', () => {
-    it('should return primary model for quiz on attempt 1', () => {
+    it('should return null for quiz on attempt 1 so llm_model_config decides', () => {
       const model = getModelForAttempt('quiz', 1);
 
-      expect(model).toBe('deepseek/deepseek-v4-flash');
+      expect(model).toBe(null);
     });
 
-    it('should return primary model for quiz on attempt 2', () => {
+    it('should return fallback model for quiz on attempt 2', () => {
       const model = getModelForAttempt('quiz', 2);
 
-      expect(model).toBe('deepseek/deepseek-v4-flash');
+      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
     });
 
     it('should return fallback model for quiz on attempt 3', () => {
@@ -214,10 +214,10 @@ describe('retry-strategy.ts - Pure Functions', () => {
       expect(model).toBe('qwen/qwen3-235b-a22b-2507');
     });
 
-    it('should return primary model for presentation on attempt 1', () => {
+    it('should return null for presentation on attempt 1 so llm_model_config decides', () => {
       const model = getModelForAttempt('presentation', 1);
 
-      expect(model).toBe('deepseek/deepseek-v4-flash');
+      expect(model).toBe(null);
     });
 
     it('should return fallback model for presentation on attempt 3', () => {

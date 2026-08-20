@@ -30,7 +30,8 @@ import {
 } from './database-service';
 import { uploadEnrichmentAsset } from './unified-storage-service';
 import { routeEnrichment, isTwoStageEnrichment } from './enrichment-router';
-import { STAGE7_CONFIG } from '../config';
+import { STAGE7_CONFIG, ENRICHMENT_PHASE_NAMES } from '../config';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   shouldRetry,
   getRetryDelay,
@@ -352,6 +353,39 @@ async function finalizeSuccessfulResult(
  * @param job - BullMQ job to process
  * @returns Job result
  */
+/**
+ * `fallback_model_id` for an LLM-based enrichment, or null when it does not apply.
+ *
+ * Read only when a retry is actually about to use it: the first attempt needs no
+ * fallback, and accounting for a route failure must not add a database round
+ * trip to the happy path. A config that cannot be read is not an error here —
+ * the caller then uses the last-resort constant.
+ */
+async function resolveConfiguredFallbackModel(
+  enrichmentType: Stage7EnrichmentType,
+  courseId: string,
+  attempt: number
+): Promise<string | null> {
+  if (attempt <= 1) return null;
+  const phaseName = ENRICHMENT_PHASE_NAMES[enrichmentType as keyof typeof ENRICHMENT_PHASE_NAMES];
+  if (!phaseName) return null;
+
+  try {
+    const config = await createModelConfigService().getModelForPhase(phaseName, courseId);
+    return config.fallbackModelId;
+  } catch (error) {
+    logger.warn(
+      {
+        phaseName,
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Could not read the configured fallback model; using the built-in one'
+    );
+    return null;
+  }
+}
+
 export async function processStage7Job(
   job: Job<Stage7JobInput, Stage7JobResult>
 ): Promise<Stage7JobResult> {
@@ -458,15 +492,23 @@ export async function processStage7Job(
       message: `Generating ${enrichmentType} content`,
     });
 
-    // Get model for LLM-based enrichments
-    const model = getModelForAttempt(enrichmentType, attemptNumber);
+    // Get model for LLM-based enrichments. A first attempt gets no override, so
+    // the handler resolves the configured model; a retry is forced onto the
+    // configured fallback, since the configured route just failed.
+    const model = getModelForAttempt(
+      enrichmentType,
+      attemptNumber,
+      await resolveConfiguredFallbackModel(enrichmentType, courseId, attemptNumber)
+    );
 
     // Prepare handler input
     const handlerInput: EnrichmentHandlerInput = {
       enrichmentContext,
       settings: {
         ...settings,
-        model,
+        // Only when there is one: writing the key unconditionally overwrote a
+        // model the caller had chosen with whatever this package thought.
+        ...(model ? { model } : {}),
         __nlm_async_mode: isNlmPollJob ? 'poll' : 'start',
         __nlm_bridge_task_id: nlmAsyncState?.taskId,
         __nlm_poll_attempt: nlmAsyncState?.pollAttempt ?? 0,

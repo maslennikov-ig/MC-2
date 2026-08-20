@@ -136,6 +136,24 @@ describe('the LangChain wrapper', () => {
     await expect(model.invoke('hello' as never)).rejects.toThrow(/mandatory/);
   });
 
+  it('carries cost recording onto the model it rebuilds', async () => {
+    // The recovery replaces the instance, and cost recording is attached to the
+    // original after it was wrapped. Losing it here would make a recovered call
+    // the one call of the run that nobody is charged for.
+    const rebuilt = { invoke: vi.fn(async () => 'answer'), callbacks: undefined as unknown };
+    const model = withMandatoryReasoningRecovery(
+      refusingModel(1) as never,
+      UNFLAGGED,
+      () => rebuilt as never
+    );
+    const recorder = [{ handleLLMEnd: vi.fn() }];
+    (model as unknown as { callbacks: unknown }).callbacks = recorder;
+
+    await model.invoke('hello' as never);
+
+    expect(rebuilt.callbacks).toBe(recorder);
+  });
+
   it('does not touch a failure that is about something else', async () => {
     const rebuilt = { invoke: vi.fn() };
     const model = withMandatoryReasoningRecovery(

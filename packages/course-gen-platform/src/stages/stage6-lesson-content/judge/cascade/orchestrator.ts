@@ -179,6 +179,7 @@ export async function executeCascadeEvaluation(
       presentationCritic = await runPresentationCritic({
         markdown: lessonMarkdown,
         lessonSpec: input.lessonSpec,
+        courseId: input.courseId,
       });
 
       if (presentationCritic.upgradedAction) {
@@ -390,6 +391,8 @@ export async function executeCascadeEvaluation(
     lessonSpec: input.lessonSpec,
     ragChunks: input.ragChunks,
     language: input.language,
+    courseId: input.courseId,
+    lessonUuid: input.lessonUuid,
   };
 
   const clevResult = await executeCLEVVoting(clevInput, {

@@ -29,6 +29,7 @@ import {
   type PresentationOutput,
 } from '../prompts/presentation-prompt';
 import { getLessonContent } from '../services/database-service';
+import { LLM_CALL_BUDGET } from '../config';
 
 // ============================================================================
 // CONFIGURATION
@@ -267,6 +268,8 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       systemPrompt,
       maxTokens: MAX_DRAFT_TOKENS,
       temperature: DRAFT_TEMPERATURE,
+      timeout: LLM_CALL_BUDGET.timeoutMs,
+      maxRetries: LLM_CALL_BUDGET.transportRetries,
       costContext: {
         courseId: enrichmentContext.course.id,
         stage: 'stage_7',
@@ -435,8 +438,23 @@ async function generateFinal(
     draftOutput
   );
 
-  // Get model from settings or use fallback
-  const model = (settings.model as string) || FALLBACK_MODEL;
+  // Get model with optimized resolution: settings → database → fallback.
+  //
+  // The same resolution as the draft, deliberately. Reading `settings.model`
+  // alone was fine only while this package always wrote that key; once a first
+  // attempt stopped forcing a model, the final call fell through to
+  // DEFAULT_MODEL_ID and never asked the database, so one presentation could be
+  // drafted by the configured model and finished by another (mc2-vk1zl).
+  const model = await resolveModelWithFallback({
+    settingsModel: settings.model as string | undefined,
+    phaseName: 'stage_7_presentation',
+    courseId: enrichmentContext.course.id,
+    fallbackModel: FALLBACK_MODEL,
+    logContext: {
+      enrichmentId: enrichmentContext.enrichment.id,
+      lessonId: enrichmentContext.lesson.id,
+    },
+  });
 
   try {
     // Generate final slides via LLM
@@ -445,6 +463,8 @@ async function generateFinal(
       systemPrompt,
       maxTokens: MAX_FINAL_TOKENS,
       temperature: FINAL_TEMPERATURE,
+      timeout: LLM_CALL_BUDGET.timeoutMs,
+      maxRetries: LLM_CALL_BUDGET.transportRetries,
       costContext: {
         courseId: enrichmentContext.course.id,
         stage: 'stage_7',

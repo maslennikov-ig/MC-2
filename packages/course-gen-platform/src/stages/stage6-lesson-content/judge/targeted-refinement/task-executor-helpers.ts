@@ -108,6 +108,15 @@ export async function executeLlmCall(
     temperature: options.temperature,
     maxTokens: options.maxTokens,
     systemPrompt,
+    ...(options.courseId
+      ? {
+          costContext: {
+            courseId: options.courseId,
+            stage: 'stage_6' as const,
+            phase: 'stage_6_patcher',
+          },
+        }
+      : {}),
   });
 
   return {

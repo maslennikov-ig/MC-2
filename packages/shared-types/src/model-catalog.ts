@@ -360,8 +360,48 @@ export const UNKNOWN_MODEL_PRICING: ModelCapabilities = {
   supportsReasoning: false,
 };
 
+/**
+ * The catalogue key a served model id belongs to.
+ *
+ * A price follows the model the provider actually served, and that is not always
+ * what was asked for: OpenRouter answers `deepseek/deepseek-v4-flash` with
+ * `deepseek/deepseek-v4-flash-0731`, and a router alias arrives as
+ * `~vendor/model-latest`. Neither is a catalogue key, so the call was traced
+ * with no price at all (mc2-b7olk.6).
+ *
+ * Only shapes that are certainly the same model are stripped: a leading `~`
+ * router marker, a trailing `-latest`, a trailing `:batch` suffix, and a
+ * trailing date. Anything else is left alone — a differently named model is a
+ * different model, not a spelling of this one.
+ */
+export function normalizeModelId(modelId: string): string {
+  return modelId
+    .replace(/^~/u, '')
+    .replace(/:batch$/u, '')
+    .replace(/-latest$/u, '')
+    .replace(/-\d{4,8}$/u, '');
+}
+
+/**
+ * What is known about a model, by exact id or by the id it is a variant of.
+ *
+ * A variant's tariff can differ from its base — the 0731 snapshot costs 1.7× the
+ * alias — so the base entry is a floor, not the truth. It is still better than
+ * no price: an unpriced row disappears from the course total silently.
+ */
 export function getModelCapabilities(modelId: string): ModelCapabilities | null {
-  return MODEL_CATALOG[modelId] ?? null;
+  // Callers reach here from accounting paths where the served model can be
+  // missing entirely - the Batch API omits it on some result bodies - and a
+  // lookup that throws would fail the generation it was only counting.
+  if (!modelId) return null;
+  const exact = MODEL_CATALOG[modelId];
+  if (exact) return exact;
+  return MODEL_CATALOG[normalizeModelId(modelId)] ?? null;
+}
+
+/** Whether the price for this id is its own, rather than its base model's. */
+export function hasExactModelPricing(modelId: string): boolean {
+  return modelId in MODEL_CATALOG;
 }
 
 export function isModelInCatalog(modelId: string): boolean {

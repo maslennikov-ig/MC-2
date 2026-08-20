@@ -14,7 +14,7 @@
  */
 
 import { z } from 'zod';
-import { createLLMEnumSchema } from './analysis-schemas';
+import { createLLMEnumSchema, llmOptional } from './analysis-schemas';
 
 // ============================================================================
 // BLOOM'S TAXONOMY LEVELS
@@ -148,7 +148,7 @@ export const quizQuestionSchema = z.object({
   question: z.string().min(10),
 
   /** Multiple choice options (required for multiple_choice type) */
-  options: z.array(quizOptionSchema).optional(),
+  options: llmOptional(z.array(quizOptionSchema)),
 
   /** Correct answer (string for MC/short answer, boolean for true/false) */
   correct_answer: z.union([z.string(), z.boolean(), z.number(), z.array(z.string())]),
@@ -201,7 +201,7 @@ export const quizEnrichmentContentSchema = z.object({
   passing_score: z.number().int().min(0).max(100),
 
   /** Optional time limit in minutes */
-  time_limit_minutes: z.number().int().positive().optional(),
+  time_limit_minutes: llmOptional(z.number().int().positive()),
 
   /** Whether to shuffle question order */
   shuffle_questions: z.boolean().default(false),

@@ -232,6 +232,7 @@ export async function executeIntentClassificationFlow(
     // Step 1b: Tier 1 — Cheap LLM classification (~200 tokens, ~$0.00005)
     try {
       classifiedIntent = await classifyIntent(
+        courseId,
         userMessage,
         nodeContext
           ? {

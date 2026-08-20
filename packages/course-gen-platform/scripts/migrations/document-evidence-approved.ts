@@ -541,8 +541,13 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // files, adding 20260815150000_auto_answer_system_source.sql and
 // 20260815160000_guarded_course_structure_commit.sql. Neither touches a
 // function inside the security manifest, so no new `after-*` digest is needed.
+// Re-pinned 2026-08-20 for the editing cost ledger (mc2-5y8ox): 236 files,
+// adding 20260820120000_generation_trace_allows_stage_edit.sql. It only widens
+// the CHECK constraint on generation_trace.stage to accept 'stage_edit', so it
+// touches no function inside the security manifest and needs no new `after-*`
+// digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '457d00fb17e334f42ffdd760daa696ff220678cf8922b81dc483286b2ca507f7';
+  '62c3576db51c5aa23c59c8f0d344de47095ab19c7fae9d6db691cc37720abc68';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

@@ -118,6 +118,17 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
     maxTokens: dynamicMaxTokens,
     systemPrompt,
     timeout: LLM_PER_ATTEMPT_TIMEOUT_MS,
+    // Self-review read the whole lesson on every attempt and left no trace row
+    // at all - not even its tokens (mc2-b7olk.1).
+    ...(courseId
+      ? {
+          costContext: {
+            courseId,
+            stage: 'stage_6' as const,
+            phase: 'stage_6_refinement',
+          },
+        }
+      : {}),
   };
 
   try {

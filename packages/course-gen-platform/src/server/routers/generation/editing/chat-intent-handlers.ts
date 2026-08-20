@@ -229,6 +229,10 @@ export async function handleLLMRequiredRoute(
   let modelUsed = targetedModelId;
   let targetedLLMResponse;
 
+  // A chat turn is paid work on this course; its phase is named after the edit,
+  // not a stage, which is why nothing recorded it (mc2-b7olk.5).
+  const costContext = { courseId, stage: 'stage_edit' as const, phase: phaseKey };
+
   // Try primary model (from DB or hardcoded fallback)
   try {
     targetedLLMResponse = await llmClient.generateChatCompletion(
@@ -241,6 +245,7 @@ export async function handleLLMRequiredRoute(
         temperature: targetedTemperature,
         maxTokens: targetedMaxTokens,
         enableCaching: true,
+        costContext,
       }
     );
   } catch (primaryError) {
@@ -267,6 +272,7 @@ export async function handleLLMRequiredRoute(
           temperature: targetedTemperature,
           maxTokens: targetedMaxTokens,
           enableCaching: true,
+          costContext,
         }
       );
     } catch (fallbackError) {
@@ -464,13 +470,16 @@ Respond ONLY with valid JSON, no markdown fences.`;
   let modelUsed = modelId;
   let llmResponse;
 
+  // See the note in the intent flow above: an edit is spend on the course.
+  const costContext = { courseId, stage: 'stage_edit' as const, phase: phaseKey };
+
   try {
     llmResponse = await llmClient.generateChatCompletion(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: modelId, temperature, maxTokens: 2048, enableCaching: true }
+      { model: modelId, temperature, maxTokens: 2048, enableCaching: true, costContext }
     );
   } catch {
     modelUsed = fallbackModelId;
@@ -479,7 +488,7 @@ Respond ONLY with valid JSON, no markdown fences.`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      { model: fallbackModelId, temperature, maxTokens: 2048, enableCaching: true }
+      { model: fallbackModelId, temperature, maxTokens: 2048, enableCaching: true, costContext }
     );
   }
 

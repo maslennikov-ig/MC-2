@@ -18,7 +18,10 @@ import {
   Json,
 } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
-import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
+import {
+  explainGenerationProgress,
+  parseGenerationProgress,
+} from '@/shared/schemas/generation-progress.schema';
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
@@ -1181,6 +1184,7 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         logger.warn(
           {
             courseId,
+            invalidFields: explainGenerationProgress(course.generation_progress),
             generation_progress: course.generation_progress,
           },
           'Invalid generation_progress data in database - using fallback'

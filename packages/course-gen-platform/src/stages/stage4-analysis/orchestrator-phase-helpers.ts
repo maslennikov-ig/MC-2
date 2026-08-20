@@ -373,8 +373,8 @@ async function runDocumentEvidencePhaseCore(
       if (!modelId) throw new Error('Configured Stage 4 model is required for document evidence');
       return {
         repository: evidenceRepository,
-        structuredPort: createProductionStructuredEvidencePort(modelId),
-        extractor: createProductionEvidenceExtractor(modelId),
+        structuredPort: createProductionStructuredEvidencePort(modelId, context.courseId),
+        extractor: createProductionEvidenceExtractor(modelId, context.courseId),
         verifyTargetedSources: verifyEvidenceSourcesWithQdrant,
         loadSourceContents: async ({ documentIds }) =>
           fetchFullTextDocuments(documentIds, context.courseId),
@@ -484,7 +484,11 @@ async function runDocumentEvidencePhaseCore(
       overrides?.conflictDependencies ??
       ({
         repository,
-        port: createProductionConflictDetectionPort({ modelId, maxRetries: 2 }),
+        port: createProductionConflictDetectionPort({
+          modelId,
+          courseId: context.courseId,
+          maxRetries: 2,
+        }),
         verifyMaterialSources: verifyEvidenceSourcesWithQdrant,
         log: context.orchestrationLogger,
       } satisfies DetectDocumentConflictsDependencies);

@@ -59,6 +59,8 @@ export interface VisualStyleParams {
   language: string;
   /** Optional category hint (professional, creative, academic, etc.) */
   category?: string;
+  /** Course to charge the call to; without it the style is generated unpriced. */
+  courseId?: string;
 }
 
 // ============================================================================
@@ -239,6 +241,15 @@ export async function generateVisualStyle(params: VisualStyleParams): Promise<Vi
       systemPrompt,
       maxTokens: MAX_STYLE_TOKENS,
       temperature: STYLE_TEMPERATURE,
+      ...(params.courseId
+        ? {
+            costContext: {
+              courseId: params.courseId,
+              stage: 'stage_4' as const,
+              phase: 'stage_4_synthesis',
+            },
+          }
+        : {}),
     });
 
     logger.debug(

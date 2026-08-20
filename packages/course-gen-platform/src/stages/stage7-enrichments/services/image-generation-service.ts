@@ -10,6 +10,7 @@ import OpenAI from 'openai';
 import sharp from 'sharp';
 import { logger } from '@/shared/logger';
 import { getApiKey } from '@/shared/services/api-key-service';
+import { recordImageCallCost, type LlmCostContext } from '@/shared/metrics/llm-cost';
 
 // ============================================================================
 // CONFIGURATION
@@ -95,6 +96,11 @@ function getImageDimensions(
 // ============================================================================
 
 export interface ImageGenerationOptions {
+  /**
+   * Where to charge the picture. Without it the image is generated and paid
+   * for, and the course total never learns of it (mc2-acjgd).
+   */
+  costContext?: LlmCostContext;
   /** Model to use (default: google/gemini-2.5-flash-image) */
   model?: string;
   /** Aspect ratio for image generation (default: '21:9' cinematic) */
@@ -209,6 +215,9 @@ export async function generateImage(
       };
     }
 
+    // cost-exempt: an image is billed per picture, not per token, so this call
+    // prices itself with `recordImageCallCost` below rather than through either
+    // LLM wrapper — the provider's own figure is the only correct one.
     // @ts-expect-error - OpenRouter extensions not in OpenAI types
     const response = await client.chat.completions.create(requestOptions, {
       signal: abortController.signal,
@@ -323,6 +332,11 @@ export async function generateImage(
       'Image generation completed'
     );
 
+    await recordImageCallCost(
+      { model, costUsd },
+      options.costContext ? { durationMs, ...options.costContext } : undefined
+    );
+
     return {
       base64Data,
       mimeType,
@@ -363,11 +377,15 @@ export async function generateImage(
  * @param prompt - Card image prompt
  * @returns Generated card image data
  */
-export async function generateCardImage(prompt: string): Promise<ImageGenerationResult> {
+export async function generateCardImage(
+  prompt: string,
+  costContext?: LlmCostContext
+): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: CARD_IMAGE_MODEL,
     aspectRatio: '1:1',
     imageSize: '1K',
+    costContext,
   });
 }
 
@@ -380,11 +398,15 @@ export async function generateCardImage(prompt: string): Promise<ImageGeneration
  * @param prompt - Cover image prompt
  * @returns Generated cover image data
  */
-export async function generateCoverImage(prompt: string): Promise<ImageGenerationResult> {
+export async function generateCoverImage(
+  prompt: string,
+  costContext?: LlmCostContext
+): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: DEFAULT_IMAGE_MODEL,
     aspectRatio: '21:9',
     imageSize: '1K',
+    costContext,
   });
 }
 

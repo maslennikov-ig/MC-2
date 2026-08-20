@@ -1,7 +1,9 @@
 import { logger } from '@/shared/logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
 import { getLanguageName } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   STAGE6_TIER_MODELS,
   TRUNCATION_CONTINUATION_MAX_TOKENS,
@@ -29,8 +31,13 @@ export async function generateTruncationContinuation(
   const tailContext = currentContent.slice(-TRUNCATION_CONTINUATION_TAIL_CHARS);
   const sectionsList = lessonSpec.sections.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
 
-  const modelId = await resolveContinuationModelId(lessonSpec, courseId);
-  const model = createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS);
+  const { modelId, phaseName } = await resolveContinuationModel(lessonSpec, courseId);
+  const model = attachCostRecording(
+    createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS),
+    modelId,
+    phaseName,
+    courseId
+  );
 
   const prompt = TRUNCATION_CONTINUATION_PROMPT_TEMPLATE.replace(
     '{{outputLanguage}}',
@@ -72,13 +79,13 @@ export async function generateTruncationContinuation(
   };
 }
 
-async function resolveContinuationModelId(
+async function resolveContinuationModel(
   lessonSpec: LessonSpecificationV2,
   courseId?: string
-): Promise<string> {
+): Promise<{ modelId: string; phaseName: PhaseName }> {
   try {
     const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
-    return tierResult.model;
+    return { modelId: tierResult.model, phaseName: tierResult.phaseName };
   } catch (error) {
     const difficultyLevel = lessonSpec.difficulty_level || 'intermediate';
     const moduleNumber = lessonSpec.lesson_id?.split('.')[0] || '';
@@ -100,7 +107,10 @@ async function resolveContinuationModelId(
       },
       'Failed to resolve continuation model from config, using hardcoded fallback'
     );
-    return STAGE6_TIER_MODELS[fallbackTier];
+    return {
+      modelId: STAGE6_TIER_MODELS[fallbackTier],
+      phaseName: `stage_6_${fallbackTier}` as PhaseName,
+    };
   }
 }
 

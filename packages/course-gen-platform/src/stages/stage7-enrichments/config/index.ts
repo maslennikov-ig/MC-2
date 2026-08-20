@@ -43,20 +43,70 @@ export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — enrichments (quiz
 
 /**
  * Model configuration for LLM-based enrichments (quiz, presentation)
+ *
+ * There is no `primary` here on purpose. The primary model belongs to
+ * `llm_model_config`, where the pipeline-admin screen edits it; a constant here
+ * reached the handler as `settings.model`, which outranks the database, so the
+ * configured model and its `fallback_model_id` were both ignored for quiz and
+ * presentation (mc2-b7olk.8). These fallbacks apply only when the phase config
+ * names none.
  */
 export const MODEL_CONFIG = {
-  /** Primary model for quiz generation */
+  /** Last-resort fallback for quiz generation, used when the phase config has none */
   quiz: {
-    primary: 'deepseek/deepseek-v4-flash',
     fallback: 'qwen/qwen3-235b-a22b-2507',
   },
-  /** Primary model for presentation generation */
+  /** Last-resort fallback for presentation generation, used when the phase config has none */
   presentation: {
-    primary: 'deepseek/deepseek-v4-flash',
     fallback: 'qwen/qwen3-235b-a22b-2507',
   },
-  /** Max attempts before switching to fallback model */
-  maxPrimaryAttempts: 2,
+  /**
+   * Attempts the configured primary model gets before the fallback takes over.
+   *
+   * One. A route that holds the connection open until the client gives up fails
+   * the same way however many times it is asked, and each ask costs a full
+   * timeout and real money.
+   */
+  maxPrimaryAttempts: 1,
+} as const;
+
+/**
+ * What one LLM enrichment call is allowed to spend before it is abandoned.
+ *
+ * Measured, not chosen: on 2026-08-17, from inside `megacampus-worker-stage7-dev`,
+ * the real prompt for a 16.6k-character lesson (8338 input tokens, `max_tokens`
+ * 8192, reasoning off) answered in 31.0s — 1832 completion tokens, finish reason
+ * `stop`. Four times that leaves room for a longer lesson and a slower provider
+ * while keeping a stalled route from costing a quarter of an hour: the shared
+ * default is 238s, and three retries against a route that never answered held a
+ * worker for 32 minutes and produced nothing (mc2-b7olk.8).
+ *
+ * One transport retry, not the client's three, for the same reason. A route that
+ * holds the connection open until the timeout answers a retry exactly the same
+ * way, and the job's own retry has a better move available — the configured
+ * fallback model.
+ *
+ * Both LLM enrichments take this budget. It was quiz-only at first, which left
+ * the identical incident reachable through presentation.
+ */
+export const LLM_CALL_BUDGET = {
+  /** Wall-clock budget for one call, in milliseconds */
+  timeoutMs: 120_000,
+
+  /** Transport-level retries for one call */
+  transportRetries: 1,
+} as const;
+
+/**
+ * `llm_model_config.phase_name` for each LLM-based enrichment type.
+ *
+ * Written out rather than built as `stage_7_${type}`: an interpolated phase name
+ * is invisible to a grep for `stage_7_quiz`, and a live phase has been declared
+ * dead twice for exactly that reason.
+ */
+export const ENRICHMENT_PHASE_NAMES = {
+  quiz: 'stage_7_quiz',
+  presentation: 'stage_7_presentation',
 } as const;
 
 /**

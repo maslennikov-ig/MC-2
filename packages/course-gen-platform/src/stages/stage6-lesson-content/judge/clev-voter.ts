@@ -92,6 +92,10 @@ export interface CLEVEvaluationInput {
   ragChunks: RAGChunk[];
   /** Content language for judge selection ('ru' for Russian, others default to 'en') */
   language?: string;
+  /** Course the evaluation is charged to; without it a judge call is unpriced. */
+  courseId?: string;
+  /** Lesson row the evaluation belongs to, for per-lesson cost. */
+  lessonUuid?: string;
 }
 
 // ============================================================================
@@ -227,6 +231,16 @@ async function executeJudge(
       temperature: modelConfig.temperature,
       maxTokens: modelConfig.maxTokens,
       systemPrompt: 'You are a precise educational content evaluator. Output only valid JSON.',
+      ...(input.courseId
+        ? {
+            costContext: {
+              courseId: input.courseId,
+              stage: 'stage_6' as const,
+              phase: 'stage_6_judge',
+              ...(input.lessonUuid ? { lessonId: input.lessonUuid } : {}),
+            },
+          }
+        : {}),
     });
 
     const durationMs = Date.now() - startTime;

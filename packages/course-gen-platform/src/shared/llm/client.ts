@@ -33,6 +33,8 @@ import {
   rememberMandatoryReasoning,
 } from './mandatory-reasoning-recovery';
 import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
+import { logTrace } from '../trace-logger';
+import { tokenEstimator } from './token-estimator';
 
 /**
  * Wall-clock budget for a single LLM call, in milliseconds.
@@ -82,6 +84,15 @@ export interface LLMClientOptions {
    * course and is only counted in the provider's own key total.
    */
   costContext?: LlmCostContext;
+  /**
+   * Transport retries for this call, overriding the client's own count.
+   *
+   * Set it low where the caller has a better answer than trying again: a route
+   * that holds the connection open until the timeout fails identically on every
+   * retry, and each one costs a full timeout and real money. Stage 7 quiz spent
+   * six such waits — 32 minutes — before giving up (mc2-b7olk.8).
+   */
+  maxRetries?: number;
 }
 
 export interface LLMClientConstructionOptions {
@@ -247,6 +258,7 @@ export class LLMClient {
       enableCaching = false,
       reasoning,
       costContext,
+      maxRetries,
     } = options;
 
     logger.info(
@@ -274,13 +286,19 @@ export class LLMClient {
     const inputContentLength = systemPrompt.length + prompt.length;
 
     const startedAt = Date.now();
-    const response = await this.executeWithRetry(
-      () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
-      model,
-      'LLM'
-    );
-    await this.recordCost(response, costContext, startedAt);
-    return response;
+    try {
+      const response = await this.executeWithRetry(
+        () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
+        model,
+        'LLM',
+        maxRetries
+      );
+      await this.recordCost(response, costContext, startedAt);
+      return response;
+    } catch (error) {
+      await this.recordFailedCall(model, systemPrompt + prompt, costContext, startedAt, error);
+      throw error;
+    }
   }
 
   /**
@@ -305,6 +323,7 @@ export class LLMClient {
       enableCaching = false,
       reasoning,
       costContext,
+      maxRetries,
     } = options;
 
     logger.info(
@@ -326,13 +345,25 @@ export class LLMClient {
     }, 0);
 
     const startedAt = Date.now();
-    const response = await this.executeWithRetry(
-      () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
-      model,
-      'Chat completion'
-    );
-    await this.recordCost(response, costContext, startedAt);
-    return response;
+    try {
+      const response = await this.executeWithRetry(
+        () => this.executeSingleRequest(requestOptions, timeout, model, inputContentLength),
+        model,
+        'Chat completion',
+        maxRetries
+      );
+      await this.recordCost(response, costContext, startedAt);
+      return response;
+    } catch (error) {
+      await this.recordFailedCall(
+        model,
+        messages.map(m => (typeof m.content === 'string' ? m.content : '')).join(' '),
+        costContext,
+        startedAt,
+        error
+      );
+      throw error;
+    }
   }
 
   /**
@@ -342,6 +373,53 @@ export class LLMClient {
    * what was asked for once a fallback fires, so the price follows the served
    * model.
    */
+  /**
+   * Records that a call was made, paid for, and produced nothing.
+   *
+   * A request that times out has already made the provider generate tokens, and
+   * the provider bills them. The price is only recorded after a successful
+   * response, so those attempts left no row at all: on 2026-08-17 three quiz
+   * attempts died on a four-minute timeout and were invisible in a course total
+   * that was already 0.04 short of the invoice (mc2-b7olk.7).
+   *
+   * The row carries no price. What the provider generated before the connection
+   * was dropped is unknowable from here, and inventing a number would be worse
+   * than an honest gap: the input estimate says roughly how much was at stake,
+   * and the row makes the loss countable.
+   */
+  private async recordFailedCall(
+    model: string,
+    inputText: string,
+    costContext: LlmCostContext | undefined,
+    startedAt: number,
+    error: unknown
+  ): Promise<void> {
+    if (!costContext) return;
+
+    try {
+      await logTrace({
+        courseId: costContext.courseId,
+        stage: costContext.stage,
+        phase: costContext.phase,
+        stepName: 'llm_call_failed',
+        ...(costContext.lessonId ? { lessonId: costContext.lessonId } : {}),
+        modelUsed: model,
+        durationMs: Date.now() - startedAt,
+        errorData: {
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+          estimatedInputTokens: tokenEstimator.estimateTokens(inputText),
+          spentButUnpriced: true,
+        },
+      });
+    } catch (traceError) {
+      logger.warn(
+        { error: traceError instanceof Error ? traceError.message : String(traceError), model },
+        '[Cost] Could not record a failed LLM call'
+      );
+    }
+  }
+
   private async recordCost(
     response: LLMResponse,
     costContext: LlmCostContext | undefined,
@@ -443,17 +521,16 @@ export class LLMClient {
   private async executeWithRetry(
     requestFn: () => Promise<LLMResponse>,
     model: string,
-    label: string
+    label: string,
+    callMaxRetries?: number
   ): Promise<LLMResponse> {
+    const maxRetries = callMaxRetries ?? this.maxRetries;
     try {
       return await retryWithBackoff(requestFn, {
-        maxRetries: this.maxRetries,
+        maxRetries,
         delays: this.retryDelays,
         onRetry: (attempt, error) => {
-          logger.warn(
-            { attempt, maxRetries: this.maxRetries, error: error.message },
-            `Retrying ${label} request`
-          );
+          logger.warn({ attempt, maxRetries, error: error.message }, `Retrying ${label} request`);
         },
       });
     } catch (error) {

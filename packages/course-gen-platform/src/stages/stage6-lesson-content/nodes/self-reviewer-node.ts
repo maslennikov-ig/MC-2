@@ -256,6 +256,10 @@ export async function selfReviewerNode(
       ragChunks: state.ragChunks || [],
       generatedContent,
       language,
+      // Self-review reads the whole lesson on every attempt. The option to
+      // charge it existed and this one caller never filled it, so five calls
+      // and 37159 tokens went unattributed on the 2026-08-17 run.
+      courseId: state.courseId,
       detectedIssues: detectedIssues && detectedIssues.length > 0 ? detectedIssues : undefined,
     });
 

@@ -162,6 +162,8 @@ export interface MermaidPipelineResult {
 export interface MermaidPipelineOptions {
   /** Skip LLM fixing stage (useful for testing or CI environments) */
   skipLLM?: boolean;
+  /** Course to charge an LLM repair to; without it the repair is unpriced. */
+  courseId?: string;
 }
 
 /**
@@ -467,7 +469,7 @@ export async function runMermaidFixPipeline(
             const llmResult = await fixMermaidWithLLM(
               fixedCode,
               validation.errors[0],
-              { llmFixCount },
+              { llmFixCount, courseId: options?.courseId },
               tier
             );
 
