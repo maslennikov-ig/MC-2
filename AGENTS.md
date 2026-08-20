@@ -58,7 +58,8 @@ Typical code-change gates in this repo include:
 
 ## Knowledge Graph
 
-- This repo uses a local Graphify graph under `graphify-out/`; read `graphify-out/GRAPH_REPORT.md` before broad search for architecture, impact, or unfamiliar code.
+- This repo uses a local Graphify graph under `graphify-out/`. Query it before broad search for architecture, impact, decisions, or unfamiliar code; it indexes documentation as well as code.
+- A missing local graph is not permission to hand-search. Use an existing suitable sibling or owner graph explicitly with `--graph <path>`, say whose graph you used, and treat it as read-only orientation. Because it may describe another branch or worktree, confirm the exact file in the current tree.
 - Use focused `graphify query`, `graphify path`, or `graphify explain`; do not paste `graphify-out/graph.json` into chat context.
 - The project-local Codex `PreToolUse` hook that runs `graphify hook-check` is allowed for Bash reminders.
 - Do not install Graphify git hooks or configure external semantic/model backends unless explicitly asked.
