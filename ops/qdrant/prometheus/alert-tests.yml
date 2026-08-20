@@ -289,24 +289,92 @@ tests:
           - exp_labels:
               severity: critical
             exp_annotations:
-              summary: Supabase backup is stale or missing
+              summary: Supabase backup is stale
               description: No successful verified Supabase backup has been recorded within thirty hours. The metric is stamped only after pg_restore validation and pointer publication succeed.
       # A backup inside the window must NOT fire, or the alert is just noise on a timer.
       - eval_time: 29h
         alertname: SupabaseBackupStale
         exp_alerts: []
+      # A present-but-stale metric is not a missing one. Keeping these apart is the whole
+      # point of the mc2-adb6y split.
+      - eval_time: 31h
+        alertname: SupabaseBackupMetricMissing
+        exp_alerts: []
 
-  # supabase-backup-absent: never published is as bad as stale, and must not read as healthy.
+  # supabase-backup-absent: never published is as bad as stale, but it is a DIFFERENT
+  # problem and now has its own alert. On 2026-08-20 the old combined rule fired
+  # "backup is stale" because a full host disk stopped Prometheus writing its WAL; the
+  # backup had run perfectly. One means go look at the backup, the other means the
+  # monitoring cannot see.
   - interval: 1m
     input_series:
       - series: 'up{job="qdrant",environment="staging"}'
-        values: '1x10'
+        values: '1x30'
     alert_rule_test:
-      - eval_time: 6m
-        alertname: SupabaseBackupStale
+      - eval_time: 15m
+        alertname: SupabaseBackupMetricMissing
         exp_alerts:
           - exp_labels:
               severity: critical
             exp_annotations:
-              summary: Supabase backup is stale or missing
-              description: No successful verified Supabase backup has been recorded within thirty hours. The metric is stamped only after pg_restore validation and pointer publication succeed.
+              summary: Supabase backup metric is not being reported
+              description: 'The backup metric has been absent for ten minutes, so backup health is UNKNOWN rather than known-bad. Check the host before the backup: a full disk stops Prometheus writing its WAL and silences this series, and the textfile writer cannot publish either. See HostDiskCritical.'
+      # Absent must not masquerade as stale any more.
+      - eval_time: 15m
+        alertname: SupabaseBackupStale
+        exp_alerts: []
+
+  # host-capacity: the alert that did not exist on 2026-08-20, when the host reached 100%
+  # and the only thing that fired blamed the backup (mc2-adb6y). 148 GB total, held first
+  # at 20% free (quiet), then 10% (warning), then 3% (critical).
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_host_filesystem_size_bytes{mountpoint="/"}'
+        values: '148000000000x60'
+      - series: 'megacampus_host_filesystem_avail_bytes{mountpoint="/"}'
+        values: '29600000000x20 14800000000x20 4440000000x20'
+    alert_rule_test:
+      # 20% free: healthy, nothing fires.
+      - eval_time: 10m
+        alertname: HostDiskLow
+        exp_alerts: []
+      # 10% free, held past the 15m window.
+      - eval_time: 38m
+        alertname: HostDiskLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              mountpoint: /
+            exp_annotations:
+              summary: Host filesystem below 15% free
+              description: '/ has less than 15% free. Docker images and build cache are the usual cause; `docker builder prune -af` frees the most for the least risk.'
+      # 10% free must NOT read as critical; a warning that cries critical gets muted.
+      - eval_time: 38m
+        alertname: HostDiskCritical
+        exp_alerts: []
+      # 3% free, held past the 5m window.
+      - eval_time: 50m
+        alertname: HostDiskCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              mountpoint: /
+            exp_annotations:
+              summary: Host filesystem below 5% free
+              description: / has less than 5% free. Deploys will fail with ENOSPC and Prometheus will stop recording, which silences other alerts and makes them look resolved. Free space before trusting any other signal from this host.
+
+  # host-capacity-absent: no disk metric means no disk headroom knowledge, which is how
+  # this went unnoticed for as long as it did.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="qdrant",environment="staging"}'
+        values: '1x60'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: HostDiskMetricMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Host filesystem metric is not being reported
+              description: megacampus-host-disk-metrics.timer has published nothing for thirty minutes, so disk headroom is unknown. Check the timer and the textfile directory.

@@ -183,15 +183,83 @@ groups:
       # published pointer validates, so a failed, skipped or never-started run simply lets it go
       # stale. The schedule is daily, and the threshold leaves six hours of slack before a single
       # missed run is called out.
+      # mc2-adb6y split this rule in two. It used to carry `or absent(metric)`, and on
+      # 2026-08-20 that branch fired critical while the backup was perfectly healthy: the
+      # host disk was full, Prometheus could not write its own WAL ("write to WAL: log
+      # samples: ... no space left on device"), the series stopped receiving samples, and
+      # `absent()` reported that as a backup failure. The two conditions need opposite
+      # responses — one means "go look at the backup", the other means "the monitoring
+      # cannot see", usually because of the host itself — so they are now separate alerts
+      # with separate text.
       - alert: SupabaseBackupStale
         expr: |
-          (time() - megacampus_supabase_last_successful_backup_unixtime_seconds > 30 * 60 * 60)
-          or absent(megacampus_supabase_last_successful_backup_unixtime_seconds)
+          time() - megacampus_supabase_last_successful_backup_unixtime_seconds > 30 * 60 * 60
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: Supabase backup is stale or missing
+          summary: Supabase backup is stale
           description: >-
             No successful verified Supabase backup has been recorded within thirty hours. The
             metric is stamped only after pg_restore validation and pointer publication succeed.
+
+      - alert: SupabaseBackupMetricMissing
+        expr: absent(megacampus_supabase_last_successful_backup_unixtime_seconds)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Supabase backup metric is not being reported
+          description: >-
+            The backup metric has been absent for ten minutes, so backup health is UNKNOWN
+            rather than known-bad. Check the host before the backup: a full disk stops
+            Prometheus writing its WAL and silences this series, and the textfile writer
+            cannot publish either. See HostDiskCritical.
+
+  - name: host-capacity-alerts
+    rules:
+      # mc2-adb6y. The deploy host reached 100% (148G, 141G used, 0 available) with no
+      # alert of any kind — seventeen rules and not one about disk. The first symptom was
+      # a deploy dying on `ENOSPC: mkdir '/tmp/tsx-1001'`, and the only alert that arrived
+      # blamed the Supabase backup, which was fine.
+      #
+      # Fed by ops/qdrant/textfile/publish-disk-metrics.sh through the textfile collector,
+      # because the exporter is deliberately scoped to "no host collectors or host
+      # namespaces" and mounting `/` into it to read the host filesystem would undo that.
+      - alert: HostDiskLow
+        expr: |
+          megacampus_host_filesystem_avail_bytes
+          / clamp_min(megacampus_host_filesystem_size_bytes, 1) < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host filesystem below 15% free
+          description: >-
+            {{ $labels.mountpoint }} has less than 15% free. Docker images and build cache are
+            the usual cause; `docker builder prune -af` frees the most for the least risk.
+
+      - alert: HostDiskCritical
+        expr: |
+          megacampus_host_filesystem_avail_bytes
+          / clamp_min(megacampus_host_filesystem_size_bytes, 1) < 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Host filesystem below 5% free
+          description: >-
+            {{ $labels.mountpoint }} has less than 5% free. Deploys will fail with ENOSPC and
+            Prometheus will stop recording, which silences other alerts and makes them look
+            resolved. Free space before trusting any other signal from this host.
+
+      - alert: HostDiskMetricMissing
+        expr: absent(megacampus_host_filesystem_avail_bytes)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host filesystem metric is not being reported
+          description: >-
+            megacampus-host-disk-metrics.timer has published nothing for thirty minutes, so
+            disk headroom is unknown. Check the timer and the textfile directory.
