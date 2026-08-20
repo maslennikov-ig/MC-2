@@ -144,33 +144,25 @@ export async function updateStorageQuota(
   });
 
   if (updateError) {
-    // If RPC doesn't exist, fall back to direct SQL update
-    logger.warn(
-      {
-        organizationId,
-        err: updateError.message,
-      },
-      'RPC update_organization_storage not available, using direct update'
+    // This used to "fall back" to an UPDATE that touched only `updated_at`,
+    // while a comment promised it would set `storage_used_bytes` by other means.
+    // It never did. `update_organization_storage` was defined in a migration
+    // that was never applied, so the RPC failed on every call and the counter
+    // this function exists to maintain has been frozen since October 2025 — 74
+    // of 75 organizations at exactly 0 against 243 MB of real files. The quota
+    // check below compares against that column, so no upload could ever exceed
+    // a quota (mc2-mg8un).
+    //
+    // Throwing is the point. A silent no-op on a counter nobody reads for
+    // months is how this survived; an error would have surfaced it the same
+    // week. There is no correct fallback here: incrementing a counter
+    // atomically is what the RPC is for, and PostgREST cannot express
+    // `column = column + delta`.
+    logger.error(
+      { organizationId, delta, err: updateError.message },
+      'Storage quota RPC failed; the organization storage counter was not updated'
     );
-    const { error } = await supabase
-      .from('organizations')
-      .update({
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', organizationId);
-
-    if (error) {
-      throw new Error(`Failed to update storage quota: ${error.message}`);
-    }
-
-    // Manually update storage_used_bytes via SQL (no direct .raw() support in client)
-    // In production, ensure the RPC function exists
-    logger.warn(
-      {
-        organizationId,
-      },
-      'Storage quota update may be inaccurate without RPC function'
-    );
+    throw new Error(`Failed to update storage quota: ${updateError.message}`);
   }
 
   // Check if quota exceeded (only on increment)
