@@ -39,6 +39,7 @@
     "test:fixtures": "vitest run tests/fixtures/seed-database.test.ts",
     "test:rls": "cd ../.. && supabase test db --workdir packages/course-gen-platform",
     "test:all": "pnpm test:full && pnpm test:rls",
+    "cost:report": "tsx scripts/cost-report.ts",
     "seed": "tsx tests/fixtures/seed-database.ts",
     "seed:clean": "tsx tests/fixtures/seed-database.ts clean",
     "verify:qdrant": "tsx tools/verify/verify-qdrant-connection.ts",

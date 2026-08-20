@@ -552,8 +552,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // (mc2-wxvyr, mc2-fyn4f). The second one does replace a function body, but
 // `restart_from_stage` is not part of the document-evidence security manifest —
 // it appears nowhere in this file — so no new `after-*` digest is needed.
+// Re-pinned 2026-08-20 for the storage-quota backfill (mc2-mg8un): 239 files,
+// adding 20260820170000_backfill_organization_storage_used.sql. It recomputes
+// `organizations.storage_used_bytes` from `file_catalog` and touches no function
+// inside the security manifest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'a6f557ad0ef84a5eb65976d5021fdaf820e8644b1f5c3a0c4eb77db2b5b161c9';
+  '49ed5bd97f3bfb1aea9348c7bcc9f473fac2914a66952bad1f0d10df2633b211';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

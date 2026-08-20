@@ -1,0 +1,15 @@
+[Unit]
+Description=Publish MegaCampus host filesystem capacity every five minutes
+
+[Timer]
+# Five minutes, not hourly. The point of this metric is to give warning before a
+# deploy dies on ENOSPC, and the host went from comfortable to 0 bytes inside a
+# single afternoon of image pulls.
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=megacampus-host-disk-metrics.service
+
+[Install]
+WantedBy=timers.target
