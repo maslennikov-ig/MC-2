@@ -7,14 +7,30 @@
  * dev+staging Supabase DB (image_* columns missing because the June migrations
  * were never run). See beads mc2-hnkmf.
  *
- * Why "tail drift" and not a full diff: this database's `schema_migrations`
- * only starts in late 2025 (everything earlier is an untracked baseline) and
- * its history has reassigned versions / renamed entries, so a naive "every repo
- * migration must appear in schema_migrations" check produces dozens of false
- * positives on old, already-applied migrations. Instead we find the newest repo
- * migration that IS recorded (the "watermark") and flag only repo migrations
- * NEWER than it that are not recorded. Migrations apply in filename order, so
- * the unapplied set is always the tail above the watermark.
+ * Every repo migration must be either recorded in `schema_migrations` or listed
+ * in `scripts/migration-drift-allowlist.txt` with a reason. Anything else fails
+ * the gate.
+ *
+ * This used to be a tail-only check, and that was its third failure mode. It
+ * found the newest repo migration that IS recorded (the "watermark") and flagged
+ * only migrations after it — so anything skipped in the MIDDLE of history was
+ * invisible, permanently: the next applied migration moved the watermark past it
+ * and it could never be reported again. On 2026-08-20 that was 86 of 279 repo
+ * migrations, and one of them was
+ * `20260413120000_drop_legacy_restart_from_stage_overload.sql`, unapplied for
+ * four months under a green gate while the overload it removes made every
+ * `restart_from_stage` RPC call unresolvable (mc2-wxvyr, mc2-y23na).
+ *
+ * The tail-only design had a real reason, recorded here before it changed: this
+ * database's `schema_migrations` only starts in late 2025 and its history has
+ * reassigned versions and renamed entries, so a naive full diff produces dozens
+ * of false positives on old, already-applied migrations. The allowlist is the
+ * answer to that — grandfather what exists, with a per-entry reason, and fail
+ * only on what is new. Each of those 86 was audited by checking whether its
+ * EFFECT is present in the database (tables, indexes, functions, types,
+ * triggers, views, columns, publication membership, nullability) rather than
+ * whether its name matches, because name matching is precisely what this history
+ * is bad at.
  *
  * Matching is by descriptive slug (filename minus timestamp prefixes), robust
  * to single/double-stamped names. Read-only. Requires SUPABASE_DB_URL.
@@ -32,13 +48,14 @@
  * Exit codes: 0 = in sync, 1 = drift detected, 2 = misconfiguration,
  * 3 = database unreachable.
  */
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, type ClientConfig } from 'pg';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(scriptDir, '..', 'supabase', 'migrations');
+const ALLOWLIST_PATH = join(scriptDir, 'migration-drift-allowlist.txt');
 
 export const EXIT_DRIFT = 1;
 export const EXIT_MISCONFIGURED = 2;
@@ -68,29 +85,97 @@ export interface RepoMigration {
 export interface DriftResult {
   repoCount: number;
   watermark: string | null;
+  /** Unapplied, unallowlisted, and newer than the watermark — usually just written. */
   missing: string[];
+  /** Unapplied, unallowlisted, and older than the watermark — the class the old gate could not see. */
+  historicalMissing: string[];
+  /** Unapplied but allowlisted with a reason. Counted, not failed. */
+  allowlistedCount: number;
+  /** Allowlist entries that are now applied, or name no repo file. Reported, not failed. */
+  staleAllowlist: string[];
 }
 
 /**
- * Watermark = newest repo migration that IS recorded as applied.
- * Drift = repo migrations after the watermark that are not recorded.
+ * Every repo migration must be applied or allowlisted.
+ *
+ * The watermark survives only to split the report: a gap in the tail is almost
+ * always a migration someone just wrote and forgot to apply, and deserves a
+ * sharper message than a gap in 2025. Both fail.
  */
 export function computeDrift(
   repoMigrations: readonly RepoMigration[],
-  appliedSlugs: ReadonlySet<string>
+  appliedSlugs: ReadonlySet<string>,
+  allowlist: ReadonlyMap<string, string> = new Map()
 ): DriftResult {
   let watermark = -1;
   for (let i = 0; i < repoMigrations.length; i += 1) {
     if (appliedSlugs.has(repoMigrations[i].slug)) watermark = i;
   }
 
-  const missing = repoMigrations.slice(watermark + 1).filter(m => !appliedSlugs.has(m.slug));
+  const missing: string[] = [];
+  const historicalMissing: string[] = [];
+  let allowlistedCount = 0;
+
+  for (let i = 0; i < repoMigrations.length; i += 1) {
+    const m = repoMigrations[i];
+    if (appliedSlugs.has(m.slug)) continue;
+    if (allowlist.has(m.slug)) {
+      allowlistedCount += 1;
+      continue;
+    }
+    if (i > watermark) missing.push(m.file);
+    else historicalMissing.push(m.file);
+  }
+
+  // An allowlist entry that is now applied, or that names a file nobody kept, is
+  // a claim about the database that has stopped being true. Say so — a rotting
+  // allowlist is how a gate quietly stops guarding again.
+  const repoSlugs = new Set(repoMigrations.map(m => m.slug));
+  const staleAllowlist = [...allowlist.keys()]
+    .filter(slug => appliedSlugs.has(slug) || !repoSlugs.has(slug))
+    .sort();
 
   return {
     repoCount: repoMigrations.length,
     watermark: watermark >= 0 ? repoMigrations[watermark].file : null,
-    missing: missing.map(m => m.file),
+    missing,
+    historicalMissing,
+    allowlistedCount,
+    staleAllowlist,
   };
+}
+
+/**
+ * Slugs the repository knowingly does not apply, mapped to why.
+ *
+ * `<slug><TAB><reason>`; blank lines and `#` comments ignored. A reason is
+ * mandatory — an entry without one is rejected rather than silently accepted,
+ * because "why is the database correct without this?" is the entire value of the
+ * file and an empty reason means nobody answered it.
+ */
+export function parseAllowlist(contents: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  contents.split('\n').forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) return;
+
+    const tab = rawLine.indexOf('\t');
+    const slug = (tab === -1 ? rawLine : rawLine.slice(0, tab)).trim();
+    const reason = tab === -1 ? '' : rawLine.slice(tab + 1).trim();
+    if (!reason) {
+      throw new Error(
+        `Migration drift allowlist line ${index + 1} has no reason: "${line}". ` +
+          'Use `<slug><TAB><reason>` and record WHY the database is correct without it.'
+      );
+    }
+    entries.set(slug, reason);
+  });
+  return entries;
+}
+
+export function loadAllowlist(path: string = ALLOWLIST_PATH): Map<string, string> {
+  if (!existsSync(path)) return new Map();
+  return parseAllowlist(readFileSync(path, 'utf-8'));
 }
 
 /**
@@ -167,6 +252,20 @@ async function main() {
   }
 
   const repoMigrations = readRepoMigrations();
+
+  let allowlist: Map<string, string>;
+  try {
+    allowlist = loadAllowlist();
+  } catch (error) {
+    // A malformed allowlist means the gate cannot tell "knowingly skipped" from
+    // "lost", so it stops rather than guessing in either direction.
+    console.error(
+      `::error::Migration drift allowlist is unreadable, so drift is unknown. ` +
+        `${error instanceof Error ? error.message : String(error)}`
+    );
+    process.exit(EXIT_MISCONFIGURED);
+  }
+
   const { ssl, verified, reason } = buildSslConfig(dbUrl, process.env.SUPABASE_DB_CA_CERT);
   if (!verified) console.warn(`::warning::Migration drift gate TLS: ${reason}.`);
 
@@ -193,26 +292,52 @@ async function main() {
     await client.end().catch(() => {});
   }
 
-  const result = computeDrift(repoMigrations, appliedSlugs);
+  const result = computeDrift(repoMigrations, appliedSlugs, allowlist);
 
   if (json) console.log(JSON.stringify(result, null, 2));
 
-  if (result.missing.length === 0) {
+  // Not a failure: a redundant entry does not let unapplied work through. But an
+  // unmaintained allowlist is how the previous gate stopped guarding, so it is
+  // never silent.
+  if (result.staleAllowlist.length > 0 && !json) {
+    console.warn(
+      `::warning::${result.staleAllowlist.length} migration drift allowlist entr(ies) are ` +
+        `stale — now applied, or naming no repo file. Remove them: ` +
+        result.staleAllowlist.join(', ')
+    );
+  }
+
+  if (result.missing.length === 0 && result.historicalMissing.length === 0) {
     if (!json) {
-      const tip = result.watermark ? ` (latest applied: ${result.watermark})` : '';
-      console.log(`✅ Migration drift check passed: no unapplied tail migrations${tip}.`);
+      const tip = result.watermark ? `, latest applied ${result.watermark}` : '';
+      console.log(
+        `✅ Migration drift check passed: all ${result.repoCount} repo migrations are applied ` +
+          `or allowlisted (${result.allowlistedCount} allowlisted${tip}).`
+      );
     }
     return;
   }
 
   if (!json) {
+    if (result.missing.length > 0) {
+      console.error(
+        `::error::Migration drift detected: ${result.missing.length} migration(s) newer than the ` +
+          `latest applied one are not in the database:`
+      );
+      for (const file of result.missing) console.error(`  - ${file}`);
+    }
+    if (result.historicalMissing.length > 0) {
+      console.error(
+        `::error::Migration drift detected: ${result.historicalMissing.length} migration(s) ` +
+          `older than the latest applied one are not in the database. This is the class the ` +
+          `tail-only gate could not see, which is how a repair sat unapplied for four months ` +
+          `(mc2-y23na):`
+      );
+      for (const file of result.historicalMissing) console.error(`  - ${file}`);
+    }
     console.error(
-      `::error::Migration drift detected: ${result.missing.length} migration(s) newer than the ` +
-        `latest applied one are not in the database:`
-    );
-    for (const file of result.missing) console.error(`  - ${file}`);
-    console.error(
-      '\nApply the missing migrations to the database before deploying. See beads mc2-hnkmf.'
+      '\nApply them, or add each to scripts/migration-drift-allowlist.txt with a reason ' +
+        'saying why the database is correct without it. See beads mc2-hnkmf, mc2-y23na.'
     );
   }
   process.exit(EXIT_DRIFT);

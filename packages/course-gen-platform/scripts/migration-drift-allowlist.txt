@@ -1,0 +1,141 @@
+# Repository migrations knowingly absent from `supabase_migrations.schema_migrations`.
+#
+# Used by `scripts/check-migration-drift.ts`. Anything NOT listed here that has no history
+# row is treated as a migration that was written and then lost — which is exactly what
+# happened to `drop_legacy_restart_from_stage_overload`: it sat unapplied for four months
+# under a green gate while the overload it removes broke every `restart_from_stage` RPC
+# call (mc2-wxvyr, mc2-y23na).
+#
+# Format: `<slug><TAB><reason>`. The slug is the filename with `.sql` and every leading
+# `<timestamp>_` prefix stripped — the same reduction `slugify()` applies to both sides.
+# Record WHY, not just THAT.
+#
+# The 86 entries below were audited on 2026-08-20 by checking, for each migration, whether
+# its EFFECT is present in the database — tables, indexes, functions, types, triggers,
+# views, columns, publication membership, nullability — rather than whether its name is in
+# the history. Name matching is what the history is bad at; effects are what actually
+# matter. Two migrations failed that audit and are absent from this list on purpose:
+#   - `add_storage_quota_functions` was genuinely missing and is now applied (mc2-mg8un);
+#   - `drop_legacy_restart_from_stage_overload` is superseded, recorded below.
+#
+# Adding an entry here is a decision, not paperwork. If you cannot say why the database is
+# correct without it, apply the migration instead.
+
+# ---------------------------------------------------------------------------------------
+# Effect present. Applied before `schema_migrations` was seeded, or recorded under a name
+# that reduces to a different slug. Verified object-by-object on 2026-08-20.
+# ---------------------------------------------------------------------------------------
+
+initial_schema	Baseline schema from 2025-01-10, predating the history table. 41 of its 44 objects are present; the 3 absent ones (`lesson_content`, its updated_at trigger, `idx_organizations_tier`) were superseded by `lesson_contents` and later index work.
+job_status	Effect present: `job_status` table and all 11 of its indexes exist.
+job_cancellation	Effect present: `job_status.cancelled`, `cancelled_at`, `cancelled_by` and both partial indexes exist.
+jwt_custom_claims	Effect present: `custom_access_token_hook` exists.
+test_auth_context	Effect present: `set_auth_context` and `get_current_auth_context` exist.
+storage_quota_functions	Effect present: `increment_storage_quota`, `decrement_storage_quota`, `reset_storage_quota` exist. NOTE: this is the 2025-01-12 file and is NOT the same as `add_storage_quota_functions`, which was genuinely missing and is now applied.
+create_hash_password_helper	Effect present: `hash_password` exists.
+create_test_auth_user_function	Effect present: `create_test_auth_user` exists.
+cleanup_old_drafts_job	Effect present: `check_pending_cleanup` and the `cleanup_job_monitoring` view exist.
+add_content_deduplication	Effect present: `file_catalog.reference_count`, the dedup indexes, `find_duplicate_file`, `increment_file_reference_count`, `decrement_file_reference_count` and both dedup stats views exist.
+add_course_enrollments_index	Effect present: `idx_course_enrollments_user_course` exists.
+add_missing_course_fields	Effect present: every added `courses` column is present.
+add_share_token_index	Effect present: `idx_courses_share_token` exists.
+add_auth_user_update_trigger	Effect present: `on_auth_user_updated` exists.
+add_user_activation	Effect present: `users.is_active`, `is_user_active` and both indexes exist.
+apply_stage8_schema	Effect present: every object it creates exists.
+create_transactional_outbox_tables	Effect present: `job_outbox`, `idempotency_keys`, their indexes and both cleanup functions exist.
+enhance_superadmin_policies_final	Effect present: `is_superadmin` and `check_policy_has_superadmin` exist.
+fix_set_auth_context	Effect present: `set_auth_context` exists with the corrected body.
+update_rpc_with_generation_status	Effect present: `update_course_progress` exists; `courses.generation_status` is present.
+update_rpc_for_stage_gates	Effect present: `update_course_progress` and `validate_generation_status_transition` exist.
+stage3_summary_metadata	Effect present: `file_catalog.summary_metadata` exists.
+stage4_analysis_fields	Effect present: `courses.analysis_result` and its GIN index exist.
+stage4_barrier_rpc	Effect present: `check_stage4_barrier` exists.
+add_failed_at_stage	Effect present: `courses.failed_at_stage` and `courses.error_code` exist, as does the `stage_error_code` type.
+add_grouped_error_logs_rpc	Effect present: `get_grouped_error_logs` and `get_grouped_error_logs_count` exist.
+grouped_logs_course_id	Effect present: both grouped-log functions exist with the course_id parameter.
+reset_resolved_on_new_error	Effect present: `reset_resolved_status_on_new_error` and `trg_reset_resolved_on_new_error` exist.
+question_types	Effect present: `clarifying_questions.question_type` and its index exist.
+clarifying_index	Effect present: `idx_clarifying_questions_course_status_priority` exists.
+approve_and_proceed_rpc	Effect present: `approve_and_proceed_atomic` exists.
+add_pending_to_stage3_init_transition	Effect present: `validate_generation_status_transition` accepts the transition.
+fix_fsm_awaiting_approval_transitions	Effect present: superseded by the applied `restore_all_lost_fsm_transitions` (20260321092043), which carries the same transitions.
+fix_init_to_awaiting_approval	Effect present: same as above — `fix_init_to_awaiting_approval_transitions` is recorded applied at 20260321085615.
+definitive_fsm_with_bypass	Effect present: `validate_generation_status_transition` carries the bypass; `add_status_guard_to_fsm_init_rpc` and the 20260321 FSM series are recorded applied.
+add_update_course_progress_overload	Effect present: `update_course_progress` exists; the percent overload is recorded applied at 20251124123343.
+add_courses_to_realtime	Effect present: `courses` is a member of the `supabase_realtime` publication.
+make_error_logs_user_id_nullable	Effect present: `error_logs.user_id` is nullable.
+add_document_processing_columns	Effect present: all five `file_catalog` processing columns and `update_file_catalog_processing` exist. The one absent object, `idx_file_catalog_markdown_content_search`, is the tsvector index deliberately dropped by `remove_tsvector_index`.
+add_generation_status_field	Effect present: `courses.generation_status`, the `generation_status` type, `log_generation_status_change` and `trg_log_generation_status` all exist. The absent `get_generation_summary` is dead — nothing in the codebase calls it.
+fix_function_search_path_security	Effect present: the functions it hardens exist with `search_path` pinned. The absent `get_generation_summary` is dead, as above.
+redesign_generation_status	Effect present: the `generation_status` redesign is live and the applied `redesign_generation_status_v2` (20251117074247) carries it. `generation_status_new` and `courses.generation_status_temp` are the swap scaffolding, correctly gone.
+add_missing_performance_indexes	Effect present except `idx_generation_history_changed_by`, a pure-performance index on a table read by admin views only. Not worth a schema change on its own; re-evaluate with a measurement.
+create_lms_integration_tables	Effect present: `lms_configurations` and `lms_import_jobs` exist with equivalent indexes under different names (`idx_lms_import_jobs_course_id`, `_status`, `_active_course_unique`). The `lms_import_status` enum was replaced by a text column with a CHECK.
+stage4_model_config	Effect present: `llm_model_config` exists. `idx_llm_model_config_phase` is absent because `remove_unused_indexes` drops it by name; `unique_course_phase`/`unique_global_phase` were superseded by the applied `unique_active_routing_rows_nulls_not_distinct` (20260812124741), which is the constraint that actually works.
+add_course_nodes_composite_index	Effect present under different names: `course_nodes` carries `idx_course_nodes_course`, `idx_course_nodes_section_order` and `idx_course_nodes_lesson_order`, created by the applied `create_course_nodes_table` and `add_composite_index_lesson_contents`.
+
+# ---------------------------------------------------------------------------------------
+# Superseded by a later migration that IS applied. Re-applying these would move the
+# database backwards.
+# ---------------------------------------------------------------------------------------
+
+drop_legacy_restart_from_stage_overload	SUPERSEDED 2026-08-20 by `restart_from_stage_single_signature`. This file drops the ambiguous overload and nothing else, which would also have dropped the admin bypass the overload deliberately carried. The replacement folds the bypass into the canonical signature. Harmless if ever applied — its DROP is IF EXISTS and both its assertions still hold — but it is not the repair that shipped. See mc2-wxvyr.
+fix_rls_recursion	Superseded: the 2025-12-30 `fix_rls_initplan_*` series and the 2026-01-23 `optimize_rls_auth_calls_*` series are applied and rewrote every policy this file touches.
+consolidate_rls_policies	Superseded by the same two applied RLS series.
+refactor_rls_single_policy	Superseded by the same two applied RLS series.
+optimize_rls_initplan	Superseded by the applied `fix_rls_initplan_*` series, which is what the name promises and this file predates by eleven months.
+optimize_rls_policies_auth_init_plan	Superseded by the applied `optimize_rls_auth_calls_remaining_policies` (20260123090609).
+consolidate_multiple_permissive_policies	Superseded by the applied `fix_duplicate_index_and_rls_initplan` (20260123094006).
+add_to_authenticated_to_rls	Superseded by the applied `tighten_benchmark_rls_to_authenticated` and the 2026-01-23 RLS series.
+update_rls_for_superadmin	Superseded: `is_superadmin` exists and the applied `fix_is_superadmin_security_definer` (20251108103252) carries the final form.
+cleanup_old_rls_function	Superseded by the applied `fix_function_search_paths` series; the function it drops is gone.
+document_security_definer_views	Superseded by the applied `fix_security_definer_views` (20260123090641) and `fix_remaining_security_definer_views`. Comment-only migration.
+move_extensions_to_schema	Superseded by the applied `move_pg_trgm_to_extensions_schema` (20260310174952).
+create_app_roles	Superseded: grants only, and the applied `grant_superadmin_to_authenticator` (20251125181028) carries the final role wiring.
+grant_role_switch	Superseded by the same applied grant migration.
+benchmark_scoring_v2	Superseded by the applied `drop_benchmark_tables` (20260214094709). Every object is correctly absent because the feature was removed.
+link_benchmarks_to_model_config	Superseded by `drop_benchmark_tables`, as above.
+migrate_enrichment_urls_to_local	Superseded: `lesson_enrichments` no longer has any URL column, so the data this migration rewrites does not exist in that shape.
+remove_tsvector_index	Effect present: `idx_file_catalog_markdown_content_search` is absent, which is what this migration is for.
+remove_unused_indexes	Effect present: `idx_llm_model_config_phase` is absent, which is what this migration is for.
+
+# ---------------------------------------------------------------------------------------
+# Configuration seeds. `llm_model_config`, `prompt_templates` and `pipeline_global_settings`
+# are live operational data — edited through the admin UI as well as by migration — so the
+# database, not these files, is the source of truth. Each was superseded by a later applied
+# routing migration (`model_routing_refresh_openrouter`, `unify_stage5_stage6_3tier_models`,
+# `phase_reasoning_configuration`, and the career-playbook series). Re-applying any of them
+# would overwrite current routing with a snapshot months out of date.
+# ---------------------------------------------------------------------------------------
+
+seed_judge_model_configs	Config seed, superseded by the applied `seed_judge_model_configs_v2` (20251210163646).
+update_stage6_prompts	Config seed, superseded by the applied Stage 6 prompt and routing migrations.
+add_emergency_standard_tier	Config seed, superseded by the applied `create_tier_settings` and later tier work.
+cleanup_obsolete_global_settings	Config cleanup against `pipeline_global_settings`; the rows it removes are already gone.
+stage4_5_language_support	Config seed, superseded by the applied Stage 4/5 routing migrations.
+stage5_tier1_escalation_configs	Config seed, superseded by the applied `stage5_tier1_escalation_phase_check` and `_data` (20260124150845/150901).
+seed_chat_intent_classification	Config seed, superseded by the applied `add_chat_model_configs` (20260211172808).
+seed_chat_stage_refinement_configs	Config seed, superseded by the applied chat config migrations.
+fix_chat_config_duplicates	Config cleanup, superseded by the applied `unique_active_routing_rows_nulls_not_distinct` (20260812124741), which prevents the duplicates structurally instead of deleting them once.
+rename_kimi_k2_to_thinking	Config rename, superseded by the applied `model_routing_refresh_openrouter` (20260812110912).
+stage6_3tier_routing	Config seed, superseded by the applied `unify_stage5_stage6_3tier_models` (20260217190748).
+update_stage6_judges	Config update, superseded by the applied Stage 6 routing refresh.
+replace_gemini_with_3_flash	Config update, superseded by the applied `model_routing_refresh_openrouter` and `replace_retired_llm_model_ids`.
+enable_cache_for_gemini	Config update, superseded by the applied `phase_reasoning_configuration` (20260812131245).
+update_stage7_cover_prompts_premium_style	Config update, superseded by the applied `update_stage7_cover_model_name` (20260123122819) and the career-playbook card prompt seed.
+
+# ---------------------------------------------------------------------------------------
+# Rollback scripts that live in the forward migrations directory by mistake. These must
+# NEVER be applied — applying one undoes a feature that is live. Moving them into
+# `rollback/` would be the real fix; until then the gate must not ask for them.
+# ---------------------------------------------------------------------------------------
+
+rollback_source_documents	Rollback script. Undoes `add_lessons_source_documents`, which IS applied and live.
+rollback_generation_pause_fields	Rollback script. Undoes `add_generation_pause_fields`, which IS applied and live.
+question_types_rollback	Rollback script. Undoes `question_types`, which IS applied and live.
+
+# ---------------------------------------------------------------------------------------
+# Deliberately deferred. Not applied, not superseded — a decision to leave alone.
+# ---------------------------------------------------------------------------------------
+
+add_compound_indexes	DEFERRED, performance only. Six compound indexes from 2025-10-16, none applied, no correctness impact. The leading columns are already covered: `job_status` has `(organization_id, status)` and `(user_id, created_at)`, and `idx_organizations_id_tier` would duplicate the primary key. Re-evaluate against a measured slow query rather than applying blind. Tracked in mc2-y23na.
+add_upsert_auto_mute_rpc	DEFERRED, dead code. `upsert_auto_mute_status` has no caller anywhere in the repository, and the applied `auto_mute_cascade_retry_and_digest` (20260216184652) is what the feature runs on now.

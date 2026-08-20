@@ -400,3 +400,105 @@ The zero-is-not-NULL guard was checked against the defect it exists to catch: re
 
 **Verdict**: PASS. One P2 (`mc2-y23na`) filed and deliberately deferred, with the reason
 above.
+
+---
+
+# Third pass — 2026-08-20: the deferred audit
+
+The second pass filed `mc2-y23na` and deliberately did not fix it, because fixing it
+meant deciding, for each of 86 migrations, whether it was applied under another name or
+genuinely skipped. That audit is done. It found one more live defect.
+
+## How the 86 were decided
+
+Not by name. The history is bad at names — that is the whole reason the gate was scoped
+the way it was. Each migration was judged by whether its **effect** is present in the
+database: tables, indexes, functions, types, triggers, views, columns, publication
+membership, column nullability.
+
+| verdict              | count | meaning                                                                         |
+| -------------------- | ----- | ------------------------------------------------------------------------------- |
+| every object present | 35    | applied before the history table was seeded, or recorded under a different slug |
+| partially present    | 8     | applied; the absent pieces were later dropped or renamed on purpose             |
+| nothing present      | 6     | 4 superseded (benchmark tables were dropped wholesale), 2 needed a decision     |
+| no checkable DDL     | 37    | config seeds, RLS rewrites, GRANTs, drops, rollback scripts                     |
+
+Two failed the audit outright, and they are the reason it was worth doing.
+
+### mc2-mg8un — the storage quota has never worked (P2)
+
+`20251015_add_storage_quota_functions.sql` creates `update_organization_storage`. It was
+never applied, and the function does not exist.
+
+`shared/qdrant/lifecycle.ts:141` calls it on every upload and every delete. When the RPC
+failed — which was every time — the fallback updated **only** `organizations.updated_at`.
+Its own comment promised otherwise:
+
+```ts
+// Manually update storage_used_bytes via SQL (no direct .raw() support in client)
+// In production, ensure the RPC function exists
+```
+
+...and then did not. It logged `Storage quota update may be inaccurate without RPC
+function` at warn level and returned successfully.
+
+So `storage_used_bytes` has never been maintained, and the quota check immediately below
+reads that column — meaning **no upload could ever exceed a quota**, because the number it
+compares against does not move.
+
+Measured on dev: 75 organizations, **74 at exactly 0**, one at 369 MB against a real
+`file_catalog` total of 243 MB across 261 files. The single nonzero value is stale too.
+
+Fixed in two parts: the migration is applied, and the fallback now throws. There is no
+correct silent fallback for an atomic counter — PostgREST cannot express
+`column = column + delta`, which is what the RPC is for. A no-op reporting success is how
+ten months passed; an error would have surfaced it the same week.
+
+Verified by round-trip: `update_organization_storage` moved a counter 0 → 1,048,576 inside
+a transaction, and clamped at 0 on a large negative delta, then rolled back.
+
+**Not** included: backfilling `storage_used_bytes`. The one nonzero row is larger than the
+entire catalog, so the intended semantics may count something beyond `file_catalog.file_size`
+— deleted files, or Qdrant vectors, given where this code lives. Recomputing from file sizes
+would replace one wrong number with another confidently wrong one. It needs an owner
+decision on what the counter is supposed to mean.
+
+### The other one
+
+`drop_legacy_restart_from_stage_overload` is the migration the second pass superseded. It
+stays in the repository, allowlisted with that reason.
+
+## The gate
+
+`computeDrift` no longer uses the watermark to decide what to check. Every repo migration
+must be applied or allowlisted; the watermark now only splits the report, because a gap in
+the tail is usually something someone just wrote and reads differently from a gap in 2024.
+
+`scripts/migration-drift-allowlist.txt` carries all 85 remaining entries, grouped and each
+with its own reason. An entry with no reason is a parse error, not a silent skip — "why is
+the database correct without this?" is the entire value of the file. Entries that go stale
+(now applied, or naming a migration nobody kept) are reported as warnings, because an
+unmaintained allowlist is how the previous gate stopped guarding.
+
+One existing test had to be rewritten rather than extended:
+
+```
+it('ignores unrecorded migrations below the watermark', ...)
+```
+
+That assertion **was** the bug. It pinned the blindness as a requirement, which is why the
+gate stayed that way through two previous rounds of fixing it.
+
+## Acceptance
+
+- Unit suite: **460 files, 7326 tests, 0 failures** (111 skipped)
+- Type Check: **PASS** · Build: **PASS** · Lint: **PASS**
+
+Both new guards were checked against the defects they exist to catch: restoring the silent
+fallback fails 2 of the 4 storage-quota tests, and the historical-gap assertion cannot pass
+against the old tail-only `computeDrift`.
+
+The end-to-end check runs in CI: the `Migration Drift Check` job executes this script
+against the live database with the shipped allowlist.
+
+**Verdict**: PASS. Nothing deferred.
