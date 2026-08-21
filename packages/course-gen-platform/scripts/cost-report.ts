@@ -43,6 +43,13 @@ interface TraceRow {
   cost_usd: number | null;
   created_at: string;
   input_data: Record<string, unknown> | null;
+  /**
+   * Where the settled figure lands. `settleTraceCostFromProvider` writes
+   * `billedByProvider` here, not into `input_data` — and this column was not
+   * even selected, so `priced by the provider` could only ever read 0. It did,
+   * on a run whose image row was demonstrably settled (mc2-r0vhq).
+   */
+  output_data: Record<string, unknown> | null;
   error_data: Record<string, unknown> | null;
 }
 
@@ -112,7 +119,7 @@ async function readRows(filter: { courseId?: string; since?: string }): Promise<
     let query = supabase
       .from('generation_trace')
       .select(
-        'id, course_id, stage, phase, step_name, model_used, tokens_used, cost_usd, created_at, input_data, error_data'
+        'id, course_id, stage, phase, step_name, model_used, tokens_used, cost_usd, created_at, input_data, output_data, error_data'
       );
 
     if (filter.courseId) query = query.eq('course_id', filter.courseId);
@@ -255,7 +262,7 @@ async function main(): Promise<void> {
   const unpriced = rows.filter(isLedgerHole);
   // Settled from `/api/v1/generation` rather than estimated from MODEL_CATALOG.
   const billedByProvider = rows.filter(
-    r => (r.input_data as { billedByProvider?: boolean } | null)?.billedByProvider === true
+    r => (r.output_data as { billedByProvider?: boolean } | null)?.billedByProvider === true
   );
   const measuredZero = rows.filter(r => r.cost_usd === 0);
   const markerRows = rows.filter(r => !isBilledCallRow(r) && (r.tokens_used ?? 0) > 0);
