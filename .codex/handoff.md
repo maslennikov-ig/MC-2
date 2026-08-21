@@ -90,11 +90,20 @@ What still constrains work:
   Since 2026-08-21 a priced call is _stamped_ `input_data.billedCall`, because neither token counts
   nor step names can tell a call from a summary: `cost:report` had been reporting 21 rows of "money
   the ledger missed" on a window whose true answer was 0.
-- **The catalogue is an estimate, not the price.** Every OpenRouter call settles against
+- **The catalogue is an estimate, not the price.** Every OpenRouter _token_ call settles against
   `/api/v1/generation`. `MODEL_CATALOG` is what a budget and a `provider.max_price` ceiling are built
   from, and `tests/unit/model-catalog-coverage.test.ts` is a hand-updated snapshot — four entries had
-  drifted by 2026-08-21, so a live drift check is filed as `mc2-hc91g`. Images are the one place a
-  price is still invented (`mc2-5mhlb`).
+  drifted by 2026-08-21, so a live drift check is filed as `mc2-hc91g`.
+- **Images are the exception, and there is a second price table.** Both image models are in
+  `MODEL_CATALOG` — but carrying _token_ rates plus `billedPerImage: true`, whose own comment says
+  token maths is "structurally wrong" for them. The per-image figure actually used comes from
+  `MODEL_COSTS` in `stage7-enrichments/services/image-generation-service.ts` (0.038 / 0.007 / 0.04),
+  which is exactly the second price table `llm-cost.ts` forbids in its header — and it has drifted:
+  measured 0.045080 against a recorded 0.007. It cannot self-correct either, because that service
+  builds its **own** `new OpenAI({...})` (line 184) and so never gets the instrumented transport that
+  captures `x-generation-id`. Meanwhile OpenRouter publishes a real `image_output` rate that neither
+  table reads. Course covers/cards do reach `generation_trace`; the playbook's cover reaches nothing
+  (`mc2-j9pmq`). Both are mispriced (`mc2-5mhlb`).
 - **Stage 6 and Stage 7 run their own workers on their own queues in their own containers.**
   Anything added to the general sandboxed processor misses them. Cost was wrong three times for
   exactly this.
@@ -118,7 +127,12 @@ For the first time the gap is split rather than named:
   overpriced 1.23× and `~deepseek/...-latest` 1.45× (`mc2-156kg`), which is why each model looked
   roughly right on its own while none of them was.
 - **About USD 0.056 is calls with no row at all**: two Stage 4 aborts at 238 s and four playbook
-  timeouts at 120 s (`mc2-64n8i`).
+  timeouts at 120 s (`mc2-64n8i`). **Revised 2026-08-21 — this line over-attributes.** The run's card
+  image was recorded at USD 0.007 (`image_call` / `stage_7_card` / `openai/gpt-5-image-mini`,
+  17:54:01) while the same model at the same 1:1 1024×1024 was measured at **USD 0.045080** the next
+  day. So roughly USD 0.038 of this bucket is one mispriced image, and the missing rows are nearer
+  USD 0.018 than USD 0.056. The fix for the missing rows is delivered and proven regardless; it is
+  the arithmetic that was wrong. See `mc2-5mhlb`.
 - **Structural blindness**: playbook spend never enters `generation_trace` (`mc2-rkmeg`), and a
   failed playbook records nothing anywhere (`mc2-ajqun`).
 
