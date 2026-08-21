@@ -1,0 +1,6 @@
+{
+  "schema_version": "verification-manifest/v2",
+  "producer": "orchestration-setup",
+  "required_steps": [],
+  "steps": []
+}

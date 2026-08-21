@@ -2,8 +2,9 @@
 
 Native same-session subagents receive four fields from
 `.codex/subagent-spawn-template.md`: goal, write zone, verification, and stop.
-Prompts stay outcome-first; selected task/docs/skills/artifacts are optional
-pointers, not mandatory empty sections.
+Prompts stay outcome-first. The Documentation decision belongs in the prompt
+only when the stream touches external or versioned behavior; selected
+task/skills/artifacts are optional pointers, not mandatory empty sections.
 
 - A worker owns one bounded stream, preserves unrelated/concurrent work, and
   stops on a write-zone conflict or scope expansion.

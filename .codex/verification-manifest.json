@@ -1,0 +1,114 @@
+{
+  "schema_version": "verification-manifest/v2",
+  "producer": "orchestration-setup",
+  "required_steps": ["type-check", "build", "test"],
+  "steps": [
+    {
+      "id": "type-check",
+      "command": "pnpm type-check",
+      "cwd": ".",
+      "inputs": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json",
+        "packages/*/src/**/*",
+        "packages/web/app/**/*",
+        "packages/web/components/**/*",
+        "packages/web/hooks/**/*",
+        "packages/web/lib/**/*",
+        "packages/web/middleware.ts"
+      ],
+      "lockfiles": ["pnpm-lock.yaml"],
+      "tools": [{"name": "pnpm", "executable": "pnpm"}],
+      "environment": [],
+      "dependencies": [],
+      "external": false,
+      "inputs_complete": false,
+      "cache": {
+        "eligible": false,
+        "reason": "TypeScript may consume ignored incremental and generated Next type state"
+      }
+    },
+    {
+      "id": "build",
+      "command": "pnpm build",
+      "cwd": ".",
+      "inputs": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json",
+        "packages/*/src/**/*",
+        "packages/web/app/**/*",
+        "packages/web/components/**/*",
+        "packages/web/hooks/**/*",
+        "packages/web/lib/**/*",
+        "packages/web/middleware.ts",
+        "packages/web/next.config.ts",
+        "packages/*/tsup.config.ts"
+      ],
+      "lockfiles": ["pnpm-lock.yaml"],
+      "tools": [{"name": "pnpm", "executable": "pnpm"}],
+      "environment": [
+        "CI",
+        "NODE_ENV",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_SITE_URL",
+        "NEXT_PUBLIC_SUPABASE_URL"
+      ],
+      "dependencies": [],
+      "external": true,
+      "inputs_complete": false,
+      "cache": {
+        "eligible": false,
+        "reason": "Next build can consume environment, generated state, and external build-time resources"
+      }
+    },
+    {
+      "id": "test",
+      "command": "pnpm test",
+      "cwd": ".",
+      "inputs": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "vitest.shared.ts",
+        "packages/*/package.json",
+        "packages/*/tsconfig*.json",
+        "packages/*/vitest*.ts",
+        "packages/*/src/**/*",
+        "packages/*/tests/**/*",
+        "packages/*/__tests__/**/*",
+        "packages/web/app/**/*",
+        "packages/web/components/**/*",
+        "packages/web/hooks/**/*",
+        "packages/web/lib/**/*",
+        "scripts/**/*",
+        "deploy/**/*"
+      ],
+      "lockfiles": ["pnpm-lock.yaml"],
+      "tools": [{"name": "pnpm", "executable": "pnpm"}],
+      "environment": [
+        "CI",
+        "NODE_ENV",
+        "SKIP_LLM_TESTS",
+        "ENABLE_REAL_API_TESTS",
+        "DOCUMENT_EVIDENCE_DATABASE_URL",
+        "QDRANT_URL",
+        "REDIS_URL",
+        "SUPABASE_URL"
+      ],
+      "dependencies": [],
+      "external": true,
+      "inputs_complete": false,
+      "cache": {
+        "eligible": false,
+        "reason": "Tests include clock, process, filesystem, database, and service-sensitive paths"
+      }
+    }
+  ]
+}
