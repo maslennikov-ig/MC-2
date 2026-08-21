@@ -24,14 +24,21 @@ import { getOpenRouterApiKey } from '../services/api-key-service';
 const OPENROUTER_API = 'https://openrouter.ai/api/v1';
 
 /**
- * How long to wait before asking for a generation record.
+ * How long a generation record takes to become readable, and how long we wait.
  *
- * The record is written after the call settles, so an immediate read races it.
- * One short wait and one retry, because this is a receipt we would like to have
- * and never something a caller is blocked on.
+ * Measured against the live API on 2026-08-21: `GET /api/v1/generation` answered
+ * 404 for **9.6 seconds** after the call completed, then returned the record.
+ * The first implementation waited 1.5s once, and so missed every single lookup
+ * of a 33-node paid run — every row kept its catalogue estimate while reporting
+ * itself as settled. The delay is why this polls rather than guessing an
+ * interval.
+ *
+ * 30s of patience against a ~10s answer, because the alternative to waiting is
+ * an unpriced row, and nothing here is on a path a user is waiting on.
  */
 const GENERATION_LOOKUP_DELAY_MS = 2_000;
-const GENERATION_LOOKUP_RETRY_DELAY_MS = 6_000;
+const GENERATION_LOOKUP_INTERVAL_MS = 2_000;
+const GENERATION_LOOKUP_MAX_WAIT_MS = 30_000;
 const GENERATION_LOOKUP_TIMEOUT_MS = 15_000;
 
 /** The provider's own account of one call. */
@@ -107,19 +114,16 @@ async function requestGeneration(
 export interface GenerationLookupOptions {
   /** Wait before the first read, so it does not race the record being written. */
   initialDelayMs?: number;
-  /**
-   * `false` to skip the retry. Used where a caller is holding up real work and
-   * an unanswered receipt is an acceptable outcome — the estimate stands.
-   */
-  retry?: boolean;
+  /** Total time to keep asking before giving up and letting the estimate stand. */
+  maxWaitMs?: number;
 }
 
 /**
  * The generation record for one call, or `null` if it never became readable.
  *
- * Never throws. Callers on a failure path can afford the full wait: it is
- * seconds against a timeout that has already cost minutes. Callers on a success
- * path pass a shorter budget and accept `null`.
+ * Never throws. Polls, because the record takes about ten seconds to appear and
+ * a single read is a coin toss — see the constants above for what happened when
+ * this guessed instead of waiting.
  */
 export async function fetchGenerationFact(
   generationId: string,
@@ -129,13 +133,15 @@ export async function fetchGenerationFact(
     const apiKey = await getOpenRouterApiKey();
     if (!apiKey) return null;
 
+    const deadline = Date.now() + (options.maxWaitMs ?? GENERATION_LOOKUP_MAX_WAIT_MS);
     await sleep(options.initialDelayMs ?? GENERATION_LOOKUP_DELAY_MS);
-    const first = await requestGeneration(generationId, apiKey);
-    if (first) return first;
-    if (options.retry === false) return null;
 
-    await sleep(GENERATION_LOOKUP_RETRY_DELAY_MS);
-    return await requestGeneration(generationId, apiKey);
+    for (;;) {
+      const fact = await requestGeneration(generationId, apiKey);
+      if (fact) return fact;
+      if (Date.now() >= deadline) return null;
+      await sleep(GENERATION_LOOKUP_INTERVAL_MS);
+    }
   } catch (error) {
     logger.debug(
       { error: error instanceof Error ? error.message : String(error), generationId },

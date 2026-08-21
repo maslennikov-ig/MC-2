@@ -331,7 +331,7 @@ export function createCareerPlaybookRuntime(
             );
           });
 
-          return await settleSuccessfulAttempt({
+          return settleSuccessfulAttempt({
             invocation,
             options,
             modelId,

@@ -449,7 +449,15 @@ describe('CareerPlaybookHandler', () => {
         generated_blocks: generatedBlocks,
         final_markdown: '# B2B Sales Manager',
         role_profile_spec: roleProfileSpec,
-        cost_breakdown: costBreakdown,
+        // Recomputed rather than passed through: since 2026-08-21 the handler
+        // settles every node against `/api/v1/generation` before persisting, so
+        // the stored breakdown is the graph's plus the derived counters. With no
+        // `generation_id` on these fixtures there is nothing to look up, and the
+        // estimate stands.
+        cost_breakdown: {
+          ...costBreakdown,
+          unknown_cost_attempts: 0,
+        },
         q_a_data: {
           fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
           followups: [],

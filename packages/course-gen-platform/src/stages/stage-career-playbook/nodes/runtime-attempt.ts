@@ -9,6 +9,7 @@
 import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { fetchGenerationFact, resolveProviderSlug } from '@/shared/llm/openrouter-generation';
 import { logger } from '@/shared/logger';
+import type { CareerPlaybookNodeCost } from '@megacampus/shared-types';
 
 import type {
   CareerPlaybookAbortedAttempt,
@@ -67,7 +68,7 @@ export function selectAttemptModel(
  * 0.5x to 1.8x, which is why a $0.077338 ledger could not be reconciled against
  * a $0.144177 invoice (mc2-jukal).
  */
-export async function settleSuccessfulAttempt(params: {
+export function settleSuccessfulAttempt(params: {
   invocation: CareerPlaybookModelInvocation;
   options: CareerPlaybookLLMCallOptions;
   modelId: string;
@@ -77,7 +78,7 @@ export async function settleSuccessfulAttempt(params: {
   attemptStartedAt: number;
   callStartedAt: number;
   abortedAttempts: CareerPlaybookAbortedAttempt[];
-}): Promise<CareerPlaybookLLMResult> {
+}): CareerPlaybookLLMResult {
   const { invocation, options, modelId, attempt, generationId } = params;
 
   // Prefer real OpenRouter usage (requested via usage.include); fall back to the
@@ -85,20 +86,12 @@ export async function settleSuccessfulAttempt(params: {
   // omits it.
   const inputTokens = invocation.usage?.input_tokens ?? params.promptTokens;
   const outputTokens = invocation.usage?.output_tokens ?? estimateTokenCount(invocation.content);
-  const estimatedCostUsd = estimateCost(modelId, inputTokens + outputTokens, inputTokens);
-
-  const fact = generationId
-    ? await fetchGenerationFact(generationId, {
-        // A shorter budget than the failure path gets: this is holding up a call
-        // that already succeeded, and an unanswered receipt only means the
-        // estimate stands.
-        initialDelayMs: 1_500,
-        retry: false,
-      })
-    : null;
-
-  // `??`, not `||`: a provider that charged exactly $0 measured that.
-  const costUsd = fact?.usageUsd ?? estimatedCostUsd;
+  // The catalogue estimate stands until the receipt arrives, and the receipt is
+  // not collected here. A generation record takes about ten seconds to become
+  // readable; waiting for one per node would add minutes to a run for a number
+  // nobody reads until it is persisted. `settleCareerPlaybookNodeCosts` collects
+  // them all at once, when the run is over and every record is long since ready.
+  const costUsd = estimateCost(modelId, inputTokens + outputTokens, inputTokens);
   const totalDurationMs = Date.now() - params.callStartedAt;
 
   logger.info(
@@ -112,11 +105,7 @@ export async function settleSuccessfulAttempt(params: {
       totalDurationMs,
       inputTokens,
       outputTokens,
-      costUsd,
-      estimatedCostUsd,
-      billedByProvider: fact?.usageUsd !== undefined && fact?.usageUsd !== null,
-      providerName: fact?.providerName,
-      servedModel: fact?.model,
+      estimatedCostUsd: costUsd,
       generationId,
     },
     'Career Playbook LLM call succeeded'
@@ -132,7 +121,6 @@ export async function settleSuccessfulAttempt(params: {
     attemptCount: attempt + 1,
     abortedAttempts: params.abortedAttempts,
     ...(generationId ? { generationId } : {}),
-    ...(fact?.providerName ? { providerName: fact.providerName } : {}),
   };
 }
 
@@ -194,4 +182,62 @@ export async function recordFailedAttempt(params: {
     },
     'Career Playbook LLM call attempt failed'
   );
+}
+
+/**
+ * Replace every node's catalogue estimate with what OpenRouter actually charged.
+ *
+ * Run once, when the generation is over and about to be persisted, because a
+ * generation record takes roughly ten seconds to become readable: collecting
+ * receipts per call would add minutes to a run, while collecting them all here
+ * costs one round of concurrent lookups against records that are long since
+ * ready.
+ *
+ * The estimate is worth replacing. On 2026-08-21 the catalogue put one luna call
+ * at $0.0058882 against a real $0.006444801 — 9% low on a single call, and the
+ * catalogue's errors do not all point the same way.
+ *
+ * Never throws: a receipt we could not collect leaves the estimate in place,
+ * which is the state this ledger was in before any of this existed.
+ */
+export async function settleCareerPlaybookNodeCosts(
+  nodeCosts: CareerPlaybookNodeCost[]
+): Promise<CareerPlaybookNodeCost[]> {
+  const settled = await Promise.all(
+    nodeCosts.map(async cost => {
+      // An aborted attempt already collected its own receipt on the failure
+      // path, where the wait was free against a timeout that had just elapsed.
+      if (!cost.generation_id || cost.billed_by_provider) return cost;
+
+      try {
+        const fact = await fetchGenerationFact(cost.generation_id);
+        // `== null` and not falsy: a provider that charged exactly $0 measured
+        // that, and it is not the same as having no receipt.
+        if (fact?.usageUsd == null) return cost;
+
+        return {
+          ...cost,
+          cost_usd: fact.usageUsd,
+          cost_unknown: false,
+          billed_by_provider: true,
+          ...(fact.providerName ? { provider_name: fact.providerName } : {}),
+        };
+      } catch {
+        return cost;
+      }
+    })
+  );
+
+  const billed = settled.filter(c => c.billed_by_provider).length;
+  logger.info(
+    {
+      nodes: settled.length,
+      billedByProvider: billed,
+      estimatedTotal: nodeCosts.reduce((s, c) => s + c.cost_usd, 0),
+      settledTotal: settled.reduce((s, c) => s + c.cost_usd, 0),
+    },
+    'Career Playbook costs settled against the provider'
+  );
+
+  return settled;
 }

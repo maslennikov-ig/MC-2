@@ -48,6 +48,7 @@ import {
   buildCareerPlaybookAbortedAttemptCosts,
   type CareerPlaybookAbortedAttempt,
 } from '@/stages/stage-career-playbook/nodes/runtime';
+import { settleCareerPlaybookNodeCosts } from '@/stages/stage-career-playbook/nodes/runtime-attempt';
 import { joinCareerPlaybookFinalBlocks } from '@/stages/stage-career-playbook/nodes/final-assembler';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
 import { generateCareerPlaybookImage } from '@/stages/stage-career-playbook/image-generation';
@@ -84,22 +85,24 @@ function normalizeRegenerationAttempts(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function buildCostBreakdown(result: CareerPlaybookGraphResult) {
+async function buildCostBreakdown(result: CareerPlaybookGraphResult) {
   const regenerationAttempts = normalizeRegenerationAttempts(result.blockRegenerationAttempts);
 
-  if (result.costBreakdown) {
-    return regenerationAttempts
-      ? { ...result.costBreakdown, regeneration_attempts: regenerationAttempts }
-      : result.costBreakdown;
-  }
-  if (!Array.isArray(result.nodeCosts)) return undefined;
+  const source = result.costBreakdown?.nodeCosts ?? result.nodeCosts;
+  if (!Array.isArray(source)) return undefined;
+
+  // The last thing before the row is written: swap every catalogue estimate for
+  // the provider's own charge. Here rather than per call because a generation
+  // record takes about ten seconds to become readable, and by now they all are.
+  const nodeCosts = await settleCareerPlaybookNodeCosts(source);
 
   return {
-    nodeCosts: result.nodeCosts,
-    total_cost_usd: sumCareerPlaybookNodeCosts(result.nodeCosts),
+    ...(result.costBreakdown ?? {}),
+    nodeCosts,
+    total_cost_usd: sumCareerPlaybookNodeCosts(nodeCosts),
     // Non-zero means the total is a lower bound: some attempts aborted before the
     // provider reported usage, so their cost is unknown rather than zero.
-    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(result.nodeCosts),
+    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(nodeCosts),
     ...(regenerationAttempts ? { regeneration_attempts: regenerationAttempts } : {}),
   };
 }
@@ -151,15 +154,18 @@ function extractFailureNodeCosts(error: unknown): CareerPlaybookNodeCost[] {
  * row may already carry a completed phase's cost, and a failure that overwrote
  * it would trade one hole for another.
  */
-function mergeFailureCostBreakdown(
+async function mergeFailureCostBreakdown(
   existing: unknown,
   failureNodeCosts: CareerPlaybookNodeCost[]
-): CareerPlaybookCostBreakdown | undefined {
+): Promise<CareerPlaybookCostBreakdown | undefined> {
   if (failureNodeCosts.length === 0) return undefined;
 
   const parsed = CareerPlaybookCostBreakdownSchema.safeParse(existing);
   const previous = parsed.success ? parsed.data : { nodeCosts: [], total_cost_usd: 0 };
-  const nodeCosts = [...previous.nodeCosts, ...failureNodeCosts];
+  const nodeCosts = await settleCareerPlaybookNodeCosts([
+    ...previous.nodeCosts,
+    ...failureNodeCosts,
+  ]);
 
   return {
     ...previous,
@@ -550,7 +556,7 @@ export class CareerPlaybookHandler {
     result: CareerPlaybookGraphResult
   ) {
     const safeResult = await this.remediateMermaidBeforePersist(result);
-    const costBreakdown = buildCostBreakdown(result);
+    const costBreakdown = await buildCostBreakdown(result);
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
     const generationWarnings = normalizeGenerationWarnings(safeResult.warnings);
@@ -718,7 +724,7 @@ export class CareerPlaybookHandler {
         .eq('id', playbookId)
         .single();
 
-      return mergeFailureCostBreakdown(
+      return await mergeFailureCostBreakdown(
         (data as { cost_breakdown: unknown } | null)?.cost_breakdown,
         failureNodeCosts
       );
@@ -727,7 +733,7 @@ export class CareerPlaybookHandler {
         { playbookId, error: errorMessageFrom(readError) },
         'Could not read the existing Career Playbook cost breakdown; recording the failure costs alone'
       );
-      return mergeFailureCostBreakdown(null, failureNodeCosts);
+      return await mergeFailureCostBreakdown(null, failureNodeCosts);
     }
   }
 

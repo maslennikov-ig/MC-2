@@ -54,6 +54,7 @@ function buildNodeCost(result: {
   costUsd: number;
   durationMs?: number;
   attemptCount?: number;
+  generationId?: string;
 }): CareerPlaybookNodeCost {
   return {
     node: 'specBuilder',
@@ -63,6 +64,9 @@ function buildNodeCost(result: {
     cost_usd: result.costUsd,
     duration_ms: result.durationMs,
     attempts: result.attemptCount,
+    // Carried so `settleCareerPlaybookNodeCosts` can replace the estimate above
+    // with what OpenRouter actually charged.
+    ...(result.generationId ? { generation_id: result.generationId } : {}),
     outcome: 'succeeded',
   };
 }
