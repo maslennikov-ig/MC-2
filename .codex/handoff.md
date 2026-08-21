@@ -22,14 +22,14 @@ constrains work:
   ceiling), and a test rejects any literal above that ceiling. The old `0.7` was unreachable against
   embeddings topping out near 0.58, which made hybrid search BM25-only.
 - Degenerate parents no longer reach the index (`selectIndexableChunks`); search drops repeated text
-  as a safety net. Production was cleaned 13712 → 6856 points. Both chunking paths were measured and
-  are healthy; `groupIntoParents()` was accused twice and caused neither defect.
+  as a safety net. Production was cleaned 13712 → 6856 points. Both chunking paths are healthy;
+  `groupIntoParents()` was accused twice and caused neither defect.
 - Only children are indexed, plus any childless parent; the passage is rebuilt at retrieval time from
   siblings, **after reranking** in the two paths that rerank. The budget is a ceiling on what
   expansion adds, never a reason to drop a retrieved chunk. On for Stage 5 section RAG, Stage 6
   lesson RAG and `search_documents`; off for evidence retrieval, where a citation must point at the
-  fragment that matched. It is a no-op on points indexed before it. Measured 2026-08-13: siblings on
-  105 of 110 indexed children, average expansion 5.5×. Resulting **quality** is not measured.
+  fragment that matched. A no-op on points indexed before it. Measured 2026-08-13: siblings on 105 of
+  110 indexed children, average expansion 5.5×. Resulting **quality** is not measured.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -62,117 +62,116 @@ $0.065/$0.180. `DEFAULT_MODEL_ID`, all 92 occurrences in `config-seed.json` and 
 
 ## Phase configs audited (2026-08-13, `7ad421986`)
 
-Stored configuration is clean on the checks that matter: no budget exceeds a model ceiling once the
-reasoning budget is added, no reasoning on a model that refuses it, every model catalogued and live,
-every fallback crossing vendors. What was open was the seam, not the data — Stage 5, metadata
-generation and `getModelForPhase` each dropped part of a phase config; all three now go through
-`buildProviderParams`, held by `tests/unit/phase-config-provider-contract.test.ts`. The collision
-fallback is `google/gemini-3.7-flash`.
-
-Open from the audit, none in the current epics: `mc2-s1vg5` (`generate:config-seed` exits 0 on an
-unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
-delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
+Stored configuration is clean on the checks that matter. What was open was the seam, not the data:
+Stage 5, metadata generation and `getModelForPhase` each dropped part of a phase config, and all
+three now go through `buildProviderParams`, held by
+`tests/unit/phase-config-provider-contract.test.ts`. Collision fallback: `google/gemini-3.7-flash`.
+Open, none in the current epics: `mc2-s1vg5` (`generate:config-seed` exits 0 on an unreachable
+database), `mc2-9yrgb` (`stage_5_escalation` requested by nothing — do not delete on that alone),
+`mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
 ## Cost accounting: where it stands
 
-Epic `mc2-qrdkt` is complete (17 of 17). Three paid runs in August took the recorded share of the
-OpenRouter bill from **48% → 55% → 54%**; the fixes behind that are merged and their evidence lives
-in the `bd` close reasons, not here.
-
+Epic `mc2-qrdkt` is complete (17 of 17); the evidence lives in the `bd` close reasons, not here.
 What still constrains work:
 
 - **One rule, held by a guard.** A paid call prices itself at the call, from its own token split and
-  the model the provider actually served; a node-level summary row keeps tokens and carries **no**
-  price. A priced call is _stamped_ `input_data.billedCall`, because neither token counts nor step
-  names can tell a call from a summary: `cost:report` had been reporting 21 rows of "money the ledger
-  missed" on a window whose true answer was 0.
+  the model the provider served; a node-level summary row keeps tokens and carries **no** price. A
+  priced call is _stamped_ `input_data.billedCall`: neither token counts nor step names tell a call
+  from a summary, and `cost:report` once reported 21 rows of "missing money" where the answer was 0.
 - **The catalogue is an estimate, not the price.** Every OpenRouter call settles against
   `/api/v1/generation`. `MODEL_CATALOG` is what a budget and a `provider.max_price` ceiling are built
   from; `tests/unit/model-catalog-coverage.test.ts` is a hand-updated snapshot that stays offline on
   purpose, because routing must not depend on a third party being reachable.
-  `scripts/check-model-catalog-drift.ts` is the online half: it reads `/api/v1/models`, names any
-  entry that disagrees, and exits **2** when it cannot reach the API against **1** when the catalogue
-  is wrong — those two must not look alike. Default scope is `LIVE_ROUTING_MODEL_IDS` and is green;
-  `--all` also covers retired entries, four of which are still adrift (`mc2-g1zt9`).
-- **Nothing routes to a `~`-alias any more** — see the routing section above (`mc2-qch4w`). The alias
-  entry stays in the catalogue only so rows it already wrote still resolve.
+  `scripts/check-model-catalog-drift.ts` is the online half: it reads `/api/v1/models` and exits **2**
+  when it cannot reach the API against **1** when the catalogue is wrong — those must not look alike.
+  Both scopes green 2026-08-21; `--all` found five adrift entries, not the four the plan named, the
+  fifth being `deepseek/deepseek-v4-flash`, which every undated V4 Flash snapshot is priced from
+  (`mc2-g1zt9`). It runs in **no** CI job, deliberately: a provider's tariff change must not be able
+  to fail our build and with it the deploy. Scheduled non-blocking check: `mc2-ts9i2`.
+- **Nothing routes to a `~`-alias any more** (`mc2-qch4w`); its catalogue entry stays only so rows it
+  already wrote still resolve.
 - **The second price table is gone; images price like everything else.** `MODEL_COSTS` in the image
-  service (0.038 / 0.007 / 0.04, plus `DEFAULT_COST_USD = 0.04` for anything unrecognised) is
-  deleted. Image models carry `imageOutputPricePerMillion` in `MODEL_CATALOG` — OpenRouter's
-  published `image_output` rate, which nothing had ever read — and an image call's completion tokens
-  are image tokens, so the estimate is the same arithmetic as any other call. An uncatalogued image
-  model is traced **unpriced** and warns, instead of resolving to a confident $0.04. The estimate is
-  only a placeholder: the service now uses the shared transport, so `x-generation-id` arrives and
-  `settleTraceCostFromProvider` replaces it with the real charge (`mc2-5mhlb`).
+  service (0.038 / 0.007 / 0.04, plus `DEFAULT_COST_USD = 0.04` for the unrecognised) is deleted.
+  Image models carry `imageOutputPricePerMillion` in `MODEL_CATALOG` — OpenRouter's published
+  `image_output` rate, which nothing had ever read — and an image call's completion tokens are image
+  tokens, so the estimate is the same arithmetic as any other call. An uncatalogued image model is
+  traced **unpriced** and warns, instead of a confident $0.04. The estimate is only a placeholder:
+  the service uses the shared transport, so `x-generation-id` arrives and the settlement replaces it
+  with the real charge (`mc2-5mhlb`).
 - **One transport, and a guard against the next one.** Every OpenRouter chat client comes from
   `shared/llm/openrouter-client.ts`, the only place `instrumentFetchWithGenerationId` is attached.
   `tests/unit/shared/llm/one-openrouter-transport.test.ts` fails on a `new OpenAI(` or a hand-written
   `openrouter.ai/api/v1` anywhere else; the exception list may shrink, never grow silently. Writing
   it turned up two transports nobody had counted — Stage 5's `metadata-generator.ts` and
-  `section-batch/constants.ts`, both `ChatOpenAI`, both reading `process.env` for the key.
-  Grandfathered as `mc2-me7nx`: their calls are priced from the catalogue, not from a receipt.
+  `section-batch/constants.ts`, both reading `process.env` for the key. Both go through the shared
+  factory as of 2026-08-21 and both entries are gone from the list, leaving one: Stage 7 audio
+  (`mc2-me7nx` closed). Metadata generation was also asking `getModelForPhase` for a model without a
+  course id, so it spent anonymously; it passes one now.
+- **A LangChain call prices itself from the constructor, and reads its receipt off the message.**
+  `ChatOpenAI.withConfig` — which `withStructuredOutput` and `bindTools` both funnel through — is
+  `new ChatOpenAI(this.fields)` by design (langchainjs#8586), so anything attached to a built model
+  is dropped by the clone; that silently cost every structured call its price. Hence
+  `createCostRecordingModel`/`Async` in the factory, never build-then-attach. The generation id comes
+  from `generations[0][0].message.id` — OpenRouter's `gen-…`, the same value the header carries — so
+  the course pipeline needs no `AsyncLocalStorage` slot. Identical in @langchain/openai 1.4.7 and
+  1.5.10, and `tests/unit/shared/llm/structured-output-reaches-invoke.test.ts` fails if that changes
+  (`mc2-258fi`). The wrapped `fetch` stays for the failure path, which produces no message — that is
+  what the Career Playbook reads.
 - **The playbook cover reaches a ledger.** `generation_trace.course_id` is a foreign key into
   `courses` and a playbook is not a course, so the cover was logged as unattributable — it was the
   entire $0.045080 residual of the 2026-08-21 run. It is now a `cardImage` node cost appended to
   `career_playbooks.cost_breakdown`, written from the image job because that job finishes _after_ the
-  playbook row (`mc2-j9pmq`). A cover whose call _fails_ still leaves no row: `mc2-ietzn`.
+  playbook row (`mc2-j9pmq`). A cover whose call fails now leaves a row too, unpriced until the settlement (`mc2-ietzn`).
 - **Stage 6 and Stage 7 run their own workers, queues and containers.** Anything added to the general
   sandboxed processor misses them. Cost was wrong three times for exactly this.
-- **One hole is named rather than closed**, and sits in the guard's exception list so it can shrink
-  but not grow in silence: document evidence prices itself into its own coverage ledger and never
-  reaches the course total (`mc2-b7olk.4`). Course editing (`mc2-b7olk.5`) now has `stage_edit` and
-  is live and proven.
+- **One hole is named rather than closed:** document evidence prices itself into its own coverage
+  ledger and never reaches the course total (`mc2-b7olk.4`). Course editing (`mc2-b7olk.5`) has
+  `stage_edit` and is live and proven.
 
-**The find that reshaped all of this.** `x-generation-id` arrives with the response headers — before
-the body, and before any timeout abort — and `GET /api/v1/generation?id=` then returns `usage` (what
-OpenRouter actually billed), the real token counts, `cancelled`, and `provider_name`. An aborted call
-becomes countable and the price stops being a catalogue estimate.
+**The find that reshaped all of this.** `GET /api/v1/generation?id=` returns `usage` (what OpenRouter
+actually billed), the real token counts, `cancelled` and `provider_name`. The id is in the response
+body, and also in the `x-generation-id` header — which arrives before the body and before any timeout
+abort, so even an aborted call becomes countable.
 
-**Run of 2026-08-21 — the reconciliation became arithmetic.** Window from 09:37:27Z: OpenRouter
-billed **USD 0.165079**, `cost:report --since` reported **USD 0.119999**, residual **USD 0.045080**.
-Thirty LLM calls, all thirty priced from `/api/v1/generation`, `unknown_cost_attempts` 0, and the
-worker log for the window held exactly thirty `Career Playbook LLM call succeeded` lines plus one
-other paid call — so the residual was not a gap but one named call, the playbook's card image, at a
-hardcoded USD 0.007 against USD 0.045080 charged. Both causes are fixed above (`mc2-j9pmq`,
-`mc2-5mhlb`); the next run is the first to test that. Compare 2026-08-20: 46% adrift and
-unattributable.
+**Runs of 2026-08-21.** The last one reconciled to **+USD 0.000422 of USD 0.193916** and the sign
+flipped: what remains is over-estimation, not missing money (2026-08-20 was 46% adrift). Its one
+failure: of fifteen billed calls exactly one carried a provider receipt, because the LangChain path
+dropped the id. Fixed above and untested by a run.
 
 Three things that only a live run could say:
 
 - **A generation record takes ~9.6 s to become readable.** The first implementation read once after
-  1.5 s, settled zero of 33 nodes, and reported success. The lookup now polls to 30 s, and the
-  playbook collects every receipt in one pass at persist time rather than waiting per call.
+  1.5 s, settled zero of 33 nodes and reported success. The lookup polls to 30 s, and the playbook
+  collects every receipt in one pass at persist time rather than waiting per call.
 - **`provider.max_price` set below every endpoint is a refusal**, not a cheaper route —
   `No endpoints found that satisfy the max price for this request`. One wrong catalogue price would
   fail every call for that model, so the ceiling yields and the generation lives.
-- **`provider.ignore` accepts display names, slugs and a naive lower-cased form alike.** The
-  documented slug is what we send; the fallback to the display name is now safe rather than a guess.
+- **`provider.ignore` accepts display names, slugs and a naive lower-cased form alike.** We send the
+  documented slug; the fallback to the display name is safe rather than a guess.
 
 **Still unproven live:** the per-chain provider ignore. The 2026-08-21 run had no failed attempt, so
-nothing routed around anything. Held by unit tests and the 2026-08-20 manual measurement
-(205 s on OpenInference at status `-2`; 58.7 s on Sail Research with it excluded).
-
-**The ceiling is doing its job.** All three endpoints the run used for the deepseek alias — Sail
-Research, Relace, Decart — are the three cheapest of ~30, all inside the 1.5× ceiling. The 21 above
-it, up to AtlasCloud at 6.8× the cheapest, were never reachable.
+nothing routed around anything. Held by unit tests and the 2026-08-20 manual measurement (205 s on
+OpenInference at status `-2`; 58.7 s on Sail Research with it excluded). **The ceiling is doing its
+job:** the three endpoints the run used were the three cheapest of ~30, and the 21 above the 1.5×
+ceiling — up to AtlasCloud at 6.8× — were never reachable.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
-recognised by what the provider says, remembered for the life of the process, and retried asking for
-the least deliberation — on both the OpenAI-SDK and the LangChain path. The catalogue entry is still
-primary; the remembering is logged at warn so it gets added.
+recognised by what the provider says, remembered for the process, and retried asking for the least
+deliberation; the catalogue entry stays primary and the remembering is logged at warn. The net has a
+hole: it replaces `invoke` on the instance, so the four structured call sites reach a clone
+(`mc2-148j9`).
 
 **A log line says which deployment it came from.** Every dev container runs `NODE_ENV=production`, so
-every dev log line claimed to be production. The pino base now uses `detectEnvironment()` — the same
-vocabulary as `error_logs.environment` — and the backend image carries `APP_VERSION` from `VCS_REF`
-instead of `0.0.0`.
+every dev log line claimed to be production. The pino base uses `detectEnvironment()`, and the image
+carries `APP_VERSION` from `VCS_REF`.
 
 **Timeouts are set from measurement, and waiting is the owner's chosen trade.**
 `DEFAULT_LLM_TIMEOUT_MS` is **300000**, and all eleven `stage_career_playbook_*` phases carry 238000
 in both `config-seed.json` and `llm_model_config`. That was the load-bearing fix of 2026-08-20/21: a
-realistic Stage 4 request measured 119.0s, two calls exceeded even a 238s budget, and on 2026-08-21 a
-`group_3` call took 229s and a `group_6` call spent the full 238s — all of which a smaller budget
-would have aborted and re-billed. Still far under the 620s hang the abort bound catches
-(`mc2-wg60c`).
+realistic Stage 4 request measured 119.0s, and on 2026-08-21 a `group_3` call took 229s and a
+`group_6` call spent the full 238s — all of which a smaller budget would have aborted and re-billed.
+Still far under the 620s hang the abort bound catches (`mc2-wg60c`).
 
 **Attempt 1 stays on the primary.** `FALLBACK_FROM_ATTEMPT = 2`: the old
 `useFallback = ... || attempt > 0` spent three of four attempts on the slow alias. `spec-builder.ts`
@@ -191,11 +190,9 @@ its worker between checks; each lesson is also enqueued with a `STAGE6_BATCH_MAX
 generates synchronously by itself if the batch never lands. Eligibility is decided per call against
 the **live** catalogue: the `:batch` sibling must exist, be cheaper on both legs and fit the request.
 Not a config switch — a `:batch` id posted to the synchronous endpoint breaks the caller. A `:batch`
-tariff is **not** reliably half the base one: two of the four were recorded that way and were wrong
-(see the catalogue drift note above).
-
-`MODEL_CATALOG` prices are the `/models` base rate. With many providers that rate is a default, not a
-promise: `z-ai/glm-5.2` ran from $0.49 to $1.40 per million input on one day.
+tariff is **not** reliably half the base one. `MODEL_CATALOG` prices are the `/models` base rate, and
+with many providers that is a default, not a promise: `z-ai/glm-5.2` ran $0.49 to $1.40 per million
+input on one day.
 
 ## Backlog truth and order
 
@@ -261,8 +258,8 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-gmab0` mandatory-reasoning recovery — no model has refused to disable reasoning in any run, so
-  it is still held by unit tests only; it rides along with the next paid run.
+- `mc2-gmab0` mandatory-reasoning recovery — no model has refused in any run, so it is held by unit
+  tests only, and `mc2-148j9` says it misses the structured call sites outright.
 - `mc2-b7olk.4` — document evidence keeps its own cost ledger and never reaches the course total. It
   needs a decision about where that money belongs, not a forgotten argument.
 - `mc2-z0xr3` — stays open until a run on the repaired code reconciles without an unnamed residual.
@@ -274,12 +271,14 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: the paid run in `docs/runbooks/cost-ledger-paid-run.md`, then epic `mc2-4clyr`
+Next stage id: the paid run in `docs/runbooks/cost-ledger-paid-run.md`, then epic `mc2-4clyr`.
+Its one new acceptance line: `priced by the provider` close to the number of billed calls, against
+the 1 of 15 that the 2026-08-21 run scored.
 
-Recommended action: sections A–H of `docs/plans/settled-picture-osprey.md` are delivered
-(`mc2-l17v5`, `mc2-5mhlb`, `mc2-j9pmq`, `mc2-z7ryi`, `mc2-qch4w`, `mc2-hc91g`, `mc2-9nf9q`,
-`mc2-dgw4u`). What remains is the repeat paid run — that plan's acceptance, not separate work, and
-the first run on code where images price themselves and nothing routes to a `~`-alias.
+Recommended action: sections A–G of `docs/plans/honest-receipt-kestrel.md` are delivered
+(`mc2-fcs45`, `mc2-gqhws`, `mc2-258fi`, `mc2-me7nx`, `mc2-ietzn`, `mc2-g1zt9`, `mc2-hjj8a` rewritten
+and left open). What remains is the repeat paid run — that plan's acceptance, not separate work, and
+the first run on code where the course pipeline carries a provider receipt.
 
 Do not start `mc2-4clyr` before the number holds. The epic is about cutting generation cost, and its
 headline also needs correcting: across all 1589 judged lessons rather than the 490 that reached a
@@ -297,7 +296,7 @@ rather than chase speed. Key stages may move to `openai/gpt-5.6-luna` at ~8× th
 
 Run the paid run in `docs/runbooks/cost-ledger-paid-run.md` against `develop` on dev, then reconcile
 `pnpm cost:report --since <T0>` TOTAL against the delta of `/api/v1/credits` for the same window and
-answer the acceptance list of `docs/plans/settled-picture-osprey.md` line by line. Ask before
+answer the acceptance list of `docs/plans/honest-receipt-kestrel.md` line by line. Ask before
 spending. Use $orchestrator-stage for the epic itself; single tasks are ordinary local work. Do not
 enable the cohort, change its threshold, reindex, force-push, migrate beyond `mc2-ufpko`, or spend
 beyond the USD 5 ceiling without separate current authorization.
