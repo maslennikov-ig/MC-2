@@ -734,17 +734,19 @@ export async function runDocumentEvidencePreflight(
           });
           generated = 'card' in raw ? raw : { card: raw, metrics: emptyGenerationMetrics() };
         } catch (error) {
-          if (
-            error instanceof EvidenceExtractionScopeError ||
-            error instanceof EvidenceCheckpointError
-          ) {
+          // Only a bad checkpoint still stops the run: see the same distinction
+          // in `card-generator.ts`. An out-of-scope unit is one card's problem
+          // and gets one card's outcome (mc2-gqhws).
+          if (error instanceof EvidenceCheckpointError) {
             throw error;
           }
           generated = {
             card: createFailedEvidenceCard(
               source,
               { allocatedTokens: allocation.allocatedTokens, processingMode: allocation.mode },
-              'card_generation_failed_after_retries'
+              error instanceof EvidenceExtractionScopeError
+                ? 'card_generation_returned_out_of_scope_evidence'
+                : 'card_generation_failed_after_retries'
             ),
             metrics: emptyGenerationMetrics(),
           };

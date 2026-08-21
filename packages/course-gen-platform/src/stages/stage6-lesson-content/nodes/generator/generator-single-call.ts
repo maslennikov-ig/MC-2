@@ -11,8 +11,7 @@
  */
 
 import { logger } from '@/shared/logger';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
+import { createCostRecordingModel, createOpenRouterModel } from '@/shared/llm/langchain-models';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
@@ -138,11 +137,13 @@ export async function generateLessonSingleCall(
     // ordinary run wrote a trace row with tokens and no price and the course
     // total silently omitted lesson generation (mc2-4wiot). Pricing happens at
     // the call because that is the only place holding the input/output split.
-    model = attachCostRecording(
-      createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning),
+    model = createCostRecordingModel(
       modelId,
+      temperature,
+      maxTokens,
       phaseName,
-      courseId
+      courseId,
+      reasoning
     );
     const response = await model.invoke(prompt);
     responseContent =

@@ -1,6 +1,5 @@
 import { logger } from '@/shared/logger';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
+import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { getLanguageName } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
@@ -32,9 +31,10 @@ export async function generateTruncationContinuation(
   const sectionsList = lessonSpec.sections.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
 
   const { modelId, phaseName } = await resolveContinuationModel(lessonSpec, courseId);
-  const model = attachCostRecording(
-    createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS),
+  const model = createCostRecordingModel(
     modelId,
+    0.2,
+    TRUNCATION_CONTINUATION_MAX_TOKENS,
     phaseName,
     courseId
   );

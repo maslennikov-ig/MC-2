@@ -303,9 +303,8 @@ function validateAnalysisResult(result: AnalysisResult): void {
   if (!result.course_category) {
     throw new Error('Validation error: course_category is missing');
   }
-  if (!result.contextual_language) {
-    throw new Error('Validation error: contextual_language is missing');
-  }
+  // contextual_language is optional (DEPRECATED - only present for legacy data).
+  // The assembly above adds it conditionally, so requiring it here rejected our own output.
   if (!result.topic_analysis) {
     throw new Error('Validation error: topic_analysis is missing');
   }

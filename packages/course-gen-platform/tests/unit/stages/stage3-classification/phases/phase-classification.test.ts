@@ -6,7 +6,7 @@ import {
   getCourseClassifications,
 } from '@/stages/stage3-classification/phases/phase-classification';
 import { cache } from '@/shared/cache/redis';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -59,7 +59,7 @@ vi.mock('@/shared/logger/index.js', () => {
 });
 
 vi.mock('@/shared/llm/langchain-models', () => ({
-  createOpenRouterModel: vi.fn(() => ({
+  createCostRecordingModel: vi.fn(() => ({
     invoke: mockModelInvoke,
     withStructuredOutput: vi.fn(() => ({
       invoke: mockStructuredModelInvoke,

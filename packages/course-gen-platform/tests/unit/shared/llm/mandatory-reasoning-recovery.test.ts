@@ -136,21 +136,24 @@ describe('the LangChain wrapper', () => {
     await expect(model.invoke('hello' as never)).rejects.toThrow(/mandatory/);
   });
 
-  it('carries cost recording onto the model it rebuilds', async () => {
-    // The recovery replaces the instance, and cost recording is attached to the
-    // original after it was wrapped. Losing it here would make a recovered call
-    // the one call of the run that nobody is charged for.
-    const rebuilt = { invoke: vi.fn(async () => 'answer'), callbacks: undefined as unknown };
+  it('leaves the rebuilt model the cost recording it was built with', async () => {
+    // The recovery replaces the instance, and a recovered call that lost its
+    // recording would be the one call of the run nobody is charged for. It used
+    // to be carried across by hand, because recording was assigned to the model
+    // after it was wrapped. It is a constructor field now — `rebuild` produces a
+    // model that already has it — so the copy is gone and this checks that the
+    // recovery does not clobber what the factory built in (mc2-258fi).
+    const recorder = [{ handleLLMEnd: vi.fn() }];
+    const rebuilt = { invoke: vi.fn(async () => 'answer'), callbacks: recorder as unknown };
     const model = withMandatoryReasoningRecovery(
       refusingModel(1) as never,
       UNFLAGGED,
       () => rebuilt as never
     );
-    const recorder = [{ handleLLMEnd: vi.fn() }];
-    (model as unknown as { callbacks: unknown }).callbacks = recorder;
 
     await model.invoke('hello' as never);
 
+    expect(rebuilt.invoke).toHaveBeenCalledTimes(1);
     expect(rebuilt.callbacks).toBe(recorder);
   });
 

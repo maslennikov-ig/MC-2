@@ -64,9 +64,13 @@ function rawModelBuilds(text: string): number[] {
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
     const before = text.slice(Math.max(0, match.index - 400), match.index);
-    // A build that is immediately handed to the recorder is accounted for.
-    if (/attachCostRecording\(\s*$/u.test(before)) continue;
-    // ...as is one the surrounding code says it prices itself, and why.
+    // There used to be an allowance here for a build handed straight to
+    // `attachCostRecording`. That shape is gone: recording has to be in the
+    // constructor to survive `withStructuredOutput`, so a stage that needs it
+    // calls `createCostRecordingModel` and never the raw builder (mc2-258fi).
+    // A raw build in a stage is now always something to look at.
+    // A call the surrounding code says it prices itself, with the reason, stays
+    // allowed.
     if (before.slice(-400).includes(EXEMPT_MARK)) continue;
     // Declarations, imports and type positions are not calls.
     if (/(?:import|export|function|typeof)\s[^;]*$/u.test(before.split('\n').pop() ?? '')) continue;

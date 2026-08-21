@@ -85,9 +85,12 @@ export function forgetLearnedMandatoryReasoning(): void {
  * first of them is news; gating the retry on being first would let every other
  * in-flight call fail on a request nobody fixed.
  *
- * Only `invoke` is wrapped, which is what this codebase calls — directly and
- * through `withStructuredOutput`, whose binding delegates to it. `stream` and
- * `batch` would not be covered.
+ * Only `invoke` is wrapped, and only on this instance. That covers the direct
+ * calls, which is most of them, and **not** the four that go through
+ * `withStructuredOutput`: it builds a new `ChatOpenAI` from the constructor
+ * fields, so a replaced method does not travel with it. This docstring claimed
+ * the opposite until a test was written for it (mc2-258fi), and the claim was
+ * never true. `stream` and `batch` are not covered either.
  */
 export function withMandatoryReasoningRecovery(
   model: ChatOpenAI,
@@ -102,11 +105,10 @@ export function withMandatoryReasoningRecovery(
       if (!isMandatoryReasoningRejection(error)) throw error;
       rememberMandatoryReasoning(modelId);
       const retryModel = rebuild();
-      // The rebuild is a fresh instance, and everything attached to the model
-      // after it was wrapped - cost recording above all - lives on the old one.
-      // Read the callbacks now rather than at wrap time: `attachCostRecording`
-      // runs after this function returns, so at wrap time there are none.
-      retryModel.callbacks = model.callbacks;
+      // The rebuild is a fresh instance. Cost recording reaches it because the
+      // factory puts the callbacks in the constructor, which is the only place
+      // they survive from; carrying them across by hand here would only copy
+      // what `rebuild` already built in.
       return await retryModel.invoke(...args);
     }
   }) as ChatOpenAI['invoke'];

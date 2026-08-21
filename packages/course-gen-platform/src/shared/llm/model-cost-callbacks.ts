@@ -8,7 +8,7 @@
  * @module shared/llm/model-cost-callbacks
  */
 
-import type { ChatOpenAI } from '@langchain/openai';
+import type { Callbacks } from '@langchain/core/callbacks/manager';
 import type { LLMResult } from '@langchain/core/outputs';
 
 import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
@@ -35,21 +35,50 @@ export function stageOfPhase(phase: string): LlmCostContext['stage'] | undefined
 }
 
 /**
- * Attaches cost recording to a model.
+ * OpenRouter's own name for this call, as LangChain hands it back.
  *
- * Without a course id there is nothing to attribute the cost to, and the model
- * is returned untouched.
+ * The provider's figure is fetched with it later, and until 2026-08-21 no call
+ * on this path had one: the id was being read off the `x-generation-id` response
+ * header into an `AsyncLocalStorage` slot that nothing here ever opened. The
+ * same `gen-…` value is in the response body as `id`, and LangChain puts it on
+ * the message — no slot, no wrapped transport, no ordering to get wrong
+ * (mc2-258fi).
+ *
+ * The header still matters for the calls that never produce a message: an abort
+ * has no `handleLLMEnd`, and the Career Playbook reads its id from the slot.
  */
-export function attachCostRecording(
-  model: ChatOpenAI,
+function generationIdOf(output: LLMResult): string | undefined {
+  const generation = output.generations?.[0]?.[0] as { message?: { id?: unknown } } | undefined;
+  const id = generation?.message?.id;
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
+}
+
+/**
+ * The callbacks that make a LangChain model price its own calls.
+ *
+ * Returned for the constructor, never assigned to a built model. `ChatOpenAI`
+ * implements `withConfig` — which `withStructuredOutput` and `bindTools` both go
+ * through — as `new ChatOpenAI(this.fields)`, deliberately, so that two bound
+ * models cannot share state (langchainjs#8586). The clone therefore carries the
+ * constructor fields and nothing else: callbacks assigned afterwards were
+ * dropped, and every structured call recorded no cost at all. Constructor
+ * callbacks are in `fields`, so they survive, and the behaviour is identical in
+ * @langchain/openai 1.4.7 and 1.5.10 — this is the supported shape, not a
+ * workaround for a version. `tests/unit/shared/llm/structured-output-reaches-invoke.test.ts`
+ * fails if that ever changes.
+ *
+ * Without a course id there is nothing to attribute the cost to, and nothing is
+ * returned.
+ */
+export function costRecordingCallbacks(
   modelId: string,
   phase: string,
   courseId?: string
-): ChatOpenAI {
+): Callbacks | undefined {
   const stage = stageOfPhase(phase);
-  if (!courseId || !stage) return model;
+  if (!courseId || !stage) return undefined;
 
-  model.callbacks = [
+  return [
     {
       handleLLMEnd: async (output: LLMResult) => {
         const usage = (output.llmOutput?.tokenUsage ?? {}) as {
@@ -57,16 +86,17 @@ export function attachCostRecording(
           completionTokens?: number;
         };
         if (usage.promptTokens === undefined && usage.completionTokens === undefined) return;
+        const generationId = generationIdOf(output);
         await recordLlmCallCost(
           {
             model: modelId,
             inputTokens: usage.promptTokens ?? 0,
             outputTokens: usage.completionTokens ?? 0,
+            ...(generationId ? { generationId } : {}),
           },
           { courseId, stage, phase }
         );
       },
     },
   ];
-  return model;
 }

@@ -327,7 +327,10 @@ async function main(): Promise<void> {
     for (const row of rows) {
       const result = SeedConfigSchema.safeParse(row);
       if (!result.success) {
-        logger.error({ errors: result.error.errors }, `[Config Seed] Invalid config: ${row.phase_name}`);
+        logger.error(
+          { errors: result.error.errors },
+          `[Config Seed] Invalid config: ${row.phase_name}`
+        );
         invalidCount++;
       }
     }
@@ -336,7 +339,9 @@ async function main(): Promise<void> {
       throw new Error(`VALIDATION FAILED: ${invalidCount} invalid config(s) found`);
     }
 
-    logger.info(`[Config Seed] Validation passed: ${rows.length} configs, all required phases present`);
+    logger.info(
+      `[Config Seed] Validation passed: ${rows.length} configs, all required phases present`
+    );
 
     // Sort by phase_name for consistent output
     const sortedData = rows
@@ -366,7 +371,9 @@ async function main(): Promise<void> {
 
       if (stat.size !== expectedSize) {
         fs.unlinkSync(tmpPath);
-        throw new Error(`File write verification failed: expected ${expectedSize} bytes, got ${stat.size}`);
+        throw new Error(
+          `File write verification failed: expected ${expectedSize} bytes, got ${stat.size}`
+        );
       }
 
       // Atomic rename
@@ -379,7 +386,9 @@ async function main(): Promise<void> {
       throw writeErr;
     }
 
-    logger.info(`[Config Seed] Refreshed: ${sortedData.length} configs fetched and saved to ${SEED_PATH}`);
+    logger.info(
+      `[Config Seed] Refreshed: ${sortedData.length} configs fetched and saved to ${SEED_PATH}`
+    );
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.warn(`[Config Seed] DB unavailable during build. Using committed config-seed.json.`);
@@ -409,7 +418,7 @@ async function main(): Promise<void> {
   logger.info('[Config Seed] Generation complete!');
 }
 
-main().catch((err) => {
+main().catch(err => {
   logger.error({ err }, '[Config Seed] Fatal error:');
   process.exit(1);
 });

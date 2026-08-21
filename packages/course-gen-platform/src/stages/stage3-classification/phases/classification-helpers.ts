@@ -6,8 +6,7 @@
  */
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { createOpenRouterModel } from '../../../shared/llm/langchain-models';
-import { attachCostRecording } from '../../../shared/llm/model-cost-callbacks';
+import { createCostRecordingModel } from '../../../shared/llm/langchain-models';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { DocumentPriority } from '@megacampus/shared-types';
@@ -190,9 +189,10 @@ export async function classifyDocument(
   courseId?: string
 ): Promise<ClassificationResponse> {
   const modelConfig = await getClassificationModelConfig();
-  const model = attachCostRecording(
-    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
+  const model = createCostRecordingModel(
     modelConfig.modelId,
+    modelConfig.temperature,
+    modelConfig.maxTokens,
     'stage_3_classification',
     courseId
   );
@@ -235,9 +235,10 @@ export async function classifyDocumentsComparatively(
   courseId?: string
 ): Promise<ComparativeClassificationResponse> {
   const modelConfig = await getClassificationModelConfig();
-  const model = attachCostRecording(
-    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
+  const model = createCostRecordingModel(
     modelConfig.modelId,
+    modelConfig.temperature,
+    modelConfig.maxTokens,
     'stage_3_classification',
     courseId
   );

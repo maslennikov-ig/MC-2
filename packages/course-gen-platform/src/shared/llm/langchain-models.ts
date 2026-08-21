@@ -27,7 +27,7 @@ import {
   requiresReasoningNow,
   withMandatoryReasoningRecovery,
 } from './mandatory-reasoning-recovery';
-import { attachCostRecording } from './model-cost-callbacks';
+import { costRecordingCallbacks } from './model-cost-callbacks';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   DEFAULT_MODEL_ID,
@@ -484,13 +484,25 @@ export function buildProviderParams(
   };
 }
 
+/**
+ * What a model needs in order to charge its calls to something.
+ *
+ * It has to be known at construction time, not attached afterwards: see
+ * `costRecordingCallbacks`.
+ */
+export interface ModelCostContext {
+  phase: string;
+  courseId?: string;
+}
+
 export function createOpenRouterModel(
   modelId: string,
   temperature: number = 0.7,
   maxTokens: number = 4096,
   timeoutMs?: number,
   reasoning?: LangchainReasoningRequest,
-  providerRouting?: OpenRouterProviderRouting
+  providerRouting?: OpenRouterProviderRouting,
+  costContext?: ModelCostContext
 ): ChatOpenAI {
   const apiKey = getApiKeySync('openrouter');
 
@@ -501,16 +513,43 @@ export function createOpenRouterModel(
     );
   }
 
+  const callbacks = costContext
+    ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
+    : undefined;
+
   const build = (): ChatOpenAI =>
     new ChatOpenAI({
       model: modelId,
       configuration: { baseURL: OPENROUTER_BASE_URL, fetch: instrumentFetchWithGenerationId() },
       apiKey,
+      ...(callbacks ? { callbacks } : {}),
       ...(timeoutMs ? { timeout: timeoutMs } : {}),
       ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
     });
 
   return withMandatoryReasoningRecovery(build(), modelId, build);
+}
+
+/**
+ * A model that prices its own calls, for the stages that pick their own model
+ * instead of going through `getModelForPhase`.
+ *
+ * One call rather than build-then-attach, because attaching afterwards does not
+ * survive `withStructuredOutput` — the reason is in `costRecordingCallbacks`,
+ * and it cost every structured call its price.
+ */
+export function createCostRecordingModel(
+  modelId: string,
+  temperature: number,
+  maxTokens: number,
+  phase: string,
+  courseId?: string,
+  reasoning?: LangchainReasoningRequest
+): ChatOpenAI {
+  return createOpenRouterModel(modelId, temperature, maxTokens, undefined, reasoning, undefined, {
+    phase,
+    ...(courseId ? { courseId } : {}),
+  });
 }
 
 /**
@@ -534,7 +573,8 @@ export async function createOpenRouterModelAsync(
   maxTokens: number = 4096,
   timeoutMs?: number,
   reasoning?: LangchainReasoningRequest,
-  providerRouting?: OpenRouterProviderRouting
+  providerRouting?: OpenRouterProviderRouting,
+  costContext?: ModelCostContext
 ): Promise<ChatOpenAI> {
   const apiKey = await getOpenRouterApiKey();
 
@@ -544,11 +584,16 @@ export async function createOpenRouterModelAsync(
     );
   }
 
+  const callbacks = costContext
+    ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
+    : undefined;
+
   const build = (): ChatOpenAI =>
     new ChatOpenAI({
       model: modelId,
       configuration: { baseURL: OPENROUTER_BASE_URL, fetch: instrumentFetchWithGenerationId() },
       apiKey,
+      ...(callbacks ? { callbacks } : {}),
       ...(timeoutMs ? { timeout: timeoutMs } : {}),
       ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
     });
@@ -615,14 +660,15 @@ export async function getModelForPhase(
     // `config.reasoning` has to travel with the rest of the phase config: a
     // phase that reads its reasoning budget out of the database and then drops
     // it before the request is a phase that thinks it deliberates and does not.
-    const model = await createOpenRouterModelAsync(
+    return await createOpenRouterModelAsync(
       config.modelId,
       config.temperature,
       config.maxTokens,
       undefined,
-      config.reasoning
+      config.reasoning,
+      undefined,
+      { phase, ...(courseId ? { courseId } : {}) }
     );
-    return attachCostRecording(model, config.modelId, phase, courseId);
   } catch (err) {
     logger.warn(
       { phase, error: err },

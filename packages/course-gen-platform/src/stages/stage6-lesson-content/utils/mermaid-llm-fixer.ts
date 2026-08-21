@@ -38,8 +38,7 @@
  * ```
  */
 
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
+import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { logger } from '@/shared/logger';
 import { HumanMessage } from '@langchain/core/messages';
 
@@ -366,9 +365,10 @@ export async function fixMermaidWithLLM(
 
     // Create LLM instance with selected model tier
     const selectedModel = LLM_MODELS[modelTier];
-    const model = attachCostRecording(
-      createOpenRouterModel(selectedModel, LLM_TEMPERATURE, LLM_MAX_TOKENS),
+    const model = createCostRecordingModel(
       selectedModel,
+      LLM_TEMPERATURE,
+      LLM_MAX_TOKENS,
       'stage_6_refinement',
       context.courseId
     );
