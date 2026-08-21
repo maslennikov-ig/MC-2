@@ -25,11 +25,11 @@ constrains work:
   as a safety net. Production was cleaned 13712 → 6856 points. Both chunking paths are healthy;
   `groupIntoParents()` was accused twice and caused neither defect.
 - Only children are indexed, plus any childless parent; the passage is rebuilt at retrieval time from
-  siblings, **after reranking** in the two paths that rerank. The budget is a ceiling on what
-  expansion adds, never a reason to drop a retrieved chunk. On for Stage 5 section RAG, Stage 6
-  lesson RAG and `search_documents`; off for evidence retrieval, where a citation must point at the
-  fragment that matched. A no-op on points indexed before it. Measured 2026-08-13: siblings on 105 of
-  110 indexed children, average expansion 5.5×. Resulting **quality** is not measured.
+  siblings, **after reranking** in the two paths that rerank. The budget caps what expansion adds and
+  never drops a retrieved chunk. On for Stage 5 section RAG, Stage 6 lesson RAG and
+  `search_documents`; off for evidence retrieval, where a citation must point at the fragment that
+  matched. A no-op on older points. Measured 2026-08-13: siblings on 105 of 110 indexed children,
+  average expansion 5.5×; resulting **quality** is not measured.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -141,20 +141,26 @@ dropped the id. Fixed above and untested by a run.
 
 Three things that only a live run could say:
 
-- **A generation record takes ~9.6 s to become readable.** The first implementation read once after
-  1.5 s, settled zero of 33 nodes and reported success. The lookup polls to 30 s, and the playbook
-  collects every receipt in one pass at persist time rather than waiting per call.
+- **A generation record takes ~9.6 s to become readable**, and for a call still running, never. The
+  first implementation read once after 1.5 s, settled zero of 33 nodes and reported success. The
+  lookup polls to 30 s and the playbook collects receipts in one pass at persist time; routing no
+  longer waits on it.
 - **`provider.max_price` set below every endpoint is a refusal**, not a cheaper route —
   `No endpoints found that satisfy the max price for this request`. One wrong catalogue price would
-  fail every call for that model, so the ceiling yields and the generation lives.
-- **`provider.ignore` accepts display names, slugs and a naive lower-cased form alike.** We send the
-  documented slug; the fallback to the display name is safe rather than a guess.
+  fail every call for that model, so the ceiling yields and the generation lives. A pinned attempt is
+  also filtered against it up front, on live prices, so the pin cannot spend an attempt on a refusal.
 
-**Still unproven live:** the per-chain provider ignore. The 2026-08-21 run had no failed attempt, so
-nothing routed around anything. Held by unit tests and the 2026-08-20 manual measurement (205 s on
-OpenInference at status `-2`; 58.7 s on Sail Research with it excluded). **The ceiling is doing its
-job:** the three endpoints the run used were the three cheapest of ~30, and the 21 above the 1.5×
-ceiling — up to AtlasCloud at 6.8× — were never reachable.
+**The attempt names its endpoint, because a hung one never names itself.** Routing around a failure
+used to need `GET /api/v1/generation` to name the provider, and that record is unreadable while the
+call is still running — which is what a timeout is. Proven on 2026-08-21: an attempt hung 238 s,
+`ignoredInThisChain` was empty, the retry returned to the same provider for 504 s more. Measured
+alternatives both fail: `X-Provider-Name` is advertised in `access-control-expose-headers` and never
+sent; `provider` is in the body and every SSE chunk, but that call produced neither. So an attempt is
+pinned — `provider.order` with one `tag` from `/models/{model}/endpoints`, `allow_fallbacks: false` —
+and the next takes the next cheapest. Sorted by live price, degraded endpoints skipped as OpenRouter
+skips them, nothing outliving the call, no pin when the list cannot be fetched (`mc2-6crnj`). **The
+ceiling holds:** the run used the three cheapest of ~30, and the 21 above the 1.5× ceiling — to
+AtlasCloud at 6.8× — were unreachable.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the process, and retried asking for the least
@@ -168,15 +174,15 @@ carries `APP_VERSION` from `VCS_REF`.
 
 **Timeouts are set from measurement, and waiting is the owner's chosen trade.**
 `DEFAULT_LLM_TIMEOUT_MS` is **300000**, and all eleven `stage_career_playbook_*` phases carry 238000
-in both `config-seed.json` and `llm_model_config`. That was the load-bearing fix of 2026-08-20/21: a
-realistic Stage 4 request measured 119.0s, and on 2026-08-21 a `group_3` call took 229s and a
-`group_6` call spent the full 238s — all of which a smaller budget would have aborted and re-billed.
-Still far under the 620s hang the abort bound catches (`mc2-wg60c`).
+in both `config-seed.json` and `llm_model_config`. A realistic Stage 4 request measured 119.0s, and
+on 2026-08-21 a `group_3` call took 229s and a `group_6` call spent the full 238s — all of which a
+smaller budget would have aborted and re-billed. Under the 620s hang the abort bound catches
+(`mc2-wg60c`).
 
 **Attempt 1 stays on the primary.** `FALLBACK_FROM_ATTEMPT = 2`: the old
 `useFallback = ... || attempt > 0` spent three of four attempts on the slow alias. `spec-builder.ts`
 was accused of a standing pin and did not deserve it — that line is an escalation inside
-`catch (retryError)`. Write-up in `mc2-rqukn`; `mc2-xm7yf`, `mc2-ajg9h` closed.
+`catch (retryError)` (`mc2-rqukn`; `mc2-xm7yf`, `mc2-ajg9h` closed).
 
 **A deploy can be skipped on a green pipeline.** Run 31776031693 was fully green but touched only a
 test file, so `Detect Deploy-Relevant Changes` skipped `Deploy to Dev` and dev kept running old code.
@@ -189,18 +195,17 @@ OpenRouter batch (`/api/beta/batches`, plain model slug, 24h window). A coordina
 its worker between checks; each lesson is also enqueued with a `STAGE6_BATCH_MAX_WAIT_MS` delay, so it
 generates synchronously by itself if the batch never lands. Eligibility is decided per call against
 the **live** catalogue: the `:batch` sibling must exist, be cheaper on both legs and fit the request.
-Not a config switch — a `:batch` id posted to the synchronous endpoint breaks the caller. A `:batch`
-tariff is **not** reliably half the base one. `MODEL_CATALOG` prices are the `/models` base rate, and
-with many providers that is a default, not a promise: `z-ai/glm-5.2` ran $0.49 to $1.40 per million
-input on one day.
+Not a config switch — a `:batch` id posted to the synchronous endpoint breaks the caller, and a
+`:batch` tariff is **not** reliably half the base one. `MODEL_CATALOG` prices are the `/models` base
+rate, which with many providers is a default rather than a promise: `z-ai/glm-5.2` ran $0.49 to $1.40
+per million input on one day.
 
 ## Backlog truth and order
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order: 49 work items plus 5
 epics; do not re-open the 27 already closed with a commit or a measurement, and do not re-rank by
 tracker priority. Complete through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y0.13.6` (T3),
-`mc2-iioip` (T4) and the `mc2-wxun`/`mc2-vjbb` boundary (T5). Live, migration, research and
-owner-decision items remain explicitly deferred.
+`mc2-iioip` (T4) and the `mc2-wxun`/`mc2-vjbb` boundary (T5).
 
 ## Live operational facts
 
@@ -209,24 +214,22 @@ owner-decision items remain explicitly deferred.
   snapshot older than that returns 13712 and is not evidence of a fault — half of those are copies.
 - Qdrant and uploads have a daily restricted pull to `helixa-new` (14-day/14-copy bounds, 10 GiB
   floor, 30-day local retention). On-host snapshots share the docker volume with live data, so that
-  pull is the only real mitigation — a second machine, not disaster recovery. `mc2-hfoh3` closed.
+  pull is the only real mitigation — a second machine, not disaster recovery.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production. Worker logs
   carry a real `environment` label — before that fix every dev container called itself `production`.
-- Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed
-  set (all 87 files behind the 218 indexed documents are present on disk, verified 2026-08-13).
-  Uploads live on the production host, not in Supabase Storage — the only bucket is
-  `course-enrichments` with 14 objects.
+- Nine source documents are accepted as lost; do not reopen them. They are **not** in the indexed set
+  (all 87 files behind the 218 indexed documents are on disk, verified 2026-08-13). Uploads live on
+  the production host, not in Supabase Storage; the only bucket is `course-enrichments`, 14 objects.
 - Monitoring drift is a separate job and must never become a deploy step: it can trigger rollback.
-- `AGENTS.md` is rewritten by a `bd` hook: stage and commit explicit paths, never `git add -A`.
+  `AGENTS.md` is rewritten by a `bd` hook: stage explicit paths, never `git add -A`.
 - Deploy/rollback entrypoints exit 75 when `/opt/megacampus/.host-operation.lock` is held; manual
   infrastructure work must use `scripts/with_host_operation_lock.sh`.
 - The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
   `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` suites run on uid 1000
-  only — exercised locally, skipped on CI runners — and carry a 120s budget because their wall clock
-  is four concurrent real subprocess chains, not their own work (mc2-bvynv).
-- `graph-reviewed: blocked` — the graph is read, not refreshed. Graphify 0.9.14 has no `build`
-  subcommand, so a rebuild runs through the `/graphify` skill flow, not from closeout.
+  only and carry a 120s budget: their wall clock is four concurrent subprocess chains (mc2-bvynv).
+- `graph-reviewed: blocked` — the graph is read, not refreshed: Graphify 0.9.14 has no `build`
+  subcommand, so a rebuild goes through the `/graphify` skill flow.
 
 ## Owner decisions
 
@@ -254,7 +257,6 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
   cohort and deciding whether to change 0.15 are live/owner actions.
 - `mc2-r7udy`, `mc2-6ye5z.4`, `mc2-6ye5z.5`, `mc2-6ye5z.8` — each needs a new enum value or table.
   The owner approved a migration on 2026-08-13 **only** for `mc2-ufpko`; these stay deferred.
-- `mc2-db696.61` — owner decision above.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
@@ -262,11 +264,10 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
   tests only, and `mc2-148j9` says it misses the structured call sites outright.
 - `mc2-b7olk.4` — document evidence keeps its own cost ledger and never reaches the course total. It
   needs a decision about where that money belongs, not a forgotten argument.
-- `mc2-z0xr3` — stays open until a run on the repaired code reconciles without an unnamed residual.
+- `mc2-z0xr3` — the 2026-08-21 run left $0.007506 of spend with no row anywhere (`mc2-79lvc`); open
+  until a residual is attributed, not merely named.
 - `mc2-dgw4u` — **owner question:** Stage 7 audio bills a separate OpenAI account and is outside every
-  OpenRouter reconciliation by construction. The boundary is now named in the runbook; whether audio
-  stays on a direct account is not decided.
-- The eight §9 exclusions listed under Safety boundary — gates already recorded there.
+  OpenRouter reconciliation by construction; whether it stays there is not decided.
 
 ## Next recommended
 
