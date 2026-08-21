@@ -28,7 +28,7 @@ Also newly live: editing spend records under stage `stage_edit` (the CHECK const
 that rejected it is fixed), and chat intent classification, Stage 6 generation, image
 calls, served model variants and genuine $0 calls are all priced.
 
-Since 2026-08-21 three more things are live and this run is the first to exercise them:
+Live since the 2026-08-21 run, and confirmed by it:
 
 - **Prices come from the provider, not the catalogue.** Each call's `x-generation-id` is
   read from the response headers and settled against `GET /api/v1/generation`, which
@@ -41,7 +41,7 @@ Since 2026-08-21 three more things are live and this run is the first to exercis
   rather than `generation_trace`, and the report now reads both. Before this, half the
   product was outside every reconciliation.
 
-Since 2026-08-21 three more, first exercised by this run:
+Shipped after that run and **not yet exercised by any** — this is the first run to test them:
 
 - **Images are priced like everything else.** The image service used to keep a private
   price table — `openai/gpt-5-image-mini` at $0.007 against a real $0.045080, 6.4x low —
