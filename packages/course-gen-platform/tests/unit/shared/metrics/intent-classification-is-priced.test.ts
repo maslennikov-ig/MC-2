@@ -101,8 +101,8 @@ describe('an intent classification is charged to its course', () => {
       modelUsed: 'openai/gpt-5.6-luna',
       tokensUsed: 480,
     });
-    // Catalogue price for gpt-5.6-luna: $0.10 in, $0.60 out per million.
-    expect(entry.costUsd).toBeCloseTo((420 * 0.1 + 60 * 0.6) / 1_000_000, 12);
+    // Catalogue price for gpt-5.6-luna: $0.20 in, $1.20 out per million.
+    expect(entry.costUsd).toBeCloseTo((420 * 0.2 + 60 * 1.2) / 1_000_000, 12);
   });
 
   it('prices the model the provider served, not only the one asked for', async () => {

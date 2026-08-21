@@ -38,6 +38,8 @@ import {
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 import { createModelConfigService } from './model-config-service';
 import { buildReasoningPayload } from './client-helpers';
+import type { OpenRouterProviderRouting } from './client-helpers';
+import { instrumentFetchWithGenerationId } from './generation-id-capture';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
@@ -433,7 +435,8 @@ export function buildProviderParams(
   modelId: string,
   temperature: number,
   maxTokens: number,
-  reasoning?: LangchainReasoningRequest
+  reasoning?: LangchainReasoningRequest,
+  providerRouting?: OpenRouterProviderRouting
 ): {
   temperature?: number;
   maxTokens: number;
@@ -441,6 +444,16 @@ export function buildProviderParams(
 } {
   const modelKwargs: Record<string, unknown> = { usage: { include: true } };
   let effectiveMaxTokens = maxTokens;
+
+  // Provider routing rides in `modelKwargs` on this path, the way `extra_body`
+  // carries it on the direct SDK path. Both end up as the same `provider` field
+  // in the OpenRouter request body.
+  if (providerRouting && (providerRouting.ignore?.length || providerRouting.max_price)) {
+    modelKwargs.provider = {
+      ...(providerRouting.ignore?.length ? { ignore: providerRouting.ignore } : {}),
+      ...(providerRouting.max_price ? { max_price: providerRouting.max_price } : {}),
+    };
+  }
 
   if (reasoning?.enabled) {
     if (modelSupportsReasoning(modelId)) {
@@ -481,7 +494,8 @@ export function createOpenRouterModel(
   temperature: number = 0.7,
   maxTokens: number = 4096,
   timeoutMs?: number,
-  reasoning?: LangchainReasoningRequest
+  reasoning?: LangchainReasoningRequest,
+  providerRouting?: OpenRouterProviderRouting
 ): ChatOpenAI {
   const apiKey = getApiKeySync('openrouter');
 
@@ -497,10 +511,14 @@ export function createOpenRouterModel(
       model: modelId,
       configuration: {
         baseURL: OPENROUTER_BASE_URL,
+        // Same reason as the direct SDK client: `x-generation-id` arrives with
+        // the headers, so wrapping the transport is what makes an aborted call
+        // countable and its provider identifiable.
+        fetch: instrumentFetchWithGenerationId(),
       },
       apiKey: apiKey,
       ...(timeoutMs ? { timeout: timeoutMs } : {}),
-      ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
+      ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
     });
 
   return withMandatoryReasoningRecovery(build(), modelId, build);
@@ -526,7 +544,8 @@ export async function createOpenRouterModelAsync(
   temperature: number = 0.7,
   maxTokens: number = 4096,
   timeoutMs?: number,
-  reasoning?: LangchainReasoningRequest
+  reasoning?: LangchainReasoningRequest,
+  providerRouting?: OpenRouterProviderRouting
 ): Promise<ChatOpenAI> {
   const apiKey = await getOpenRouterApiKey();
 
@@ -541,10 +560,11 @@ export async function createOpenRouterModelAsync(
       model: modelId,
       configuration: {
         baseURL: OPENROUTER_BASE_URL,
+        fetch: instrumentFetchWithGenerationId(),
       },
       apiKey: apiKey,
       ...(timeoutMs ? { timeout: timeoutMs } : {}),
-      ...buildProviderParams(modelId, temperature, maxTokens, reasoning),
+      ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
     });
 
   return withMandatoryReasoningRecovery(build(), modelId, build);

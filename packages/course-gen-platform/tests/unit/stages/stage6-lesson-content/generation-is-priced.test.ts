@@ -128,8 +128,10 @@ describe('Stage 6 generation prices itself', () => {
       modelUsed: MODEL,
       tokensUsed: 15_000,
     });
-    // 10k in at $0.1/M plus 5k out at $0.6/M.
-    expect(row.costUsd).toBeCloseTo(0.004, 6);
+    // 10k in at $0.2/M plus 5k out at $1.2/M. Both legs doubled on 2026-08-21:
+    // the catalogue had been carrying luna's Batch tariff as its synchronous one
+    // (mc2-v1pn2).
+    expect(row.costUsd).toBeCloseTo(0.008, 6);
   });
 
   it('charges the continuation of a truncated lesson too', async () => {

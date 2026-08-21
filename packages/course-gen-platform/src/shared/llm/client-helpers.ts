@@ -19,6 +19,7 @@ import {
   modelSupportsTemperature,
   modelSupportsReasoning,
   getModelCapabilities,
+  hasExactModelPricing,
   MANDATORY_REASONING_RESERVE_TOKENS,
 } from '@megacampus/shared-types';
 
@@ -34,9 +35,24 @@ export type MessageWithCacheControl = ChatCompletionMessageParam & {
  * OpenRouter-specific request options
  * Extends standard OpenAI params with provider-specific fields
  */
+/**
+ * Per-request provider routing, as `extra_body.provider`.
+ *
+ * `ignore` is the only lever OpenRouter gives us against a provider that is
+ * merely slow: `allow_fallbacks` moves on for a refusal or an outage but not for
+ * a crawl, and there is no per-request provider timeout. `max_price` is the
+ * counterweight — leaving a provider out must not buy us a dearer one.
+ */
+export interface OpenRouterProviderRouting {
+  /** Provider *slugs* (`open-inference`), never display names (`OpenInference`). */
+  ignore?: string[];
+  /** Dollars per million tokens. A provider above either figure is not used. */
+  max_price?: { prompt?: number; completion?: number };
+}
+
 export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & {
   extra_body?: {
-    provider?: {
+    provider?: OpenRouterProviderRouting & {
       cache_control?: boolean;
     };
   };
@@ -169,6 +185,76 @@ function withSamplingControls(
 }
 
 /**
+ * The most a provider may charge for this model, in dollars per million tokens.
+ *
+ * A ceiling exists because ignoring a provider must not be a licence to spend:
+ * the `deepseek-v4-flash-0731` snapshot has around thirty endpoints spanning
+ * 6.8x in prompt price, and `sort: throughput` was measured on 2026-08-20
+ * picking AtlasCloud at $0.000383 against $0.000053 on the default route — seven
+ * times the price for the same answer. Cheapest stays the goal; this only
+ * removes the tail.
+ *
+ * Sent only for a model the catalogue prices *exactly*. A ceiling built on a
+ * wrong number is worse than no ceiling: set below every real endpoint, it
+ * refuses the whole model and turns a pricing error into a failed generation.
+ * Four catalogue entries were found to have drifted from the published rates on
+ * 2026-08-21, so an inexact match — a dated snapshot or a `~` alias priced from
+ * its base model, whose own tariff differs — gets no ceiling rather than a
+ * guessed one.
+ *
+ * Deliberately synchronous and offline. The published rates are a network call
+ * away, but putting one in front of every attempt would make routing depend on
+ * a third party being reachable, and would fail a generation to enforce a
+ * spending limit. `tests/unit/model-catalog-coverage.test.ts` is what keeps
+ * these figures honest.
+ */
+export function buildProviderPriceCeiling(
+  model: string,
+  multiplier: number
+): { prompt: number; completion: number } | undefined {
+  if (!hasExactModelPricing(model)) return undefined;
+
+  const capabilities = getModelCapabilities(model);
+  if (!capabilities) return undefined;
+
+  const { inputPricePerMillion: prompt, outputPricePerMillion: completion } = capabilities;
+  // A free leg would make the ceiling read "free providers only" rather than
+  // "nothing extravagant".
+  if (prompt <= 0 || completion <= 0) return undefined;
+
+  return {
+    prompt: Number((prompt * multiplier).toFixed(6)),
+    completion: Number((completion * multiplier).toFixed(6)),
+  };
+}
+
+/**
+ * Merge provider routing into a request without clobbering what is already there.
+ *
+ * The Anthropic cache flag and the routing controls both live under
+ * `extra_body.provider`, and the routing controls are re-applied between
+ * attempts of the same call. Assigning the object wholesale — which is what the
+ * cache branch used to do — would drop whichever of the two was written first.
+ */
+export function applyProviderRouting(
+  requestOptions: OpenRouterRequestOptions,
+  routing: OpenRouterProviderRouting & { cache_control?: boolean }
+): void {
+  const extraBody = (requestOptions.extra_body ??= {});
+  const provider = (extraBody.provider ??= {});
+
+  if (routing.cache_control !== undefined) provider.cache_control = routing.cache_control;
+  if (routing.max_price !== undefined) provider.max_price = routing.max_price;
+
+  // An empty list is meaningful: it is the first attempt, which ignores nobody.
+  // Sending `ignore: []` is harmless, but leaving a stale list behind is not.
+  if (routing.ignore !== undefined) {
+    if (routing.ignore.length > 0) provider.ignore = routing.ignore;
+    else delete provider.ignore;
+  }
+}
+
+/**
  * Build request options for a single-turn completion request.
  *
  * @param model - Model identifier
@@ -212,9 +298,7 @@ export function buildCompletionRequest(
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
-    requestOptions.extra_body = {
-      provider: { cache_control: true },
-    };
+    applyProviderRouting(requestOptions, { cache_control: true });
   }
 
   return [messages, requestOptions];
@@ -261,9 +345,7 @@ export function buildChatCompletionRequest(
 
   // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
-    requestOptions.extra_body = {
-      provider: { cache_control: true },
-    };
+    applyProviderRouting(requestOptions, { cache_control: true });
   }
 
   return [messagesWithCacheControl, requestOptions];
@@ -336,6 +418,11 @@ export function parseCompletionResponse(
     totalTokens = estimated.totalTokens;
   }
 
+  // OpenRouter names the endpoint that served the request in the body. It is the
+  // only place a *successful* call reveals it, and it is what the next attempt
+  // needs in order to route around it.
+  const servedBy = (completion as unknown as Record<string, unknown>).provider;
+
   return {
     content: choice.message.content,
     inputTokens,
@@ -344,6 +431,7 @@ export function parseCompletionResponse(
     model: completion.model || model,
     finishReason: choice.finish_reason || 'unknown',
     requestId: (completion as unknown as Record<string, unknown>)._request_id as string | undefined,
+    ...(typeof servedBy === 'string' && servedBy.length > 0 ? { providerName: servedBy } : {}),
   };
 }
 

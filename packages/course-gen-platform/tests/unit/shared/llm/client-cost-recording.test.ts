@@ -67,8 +67,10 @@ describe('LLMClient cost recording', () => {
       modelUsed: 'z-ai/glm-5.2',
       tokensUsed: 300_000,
     });
-    // glm-5.2 is $1.19 in and $3.74 out per million: 0.238 + 0.374.
-    expect(entry.costUsd).toBeCloseTo(0.612, 10);
+    // glm-5.2 is $0.966 in and $3.036 out per million: 0.1932 + 0.3036.
+    // Re-read from /api/v1/models on 2026-08-21; the entry had been 1.23x dear
+    // on both legs (mc2-156kg).
+    expect(entry.costUsd).toBeCloseTo(0.4968, 10);
   });
 
   it('makes no trace row for a call with no course to charge', async () => {

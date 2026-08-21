@@ -45,21 +45,21 @@ describe('recordLlmCallCost', () => {
       tokensUsed: 2_000_000,
       inputData: { inputTokens: 1_000_000, outputTokens: 1_000_000 },
     });
-    // Catalogue price for gpt-5.6-luna: $0.10 in, $0.60 out per million.
-    expect(entry.costUsd).toBeCloseTo(0.7, 10);
+    // Catalogue price for gpt-5.6-luna: $0.20 in, $1.20 out per million.
+    expect(entry.costUsd).toBeCloseTo(1.4, 10);
   });
 
   it('charges input and output at their own rates', async () => {
     const { calculateLlmCostUsd } = await import('@/shared/metrics/llm-cost');
 
-    // glm-5.2 is $1.19 in and $3.74 out per million: judging reads a lesson and
-    // writes little, so the two rates are not interchangeable.
+    // glm-5.2 is $0.966 in and $3.036 out per million: judging reads a lesson
+    // and writes little, so the two rates are not interchangeable.
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 1_000_000, outputTokens: 0 })
-    ).toBeCloseTo(1.19, 10);
+    ).toBeCloseTo(0.966, 10);
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 0, outputTokens: 1_000_000 })
-    ).toBeCloseTo(3.74, 10);
+    ).toBeCloseTo(3.036, 10);
   });
 
   it('reports a call it cannot attribute instead of dropping it silently', async () => {

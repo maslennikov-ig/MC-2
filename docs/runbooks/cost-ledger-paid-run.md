@@ -28,6 +28,19 @@ Also newly live: editing spend records under stage `stage_edit` (the CHECK const
 that rejected it is fixed), and chat intent classification, Stage 6 generation, image
 calls, served model variants and genuine $0 calls are all priced.
 
+Since 2026-08-21 three more things are live and this run is the first to exercise them:
+
+- **Prices come from the provider, not the catalogue.** Each call's `x-generation-id` is
+  read from the response headers and settled against `GET /api/v1/generation`, which
+  reports what OpenRouter actually charged. The catalogue is now an estimate for budgets.
+  The report counts how many rows were settled this way.
+- **A provider that fails is skipped for the rest of that call.** Not a standing
+  blocklist — the next call starts again at the cheapest endpoint. Every request also
+  carries a `max_price` ceiling at 1.5x the catalogue rate.
+- **Career Playbook spend is in the TOTAL.** It lives in `career_playbooks.cost_breakdown`
+  rather than `generation_trace`, and the report now reads both. Before this, half the
+  product was outside every reconciliation.
+
 ## Steps
 
 1. Record the start time before touching anything. The reconciliation needs it.
@@ -66,13 +79,23 @@ calls, served model variants and genuine $0 calls are all priced.
 Report pass or fail on each line, naming what failed.
 
 - Both generations complete without a stage failing.
-- `rows with tokens but NO price` is **0**. Anything above 0 is money the ledger still
-  misses; the report lists the exact stage, phase and model — quote them.
+- `billed calls with NO price` is **0**. Anything above 0 is money the ledger still
+  misses; the report lists the exact stage, phase, step and model — quote them. This
+  counts only rows a recorder stamped as a paid call: stage progress markers such as
+  `judge_complete` carry token totals and are unpriced on purpose, because the calls they
+  summarise price themselves. The report reports those separately as `progress markers`.
+- `priced by the provider` is above 0, and close to the number of billed calls. A low
+  figure means the generation lookup is not landing — quote it.
 - `stage_edit rows` is above 0 after the chat edit, and their cost is not null.
 - `courses.estimated_cost_usd` matches the trace sum. The report prints both and says
   `match` or `MISMATCH`.
-- The report's TOTAL is compared against the OpenRouter dashboard for T0 → now. Ask the
-  user for that figure; do not estimate it. A gap is the finding.
+- The report's TOTAL is compared against the OpenRouter figure for T0 → now, either the
+  dashboard or the delta of `GET /api/v1/credits`. Ask the user for that figure; do not
+  estimate it. A gap is the finding — and now that most rows carry the provider's own
+  charge, a gap points at a call that left no row rather than at a wrong price.
+- The worker logs show at least one retry that routed around a provider, if any call
+  failed: search for `routes around it`. If nothing failed, say so — it is not a failure
+  of this line.
 - No upload failed on the storage quota, and the counter moved:
 
   ```sql

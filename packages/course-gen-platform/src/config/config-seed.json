@@ -2505,7 +2505,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2532,7 +2532,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2559,7 +2559,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2586,7 +2586,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2613,7 +2613,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2640,7 +2640,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2667,7 +2667,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2694,7 +2694,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2721,7 +2721,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2775,7 +2775,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null
@@ -2802,7 +2802,7 @@
     "weight": null,
     "quality_threshold": null,
     "max_retries": 3,
-    "timeout_ms": 120000,
+    "timeout_ms": 238000,
     "reasoning_enabled": false,
     "reasoning_effort": null,
     "reasoning_max_tokens": null

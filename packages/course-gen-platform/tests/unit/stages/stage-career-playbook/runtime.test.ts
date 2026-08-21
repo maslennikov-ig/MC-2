@@ -4,13 +4,13 @@ import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/node
 import { logger } from '@/shared/logger';
 
 describe('Career Playbook runtime', () => {
-  it('times out hung LLM calls and retries with the fallback model', async () => {
+  it('times out hung LLM calls and reaches the fallback model on the third attempt', async () => {
     vi.useFakeTimers();
     try {
-      const firstInvoke = vi.fn(() => new Promise<{ content: string }>(() => {}));
+      const primaryInvoke = vi.fn(() => new Promise<{ content: string }>(() => {}));
       const fallbackInvoke = vi.fn().mockResolvedValue({ content: 'ok' });
       const createModel = vi.fn((modelId: string) => ({
-        invoke: modelId === 'fast-model' ? firstInvoke : fallbackInvoke,
+        invoke: modelId === 'fast-model' ? primaryInvoke : fallbackInvoke,
       }));
       const runtime = createCareerPlaybookRuntime({
         promptService: { renderPrompt: vi.fn() },
@@ -20,7 +20,7 @@ describe('Career Playbook runtime', () => {
             fallbackModelId: 'adult-model',
             temperature: 0.2,
             maxTokens: 1000,
-            maxRetries: 1,
+            maxRetries: 2,
             timeoutMs: 5,
           }),
         },
@@ -32,11 +32,14 @@ describe('Career Playbook runtime', () => {
         promptKey: 'career_playbook_cross_block_judge',
         node: 'crossBlockJudge',
       });
-      await Promise.resolve();
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(6);
-      await Promise.resolve();
-      await Promise.resolve();
+      // Three attempts, each hitting the 5ms budget in turn.
+      for (let i = 0; i < 3; i += 1) {
+        await Promise.resolve();
+        await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(6);
+        await Promise.resolve();
+        await Promise.resolve();
+      }
 
       await expect(resultPromise).resolves.toEqual(
         expect.objectContaining({
@@ -44,16 +47,45 @@ describe('Career Playbook runtime', () => {
           model: 'adult-model',
         })
       );
-      expect(firstInvoke).toHaveBeenCalledTimes(1);
+      // The primary gets two goes, not one: since 2026-08-21 a single failure no
+      // longer hands the rest of the call to the fallback. The failed provider is
+      // excluded from the retry, so the second go is a different endpoint rather
+      // than a repeat (mc2-64n8i).
+      expect(primaryInvoke).toHaveBeenCalledTimes(2);
       expect(fallbackInvoke).toHaveBeenCalledTimes(1);
-      expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000, 5);
-      expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 5);
+      expect(createModel).toHaveBeenNthCalledWith(
+        1,
+        'fast-model',
+        0.2,
+        1000,
+        5,
+        undefined,
+        expect.any(Object)
+      );
+      expect(createModel).toHaveBeenNthCalledWith(
+        2,
+        'fast-model',
+        0.2,
+        1000,
+        5,
+        undefined,
+        expect.any(Object)
+      );
+      expect(createModel).toHaveBeenNthCalledWith(
+        3,
+        'adult-model',
+        0.2,
+        1250,
+        5,
+        undefined,
+        expect.any(Object)
+      );
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('retries failed LLM calls and escalates to the configured fallback model', async () => {
+  it('retries a failed call on the primary first, and only then escalates', async () => {
     const invoke = vi
       .fn()
       .mockRejectedValueOnce(new Error('transient provider error'))
@@ -81,10 +113,13 @@ describe('Career Playbook runtime', () => {
       node: 'departmentClassifier',
     });
 
+    // One failure no longer means "give up on the primary". The retry stays on
+    // the configured primary model, with the provider that just failed excluded
+    // from it (mc2-pdsjz).
     expect(result).toEqual(
       expect.objectContaining({
         content: 'ok',
-        model: 'adult-model',
+        model: 'fast-model',
       })
     );
     expect(modelConfigService.getModelForPhase).toHaveBeenCalledWith(
@@ -93,9 +128,84 @@ describe('Career Playbook runtime', () => {
       Math.ceil('prompt'.length / 4),
       undefined
     );
-    expect(createModel).toHaveBeenNthCalledWith(1, 'fast-model', 0.2, 1000, 300_000);
-    expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenNthCalledWith(
+      1,
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
+    expect(createModel).toHaveBeenNthCalledWith(
+      2,
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('escalates to the fallback model once the primary has failed twice', async () => {
+    const invoke = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('transient provider error'))
+      .mockRejectedValueOnce(new Error('transient provider error'))
+      .mockResolvedValueOnce({ content: 'ok' });
+    const createModel = vi.fn(() => ({ invoke }));
+
+    const runtime = createCareerPlaybookRuntime({
+      promptService: { renderPrompt: vi.fn() },
+      modelConfigService: {
+        getModelForPhase: vi.fn().mockResolvedValue({
+          modelId: 'fast-model',
+          fallbackModelId: 'adult-model',
+          temperature: 0.2,
+          maxTokens: 1000,
+          maxRetries: 2,
+        }),
+      },
+      createModel,
+    });
+
+    const result = await runtime.invokeLLM('prompt', {
+      phaseName: 'stage_career_playbook_department_classifier',
+      promptKey: 'career_playbook_department_classifier',
+      node: 'departmentClassifier',
+    });
+
+    expect(result).toEqual(expect.objectContaining({ content: 'ok', model: 'adult-model' }));
+    expect(createModel).toHaveBeenNthCalledWith(
+      1,
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
+    expect(createModel).toHaveBeenNthCalledWith(
+      2,
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
+    expect(createModel).toHaveBeenNthCalledWith(
+      3,
+      'adult-model',
+      0.2,
+      1250,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
+    expect(invoke).toHaveBeenCalledTimes(3);
   });
 
   it('can start directly with the configured fallback model for validation retries', async () => {
@@ -123,7 +233,14 @@ describe('Career Playbook runtime', () => {
       maxTokensMultiplier: 1.25,
     });
 
-    expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1250, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'adult-model',
+      0.2,
+      1250,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('starts large-input calls on the fallback model when preferFallbackModelAboveTokens is exceeded', async () => {
@@ -154,7 +271,14 @@ describe('Career Playbook runtime', () => {
 
     expect(result.model).toBe('adult-model');
     expect(createModel).toHaveBeenCalledTimes(1);
-    expect(createModel).toHaveBeenCalledWith('adult-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'adult-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('keeps sub-threshold calls on the primary model even when preferFallbackModelAboveTokens is set', async () => {
@@ -184,7 +308,14 @@ describe('Career Playbook runtime', () => {
 
     expect(result.model).toBe('fast-model');
     expect(createModel).toHaveBeenCalledTimes(1);
-    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('preserves the retry net for large-input calls: a failed first fallback attempt still retries', async () => {
@@ -216,8 +347,24 @@ describe('Career Playbook runtime', () => {
 
     expect(result.model).toBe('adult-model');
     // Both attempts run on the fallback model: fallback-first, retry net intact.
-    expect(createModel).toHaveBeenNthCalledWith(1, 'adult-model', 0.2, 1000, 300_000);
-    expect(createModel).toHaveBeenNthCalledWith(2, 'adult-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenNthCalledWith(
+      1,
+      'adult-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
+    expect(createModel).toHaveBeenNthCalledWith(
+      2,
+      'adult-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
     expect(invoke).toHaveBeenCalledTimes(2);
   });
 
@@ -247,7 +394,14 @@ describe('Career Playbook runtime', () => {
     });
 
     expect(result.model).toBe('fast-model');
-    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('uses LangChain structured output when a schema is provided', async () => {
@@ -388,7 +542,14 @@ describe('Career Playbook runtime', () => {
       undefined
     );
     // Fits comfortably inside a 128k window, so the output budget is untouched.
-    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('clamps the output budget to the resolved model context window', async () => {
@@ -416,7 +577,14 @@ describe('Career Playbook runtime', () => {
       node: 'specBuilder',
     });
 
-    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'fast-model',
+      0.2,
+      1000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('leaves the output budget untouched when the model context window is unknown', async () => {
@@ -443,7 +611,14 @@ describe('Career Playbook runtime', () => {
       node: 'specBuilder',
     });
 
-    expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 4000, 300_000);
+    expect(createModel).toHaveBeenCalledWith(
+      'fast-model',
+      0.2,
+      4000,
+      300_000,
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it('warns and floors the output budget when the prompt exceeds the context window', async () => {
@@ -473,7 +648,14 @@ describe('Career Playbook runtime', () => {
         node: 'specBuilder',
       });
 
-      expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 512, 300_000);
+      expect(createModel).toHaveBeenCalledWith(
+        'fast-model',
+        0.2,
+        512,
+        300_000,
+        undefined,
+        expect.any(Object)
+      );
       expect(warnSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           phaseName: 'stage_career_playbook_spec',
@@ -631,7 +813,14 @@ describe('Career Playbook runtime', () => {
         promptKey: 'career_playbook_cross_block_judge',
         node: 'crossBlockJudge',
       });
-      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-flash', 0.2, 1000, 300_000);
+      expect(createModel).toHaveBeenCalledWith(
+        'deepseek/deepseek-v4-flash',
+        0.2,
+        1000,
+        300_000,
+        undefined,
+        expect.any(Object)
+      );
 
       // ... while a different phase keeps its DB-routed model untouched.
       createModel.mockClear();
@@ -640,7 +829,14 @@ describe('Career Playbook runtime', () => {
         promptKey: 'career_playbook_spec_builder',
         node: 'specBuilder',
       });
-      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-pro', 0.2, 1000, 300_000);
+      expect(createModel).toHaveBeenCalledWith(
+        'deepseek/deepseek-v4-pro',
+        0.2,
+        1000,
+        300_000,
+        undefined,
+        expect.any(Object)
+      );
     } finally {
       delete process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES;
     }
@@ -677,7 +873,14 @@ describe('Career Playbook runtime', () => {
         preferFallbackModel: true,
       });
 
-      expect(createModel).toHaveBeenCalledWith('deepseek/deepseek-v4-pro', 0.2, 1000, 300_000);
+      expect(createModel).toHaveBeenCalledWith(
+        'deepseek/deepseek-v4-pro',
+        0.2,
+        1000,
+        300_000,
+        undefined,
+        expect.any(Object)
+      );
     } finally {
       delete process.env.CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES;
     }
@@ -718,7 +921,14 @@ describe('Career Playbook runtime', () => {
       });
 
       // Malformed JSON is ignored: the DB-routed model is used unchanged ...
-      expect(createModel).toHaveBeenCalledWith('fast-model', 0.2, 1000, 300_000);
+      expect(createModel).toHaveBeenCalledWith(
+        'fast-model',
+        0.2,
+        1000,
+        300_000,
+        undefined,
+        expect.any(Object)
+      );
       // ... and the warning fires once for the stable bad value, not per call.
       const overrideWarnings = warnSpy.mock.calls.filter(
         call => call[1] === 'Ignoring malformed CAREER_PLAYBOOK_PHASE_MODEL_OVERRIDES'

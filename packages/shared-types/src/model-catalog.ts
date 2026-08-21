@@ -119,15 +119,24 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
     billedPerImage: true,
   },
+  /**
+   * Re-read from `/api/v1/models` on 2026-08-21: $0.20/$1.20. The entry had
+   * carried $0.10/$0.60 — exactly the Batch tariff below, so the synchronous
+   * rate had been recorded at half its real value. Every luna call in the
+   * 2026-08-20 run was therefore under-counted by half, and because luna is the
+   * primary for the Career Playbook's spec and proofreading phases, that
+   * mispricing was the single largest catalogue contribution to the $0.066839
+   * gap against the invoice (mc2-v1pn2).
+   */
   'openai/gpt-5.6-luna': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.6,
+    inputPricePerMillion: 0.2,
+    outputPricePerMillion: 1.2,
     contextLength: 1050000,
     maxOutputTokens: 128000,
     supportsTemperature: false,
     supportsReasoning: true,
   },
-  /** Available through Batch API, but currently has no token-price discount. */
+  /** Async Batch API tariff: half the synchronous rate above, confirmed 2026-08-21. */
   'openai/gpt-5.6-luna:batch': {
     inputPricePerMillion: 0.1,
     outputPricePerMillion: 0.6,
@@ -137,15 +146,20 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   /**
-   * The `/models` base rate, re-read 2026-08-14. An earlier entry recorded
-   * $0.63/$1.98, which is one provider's rate (DigitalOcean), not the base one.
-   * This model is served by many providers and they disagree widely — on that
-   * date the endpoint list ran from $0.49/$1.54 to $1.40/$4.40 — so the base
-   * rate is the catalogue default, not a guarantee of what a call is charged.
+   * The `/models` base rate, re-read 2026-08-21: $0.966/$3.036. The entry had
+   * carried $1.19/$3.74, which is 1.23x too dear — an overstatement, and
+   * therefore one that hid the luna understatement above rather than adding to
+   * it, which is why the invoice gap looked smaller than its causes (mc2-156kg).
+   *
+   * This model is served by many providers and they disagree widely — the
+   * endpoint list has run from $0.49/$1.54 to $1.40/$4.40 — so the base rate is
+   * the catalogue default, not a guarantee of what a call is charged. Since
+   * 2026-08-21 the charge itself is read back from `/api/v1/generation`, and
+   * this figure is what a price ceiling and a budget estimate are built from.
    */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 1.19,
-    outputPricePerMillion: 3.74,
+    inputPricePerMillion: 0.966,
+    outputPricePerMillion: 3.036,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -164,9 +178,19 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: true,
   },
+  /**
+   * Re-read 2026-08-21: $0.065/$0.140. The entry had carried $0.08/$0.252, over
+   * by 1.23x on input and 1.80x on output (mc2-156kg).
+   *
+   * A `~` alias is a redirect, not a model: it follows its family to whatever
+   * snapshot is current, and on 2026-08-17 07:03 it followed DeepSeek V4 Flash
+   * to `-20260731`, taking median latency from 8.7s to 102s without a single
+   * configuration change on our side. Its price can move the same way, which is
+   * the reason nothing downstream treats this number as the charge.
+   */
   '~deepseek/deepseek-v4-flash-latest': {
-    inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.252,
+    inputPricePerMillion: 0.065,
+    outputPricePerMillion: 0.14,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
