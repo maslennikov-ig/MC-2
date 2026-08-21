@@ -10,10 +10,11 @@
  * entire residual of the 2026-08-21 reconciliation (mc2-z7ryi).
  *
  * The check found a fifth and a sixth while it was being written — both
- * `ChatOpenAI` builders inside Stage 5, both reading the env key directly. They
- * are grandfathered below rather than fixed here, because instrumenting them
- * usefully means wrapping their call sites in `withGenerationIdCapture` and that
- * is a change to Stage 5, not to accounting (mc2-me7nx).
+ * `ChatOpenAI` builders inside Stage 5, both reading the env key directly, both
+ * grandfathered at the time because instrumenting them looked like it needed a
+ * change to Stage 5's call sites. It did not: the generation id turned out to be
+ * on the message rather than in a header, so both now go through the shared
+ * factory and both entries are gone from the list (mc2-me7nx, mc2-258fi).
  *
  * Form follows the other gates in this repository: what exists is listed, and
  * the list may shrink but never grow silently.
@@ -38,10 +39,6 @@ const FACTORY = 'shared/llm/openrouter-client.ts';
 const TRANSPORT_EXCEPTIONS: Record<string, string> = {
   'stages/stage7-enrichments/handlers/audio-handler.ts':
     'Stage 7 audio is OpenAI TTS on a direct OpenAI account, not OpenRouter: no baseURL, no generation record, and the /api/v1/credits delta cannot see it. The boundary is named in docs/runbooks/cost-ledger-paid-run.md (mc2-dgw4u)',
-  'stages/stage5-generation/utils/metadata-generator.ts':
-    'builds its own ChatOpenAI on the hardcoded-fallback path and reads OPENROUTER_API_KEY directly; instrumenting it means wrapping its call sites in withGenerationIdCapture (mc2-me7nx)',
-  'stages/stage5-generation/utils/section-batch/constants.ts':
-    'exports the base URL for the section-batch ChatOpenAI builder, which is uninstrumented for the same reason as metadata-generator (mc2-me7nx)',
 };
 
 /**

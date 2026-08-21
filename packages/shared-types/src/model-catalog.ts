@@ -240,7 +240,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   '~deepseek/deepseek-v4-flash-latest': {
     inputPricePerMillion: 0.065,
-    outputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.18,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -268,29 +268,30 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
   'deepseek/deepseek-v3.1-terminus': {
     inputPricePerMillion: 0.27,
-    outputPricePerMillion: 0.95,
+    outputPricePerMillion: 1.0,
     contextLength: 163840,
     maxOutputTokens: 32768,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   /**
-   * Re-read 2026-08-21: $0.0826/$0.1652. The entry had carried $0.14/$0.28,
-   * 1.7x over on both legs. It matters more than a retired entry normally would,
-   * because `normalizeModelId` prices every dated V4 Flash snapshot from here
-   * when the snapshot has no entry of its own (mc2-hc91g).
+   * Re-read twice on 2026-08-21: $0.14/$0.28 was 1.7x over, and the $0.0826/
+   * $0.1652 that replaced it was still 1.04x over. It matters more than a
+   * retired entry normally would, because `normalizeModelId` prices every dated
+   * V4 Flash snapshot from here when the snapshot has no entry of its own
+   * (mc2-hc91g).
    */
   'deepseek/deepseek-v4-flash': {
-    inputPricePerMillion: 0.0826,
-    outputPricePerMillion: 0.1652,
+    inputPricePerMillion: 0.0798,
+    outputPricePerMillion: 0.1596,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'deepseek/deepseek-v4-pro': {
-    inputPricePerMillion: 1.168,
-    outputPricePerMillion: 2.336,
+    inputPricePerMillion: 1.6,
+    outputPricePerMillion: 3.2,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
@@ -421,8 +422,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   'z-ai/glm-5': {
-    inputPricePerMillion: 0.95,
-    outputPricePerMillion: 2.55,
+    inputPricePerMillion: 0.6,
+    outputPricePerMillion: 1.92,
     contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,

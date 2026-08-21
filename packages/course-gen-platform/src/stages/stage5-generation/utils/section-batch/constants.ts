@@ -1,9 +1,4 @@
 /**
- * OpenRouter API base URL
- */
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-
-/**
  * LAST-RESORT FALLBACK MODELS (3-tier routing)
  *
  * Primary model selection uses getModelForPhase() from database via:

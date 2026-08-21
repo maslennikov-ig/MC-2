@@ -55,8 +55,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(pricing.combinedPricePerMillion).toBeUndefined();
       // Re-read from /api/v1/models on 2026-08-21; the catalogue had carried
       // $0.14/$0.28, 1.7x over on both legs (mc2-hc91g).
-      expect(pricing.inputPricePerMillion).toBe(0.0826);
-      expect(pricing.outputPricePerMillion).toBe(0.1652);
+      expect(pricing.inputPricePerMillion).toBe(0.0798);
+      expect(pricing.outputPricePerMillion).toBe(0.1596);
     });
 
     it('should have pricing for google/gemini-3.7-flash with split pricing', () => {
@@ -131,14 +131,14 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost.metadata_cost_usd).toBeCloseTo(0.0117, 6);
 
       // Sections cost (deepseek-v4-flash, 50/50 split):
-      // (22500/1M * 0.0826) + (22500/1M * 0.1652) = 0.0055755
-      expect(cost.sections_cost_usd).toBeCloseTo(0.0055755, 6);
+      // (22500/1M * 0.0798) + (22500/1M * 0.1596) = 0.0053865
+      expect(cost.sections_cost_usd).toBeCloseTo(0.0053865, 6);
 
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.0117 + 0.0055755 = 0.0172755
-      expect(cost.total_cost_usd).toBeCloseTo(0.0172755, 6);
+      // Total cost: 0.0117 + 0.0053865 = 0.0170865
+      expect(cost.total_cost_usd).toBeCloseTo(0.0170865, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);

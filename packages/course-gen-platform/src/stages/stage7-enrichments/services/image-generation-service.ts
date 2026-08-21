@@ -9,7 +9,7 @@
 import sharp from 'sharp';
 import { logger } from '@/shared/logger';
 import { createOpenRouterClient } from '@/shared/llm/openrouter-client';
-import { withGenerationIdCapture } from '@/shared/llm/generation-id-capture';
+import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
   calculateImageCostUsd,
   recordImageCallCost,
@@ -193,6 +193,11 @@ export async function generateImage(
     abortController.abort();
   }, API_TIMEOUT_MS);
 
+  // Hoisted so the id survives the throw: the header arrives before the body,
+  // so an attempt that goes on to fail still has one, and it is the only thing
+  // that identifies what the provider charged for it.
+  let slotRef: GenerationIdSlot | undefined;
+
   try {
     // Build request options - only include image_config for models that support it
     // GPT models ignore image_config and always generate 1024x1024
@@ -219,6 +224,7 @@ export async function generateImage(
     // filled from the response headers via `AsyncLocalStorage`, so reading it
     // outside this scope reads nothing.
     const { response, generationId } = await withGenerationIdCapture(async slot => {
+      slotRef = slot;
       // cost-exempt: an image is billed per image token, not per text token, so
       // this call prices itself with `recordImageCallCost` below rather than
       // through either LLM wrapper — and then replaces that estimate with the
@@ -370,6 +376,13 @@ export async function generateImage(
     clearTimeout(timeoutId);
     const durationMs = Date.now() - startTime;
 
+    await recordFailedImageSpend({
+      model,
+      generationId: slotRef?.generationId,
+      durationMs,
+      costContext: options.costContext,
+    });
+
     // Check if it was a timeout/abort
     if (error instanceof Error && error.name === 'AbortError') {
       logger.error({ model, durationMs }, 'Image generation timed out');
@@ -386,6 +399,45 @@ export async function generateImage(
     );
 
     throw error;
+  }
+}
+
+/**
+ * Write down what a failed image generation spent.
+ *
+ * A provider that has started work has been paid whether or not a picture comes
+ * back, and until this existed the failure left no row anywhere — the same hole
+ * `recordFailedAttempt` closed for text calls (mc2-ietzn).
+ *
+ * There are no token counts to estimate from, so the row is written without a
+ * price and says so; `settleTraceCostFromProvider` replaces that with the real
+ * charge as soon as the generation record is readable. Accounting must not be
+ * able to fail a generation, so nothing is thrown from here — the caller is
+ * about to rethrow the actual error, which is the one worth having.
+ */
+async function recordFailedImageSpend(params: {
+  model: string;
+  generationId: string | undefined;
+  durationMs: number;
+  costContext?: LlmCostContext;
+}): Promise<void> {
+  const { model, generationId, durationMs, costContext } = params;
+  if (!generationId || !costContext) return;
+
+  try {
+    await recordImageCallCost(
+      { model, generationId },
+      { ...costContext, durationMs, stepName: 'image_call_failed' }
+    );
+  } catch (recordError) {
+    logger.warn(
+      {
+        model,
+        generationId,
+        error: recordError instanceof Error ? recordError.message : String(recordError),
+      },
+      'Could not record the spend of a failed image generation'
+    );
   }
 }
 

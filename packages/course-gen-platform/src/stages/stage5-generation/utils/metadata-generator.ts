@@ -38,17 +38,12 @@ import logger from '@/shared/logger';
 import {
   getModelForPhase,
   getTextContent,
-  buildProviderParams,
+  createCostRecordingModelAsync,
 } from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-/**
- * OpenRouter API base URL
- */
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
  * Quality thresholds for metadata validation (RT-001)
@@ -192,9 +187,10 @@ export class MetadataGenerator {
     const { modelId: primaryModelId, configured } = await this.selectModelForLanguage(
       language,
       false,
-      estimatedInputTokens
+      estimatedInputTokens,
+      input.course_id
     );
-    const model = configured ?? this.createModel(primaryModelId);
+    const model = configured ?? (await this.createModel(primaryModelId, input.course_id));
 
     logger.info({
       msg: 'Metadata generation: selected model',
@@ -491,7 +487,8 @@ export class MetadataGenerator {
   private async selectModelForLanguage(
     language: string,
     useFallback: boolean = false,
-    estimatedTokens: number = 50000
+    estimatedTokens: number = 50000,
+    courseId?: string
   ): Promise<{ modelId: string; configured: ChatOpenAI | null }> {
     if (useFallback) {
       // Kimi K2-0905 (Gold for both)
@@ -501,12 +498,10 @@ export class MetadataGenerator {
     // Use getModelForPhase for phase-specific model selection
     try {
       const langCode = language === 'ru' || language === 'russian' ? 'ru' : 'en';
-      const model = await getModelForPhase(
-        'stage_5_metadata',
-        undefined,
-        estimatedTokens,
-        langCode
-      );
+      // The course id is what makes the call chargeable: without it the model
+      // is handed back with no cost recording and metadata generation spends
+      // anonymously (mc2-me7nx).
+      const model = await getModelForPhase('stage_5_metadata', courseId, estimatedTokens, langCode);
       const modelId = model.model || MODELS.metadata_fallback;
 
       logger.info({
@@ -828,37 +823,28 @@ ${schemaDescription}
   }
 
   /**
-   * Create ChatOpenAI model instance for OpenRouter
+   * Build the model for the hardcoded-fallback path.
    *
-   * @param modelId - OpenRouter model identifier
-   * @param temperature - Optional temperature override (default: 0.7)
-   * @param maxTokens - Optional maxTokens override (default: 8000)
-   * @returns Configured ChatOpenAI instance
+   * Through the shared factory, which decides three things this class used to
+   * decide badly on its own: the key comes from the admin panel rather than
+   * `process.env`, the transport is the instrumented one, and the call records
+   * its own price against the course (mc2-me7nx). `temperature` and `maxTokens`
+   * still go through the provider check inside the factory — `temperature` is
+   * not accepted by every model this can fall back to.
    */
-  private createModel(
+  private async createModel(
     modelId: string,
+    courseId?: string,
     temperature: number = 0.7,
     maxTokens: number = 8000
-  ): ChatOpenAI {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-
-    if (!apiKey) {
-      throw new Error(
-        'OPENROUTER_API_KEY environment variable is required for metadata generation'
-      );
-    }
-
-    return new ChatOpenAI({
-      modelName: modelId,
-      configuration: {
-        baseURL: OPENROUTER_BASE_URL,
-      },
-      apiKey: apiKey, // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
-      // Only reached on the hardcoded-fallback path now, but it still goes
-      // through the provider check: `temperature` is not accepted by every
-      // model this can fall back to.
-      ...buildProviderParams(modelId, temperature, maxTokens),
-    });
+  ): Promise<ChatOpenAI> {
+    return createCostRecordingModelAsync(
+      modelId,
+      temperature,
+      maxTokens,
+      'stage_5_metadata',
+      courseId
+    );
   }
 
   /**

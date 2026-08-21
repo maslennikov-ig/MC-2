@@ -27,8 +27,15 @@ vi.mock('@/shared/services/api-key-service', () => ({
   getOpenRouterApiKey: async () => 'test-key',
 }));
 vi.mock('openai', () => ({
+  // The constructor options are kept so a test can drive the very `fetch` the
+  // factory wrapped, which is where the generation id is deposited.
   default: class {
-    chat = { completions: { create: createCompletionMock } };
+    constructor(readonly options: { fetch?: typeof globalThis.fetch }) {}
+    chat = {
+      completions: {
+        create: (...args: unknown[]) => createCompletionMock(this.options, ...args),
+      },
+    };
   },
 }));
 
@@ -44,6 +51,7 @@ const ONE_PIXEL =
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   createCompletionMock.mockResolvedValue({
     choices: [{ message: { images: [`data:image/png;base64,${ONE_PIXEL}`] } }],
     // An image call's completion tokens are image tokens, and they are what the
@@ -125,5 +133,62 @@ describe('Stage 7 image generation', () => {
     expect(result.costUsd).toBeUndefined();
     const row = logTraceMock.mock.calls.map(call => call[0])[0];
     expect(row.costUsd).toBeUndefined();
+  });
+
+  it('writes down what an aborted generation spent, instead of nothing', async () => {
+    // The provider answered with headers — so it started work, so it was paid —
+    // and then the call failed. Before this, the money existed and the row did
+    // not (mc2-ietzn).
+    const GENERATION_ID = 'gen-1787317000-AbortedCard';
+    // Stubbed before the client is built: the wrapper closes over the global
+    // `fetch` it finds at construction time, so a stub installed later would
+    // send a real request.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { headers: { 'x-generation-id': GENERATION_ID } }))
+    );
+    createCompletionMock.mockImplementation(
+      async (options: { fetch?: typeof globalThis.fetch }) => {
+        await options.fetch!('https://openrouter.ai/api/v1/chat/completions');
+        throw new Error('connection reset while reading the image');
+      }
+    );
+
+    await expect(
+      generateCardImage('a card', {
+        courseId: COURSE_ID,
+        stage: 'stage_7',
+        phase: 'stage_7_card',
+      })
+    ).rejects.toThrow(/connection reset/);
+
+    const row = logTraceMock.mock.calls.map(call => call[0])[0];
+    expect(row).toMatchObject({
+      courseId: COURSE_ID,
+      stage: 'stage_7',
+      phase: 'stage_7_card',
+      stepName: 'image_call_failed',
+    });
+    // No tokens came back, so there is nothing to estimate from. The row says
+    // "unknown", never a guess, and the provider's own charge lands on it once
+    // the generation record is readable.
+    expect(row.costUsd).toBeUndefined();
+    expect(row.inputData).toMatchObject({ billedCall: true, generationId: GENERATION_ID });
+  });
+
+  it('records nothing when the call never reached the provider', async () => {
+    // No generation id means no headers means no work started: writing a row
+    // here would be inventing spend.
+    createCompletionMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+
+    await expect(
+      generateCardImage('a card', {
+        courseId: COURSE_ID,
+        stage: 'stage_7',
+        phase: 'stage_7_card',
+      })
+    ).rejects.toThrow(/ENOTFOUND/);
+
+    expect(logTraceMock).not.toHaveBeenCalled();
   });
 });

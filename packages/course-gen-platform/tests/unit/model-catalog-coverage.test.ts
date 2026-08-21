@@ -124,15 +124,17 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedImageRates);
   });
 
-  it('prices listed retired models at the OpenRouter rates verified on 2026-08-14', () => {
+  it('prices listed retired models at the OpenRouter rates verified on 2026-08-21', () => {
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v3.1-terminus': [0.27, 0.95],
-      // Re-read 2026-08-21: 1.7x too dear, and it mattered more than a retired
-      // entry usually would, because `normalizeModelId` prices every undated V4
-      // Flash snapshot from here (mc2-hc91g).
-      'deepseek/deepseek-v4-flash': [0.0826, 0.1652],
-      '~deepseek/deepseek-v4-flash-latest': [0.065, 0.14],
-      'deepseek/deepseek-v4-pro': [1.168, 2.336],
+      'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
+      // It matters more than a retired entry usually would, because
+      // `normalizeModelId` prices every undated V4 Flash snapshot from here
+      // (mc2-hc91g). The 2026-08-21 re-read found it 1.04x dear — small, and
+      // still the direction that over-reports rather than the one that builds a
+      // `max_price` under every endpoint and refuses the call.
+      'deepseek/deepseek-v4-flash': [0.0798, 0.1596],
+      '~deepseek/deepseek-v4-flash-latest': [0.065, 0.18],
+      'deepseek/deepseek-v4-pro': [1.6, 3.2],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],
@@ -140,7 +142,7 @@ describe('model catalogue coverage', () => {
       'qwen/qwen3-max': [0.78, 3.9],
       'qwen/qwen3.7-plus': [0.32, 1.28],
       'z-ai/glm-4.6': [0.5, 2],
-      'z-ai/glm-5': [0.95, 2.55],
+      'z-ai/glm-5': [0.6, 1.92],
     };
 
     const actual = Object.fromEntries(
