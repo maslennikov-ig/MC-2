@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-20. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-21. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -87,6 +87,14 @@ What still constrains work:
 - **One rule, held by a guard.** A paid call prices itself at the call, from its own token split and
   the model the provider actually served. A node-level summary row keeps tokens and carries **no**
   price — `generator_complete` and `judge_complete` are summaries, so nothing is double-counted.
+  Since 2026-08-21 a priced call is _stamped_ `input_data.billedCall`, because neither token counts
+  nor step names can tell a call from a summary: `cost:report` had been reporting 21 rows of "money
+  the ledger missed" on a window whose true answer was 0.
+- **The catalogue is an estimate, not the price.** Every OpenRouter call settles against
+  `/api/v1/generation`. `MODEL_CATALOG` is what a budget and a `provider.max_price` ceiling are built
+  from, and `tests/unit/model-catalog-coverage.test.ts` is a hand-updated snapshot — four entries had
+  drifted by 2026-08-21, so a live drift check is filed as `mc2-hc91g`. Images are the one place a
+  price is still invented (`mc2-5mhlb`).
 - **Stage 6 and Stage 7 run their own workers on their own queues in their own containers.**
   Anything added to the general sandboxed processor misses them. Cost was wrong three times for
   exactly this.
@@ -117,11 +125,47 @@ For the first time the gap is split rather than named:
 What now works: `stage_edit` rows appear and carry a price (chat guidance 0.000065, node refinement
 0.000140), and the storage quota moved by exactly the uploaded bytes with no failed upload.
 
-**The find that reshapes the remaining work.** `x-generation-id` arrives with the response headers —
-before the body, and before any timeout abort — and `GET /api/v1/generation?id=` then returns
-`usage` (what OpenRouter actually billed), the real token counts, `cancelled`, and `provider_name`.
-An aborted call becomes countable and the price stops being a catalogue estimate. The plan built on
-it is `docs/plans/steady-routing-heron.md`, foundation task `mc2-ihhwp`.
+**The find that reshaped it.** `x-generation-id` arrives with the response headers — before the body,
+and before any timeout abort — and `GET /api/v1/generation?id=` then returns `usage` (what OpenRouter
+actually billed), the real token counts, `cancelled`, and `provider_name`. An aborted call becomes
+countable and the price stops being a catalogue estimate. Plan:
+`docs/plans/steady-routing-heron.md`. Sections A–F shipped 2026-08-21 in `fe8f40b54`, `0664c7b07`,
+`37ecd2047`.
+
+**Run of 2026-08-21 — the reconciliation is arithmetic now.** Two career playbooks on the same
+questionnaire that failed on 2026-08-20; both completed. Second run, window from 09:37:27Z:
+
+|                                        |                  |
+| -------------------------------------- | ---------------- |
+| OpenRouter, delta of `/api/v1/credits` | **USD 0.165079** |
+| `pnpm cost:report --since` TOTAL       | **USD 0.119999** |
+| Residual                               | **USD 0.045080** |
+
+Thirty LLM calls, **all thirty** priced from `/api/v1/generation` rather than the catalogue,
+`unknown_cost_attempts` 0. The worker log for the window holds exactly thirty
+`Career Playbook LLM call succeeded` lines and exactly one other paid call. So the residual is not a
+gap to investigate but one named call: the playbook's card image, which records its price nowhere
+(`mc2-j9pmq`) and whose hardcoded USD 0.007 is 6.4× under the USD 0.045080 actually charged
+(`mc2-5mhlb`). Compare 2026-08-20: 46% adrift and unattributable.
+
+Three things that only a live run could say:
+
+- **A generation record takes ~9.6 s to become readable.** The first implementation read once after
+  1.5 s, settled zero of 33 nodes, and reported success. The lookup now polls to 30 s, and the
+  playbook collects every receipt in one pass at persist time rather than waiting per call.
+- **`provider.max_price` set below every endpoint is a refusal**, not a cheaper route —
+  `No endpoints found that satisfy the max price for this request`. One wrong catalogue price would
+  fail every call for that model, so the ceiling yields and the generation lives.
+- **`provider.ignore` accepts display names, slugs and a naive lower-cased form alike.** The
+  documented slug is what we send; the fallback to the display name is now safe rather than a guess.
+
+**Still unproven live:** the per-chain provider ignore. The 2026-08-21 run had no failed attempt, so
+nothing routed around anything. Held by unit tests and the 2026-08-20 manual measurement
+(205 s on OpenInference at status `-2`; 58.7 s on Sail Research with it excluded).
+
+**The ceiling is doing its job.** All three endpoints the run used for the deepseek alias — Sail
+Research, Relace, Decart — are the three cheapest of ~30, all inside the 1.5× ceiling. The 21 above
+it, up to AtlasCloud at 6.8× the cheapest, were never reachable.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
@@ -139,13 +183,19 @@ measured through the same SDK from the same worker container with reasoning alre
 now `DEFAULT_LLM_TIMEOUT_MS` = 238s, twice the measurement, and still far under the 620s hang the
 abort bound turned into an honest failure on 2026-08-13. Routing rows were left alone.
 
-**Leaving the routing rows alone is what kept it open.** On 2026-08-20 two Stage 4 calls exceeded
-even 238s, and a direct measurement found 205s on a provider whose endpoint status is already `-2`.
-The career playbook was worse off: `stage_career_playbook_*` carries its own `timeout_ms` of
-120000, half the budget the platform measured for the same model, and `specBuilder` can never
-escalate off it because `nodes/spec-builder.ts:407` sets `preferFallbackModel: true` while
-`nodes/runtime.ts:233` treats that as "fallback on every attempt" — the configured primary
-`openai/gpt-5.6-luna` is never tried. `mc2-xm7yf`, `mc2-ajg9h`.
+**Leaving the routing rows alone is what kept it open — closed 2026-08-21.** On 2026-08-20 two
+Stage 4 calls exceeded even 238s, and a direct measurement found 205s on a provider whose endpoint
+status is already `-2`. `DEFAULT_LLM_TIMEOUT_MS` is now **300000**, and all eleven
+`stage_career_playbook_*` phases moved from 120000 to 238000 in both `config-seed.json` and
+`llm_model_config`. That was the load-bearing fix: on 2026-08-21 a `group_3` call took 229s and a
+`group_6` call spent the full 238s, both of which the old budget would have aborted.
+
+**One diagnosis in that plan did not survive checking.** `spec-builder.ts:407` is an escalation
+inside `catch (retryError)`, not a standing pin; the first specBuilder call carries no
+`preferFallbackModel` and does reach `openai/gpt-5.6-luna` — which on 2026-08-21 answered on attempt
+0 in 20.8s. The real mechanism was `useFallback = ... || attempt > 0`, which spent three of four
+attempts on the slow alias. `FALLBACK_FROM_ATTEMPT = 2` now keeps attempt 1 on the primary. Write-up
+in `mc2-rqukn`; the plan carries a correction note. `mc2-xm7yf`, `mc2-ajg9h` closed.
 
 **Closed with it.** `mc2-ufpko` (cascade exemption for the conflict-checkpoint trigger, migration
 `20260813140000`), `mc2-s2x84` (evidence failures record their cause, not the document),
