@@ -85,7 +85,35 @@ function normalizeRegenerationAttempts(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-async function buildCostBreakdown(result: CareerPlaybookGraphResult) {
+/**
+ * What the row already paid for before this job ran.
+ *
+ * A playbook spends money before its graph starts: `requestFollowups` makes an
+ * LLM call and appends its node cost to the row. The success path used to build
+ * the breakdown from the graph result alone and write it whole, so that call
+ * disappeared at the moment the graph finished — $0.00029784 on 2026-08-21, and
+ * the same amount on every playbook ever generated (mc2-ai4a8). The failure path
+ * had always merged; only this one did not.
+ *
+ * Deduplicated on `generation_id`, so a graph that ever does start from the
+ * stored costs cannot make one call count twice.
+ */
+function priorNodeCostsNotIn(
+  existing: unknown,
+  incoming: CareerPlaybookNodeCost[]
+): CareerPlaybookNodeCost[] {
+  const parsed = CareerPlaybookCostBreakdownSchema.safeParse(existing);
+  if (!parsed.success) return [];
+
+  const alreadyCounted = new Set(
+    incoming.map(nodeCost => nodeCost.generation_id).filter((id): id is string => !!id)
+  );
+  return parsed.data.nodeCosts.filter(
+    nodeCost => !nodeCost.generation_id || !alreadyCounted.has(nodeCost.generation_id)
+  );
+}
+
+async function buildCostBreakdown(result: CareerPlaybookGraphResult, existing?: unknown) {
   const regenerationAttempts = normalizeRegenerationAttempts(result.blockRegenerationAttempts);
 
   const source = result.costBreakdown?.nodeCosts ?? result.nodeCosts;
@@ -94,7 +122,10 @@ async function buildCostBreakdown(result: CareerPlaybookGraphResult) {
   // The last thing before the row is written: swap every catalogue estimate for
   // the provider's own charge. Here rather than per call because a generation
   // record takes about ten seconds to become readable, and by now they all are.
-  const nodeCosts = await settleCareerPlaybookNodeCosts(source);
+  const nodeCosts = await settleCareerPlaybookNodeCosts([
+    ...priorNodeCostsNotIn(existing, source),
+    ...source,
+  ]);
 
   return {
     ...(result.costBreakdown ?? {}),
@@ -556,7 +587,10 @@ export class CareerPlaybookHandler {
     result: CareerPlaybookGraphResult
   ) {
     const safeResult = await this.remediateMermaidBeforePersist(result);
-    const costBreakdown = await buildCostBreakdown(result);
+    const costBreakdown = await buildCostBreakdown(
+      result,
+      await this.readStoredCostBreakdown(jobData.playbookId)
+    );
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
     const generationWarnings = normalizeGenerationWarnings(safeResult.warnings);
@@ -705,6 +739,29 @@ export class CareerPlaybookHandler {
     }
 
     await this.updatePlaybook(jobData.playbookId, updatePayload);
+  }
+
+  /**
+   * The spend already on the row, or nothing if it cannot be read.
+   *
+   * Never throws: losing a pre-generation call from the total is bad, and
+   * failing the job that just succeeded over it would be worse.
+   */
+  private async readStoredCostBreakdown(playbookId: string): Promise<unknown> {
+    try {
+      const { data } = await this.getCareerPlaybookSupabase()
+        .from('career_playbooks')
+        .select('cost_breakdown')
+        .eq('id', playbookId)
+        .single();
+      return (data as { cost_breakdown: unknown } | null)?.cost_breakdown ?? null;
+    } catch (readError) {
+      logger.warn(
+        { playbookId, error: errorMessageFrom(readError) },
+        'Could not read the stored Career Playbook cost breakdown; recording this run alone'
+      );
+      return null;
+    }
   }
 
   /**
