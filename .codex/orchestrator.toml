@@ -289,3 +289,27 @@ idempotent_retries = true
 [documentation]
 closeout_docs_review_required = true
 project_index_required = true
+
+[token_efficiency]
+schema = "token-efficiency/v1"
+native_fork_turns_default = "none"
+non_none_fork_override_enabled = true
+non_none_fork_override_requires_rationale = true
+non_none_fork_override_context_sources = ["nearest_agents", "selected_beads_goal", "exact_existing_reference"]
+native_prompt_fields = ["goal", "write_zone", "verification", "stop"]
+copied_history_allowed = false
+copied_rules_allowed = false
+routine_updates = "coalesce"
+required_updates = ["blocker", "decision", "material_artifact", "final", "platform_heartbeat"]
+tool_output_default = "bounded_summary"
+truncation_signal_required = true
+tool_output_expansion_requires_rationale = true
+worker_verification = "focused_red_green"
+final_acceptance_owner = "root"
+full_suite_boundary = "epic_or_release"
+parallelism_gate = "material_benefit"
+model_routing_source = "orchestrator-stage/references/delegation-and-isolation.md"
+agents_management = "marker_only"
+agents_first_adoption = "defer_without_explicit_flag"
+agents_custom_overlap = "defer"
+hard_token_cap = false
