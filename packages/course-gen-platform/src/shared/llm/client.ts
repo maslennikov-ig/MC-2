@@ -134,7 +134,7 @@ export function isPriceCeilingRefusal(error: unknown): boolean {
  */
 function isProviderAnswerableFailure(error: unknown): boolean {
   if (error instanceof OpenAI.APIError) {
-    const status = error.status ?? 0;
+    const status: number = (error as { status?: number }).status ?? 0;
     return status === 429 || status >= 500;
   }
 

@@ -229,6 +229,23 @@ export function buildProviderPriceCeiling(
 }
 
 /**
+ * The same routing block, shaped for the LangChain path's `modelKwargs`.
+ *
+ * `undefined` when there is nothing to say, so an empty `provider: {}` never
+ * goes out. Both paths end up sending the same `provider` field to OpenRouter;
+ * only the envelope differs.
+ */
+export function toProviderKwargs(
+  routing?: OpenRouterProviderRouting
+): OpenRouterProviderRouting | undefined {
+  if (!routing?.ignore?.length && !routing?.max_price) return undefined;
+  return {
+    ...(routing.ignore?.length ? { ignore: routing.ignore } : {}),
+    ...(routing.max_price ? { max_price: routing.max_price } : {}),
+  };
+}
+
+/**
  * Merge provider routing into a request without clobbering what is already there.
  *
  * The Anthropic cache flag and the routing controls both live under
