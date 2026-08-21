@@ -335,8 +335,10 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.14/1M input + $0.28/1M output = $0.42
-      expect(cost).toBeCloseTo(0.42, 4);
+      // $0.0826/1M input + $0.1652/1M output = $0.2478, re-read from
+      // /api/v1/models on 2026-08-21. The entry had carried $0.14/$0.28, 1.7x
+      // over on both legs (mc2-hc91g).
+      expect(cost).toBeCloseTo(0.2478, 4);
     });
 
     it('should estimate cost for google/gemini-3.7-flash', () => {

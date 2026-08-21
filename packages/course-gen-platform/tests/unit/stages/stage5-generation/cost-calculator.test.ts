@@ -53,8 +53,10 @@ describe('Stage 5 Cost Calculator Service', () => {
       const pricing = OPENROUTER_PRICING['deepseek/deepseek-v4-flash'];
       expect(pricing).toBeDefined();
       expect(pricing.combinedPricePerMillion).toBeUndefined();
-      expect(pricing.inputPricePerMillion).toBe(0.14);
-      expect(pricing.outputPricePerMillion).toBe(0.28);
+      // Re-read from /api/v1/models on 2026-08-21; the catalogue had carried
+      // $0.14/$0.28, 1.7x over on both legs (mc2-hc91g).
+      expect(pricing.inputPricePerMillion).toBe(0.0826);
+      expect(pricing.outputPricePerMillion).toBe(0.1652);
     });
 
     it('should have pricing for google/gemini-3.7-flash with split pricing', () => {
@@ -128,14 +130,15 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 0.78) + (2500/1M * 3.90) = 0.0117
       expect(cost.metadata_cost_usd).toBeCloseTo(0.0117, 6);
 
-      // Sections cost (deepseek-v4-flash, 50/50 split): (22500/1M * 0.14) + (22500/1M * 0.28) = 0.00945
-      expect(cost.sections_cost_usd).toBeCloseTo(0.00945, 6);
+      // Sections cost (deepseek-v4-flash, 50/50 split):
+      // (22500/1M * 0.0826) + (22500/1M * 0.1652) = 0.0055755
+      expect(cost.sections_cost_usd).toBeCloseTo(0.0055755, 6);
 
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.0117 + 0.00945 = 0.02115
-      expect(cost.total_cost_usd).toBeCloseTo(0.02115, 6);
+      // Total cost: 0.0117 + 0.0055755 = 0.0172755
+      expect(cost.total_cost_usd).toBeCloseTo(0.0172755, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);

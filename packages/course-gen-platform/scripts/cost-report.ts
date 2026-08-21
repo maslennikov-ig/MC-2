@@ -383,10 +383,22 @@ async function main(): Promise<void> {
     console.log('\n══ CACHED TOTAL ══');
     console.log(`courses.estimated_cost_usd      ${stored === null ? 'NULL' : usd(stored)}`);
     console.log(`sum over generation_trace       ${usd(traceTotal)}`);
-    if (stored !== null && Math.abs(stored - traceTotal) > 1e-6) {
+    // Compared at the column's own precision, not at the sum's. The two are
+    // stored differently — `courses.estimated_cost_usd` is NUMERIC(_,4) while
+    // `generation_trace.cost_usd` carries 6 — so a fresh, correct total was
+    // rounded on the way in and then declared MISMATCH on the way out. Every
+    // report said MISMATCH, on every course, whatever the state of the data,
+    // which made the line worth exactly nothing (mc2-9nf9q).
+    //
+    // The tolerance is half a unit in the stored column's last place: that is
+    // the most rounding alone can account for, so anything larger is a real
+    // staleness rather than an artefact of the schema.
+    const STORED_DECIMALS = 4;
+    const ROUNDING_TOLERANCE_USD = 0.5 * 10 ** -STORED_DECIMALS;
+    if (stored !== null && Math.abs(stored - traceTotal) > ROUNDING_TOLERANCE_USD) {
       console.log('MISMATCH — the cached total is stale; a stage or edit refresh will correct it.');
     } else if (stored !== null) {
-      console.log('match');
+      console.log(`match (to the ${STORED_DECIMALS} decimals the column stores)`);
     }
   }
 

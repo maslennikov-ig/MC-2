@@ -162,39 +162,105 @@ export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
   );
 }
 
+/** What an image call reports about itself. */
+export interface ImageCallUsage {
+  model: string;
+  /**
+   * Prompt tokens, priced at the ordinary input rate. Small next to the image
+   * but not zero: a card prompt is several hundred tokens.
+   */
+  inputTokens?: number;
+  /**
+   * Output tokens. For an image call these are **image** tokens, so they price
+   * at `imageOutputPricePerMillion` rather than at the text output rate.
+   */
+  outputTokens?: number;
+  generationId?: string;
+}
+
+/**
+ * Estimated price of one image call, or `undefined` when it cannot be estimated.
+ *
+ * `undefined` for a model the catalogue does not price *as an image model*, and
+ * for a call whose response reported no token counts. Both are absences, not
+ * zeroes, and the old code had no way to say so: it looked its model up in a
+ * private `MODEL_COSTS` table inside the image service and fell back to a flat
+ * `DEFAULT_COST_USD = 0.04` for anything unknown, so an unrecognised model
+ * produced a confident wrong number instead of a visible hole (mc2-5mhlb).
+ *
+ * This is only ever a placeholder. `settleTraceCostFromProvider` replaces it
+ * with OpenRouter's own charge about ten seconds later.
+ */
+export function calculateImageCostUsd(usage: ImageCallUsage): number | undefined {
+  const capabilities = getModelCapabilities(usage.model);
+  if (!capabilities?.imageOutputPricePerMillion) return undefined;
+  // `== null`, not falsy: a call that genuinely reported zero output tokens is a
+  // measurement, and pricing it as "unknown" is the shape that once corrupted
+  // the unpriced-rows metric (mc2-y452l).
+  if (usage.outputTokens == null) return undefined;
+
+  return (
+    ((usage.inputTokens ?? 0) * capabilities.inputPricePerMillion) / 1_000_000 +
+    (usage.outputTokens * capabilities.imageOutputPricePerMillion) / 1_000_000
+  );
+}
+
 /**
  * Records one image generation against a course.
  *
- * An image is billed per picture, not per token, so its price comes from the
- * provider's own figure rather than from `MODEL_CATALOG`. It still belongs in
- * the trace: the course total is a sum over that table, and a card image that
- * recorded its price only in `lesson_enrichments.metadata` was 18% of the
- * course it was billed to and invisible in the total (mc2-acjgd).
+ * An image is billed per image token, not per text token, and the only figure
+ * worth keeping is the provider's own — so this writes the estimate and then
+ * settles it against `GET /api/v1/generation` exactly as a token call does. It
+ * could not do that before: the image service built its own OpenAI client, the
+ * transport was never wrapped, no `x-generation-id` ever reached us, and the
+ * price stayed whatever the private table said (mc2-l17v5).
+ *
+ * It belongs in the trace regardless: the course total is a sum over that table,
+ * and a card image that recorded its price only in `lesson_enrichments.metadata`
+ * was 18% of the course it was billed to and invisible in the total (mc2-acjgd).
  */
 export async function recordImageCallCost(
-  usage: { model: string; costUsd: number },
+  usage: ImageCallUsage,
   context?: LlmCostContext
 ): Promise<void> {
+  const costUsd = calculateImageCostUsd(usage);
+
   if (!context) {
     logger.debug(
-      { model: usage.model, costUsd: usage.costUsd },
+      { model: usage.model, costUsd, generationId: usage.generationId },
       '[Cost] Image generated without a course context; its cost is not attributed'
     );
     return;
   }
 
+  if (costUsd === undefined) {
+    logger.warn(
+      { model: usage.model, courseId: context.courseId, outputTokens: usage.outputTokens },
+      '[Cost] Image model has no image rate in MODEL_CATALOG; the call is traced without an estimate'
+    );
+  }
+
   try {
-    await logTrace({
+    const traceId = await logTrace({
       courseId: context.courseId,
       stage: context.stage,
       phase: context.phase,
       stepName: context.stepName ?? 'image_call',
       ...(context.lessonId ? { lessonId: context.lessonId } : {}),
       modelUsed: usage.model,
-      costUsd: usage.costUsd,
+      ...(costUsd === undefined ? {} : { costUsd }),
       durationMs: context.durationMs ?? 0,
-      inputData: { billedCall: true, billedPerImage: true },
+      inputData: {
+        billedCall: true,
+        billedPerImage: true,
+        ...(usage.inputTokens === undefined ? {} : { inputTokens: usage.inputTokens }),
+        ...(usage.outputTokens === undefined ? {} : { outputTokens: usage.outputTokens }),
+        ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
+        ...(usage.generationId ? { generationId: usage.generationId } : {}),
+      },
     });
+
+    settleTraceCostFromProvider(traceId, usage.generationId, usage.model);
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : String(error), model: usage.model },

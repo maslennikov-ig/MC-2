@@ -1,6 +1,7 @@
 import {
   type CardEnrichmentContent,
   type CareerPlaybookGenerateImageJobData,
+  type CareerPlaybookNodeCost,
   CareerPlaybookQADataSchema,
   CareerPlaybookRoleProfileSpecSchema,
   type EnrichmentMetadata,
@@ -12,6 +13,7 @@ import {
   base64ToBuffer,
   convertToWebP,
   generateCardImage,
+  type ImageGenerationResult,
 } from '@/stages/stage7-enrichments/services/image-generation-service';
 import {
   buildPublicUrl,
@@ -27,6 +29,8 @@ import {
   type CareerPlaybookRow,
   type CareerPlaybookSupabase,
 } from '@/server/routers/career-playbook/service-mappers';
+import { appendCareerPlaybookNodeCost } from '@/server/routers/career-playbook/cost-breakdown';
+import { fetchGenerationFact } from '@/shared/llm/openrouter-generation';
 
 type CareerPlaybookImageGenerationResult = {
   imageUrl: string;
@@ -232,6 +236,113 @@ async function updatePlaybookImage(
   }
 }
 
+/**
+ * Charge the cover to the playbook that ordered it.
+ *
+ * The cover was the one paid call in the whole system that reached no ledger at
+ * all. `recordImageCallCost` needs a `courseId` because `generation_trace.course_id`
+ * is a foreign key into `courses`, and a playbook is not a course — so the call
+ * logged `Image generated without a course context` and the money vanished. On
+ * 2026-08-21 that single picture was the entire $0.045080 residual between the
+ * report's TOTAL and the OpenRouter invoice (mc2-j9pmq).
+ *
+ * So it goes where a playbook's spend already lives: `career_playbooks.cost_breakdown`,
+ * which `pnpm cost:report --since` already reads. Written from this job rather
+ * than from the generation handler because this job finishes *after* the playbook
+ * row is written — and appended, never assigned, or it would erase the node costs
+ * of the generation that preceded it.
+ *
+ * The wait for the receipt is deliberate. A generation record takes about ten
+ * seconds to become readable, and nothing else will ever come back for this row:
+ * unlike a `generation_trace` row there is no deferred settle behind it. Ten
+ * seconds at the end of a job that has already spent fifty on the picture is the
+ * cheapest honest price available.
+ *
+ * Never throws. A cover that generated is a cover that generated; failing the
+ * job over its accounting would trade a delivered picture for a bookkeeping
+ * entry.
+ */
+async function recordCoverCost(
+  playbookId: string,
+  imageResult: ImageGenerationResult,
+  durationMs: number,
+  attempt: number
+): Promise<void> {
+  try {
+    const fact = imageResult.generationId
+      ? await fetchGenerationFact(imageResult.generationId)
+      : null;
+
+    // `== null` and not falsy: a provider that charged exactly $0 measured that,
+    // and it is not the same as having no receipt (mc2-y452l).
+    const billed = fact?.usageUsd != null;
+    const costUsd = billed ? (fact?.usageUsd as number) : (imageResult.costUsd ?? 0);
+
+    const nodeCost: CareerPlaybookNodeCost = {
+      node: 'cardImage',
+      model: imageResult.modelUsed,
+      input_tokens: imageResult.inputTokens ?? 0,
+      output_tokens: imageResult.outputTokens ?? 0,
+      cost_usd: costUsd,
+      duration_ms: durationMs,
+      attempts: attempt,
+      outcome: 'succeeded',
+      // Unknown only when there is neither a receipt nor an estimate. An
+      // estimate is a number we stand behind; a zero we invented is not.
+      cost_unknown: !billed && imageResult.costUsd === undefined,
+      ...(imageResult.generationId ? { generation_id: imageResult.generationId } : {}),
+      ...(fact?.providerName ? { provider_name: fact.providerName } : {}),
+      ...(billed ? { billed_by_provider: true } : {}),
+    };
+
+    const supabase = getCareerPlaybookSupabase();
+    const { data, error: readError } = await supabase
+      .from('career_playbooks')
+      .select('cost_breakdown')
+      .eq('id', playbookId)
+      .single();
+
+    if (readError) {
+      throw new Error(`Could not read the existing cost breakdown: ${errorMessageFrom(readError)}`);
+    }
+
+    const breakdown = appendCareerPlaybookNodeCost(
+      (data as { cost_breakdown: unknown } | null)?.cost_breakdown,
+      nodeCost
+    );
+
+    const { error: writeError } = await supabase
+      .from('career_playbooks')
+      .update({ cost_breakdown: toJson(breakdown) } as Partial<CareerPlaybookRow>)
+      .eq('id', playbookId)
+      .select('id')
+      .single();
+
+    if (writeError) {
+      throw new Error(`Could not write the cost breakdown: ${errorMessageFrom(writeError)}`);
+    }
+
+    logger.info(
+      {
+        playbookId,
+        model: nodeCost.model,
+        costUsd: nodeCost.cost_usd,
+        billedByProvider: billed,
+        providerName: fact?.providerName,
+        generationId: imageResult.generationId,
+        estimatedCostUsd: imageResult.costUsd,
+        playbookTotalUsd: breakdown.total_cost_usd,
+      },
+      'Career Playbook cover cost recorded against the playbook'
+    );
+  } catch (error) {
+    logger.warn(
+      { playbookId, error: errorMessageFrom(error) },
+      'Could not record the Career Playbook cover cost; the picture is delivered, the ledger is short by it'
+    );
+  }
+}
+
 export async function generateCareerPlaybookImage(
   jobData: CareerPlaybookGenerateImageJobData
 ): Promise<CareerPlaybookImageGenerationResult> {
@@ -295,10 +406,13 @@ export async function generateCareerPlaybookImage(
     const metadata: EnrichmentMetadata = {
       generated_at: new Date().toISOString(),
       generation_duration_ms: durationMs,
-      input_tokens: 0,
-      output_tokens: 0,
-      total_tokens: 0,
-      estimated_cost_usd: imageResult.costUsd,
+      input_tokens: imageResult.inputTokens ?? 0,
+      output_tokens: imageResult.outputTokens ?? 0,
+      total_tokens: (imageResult.inputTokens ?? 0) + (imageResult.outputTokens ?? 0),
+      // The estimate, for display. The figure that reconciles lives in
+      // `career_playbooks.cost_breakdown`, written by `recordCoverCost` below
+      // from the provider's own charge.
+      estimated_cost_usd: imageResult.costUsd ?? 0,
       model_used: imageResult.modelUsed,
       quality_score: 1,
       retry_attempts: attempt,
@@ -322,10 +436,16 @@ export async function generateCareerPlaybookImage(
         imageUrl,
         storagePath,
         durationMs,
-        costUsd: imageResult.costUsd,
+        estimatedCostUsd: imageResult.costUsd,
+        generationId: imageResult.generationId,
       },
       'Career Playbook image generation completed'
     );
+
+    // After the picture is safely stored and the row says `completed`: the
+    // accounting waits on the provider's record, and a delivered cover must not
+    // depend on that wait finishing.
+    await recordCoverCost(row.id, imageResult, durationMs, attempt);
 
     return { imageUrl, storagePath, content, metadata };
   } catch (error) {

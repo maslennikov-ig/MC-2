@@ -22,7 +22,10 @@ vi.mock('@/shared/logger', () => {
   return { logger: { ...noop, child: () => noop }, default: { ...noop, child: () => noop } };
 });
 vi.mock('@/shared/trace-logger', () => ({ logTrace: logTraceMock }));
-vi.mock('@/shared/services/api-key-service', () => ({ getApiKey: async () => 'test-key' }));
+vi.mock('@/shared/services/api-key-service', () => ({
+  getApiKey: async () => 'test-key',
+  getOpenRouterApiKey: async () => 'test-key',
+}));
 vi.mock('openai', () => ({
   default: class {
     chat = { completions: { create: createCompletionMock } };
@@ -43,6 +46,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   createCompletionMock.mockResolvedValue({
     choices: [{ message: { images: [`data:image/png;base64,${ONE_PIXEL}`] } }],
+    // An image call's completion tokens are image tokens, and they are what the
+    // estimate is built from. Before 2026-08-21 nothing read them: the price came
+    // from a private table inside the service, which had drifted to 6.4x low
+    // (mc2-5mhlb).
+    usage: { prompt_tokens: 420, completion_tokens: 5_000 },
   });
 });
 
@@ -84,5 +92,38 @@ describe('Stage 7 image generation', () => {
     await generateCardImage('a card');
 
     expect(logTraceMock).not.toHaveBeenCalled();
+  });
+
+  it('prices the card from the catalogue image rate, not from a private table', async () => {
+    const result = await generateCardImage('a card', {
+      courseId: COURSE_ID,
+      stage: 'stage_7',
+      phase: 'stage_7_card',
+    });
+
+    // $2.50/1M prompt + $8.00/1M image output, against the $0.007 the old
+    // private table quoted for the same picture.
+    const expected = (420 * 2.5) / 1_000_000 + (5_000 * 8) / 1_000_000;
+    expect(result.costUsd).toBeCloseTo(expected, 8);
+    expect(result.costUsd).toBeGreaterThan(0.007);
+  });
+
+  it('leaves the row unpriced when the response reported no tokens', async () => {
+    createCompletionMock.mockResolvedValue({
+      choices: [{ message: { images: [`data:image/png;base64,${ONE_PIXEL}`] } }],
+    });
+
+    const result = await generateCardImage('a card', {
+      courseId: COURSE_ID,
+      stage: 'stage_7',
+      phase: 'stage_7_card',
+    });
+
+    // An absence, deliberately not a number. The old code answered a missing
+    // price with a flat $0.04 default, which reads as a measurement and is not
+    // one; the provider's own charge arrives on the row seconds later anyway.
+    expect(result.costUsd).toBeUndefined();
+    const row = logTraceMock.mock.calls.map(call => call[0])[0];
+    expect(row.costUsd).toBeUndefined();
   });
 });

@@ -18,11 +18,17 @@
 /**
  * Default primary model (used when DB is unavailable)
  * DeepSeek V4 Flash - default fast runtime model for course generation.
- * The leading `~` is part of the OpenRouter id: it is an alias that always
- * resolves to the newest model in the V4 Flash family.
+ *
+ * A pinned snapshot, never a `~...-latest` alias. The alias is a redirect that
+ * follows its family: on 2026-08-17 07:03 it moved to the `-0731` snapshot with
+ * no change on our side, median latency went from 8.7s to 102s, and the courses
+ * of 12-20 August failed on timeouts nobody had configured. Pinned on
+ * 2026-08-21 to the snapshot the alias was already resolving to, so the change
+ * froze the behaviour rather than altering it (mc2-qch4w).
+ *
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = '~deepseek/deepseek-v4-flash-latest';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash-0731';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable).

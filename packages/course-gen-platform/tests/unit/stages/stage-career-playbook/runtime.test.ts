@@ -478,9 +478,10 @@ describe('Career Playbook runtime', () => {
 
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(500);
-    // deepseek/deepseek-v4-flash: $0.14/1M input + $0.28/1M output
-    // 1000 * 0.14/1e6 + 500 * 0.28/1e6 = 0.00014 + 0.00014 = 0.00028
-    expect(result.costUsd).toBeCloseTo(0.00028, 10);
+    // deepseek/deepseek-v4-flash: $0.0826/1M input + $0.1652/1M output,
+    // re-read 2026-08-21; the catalogue had carried $0.14/$0.28 (mc2-hc91g).
+    // 1000 * 0.0826/1e6 + 500 * 0.1652/1e6 = 0.0000826 + 0.0000826 = 0.0001652
+    expect(result.costUsd).toBeCloseTo(0.0001652, 10);
   });
 
   it('falls back to token estimates and still prices when usage is absent', async () => {

@@ -27,6 +27,7 @@ vi.mock('@/shared/logger', () => {
 });
 
 import {
+  calculateImageCostUsd,
   EDIT_REFRESH_DEBOUNCE_MS,
   EDIT_REFRESH_RETRY_DELAY_MS,
   recordImageCallCost,
@@ -34,7 +35,17 @@ import {
 
 const COURSE_ID = '40000000-0000-4000-8000-000000000001';
 
-const IMAGE = { model: 'google/gemini-3-flash-image', costUsd: 0.012 };
+/**
+ * A catalogued image model and the tokens one call reported.
+ *
+ * Not a hand-supplied `costUsd` any more: an image is priced from
+ * `MODEL_CATALOG`'s `image_output` rate like every other call, because the
+ * private table that used to hold that number drifted to 6.4x low (mc2-5mhlb).
+ */
+const IMAGE = { model: 'openai/gpt-5-image-mini', inputTokens: 500, outputTokens: 5_000 };
+
+/** $2.50/1M prompt tokens + $8.00/1M image output tokens. */
+const IMAGE_COST_USD = (500 * 2.5) / 1_000_000 + (5_000 * 8) / 1_000_000;
 
 describe('the course total after an image', () => {
   beforeEach(() => {
@@ -90,7 +101,26 @@ describe('the course total after an image', () => {
     expect(logTrace.mock.calls[0][0]).toMatchObject({
       courseId: COURSE_ID,
       stage: 'stage_edit',
-      costUsd: IMAGE.costUsd,
+      costUsd: IMAGE_COST_USD,
     });
+  });
+
+  it('prices the image from the catalogue rather than from a number it was handed', () => {
+    expect(calculateImageCostUsd(IMAGE)).toBeCloseTo(IMAGE_COST_USD, 8);
+  });
+
+  it('leaves a call it cannot price genuinely unpriced, not zero', () => {
+    // An uncatalogued image model used to resolve to a flat $0.04 default, so a
+    // routing mistake produced a confident wrong number instead of a hole
+    // anybody could see (mc2-5mhlb).
+    expect(
+      calculateImageCostUsd({ model: 'acme/not-a-model', outputTokens: 5_000 })
+    ).toBeUndefined();
+    // ...and so does a call whose response reported no tokens at all.
+    expect(calculateImageCostUsd({ model: IMAGE.model })).toBeUndefined();
+  });
+
+  it('treats a genuine zero-token response as a measurement, not an absence', () => {
+    expect(calculateImageCostUsd({ model: IMAGE.model, outputTokens: 0 })).toBe(0);
   });
 });

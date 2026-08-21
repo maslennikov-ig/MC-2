@@ -35,11 +35,16 @@ const seedModels = [
 
 describe('model catalogue coverage', () => {
   it('keeps Batch API variants as separate billable models at their live rates', () => {
+    // Re-read 2026-08-21. Two of these were carrying half the published rate on
+    // the belief that a Batch tariff is always half the base one. It is for luna
+    // and for gemini; it is not for the other two — `z-ai/glm-5.2:batch` is
+    // dearer than its synchronous form, and `minimax/minimax-m3:batch` costs
+    // exactly the same as it (mc2-hc91g).
     const verifiedBatchRates: Record<string, [input: number, output: number, context: number]> = {
       'google/gemini-3.7-flash:batch': [0.1875, 0.9375, 1_048_576],
-      'minimax/minimax-m3:batch': [0.15, 0.6, 524_288],
+      'minimax/minimax-m3:batch': [0.3, 1.2, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
-      'z-ai/glm-5.2:batch': [0.7, 2.2, 512_000],
+      'z-ai/glm-5.2:batch': [1.4, 4.4, 512_000],
     };
 
     const actual = Object.fromEntries(
@@ -69,7 +74,7 @@ describe('model catalogue coverage', () => {
     // z-ai/glm-5.2 was 1.23x and ~deepseek/...-latest up to 1.8x too dear
     // (mc2-v1pn2, mc2-156kg).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      '~deepseek/deepseek-v4-flash-latest': [0.065, 0.14],
+      'deepseek/deepseek-v4-flash-0731': [0.08, 0.18],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [0.966, 3.036],
       'minimax/minimax-m3': [0.3, 1.2],
@@ -94,10 +99,39 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedRates);
   });
 
+  it('prices every image model at its published image_output rate', () => {
+    // The rate that nothing read. Image prices lived in a private table inside
+    // `image-generation-service.ts` — the second price table this repository
+    // forbids itself — and it drifted until a card booked at $0.007 was billed
+    // $0.045080, 6.4x more (mc2-5mhlb).
+    const verifiedImageRates: Record<string, number> = {
+      'openai/gpt-5-image-mini': 8,
+      'google/gemini-2.5-flash-image': 30,
+    };
+
+    const billedPerImage = Object.entries(MODEL_CATALOG)
+      .filter(([, capabilities]) => capabilities.billedPerImage)
+      .map(([modelId]) => modelId);
+    expect(billedPerImage.sort()).toEqual(Object.keys(verifiedImageRates).sort());
+
+    const actual = Object.fromEntries(
+      Object.keys(verifiedImageRates).map(modelId => [
+        modelId,
+        getModelCapabilities(modelId)?.imageOutputPricePerMillion ?? null,
+      ])
+    );
+
+    expect(actual).toEqual(verifiedImageRates);
+  });
+
   it('prices listed retired models at the OpenRouter rates verified on 2026-08-14', () => {
     const verifiedRates: Record<string, [input: number, output: number]> = {
       'deepseek/deepseek-v3.1-terminus': [0.27, 0.95],
-      'deepseek/deepseek-v4-flash': [0.14, 0.28],
+      // Re-read 2026-08-21: 1.7x too dear, and it mattered more than a retired
+      // entry usually would, because `normalizeModelId` prices every undated V4
+      // Flash snapshot from here (mc2-hc91g).
+      'deepseek/deepseek-v4-flash': [0.0826, 0.1652],
+      '~deepseek/deepseek-v4-flash-latest': [0.065, 0.14],
       'deepseek/deepseek-v4-pro': [1.168, 2.336],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],

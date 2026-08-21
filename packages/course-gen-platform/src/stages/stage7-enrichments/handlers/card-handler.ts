@@ -261,7 +261,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       phase: 'stage_7_card',
       lessonId: lesson.id,
     });
-    imageCostUsd = imageResult.costUsd;
+    // `?? 0` only for the enrichment's own metadata field, which is a display
+    // number and not the ledger. The ledger row is in `generation_trace`, where
+    // an unestimated call is left genuinely unpriced and then settled against
+    // the provider's charge.
+    imageCostUsd = imageResult.costUsd ?? 0;
 
     logger.info(
       {

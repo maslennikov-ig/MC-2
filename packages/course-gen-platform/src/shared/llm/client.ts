@@ -32,10 +32,10 @@ import {
 import type { ReasoningRequest, OpenRouterRequestOptions } from './client-helpers';
 import {
   withGenerationIdCapture,
-  instrumentFetchWithGenerationId,
   annotateErrorWithGenerationId,
   readGenerationIdFromError,
 } from './generation-id-capture';
+import { buildOpenRouterClient } from './openrouter-client';
 import { fetchGenerationFact, resolveProviderSlug } from './openrouter-generation';
 import {
   isMandatoryReasoningRejection,
@@ -269,25 +269,11 @@ export class LLMClient {
    * Initialize OpenAI client with given API key
    */
   private initializeClient(apiKey: string): void {
-    const appUrl = process.env.APP_URL || 'https://ai.megacampus.ru';
-
-    this.client = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: apiKey,
-      defaultHeaders: {
-        'HTTP-Referer': appUrl,
-        'X-Title': 'MegaCampus Course Generator',
-      },
-      timeout: DEFAULT_LLM_TIMEOUT_MS,
-      // The transport is wrapped so `x-generation-id` is captured the moment
-      // OpenRouter's headers arrive. Doing it here rather than around the parsed
-      // result is the whole point: the body read is what aborts, and an aborted
-      // attempt still has an id, a cost and a provider on OpenRouter's side.
-      fetch: instrumentFetchWithGenerationId(),
-      // Allow browser-like environment (JSDOM for mermaid creates global.window)
-      // This is safe because we're running in Node.js, not a real browser
-      dangerouslyAllowBrowser: true,
-    });
+    // The shared factory owns the base URL, the headers and — the part that
+    // matters — the wrapped transport that captures `x-generation-id` the moment
+    // OpenRouter's headers arrive. Building one here instead is how two other
+    // call sites ended up unable to price themselves (mc2-l17v5).
+    this.client = buildOpenRouterClient(apiKey, { timeoutMs: DEFAULT_LLM_TIMEOUT_MS });
 
     this.initialized = true;
     logger.info('LLMClient initialized with OpenRouter backend');

@@ -41,6 +41,34 @@ Since 2026-08-21 three more things are live and this run is the first to exercis
   rather than `generation_trace`, and the report now reads both. Before this, half the
   product was outside every reconciliation.
 
+Since 2026-08-21 three more, first exercised by this run:
+
+- **Images are priced like everything else.** The image service used to keep a private
+  price table — `openai/gpt-5-image-mini` at $0.007 against a real $0.045080, 6.4x low —
+  and its client was built by hand, so no `x-generation-id` ever reached it. It now goes
+  through the shared transport and settles against the provider like a token call.
+- **The playbook cover reaches a ledger at all.** It belongs to no course, so
+  `generation_trace` had no row to charge it to and it was logged as unattributable. It is
+  now a `cardImage` node cost inside `career_playbooks.cost_breakdown`.
+- **The default model is a pinned snapshot.** `deepseek/deepseek-v4-flash-0731` in place of
+  the `~deepseek/deepseek-v4-flash-latest` alias, which silently followed its family on
+  2026-08-17 and took median latency from 8.7s to 102s. The alias resolved to this same
+  snapshot on 2026-08-21, so the pin froze the behaviour rather than changing it.
+
+## What this reconciliation cannot see
+
+**Stage 7 audio is not on this bill.** `stage7-enrichments/handlers/audio-handler.ts`
+builds an OpenAI client with no `baseURL`, so it calls `api.openai.com` and is charged to
+a separate OpenAI account. It has no generation record, and the `/api/v1/credits` delta
+cannot see it in principle. Its cost is estimated from a per-character TTS rate in that
+handler's own table.
+
+So "the report's TOTAL matches the OpenRouter figure" means _the OpenRouter spend is fully
+accounted for_. It does not mean every dollar the run cost is accounted for. If the run
+generated audio, the OpenAI account has to be read separately or the audio named as
+excluded. Whether audio stays on a direct OpenAI account is an open question for the owner
+(`mc2-dgw4u`).
+
 ## Steps
 
 1. Record the start time before touching anything. The reconciliation needs it.
@@ -92,7 +120,19 @@ Report pass or fail on each line, naming what failed.
 - The report's TOTAL is compared against the OpenRouter figure for T0 → now, either the
   dashboard or the delta of `GET /api/v1/credits`. Ask the user for that figure; do not
   estimate it. A gap is the finding — and now that most rows carry the provider's own
-  charge, a gap points at a call that left no row rather than at a wrong price.
+  charge, a gap points at a call that left no row rather than at a wrong price. Stage 7
+  audio is outside this comparison by construction; see the section above.
+- The card image and the playbook cover carry the provider's charge, not an estimate. In
+  `generation_trace`, `output_data.billedByProvider` is true for `step_name='image_call'`;
+  in `career_playbooks.cost_breakdown`, the `cardImage` node has `billed_by_provider`.
+  A cover recorded at $0.007 is the old private table still in play.
+- No `~`-alias appears in the routing that ran:
+
+  ```sql
+  select phase_name, model_id, fallback_model_id from llm_model_config
+  where is_active and (model_id like '~%' or fallback_model_id like '~%');
+  ```
+
 - The worker logs show at least one retry that routed around a provider, if any call
   failed: search for `routes around it`. If nothing failed, say so — it is not a failure
   of this line.

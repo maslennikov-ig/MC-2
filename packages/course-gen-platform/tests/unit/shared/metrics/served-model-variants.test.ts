@@ -23,7 +23,7 @@ import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
 describe('a served model variant', () => {
   it('is priced from its base model rather than not at all', () => {
     const cost = calculateLlmCostUsd({
-      model: 'deepseek/deepseek-v4-flash-0731',
+      model: 'deepseek/deepseek-v4-flash-0815',
       inputTokens: 7293,
       outputTokens: 137,
     });
@@ -32,8 +32,17 @@ describe('a served model variant', () => {
   });
 
   it('says the price is not its own, so the catalogue can gain the entry', () => {
-    expect(hasExactModelPricing('deepseek/deepseek-v4-flash-0731')).toBe(false);
+    expect(hasExactModelPricing('deepseek/deepseek-v4-flash-0815')).toBe(false);
     expect(hasExactModelPricing('deepseek/deepseek-v4-flash')).toBe(true);
+  });
+
+  it('gives the pinned snapshot its own price, because it is what routing asks for', () => {
+    // The example this file was written around. `-0731` was a served variant
+    // nobody had asked for until 2026-08-21, when it became the pinned default
+    // in place of the `~...-latest` alias — so it needs its own tariff and not
+    // its base model's floor, or `provider.max_price` is built from the wrong
+    // number and the ceiling can refuse every call (mc2-qch4w).
+    expect(hasExactModelPricing('deepseek/deepseek-v4-flash-0731')).toBe(true);
   });
 
   it('reads a router alias and a batch suffix as the same model', () => {

@@ -6,11 +6,15 @@
  * modalities: ["text", "image"] for image-capable models.
  */
 
-import OpenAI from 'openai';
 import sharp from 'sharp';
 import { logger } from '@/shared/logger';
-import { getApiKey } from '@/shared/services/api-key-service';
-import { recordImageCallCost, type LlmCostContext } from '@/shared/metrics/llm-cost';
+import { createOpenRouterClient } from '@/shared/llm/openrouter-client';
+import { withGenerationIdCapture } from '@/shared/llm/generation-id-capture';
+import {
+  calculateImageCostUsd,
+  recordImageCallCost,
+  type LlmCostContext,
+} from '@/shared/metrics/llm-cost';
 
 // ============================================================================
 // CONFIGURATION
@@ -21,16 +25,6 @@ const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
-
-/** Cost per image by model (USD) */
-const MODEL_COSTS: Record<string, number> = {
-  'google/gemini-2.5-flash-image': 0.038,
-  'openai/gpt-5-image-mini': 0.007,
-  'openai/gpt-5-image': 0.04,
-};
-
-/** Default cost if model not in lookup */
-const DEFAULT_COST_USD = 0.04;
 
 const DEFAULT_ASPECT_RATIO = '21:9';
 const DEFAULT_IMAGE_SIZE = '1K'; // 1536x672 for 21:9 cinematic - optimal for web covers
@@ -122,10 +116,31 @@ export interface ImageGenerationResult {
   width: number;
   /** Image height */
   height: number;
-  /** Cost in USD */
-  costUsd: number;
+  /**
+   * Estimated cost in USD, from `MODEL_CATALOG`'s image rate and the tokens the
+   * response reported.
+   *
+   * `undefined` when neither is available — an absence, deliberately not a
+   * number. The estimate that used to stand here came from a private price table
+   * and read $0.007 against a real $0.045080 (mc2-5mhlb). The figure to trust is
+   * the one `GET /api/v1/generation` writes onto the trace row via
+   * {@link generationId} about ten seconds later.
+   */
+  costUsd?: number;
   /** Model used */
   modelUsed: string;
+  /** Prompt tokens the response reported, when it reported any. */
+  inputTokens?: number;
+  /** Image output tokens the response reported, when it reported any. */
+  outputTokens?: number;
+  /**
+   * OpenRouter's `x-generation-id` for this call.
+   *
+   * The key to what the picture actually cost. A caller that has no
+   * `generation_trace` row to settle — the Career Playbook cover, which belongs
+   * to no course — uses it to collect the receipt itself.
+   */
+  generationId?: string;
 }
 
 // ============================================================================
@@ -164,13 +179,11 @@ export async function generateImage(
     'Starting image generation'
   );
 
-  const apiKey = await getApiKey('openrouter');
-
-  if (!apiKey) {
-    throw new Error(
-      'OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.'
-    );
-  }
+  // The shared factory, not a local `new OpenAI`: it is what wraps the transport
+  // so `x-generation-id` reaches `withGenerationIdCapture`. Without it this call
+  // could never learn what it cost, and its price stayed an invented constant
+  // for as long as the service existed (mc2-l17v5).
+  const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
 
   const startTime = Date.now();
 
@@ -181,19 +194,6 @@ export async function generateImage(
   }, API_TIMEOUT_MS);
 
   try {
-    const client = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey,
-      defaultHeaders: {
-        'HTTP-Referer': process.env.APP_URL || 'https://ai.megacampus.ru',
-        'X-Title': 'MegaCampus Course Generator',
-      },
-      timeout: API_TIMEOUT_MS,
-      // Mermaid validation installs a JSDOM window in this Node worker.
-      // The key remains server-side; allow the SDK to run in that browser-like process.
-      dangerouslyAllowBrowser: true,
-    });
-
     // Build request options - only include image_config for models that support it
     // GPT models ignore image_config and always generate 1024x1024
     const requestOptions: Record<string, unknown> = {
@@ -215,12 +215,19 @@ export async function generateImage(
       };
     }
 
-    // cost-exempt: an image is billed per picture, not per token, so this call
-    // prices itself with `recordImageCallCost` below rather than through either
-    // LLM wrapper — the provider's own figure is the only correct one.
-    // @ts-expect-error - OpenRouter extensions not in OpenAI types
-    const response = await client.chat.completions.create(requestOptions, {
-      signal: abortController.signal,
+    // The capture has to wrap the call, not the parsed result: the slot is
+    // filled from the response headers via `AsyncLocalStorage`, so reading it
+    // outside this scope reads nothing.
+    const { response, generationId } = await withGenerationIdCapture(async slot => {
+      // cost-exempt: an image is billed per image token, not per text token, so
+      // this call prices itself with `recordImageCallCost` below rather than
+      // through either LLM wrapper — and then replaces that estimate with the
+      // provider's own figure.
+      // @ts-expect-error - OpenRouter extensions not in OpenAI types
+      const completion = await client.chat.completions.create(requestOptions, {
+        signal: abortController.signal,
+      });
+      return { response: completion, generationId: slot.generationId };
     });
 
     clearTimeout(timeoutId);
@@ -314,8 +321,16 @@ export async function generateImage(
     // Get actual dimensions based on model and settings
     const actualDimensions = getImageDimensions(model, imageSize, aspectRatio);
 
-    // Get model-specific cost
-    const costUsd = MODEL_COSTS[model] ?? DEFAULT_COST_USD;
+    // The output tokens of an image call are image tokens; the catalogue prices
+    // them at the model's `image_output` rate. This is a placeholder for the ten
+    // seconds until the provider's own charge lands on the trace row.
+    const usage = {
+      model,
+      inputTokens: response.usage?.prompt_tokens,
+      outputTokens: response.usage?.completion_tokens,
+      ...(generationId ? { generationId } : {}),
+    };
+    const costUsd = calculateImageCostUsd(usage);
 
     logger.info(
       {
@@ -327,13 +342,16 @@ export async function generateImage(
         imageSize,
         actualWidth: actualDimensions.width,
         actualHeight: actualDimensions.height,
-        costUsd,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        estimatedCostUsd: costUsd,
+        generationId,
       },
       'Image generation completed'
     );
 
     await recordImageCallCost(
-      { model, costUsd },
+      usage,
       options.costContext ? { durationMs, ...options.costContext } : undefined
     );
 
@@ -342,8 +360,11 @@ export async function generateImage(
       mimeType,
       width: actualDimensions.width,
       height: actualDimensions.height,
-      costUsd,
+      ...(costUsd === undefined ? {} : { costUsd }),
       modelUsed: model,
+      ...(usage.inputTokens === undefined ? {} : { inputTokens: usage.inputTokens }),
+      ...(usage.outputTokens === undefined ? {} : { outputTokens: usage.outputTokens }),
+      ...(generationId ? { generationId } : {}),
     };
   } catch (error) {
     clearTimeout(timeoutId);
@@ -372,7 +393,10 @@ export async function generateImage(
  * Generate a card image (1:1 square) using GPT-5 Image Mini
  *
  * Convenience wrapper for card generation with optimal settings.
- * GPT-5 Mini is cost-effective ($0.007) and always generates 1024x1024 squares.
+ * GPT-5 Mini always generates 1024x1024 squares. It is not as cheap as this
+ * comment used to claim: the $0.007 quoted here came from the private price
+ * table this service kept, and one measured card was billed $0.045080
+ * (mc2-5mhlb).
  *
  * @param prompt - Card image prompt
  * @returns Generated card image data
