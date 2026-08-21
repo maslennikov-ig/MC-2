@@ -253,3 +253,43 @@ LangChain-путь — `modelKwargs` в `langchain-models.ts:442`.
 
 Потоки 1 и 2 идут параллельно — по файлам они не пересекаются, кроме раздела A,
 который нужен обоим. Поэтому **A делается первым и один раз**, дальше потоки расходятся.
+
+## Стартовый промпт для следующей сессии
+
+Проверен `orch-prompts prompt-check --kind handoff --runtime claude --profile opus-5`: pass,
+с предупреждением о размере (1726 символов против цели 1500). Резать дальше пришлось бы
+за счёт решений владельца, а они здесь несущие.
+
+```
+Target: Claude Code CLI, repo /home/me/code/mc2, branch develop
+Audience: assistant, fresh session
+Runtime: WSL, VS Code terminal
+
+Goal: Implement sections A through F of docs/plans/steady-routing-heron.md,
+deliver into develop via /push-dev, then re-run docs/runbooks/cost-ledger-paid-run.md
+and reconcile against the OpenRouter invoice.
+
+Context: Read the plan first — it holds the evidence, the owner's decisions and the
+exact files and lines. In short: on 12 August every phase moved from a pinned
+deepseek snapshot to the floating alias ~...-latest; on 17 August the alias followed
+the family to a new snapshot and median latency went from 8.7 s to 102 s. That
+aborts Stage 4 and fails the career playbook. The 2026-08-20 run recorded $0.077338
+against an invoice of $0.144177.
+
+The find it is built on: x-generation-id arrives with the response headers, before
+the body and before any timeout abort, and GET /api/v1/generation?id= returns what
+OpenRouter actually billed plus the provider name.
+
+Three owner decisions are binding: a provider is ignored only inside the current
+chain of attempts, never in a standing blocklist, and the next call starts again
+with the cheapest; cheapest stays the goal, so max_price is a ceiling and
+sort=throughput is out; waiting is acceptable, so raise timeouts rather than chase
+speed.
+
+Start with mc2-ihhwp — it blocks mc2-pdsjz, mc2-svokw and mc2-jukal. Then routing
+and money run in parallel; `bd ready` has both. Change nothing the plan does not
+name; if a fix needs a decision the plan does not record, stop and ask.
+
+Output: the plan's acceptance list answered line by line, the report TOTAL next to
+the OpenRouter figure for the same window, and a Beads issue for anything new.
+```

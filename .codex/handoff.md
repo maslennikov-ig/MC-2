@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-16. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-20. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -54,6 +54,14 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
 generation; Stage 5 ~5.5%, Stage 4 ~1.9%. Epic `mc2-4clyr` holds what follows from that.
 
+**Correction, 2026-08-20.** The `~` is not a harmless spelling. OpenRouter documents
+`~deepseek/deepseek-v4-flash-latest` as a redirect — _«always redirects to the latest model in the
+DeepSeek V4 Flash family»_ — while `deepseek/deepseek-v4-flash` is the pinned 0423 snapshot the
+routing table used to name. On 17 August the family moved and the alias followed it to `-0731`:
+median call latency went from 8.7 s to 102 s, and that is what aborts Stage 4 and fails the career
+playbook. Root cause and the measurements are `mc2-qch4w`; the repair plan is
+`docs/plans/steady-routing-heron.md`.
+
 ## Phase configs audited (2026-08-13, `7ad421986`)
 
 `mc2-o3s4r` closed. Stored configuration is clean on the checks that matter: no budget exceeds a
@@ -68,95 +76,52 @@ Open from the audit, none in the current epics: `mc2-s1vg5` (`generate:config-se
 unreachable database), `mc2-9yrgb` (`stage_5_escalation` configured but requested by nothing — do not
 delete on that alone), `mc2-p6u8k` (Stage 5 last-resort constants name retired models).
 
-## Live course run (2026-08-15, `mc2-2pplo` — a course reached Stage 6 and published)
+## Cost accounting: where it stands
 
-Epic `mc2-qrdkt` is complete, 17 of 17. Course `8a174ee7` finished: `published`, 3 lessons,
-quality 0.93, 18-22 KB of real Russian content per lesson on `openai/gpt-5.6-luna`. Total spend
-across every attempt **USD 0.222333** of the USD 5 ceiling; the successful course itself cost
-USD 0.042368 (stage_4 0.0118, stage_5 0.0013, stage_6 0.0293). Test data was removed in full.
+Epic `mc2-qrdkt` is complete (17 of 17). Three paid runs in August took the recorded share of the
+OpenRouter bill from **48% → 55% → 54%**; the fixes behind that are merged and their evidence lives
+in the `bd` close reasons, not here.
 
-Eight defects, each of which alone stopped a course, were found and fixed during the run: the shape
-of Stage 4's lists, a number sent as a string, the conflict detector's envelope, mandatory reasoning
-on five models rather than one, `answer_source='system'` against a CHECK plus a cost-rounding guard,
-10 KB of JSON in a PostgREST URL, a micro course judged against `general_auto`, and a generation
-lock held across a stage handoff. Details in the `bd` close reasons.
+What still constrains work:
 
-**What the run taught, beyond the fixes (2026-08-16).** Most causes were known to the code and never
-printed. Four blindness sites were repaired during the run and the sweep afterwards found more:
-twelve pipeline sites reduced a PostgREST error to `message` alone (`describeDatabaseError` now
-appends `code`/`details`/`hint`), the downstream reducer checked its unit set outside the retry
-budget written for it, the Stage 6 judge parser said how many bytes came back instead of which field
-was wrong. Audits of the other three failure families — envelope fragility, validation outside a
-retry budget, a lock held across a handoff — found one real instance each and are recorded closed
-with the places checked (`mc2-qrdkt.4` through `.7`).
+- **One rule, held by a guard.** A paid call prices itself at the call, from its own token split and
+  the model the provider actually served. A node-level summary row keeps tokens and carries **no**
+  price — `generator_complete` and `judge_complete` are summaries, so nothing is double-counted.
+- **Stage 6 and Stage 7 run their own workers on their own queues in their own containers.**
+  Anything added to the general sandboxed processor misses them. Cost was wrong three times for
+  exactly this.
+- **Two holes are named rather than closed**, and sit in the guard's exception list so it can shrink
+  but not grow in silence: document evidence prices itself into its own coverage ledger and never
+  reaches the course total (`mc2-b7olk.4`), and course editing had no stage to charge (`mc2-b7olk.5`)
+  — the `stage_edit` half of that is now live and proven, see the 2026-08-20 run below.
+- **`mc2-gmab0`'s mandatory-reasoning recovery is still unproven live.** No model has refused to
+  disable reasoning in any run so far, so it is held by unit tests alone.
 
-**Stage 6 and Stage 7 spend now reaches the course.** `courses.estimated_cost_usd` stopped at
-Stage 5 because the refresh lives in the general sandboxed processor and those two stages run on
-their own queues in their own containers. Stage 7 was unpriced for a second, separate reason, and
-the first attempt named the wrong one: widening `stageOfPhase` to `stage_7` priced nothing, because
-Stage 7 does not use the LangChain path that function belongs to. Its six calls go through the
-OpenAI SDK client and none passed a `costContext`, so they left no trace row at all. All six now do,
-and a guard reads the sources so the next call site cannot forget (`mc2-gmab0`).
+**Run of 2026-08-20 (`mc2-z0xr3` — the run the ledger work was waiting for).**
+Course `bf1151ca` on dev finished; career playbook `c8649a86` **failed**. OpenRouter billed
+**USD 0.144177** for the window against **USD 0.077338** recorded — 0.076998 in `generation_trace`
+plus 0.000340 in `career_playbooks.cost_breakdown`. No other traffic on the key: every
+staging/production container was silent, and the key is the same everywhere.
 
-**Live confirmation run (2026-08-16, course `944e6795` on dev, USD 0.0646 billed).** A micro course
-ran end to end plus one Stage 7 quiz, with no other traffic on the key in the window. Two of the three
-`mc2-gmab0` fixes are now proven on real data, and the run found what the tests could not:
+For the first time the gap is split rather than named:
 
-- Confirmed: the Stage 6 container itself refreshes the course total (`0.003264 → 0.020332 →
-0.027658`), and Stage 7 SDK calls now write priced `stage_7` trace rows — including the two that
-  failed, which is the failed-stage-spend fix working.
-- Not confirmed: the mandatory-reasoning recovery never fired. No model refused, so it stays held by
-  unit tests alone.
-- **The course total is still wrong, for a reason the fix did not touch.** Recorded 0.0310 against
-  0.0646 actually billed. Stage 6 lesson generation carries no price at all on the synchronous path
-  (`mc2-4wiot`, P0: `generationCostUsd` is only set from a Batch prefetch or a retry, and Batch is off
-  by default), and the card image's USD 0.007 lives only in the enrichment metadata (`mc2-acjgd`).
-  About a cent beyond those two is still unexplained — `mc2-z0xr3` is the reconciliation.
-- Also found: quiz generation dies whenever the model answers `time_limit_minutes: null`, and pays
-  for both attempts (`mc2-d3726`); the Stage 6 finalize progress warning names no field (`mc2-g3v9c`).
+- **USD 0.010388 is the catalogue lying.** `openai/gpt-5.6-luna` is priced at exactly half the
+  provider's rate — 0.10/0.60 against 0.20/1.20 (`mc2-v1pn2`). Against it, `z-ai/glm-5.2` is
+  overpriced 1.23× and `~deepseek/...-latest` 1.45× (`mc2-156kg`), which is why each model looked
+  roughly right on its own while none of them was.
+- **About USD 0.056 is calls with no row at all**: two Stage 4 aborts at 238 s and four playbook
+  timeouts at 120 s (`mc2-64n8i`).
+- **Structural blindness**: playbook spend never enters `generation_trace` (`mc2-rkmeg`), and a
+  failed playbook records nothing anywhere (`mc2-ajqun`).
 
-**Everything that run exposed is fixed and merged, except the count itself (`mc2-b7olk`).** One rule
-replaced four half-conventions: a paid call prices itself at the call, from its own token split and
-the model the provider actually served; a node-level summary row keeps tokens and carries no price.
-Writing lessons, continuing a truncated one, regenerating a section, self-review, both judge paths,
-the patcher, the delta judge, the expander, image generation, Stage 2 summarization, Stage 3
-classification, the Stage 4 visual style, the mermaid repair and the presentation critic all do this
-now. `judge_complete` stopped estimating — it split the whole cascade's tokens evenly across judges
-and charged refinement tokens at judge rates — because pricing the calls while it still estimated
-would have counted the same tokens twice.
+What now works: `stage_edit` rows appear and carry a price (chat guidance 0.000065, node refinement
+0.000140), and the storage quota moved by exactly the uploaded bytes with no failed upload.
 
-Two holes are named rather than closed, both found by the guard while writing it: document evidence
-prices itself into its own coverage ledger and never reaches the course total (`mc2-b7olk.4`), and
-editing a course — chat, inline blocks, element CRUD — has no stage in `generation_trace` to charge
-at all (`mc2-b7olk.5`). They are in the guard's exception list with those ids, so the list can shrink
-but not grow in silence.
-
-**Second confirmation run (2026-08-17, course `b0b2efde` on dev, USD 0.092839 billed).** No other
-traffic on the key: the baseline read equalled the previous run's closing figure to the cent, and all
-production containers were silent through the window.
-
-- The recompute is exact: `estimated_cost_usd` 0.0509 == `sum(generation_trace.cost_usd)` 0.050911.
-- Newly visible, and previously worth nothing: lesson generation (`stage_6_content`, 5 calls, 29544
-  tokens, 0.012492), the section expander (0.002745), the card image (`image_call`, 0.007).
-- Nothing is double-counted: `generator_complete` and `judge_complete` carry tokens and no price.
-- The recorded share of the bill went from 48% (0.0310 of 0.0646) to 55% (0.0509 of 0.0928).
-
-**The sum still does not reconcile — 0.0419 unexplained — but the run named three reasons instead of
-leaving a mystery.** Self-review passed no `courseId`, so five calls and 37159 tokens were
-unattributed; that is fixed here, and it is the class the source guard cannot see, because the call
-site does pass a context and the context is simply empty. The provider served
-`deepseek-v4-flash-0731`, a dated snapshot that is not a catalogue key, so that row was written with
-no price at all — and its real tariff is 1.7× the alias it was asked for (`mc2-b7olk.6`). Three quiz
-attempts died on a 4-minute timeout and left no row at all, because the price is recorded only after
-a successful response (`mc2-b7olk.7`); the timeouts themselves are `mc2-b7olk.8`, and they cost the
-course its quiz. Those three come to roughly 0.013 of the 0.0419; about 0.029 is still unaccounted.
-
-All three are now fixed: self-review is handed the course, a served variant is priced from the model it
-is a variant of (with a warning naming the id the catalogue should gain, because a snapshot's own
-tariff is higher), and a failed call leaves an `llm_call_failed` row carrying the reason and a
-`spentButUnpriced` marker rather than nothing. `mc2-z0xr3` stays open: the next paid run is the one
-that can finally split the remaining gap, because every known cause of it now either prices itself or
-says out loud that it could not.
+**The find that reshapes the remaining work.** `x-generation-id` arrives with the response headers —
+before the body, and before any timeout abort — and `GET /api/v1/generation?id=` then returns
+`usage` (what OpenRouter actually billed), the real token counts, `cancelled`, and `provider_name`.
+An aborted call becomes countable and the price stops being a catalogue estimate. The plan built on
+it is `docs/plans/steady-routing-heron.md`, foundation task `mc2-ihhwp`.
 
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the life of the process, and retried asking for
@@ -173,6 +138,14 @@ real answer time — a realistic Stage 4 request (8204 input tokens, `max_tokens
 measured through the same SDK from the same worker container with reasoning already off. The budget is
 now `DEFAULT_LLM_TIMEOUT_MS` = 238s, twice the measurement, and still far under the 620s hang the
 abort bound turned into an honest failure on 2026-08-13. Routing rows were left alone.
+
+**Leaving the routing rows alone is what kept it open.** On 2026-08-20 two Stage 4 calls exceeded
+even 238s, and a direct measurement found 205s on a provider whose endpoint status is already `-2`.
+The career playbook was worse off: `stage_career_playbook_*` carries its own `timeout_ms` of
+120000, half the budget the platform measured for the same model, and `specBuilder` can never
+escalate off it because `nodes/spec-builder.ts:407` sets `preferFallbackModel: true` while
+`nodes/runtime.ts:233` treats that as "fallback on every attempt" — the configured primary
+`openai/gpt-5.6-luna` is never tried. `mc2-xm7yf`, `mc2-ajg9h`.
 
 **Closed with it.** `mc2-ufpko` (cascade exemption for the conflict-checkpoint trigger, migration
 `20260813140000`), `mc2-s2x84` (evidence failures record their cause, not the document),
@@ -275,20 +248,31 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
   The two cost fixes in that issue are confirmed live and no longer deferred.
 - `mc2-b7olk.4`, `mc2-b7olk.5` — document evidence keeps its own cost ledger, and course editing has
   no stage to charge. Both need a decision about where that money belongs, not a forgotten argument.
-- `mc2-z0xr3` — the one paid run that proves the total. Needs current authorization to spend; the
-  fixes it verifies are merged and deployed.
+- `mc2-z0xr3` — **run on 2026-08-20, stays open.** It did what it was for: the gap is now split into
+  named causes instead of one number. It closes when a run on the repaired code reconciles.
 - The eight §9 exclusions listed under Safety boundary — gates already recorded there.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: `mc2-z0xr3`, then epic `mc2-4clyr`
+Next stage id: `docs/plans/steady-routing-heron.md`, then epic `mc2-4clyr`
 
-Recommended action: `mc2-z0xr3` — one paid micro course, `/credits` read before and after, recorded
-total compared against the delta. Every fix it verifies is merged; what is not verified is that they
-add up. Do not start `mc2-4clyr` before that number holds: the epic is about cutting generation cost,
-and on 2026-08-16 the recorded cost was roughly half the real one. Costing it on today's numbers
-would cost it on a number we already know is wrong.
+Recommended action: work the plan in `docs/plans/steady-routing-heron.md`. Start with `mc2-ihhwp` —
+knowing the provider and the generation id of every call is the foundation, and it blocks
+`mc2-pdsjz`, `mc2-svokw` and `mc2-jukal`. After that the routing stream (`mc2-pdsjz`, `mc2-svokw`,
+`mc2-ajg9h`, `mc2-xm7yf`, `mc2-qch4w`) and the money stream (`mc2-jukal`, `mc2-v1pn2`, `mc2-156kg`,
+`mc2-64n8i`, `mc2-ajqun`, `mc2-rkmeg`, `mc2-wjdfe`, `mc2-wjmrd`, `mc2-9nf9q`) run in parallel; they
+do not share files. A repeat paid run is part of that plan's acceptance, not separate work.
+
+Do not start `mc2-4clyr` before the number holds. The epic is about cutting generation cost, and on
+2026-08-20 the recorded cost was still 54% of the real one. Costing it today would cost it on a
+number we already know is wrong.
+
+**Three owner decisions of 2026-08-20 bind the routing work** and must not be revisited without a
+new decision: a provider that fails is ignored only inside the current chain of attempts, never in a
+standing blocklist, and the next call starts again with the cheapest; cheapest stays the goal, so
+`max_price` is a ceiling and `sort=throughput` is out; waiting is acceptable, so raise timeouts
+rather than chase speed. Key stages may move to `openai/gpt-5.6-luna` at ~8× the per-call price.
 
 `mc2-4clyr`'s headline number needs correcting first: across all 1589 judged lessons rather than the 490 that
 reached a judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three,
@@ -297,7 +281,9 @@ cannot be done from history — `singleJudge` is null in every stored cascade ro
 
 ## Starter prompt for next orchestrator
 
-The starter prompt lives at the end of `docs/plans/humble-floating-widget.md`. Use $orchestrator-stage
+The starter prompt for the routing and cost work is in the handoff notes of
+`docs/plans/steady-routing-heron.md`; the older one at the end of
+`docs/plans/humble-floating-widget.md` is superseded for that stream. Use $orchestrator-stage
 for the epic itself; single tasks are ordinary local work. Do not enable the cohort, change its
 threshold, reindex, force-push, deploy, migrate beyond `mc2-ufpko`, or spend beyond the USD 5 ceiling
 without separate current authorization.
