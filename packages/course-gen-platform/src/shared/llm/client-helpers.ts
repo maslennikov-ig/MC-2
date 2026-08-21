@@ -46,6 +46,15 @@ export type MessageWithCacheControl = ChatCompletionMessageParam & {
 export interface OpenRouterProviderRouting {
   /** Provider *slugs* (`open-inference`), never display names (`OpenInference`). */
   ignore?: string[];
+  /**
+   * Endpoints to try, in order — `sail-research/fp4`, the `tag` that
+   * `/models/{model}/endpoints` reports. With one entry and `allow_fallbacks`
+   * off this pins the attempt, which is the only way to know who served a call
+   * that never answered (see `openrouter-endpoints.ts`).
+   */
+  order?: string[];
+  /** Whether OpenRouter may go beyond `order`. Off is what makes a failure attributable. */
+  allow_fallbacks?: boolean;
   /** Dollars per million tokens. A provider above either figure is not used. */
   max_price?: { prompt?: number; completion?: number };
 }
@@ -238,9 +247,15 @@ export function buildProviderPriceCeiling(
 export function toProviderKwargs(
   routing?: OpenRouterProviderRouting
 ): OpenRouterProviderRouting | undefined {
-  if (!routing?.ignore?.length && !routing?.max_price) return undefined;
+  if (!routing?.ignore?.length && !routing?.order?.length && !routing?.max_price) return undefined;
   return {
     ...(routing.ignore?.length ? { ignore: routing.ignore } : {}),
+    ...(routing.order?.length ? { order: routing.order } : {}),
+    // Only meaningful alongside `order`, and only ever sent as `false`: leaving
+    // it out is OpenRouter's default of true.
+    ...(routing.order?.length && routing.allow_fallbacks === false
+      ? { allow_fallbacks: false }
+      : {}),
     ...(routing.max_price ? { max_price: routing.max_price } : {}),
   };
 }
@@ -262,6 +277,19 @@ export function applyProviderRouting(
 
   if (routing.cache_control !== undefined) provider.cache_control = routing.cache_control;
   if (routing.max_price !== undefined) provider.max_price = routing.max_price;
+
+  // Same rule as `ignore` below, for the same reason: a pin left behind from the
+  // previous attempt would send the retry back to the endpoint that just failed.
+  if (routing.order !== undefined) {
+    if (routing.order.length > 0) {
+      provider.order = routing.order;
+      if (routing.allow_fallbacks === false) provider.allow_fallbacks = false;
+      else delete provider.allow_fallbacks;
+    } else {
+      delete provider.order;
+      delete provider.allow_fallbacks;
+    }
+  }
 
   // An empty list is meaningful: it is the first attempt, which ignores nobody.
   // Sending `ignore: []` is harmless, but leaving a stale list behind is not.

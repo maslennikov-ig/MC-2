@@ -2,6 +2,7 @@ import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shared/llm/client';
 import { buildProviderPriceCeiling } from '@/shared/llm/client-helpers';
 import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
+import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
 import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
   selectAttemptModel,
@@ -267,10 +268,16 @@ export function createCareerPlaybookRuntime(
       const callStartedAt = Date.now();
       const abortedAttempts: CareerPlaybookAbortedAttempt[] = [];
 
-      // Lives and dies with this call, deliberately. The owner's decision of
+      // Both live and die with this call, deliberately. The owner's decision of
       // 2026-08-20: no standing blocklist, because a provider that is degraded
       // now may be the cheapest working one next time, and a list nobody prunes
       // goes stale in silence. The next call starts at the cheapest again.
+      //
+      // `triedEndpointTags` is the same rule stated forwards: the endpoints this
+      // chain has already spent an attempt on. `ignoredProviderSlugs` remains
+      // for the path where no endpoint list could be fetched, where the only way
+      // to learn the provider is still to ask afterwards.
+      const triedEndpointTags = new Set<string>();
       const ignoredProviderSlugs = new Set<string>();
 
       // A ceiling no endpoint can meet is a refusal, not a cheaper route —
@@ -303,10 +310,45 @@ export function createCareerPlaybookRuntime(
         const priceCeiling = priceCeilingRefused
           ? undefined
           : buildProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
+
+        // Pin this attempt to one endpoint, so that whatever happens to it is
+        // attributable without asking anyone afterwards. Routing around a
+        // provider used to depend on `GET /api/v1/generation` naming it, and
+        // that record is unreadable while the call is still running — which is
+        // exactly what a timeout is (mc2-6crnj).
+        const endpoint = pickCheapestUntriedEndpoint(
+          await listModelEndpoints(modelId),
+          triedEndpointTags,
+          priceCeiling
+        );
+        if (endpoint) triedEndpointTags.add(endpoint.tag);
+
         const providerRouting: OpenRouterProviderRouting = {
-          ...(ignoredProviderSlugs.size > 0 ? { ignore: [...ignoredProviderSlugs] } : {}),
+          ...(endpoint ? { order: [endpoint.tag], allow_fallbacks: false } : {}),
+          // Only when there is no pin: with one, the endpoints already tried are
+          // excluded by not being chosen, and `ignore` would say the same thing
+          // twice. Without one — an unreachable endpoint list — this is the old
+          // behaviour, unchanged, learning the provider after the fact.
+          ...(!endpoint && ignoredProviderSlugs.size > 0
+            ? { ignore: [...ignoredProviderSlugs] }
+            : {}),
           ...(priceCeiling ? { max_price: priceCeiling } : {}),
         };
+
+        if (endpoint) {
+          logger.debug(
+            {
+              phaseName: options.phaseName,
+              node: options.node,
+              modelId,
+              attempt,
+              endpoint: endpoint.tag,
+              providerName: endpoint.providerName,
+              promptPricePerMillion: endpoint.promptPricePerMillion,
+            },
+            'Career Playbook attempt pinned to one endpoint'
+          );
+        }
 
         // Hoisted so the id survives the throw: on an abort it is the only thing
         // the attempt leaves behind, and it is what identifies both the provider

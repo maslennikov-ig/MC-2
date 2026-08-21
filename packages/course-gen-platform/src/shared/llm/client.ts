@@ -37,6 +37,7 @@ import {
 } from './generation-id-capture';
 import { buildOpenRouterClient } from './openrouter-client';
 import { fetchGenerationFact, resolveProviderSlug } from './openrouter-generation';
+import { listModelEndpoints, pickCheapestUntriedEndpoint } from './openrouter-endpoints';
 import {
   isMandatoryReasoningRejection,
   rememberMandatoryReasoning,
@@ -677,8 +678,30 @@ export class LLMClient {
       );
     }
 
+    // The same rule as the chain's skip list, stated forwards: the endpoints
+    // this call has already spent an attempt on. Nothing outlives the return.
+    const triedEndpointTags = new Set<string>();
+
     const attempt = async (): Promise<LLMResponse> => {
-      applyProviderRouting(requestOptions, { ignore: [...ignoredProviderSlugs] });
+      // Pinning the attempt to one endpoint is what makes its failure
+      // attributable. Asking afterwards does not work for the failure that
+      // matters: `GET /api/v1/generation` cannot be read while the call is still
+      // running, which is what a timeout is (mc2-6crnj).
+      const endpoint = pickCheapestUntriedEndpoint(
+        await listModelEndpoints(model),
+        triedEndpointTags,
+        requestOptions.extra_body?.provider?.max_price
+      );
+      if (endpoint) triedEndpointTags.add(endpoint.tag);
+
+      applyProviderRouting(requestOptions, {
+        // With a pin, the endpoints already tried are excluded by not being
+        // chosen. Without one — an unreachable endpoint list — this is the older
+        // behaviour untouched, learning the provider after the fact.
+        ignore: endpoint ? [] : [...ignoredProviderSlugs],
+        order: endpoint ? [endpoint.tag] : [],
+        ...(endpoint ? { allow_fallbacks: false } : {}),
+      });
       try {
         return await this.executeSingleRequest(requestOptions, timeout, model, inputContentLength);
       } catch (error) {
@@ -696,7 +719,11 @@ export class LLMClient {
           delete requestOptions.extra_body?.provider?.max_price;
           throw error;
         }
-        await this.excludeFailedProvider(error, ignoredProviderSlugs, model);
+        // Only worth asking when nothing was pinned. With a pin we already know
+        // who this was, and the lookup is not free: it polls for a generation
+        // record that a timed-out call has not produced yet, holding the retry
+        // for up to 30s to learn something we would then discard (mc2-6crnj).
+        if (!endpoint) await this.excludeFailedProvider(error, ignoredProviderSlugs, model);
         throw error;
       }
     };
