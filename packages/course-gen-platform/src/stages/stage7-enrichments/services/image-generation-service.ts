@@ -19,16 +19,69 @@ import {
   recordImageCallCost,
   type LlmCostContext,
 } from '@/shared/metrics/llm-cost';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-/** Default model for cover images (21:9 cinematic) - Gemini supports aspect ratio control */
+/**
+ * Fallbacks for the two image phases, used when the database cannot be read.
+ *
+ * These were the only source of truth until 2026-08-22. `llm_model_config` has
+ * carried active `stage_7_card` and `stage_7_cover` rows all along, the admin
+ * screen showed them as editable, and nothing read them — editing there changed
+ * nothing at all. The gap was invisible because the rows happened to name the
+ * same models as these constants, and a configuration that agrees with the code
+ * by coincidence is a defect waiting for the day somebody changes one of them
+ * (mc2-bnm62).
+ *
+ * They stay as a floor rather than being deleted: a database that will not
+ * answer must not stop a course from getting its cover.
+ */
 const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
+
+/**
+ * The model an image phase is configured to use, or its built-in fallback.
+ *
+ * Same shape as `resolveFallbackModel` in the Stage 7 job processor, and for the
+ * same reason: a phase config that cannot be read is a reason to carry on with
+ * the built-in model, never a reason to fail the enrichment.
+ *
+ * Images have no fallback-model path of their own — `fallback_model_id` on these
+ * rows is still read by nobody — so only the primary is honoured here, and the
+ * row's second column remains a promise this code does not keep.
+ */
+async function resolveImageModel(
+  phaseName: 'stage_7_card' | 'stage_7_cover',
+  builtIn: string,
+  courseId?: string
+): Promise<string> {
+  try {
+    const config = await createModelConfigService().getModelForPhase(phaseName, courseId);
+    if (config.modelId && config.modelId !== builtIn) {
+      logger.info(
+        { phaseName, courseId, configuredModel: config.modelId, builtIn },
+        'Image phase is using the model configured in the database rather than the built-in one'
+      );
+    }
+    return config.modelId || builtIn;
+  } catch (error) {
+    logger.warn(
+      {
+        phaseName,
+        courseId,
+        builtIn,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Could not read the configured image model; using the built-in one'
+    );
+    return builtIn;
+  }
+}
 
 /**
  * How much detail a card is worth paying for.
@@ -542,7 +595,7 @@ export async function generateCardImage(
   costContext?: LlmCostContext
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
-    model: CARD_IMAGE_MODEL,
+    model: await resolveImageModel('stage_7_card', CARD_IMAGE_MODEL, costContext?.courseId),
     aspectRatio: '1:1',
     imageSize: '1K',
     costContext,
@@ -563,7 +616,7 @@ export async function generateCoverImage(
   costContext?: LlmCostContext
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
-    model: DEFAULT_IMAGE_MODEL,
+    model: await resolveImageModel('stage_7_cover', DEFAULT_IMAGE_MODEL, costContext?.courseId),
     aspectRatio: '21:9',
     imageSize: '1K',
     costContext,
