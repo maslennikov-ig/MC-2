@@ -78,9 +78,35 @@ every structured call its price (`mc2-258fi`) and, separately, its mandatory-rea
 which also puts them below `invoke` and so covers `stream` and `batch`. Held by
 `tests/unit/shared/llm/structured-output-reaches-invoke.test.ts`.
 
+**A health check that reads a variable has checked nothing.** The NotebookLM bridge decided the
+geo-bypass proxy was fine because `HTTPS_PROXY` was set. On 2026-08-22 the tunnel had been dead long
+enough that nothing had generated since April: no listener on the forwarded port, the upstream host
+refusing SSH outright. Both containers — dev and production — reported `healthy` throughout, because
+Docker's own HEALTHCHECK only wants a 200 from `/health` and a `degraded` body still returns one. A
+dependency check must make the dependency answer. Corollary for anything behind an outbound hop:
+prove the hop, not its configuration, and remember that `docker ps` showing `(healthy)` is a claim
+about a loopback request.
+
+**An unpinned dependency lets the build date choose the version.** `notebooklm-py>=0.1.0` gave
+`:latest` (built 2026-08-10) version 0.8.0 and `:develop` (built 2026-06-04) version 0.6.0, so
+production sat two minors ahead of dev across a release that restructured error handling and removed
+dict-subscript access, and nobody had decided either. A floor is not a range. This bites hardest
+where the library automates somebody else's web interface, because there the upstream can also
+change under a version that did not move.
+
+**The empty path that logs nothing is the one you will meet.** `retrieveLessonContextCore` had five
+ways to return no chunks; four logged and one did not, and the silent one is what a live run hit —
+zero RAG chunks in 143 ms with the document indexed, identified only by which log lines were
+_missing_. When a function has several early returns for the same outcome, the one without a line is
+not cheaper, it is the one that costs an afternoon. Related: a fallback that re-parses with the
+schema that just refused the value does not "use defaults", it throws (`mc2-80o1t`).
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.
+- Production workers take their environment from `/opt/megacampus/.env.<active_color>` — read
+  `active_color` first. `.env.production` is the compose default and is not what runs. A variable
+  that must survive a deploy goes into **both** `.env.green` and `.env.blue`.
 - `AGENTS.md` is rewritten by a `bd` hook, so the primary worktree is rarely clean. Stage explicit
   paths; never `git add -A`.
 - `q12-privileged-launch.sh` and `q12-writer-resume.py` are root-owned and deliberately NOT shipped
