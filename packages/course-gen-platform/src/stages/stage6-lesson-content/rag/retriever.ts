@@ -375,6 +375,46 @@ async function retrieveLessonContextCore(
     specifiedPrimaryDocIds.length > 0 &&
     primaryDocIds?.length === 0
   ) {
+    // The one empty-result path that used to say nothing at all.
+    //
+    // The lesson names documents, the accepted evidence set names documents,
+    // and they do not overlap — so the lesson is written without the user's
+    // sources. Every other early return here logs; this one returned in ~140 ms
+    // leaving no line, no trace row and nothing to tell it apart from a course
+    // that simply has no documents. On 2026-08-22 a dev run hit it with two
+    // chunks sitting indexed in Qdrant, and the branch had to be identified by
+    // eliminating the four that do log (mc2-kznfz).
+    //
+    // It also sits ABOVE the Tier 1 gate, so the shadow cohort that exists to
+    // measure silent RAG loss (mc2-wxun) cannot see this one at all.
+    logger.warn(
+      {
+        courseId,
+        lessonId: lessonSpec.lesson_id,
+        specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
+        allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
+        outcome: 'empty',
+      },
+      '[Lesson RAG] Lesson documents and accepted evidence do not intersect - writing without sources'
+    );
+    try {
+      await logTrace({
+        courseId,
+        lessonId: lessonSpec.lesson_id,
+        stage: 'stage_6',
+        phase: 'rag_retrieval',
+        stepName: 'evidence_scope_empty',
+        inputData: {
+          lessonId: lessonSpec.lesson_id,
+          specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
+          allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
+        },
+        outputData: { chunksFound: 0, reason: 'lesson_documents_outside_accepted_evidence' },
+        durationMs: Date.now() - startTime,
+      });
+    } catch {
+      // Don't fail on trace error
+    }
     return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
   }
   const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
