@@ -234,7 +234,10 @@ production mutation, and schema migrations — the only approved one is `mc2-ufp
 Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`,
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
 
-Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
+Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`. Branches were swept
+on 2026-08-22 (`mc2-3mq9b`): 200 remote and 69 local down to 10 and 10, shas preserved in
+`.codex/deleted-branches-2026-08-22.tsv`, and `/push-dev` now deletes the branch it delivered — so a
+report that names a branch again means something really was left behind.
 
 ## Explicit defers
 
@@ -262,9 +265,7 @@ Next stage id: **`docs/plans/cheaper-verdict-heron.md`** — the paid run that t
 calculated savings into measured ones (`mc2-bxmje`), then the writing-phase comparison it unblocks
 (`mc2-tux1y`, with `mc2-oofx5` riding along). Both inside epic `mc2-4clyr`, now 3 of 6.
 
-Recommended action: run `mc2-bxmje` against that plan, then `mc2-tux1y`; and settle the stranded
-branches with the owner (`mc2-3mq9b` — `codex/token-efficiency-rollout` carries three
-`.codex/*-template.json` files that `run_process_verification.sh` requires and git does not have).
+Recommended action: run `mc2-bxmje` against that plan, then `mc2-tux1y`.
 Use $orchestrator-stage for the epic; single tasks are ordinary local work.
 
 **Correct the epic's headline before planning from it.** Across all 1589 judged lessons rather than
@@ -297,9 +298,9 @@ chars). Paste it into a fresh session. It is on disk and **untracked** — `.git
 `.codex/*` out bar the named few — so look for the file, not a commit; everything it depends on is
 tracked, and it repeats the standing authorization for a reader who has only the prompt.
 
-In short: `mc2-bxmje` against `docs/plans/cheaper-verdict-heron.md`, then `mc2-tux1y`, then the
-stranded branches `mc2-3mq9b`. $orchestrator-stage for the epic; single tasks are ordinary local
-work. **Do not ask — act and report**, inside the standing authorization under Safety boundary.
+In short: `mc2-bxmje` against `docs/plans/cheaper-verdict-heron.md`, then `mc2-tux1y`.
+$orchestrator-stage for the epic; single tasks are ordinary local work. **Do not ask — act and
+report**, inside the standing authorization under Safety boundary.
 
 ## Read first
 
