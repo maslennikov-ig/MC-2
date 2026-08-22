@@ -5,6 +5,7 @@
 
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { FilterCheckResult } from './types';
+import logger from '@/shared/logger';
 
 // ============================================================================
 // LEARNING OBJECTIVE COVERAGE
@@ -169,14 +170,73 @@ const UNICODE_SCRIPTS = {
 } as const;
 
 /**
- * Language to unexpected (foreign) scripts mapping
- * These scripts should NEVER appear in content of given language
+ * The script each supported language is actually written in.
+ *
+ * This replaces a table of *unexpected* scripts keyed by language, which listed
+ * `ru`, `en` and `zh` and was read as `TABLE[lang] || []`. For Spanish — a
+ * language this product claims to support — that empty array meant
+ * `checkLanguageConsistency` examined nothing and passed every time: a Spanish
+ * lesson could be half Chinese and the check would call it clean. Missing
+ * configuration read as "no violations", which is the same shape as the drift
+ * gate that was blind three times (mc2-v6fqp).
+ *
+ * Stating what a language *is* written in rather than what it is not means a
+ * language that is present here is checked, and one that is absent is reported
+ * rather than waved through.
  */
-const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)[]> = {
-  ru: ['CJK', 'ARABIC', 'DEVANAGARI'], // Chinese in Russian is always wrong
-  en: ['CJK', 'CYRILLIC', 'ARABIC', 'DEVANAGARI'], // Non-Latin in English
-  zh: ['CYRILLIC', 'ARABIC', 'DEVANAGARI'], // Non-CJK in Chinese
+const LANGUAGE_NATIVE_SCRIPT: Record<string, keyof typeof UNICODE_SCRIPTS> = {
+  ru: 'CYRILLIC',
+  uk: 'CYRILLIC',
+  en: 'LATIN',
+  es: 'LATIN',
+  fr: 'LATIN',
+  de: 'LATIN',
+  pt: 'LATIN',
+  it: 'LATIN',
+  pl: 'LATIN',
+  tr: 'LATIN',
+  vi: 'LATIN',
+  id: 'LATIN',
+  ms: 'LATIN',
+  zh: 'CJK',
+  ja: 'CJK',
+  ko: 'CJK',
+  ar: 'ARABIC',
+  hi: 'DEVANAGARI',
+  bn: 'DEVANAGARI',
+  th: 'LATIN', // Thai script is not in UNICODE_SCRIPTS; Latin is the safe base
 };
+
+/**
+ * Latin letters are never counted as foreign.
+ *
+ * Every language in this product borrows them — product names, units, code
+ * identifiers in prose, `HTTP`, `API`. The original table encoded this by
+ * omission for `ru` and `zh`; here it is a rule with a reason.
+ */
+const ALWAYS_TOLERATED_SCRIPT: keyof typeof UNICODE_SCRIPTS = 'LATIN';
+
+/**
+ * Which scripts must not appear in prose written in this language.
+ *
+ * An unknown language cannot be checked honestly — we do not know what it looks
+ * like — so it is treated as Latin-script and the caller is told, in
+ * `unconfiguredLanguage`, that the answer is weaker than it looks. Silence was
+ * the previous behaviour and it is what this function exists to stop.
+ */
+function unexpectedScriptsFor(language: string): {
+  scripts: (keyof typeof UNICODE_SCRIPTS)[];
+  unconfiguredLanguage: boolean;
+} {
+  const native = LANGUAGE_NATIVE_SCRIPT[language];
+  const effectiveNative = native ?? ALWAYS_TOLERATED_SCRIPT;
+
+  const scripts = (Object.keys(UNICODE_SCRIPTS) as (keyof typeof UNICODE_SCRIPTS)[]).filter(
+    script => script !== effectiveNative && script !== ALWAYS_TOLERATED_SCRIPT
+  );
+
+  return { scripts, unconfiguredLanguage: native === undefined };
+}
 
 /**
  * Scripts that require ZERO tolerance (any occurrence is a failure)
@@ -221,12 +281,19 @@ export function checkLanguageConsistency(
   foreignCharacters: number;
   foreignSamples: string[];
   scriptsFound: string[];
+  unconfiguredLanguage: boolean;
 } {
   // Extract prose text (exclude code blocks)
   const proseText = extractProseText(content);
 
-  // Get unexpected scripts for this language
-  const unexpectedScriptKeys = LANGUAGE_UNEXPECTED_SCRIPTS[expectedLanguage] || [];
+  const { scripts: unexpectedScriptKeys, unconfiguredLanguage } =
+    unexpectedScriptsFor(expectedLanguage);
+  if (unconfiguredLanguage) {
+    logger.warn(
+      { expectedLanguage, checkedScripts: unexpectedScriptKeys },
+      '[Language check] No native script configured for this language - checking it as Latin-script; add it to LANGUAGE_NATIVE_SCRIPT'
+    );
+  }
 
   let totalForeignCount = 0;
   const allSamples: string[] = [];
@@ -270,6 +337,7 @@ export function checkLanguageConsistency(
     foreignCharacters: number;
     foreignSamples: string[];
     scriptsFound: string[];
+    unconfiguredLanguage: boolean;
   } = {
     passed,
     actual: totalForeignCount,
@@ -277,6 +345,9 @@ export function checkLanguageConsistency(
     foreignCharacters: totalForeignCount,
     foreignSamples: allSamples.slice(0, 5),
     scriptsFound,
+    // A pass on an unconfigured language is weaker evidence than a pass on a
+    // configured one, and whoever reads this result is entitled to know which.
+    unconfiguredLanguage,
   };
 
   if (!passed) {

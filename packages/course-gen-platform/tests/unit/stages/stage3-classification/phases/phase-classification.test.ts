@@ -90,6 +90,9 @@ vi.mock('@/shared/llm/token-estimator', () => ({
   tokenEstimator: {
     estimateTokens: vi.fn(() => 100),
   },
+  // The real one; classification asks it which script a document is in, and a
+  // stub would make these tests agree with themselves rather than with it.
+  detectScriptLanguage: vi.fn((text: string) => (/[Ѐ-ӿ]/u.test(text) ? 'rus' : 'eng')),
 }));
 
 vi.mock('@/stages/stage3-classification/utils/tournament-classification', () => ({

@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import type {
   DocumentEvidenceCard,
   DocumentEvidenceCoverageSummary,
 } from '@megacampus/shared-types';
-import { tokenEstimator } from '@/shared/llm/token-estimator';
+import { tokenEstimator, toTokenRatioLanguage } from '@/shared/llm/token-estimator';
 import type { EvidenceGenerationMetrics, StructuredEvidencePort } from './card-generator';
 import { emptyGenerationMetrics, EvidenceCheckpointError } from './card-generator';
 import type { DocumentSummaryResult } from '../handler-helpers';
@@ -64,7 +65,7 @@ export interface BuildDownstreamEvidenceRepresentationInput {
   runId: string;
   cards: DocumentEvidenceCard[];
   coverage: DocumentEvidenceCoverageSummary;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   modelId: string;
   evidenceVersion: string;
   targetTokens: number;
@@ -107,8 +108,8 @@ function sha256(value: string): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
 }
 
-function estimate(value: string, language: 'ru' | 'en'): number {
-  return tokenEstimator.estimateTokens(value, language === 'ru' ? 'rus' : 'eng');
+function estimate(value: string, language: LanguageCode): number {
+  return tokenEstimator.estimateTokens(value, toTokenRatioLanguage(language));
 }
 
 function sortedUnique(values: string[]): string[] {
@@ -159,7 +160,7 @@ function validateCompleteRepresentation(
   representation: DownstreamEvidenceRepresentation,
   identityHash: string,
   sourceDocumentIds: string[],
-  language: 'ru' | 'en',
+  language: LanguageCode,
   targetTokens: number
 ): DownstreamEvidenceRepresentation {
   const outcomeIds = representation.sourceOutcomes.map(outcome => outcome.documentId);

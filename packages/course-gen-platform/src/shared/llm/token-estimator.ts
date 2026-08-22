@@ -16,6 +16,7 @@
 
 import { franc } from 'franc-min';
 import logger from '../logger';
+import { normalizeLanguageCode } from '../workspace-utils';
 
 /**
  * Language-specific character-to-token ratios
@@ -39,6 +40,94 @@ const LANGUAGE_RATIOS: Record<string, number> = {
   ara: 3.0, // Arabic (RTL script)
   default: 4.0, // Fallback for unknown languages
 };
+
+/**
+ * ISO 639-1 (what a course is labelled with) to ISO 639-3 (what the ratios above
+ * are keyed by).
+ *
+ * Every entry here has a ratio; a language with no ratio of its own is left out
+ * so it lands on `default` honestly rather than through a wrong neighbour.
+ */
+const ISO_639_1_TO_639_3: Record<string, string> = {
+  ru: 'rus',
+  en: 'eng',
+  de: 'deu',
+  fr: 'fra',
+  es: 'spa',
+  pt: 'por',
+  it: 'ita',
+  pl: 'pol',
+  uk: 'ukr',
+  zh: 'cmn',
+  ja: 'jpn',
+  ko: 'kor',
+  ar: 'ara',
+};
+
+/**
+ * The ISO 639-3 code the ratio table is keyed by, from whatever a caller has.
+ *
+ * This exists because three call sites had each written
+ * `language === 'ru' ? 'rus' : 'eng'`, which is correct for exactly two of the
+ * nineteen languages this product claims to support. For Spanish it is wrong by
+ * 7% and nobody would notice; for Chinese it says 4.0 where the table right
+ * above says 2.0, so every budget computed from it is **half** the text's real
+ * cost, and the consequence is truncation blamed on the model (mc2-v6fqp).
+ *
+ * Accepts an ISO 639-3 code unchanged, so a caller that already has one (the
+ * `franc` path, the Cyrillic sniffers) can route through here too.
+ */
+export function toTokenRatioLanguage(language: string | null | undefined): string {
+  if (!language) return 'default';
+
+  const trimmed = language.trim().toLowerCase();
+  if (!trimmed) return 'default';
+
+  // Already a key of the ratio table — including 'und', which franc returns for
+  // text it cannot place and which correctly falls through to the default.
+  if (trimmed in LANGUAGE_RATIOS) return trimmed;
+
+  const mapped = ISO_639_1_TO_639_3[normalizeLanguageCode(trimmed, 'en')];
+  return mapped ?? 'default';
+}
+
+/**
+ * Scripts that settle the ratio on their own, in the order they are tested.
+ *
+ * Two places in this codebase sniffed the script by hand and both asked exactly
+ * one question — "is there Cyrillic?" — answering `eng` to everything else. For
+ * a Chinese document that is 4.0 chars per token where the table above says 2.0,
+ * so the estimate is half the real cost and the budget built on it is half the
+ * size it should be. Han is tested after Hangul and Kana because Japanese and
+ * Korean text both contain Han characters and neither is Chinese.
+ */
+const SCRIPT_TO_LANGUAGE: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[Ѐ-ӿ]/u, 'rus'], // Cyrillic
+  [/[가-힯ᄀ-ᇿ]/u, 'kor'], // Hangul
+  [/[぀-ゟ゠-ヿ]/u, 'jpn'], // Hiragana, Katakana
+  [/[一-鿿㐀-䶿]/u, 'cmn'], // Han
+  [/[؀-ۿݐ-ݿ]/u, 'ara'], // Arabic
+];
+
+/** How much of a document is enough to tell what it is written in. */
+const SCRIPT_SAMPLE_CHARACTERS = 1000;
+
+/**
+ * The ratio-table language a text's script implies.
+ *
+ * A crude test on purpose — it distinguishes writing systems, not languages, and
+ * cannot tell Ukrainian from Russian or Spanish from English. That is the right
+ * resolution for choosing a chars-per-token ratio, where the large errors are
+ * between scripts and the small ones within them. Falls back to `eng`, which is
+ * also the `default` ratio.
+ */
+export function detectScriptLanguage(text: string): string {
+  const sample = text.slice(0, SCRIPT_SAMPLE_CHARACTERS);
+  for (const [pattern, language] of SCRIPT_TO_LANGUAGE) {
+    if (pattern.test(sample)) return language;
+  }
+  return 'eng';
+}
 
 /**
  * Minimum text length for reliable language detection

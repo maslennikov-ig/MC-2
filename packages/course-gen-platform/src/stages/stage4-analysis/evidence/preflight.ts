@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import {
   DocumentEvidenceCardsSchema,
   DocumentEvidenceCoverageSummarySchema,
@@ -56,7 +57,7 @@ export interface DocumentEvidencePreflightInput extends EvidenceBudgetOptions {
   courseId: string;
   organizationId: string;
   topic: string;
-  language?: 'ru' | 'en';
+  language?: LanguageCode;
   evidenceVersion: string;
   modelId?: string;
   sources: DocumentEvidencePreflightSource[];

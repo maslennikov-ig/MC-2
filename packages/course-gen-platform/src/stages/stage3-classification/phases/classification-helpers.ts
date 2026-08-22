@@ -10,6 +10,7 @@ import { createCostRecordingModel } from '../../../shared/llm/langchain-models';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { DocumentPriority } from '@megacampus/shared-types';
+import { detectScriptLanguage } from '@/shared/llm/token-estimator';
 import { tokenEstimator } from '../../../shared/llm/token-estimator';
 import { createPromptService } from '../../../shared/prompts/prompt-service';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
@@ -477,10 +478,13 @@ export function extractJsonFromResponse(response: string): string {
 }
 
 /**
- * Detect document language using simple heuristic
+ * Detect document language from its script.
+ *
+ * Was a Cyrillic test with `eng` for everything else, which put Chinese,
+ * Japanese, Korean and Arabic documents on the English chars-per-token ratio \u2014
+ * for Chinese that is 4.0 against a real 2.0 (mc2-v6fqp). The shared detector
+ * asks the same question about five scripts instead of one.
  */
 export function detectLanguage(text: string): string {
-  const cyrillicPattern = /[\u0400-\u04FF]/;
-  const hasCyrillic = cyrillicPattern.test(text.slice(0, 1000));
-  return hasCyrillic ? 'rus' : 'eng';
+  return detectScriptLanguage(text);
 }

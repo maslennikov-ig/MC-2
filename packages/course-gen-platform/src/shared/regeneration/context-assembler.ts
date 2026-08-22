@@ -14,6 +14,7 @@ import type { ContextTier, TIER_TOKEN_BUDGETS } from '@megacampus/shared-types/r
 import type { CourseStructure, Lesson } from '@megacampus/shared-types/generation-result';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import logger from '@/shared/logger';
+import { tokenEstimator, detectScriptLanguage } from '@/shared/llm/token-estimator';
 
 // ============================================================================
 // Interfaces
@@ -72,38 +73,25 @@ const TIER_BUDGETS: typeof TIER_TOKEN_BUDGETS = {
 // ============================================================================
 
 /**
- * Character→Token ratios by language
- * Based on OpenAI tokenizer benchmarks
- */
-const TOKEN_RATIOS: Record<string, number> = {
-  eng: 0.25, // English: 4 chars ≈ 1 token
-  rus: 0.35, // Russian: 3 chars ≈ 1 token
-  default: 0.3,
-};
-
-/**
- * Detect language from text (simple heuristic)
- */
-function detectLanguage(text: string): 'eng' | 'rus' {
-  // Simple heuristic: check for Cyrillic characters
-  const cyrillicRegex = /[\u0400-\u04FF]/;
-  return cyrillicRegex.test(text) ? 'rus' : 'eng';
-}
-
-/**
- * Estimate tokens from text using character count heuristic
+ * Estimate tokens from text.
  *
- * Based on research:
- * - English: 1 token ≈ 4 characters (0.25 ratio)
- * - Russian: 1 token ≈ 2-3 characters (0.35 ratio)
+ * This used to carry a private ratio table (`eng: 0.25, rus: 0.35`) and a
+ * private Cyrillic sniffer - the fourth hand-rolled copy of one decision, and
+ * the one written in inverted units. It knew two languages, so a Chinese or
+ * Japanese regeneration context was budgeted at the English ratio: 4.0
+ * characters per token against a real 2.0, which is half the tokens the text
+ * actually costs (mc2-v6fqp).
+ *
+ * Both halves now come from `shared/llm/token-estimator`, where the researched
+ * table lives. One consequence worth saying out loud: its Russian ratio is 3.2
+ * characters per token where the deleted table said ~2.86, so Russian estimates
+ * here fall by about 10%. That is a validated number replacing a local one, not
+ * a new guess.
  */
 export function estimateTokens(text: string): number {
   if (!text || text.length === 0) return 0;
 
-  const language = detectLanguage(text);
-  const ratio = TOKEN_RATIOS[language] || TOKEN_RATIOS.default;
-
-  return Math.ceil(text.length * ratio);
+  return tokenEstimator.estimateTokens(text, detectScriptLanguage(text));
 }
 
 // ============================================================================

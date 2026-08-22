@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
-import { tokenEstimator } from '@/shared/llm/token-estimator';
+import { tokenEstimator, toTokenRatioLanguage } from '@/shared/llm/token-estimator';
 import { logger } from '@/shared/logger';
 import type { EvidenceDocumentAllocation } from './budget';
 import type { DocumentEvidencePreflightSource } from './preflight';
@@ -61,13 +62,13 @@ export interface StructuredEvidencePort {
   extractMap(input: {
     unit: EvidenceSourceUnit;
     topic: string;
-    language: 'ru' | 'en';
+    language: LanguageCode;
     maxOutputTokens: number;
   }): Promise<{ value: ValidatedEvidenceUnit; usage: PortUsage }>;
   reduceSummary(input: {
     units: Array<{ unitId: string; summary: string }>;
     topic: string;
-    language: 'ru' | 'en';
+    language: LanguageCode;
     level: number;
     maxOutputTokens: number;
   }): Promise<{ value: ValidatedSummaryReduction; usage: PortUsage }>;
@@ -96,7 +97,7 @@ export interface EvidenceExtractionPort {
   extract(input: {
     summary: string;
     topic: string;
-    language: 'ru' | 'en';
+    language: LanguageCode;
     documentId: string;
     documentName: string;
     sourceVersionHash: string;
@@ -134,7 +135,7 @@ export interface GenerateEvidenceCardInput {
   processingMode: DocumentEvidenceCard['processing_mode'];
   reusableSummary?: string;
   topic?: string;
-  language?: 'ru' | 'en';
+  language?: LanguageCode;
   maxBatchTokens?: number;
   maxRetries?: number;
   structuredPort?: StructuredEvidencePort;
@@ -174,8 +175,8 @@ export const emptyGenerationMetrics = (): EvidenceGenerationMetrics => ({
   reduceLevels: 0,
 });
 
-function estimate(text: string, language: 'ru' | 'en'): number {
-  return tokenEstimator.estimateTokens(text, language === 'ru' ? 'rus' : 'eng');
+function estimate(text: string, language: LanguageCode): number {
+  return tokenEstimator.estimateTokens(text, toTokenRatioLanguage(language));
 }
 
 function sha256(value: string): string {
@@ -196,14 +197,14 @@ function canonicalStatement(statement: string): string {
 export function splitEvidenceText(
   text: string,
   maxTokens: number,
-  language: 'ru' | 'en'
+  language: LanguageCode
 ): string[] {
   if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
     throw new Error('Evidence chunk token limit must be a positive integer');
   }
   const chunks: string[] = [];
   let start = 0;
-  const ratio = Math.max(1, tokenEstimator.getLanguageRatio(language));
+  const ratio = Math.max(1, tokenEstimator.getLanguageRatio(toTokenRatioLanguage(language)));
   while (start < text.length) {
     let low = start + 1;
     let high = Math.min(text.length, start + Math.ceil(maxTokens * ratio * 1.1));
@@ -224,7 +225,7 @@ export function splitEvidenceText(
 function createSourceUnits(
   source: DocumentEvidencePreflightSource,
   maxTokens: number,
-  language: 'ru' | 'en'
+  language: LanguageCode
 ): EvidenceSourceUnit[] {
   return splitEvidenceText(source.fullText ?? '', maxTokens, language).map((text, index) => {
     const inputHash = sha256(text);
@@ -530,7 +531,7 @@ function validateEvidenceUnit(unit: EvidenceSourceUnit, value: ValidatedEvidence
 function groupsForReduction(
   units: Array<{ unitId: string; summary: string }>,
   maxTokens: number,
-  language: 'ru' | 'en'
+  language: LanguageCode
 ) {
   const groups: Array<Array<{ unitId: string; summary: string }>> = [];
   let current: Array<{ unitId: string; summary: string }> = [];
@@ -588,7 +589,7 @@ function aggregateUnits(source: DocumentEvidencePreflightSource, units: Validate
 export async function hierarchicalSummarizeEvidence(input: {
   source: DocumentEvidencePreflightSource;
   topic: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   maxBatchTokens: number;
   targetTokens: number;
   maxRetries: number;
