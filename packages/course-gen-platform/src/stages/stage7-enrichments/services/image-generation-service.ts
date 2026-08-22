@@ -8,7 +8,11 @@
 
 import sharp from 'sharp';
 import { logger } from '@/shared/logger';
-import { createOpenRouterClient } from '@/shared/llm/openrouter-client';
+import {
+  createOpenRouterClient,
+  createOpenRouterImage,
+  type OpenRouterImageResponse,
+} from '@/shared/llm/openrouter-client';
 import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
   calculateImageCostUsd,
@@ -26,6 +30,25 @@ const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
 
+/**
+ * How much detail a card is worth paying for.
+ *
+ * Measured 2026-08-22 on `openai/gpt-5-image-mini`, one prompt, 1024x1024,
+ * billed by the provider rather than estimated:
+ *
+ * | quality | image tokens | charged   |
+ * |---------|--------------|-----------|
+ * | low     |          272 | $0.002341 |
+ * | medium  |         1056 | $0.008613 |
+ * | high    |         4160 | $0.033445 |
+ *
+ * `low` is not a cheaper picture, it is a worse one — it misspelled the word it
+ * rendered. `high` is visibly richer than `medium` at four times the price, and
+ * the difference does not survive being displayed as a card. So `medium`, and
+ * the knob is here for whoever disagrees.
+ */
+const DEFAULT_CARD_QUALITY: ImageQuality = 'medium';
+
 const DEFAULT_ASPECT_RATIO = '21:9';
 const DEFAULT_IMAGE_SIZE = '1K'; // 1536x672 for 21:9 cinematic - optimal for web covers
 const API_TIMEOUT_MS = 300_000; // 5 min — image models can be slow (queues, cold starts, large outputs)
@@ -42,6 +65,26 @@ const DEFAULT_NEGATIVE_PROMPT = 'Do not include any watermarks, logos, or signat
  */
 function supportsImageConfig(model: string): boolean {
   return model.startsWith('google/');
+}
+
+/**
+ * Whether this model is driven through the dedicated Images API.
+ *
+ * The split is not a preference, it is what the two endpoints offer. Chat
+ * completions takes `image_config` — `aspect_ratio` and `image_size`, Gemini
+ * only — and has no way to ask for less detail. `POST /api/v1/images` takes
+ * `quality`, and `GET /api/v1/images/models` lists it for every `openai/*` image
+ * model and for none of the Google ones (read live 2026-08-22).
+ *
+ * OpenRouter also warns that the GPT-5 image models "generate images through an
+ * LLM, so they don't provide access to the full set of supported parameters and
+ * may incur extra inference cost" — and the bill agrees. The same card through
+ * chat completions carried 3343-4472 prompt tokens and 5058-5723 completion
+ * tokens; through this endpoint, 66 and 4160. The difference is a language model
+ * we were paying to hold the picture.
+ */
+function usesImagesApi(model: string): boolean {
+  return model.startsWith('openai/');
 }
 
 /**
@@ -89,6 +132,9 @@ function getImageDimensions(
 // TYPES
 // ============================================================================
 
+/** What the Images API accepts for `quality`. */
+export type ImageQuality = 'auto' | 'low' | 'medium' | 'high';
+
 export interface ImageGenerationOptions {
   /**
    * Where to charge the picture. Without it the image is generated and paid
@@ -101,6 +147,11 @@ export interface ImageGenerationOptions {
   aspectRatio?: string;
   /** Image size/resolution: '1K', '2K' or '4K' (default: '1K') */
   imageSize?: '1K' | '2K' | '4K';
+  /**
+   * How much detail to pay for. Only reaches models on the Images API; a Gemini
+   * cover through chat completions has no such control and ignores it.
+   */
+  quality?: ImageQuality;
   /** Negative prompt to avoid unwanted elements (default: text-related terms) */
   negativePrompt?: string;
   /** Whether to skip negative prompt (default: false) */
@@ -163,6 +214,8 @@ export async function generateImage(
   const imageSize = options.imageSize ?? DEFAULT_IMAGE_SIZE;
   const negativePrompt = options.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT;
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
+  const viaImagesApi = usesImagesApi(model);
+  const quality = viaImagesApi ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
 
   // Append negative prompt to strengthen text avoidance
   // Gemini works best with natural language instructions
@@ -174,16 +227,12 @@ export async function generateImage(
       promptLength: prompt.length,
       aspectRatio,
       imageSize,
+      quality,
+      endpoint: viaImagesApi ? 'images' : 'chat.completions',
       hasNegativePrompt: !skipNegativePrompt,
     },
     'Starting image generation'
   );
-
-  // The shared factory, not a local `new OpenAI`: it is what wraps the transport
-  // so `x-generation-id` reaches `withGenerationIdCapture`. Without it this call
-  // could never learn what it cost, and its price stayed an invented constant
-  // for as long as the service existed (mc2-l17v5).
-  const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
 
   const startTime = Date.now();
 
@@ -199,27 +248,6 @@ export async function generateImage(
   let slotRef: GenerationIdSlot | undefined;
 
   try {
-    // Build request options - only include image_config for models that support it
-    // GPT models ignore image_config and always generate 1024x1024
-    const requestOptions: Record<string, unknown> = {
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: fullPrompt,
-        },
-      ],
-      modalities: ['text', 'image'],
-    };
-
-    // Only add image_config for Gemini models (OpenRouter limitation)
-    if (supportsImageConfig(model)) {
-      requestOptions.image_config = {
-        aspect_ratio: aspectRatio,
-        image_size: imageSize,
-      };
-    }
-
     // The capture has to wrap the call, not the parsed result: the slot is
     // filled from the response headers via `AsyncLocalStorage`, so reading it
     // outside this scope reads nothing.
@@ -229,6 +257,43 @@ export async function generateImage(
       // this call prices itself with `recordImageCallCost` below rather than
       // through either LLM wrapper — and then replaces that estimate with the
       // provider's own figure.
+      if (viaImagesApi) {
+        const image = await createOpenRouterImage({
+          model,
+          prompt: fullPrompt,
+          ...(quality ? { quality } : {}),
+          aspectRatio,
+          signal: abortController.signal,
+        });
+        return { response: image, generationId: slot.generationId };
+      }
+
+      // Build request options - only include image_config for models that support it
+      const requestOptions: Record<string, unknown> = {
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: fullPrompt,
+          },
+        ],
+        modalities: ['text', 'image'],
+      };
+
+      // Only add image_config for Gemini models (OpenRouter limitation)
+      if (supportsImageConfig(model)) {
+        requestOptions.image_config = {
+          aspect_ratio: aspectRatio,
+          image_size: imageSize,
+        };
+      }
+
+      // The shared factory, not a local `new OpenAI`: it is what wraps the
+      // transport so `x-generation-id` reaches `withGenerationIdCapture`.
+      // Without it this call could never learn what it cost, and its price
+      // stayed an invented constant for as long as the service existed
+      // (mc2-l17v5).
+      const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
       // @ts-expect-error - OpenRouter extensions not in OpenAI types
       const completion = await client.chat.completions.create(requestOptions, {
         signal: abortController.signal,
@@ -240,17 +305,27 @@ export async function generateImage(
 
     const durationMs = Date.now() - startTime;
 
-    // Extract image from response
-    // OpenRouter returns images as base64 data URLs in message.images array
-    const message = response.choices[0]?.message;
-
-    // Check for images array (OpenRouter format)
+    // Extract image from response.
+    //
+    // Two endpoints, two shapes. `/images` answers with `data[0].b64_json`;
+    // chat completions puts base64 data URLs in `message.images`. Both are
+    // funnelled into the one `images` array below so the format handling that
+    // follows — hard-won, four variants deep — stays in one place.
     interface OpenRouterMessage {
       images?: unknown[];
       content?: string | null;
     }
-    const messageWithImages = message as OpenRouterMessage | undefined;
-    const images = messageWithImages?.images;
+    let images: unknown[] | undefined;
+    let messageWithImages: OpenRouterMessage | undefined;
+
+    if (viaImagesApi) {
+      images = (response as OpenRouterImageResponse).data;
+    } else {
+      const message = (response as { choices?: Array<{ message?: unknown }> }).choices?.[0]
+        ?.message;
+      messageWithImages = message as OpenRouterMessage | undefined;
+      images = messageWithImages?.images;
+    }
 
     // Log the actual response structure for debugging
     logger.info(
@@ -330,10 +405,15 @@ export async function generateImage(
     // The output tokens of an image call are image tokens; the catalogue prices
     // them at the model's `image_output` rate. This is a placeholder for the ten
     // seconds until the provider's own charge lands on the trace row.
+    // Both endpoints report usage the same way; on `/images` the completion
+    // tokens are the image tokens `quality` decides the number of.
+    const reportedUsage = (
+      response as { usage?: { prompt_tokens?: number; completion_tokens?: number } }
+    ).usage;
     const usage = {
       model,
-      inputTokens: response.usage?.prompt_tokens,
-      outputTokens: response.usage?.completion_tokens,
+      inputTokens: reportedUsage?.prompt_tokens,
+      outputTokens: reportedUsage?.completion_tokens,
       ...(generationId ? { generationId } : {}),
     };
     const costUsd = calculateImageCostUsd(usage);

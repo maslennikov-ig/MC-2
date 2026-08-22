@@ -83,3 +83,80 @@ export async function createOpenRouterClient(
   }
   return buildOpenRouterClient(apiKey, options);
 }
+
+/** What `POST /api/v1/images` is asked for. */
+export interface OpenRouterImageRequest {
+  model: string;
+  prompt: string;
+  /**
+   * `auto | low | medium | high`, and the whole reason this entry point exists.
+   *
+   * Measured on `openai/gpt-5-image-mini`, 1024x1024, one prompt: low 272 image
+   * tokens for $0.002341, medium 1056 for $0.008613, high 4160 for $0.033445.
+   * Chat completions has no equivalent — `image_config` carries `aspect_ratio`
+   * and `image_size` and is Gemini-only — so every card was billed at whatever
+   * `auto` chose (mc2-xbqz8).
+   */
+  quality?: 'auto' | 'low' | 'medium' | 'high';
+  aspectRatio?: string;
+  signal?: AbortSignal;
+}
+
+/** The part of the response this repository reads. */
+export interface OpenRouterImageResponse {
+  data?: Array<{ b64_json?: string; url?: string }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    cost?: number;
+  };
+}
+
+/**
+ * Generate an image through OpenRouter's dedicated Images API.
+ *
+ * Here rather than in the image service because this module owns the base URL
+ * and the instrumented `fetch`, and the guard test says so. The same wrapper is
+ * used, so `x-generation-id` lands in the `withGenerationIdCapture` slot exactly
+ * as it does for a chat call — which is what lets an image settle against
+ * `GET /api/v1/generation` instead of keeping an estimate.
+ *
+ * A raw `fetch` and not the OpenAI SDK: `/images` is OpenRouter's own endpoint,
+ * not an OpenAI-compatible one, and `client.images.generate` would post to
+ * `/images/generations` with a different body.
+ */
+export async function createOpenRouterImage(
+  request: OpenRouterImageRequest
+): Promise<OpenRouterImageResponse> {
+  const apiKey = await getOpenRouterApiKey();
+  if (!apiKey) {
+    throw new Error(
+      'OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.'
+    );
+  }
+
+  const instrumentedFetch = instrumentFetchWithGenerationId();
+  const response = await instrumentedFetch(`${OPENROUTER_BASE_URL}/images`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.APP_URL || 'https://ai.megacampus.ru',
+      'X-Title': 'MegaCampus Course Generator',
+    },
+    body: JSON.stringify({
+      model: request.model,
+      prompt: request.prompt,
+      ...(request.quality ? { quality: request.quality } : {}),
+      ...(request.aspectRatio ? { aspect_ratio: request.aspectRatio } : {}),
+    }),
+    ...(request.signal ? { signal: request.signal } : {}),
+  });
+
+  if (!response.ok) {
+    const said = await response.text().catch(() => '');
+    throw new Error(`OpenRouter images ${response.status}: ${said.slice(0, 400)}`);
+  }
+
+  return (await response.json()) as OpenRouterImageResponse;
+}

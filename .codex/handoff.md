@@ -344,10 +344,41 @@ Measured token shape of one judge pass, from the 2026-08-22 run: 5144 in / 764 o
 that is $0.00729 on glm-5.2 (billed $0.01046, served above list), $0.00246 on minimax, $0.00195 on
 luna, $0.00055 on deepseek.
 
-What that run says about where the money is overall: of $0.202480, the two card images are $0.093685
+What that run says about where the money is overall: of $0.202480, the two card images were $0.093685
 — **46%** — against $0.052570 for all of Stage 6 and $0.004523 for Stages 4 and 5 together. On a
-small course an image costs more than the whole text pipeline. Stage 6 remains the target on a real
-course; the images are worth a separate look and are **not** in the epic.
+small course an image cost more than the whole text pipeline.
+
+**That one is fixed** (`mc2-xbqz8`). A card was going through `POST /chat/completions` with
+`modalities:['text','image']`, where the only control is `image_config` — `aspect_ratio` and
+`image_size`, Gemini-only — and there is no way to ask for less detail, so every card was billed at
+whatever `auto` chose. `quality` lives on the dedicated `POST /api/v1/images`, and
+`GET /api/v1/images/models` lists it for every `openai/*` image model and no `google/*` one.
+Measured on one prompt at 1024×1024, billed by the provider:
+
+| quality | image tokens | charged   |
+| ------- | ------------ | --------- |
+| low     | 272          | $0.002341 |
+| medium  | 1056         | $0.008613 |
+| high    | 4160         | $0.033445 |
+
+Cards now ask for **medium**. `low` is not a cheaper picture but a worse one — it misspelled the word
+it drew; `high` is richer than `medium` and the difference does not survive being shown as a card.
+Two savings, not one: even `high` through `/images` ($0.0334) beats the old path, because the GPT-5
+image models "generate images through an LLM" and the same card carried 3343–4472 prompt and
+5058–5723 completion tokens on chat against 66 and 4160 here. That difference was a language model we
+paid to hold the picture.
+
+**Covers are deliberately untouched.** `google/gemini-2.5-flash-image` at 21:9 stays on chat
+completions: the path is manual, a person triggers it when they want one (owner, 2026-08-22), and
+Gemini has no `resolution` on `/images`, so moving it would cost `image_size` and buy nothing.
+
+`createOpenRouterImage` lives in `shared/llm/openrouter-client.ts` with the base URL and the
+instrumented `fetch`, so an image still deposits its `x-generation-id` and still settles against the
+provider. Open alongside: `mc2-bnm62` — the `stage_7_card` / `stage_7_cover` rows in
+`llm_model_config` are read by nothing; the models come from constants and the values merely happen
+to agree.
+
+Stage 6 remains the target on a real course; the rest of the image work is **not** in the epic.
 
 **Three owner decisions of 2026-08-20/21 bind the routing work** and must not be revisited without a
 new decision: a provider that fails is ignored only inside the current chain of attempts, never in a

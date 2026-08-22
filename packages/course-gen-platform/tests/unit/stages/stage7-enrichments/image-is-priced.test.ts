@@ -49,15 +49,46 @@ const LESSON_ID = '0f2f6b3f-6f9a-4a52-9a24-2b1a4a9b8f10';
 const ONE_PIXEL =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+/**
+ * The card goes through `POST /api/v1/images`, which is a plain `fetch` rather
+ * than the OpenAI SDK, because that is the only endpoint carrying `quality` —
+ * the parameter that took a card from $0.045 to $0.009 (mc2-xbqz8). The cover
+ * stays on chat completions and keeps the SDK mock above.
+ */
+function stubImagesApi(
+  body: Record<string, unknown>,
+  init: { status?: number; generationId?: string } = {}
+): ReturnType<typeof vi.fn> {
+  const calls = vi.fn(
+    async () =>
+      new Response(JSON.stringify(body), {
+        status: init.status ?? 200,
+        headers: {
+          'content-type': 'application/json',
+          ...(init.generationId ? { 'x-generation-id': init.generationId } : {}),
+        },
+      })
+  );
+  vi.stubGlobal('fetch', calls);
+  return calls;
+}
+
+/** What `/images` answers with, plus the usage the estimate is built from. */
+const IMAGE_RESPONSE = {
+  data: [{ b64_json: ONE_PIXEL }],
+  // An image call's completion tokens are image tokens, and they are what the
+  // estimate is built from. Before 2026-08-21 nothing read them: the price came
+  // from a private table inside the service, which had drifted to 6.4x low
+  // (mc2-5mhlb).
+  usage: { prompt_tokens: 420, completion_tokens: 5_000 },
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+  stubImagesApi(IMAGE_RESPONSE);
   createCompletionMock.mockResolvedValue({
     choices: [{ message: { images: [`data:image/png;base64,${ONE_PIXEL}`] } }],
-    // An image call's completion tokens are image tokens, and they are what the
-    // estimate is built from. Before 2026-08-21 nothing read them: the price came
-    // from a private table inside the service, which had drifted to 6.4x low
-    // (mc2-5mhlb).
     usage: { prompt_tokens: 420, completion_tokens: 5_000 },
   });
 });
@@ -116,10 +147,40 @@ describe('Stage 7 image generation', () => {
     expect(result.costUsd).toBeGreaterThan(0.007);
   });
 
-  it('leaves the row unpriced when the response reported no tokens', async () => {
-    createCompletionMock.mockResolvedValue({
-      choices: [{ message: { images: [`data:image/png;base64,${ONE_PIXEL}`] } }],
+  it('asks for the quality it decided to pay for, and says which picture it wants', async () => {
+    // The whole saving is one field. If it stops being sent the bill goes back
+    // to whatever `auto` picks, which measured 4160 image tokens against 1056.
+    const calls = stubImagesApi(IMAGE_RESPONSE);
+
+    await generateCardImage('a card', {
+      courseId: COURSE_ID,
+      stage: 'stage_7',
+      phase: 'stage_7_card',
     });
+
+    const [url, init] = calls.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://openrouter.ai/api/v1/images');
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      model: 'openai/gpt-5-image-mini',
+      quality: 'medium',
+      aspect_ratio: '1:1',
+    });
+  });
+
+  it('sends no quality on the cover, which has no such control', async () => {
+    await generateCoverImage('a cover', {
+      courseId: COURSE_ID,
+      stage: 'stage_7',
+      phase: 'stage_7_cover',
+    });
+
+    const [, request] = createCompletionMock.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect(request).not.toHaveProperty('quality');
+    expect(request).toMatchObject({ modalities: ['text', 'image'] });
+  });
+
+  it('leaves the row unpriced when the response reported no tokens', async () => {
+    stubImagesApi({ data: [{ b64_json: ONE_PIXEL }] });
 
     const result = await generateCardImage('a card', {
       courseId: COURSE_ID,
@@ -140,18 +201,9 @@ describe('Stage 7 image generation', () => {
     // and then the call failed. Before this, the money existed and the row did
     // not (mc2-ietzn).
     const GENERATION_ID = 'gen-1787317000-AbortedCard';
-    // Stubbed before the client is built: the wrapper closes over the global
-    // `fetch` it finds at construction time, so a stub installed later would
-    // send a real request.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('{}', { headers: { 'x-generation-id': GENERATION_ID } }))
-    );
-    createCompletionMock.mockImplementation(
-      async (options: { fetch?: typeof globalThis.fetch }) => {
-        await options.fetch!('https://openrouter.ai/api/v1/chat/completions');
-        throw new Error('connection reset while reading the image');
-      }
+    stubImagesApi(
+      { error: { message: 'connection reset while reading the image' } },
+      { status: 500, generationId: GENERATION_ID }
     );
 
     await expect(
@@ -179,7 +231,12 @@ describe('Stage 7 image generation', () => {
   it('records nothing when the call never reached the provider', async () => {
     // No generation id means no headers means no work started: writing a row
     // here would be inventing spend.
-    createCompletionMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('getaddrinfo ENOTFOUND');
+      })
+    );
 
     await expect(
       generateCardImage('a card', {
