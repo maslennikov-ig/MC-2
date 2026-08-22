@@ -22,4 +22,3 @@ export function computePayloadHash(value: { hashes: { payloadHash?: string } }):
   const { payloadHash: _omitted, ...hashes } = value.hashes;
   return sha256(canonicalJson({ ...(value as Record<string, unknown>), hashes }));
 }
-

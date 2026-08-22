@@ -13,4 +13,3 @@ export function createUploadStorageReader(uploadRoot: string, readFileBytes: Rea
     return readFileBytes(candidate);
   };
 }
-

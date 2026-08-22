@@ -48,4 +48,3 @@ export interface KnowledgeSyncPackage {
   hashes: { payloadHash: string; contentHash: string };
   metadata?: Record<string, JsonValue>;
 }
-

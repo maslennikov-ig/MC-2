@@ -34,4 +34,3 @@ export function createFetchRequest(fetchImpl: typeof fetch = fetch): DeliveryCon
     }
   };
 }
-

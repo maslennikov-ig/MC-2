@@ -31,4 +31,3 @@ export async function runKnowledgeSyncDeliveryBatch(options: { batchSize?: numbe
 export async function runKnowledgeSyncReconciler(options: { apply?: boolean } = {}) {
   return reconcileCompletedKnowledgeObjects(createSupabaseReconcileRepository(), options);
 }
-

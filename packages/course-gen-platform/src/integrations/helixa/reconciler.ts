@@ -10,4 +10,3 @@ export async function reconcileCompletedKnowledgeObjects(repository: ReconcileRe
   if (options.apply !== true) return { dryRun: true, discovered: intents.length, inserted: 0, intents };
   return { dryRun: false, discovered: intents.length, inserted: await repository.insertMissing(intents), intents };
 }
-
