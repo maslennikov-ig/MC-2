@@ -69,11 +69,21 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<ModelEndpoint[]>>();
+/**
+ * `~alias` → the snapshot it serves, for the life of the process.
+ *
+ * Not time-bounded like the endpoint cache: the endpoints of a model change with
+ * its providers, and an alias moves when its family gets a new member. A worker
+ * restarts often enough, and a move that a restart picks up is a move that gets
+ * logged.
+ */
+const aliasTargets = new Map<string, string>();
 
-/** Test seam: forget every fetched list. */
+/** Test seam: forget every fetched list, and every alias resolved from one. */
 export function forgetModelEndpoints(): void {
   cache.clear();
   inFlight.clear();
+  aliasTargets.clear();
 }
 
 function readNumber(source: Record<string, unknown>, key: string): number | null {
@@ -109,6 +119,52 @@ function parseEndpoint(raw: unknown): ModelEndpoint | null {
   };
 }
 
+/**
+ * What a `~…-latest` alias points at right now.
+ *
+ * `/models/{alias}/endpoints` answers **200 with an empty list** — measured
+ * 2026-08-22: 0 for `~deepseek/deepseek-v4-flash-latest`, 30 for
+ * `deepseek/deepseek-v4-flash-0731`, 17 for the undated slug. An empty list is
+ * indistinguishable from "could not find out", so routing on an alias silently
+ * turns off the per-attempt endpoint pin — the thing that on 2026-08-22 moved
+ * two hung 238s calls onto a working provider instead of back onto the same one.
+ *
+ * OpenRouter names the target itself: the alias's `/models` entry carries
+ * `alias_target.slug`. So the alias is followed, as the owner asked, and the
+ * pin, the price ceiling and the receipt keep working against the concrete
+ * snapshot. Nothing is inferred from context length or price.
+ *
+ * Only the endpoint lookup needs this. A request may name the alias directly and
+ * be served correctly — verified live, including with `provider.order` pinned to
+ * an endpoint of the resolved snapshot.
+ */
+async function resolveAliasTarget(modelId: string, apiKey: string): Promise<string> {
+  if (!modelId.startsWith('~')) return modelId;
+
+  const cached = aliasTargets.get(modelId);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!response.ok) return modelId;
+
+    const payload = (await response.json()) as {
+      data?: Array<{ id?: string; alias_target?: { slug?: string } }>;
+    };
+    const slug = payload.data?.find(entry => entry.id === modelId)?.alias_target?.slug;
+    if (!slug) return modelId;
+
+    aliasTargets.set(modelId, slug);
+    logger.info({ modelId, slug }, '[Routing] Alias resolved to the snapshot it serves today');
+    return slug;
+  } catch {
+    // An unresolved alias is the old behaviour, not a failure.
+    return modelId;
+  }
+}
+
 async function requestEndpoints(modelId: string): Promise<ModelEndpoint[]> {
   // Synchronous on purpose. The caller is about to make a paid call, so the key
   // has already been resolved database-first and cached; going back to the
@@ -118,9 +174,12 @@ async function requestEndpoints(modelId: string): Promise<ModelEndpoint[]> {
   const apiKey = getApiKeySync('openrouter');
   if (!apiKey) return [];
 
+  // An alias has no endpoints of its own; ask the snapshot it points at.
+  const resolved = await resolveAliasTarget(modelId, apiKey);
+
   // The path is `/models/{author}/{slug}/endpoints`, so the model id goes in
   // whole and only its segments are escaped.
-  const path = modelId
+  const path = resolved
     .split('/')
     .map(segment => encodeURIComponent(segment))
     .join('/');

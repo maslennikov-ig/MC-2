@@ -33,13 +33,25 @@ constrains work:
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
-Seven live models (`LIVE_ROUTING_MODEL_IDS`): simple work on `deepseek/deepseek-v4-flash-0731`
-(a pinned snapshot since 2026-08-21; see the correction below), complex on
-`openai/gpt-5.6-luna` and `z-ai/glm-5.2`, plus
-`google/gemini-3.7-flash`, `minimax/minimax-m3` and the two image models. Four invariants to
-preserve: judges keep three separate vendors, `emergency` stays off OpenAI, every fallback crosses
-vendors, and the three escalation phases avoid the default model on both hops because by the time
-they run it has already failed.
+Seven live models: the workhorse is `~deepseek/deepseek-v4-flash-latest` with `openai/gpt-5.6-luna`
+as its fallback (owner, 2026-08-22 — see the alias section below), `z-ai/glm-5.2` for the deciding
+judge and Stage 6's last chance, plus `google/gemini-3.7-flash`, `minimax/minimax-m3` and the two
+image models. Four invariants to preserve: judges keep three separate vendors, `emergency` stays off
+OpenAI, every fallback crosses vendors, and the three escalation phases avoid the default model on
+both hops because by the time they run it has already failed.
+
+**Judges, reshuffled 2026-08-22 by price** (`mc2-d1d09`): primary `gpt-5.6-luna`, secondary
+**`deepseek-v4-flash-latest`**, tiebreaker **`glm-5.2`** (fallback `minimax-m3`). The point is not the
+second vote: `executeSingleJudge` takes `judgeModels.secondary`, so that seat is the **most frequent
+judge call in the pipeline** — every lesson past the heuristics, 1318 of 1911 by history, against 608
+that reach a panel. It was on the dearest model of the pool. One judge pass on the measured shape
+(5144 in / 764 out): glm-5.2 $0.00729, minimax $0.00246, luna $0.00195, deepseek $0.00055.
+
+**What moved to DeepSeek, and what did not.** 16 global rows where DeepSeek already served the same
+phase at the other tier now lead with it — same model, different input size, reversible. The 30 rows
+where it runs nowhere on that phase are the product's writing (lesson body, course structure, Stage 4
+expert, the playbook's authoring phases) and are deliberately untouched: that needs a comparison run,
+not an `UPDATE` (`mc2-tux1y`). The 12 `course_override` rows on two courses are also untouched.
 
 Reasoning is per-phase and the budget is the load-bearing part — OpenRouter bills reasoning tokens
 against `max_tokens`, so the budget is ADDED, and both the database and the seed generator refuse
@@ -49,16 +61,32 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
 generation; Stage 5 ~5.5%, Stage 4 ~1.9%. Epic `mc2-4clyr` holds what follows from that.
 
+**The `~` alias is back, on purpose, and what made it safe.** The owner asked for
+`~deepseek/deepseek-v4-flash-latest` on 2026-08-22. The reason it was pinned in the first place is
+below and still true — but a second, sharper problem had appeared since:
+`GET /models/{alias}/endpoints` answers **200 with an empty list** (measured: 0 for the alias, 30 for
+`-0731`, 17 for the undated slug), and this codebase reads an empty list as _could not find out_. So
+routing on an alias silently switched off the per-attempt endpoint pin — the thing that hours earlier
+had moved two hung 238 s calls onto a working provider. `listModelEndpoints` now follows OpenRouter's
+own `alias_target.slug` field to the concrete snapshot, cached for the life of the process and logged
+as `[Routing] Alias resolved to the snapshot it serves today`. Nothing is inferred from context
+length or price. Verified live: the alias yields the same 30 endpoints as the snapshot, and a request
+naming the alias with `provider.order` pinned to one of them is served by that provider.
+
+**What is still true of an alias:** it can move without telling us, and the family already has a new
+member — `deepseek/deepseek-v4-flash-vision-exp`, experimental, **5.5× the input price**. The log
+line above is where a move becomes visible; a scheduled check is `mc2-ts9i2`.
+
 **The `~` was never a harmless spelling — root cause, closed 2026-08-21 (`mc2-qch4w`).** OpenRouter
 documents `~deepseek/deepseek-v4-flash-latest` as a redirect that _«always redirects to the latest
 model in the DeepSeek V4 Flash family»_. On 17 August the family moved, the alias followed it to
 `-0731`, median call latency went from 8.7 s to 102 s with no change on our side, and that is what
-aborted Stage 4 and failed the career playbook through 20 August. Routing is now pinned to
-`deepseek/deepseek-v4-flash-0731` — chosen because the alias was already resolving to it (same
-1310720 context), so the pin froze the behaviour rather than altering it, and because that snapshot
-carries 30 endpoints against 18 for the undated id, with the same cheapest endpoint at
-$0.065/$0.180. `DEFAULT_MODEL_ID`, all 92 occurrences in `config-seed.json` and the active rows of
-`llm_model_config` were changed together, since the database wins over the seed at runtime.
+aborted Stage 4 and failed the career playbook through 20 August. Routing was pinned to
+`deepseek/deepseek-v4-flash-0731` for a day, then returned to the alias on the owner's decision with
+the endpoint resolution above. What the pin taught and still holds: `DEFAULT_MODEL_ID`, every
+occurrence in `config-seed.json` and the active rows of `llm_model_config` are changed **together**,
+since the database wins over the seed at runtime — `pnpm generate:config-seed` reads the database and
+rewrites the seed, and it is the only correct order.
 
 ## Phase configs audited (2026-08-13, `7ad421986`)
 
@@ -318,7 +346,8 @@ judged lessons rather than the 490 that reached a judge, 69.2% are settled free 
 take one judge, 17.6% two and 6.9% three — so the full panel runs _below_ its 15-20% design target,
 not four times above it.
 
-**Step 1 of `mc2-r31fw` is done, and it changes the whole shape of the epic.** The score _is_ stored
+**`mc2-r31fw` and `mc2-d1d09` are closed** (2026-08-22). What the measurement said, and what it
+changed. The score _is_ stored
 — `generation_trace.output_data.enrichedOutput.singleJudge.score`, populated on 1302 of 2567
 `judge_complete` rows (an earlier note in this file claimed it was null everywhere; it was wrong).
 Measured distribution: min **0.520**, p10 0.700, median **0.820**, p90 0.880, max 0.930.
@@ -339,6 +368,26 @@ Measured distribution: min **0.520**, p10 0.700, median **0.820**, p90 0.880, ma
 - **A lesson that reaches the panel is judged by glm-5.2 twice.** `executeCLEVVoting` re-runs
   `primary` and `secondary` from scratch and the single judge's verdict — cast by that same
   `secondary` — is discarded rather than counted as one of the panel's votes.
+
+**Two more things the cascade was doing.** The single judge and the panel had **different prompts**:
+the panel's carries three checks the single judge's did not — that exercises and the conclusion
+belong to this lesson, that no stray CJK or Arabic leaked into the prose, and that the lesson is not
+far shorter than its stated duration. The cheap gate that settles 37% of lessons alone was asking
+_less_ than the panel behind it. One prompt now. And only because of that, a second fix became
+legitimate: a lesson reaching the panel is no longer judged twice — the single verdict _is_ the
+secondary vote and is counted as one instead of being re-cast.
+
+The rule itself is one clause now. `score < 1 - threshold` never fired once in 1302 verdicts and is
+gone; `confidence >= medium` stays, having never blocked either, because unlike the other it is a
+real guard rather than an unreachable one. Threshold **0.75**, chosen off the distribution: nearest
+to the cascade's own 15-20% design target while approaching it from above (24.3%), and clear of p10
+so the weak tail keeps its second opinion.
+
+Held by `tests/unit/stages/stage6-lesson-content/judge/cascade/single-verdict-is-accepted.test.ts`,
+written as behaviour so the number can move again without rewriting the contract.
+
+Estimated, at list rates, per lesson past the heuristics: judging **$0.01179 → $0.00204**. An
+estimate, not an invoice — the next paid run is what settles it.
 
 Measured token shape of one judge pass, from the 2026-08-22 run: 5144 in / 764 out. At list rates
 that is $0.00729 on glm-5.2 (billed $0.01046, served above list), $0.00246 on minimax, $0.00195 on

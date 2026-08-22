@@ -171,3 +171,80 @@ describe('choosing among endpoints', () => {
     expect(pickCheapestUntriedEndpoint(list, new Set(['a/fp4', 'c/fp4']))?.tag).toBe('d/fp8');
   });
 });
+
+/**
+ * Contract: a `~…-latest` alias is followed to the snapshot it serves, because
+ * an alias has no endpoints of its own.
+ *
+ * Measured against the live API on 2026-08-22:
+ * `/models/~deepseek/deepseek-v4-flash-latest/endpoints` answers **200 with an
+ * empty list**, while `deepseek/deepseek-v4-flash-0731` answers with 30. An
+ * empty list is how this module says "could not find out", so routing on the
+ * alias would silently turn the pin off — and the pin is what moved two hung
+ * 238s calls onto a working provider that same day (mc2-6crnj).
+ *
+ * The target is read from OpenRouter's own `alias_target.slug`, never guessed
+ * from context length or price.
+ */
+describe('following a latest-alias', () => {
+  const ALIAS = '~deepseek/deepseek-v4-flash-latest';
+  const SNAPSHOT = 'deepseek/deepseek-v4-flash-0731';
+
+  beforeEach(forgetModelEndpoints);
+
+  function transport() {
+    const asked: string[] = [];
+    return {
+      asked,
+      fetchMock: vi.fn(async (url: string) => {
+        asked.push(url);
+        if (url.endsWith('/models')) {
+          return new Response(
+            JSON.stringify({
+              data: [
+                { id: 'openai/gpt-5.6-luna' },
+                { id: ALIAS, alias_target: { name: 'DeepSeek V4 Flash 0731', slug: SNAPSHOT } },
+              ],
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response(JSON.stringify(payload()), { status: 200 });
+      }),
+    };
+  }
+
+  it('asks the snapshot for its endpoints, not the alias', async () => {
+    const { asked, fetchMock } = transport();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const endpoints = await listModelEndpoints(ALIAS);
+
+    expect(asked.some(url => url.endsWith(`/models/${SNAPSHOT}/endpoints`))).toBe(true);
+    expect(asked.some(url => url.includes('deepseek-v4-flash-latest/endpoints'))).toBe(false);
+    expect(endpoints.length).toBeGreaterThan(0);
+  });
+
+  it('resolves the alias once, not on every attempt of every chain', async () => {
+    const { asked, fetchMock } = transport();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Far enough apart that the endpoint list's own five-minute cache is stale
+    // and the list is fetched again; the alias must not be.
+    await listModelEndpoints(ALIAS, 0);
+    await listModelEndpoints(ALIAS, 60 * 60_000);
+
+    expect(asked.filter(url => url.endsWith('/models/endpoints')).length).toBe(0);
+    expect(asked.filter(url => url.endsWith(`/models/${SNAPSHOT}/endpoints`)).length).toBe(2);
+    expect(asked.filter(url => url.endsWith('/models')).length).toBe(1);
+  });
+
+  it('leaves an ordinary model id alone', async () => {
+    const { asked, fetchMock } = transport();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await listModelEndpoints(SNAPSHOT);
+
+    expect(asked.some(url => url.endsWith('/models'))).toBe(false);
+  });
+});

@@ -19,16 +19,30 @@
  * Default primary model (used when DB is unavailable)
  * DeepSeek V4 Flash - default fast runtime model for course generation.
  *
- * A pinned snapshot, never a `~...-latest` alias. The alias is a redirect that
- * follows its family: on 2026-08-17 07:03 it moved to the `-0731` snapshot with
- * no change on our side, median latency went from 8.7s to 102s, and the courses
- * of 12-20 August failed on timeouts nobody had configured. Pinned on
- * 2026-08-21 to the snapshot the alias was already resolving to, so the change
- * froze the behaviour rather than altering it (mc2-qch4w).
+ * The `~...-latest` alias, by the owner's decision of 2026-08-22, and the one
+ * thing that has to be true for that to be safe is now true.
+ *
+ * The history is real: on 2026-08-17 07:03 the alias followed its family to the
+ * `-0731` snapshot with no change on our side, median latency went from 8.7s to
+ * 102s, and the courses of 12-20 August failed on timeouts nobody had
+ * configured. It was pinned on 2026-08-21 (mc2-qch4w).
+ *
+ * What made the alias newly dangerous, and what was fixed to allow it back:
+ * `/models/{alias}/endpoints` answers 200 with an **empty list**, which this
+ * codebase reads as "could not find out" — so routing on an alias silently
+ * disabled the per-attempt endpoint pin, the thing that on 2026-08-22 moved two
+ * hung 238s calls onto a working provider. `listModelEndpoints` now follows
+ * OpenRouter's own `alias_target.slug` to the snapshot, so the family is
+ * followed and the pin, the price ceiling and the receipt all still work.
+ *
+ * What is still true of an alias: it can move without telling us. The log line
+ * "[Routing] Alias resolved to the snapshot it serves today" is where a move
+ * shows up, and a new member already exists in the family —
+ * `deepseek-v4-flash-vision-exp`, experimental, at 5.5x the input price.
  *
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash-0731';
+export const DEFAULT_MODEL_ID = '~deepseek/deepseek-v4-flash-latest';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable).
