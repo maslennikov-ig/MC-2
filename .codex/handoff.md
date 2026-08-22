@@ -252,40 +252,40 @@ naming a branch again means something really was left behind.
   `mc2-3lo22`. `mc2-db696.106`/`.107` — PDF fidelity/grounding, separate deploy accounts: not
   planned. `mc2-gmab0` — held by unit tests.
 
-## `snuggly-wiggling-sutton.md`, run 2026-08-22 (numbers in the `bd` close reasons)
+## `snuggly-wiggling-sutton.md`, run 2026-08-22 — 8 paid runs, $0.298, 0 unpriced, $10.42 left
 
 **Phase 0 done — the hop is back (`mc2-xjykw`).** New SOCKS5 through `helixa-new` (82.26.152.8,
 Amsterdam NL), its own revocable key restricted to `from="95.81.98.230",restrict,port-forwarding`,
-system unit `megacampus-socks.service`. Proved four ways, because the old check lied: listener on
-1080, `curl --socks5-hostname` egressing as NL, TCP from inside the bridge, and a read-only
-`notebooks.list()` now failing on **authentication** rather than CSRF, which is the proof the hop
-works. Correction to that ticket: a unit _did_ exist — a **user** unit, `Linger=yes`, restarting ssh
-every 12 s against a refusing host since February, `is-active` green throughout.
+unit `megacampus-socks.service`. Proved four ways because the old check lied: listener on 1080,
+`curl --socks5-hostname` egressing as NL, TCP from inside the bridge, and `notebooks.list()` now
+failing on **authentication** rather than CSRF, which is the proof. Correction: a unit _did_ exist —
+a **user** unit restarting ssh every 12 s against a refusing host since February, `is-active` green.
 
 **Phase 1 stops at the cookies (`mc2-3lo22`, P1, owner-owned).** `/health` reports `earliest cookie
-expires 2026-03-31 (-144d)` — not 28.08 as the plan said, that was not the earliest; it matches the
-last NLM generation, 2026-04-15. Needs `notebooklm login`. Done meanwhile: the three enum values
-(`mc2-6ye5z.4/.5/.8`, migration applied, handlers still to write) and the CI job (`mc2-3d3ku`, green
-first run). `mc2-p99f1` has **no gate at all** — every layer already accepts the four types;
-`ON_DEMAND_ENRICHMENT_TYPES` is read by nobody and both ends now say so.
+expires 2026-03-31 (-144d)` — not 28.08 as the plan said; it matches the last NLM generation,
+2026-04-15. Needs `notebooklm login`. Done meanwhile: the three enum values (migration applied,
+handlers still to write) and the CI job (`mc2-3d3ku`, green first run). `mc2-p99f1` has **no gate at
+all** — every layer already accepts the four types; `ON_DEMAND_ENRICHMENT_TYPES` is read by nobody.
 
 **Phase 2 done.** `mc2-kznfz` was neither hypothesis: `convertToLessonSpecV2` wrote
 `primary_documents: ['auto-generated']`, a word that never matches a UUID, so **every automatic-mode
 course with an uploaded document was written without it** since 2026-02-09. `mc2-f1tqd` fixed at the
 `configuration.fetch` seam: an empty 200 throws by name with status, body and generation id.
 
-**Phase 3 done.** `mc2-r7udy` unblocked: the constraint was an enum, not a CHECK, so it _did_ need a
-migration — `worker_started`, a marker from both entrypoints, and
+**Phase 3 done.** `mc2-r7udy` unblocked — the constraint was an enum, not a CHECK, so it _did_ need
+a migration: `worker_started`, a marker from both entrypoints, and
 `pipelineAdmin.getWorkerRestartsDuringCourse`. `mc2-bnm62`: the two image rows are read now.
 `mc2-tux1y` measured in `mc2-bneet` — **do not switch**: judge 0.87-0.90 against 0.92-0.93, lessons
 29% shorter, an invented statistic in the prose, for $0.008 a micro course.
 
-**Phase 4 found a blocker no test had.** Chinese could not be generated **at all**: Stage 5 refused
-`section_title` and `key_topics` on Latin-calibrated character minimums; fixed by weighting Han,
-Kana and Hangul as two (`8ebc95dcb`). Spanish is clean — judge 0.94/0.95/0.90, 0 regenerations, and
-it reads idiomatically. Found by reading before running: the check was **fail-open** for `es`, and
-four places collapsed the language code so Chinese budgets were half size. Matrix in `mc2-v6fqp`.
-Day's spend $0.215 over five runs, all reconciled to the `/credits` delta, 0 unpriced; $10.60 left.
+**Phase 4 done, and it was the whole day.** Spanish and Chinese both complete; Chinese never could
+before. **Five defects, one class** — a threshold calibrated on Latin script applied to another,
+invisible until a non-ru/en language ran, each found once the previous was fixed: fail-open language
+check for `es`; four places halving Chinese token budgets; Stage 5 refusing every Chinese title;
+Stage 4 refusing its prose fields; the Stage 6 judge scoring **every Chinese lesson zero** for
+counting words by whitespace. Two were mine — `.refine()` deleted the constraint from the prompt
+`zodToPromptSchema` renders: here a Zod schema is not only validation, it is the prompt. Judge now
+es 0.94/0.95/0.90, zh 0.95/0.90/0.85, both read by eye; matrix and limits in `mc2-v6fqp`.
 
 ## Next recommended
 
