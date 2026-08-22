@@ -191,4 +191,103 @@ export const statsRouter = router({
         });
       }
     }),
+
+  /**
+   * Which workers restarted while this course was generating.
+   *
+   * The whole of `mc2-r7udy`'s acceptance: given a course id, an operator can
+   * answer "did a worker restart during this, and did it come back on different
+   * code?" from the database alone. Until 2026-08-22 the answer lived only in
+   * container logs that rotate, so every stuck-Stage-6 investigation guessed.
+   *
+   * The window is the course's own generation window, widened by a margin at
+   * each end, because a restart just before generation began is part of the same
+   * story — a worker that came up mid-deploy is exactly the case being looked
+   * for.
+   *
+   * `buildsSeen` is the interesting line. One build across the window is a
+   * restart; two is a deploy, and a deploy is usually the suspect.
+   */
+  getWorkerRestartsDuringCourse: superadminProcedure
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        /** Extra minutes examined on each side of the generation window. */
+        marginMinutes: z.number().int().min(0).max(720).default(15),
+      })
+    )
+    .query(async ({ input }) => {
+      const supabase = getSupabaseAdmin();
+
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select('created_at, updated_at, generation_status')
+        .eq('id', input.courseId)
+        .single();
+
+      if (courseError || !course) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+      }
+
+      // Both timestamps are nullable in the schema. A course with neither has no
+      // window to look in, and inventing one from `now` would answer a different
+      // question than the operator asked.
+      if (!course.created_at) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Course has no created_at, so there is no generation window to examine',
+        });
+      }
+
+      const marginMs = input.marginMinutes * 60_000;
+      const startedAt = new Date(course.created_at).getTime();
+      const endedAt = course.updated_at ? new Date(course.updated_at).getTime() : Date.now();
+      const from = new Date(startedAt - marginMs).toISOString();
+      const to = new Date(endedAt + marginMs).toISOString();
+
+      const { data: markers, error: markerError } = await supabase
+        .from('system_metrics')
+        .select('timestamp, message, metadata')
+        .eq('event_type', 'worker_started')
+        .gte('timestamp', from)
+        .lte('timestamp', to)
+        .order('timestamp', { ascending: true });
+
+      if (markerError) {
+        logger.error(
+          { err: markerError.message, courseId: input.courseId },
+          'Failed to read worker restart markers'
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to read worker restart markers',
+        });
+      }
+
+      const rows = markers ?? [];
+      const readMeta = (row: (typeof rows)[number], key: string): string | null => {
+        const meta = row.metadata as Record<string, unknown> | null;
+        const value = meta?.[key];
+        return typeof value === 'string' ? value : null;
+      };
+
+      return {
+        courseId: input.courseId,
+        generationStatus: course.generation_status,
+        window: { from, to, marginMinutes: input.marginMinutes },
+        restartCount: rows.length,
+        // An empty result before 2026-08-22 means the marker did not exist yet,
+        // not that no worker restarted. Callers reading history need that.
+        markersAvailableSince: '2026-08-22',
+        buildsSeen: [...new Set(rows.map(row => readMeta(row, 'app_version')).filter(Boolean))],
+        rolesSeen: [...new Set(rows.map(row => readMeta(row, 'worker_role')).filter(Boolean))],
+        restarts: rows.map(row => ({
+          at: row.timestamp,
+          role: readMeta(row, 'worker_role'),
+          appVersion: readMeta(row, 'app_version'),
+          workerInstanceId: readMeta(row, 'worker_instance_id'),
+          hostname: readMeta(row, 'hostname'),
+        })),
+      };
+    }),
 });

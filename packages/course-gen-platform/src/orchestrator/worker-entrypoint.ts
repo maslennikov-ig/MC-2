@@ -42,6 +42,7 @@ import {
 } from '../shared/llm/model-config-bunker';
 import { TIMEOUTS } from '../shared/constants/timeouts';
 import { refreshReadinessHeartbeat } from './worker-readiness';
+import { recordWorkerStart } from './worker-start-marker';
 
 // Validate environment
 validateEnvironment();
@@ -361,6 +362,15 @@ async function main() {
       },
       'Worker started successfully'
     );
+
+    // A line in a log that rotates cannot answer "did a worker restart while
+    // this course was generating?" three weeks later. This row can (mc2-r7udy).
+    // Not awaited into the startup path's success: it is best-effort by design.
+    await recordWorkerStart({
+      concurrency,
+      queueName: workerStatus.queueName,
+      registeredHandlers: workerStatus.registeredHandlers,
+    });
   } catch (error) {
     logger.error({ err: error }, 'Failed to start worker');
     process.exit(1);
