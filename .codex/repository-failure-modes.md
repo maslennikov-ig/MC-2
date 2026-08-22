@@ -58,6 +58,26 @@ stated confidently and were wrong; each was killed by a single cheap query or a 
 suspect with evidence is worth more than a confident cause without it, and it is honest to ship the
 former labelled as such.
 
+**A `~…-latest` alias is a routing shim, not a model, and it lies twice.** OpenRouter documents it as
+a redirect that "always redirects to the latest model in the family". On 2026-08-17 the family moved,
+median call latency went 8.7 s → 102 s with no change on our side, and the courses of 12-20 August
+failed on timeouts nobody had configured (`mc2-qch4w`). The second lie is quieter and was measured on
+2026-08-22: `GET /models/{alias}/endpoints` answers **200 with an empty list** — 0 against 30 for the
+pinned snapshot — and this codebase reads an empty list as _could not find out_, so an alias silently
+switches off the per-attempt endpoint pin. `listModelEndpoints` now follows OpenRouter's own
+`alias_target.slug` and that hole is closed, but **routing stays on a pinned snapshot** by the
+owner's decision: the DeepSeek V4 Flash family already carries an experimental vision variant at 5.5×
+the input price, and a redirect is free to land on it.
+
+**A LangChain clone keeps only what the constructor was given.** `ChatOpenAI.withConfig` — which
+`withStructuredOutput` and `bindTools` both funnel through — is `new ChatOpenAI(this.fields)` by
+design (langchainjs#8586), so anything attached to a built instance is dropped, silently. That cost
+every structured call its price (`mc2-258fi`) and, separately, its mandatory-reasoning recovery
+(`mc2-148j9`). The rule that follows: build with it, never attach it. Cost recording rides in
+`callbacks`; the generation-id capture and the reasoning-floor resend ride in `configuration.fetch`,
+which also puts them below `invoke` and so covers `stream` and `batch`. Held by
+`tests/unit/shared/llm/structured-output-reaches-invoke.test.ts`.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.
