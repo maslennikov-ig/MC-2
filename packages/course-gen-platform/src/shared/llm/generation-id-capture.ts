@@ -34,6 +34,17 @@ export function withGenerationIdCapture<T>(fn: (slot: GenerationIdSlot) => Promi
   return generationIdStore.run(slot, () => fn(slot));
 }
 
+/**
+ * The current attempt's slot, for a transport wrapper that has to name the call
+ * it is failing.
+ *
+ * Returns `undefined` outside an attempt rather than throwing: reading the id is
+ * always an improvement to a message, never a precondition for one.
+ */
+export function readGenerationIdSlot(): GenerationIdSlot | undefined {
+  return generationIdStore.getStore();
+}
+
 /** Where a failed attempt's generation id rides out of the `throw`. */
 const GENERATION_ID_ON_ERROR = Symbol.for('megacampus.generationId');
 

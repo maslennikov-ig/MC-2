@@ -34,6 +34,7 @@ import { createModelConfigService } from './model-config-service';
 import { buildReasoningPayload, toProviderKwargs } from './client-helpers';
 import type { OpenRouterProviderRouting } from './client-helpers';
 import { instrumentFetchWithGenerationId } from './generation-id-capture';
+import { guardAgainstEmptyCompletion } from './empty-response-guard';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
@@ -71,12 +72,19 @@ const modelConfigService = createModelConfigService();
  * afterwards is dropped — which is how structured calls lost their price
  * (mc2-258fi) and their mandatory-reasoning recovery (mc2-148j9).
  *
- * Order matters: the recovery is outermost, so the generation id deposited by
- * the retry replaces the refused request's and the ledger names the call that
- * was actually served.
+ * Order matters, and there are two reasons for this one. The recovery is
+ * outermost, so the generation id deposited by the retry replaces the refused
+ * request's and the ledger names the call that was actually served. The
+ * empty-completion guard sits below it and above the id capture: below, because
+ * a 400 the recovery is about to retry must reach it as a response and not as a
+ * throw; above, because the id has to be in the slot before the guard can put it
+ * into the error (mc2-f1tqd).
  */
 function openRouterTransport(modelId: string): typeof globalThis.fetch {
-  return withMandatoryReasoningRecoveryFetch(modelId, instrumentFetchWithGenerationId());
+  return withMandatoryReasoningRecoveryFetch(
+    modelId,
+    guardAgainstEmptyCompletion(instrumentFetchWithGenerationId())
+  );
 }
 
 /**
