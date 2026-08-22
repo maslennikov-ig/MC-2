@@ -228,18 +228,20 @@ is". `mc2-b7olk.4` — document-evidence money **does** belong in the course tot
 one priced row is the rule the ledger stands on. Migrations approved **when necessary, useful and
 current**, one at a time. `mc2-hqfc3` video stays parked; NotebookLM checked instead (`mc2-rmbwo`).
 
-**Still open.** `mc2-wxun`/`mc2-vjbb` — the shadow cohort is worth enabling, but only in
-**production**: on dev it would measure nothing. `mc2-v6fqp` — a budget and disposable inputs.
+**Still open:** `mc2-v6fqp` needs one word — which third language. "ru and en" is read as the test
+language for everything else, since this task's own acceptance requires a non-ru/en path.
 
 ## Safety boundary
 
-**Standing authorization, owner 2026-08-22: do not ask, act and report.** It covers paid runs inside
-the USD 5 ceiling, commits, `git push` to `develop`, dev deploys on a green pipeline, edits to
-`llm_model_config` and `config-seed.json`, and branch/worktree cleanup. The OpenRouter key is shared
-with production, so read its remaining credit before and during a run.
+**Standing authorization, owner 2026-08-22: do not ask, act and report.** Paid runs inside the USD 5
+ceiling, commits, `git push` to `develop`, dev deploys on a green pipeline, edits to
+`llm_model_config` and `config-seed.json`, branch/worktree cleanup, **the migrations named in
+`four-doors-marten.md`** when they prove necessary, and **`RAG_SHADOW_RETRIEVAL_RATE` in
+production**. The OpenRouter key is shared with production: read its remaining credit before and
+during a run.
 
-Outside it, and needing a fresh decision each time: reindex, force-push, secrets or access changes,
-production mutation, and schema migrations — the only approved one is `mc2-ufpko` (2026-08-13).
+Outside it, needing a fresh decision each time: reindex, force-push, secrets or access changes, any
+other production mutation, and any migration the plan does not name.
 
 Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `mc2-qd12b`,
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
@@ -252,39 +254,37 @@ report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- `mc2-6ye5z.4/.5/.8` — an enum value each, so a migration each; blocked on `mc2-rmbwo`. `mc2-r7udy`
-  probably needs none: `system_metrics` already has `event_type` and a JSONB `metadata`.
+- `mc2-6ye5z.4/.5/.8` — one `ALTER TYPE` for all three, blocked on `mc2-rmbwo`; `mc2-r7udy` needs
+  none at all (`system_metrics` carries no CHECK).
 - `mc2-db696.106`/`.107` — PDF fidelity and grounding. Separate deploy accounts: not planned.
-- `mc2-gmab0` mandatory-reasoning recovery — held by unit tests; no model has ever refused.
-- `mc2-f1tqd` — five attempts died reading an empty provider response instead of naming it.
+  `mc2-gmab0` — held by unit tests. `mc2-f1tqd` — an empty provider response crashes the parse.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`docs/plans/cheaper-verdict-heron.md`** — the paid run that turns 2026-08-22's
-calculated savings into measured ones (`mc2-bxmje`), then the writing-phase comparison it unblocks
-(`mc2-tux1y`, with `mc2-oofx5` riding along). Both inside epic `mc2-4clyr`, now 3 of 6.
+Next stage id: **`docs/plans/four-doors-marten.md`** — four independent tracks after six owner
+answers on 2026-08-22. A: the paid acceptance (`mc2-bxmje` against
+`docs/plans/cheaper-verdict-heron.md`), then `mc2-tux1y`. B: document-evidence money into the course
+total (`mc2-b7olk.4`). C: NotebookLM, in order — `mc2-rmbwo`, `mc2-p99f1`, then the three that need
+a migration. D: the shadow cohort in production (`mc2-wxun`, `mc2-vjbb`).
 
 Recommended action: run `mc2-bxmje` against that plan, then `mc2-tux1y`.
 Use $orchestrator-stage for the epic; single tasks are ordinary local work.
 
 **Correct the epic's headline before planning from it.** Across all 1589 judged lessons rather than
 the 490 that reached a judge: 69.2% settled free by heuristics, 6.3% one judge, 17.6% two, 6.9%
-three — the full panel runs _below_ its 15-20% design target, not four times above it. And "Stage 6
-is 90%" is a share **by tokens**: by money, on a small course, the two card images were 46% of the
+three — the full panel runs _below_ its 15-20% design target, not four times above it. "Stage 6 is
+90%" is a share **by tokens**: by money, on a small course, the two card images were 46% of the
 window until `mc2-xbqz8` cut them by 81%.
 
-**What 2026-08-22 changed in the cascade** is in the plan in full: the single-judge seat moved off
-the pool's dearest model, the threshold went 0.80 → **0.75** off a measured distribution (1302
-verdicts, median **0.820**, so 0.80 sat on the steepest point of the curve), the single judge and the
-panel had **different prompts** and now share the panel's, and only because of that a lesson reaching
-the panel is no longer judged twice. Held by
+**What 2026-08-22 changed in the cascade** is in `cheaper-verdict-heron.md` in full: the
+single-judge seat moved off the pool's dearest model, the threshold went 0.80 → **0.75** off a
+measured distribution (1302 verdicts, median **0.820**), the two judge prompts became one, and only
+because of that a lesson reaching the panel is no longer judged twice. Held by
 `tests/unit/stages/stage6-lesson-content/judge/cascade/single-verdict-is-accepted.test.ts`, written
-as behaviour so the number can move again.
-
-Estimated at list rates, per lesson past the heuristics: judging **$0.01173 → $0.00140**. An
-estimate, not an invoice. Two caveats arithmetic cannot remove: 21.2% is the third-judge rate over
-the _old_ panel population, and the run cannot show the threshold effect at all — see the plan.
+as behaviour so the number can move again. Estimated per lesson past the heuristics: judging
+**$0.01173 → $0.00140** — an estimate, not an invoice, and the run cannot show the threshold effect
+at all.
 
 **Three owner decisions of 2026-08-20/21 bind the routing work**, not to be revisited without a new
 one: a failing provider is ignored only inside the current chain of attempts, never in a standing
@@ -293,13 +293,13 @@ is acceptable, so raise timeouts rather than chase speed.
 
 ## Starter prompt for next orchestrator
 
-It is written and checked: **`.codex/next-goal-cheaper-verdict.md`** (`prompt-check` clean at 1500
-chars). Paste it into a fresh session. It is on disk and **untracked** — `.gitignore` keeps
-`.codex/*` out bar the named few — so look for the file, not a commit; everything it depends on is
-tracked, and it repeats the standing authorization for a reader who has only the prompt.
+It is written and checked: **`.codex/next-goal-four-doors.md`** (`prompt-check` clean, 1442 chars);
+`next-goal-cheaper-verdict.md` beside it covers track A alone. Both are **untracked** — `.gitignore`
+keeps `.codex/*` out bar the named few — so look for the file, not a commit. Everything they depend
+on is tracked, and each repeats the standing authorization for a reader who has only the prompt.
 
-In short: `mc2-bxmje` against `docs/plans/cheaper-verdict-heron.md`, then `mc2-tux1y`.
-$orchestrator-stage for the epic; single tasks are ordinary local work. **Do not ask — act and
+In short: four tracks in `docs/plans/four-doors-marten.md`, independent bar the order inside C.
+$orchestrator-stage for an epic; single tasks are ordinary local work. **Do not ask — act and
 report**, inside the standing authorization under Safety boundary.
 
 ## Read first
