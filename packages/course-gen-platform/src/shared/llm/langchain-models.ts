@@ -25,7 +25,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import {
   requiresReasoningNow,
-  withMandatoryReasoningRecovery,
+  withMandatoryReasoningRecoveryFetch,
 } from './mandatory-reasoning-recovery';
 import { costRecordingCallbacks } from './model-cost-callbacks';
 import { PHASE_FALLBACK_CONFIG } from './phase-fallback-config';
@@ -61,6 +61,23 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
  * Singleton ModelConfigService instance
  */
 const modelConfigService = createModelConfigService();
+
+/**
+ * The one transport every LangChain model on this path is built with.
+ *
+ * Both wrappers have to ride in `configuration`, because that is a constructor
+ * field and therefore the only thing that survives the `new ChatOpenAI(fields)`
+ * clone `withStructuredOutput` builds. Anything attached to the instance
+ * afterwards is dropped — which is how structured calls lost their price
+ * (mc2-258fi) and their mandatory-reasoning recovery (mc2-148j9).
+ *
+ * Order matters: the recovery is outermost, so the generation id deposited by
+ * the retry replaces the refused request's and the ledger names the call that
+ * was actually served.
+ */
+function openRouterTransport(modelId: string): typeof globalThis.fetch {
+  return withMandatoryReasoningRecoveryFetch(modelId, instrumentFetchWithGenerationId());
+}
 
 /**
  * Build the provider-specific half of a ChatOpenAI config.
@@ -176,17 +193,14 @@ export function createOpenRouterModel(
     ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
     : undefined;
 
-  const build = (): ChatOpenAI =>
-    new ChatOpenAI({
-      model: modelId,
-      configuration: { baseURL: OPENROUTER_BASE_URL, fetch: instrumentFetchWithGenerationId() },
-      apiKey,
-      ...(callbacks ? { callbacks } : {}),
-      ...(timeoutMs ? { timeout: timeoutMs } : {}),
-      ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
-    });
-
-  return withMandatoryReasoningRecovery(build(), modelId, build);
+  return new ChatOpenAI({
+    model: modelId,
+    configuration: { baseURL: OPENROUTER_BASE_URL, fetch: openRouterTransport(modelId) },
+    apiKey,
+    ...(callbacks ? { callbacks } : {}),
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
+    ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
+  });
 }
 
 /**
@@ -277,17 +291,14 @@ export async function createOpenRouterModelAsync(
     ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
     : undefined;
 
-  const build = (): ChatOpenAI =>
-    new ChatOpenAI({
-      model: modelId,
-      configuration: { baseURL: OPENROUTER_BASE_URL, fetch: instrumentFetchWithGenerationId() },
-      apiKey,
-      ...(callbacks ? { callbacks } : {}),
-      ...(timeoutMs ? { timeout: timeoutMs } : {}),
-      ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
-    });
-
-  return withMandatoryReasoningRecovery(build(), modelId, build);
+  return new ChatOpenAI({
+    model: modelId,
+    configuration: { baseURL: OPENROUTER_BASE_URL, fetch: openRouterTransport(modelId) },
+    apiKey,
+    ...(callbacks ? { callbacks } : {}),
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
+    ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
+  });
 }
 
 /**

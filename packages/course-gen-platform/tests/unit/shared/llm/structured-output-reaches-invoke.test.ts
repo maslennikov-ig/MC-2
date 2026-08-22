@@ -17,7 +17,10 @@
  *     slot this plan was about to add);
  *   - `model.callbacks`, which is how `attachCostRecording` records a price.
  *
- * The second one is money: a structured call priced nothing at all.
+ * The second one is money: a structured call priced nothing at all. Both are now
+ * built from constructor fields instead — cost recording through `callbacks`,
+ * reasoning recovery through `configuration.fetch` (mc2-148j9) — so these tests
+ * describe the trap, not a live defect.
  *
  * These tests state the LangChain behaviour, not our wish. If an upgrade makes
  * `withConfig` preserve the instance, they fail and the compensation in
@@ -41,7 +44,7 @@ function buildModel(): ChatOpenAI {
   });
 }
 
-/** Exactly the shape `withMandatoryReasoningRecovery` uses. */
+/** The shape the mandatory-reasoning recovery used before it moved to the transport. */
 function replaceInvoke(model: ChatOpenAI, reached: string[]): void {
   model.invoke = (async () => {
     reached.push('invoke');

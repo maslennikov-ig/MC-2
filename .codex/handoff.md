@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-21. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-22. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -134,10 +134,28 @@ actually billed), the real token counts, `cancelled` and `provider_name`. The id
 body, and also in the `x-generation-id` header — which arrives before the body and before any timeout
 abort, so even an aborted call becomes countable.
 
-**Runs of 2026-08-21.** The last one reconciled to **+USD 0.000422 of USD 0.193916** and the sign
-flipped: what remains is over-estimation, not missing money (2026-08-20 was 46% adrift). Its one
-failure: of fifteen billed calls exactly one carried a provider receipt, because the LangChain path
-dropped the id. Fixed above and untested by a run.
+**The ledger reconciles. Run of 2026-08-22, `7c80e479c`** (`mc2-z0xr3`, `mc2-79lvc` closed):
+
+|                                                  |           |
+| ------------------------------------------------ | --------- |
+| report TOTAL, `cost:report --since T0`           | $0.202480 |
+| delta of `/api/v1/credits`                       | $0.202481 |
+| provider sum over the 65 recorded generation ids | $0.202481 |
+
+Three numbers, one of them independent of our own arithmetic, and the gap is the report's sixth
+decimal. **25 of 25** billed calls carried a provider receipt, against 1 of 15 the day before; zero
+billed calls without a price; `courses.estimated_cost_usd` matches the trace sum. Both covers carry
+the provider's charge — course card $0.045076, playbook cover $0.048609, neither the $0.007 of the
+deleted private table. No production container touched the key in the window. The 2026-08-21
+residual of $0.007506 is gone with the two defects that made it (`mc2-lymou`, `mc2-ai4a8`).
+
+Five of the playbook's 40 attempts are recorded `cost_unknown`; the provider has no generation
+record for any of them, and the exact match proves they cost nothing. They are a defect of a
+different kind — `mc2-f1tqd`, below.
+
+The run did **not** upload a document, deliberately: document evidence keeps its own ledger
+(`mc2-b7olk.4`) and would have put a known-unattributable delta into the window this run existed to
+close. The storage-quota line was proven on 2026-08-20 instead.
 
 Three things that only a live run could say:
 
@@ -158,15 +176,32 @@ alternatives both fail: `X-Provider-Name` is advertised in `access-control-expos
 sent; `provider` is in the body and every SSE chunk, but that call produced neither. So an attempt is
 pinned — `provider.order` with one `tag` from `/models/{model}/endpoints`, `allow_fallbacks: false` —
 and the next takes the next cheapest. Sorted by live price, degraded endpoints skipped as OpenRouter
-skips them, nothing outliving the call, no pin when the list cannot be fetched (`mc2-6crnj`). **The
+skips them, nothing outliving the call, no pin when the list cannot be fetched. **The
 ceiling holds:** the run used the three cheapest of ~30, and the 21 above the 1.5× ceiling — to
 AtlasCloud at 6.8× — were unreachable.
 
+**Proven live on 2026-08-22 and closed** (`mc2-6crnj`). The same failure, twice, and this time the
+retry left: `group6Generator` and `crossBlockJudge` each hung the full 238 s on `sail-research/fp4`,
+and each attempt 1 was pinned to `open-inference/fp4` and answered — one of them in 44.7 s. 26 pin
+lines in the run, every new call starting again at the cheapest, no standing blocklist.
+
+**A pinned endpoint can also answer with nothing** (`mc2-f1tqd`, open). Five attempts on that same
+`sail-research/fp4` died on `Cannot read properties of undefined` — `'map'` in `crossBlockJudge`,
+`'message'` in `group2Generator` — and the provider has no generation record for any of them, so the
+response was empty rather than wrong. The parse crashes instead of naming what arrived; the retry on
+another endpoint succeeded every time. Not money, ~85 s and five extra calls.
+
 **`requiresReasoning` is a net now, not only a list.** A model that refuses to disable reasoning is
 recognised by what the provider says, remembered for the process, and retried asking for the least
-deliberation; the catalogue entry stays primary and the remembering is logged at warn. The net has a
-hole: it replaces `invoke` on the instance, so the four structured call sites reach a clone
-(`mc2-148j9`).
+deliberation; the catalogue entry stays primary and the remembering is logged at warn. The net used
+to have a hole — it replaced `invoke`, so the four structured call sites reached a clone that never
+had it. Since 2026-08-22 the recovery is a **transport** wrapper in `configuration.fetch`
+(`mc2-148j9`): a 400 whose body says reasoning is mandatory is re-sent once with
+`reasoning: {effort:'low'}` and a budget grown by `MANDATORY_REASONING_RESERVE_TOKENS`, capped by
+the model's output ceiling. `configuration` is a constructor field, so it survives the
+`new ChatOpenAI(fields)` clone — the same reason cost recording rides in `callbacks` — and being
+below `invoke` it now covers `stream` and `batch` too. A body already carrying the floor is not
+re-sent, so a second refusal is an ordinary error rather than a loop.
 
 **A log line says which deployment it came from.** Every dev container runs `NODE_ENV=production`, so
 every dev log line claimed to be production. The pino base uses `detectEnvironment()`, and the image
@@ -260,32 +295,34 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 - `mc2-db696.106`/`.107` — PDF fidelity and content grounding. `.108` is partly overtaken: the
   transport is bounded by an explicit signal, receipts are not.
 - Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-gmab0` mandatory-reasoning recovery — no model has refused in any run, so it is held by unit
-  tests only, and `mc2-148j9` says it misses the structured call sites outright.
+- `mc2-gmab0` mandatory-reasoning recovery — no model has refused in any run, so it is still held by
+  unit tests only. It does now cover the structured call sites (`mc2-148j9` closed).
 - `mc2-b7olk.4` — document evidence keeps its own cost ledger and never reaches the course total. It
   needs a decision about where that money belongs, not a forgotten argument.
-- `mc2-z0xr3` — the 2026-08-21 run left $0.007506 of spend with no row anywhere (`mc2-79lvc`); open
-  until a residual is attributed, not merely named.
+- `mc2-f1tqd` — five attempts died reading an empty provider response instead of naming it. Free but
+  slow, and it hid behind the retry that saved it.
 - `mc2-dgw4u` — **owner question:** Stage 7 audio bills a separate OpenAI account and is outside every
   OpenRouter reconciliation by construction; whether it stays there is not decided.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: the paid run in `docs/runbooks/cost-ledger-paid-run.md`, then epic `mc2-4clyr`.
-Its one new acceptance line: `priced by the provider` close to the number of billed calls, against
-the 1 of 15 that the 2026-08-21 run scored.
+Next stage id: epic `mc2-4clyr`.
 
-Recommended action: sections A–G of `docs/plans/honest-receipt-kestrel.md` are delivered
-(`mc2-fcs45`, `mc2-gqhws`, `mc2-258fi`, `mc2-me7nx`, `mc2-ietzn`, `mc2-g1zt9`, `mc2-hjj8a` rewritten
-and left open). What remains is the repeat paid run — that plan's acceptance, not separate work, and
-the first run on code where the course pipeline carries a provider receipt.
+`docs/plans/honest-receipt-kestrel.md` is complete: sections A–G delivered, and its acceptance — the
+repeat paid run — passed on 2026-08-22 with every line answered (`mc2-z0xr3`). **The number holds, so
+the bar on `mc2-4clyr` is lifted.**
 
-Do not start `mc2-4clyr` before the number holds. The epic is about cutting generation cost, and its
-headline also needs correcting: across all 1589 judged lessons rather than the 490 that reached a
-judge, 69.2% are settled free by heuristics, 6.3% take one judge, 17.6% two and 6.9% three — so the
-full panel runs _below_ its 15-20% design target, not four times above it. `mc2-r31fw` step 1 cannot
-be done from history: `singleJudge` is null in every stored cascade row.
+The epic is about cutting generation cost, and its headline needs correcting first: across all 1589
+judged lessons rather than the 490 that reached a judge, 69.2% are settled free by heuristics, 6.3%
+take one judge, 17.6% two and 6.9% three — so the full panel runs _below_ its 15-20% design target,
+not four times above it. `mc2-r31fw` step 1 cannot be done from history: `singleJudge` is null in
+every stored cascade row.
+
+What the 2026-08-22 run says about where the money is: of $0.202480, the two cover images are
+$0.093685 — **46%** — against $0.052570 for all of Stage 6 and $0.004523 for Stages 4 and 5 together.
+On a small course an image costs more than the whole text pipeline. Stage 6 remains the target on a
+real course; the images are worth a separate look.
 
 **Three owner decisions of 2026-08-20/21 bind the routing work** and must not be revisited without a
 new decision: a provider that fails is ignored only inside the current chain of attempts, never in a
@@ -295,12 +332,13 @@ rather than chase speed. Key stages may move to `openai/gpt-5.6-luna` at ~8× th
 
 ## Starter prompt for next orchestrator
 
-Run the paid run in `docs/runbooks/cost-ledger-paid-run.md` against `develop` on dev, then reconcile
-`pnpm cost:report --since <T0>` TOTAL against the delta of `/api/v1/credits` for the same window and
-answer the acceptance list of `docs/plans/honest-receipt-kestrel.md` line by line. Ask before
-spending. Use $orchestrator-stage for the epic itself; single tasks are ordinary local work. Do not
-enable the cohort, change its threshold, reindex, force-push, migrate beyond `mc2-ufpko`, or spend
-beyond the USD 5 ceiling without separate current authorization.
+Open epic `mc2-4clyr` — cutting Stage 6 generation cost. Correct its headline against the 1589-lesson
+figures above before planning from it, and read the 2026-08-22 run's split: on a small course the two
+cover images outweigh the whole text pipeline. Use $orchestrator-stage for the epic itself; single
+tasks are ordinary local work. Ask before spending: the cost ledger is now proven, so a paid run is
+for measuring a change, not for finding holes. Do not enable the cohort, change its threshold,
+reindex, force-push, migrate beyond `mc2-ufpko`, or spend beyond the USD 5 ceiling without separate
+current authorization.
 
 ## Read first
 

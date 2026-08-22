@@ -2,16 +2,33 @@
 
 **Why this exists.** Over 2026-08-20 nine defects in cost accounting were found, fixed
 and shipped to dev and staging. Every one was invisible to the test suite and only
-provable against real data. The ledger has never recorded a real edit: `generation_trace`
-held **zero** `stage_edit` rows when that work finished, and nothing has run since. The
-wiring is verified; the behaviour is not.
+provable against real data. That is the standing reason to run this: unit tests verify the
+wiring, and only a paid run verifies the behaviour.
 
 Twice before, a paid run found defects no test had. Expect this one to as well. Finding
 one is the run succeeding, not failing.
 
-Open task this closes or updates: `mc2-z0xr3` — reconcile a course's recorded cost
+**Last result — 2026-08-22, `7c80e479c`: every acceptance line passed.** Report TOTAL
+$0.202480 against a `/credits` delta of $0.202481, and a third figure from summing
+`GET /api/v1/generation` over the 65 recorded ids agreed to the same six decimals. 25 of
+25 billed calls carried a provider receipt. The run still found one defect (`mc2-f1tqd`).
+So the purpose of the next run is to **measure a change**, not to look for holes — and it
+does not need to be this whole runbook unless the change touches the ledger.
+
+**Nobody drives the UI.** The owner's answer of 2026-08-20 stands: these runs are driven
+from code. Mint a session with `auth/v1/admin/generate_link` → `auth/v1/verify`
+(`token_hash` + `type` only), then call `https://dev.ai.megacampus.ru/api/trpc/<procedure>`
+with `Authorization: Bearer`. The course flow is a `courses` insert under RLS then
+`generation.initiate`; the playbook flow is `careerPlaybook.session.start` →
+`submitAnswer` per fixed key → `business_context` → `generation.requestFollowups` →
+`submitAnswer` per follow-up **by `question_id`** → `generation.approveAndGenerate`.
+`requestFollowups` takes a record of whole answer objects, not of strings.
+
+The task this existed for is closed: `mc2-z0xr3` — reconcile a course's recorded cost
 against the OpenRouter invoice. On 2026-08-16 a course showed $0.031 while the provider
-billed $0.065, and there was no way to see where the difference lived.
+billed $0.065, and there was no way to see where the difference lived; on 2026-08-22 the
+two figures agreed to the sixth decimal. File whatever the next run finds against a new
+issue and reference that one.
 
 ## What this run exercises first
 
@@ -41,7 +58,7 @@ Live since the 2026-08-21 run, and confirmed by it:
   rather than `generation_trace`, and the report now reads both. Before this, half the
   product was outside every reconciliation.
 
-Shipped after that run and **not yet exercised by any** — this is the first run to test them:
+Exercised for the first time by the 2026-08-22 run, and all three held:
 
 - **Images are priced like everything else.** The image service used to keep a private
   price table — `openai/gpt-5-image-mini` at $0.007 against a real $0.045080, 6.4x low —
@@ -82,7 +99,12 @@ excluded. Whether audio stays on a direct OpenAI account is an open question for
    Supabase database. Career playbook lives at `/<locale>/career-playbook`. Keep the
    course small — the point is covering the pipeline, not volume.
 
-3. The user drives the UI. Watch for failures rather than guessing:
+   **Upload a document only if the run is about documents.** Evidence extraction keeps its
+   own cost ledger and never reaches the course total (`mc2-b7olk.4`), so an upload puts a
+   knowingly unattributable delta into the window and a reconciliation cannot converge past
+   it. The 2026-08-22 run left it out and said so.
+
+3. Drive both generations from code (see above). Watch for failures rather than guessing:
 
    ```bash
    ssh megacampus-prod "docker logs --since 10m megacampus-worker-dev 2>&1 \
@@ -99,8 +121,12 @@ excluded. Whether audio stays on a direct OpenAI account is an open question for
    pnpm cost:report --since <T0>
    ```
 
-5. Then have the user make one chat edit to the finished course. That is the only way
-   `stage_edit` rows appear. Re-run the report.
+5. Then make one chat edit to the finished course — `generation.chat` with
+   `chatType:'node'` and `blockPath: 'sections[0].lessons[0]'`, then `applyProposal`. That
+   is the only way `stage_edit` rows appear. Ask for something the schema can actually
+   change: a rename produced a proposal on 2026-08-22 where rewriting a lesson
+   _description_ returned advice and no proposal, because that field is not editable.
+   Re-run the report.
 
 ## Acceptance
 
@@ -136,7 +162,15 @@ Report pass or fail on each line, naming what failed.
 - The worker logs show at least one retry that routed around a provider, if any call
   failed: search for `routes around it`. If nothing failed, say so — it is not a failure
   of this line.
-- No upload failed on the storage quota, and the counter moved:
+- A third figure, when the first two disagree and you need to know which is wrong: sum
+  `GET /api/v1/generation?id=` over every id in `generation_trace.output_data.generationId`
+  and `career_playbooks.cost_breakdown.nodeCosts[].generation_id`. It is free, it comes
+  from the provider rather than from our arithmetic, and it separates "a row carries the
+  wrong price" from "a call left no row at all". Ids the provider cannot find are calls
+  that were never billed.
+
+- If, and only if, the run uploaded a document: no upload failed on the storage quota, and
+  the counter moved:
 
   ```sql
   select name, storage_used_bytes from organizations where storage_used_bytes > 0;

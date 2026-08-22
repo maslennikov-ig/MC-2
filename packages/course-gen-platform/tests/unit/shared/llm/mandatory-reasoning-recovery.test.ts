@@ -12,12 +12,15 @@
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
+import { ChatOpenAI } from '@langchain/openai';
+import { z } from 'zod';
+
 import {
   forgetLearnedMandatoryReasoning,
   isMandatoryReasoningRejection,
   rememberMandatoryReasoning,
   requiresReasoningNow,
-  withMandatoryReasoningRecovery,
+  withMandatoryReasoningRecoveryFetch,
 } from '@/shared/llm/mandatory-reasoning-recovery';
 import { applyMandatoryReasoningFloor } from '@/shared/llm/client-helpers';
 
@@ -78,98 +81,120 @@ describe('mandatory reasoning recovery', () => {
   });
 });
 
-describe('the LangChain wrapper', () => {
+/**
+ * The recovery lives in the transport, not in `invoke`, because that is the only
+ * layer `withStructuredOutput` cannot drop (mc2-148j9). These tests state that
+ * as behaviour: what the wire carries on the retry, and that a structured call
+ * gets one.
+ */
+describe('the transport wrapper', () => {
   beforeEach(forgetLearnedMandatoryReasoning);
 
-  function refusingModel(refusals: number) {
-    let refused = 0;
-    return {
-      invoke: async () => {
-        if (refused < refusals) {
-          refused += 1;
-          throw new ApiError(
-            400,
-            'Reasoning is mandatory for this endpoint and cannot be disabled'
-          );
-        }
-        return 'answer';
-      },
-    };
-  }
+  const REFUSAL = JSON.stringify({
+    error: {
+      code: 400,
+      message: 'Reasoning is mandatory for this endpoint and cannot be disabled',
+    },
+  });
 
-  it('rebuilds the model and calls it again', async () => {
-    const rebuilt = { invoke: vi.fn(async () => 'answer from the rebuilt model') };
-    const model = withMandatoryReasoningRecovery(
-      refusingModel(1) as never,
-      UNFLAGGED,
-      () => rebuilt as never
+  const refused = () =>
+    new Response(REFUSAL, { status: 400, headers: { 'content-type': 'application/json' } });
+
+  const answered = () =>
+    new Response(
+      JSON.stringify({
+        id: 'chatcmpl-1',
+        object: 'chat.completion',
+        created: 1,
+        model: UNFLAGGED,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: { role: 'assistant', content: 'answer' },
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
     );
 
-    await expect(model.invoke('hello' as never)).resolves.toBe('answer from the rebuilt model');
+  /** A transport that refuses the first `refusals` requests and records bodies. */
+  function fakeFetch(refusals: number) {
+    const bodies: Record<string, unknown>[] = [];
+    let seen = 0;
+    const fetchImpl = vi.fn(async (_input: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      seen += 1;
+      return seen <= refusals ? refused() : answered();
+    });
+    return { fetchImpl: fetchImpl as unknown as typeof globalThis.fetch, bodies, calls: fetchImpl };
+  }
 
-    expect(rebuilt.invoke).toHaveBeenCalledTimes(1);
+  function modelOn(fetchImpl: typeof globalThis.fetch): ChatOpenAI {
+    return new ChatOpenAI({
+      model: UNFLAGGED,
+      apiKey: 'test-key',
+      maxTokens: 1_000,
+      maxRetries: 0,
+      configuration: {
+        baseURL: 'http://127.0.0.1:1/never-reached',
+        fetch: withMandatoryReasoningRecoveryFetch(UNFLAGGED, fetchImpl),
+      },
+      modelKwargs: { reasoning: { enabled: false } },
+    });
+  }
+
+  it('re-sends the refused request asking for the least deliberation', async () => {
+    const { fetchImpl, bodies, calls } = fakeFetch(1);
+
+    await modelOn(fetchImpl).invoke('hello');
+
+    expect(calls).toHaveBeenCalledTimes(2);
+    expect(bodies[0]).toMatchObject({ reasoning: { enabled: false }, max_tokens: 1_000 });
+    expect(bodies[1]).toMatchObject({ reasoning: { effort: 'low' } });
+    // The floor is billed against the answer budget, so the budget grows.
+    expect(bodies[1].max_tokens).toBeGreaterThan(1_000);
     expect(requiresReasoningNow(UNFLAGGED)).toBe(true);
   });
 
-  it('retries once per call, not once per model', async () => {
-    // Two calls refused before either has been handled: only the first is news,
-    // and gating the retry on that would leave the second unhelped.
-    const rebuilt = { invoke: vi.fn(async () => 'answer') };
-    const build = () => rebuilt as never;
-    const first = withMandatoryReasoningRecovery(refusingModel(1) as never, UNFLAGGED, build);
-    const second = withMandatoryReasoningRecovery(refusingModel(1) as never, UNFLAGGED, build);
+  it('reaches a structured call, which a replaced invoke never did', async () => {
+    // The whole point of mc2-148j9: `withStructuredOutput` builds
+    // `new ChatOpenAI(this.fields)`, so only constructor fields survive. If the
+    // recovery were on `invoke` this would make one request and fail with the
+    // provider's 400.
+    const { fetchImpl, bodies, calls } = fakeFetch(1);
+    const structured = modelOn(fetchImpl).withStructuredOutput(z.object({ answer: z.string() }), {
+      name: 'extract',
+    });
+
+    await structured.invoke('hello').catch(() => undefined);
+
+    expect(calls).toHaveBeenCalledTimes(2);
+    expect(bodies[1]).toMatchObject({ reasoning: { effort: 'low' } });
+  });
+
+  it('gives up rather than looping when the floor is refused too', async () => {
+    const { fetchImpl, calls } = fakeFetch(2);
+
+    await expect(modelOn(fetchImpl).invoke('hello')).rejects.toThrow(/mandatory/);
+
+    expect(calls).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not touch a 400 that is about something else', async () => {
+    const other = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: { message: 'context length exceeded' } }), {
+          status: 400,
+        })
+    );
 
     await expect(
-      Promise.all([first.invoke('a' as never), second.invoke('b' as never)])
-    ).resolves.toEqual(['answer', 'answer']);
+      modelOn(other as unknown as typeof globalThis.fetch).invoke('hello')
+    ).rejects.toThrow(/context length/);
 
-    expect(rebuilt.invoke).toHaveBeenCalledTimes(2);
-  });
-
-  it('gives up rather than looping when the rebuilt model is refused too', async () => {
-    const model = withMandatoryReasoningRecovery(
-      refusingModel(2) as never,
-      UNFLAGGED,
-      () => refusingModel(2) as never
-    );
-
-    await expect(model.invoke('hello' as never)).rejects.toThrow(/mandatory/);
-  });
-
-  it('leaves the rebuilt model the cost recording it was built with', async () => {
-    // The recovery replaces the instance, and a recovered call that lost its
-    // recording would be the one call of the run nobody is charged for. It used
-    // to be carried across by hand, because recording was assigned to the model
-    // after it was wrapped. It is a constructor field now — `rebuild` produces a
-    // model that already has it — so the copy is gone and this checks that the
-    // recovery does not clobber what the factory built in (mc2-258fi).
-    const recorder = [{ handleLLMEnd: vi.fn() }];
-    const rebuilt = { invoke: vi.fn(async () => 'answer'), callbacks: recorder as unknown };
-    const model = withMandatoryReasoningRecovery(
-      refusingModel(1) as never,
-      UNFLAGGED,
-      () => rebuilt as never
-    );
-
-    await model.invoke('hello' as never);
-
-    expect(rebuilt.invoke).toHaveBeenCalledTimes(1);
-    expect(rebuilt.callbacks).toBe(recorder);
-  });
-
-  it('does not touch a failure that is about something else', async () => {
-    const rebuilt = { invoke: vi.fn() };
-    const model = withMandatoryReasoningRecovery(
-      {
-        invoke: async () => {
-          throw new ApiError(400, 'context length exceeded');
-        },
-      } as never,
-      UNFLAGGED,
-      () => rebuilt as never
-    );
-
-    await expect(model.invoke('hello' as never)).rejects.toThrow(/context length/);
-    expect(rebuilt.invoke).not.toHaveBeenCalled();
+    expect(other).toHaveBeenCalledTimes(1);
+    expect(requiresReasoningNow(UNFLAGGED)).toBe(false);
   });
 });
