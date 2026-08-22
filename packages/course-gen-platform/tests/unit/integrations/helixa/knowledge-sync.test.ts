@@ -1,17 +1,21 @@
 import { createHash, createHmac } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/shared/supabase/admin', () => ({ getSupabaseAdmin: vi.fn() }));
 vi.mock('@/stages/stage1-document-upload/storage-paths', () => ({ getUploadStorageRootPath: () => '/tmp/uploads' }));
 
-import { buildKnowledgeSyncPackage, serializeKnowledgeSyncPackage, type KnowledgeExportSnapshot } from '@/integrations/helixa/package-builder';
-import { classifyDeliveryFailure, deliverClaimedKnowledgeSync } from '@/integrations/helixa/delivery';
-import { processKnowledgeSyncOutboxEntry } from '@/integrations/helixa/outbox';
+import { buildKnowledgeSyncPackage, routeMediaType, serializeKnowledgeSyncPackage, type KnowledgeExportSnapshot } from '@/integrations/helixa/package-builder';
+import { classifyDeliveryFailure, createFetchRequest, deliverClaimedKnowledgeSync } from '@/integrations/helixa/delivery';
+import { computeRetryDelayMs, KnowledgeSyncPreparationError, processKnowledgeSyncOutboxEntry } from '@/integrations/helixa/outbox';
 import { reconcileCompletedKnowledgeObjects } from '@/integrations/helixa/reconciler';
-import { mapCompletedCourse, mapCompletedRoleGuide } from '@/integrations/helixa/snapshot-loader';
+import { bindAcceptedCourseSources, mapCompletedCourse, mapCompletedRoleGuide } from '@/integrations/helixa/snapshot-loader';
 import { createUploadStorageReader } from '@/integrations/helixa/storage-reader';
 import { readKnowledgeSyncRuntimeConfig } from '@/integrations/helixa/runtime-repository';
+import { claimKnowledgeSyncOutbox } from '@/integrations/helixa/runtime-repository';
+import { getSupabaseAdmin } from '@/shared/supabase/admin';
 
 const completedAt = '2026-08-22T12:34:56.000Z';
 const organizationId = 'org-1';
@@ -47,10 +51,11 @@ describe('MegaCampus knowledge package', () => {
     expect(first.schemaVersion).toBe('2026-06-16.megacampus-knowledge-sync.v1');
     expect(first.eventId).toBe(second.eventId);
     expect(first.object.version).toBe(completedAt);
-    expect(first.sourceDocuments[0]).toMatchObject({
+    const primary = first.sourceDocuments.find(document => document.authority === 'primary_source');
+    expect(primary).toMatchObject({
       route: { family: 'local_text' }, provenance: { sourceType: 'file_catalog', sourceId: 'file-1' },
     });
-    expect(first.sourceDocuments[0]?.artifacts.map(item => item.representation)).toEqual([
+    expect(primary?.artifacts.map(item => item.representation)).toEqual([
       'original_bytes', 'trusted_normalized_markdown',
     ]);
 
@@ -77,8 +82,26 @@ describe('MegaCampus knowledge package', () => {
     expect(result.eventType).toBe('ROLE_GUIDE_COMPLETED');
     expect(result.object.kind).toBe('ROLE_GUIDE');
     expect(result.content.lessons).toEqual([]);
-    expect(result.sourceDocuments[0]?.route.family).toBe('docling');
-    expect(result.sourceDocuments[0]?.artifacts[1]).toMatchObject({ representation: 'accepted_docling_json', content: docling });
+    const primary = result.sourceDocuments.find(document => document.authority === 'primary_source');
+    expect(primary?.route.family).toBe('docling');
+    expect(primary?.artifacts[1]).toMatchObject({ representation: 'accepted_docling_json', content: docling });
+  });
+
+  it.each([
+    ['COURSE', 'derived_training'], ['ROLE_GUIDE', 'derived_role_guide'],
+  ] as const)('always emits citable generated-object evidence for %s', async (kind, authority) => {
+    const result = await buildKnowledgeSyncPackage(snapshot({
+      kind, id: kind === 'COURSE' ? courseId : 'role-1',
+      summaryMarkdown: kind === 'COURSE' ? '# Course\nSummary' : '# Role\nFinal guide',
+      blocks: kind === 'ROLE_GUIDE' ? [{ key: 'mission', markdown: 'Lead.' }] : [],
+      lessons: kind === 'COURSE' ? [{ id: 'lesson-1', markdown: '# Lesson\nLearn.' }] : [], sources: [],
+    }), { environment: 'test', externalProjectId: null });
+    const generated = result.sourceDocuments.find(document => document.provenance.sourceType === 'generated_object');
+    expect(generated).toMatchObject({ authority, route: { family: 'local_text' } });
+    expect(generated?.artifacts[0]).toMatchObject({ representation: 'original_bytes', mediaType: 'text/markdown' });
+    expect(result.evidenceSegments).toContainEqual(expect.objectContaining({
+      documentKey: generated?.documentKey, artifactKey: generated?.artifacts[0]?.artifactKey, authority,
+    }));
   });
 
   it('fails closed for unapproved, cross-tenant, or cross-object sources', async () => {
@@ -112,8 +135,18 @@ describe('MegaCampus knowledge package', () => {
       objectId: courseId, approved: true, version: 'v1', fileName: `source-${index}.bin`, mediaType,
       readOriginalBytes: async () => Buffer.from(`bytes-${index}`),
     })) }), { environment: 'test', externalProjectId: null });
-    expect(result.sourceDocuments.map(item => item.route.family)).toEqual([...routes.values()]);
+    expect(result.sourceDocuments.filter(item => item.authority === 'primary_source').map(item => item.route.family)).toEqual([...routes.values()]);
     expect(result.metadata).toMatchObject({ routeCounts: { unsupported: 1 } });
+  });
+
+  it('matches the frozen Helixa MIME essence policy including malformed values', () => {
+    const cases = new Map<string, string>([
+      ['application/msword', 'docling'], ['application/vnd.ms-excel', 'docling'],
+      ['application/vnd.ms-powerpoint', 'docling'], ['image/bmp', 'docling'], ['image/webp', 'docling'],
+      ['application/problem+json; charset=utf-8', 'local_text'], ['text/plain; charset=utf-8', 'local_text'],
+      ['text/csv', 'unsupported'], ['text/plain; broken', 'unsupported'], ['not-a-media-type', 'unsupported'],
+    ]);
+    for (const [mediaType, route] of cases) expect(routeMediaType(mediaType)).toBe(route);
   });
 
   it('fails the package when approved source bytes cannot be read and safely keeps an original-only source', async () => {
@@ -121,7 +154,7 @@ describe('MegaCampus knowledge package', () => {
       id: 'missing', sourceType: 'file_catalog', organizationId, objectKind: 'COURSE', objectId: courseId,
       approved: true, version: 'v1', fileName: 'missing.pdf', mediaType: 'application/pdf',
       readOriginalBytes: async () => { throw new Error('storage unavailable'); },
-    }] }), { environment: 'test', externalProjectId: null })).rejects.toThrow('storage unavailable');
+    }] }), { environment: 'test', externalProjectId: null })).rejects.toThrow(/storage/i);
 
     const originalOnly = await buildKnowledgeSyncPackage(snapshot({ sources: [{
       id: 'raw', sourceType: 'file_catalog', organizationId, objectKind: 'COURSE', objectId: courseId,
@@ -145,16 +178,49 @@ describe('MegaCampus knowledge package', () => {
       sources: [], readBytes: vi.fn(),
     });
     expect(guide).toMatchObject({ kind: 'ROLE_GUIDE', summaryMarkdown: '# Sales Lead', structure: { roleProfileSpec: { level: 'lead' } } });
-    await expect(mapCompletedCourse({ ...({ course: { id: courseId, organization_id: organizationId, generation_status: 'stage_6_complete', generation_completed_at: null, title: 'Course', language: 'ru', course_structure: {} }, lessonContents: [], files: [], readBytes: vi.fn() }) })).rejects.toThrow(/completed/i);
+    await expect(mapCompletedCourse({ ...({ course: { id: courseId, organization_id: organizationId, generation_status: 'stage_6_complete', generation_completed_at: null, title: 'Course', language: 'ru', course_structure: {} }, lessonContents: [], files: [], readBytes: vi.fn() }) })).rejects.toThrow(/event_identity/i);
   });
 
-  it('reads source bytes only below the injected upload root', async () => {
-    const readFileBytes = vi.fn().mockResolvedValue(Buffer.from('ok'));
-    const reader = createUploadStorageReader('/srv/mc2/uploads', readFileBytes);
-    await expect(reader({ id: 'f1', storage_path: 'org/f1.pdf' })).resolves.toEqual(Buffer.from('ok'));
-    expect(readFileBytes).toHaveBeenCalledWith('/srv/mc2/uploads/org/f1.pdf');
-    await expect(reader({ id: 'f2', storage_path: '../secret' })).rejects.toThrow(/outside/i);
-    await expect(reader({ id: 'f3', storage_path: '/etc/passwd' })).rejects.toThrow(/outside/i);
+  it('binds Course approval to the exact accepted manifest version', () => {
+    const hash = 'a'.repeat(64);
+    const files = [{ id: '550e8400-e29b-41d4-a716-446655440000', hash }];
+    expect(bindAcceptedCourseSources([{ document_id: files[0]!.id, source_version_hash: hash, document_name: 'policy' }], files)).toEqual([{ ...files[0], approved: true, approvedVersion: hash }]);
+    expect(() => bindAcceptedCourseSources([{ document_id: files[0]!.id, source_version_hash: 'b'.repeat(64), document_name: 'policy' }], files)).toThrow(/provenance/i);
+    expect(() => bindAcceptedCourseSources([{ document_id: 'bad', source_version_hash: hash, document_name: 'policy' }], files)).toThrow(/provenance/i);
+    expect(() => bindAcceptedCourseSources(undefined, files)).toThrow(/provenance/i);
+  });
+
+  it('keeps Role Guide source-row identity object-scoped when two guides share one file', async () => {
+    const sharedFile = { id: 'file-shared', organization_id: organizationId, course_id: null, filename: 'policy.pdf', mime_type: 'application/pdf', hash: 'hash-v1', storage_path: 'org/policy.pdf', approved: true };
+    const build = async (playbookId: string, sourceId: string) => buildKnowledgeSyncPackage(await mapCompletedRoleGuide({
+      playbook: { id: playbookId, organization_id: organizationId, status: 'completed', completed_at: completedAt, position_title: 'Role', language: 'en', final_markdown: '# Role', role_profile_spec: {}, generated_blocks: {} },
+      sources: [{ id: sourceId, playbook_id: playbookId, organization_id: organizationId, source_type: 'file', status: 'ready', filename: 'policy.pdf', text: null, file: sharedFile }],
+      readBytes: async () => Buffer.from('shared'),
+    }), { environment: 'test', externalProjectId: null });
+    const [first, second] = await Promise.all([build('role-1', 'source-1'), build('role-2', 'source-2')]);
+    const firstPrimary = first.sourceDocuments.find(item => item.authority === 'primary_source')!;
+    const secondPrimary = second.sourceDocuments.find(item => item.authority === 'primary_source')!;
+    expect(firstPrimary.provenance).toMatchObject({ sourceId: 'source-1', metadata: { underlyingFileId: 'file-shared' } });
+    expect(secondPrimary.provenance.sourceId).toBe('source-2');
+    expect(firstPrimary.documentKey).not.toBe(secondPrimary.documentKey);
+  });
+
+  it('reads source bytes below the real root and refuses a symlink escape', async () => {
+    const boundary = await mkdtemp(path.join(tmpdir(), 'mc2-helixa-storage-'));
+    const root = path.join(boundary, 'uploads');
+    const inside = path.join(root, 'org');
+    await import('node:fs/promises').then(fs => fs.mkdir(inside, { recursive: true }));
+    await writeFile(path.join(inside, 'safe.txt'), 'safe');
+    await writeFile(path.join(boundary, 'outside.txt'), 'outside');
+    await symlink(path.join(boundary, 'outside.txt'), path.join(inside, 'escape.txt'));
+    try {
+      const reader = createUploadStorageReader(root);
+      await expect(reader({ id: 'f1', storage_path: 'org/safe.txt' })).resolves.toEqual(Buffer.from('safe'));
+      await expect(reader({ id: 'f2', storage_path: 'org/escape.txt' })).rejects.toThrow(/provenance/i);
+      await expect(reader({ id: 'f3', storage_path: '../outside.txt' })).rejects.toThrow(/provenance/i);
+    } finally {
+      await rm(boundary, { recursive: true, force: true });
+    }
   });
 });
 
@@ -163,12 +229,29 @@ describe('delivery and durable intent', () => {
     expect(readKnowledgeSyncRuntimeConfig({
       HELIXA_KNOWLEDGE_SYNC_ENDPOINT: 'https://helixa.test/api/integrations/megacampus/knowledge-sync',
       HELIXA_KNOWLEDGE_SYNC_HMAC_KEY: 'runtime-only', HELIXA_EXTERNAL_SYSTEM_ID: 'system-1',
-      HELIXA_DESTINATION_PROJECT_ID: 'project-1', APP_ENV: 'test',
+      HELIXA_DESTINATION_PROJECT_ID: 'project-1', HELIXA_KNOWLEDGE_SYNC_BINDING_ID: 'binding-1',
+      HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID: organizationId, HELIXA_DESTINATION_BINDING_ID: 'destination-1', APP_ENV: 'test',
     })).toEqual({
       endpoint: 'https://helixa.test/api/integrations/megacampus/knowledge-sync', hmacKey: 'runtime-only',
       externalSystemId: 'system-1', externalProjectId: 'project-1', environment: 'test',
+      bindingId: 'binding-1', organizationId, destinationBindingId: 'destination-1',
     });
     expect(() => readKnowledgeSyncRuntimeConfig({})).toThrow(/incomplete/i);
+  });
+  it('claims only the invoking organization/environment/destination binding', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+    vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
+    const binding = readKnowledgeSyncRuntimeConfig({
+      HELIXA_KNOWLEDGE_SYNC_ENDPOINT: 'https://helixa.test', HELIXA_KNOWLEDGE_SYNC_HMAC_KEY: 'key',
+      HELIXA_EXTERNAL_SYSTEM_ID: 'system-1', HELIXA_DESTINATION_PROJECT_ID: 'project-1',
+      HELIXA_KNOWLEDGE_SYNC_BINDING_ID: 'binding-1', HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID: organizationId,
+      HELIXA_DESTINATION_BINDING_ID: 'destination-1', APP_ENV: 'staging',
+    });
+    await claimKnowledgeSyncOutbox(binding, 7);
+    expect(rpc).toHaveBeenCalledWith('claim_helixa_knowledge_sync_outbox', {
+      p_binding_id: 'binding-1', p_organization_id: organizationId, p_environment: 'staging',
+      p_destination_binding_id: 'destination-1', p_batch_size: 7,
+    });
   });
   it('signs exact stored bytes and sends injected routing headers', async () => {
     const rawBody = Buffer.from('{"stable":true}');
@@ -184,6 +267,12 @@ describe('delivery and durable intent', () => {
     } }));
   });
 
+  it('uses a request deadline shorter than the database lease', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response('', { status: 202 }));
+    await createFetchRequest(fetchImpl as typeof fetch, 120_000)({ url: 'https://helixa.test', method: 'POST', headers: {}, body: Buffer.from('{}') });
+    expect(fetchImpl.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('classifies retryable and terminal responses exactly', () => {
     expect(classifyDeliveryFailure({ kind: 'network', message: 'reset' })).toBe('retryable');
     for (const status of [408, 429, 500, 503]) expect(classifyDeliveryFailure({ kind: 'http', status, message: 'failed' })).toBe('retryable');
@@ -194,11 +283,11 @@ describe('delivery and durable intent', () => {
     const rawBody = Buffer.from('{"already":"frozen"}');
     const buildPackage = vi.fn();
     const repository = {
-      persistRawBodyOnce: vi.fn(), markDelivered: vi.fn(), reschedule: vi.fn(), markTerminal: vi.fn(),
+      persistRawBodyOnce: vi.fn(), markDelivered: vi.fn().mockResolvedValue(true), reschedule: vi.fn().mockResolvedValue(true), markTerminal: vi.fn().mockResolvedValue(true),
     };
     const request = vi.fn().mockResolvedValue({ status: 503, body: '' });
     const result = await processKnowledgeSyncOutboxEntry({
-      entry: { id: 'outbox-1', eventId: 'event-1', objectKind: 'COURSE', objectId: courseId, organizationId, completedAt, rawBody },
+      entry: { id: 'outbox-1', eventId: 'event-1', objectKind: 'COURSE', objectId: courseId, organizationId, completedAt, rawBody, attempts: 2, leaseToken: 'lease-b', bindingId: 'binding-1' },
       buildPackage, repository,
       delivery: { endpoint: 'https://helixa.test/api/integrations/megacampus/knowledge-sync', hmacKey: 'key', externalSystemId: 'system-1', request },
       now: new Date('2026-08-22T13:00:00.000Z'),
@@ -207,7 +296,31 @@ describe('delivery and durable intent', () => {
     expect(buildPackage).not.toHaveBeenCalled();
     expect(repository.persistRawBodyOnce).not.toHaveBeenCalled();
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ body: rawBody }));
-    expect(repository.reschedule).toHaveBeenCalledWith('outbox-1', new Date('2026-08-22T13:01:00.000Z'), 'HTTP 503');
+    expect(repository.reschedule).toHaveBeenCalledWith('outbox-1', 'lease-b', expect.any(Date), 'HTTP 503');
+  });
+
+  it('treats stale worker A as lost lease after worker B reclaims and delivers', async () => {
+    const repository = { persistRawBodyOnce: vi.fn(), markDelivered: vi.fn().mockResolvedValue(false), reschedule: vi.fn(), markTerminal: vi.fn() };
+    const result = await processKnowledgeSyncOutboxEntry({
+      entry: { id: 'outbox-1', eventId: 'event-1', objectKind: 'COURSE', objectId: courseId, organizationId, completedAt, rawBody: Buffer.from('{}'), attempts: 2, leaseToken: 'lease-a', bindingId: 'binding-1' },
+      buildPackage: vi.fn(), repository,
+      delivery: { endpoint: 'https://helixa.test', hmacKey: 'key', externalSystemId: 'system', request: vi.fn().mockResolvedValue({ status: 202, body: '' }) },
+    });
+    expect(result).toBe('lost_lease');
+    expect(repository.reschedule).not.toHaveBeenCalled();
+    expect(repository.markTerminal).not.toHaveBeenCalled();
+  });
+
+  it('terminalizes deterministic preparation errors and caps transient retries with backoff', async () => {
+    const repository = { persistRawBodyOnce: vi.fn(), markDelivered: vi.fn(), reschedule: vi.fn(), markTerminal: vi.fn().mockResolvedValue(true) };
+    const baseEntry = { id: 'o1', eventId: 'e1', objectKind: 'COURSE' as const, objectId: courseId, organizationId, completedAt, rawBody: null, attempts: 1, leaseToken: 'lease', bindingId: 'binding-1' };
+    expect(await processKnowledgeSyncOutboxEntry({ entry: baseEntry, buildPackage: async () => { throw new KnowledgeSyncPreparationError('provenance', false); }, repository, delivery: { endpoint: 'x', hmacKey: 'k', externalSystemId: 's', request: vi.fn() } })).toBe('terminal');
+    expect(repository.markTerminal).toHaveBeenCalledWith('o1', 'lease', 'Preparation requires operator action');
+    expect(computeRetryDelayMs(1, 'e1')).toBeLessThan(computeRetryDelayMs(5, 'e1'));
+
+    repository.markTerminal.mockClear();
+    expect(await processKnowledgeSyncOutboxEntry({ entry: { ...baseEntry, attempts: 8 }, buildPackage: async () => { throw new KnowledgeSyncPreparationError('storage', true); }, repository, delivery: { endpoint: 'x', hmacKey: 'k', externalSystemId: 's', request: vi.fn() } })).toBe('terminal');
+    expect(repository.markTerminal).toHaveBeenCalled();
   });
 
   it('migration atomically captures both completion transitions without changing job_outbox', async () => {
@@ -217,6 +330,13 @@ describe('delivery and durable intent', () => {
     expect(sql).toContain('AFTER INSERT OR UPDATE OF status, completed_at ON career_playbooks');
     expect(sql).toContain("object_kind IN ('COURSE', 'ROLE_GUIDE')");
     expect(sql).toContain("item.status = 'processing' AND item.last_attempt_at < NOW() - INTERVAL '15 minutes'");
+    expect(sql).toContain('destination_binding_id');
+    expect(sql).toContain('claim_generation');
+    expect(sql).toContain('lease_token');
+    expect(sql).toContain('WHERE item.binding_id = p_binding_id');
+    expect(sql).toContain("status = 'processing' AND lease_token = p_lease_token");
+    expect(sql).toContain('reset_helixa_knowledge_sync_intent');
+    expect(sql).not.toMatch(/reset_helixa_knowledge_sync_intent[\s\S]*raw_body\s*=\s*NULL/i);
     expect(sql).not.toMatch(/ALTER\s+TABLE\s+job_outbox/i);
   });
 

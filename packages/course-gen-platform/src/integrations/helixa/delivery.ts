@@ -24,10 +24,10 @@ export async function deliverClaimedKnowledgeSync(delivery: ClaimedDelivery, con
   return response;
 }
 
-export function createFetchRequest(fetchImpl: typeof fetch = fetch): DeliveryConfig['request'] {
+export function createFetchRequest(fetchImpl: typeof fetch = fetch, timeoutMs = 120_000): DeliveryConfig['request'] {
   return async input => {
     try {
-      const response = await fetchImpl(input.url, { method: input.method, headers: input.headers, body: input.body });
+      const response = await fetchImpl(input.url, { method: input.method, headers: input.headers, body: input.body, signal: AbortSignal.timeout(timeoutMs) });
       return { status: response.status, body: await response.text() };
     } catch (error) {
       throw { kind: 'network', message: error instanceof Error ? error.message : 'Network delivery failed' } satisfies DeliveryFailure;

@@ -1,5 +1,6 @@
 import { canonicalJson, computePayloadHash, sha256 } from './canonical-json';
 import { KNOWLEDGE_SYNC_SCHEMA_VERSION, type JsonValue, type KnowledgeObjectKind, type KnowledgeSyncPackage, type ProcessingRoute, type SourceDocument } from './contract';
+import { KnowledgeSyncPreparationError } from './errors';
 
 export interface ExportSource {
   id: string;
@@ -10,6 +11,7 @@ export interface ExportSource {
   approved: boolean;
   version: string;
   sourceSha256?: string;
+  underlyingFileId?: string;
   fileName: string;
   mediaType: string;
   readOriginalBytes(): Promise<Buffer>;
@@ -34,16 +36,38 @@ export interface KnowledgeExportSnapshot {
 
 export interface PackageBuildOptions { environment: string; externalProjectId: string | null }
 
-const docling = new Set(['application/pdf', 'text/html', 'application/xhtml+xml', 'application/epub+zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.presentation', 'application/vnd.oasis.opendocument.spreadsheet', 'image/png', 'image/jpeg', 'image/tiff']);
-const localText = new Set(['text/plain', 'text/markdown', 'application/json', 'text/csv']);
-const rss = new Set(['application/rss+xml', 'application/atom+xml']);
+const MAX_EMBEDDED_ARTIFACT_BYTES = 64 * 1024 * 1024;
+const MAX_RAW_PACKAGE_BYTES = 256 * 1024 * 1024;
+const docling = new Set([
+  'application/pdf', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.presentation', 'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.text', 'application/epub+zip', 'application/xhtml+xml', 'text/html',
+  'image/bmp', 'image/jpeg', 'image/png', 'image/tiff', 'image/webp',
+]);
+
+function mediaTypeEssence(value: string): string | null {
+  const parts = value.split(';');
+  const essence = parts.shift()?.trim().toLowerCase() ?? '';
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/u.test(essence)) return null;
+  for (const rawParameter of parts) {
+    const parameter = rawParameter.trim();
+    const separator = parameter.indexOf('=');
+    if (separator <= 0 || separator === parameter.length - 1) return null;
+  }
+  return essence;
+}
 
 export function routeMediaType(mediaType: string): ProcessingRoute {
-  const normalized = mediaType.toLowerCase().split(';', 1)[0]!.trim();
-  if (docling.has(normalized)) return 'docling';
-  if (localText.has(normalized)) return 'local_text';
-  if (rss.has(normalized)) return 'content_rss';
-  if (normalized.startsWith('audio/') || normalized.startsWith('video/')) return 'meetings_media';
+  if (typeof mediaType !== 'string') return 'unsupported';
+  const essence = mediaTypeEssence(mediaType);
+  if (essence == null) return 'unsupported';
+  if (essence === 'application/rss+xml' || essence === 'application/atom+xml') return 'content_rss';
+  if (essence.startsWith('audio/') || essence.startsWith('video/')) return 'meetings_media';
+  if (docling.has(essence)) return 'docling';
+  if (essence === 'text/plain' || essence === 'text/markdown' || essence === 'application/json' || essence.endsWith('+json')) return 'local_text';
   return 'unsupported';
 }
 
@@ -60,7 +84,7 @@ function stableKey(prefix: string, ...parts: string[]): string { return `${prefi
 
 function assertSourceProvenance(snapshot: KnowledgeExportSnapshot, source: ExportSource): void {
   if (!source.approved || source.organizationId !== snapshot.organizationId || source.objectKind !== snapshot.kind || source.objectId !== snapshot.id) {
-    throw new Error(`Source provenance is not approved for ${snapshot.kind}:${snapshot.id}`);
+    throw new KnowledgeSyncPreparationError('provenance', false);
   }
 }
 
@@ -69,24 +93,61 @@ export function knowledgeEventId(input: Pick<KnowledgeExportSnapshot, 'kind' | '
 }
 
 export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapshot, options: PackageBuildOptions): Promise<KnowledgeSyncPackage> {
-  if (!snapshot.summaryMarkdown.trim()) throw new Error('Completed object requires non-empty summary Markdown');
+  if (!snapshot.summaryMarkdown.trim()) throw new KnowledgeSyncPreparationError('contract', false);
+  if ((snapshot.sources?.length ?? 0) > 255) throw new KnowledgeSyncPreparationError('payload_size', false);
   const content = { summaryMarkdown: snapshot.summaryMarkdown, structure: snapshot.structure, blocks: snapshot.blocks, lessons: snapshot.lessons };
-  const sourceDocuments: SourceDocument[] = [];
-  const evidenceSegments: KnowledgeSyncPackage['evidenceSegments'] = [];
+  const generatedAuthority = snapshot.kind === 'COURSE' ? 'derived_training' : 'derived_role_guide';
+  let generatedText: string;
+  try {
+    generatedText = snapshot.kind === 'COURSE'
+      ? [snapshot.summaryMarkdown, ...snapshot.lessons.map(lesson => typeof lesson.markdown === 'string' ? lesson.markdown : canonicalJson(lesson))].join('\n\n')
+      : [snapshot.summaryMarkdown, ...snapshot.blocks.map(block => typeof block.markdown === 'string' ? block.markdown : canonicalJson(block))].join('\n\n');
+  } catch {
+    throw new KnowledgeSyncPreparationError('contract', false);
+  }
+  const generatedBytes = Buffer.from(generatedText, 'utf8');
+  if (generatedBytes.byteLength > MAX_EMBEDDED_ARTIFACT_BYTES) throw new KnowledgeSyncPreparationError('payload_size', false);
+  const generatedDocumentKey = stableKey('document', snapshot.organizationId, snapshot.kind, snapshot.id, 'generated', snapshot.completedAt);
+  const generatedArtifactKey = stableKey('artifact', snapshot.organizationId, snapshot.kind, snapshot.id, generatedDocumentKey, sha256(generatedBytes));
+  const sourceDocuments: SourceDocument[] = [{
+    documentKey: generatedDocumentKey,
+    authority: generatedAuthority,
+    provenance: { system: 'megacampus', sourceType: 'generated_object', sourceId: snapshot.id, sourceVersion: snapshot.completedAt },
+    route: { family: 'local_text' },
+    artifacts: [artifact(generatedBytes, generatedArtifactKey, `${snapshot.kind.toLowerCase()}-${snapshot.id}.md`, 'text/markdown')],
+  }];
+  const evidenceSegments: KnowledgeSyncPackage['evidenceSegments'] = [{
+    segmentKey: stableKey('evidence', snapshot.organizationId, snapshot.kind, snapshot.id, generatedDocumentKey),
+    documentKey: generatedDocumentKey, artifactKey: generatedArtifactKey, authority: generatedAuthority,
+    text: generatedText, locator: { kind: 'whole_artifact' },
+  }];
 
   for (const source of snapshot.sources ?? []) {
     assertSourceProvenance(snapshot, source);
-    const bytes = await source.readOriginalBytes();
-    if (bytes.byteLength === 0) throw new Error(`Approved source ${source.id} is empty`);
-    if (source.sourceSha256 && sha256(bytes) !== source.sourceSha256) throw new Error(`Approved source ${source.id} hash does not match stored provenance`);
-    const documentKey = stableKey('document', source.sourceType, source.id, source.version);
-    const originalKey = stableKey('artifact', documentKey, 'original', sha256(bytes));
+    let bytes: Buffer;
+    try {
+      bytes = await source.readOriginalBytes();
+    } catch (error) {
+      if (error instanceof KnowledgeSyncPreparationError) throw error;
+      throw new KnowledgeSyncPreparationError('storage', true);
+    }
+    if (bytes.byteLength === 0) throw new KnowledgeSyncPreparationError('contract', false);
+    if (bytes.byteLength > MAX_EMBEDDED_ARTIFACT_BYTES) throw new KnowledgeSyncPreparationError('payload_size', false);
+    if (source.sourceSha256 && sha256(bytes) !== source.sourceSha256) throw new KnowledgeSyncPreparationError('provenance', false);
+    const documentKey = stableKey('document', snapshot.organizationId, snapshot.kind, snapshot.id, source.sourceType, source.id, source.version);
+    const originalKey = stableKey('artifact', snapshot.organizationId, snapshot.kind, snapshot.id, documentKey, 'original', sha256(bytes));
     const artifacts: SourceDocument['artifacts'] = [artifact(bytes, originalKey, source.fileName, source.mediaType)];
     let evidenceArtifactKey: string | undefined;
     let evidenceText: string | undefined;
     const route = routeMediaType(source.mediaType);
     if (source.acceptedDoclingJson !== undefined && route === 'docling') {
-      JSON.parse(source.acceptedDoclingJson);
+      let parsed: { schema_name?: unknown };
+      try {
+        parsed = JSON.parse(source.acceptedDoclingJson) as { schema_name?: unknown };
+      } catch {
+        throw new KnowledgeSyncPreparationError('contract', false);
+      }
+      if (parsed?.schema_name !== 'DoclingDocument') throw new KnowledgeSyncPreparationError('contract', false);
       evidenceArtifactKey = stableKey('artifact', documentKey, 'docling', sha256(source.acceptedDoclingJson));
       artifacts.push(textArtifact(source.acceptedDoclingJson, evidenceArtifactKey, `${source.fileName}.docling.json`, 'accepted_docling_json'));
     }
@@ -95,7 +156,7 @@ export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapsho
       evidenceText = source.trustedMarkdown;
       artifacts.push(textArtifact(source.trustedMarkdown, evidenceArtifactKey, `${source.fileName}.md`, 'trusted_normalized_markdown'));
     }
-    sourceDocuments.push({ documentKey, authority: 'primary_source', provenance: { system: 'megacampus', sourceType: source.sourceType, sourceId: source.id, sourceVersion: source.version }, route: { family: route }, artifacts });
+    sourceDocuments.push({ documentKey, authority: 'primary_source', provenance: { system: 'megacampus', sourceType: source.sourceType, sourceId: source.id, sourceVersion: source.version, ...(source.underlyingFileId ? { metadata: { underlyingFileId: source.underlyingFileId } } : {}) }, route: { family: route }, artifacts });
     if (evidenceArtifactKey && evidenceText?.trim()) evidenceSegments.push({ segmentKey: stableKey('evidence', documentKey, evidenceArtifactKey), documentKey, artifactKey: evidenceArtifactKey, authority: 'primary_source', text: evidenceText, locator: { kind: 'whole_artifact' } });
   }
 
@@ -115,6 +176,8 @@ export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapsho
 }
 
 export function serializeKnowledgeSyncPackage(value: KnowledgeSyncPackage): Buffer {
-  if (computePayloadHash(value) !== value.hashes.payloadHash) throw new Error('Package payload hash mismatch');
-  return Buffer.from(canonicalJson(value), 'utf8');
+  if (computePayloadHash(value) !== value.hashes.payloadHash) throw new KnowledgeSyncPreparationError('contract', false);
+  const raw = Buffer.from(canonicalJson(value), 'utf8');
+  if (raw.byteLength > MAX_RAW_PACKAGE_BYTES) throw new KnowledgeSyncPreparationError('payload_size', false);
+  return raw;
 }

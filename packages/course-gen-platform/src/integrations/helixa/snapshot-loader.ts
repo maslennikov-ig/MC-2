@@ -1,6 +1,9 @@
-import type { JsonValue } from './contract';
-import type { ExportSource, KnowledgeExportSnapshot } from './package-builder';
+import { DocumentEvidenceSourceManifestSchema } from '@megacampus/shared-types';
+
 import { sha256 } from './canonical-json';
+import type { JsonValue } from './contract';
+import { KnowledgeSyncPreparationError } from './errors';
+import type { ExportSource, KnowledgeExportSnapshot } from './package-builder';
 
 interface CompletedCourseRow {
   id: string; organization_id: string; generation_status: string | null; generation_completed_at: string | null;
@@ -9,7 +12,7 @@ interface CompletedCourseRow {
 interface LessonContentRow { lesson_id: string; status: string; content: unknown; metadata: unknown }
 interface FileRow {
   id: string; organization_id: string; course_id: string | null; filename: string; mime_type: string; hash: string;
-  storage_path: string; markdown_content?: string | null; parsed_content?: unknown; approved: boolean;
+  storage_path: string; markdown_content?: string | null; parsed_content?: unknown; approved: boolean; approvedVersion?: string;
 }
 interface CompletedRoleGuideRow {
   id: string; organization_id: string; status: string; completed_at: string | null; position_title: string | null;
@@ -26,10 +29,11 @@ function jsonObject(value: unknown): Record<string, JsonValue> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, JsonValue> : {};
 }
 
-function fileSource(file: FileRow, kind: 'COURSE' | 'ROLE_GUIDE', objectId: string, sourceType: ExportSource['sourceType'], readBytes: ReadBytes): ExportSource {
+function fileSource(file: FileRow, kind: 'COURSE' | 'ROLE_GUIDE', objectId: string, sourceType: ExportSource['sourceType'], readBytes: ReadBytes, sourceRowId = file.id): ExportSource {
   return {
-    id: file.id, sourceType, organizationId: file.organization_id, objectKind: kind, objectId,
-    approved: file.approved, version: file.hash,
+    id: sourceRowId, sourceType, organizationId: file.organization_id, objectKind: kind, objectId,
+    approved: file.approved, version: file.approvedVersion ?? file.hash,
+    ...(sourceRowId !== file.id ? { underlyingFileId: file.id } : {}),
     ...(file.hash.match(/^[a-f0-9]{64}$/) ? { sourceSha256: file.hash } : {}),
     fileName: file.filename, mediaType: file.mime_type,
     readOriginalBytes: () => readBytes(file),
@@ -39,10 +43,26 @@ function fileSource(file: FileRow, kind: 'COURSE' | 'ROLE_GUIDE', objectId: stri
   };
 }
 
+export function parseAcceptedCourseSourceManifest(manifestInput: unknown) {
+  const parsed = DocumentEvidenceSourceManifestSchema.safeParse(manifestInput);
+  if (!parsed.success) throw new KnowledgeSyncPreparationError('provenance', false);
+  return parsed.data;
+}
+
+export function bindAcceptedCourseSources<T extends { id: string; hash: string }>(manifestInput: unknown, files: T[]): Array<T & { approved: true; approvedVersion: string }> {
+  const manifest = parseAcceptedCourseSourceManifest(manifestInput);
+  const byId = new Map(files.map(file => [file.id, file]));
+  return manifest.map(source => {
+    const file = byId.get(source.document_id);
+    if (!file || file.hash !== source.source_version_hash) throw new KnowledgeSyncPreparationError('provenance', false);
+    return { ...file, approved: true as const, approvedVersion: source.source_version_hash };
+  });
+}
+
 export async function mapCompletedCourse(input: { course: CompletedCourseRow; lessonContents: LessonContentRow[]; files: FileRow[]; readBytes: ReadBytes }): Promise<KnowledgeExportSnapshot> {
   const { course } = input;
-  if (course.generation_status !== 'completed' || !course.generation_completed_at) throw new Error('Course is not completed');
-  if (input.files.some(file => file.organization_id !== course.organization_id || file.course_id !== course.id || !file.approved)) throw new Error('Course source provenance is not approved');
+  if (course.generation_status !== 'completed' || !course.generation_completed_at) throw new KnowledgeSyncPreparationError('event_identity', false);
+  if (input.files.some(file => file.organization_id !== course.organization_id || file.course_id !== course.id || !file.approved || file.approvedVersion !== file.hash)) throw new KnowledgeSyncPreparationError('provenance', false);
   return {
     kind: 'COURSE', id: course.id, organizationId: course.organization_id, completedAt: course.generation_completed_at,
     title: course.title, language: course.language ?? 'ru',
@@ -56,13 +76,13 @@ export async function mapCompletedCourse(input: { course: CompletedCourseRow; le
 
 export async function mapCompletedRoleGuide(input: { playbook: CompletedRoleGuideRow; sources: RoleGuideSourceRow[]; readBytes: ReadBytes }): Promise<KnowledgeExportSnapshot> {
   const { playbook } = input;
-  if (playbook.status !== 'completed' || !playbook.completed_at || !playbook.final_markdown?.trim()) throw new Error('Role Guide is not completed');
+  if (playbook.status !== 'completed' || !playbook.completed_at || !playbook.final_markdown?.trim()) throw new KnowledgeSyncPreparationError('event_identity', false);
   const sources: ExportSource[] = [];
   for (const source of input.sources) {
-    if (source.status !== 'ready' || source.organization_id !== playbook.organization_id || source.playbook_id !== playbook.id) throw new Error('Role Guide source provenance is not approved');
+    if (source.status !== 'ready' || source.organization_id !== playbook.organization_id || source.playbook_id !== playbook.id) throw new KnowledgeSyncPreparationError('provenance', false);
     if (source.source_type === 'file') {
-      if (!source.file || source.file.organization_id !== playbook.organization_id || source.file.course_id !== null) throw new Error('Role Guide file provenance is not approved');
-      sources.push(fileSource({ ...source.file, approved: true }, 'ROLE_GUIDE', playbook.id, 'career_playbook_source', input.readBytes));
+      if (!source.file || source.file.organization_id !== playbook.organization_id || source.file.course_id !== null) throw new KnowledgeSyncPreparationError('provenance', false);
+      sources.push(fileSource({ ...source.file, approved: true }, 'ROLE_GUIDE', playbook.id, 'career_playbook_source', input.readBytes, source.id));
     } else if (source.text?.trim()) {
       const bytes = Buffer.from(source.text, 'utf8');
       sources.push({ id: source.id, sourceType: 'career_playbook_source', organizationId: source.organization_id, objectKind: 'ROLE_GUIDE', objectId: playbook.id, approved: true, version: sha256(bytes), sourceSha256: sha256(bytes), fileName: source.filename ?? `source-${source.id}.txt`, mediaType: 'text/plain', readOriginalBytes: async () => bytes, trustedMarkdown: source.text });
