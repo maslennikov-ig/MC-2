@@ -248,59 +248,59 @@ naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- `mc2-6ye5z.4/.5/.8`, `mc2-rmbwo`, `mc2-p99f1` — all blocked on `mc2-xjykw`, below. `mc2-r7udy`
-  needs no migration (`system_metrics` carries no CHECK).
-- `mc2-db696.106`/`.107` — PDF fidelity and grounding. Separate deploy accounts: not planned.
-  `mc2-gmab0` — held by unit tests. `mc2-f1tqd` — an empty provider response crashes the parse; did
-  **not** recur on the 2026-08-22 runs.
+- `mc2-6ye5z.4/.5/.8`, `mc2-rmbwo`, `mc2-p99f1` — enum values added; handlers and live proof wait on
+  `mc2-3lo22`. `mc2-db696.106`/`.107` — PDF fidelity/grounding, separate deploy accounts: not
+  planned. `mc2-gmab0` — held by unit tests.
 
-## The four tracks of `four-doors-marten.md`, run 2026-08-22 (numbers in the `bd` close reasons)
+## `snuggly-wiggling-sutton.md`, run 2026-08-22 (numbers in the `bd` close reasons)
 
-**A and B are closed** (`mc2-bxmje`, `mc2-b7olk.4`), both reconciled to the `/credits` delta at the
-sixth decimal. A cut a micro course $0.1027 → $0.030963 and the card image 4.9×; the single judge now
-runs on deepseek. **What A could not show:** all three lessons scored 0.91–0.94, no panel convened,
-so the 0.80 → 0.75 threshold move is still unmeasured — that needs accumulated `singleJudge.score`.
-B was already built (`eb939d21f`); only the live acceptance was missing, and the runbook's "do not
-upload a document" caveat is now lifted.
+**Phase 0 done — the hop is back (`mc2-xjykw`).** New SOCKS5 through `helixa-new` (82.26.152.8,
+Amsterdam NL), its own revocable key restricted to `from="95.81.98.230",restrict,port-forwarding`,
+system unit `megacampus-socks.service`. Proved four ways, because the old check lied: listener on
+1080, `curl --socks5-hostname` egressing as NL, TCP from inside the bridge, and a read-only
+`notebooks.list()` now failing on **authentication** rather than CSRF, which is the proof the hop
+works. Correction to that ticket: a unit _did_ exist — a **user** unit, `Linger=yes`, restarting ssh
+every 12 s against a refusing host since February, `is-active` green throughout.
 
-**C is blocked at the network, not the library (`mc2-xjykw`, P0).** NotebookLM is unreachable from
-both bridges: the SOCKS5 geo-bypass at `172.19.0.1:1080` has no listener and the upstream
-`185.200.177.180` refuses port 22, so restarting autossh cannot help. Without the hop a request lands
-on `https://notebook.google/` and dies extracting a CSRF token — dropping the proxy is not a
-workaround. Cookies are fine (66 of 70 alive, earliest expiry **2026-08-28** — renew soon). Nothing
-has generated since 2026-04-15, so nobody noticed. A third-party host: the owner's call. Fixed
-alongside: the health check passed on a set variable rather than an open socket; `mc2-aqsjj` pinned
-`notebooklm-py==0.8.0` (dev 0.6.0, prod 0.8.0, chosen by build date); `mc2-3d3ku` — the bridge suite
-is in no CI job and was red.
+**Phase 1 stops at the cookies (`mc2-3lo22`, P1, owner-owned).** `/health` reports `earliest cookie
+expires 2026-03-31 (-144d)` — not 28.08 as the plan said, that was not the earliest; it matches the
+last NLM generation, 2026-04-15. Needs `notebooklm login`. Done meanwhile: the three enum values
+(`mc2-6ye5z.4/.5/.8`, migration applied, handlers still to write) and the CI job (`mc2-3d3ku`, green
+first run). `mc2-p99f1` has **no gate at all** — every layer already accepts the four types;
+`ON_DEMAND_ENRICHMENT_TYPES` is read by nobody and both ends now say so.
 
-**D — switch live, proof pending (`mc2-wxun` closed).** `RAG_SHADOW_RETRIEVAL_RATE=0.05` is on the
-running production Stage 6 worker, in **both** `.env.green` and `.env.blue` so a colour flip cannot
-drop it. No rows yet — the shadow fires only on a Tier 1 exit and production has not generated since.
-Count `step_name='tier1_shadow'`; raise 0.05 once rows land, then `mc2-vjbb`.
+**Phase 2 done.** `mc2-kznfz` was neither hypothesis: `convertToLessonSpecV2` wrote
+`primary_documents: ['auto-generated']`, a word that never matches a UUID, so **every automatic-mode
+course with an uploaded document was written without it** since 2026-02-09. `mc2-f1tqd` fixed at the
+`configuration.fetch` seam: an empty 200 throws by name with status, body and generation id.
 
-**Two defects the runs found**, which is the runs working. `mc2-80o1t` (fixed): one `null` from the
-model discarded a lesson's entire LLM self-review, and two of three lessons reached the judge on
-heuristics alone while Stage 6 reported success. `mc2-kznfz` (logged, cause open): a course with an
-indexed document produced zero RAG chunks in 143 ms through the only empty path writing neither log
-nor trace row — the lesson's documents and the accepted evidence set did not intersect. That branch
-sits **above** the Tier 1 gate, so track D's cohort cannot see this case at all.
+**Phase 3 done.** `mc2-r7udy` unblocked: the constraint was an enum, not a CHECK, so it _did_ need a
+migration — `worker_started`, a marker from both entrypoints, and
+`pipelineAdmin.getWorkerRestartsDuringCourse`. `mc2-bnm62`: the two image rows are read now.
+`mc2-tux1y` measured in `mc2-bneet` — **do not switch**: judge 0.87-0.90 against 0.92-0.93, lessons
+29% shorter, an invented statistic in the prose, for $0.008 a micro course.
 
-**Three owner decisions of 2026-08-20/21 bind the routing work:** a failing provider is ignored only
-inside the current chain of attempts, never in a standing blocklist; cheapest stays the goal
-(`max_price` a ceiling, `sort=throughput` out); waiting is acceptable, so raise timeouts.
+**Phase 4 found a blocker no test had.** Chinese could not be generated **at all**: Stage 5 refused
+`section_title` and `key_topics` on Latin-calibrated character minimums; fixed by weighting Han,
+Kana and Hangul as two (`8ebc95dcb`). Spanish is clean — judge 0.94/0.95/0.90, 0 regenerations, and
+it reads idiomatically. Found by reading before running: the check was **fail-open** for `es`, and
+four places collapsed the language code so Chinese budgets were half size. Matrix in `mc2-v6fqp`.
+Day's spend $0.215 over five runs, all reconciled to the `/credits` delta, 0 unpriced; $10.60 left.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`docs/plans/snuggly-wiggling-sutton.md`** — five phases, written 2026-08-22, not
-started. Recommended action: phase 0, the SOCKS hop, which unblocks phase 1 entirely. Branch
-`fix/found-defects-2026-08-22` via `/push-dev`. Use $orchestrator-stage for an epic.
+Next stage id: **`mc2-3lo22`** — the NotebookLM cookies, which are the only thing standing between
+phase 1 of `docs/plans/snuggly-wiggling-sutton.md` and completion. Recommended action: ask the owner
+to run `notebooklm login`, deploy `storage_state.json` to both bridges, then order each of the four
+NLM types on a live lesson. Use $orchestrator-stage for an epic.
 
 ## Starter prompt for next orchestrator
 
-Read `docs/plans/snuggly-wiggling-sutton.md` whole first — four fresh owner decisions are in it.
-`.codex/next-goal-four-doors.md` is **stale**; ignore it. **Do not ask — act and report**, inside the
-standing authorization under Safety boundary.
+Read `docs/plans/snuggly-wiggling-sutton.md` whole first, then this file's run section above: four
+of its five phases are done and the plan does not know that. `.codex/next-goal-four-doors.md` is
+**stale**; ignore it. **Do not ask — act and report**, inside the standing authorization under
+Safety boundary.
 
 ## Read first
 

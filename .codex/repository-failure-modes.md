@@ -101,6 +101,40 @@ _missing_. When a function has several early returns for the same outcome, the o
 not cheaper, it is the one that costs an afternoon. Related: a fallback that re-parses with the
 schema that just refused the value does not "use defaults", it throws (`mc2-80o1t`).
 
+**A threshold in characters is a claim about a writing system.** Stage 5 refused every Chinese
+course it was ever asked to make — `section_title` min 10 characters, `key_topics` min 5 — and
+nothing was wrong with the text: `应急基金核心概念` is eight characters and a complete idiomatic
+title that takes thirty-five in English. The minimums were calibrated on Latin script. The same
+factor of two is already written down elsewhere in this repository, in the chars-per-token table
+(2.0 for Chinese against 4.0 for English), and three call sites bypassed _that_ too by writing
+`language === 'ru' ? 'rus' : 'eng'`. When a number describes how much a character carries, weight
+it by script rather than lowering it — lowering lets genuinely truncated Latin text through.
+Related and worse: a lookup of the form `TABLE[language] || []` turns an unlisted language into
+**no checks at all**, which is how the Spanish language-consistency check passed everything.
+Configure by what a thing _is_ (which script a language uses) rather than by what it is not.
+
+**A placeholder in an id field is a filter nobody wrote.** `convertToLessonSpecV2` put
+`primary_documents: ['auto-generated']` into every automatic-mode lesson spec. Stage 6 intersects
+that list with the accepted document-evidence set, a word never matches a UUID, and so every
+automatic course with an uploaded document was written **without the document** for six months —
+zero chunks in 140 ms, `success: true`, judge scores of 0.90-0.93. Two other builders of the same
+field document the empty-array sentinel and one of them says outright "do not use 'default'
+sentinel"; this was the same mistake under a different word, which is why the guard now rejects any
+non-UUID literal rather than that one string.
+
+**Supervision is not availability, and `is-active` is a claim about the supervisor.** The dead
+SOCKS tunnel did have a systemd unit — a _user_ unit, `Linger=yes`, `Restart=always`, active since
+February. It restarted `ssh` every twelve seconds against a host refusing connections, logged
+`Connection refused` each time, and `systemctl is-active` answered `active` throughout, because the
+`autossh` parent was alive. Four months. Look for user units too (`systemctl --user`), and judge a
+tunnel by its listener and its egress, never by its unit state.
+
+**Ask the server what the constraint is.** `mc2-r7udy` was blocked from February on
+`system_metrics.event_type` refusing a new value, and the plan to unblock it stated no migration was
+needed because the table has no CHECK constraint. True, and beside the point: the constraint is a
+PostgreSQL enum, which is stricter. `pg_type.typtype = 'e'` says so in one query; the migrations
+directory does not. Sibling of "A Constraint the Repo Cannot Show You" and the same remedy.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.
