@@ -216,3 +216,23 @@ codex/q12-live-controller	516e4adf8
 codex/self-hosted-qdrant-platform	c8624cd9b
 codex/update-github-actions-node24	907406fd4
 codex/verification-evidence-v2	b46c01fe8
+
+# Local-only leftovers, cleared the same day after the origin sweep.
+#
+# Both `backup/*` branches pointed at EXACTLY the commits `origin/archive/*` already carries —
+# the same sha under a second name, on one laptop. Removing the local name loses nothing; the
+# archives on origin are the copy that matters.
+backup/checkpoint-2026-04-12_2026-05-10	7ffa264cf	= origin/archive/checkpoint-pre-sync-2026-05-10
+backup/develop_pre-sync_2026-05-10	84055f862	= origin/archive/develop-pre-sync-2026-05-10
+#
+# `codex/career-playbook-numeric-review` was NOT deleted. The allowlist promises it is kept "so the
+# 2026-06 exploration is not lost", and it existed on one disk only — a promise a disk failure would
+# have broken. It was pushed to origin instead, which is what keeping it actually means.
+#
+# Four stashes, all from June-July 2026 and all taken on branches that no longer exist, were kept as
+# annotated tags and then dropped. None applied cleanly to develop in either direction any more, so
+# none was restorable as a patch; the tags keep the commits themselves.
+stash-archive/2026-08-22-0	0376d5698	WIP on stage/cp-imp-2-judge: 43070a6f fix(career-playbook): record rea
+stash-archive/2026-08-22-1	e154dfa45	On codex/career-playbook-e2e-quality-fixes: backup career-playbook-e2e
+stash-archive/2026-08-22-2	23b0e7b10	On develop: cleanup-backup career-playbook-generation-progress before
+stash-archive/2026-08-22-3	11cf60c7b	On codex/fix-dev-lint-business-context: cleanup-backup career-playbook

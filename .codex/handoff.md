@@ -235,8 +235,9 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 `mc2-1nots`, or `mc2-5e4ek.1`; see §9 of the active spec for exact reopen gates.
 
 Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`. Branches were swept
-on 2026-08-22 (`mc2-3mq9b`): 200 remote and 69 local down to 10 and 10, shas preserved in
-`.codex/deleted-branches-2026-08-22.tsv`, and `/push-dev` now deletes the branch it delivered — so a
+on 2026-08-22 (`mc2-3mq9b`): 200 remote and 69 local down to **11 and 8**, four stashes kept as
+`stash-archive/2026-08-22-*` tags and dropped, every sha preserved in
+`.codex/deleted-branches-2026-08-22.tsv`. `/push-dev` now deletes the branch it delivered, so a
 report that names a branch again means something really was left behind.
 
 ## Explicit defers

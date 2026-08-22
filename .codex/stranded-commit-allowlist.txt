@@ -12,7 +12,7 @@
 subject:^chore: trigger deploy after Docker cleanup$	Empty CI trigger commit from 2026-01-18 that sits on every pre-sync snapshot; carries no content.
 
 archive/*	Deliberate archive snapshots. The 2026-05-10 audit re-confirmed their only non-`bd sync` content is the archive marker itself.
-backup/*	Pre-sync safety snapshots of `develop`. Verified 2026-07-27: nothing of substance is missing from `develop`.
+backup/*	Pre-sync safety snapshots of `develop`. Verified 2026-07-27: nothing of substance is missing from `develop`. None exist as of 2026-08-22: the two local ones pointed at exactly the `origin/archive/*` commits, so they were a second name for the same sha on one laptop. The glob stays so a new one is covered rather than alarming.
 codex/checkpoint-2026-04-12	April checkpoint snapshot kept beside the `backup/` copies for the same 2026-05-10 sync.
 
 feature/video-presentation-pipeline	DEFERRED, owner-gated: mc2-hqfc3. The February rendering pipeline (Azure TTS, satori slides, FFmpeg composition, two players) is absent from `develop` by decision; video runs through NotebookLM instead. The owner will say when to return, and the code needs a full refresh first.
