@@ -204,3 +204,15 @@ feature/career-playbook-phase-b-transport	179db3173
 feature/career-playbook-viewer-editor	e5000482b
 feature/nlm-enrichments	364ec5803
 fix/stage6-token-model-ladder	f5c71345f
+
+# Local-only tips, recorded 2026-08-22: these differed from the origin sha above,
+# or the branch existed only on this machine.
+codex/career-playbook-live-smoke-fixes	6379fd1fa
+codex/career-playbook-quality-review	7de9ff9d6
+codex/hallmark-hero-redesign	bb51e53a4
+codex/hero-typography-closeout	5d80fb27e
+codex/mc2-rag-retry-fix	fe928ffba
+codex/q12-live-controller	516e4adf8
+codex/self-hosted-qdrant-platform	c8624cd9b
+codex/update-github-actions-node24	907406fd4
+codex/verification-evidence-v2	b46c01fe8

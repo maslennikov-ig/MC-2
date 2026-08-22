@@ -23,6 +23,8 @@ Use `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` when a stag
 
 Use `scripts/orchestration/check_stranded_commits.py` before claiming that finished work is delivered. It reports commits that exist only on a side branch and never reached `develop`, matching by commit subject because cherry-pick and squash change sha, tree and patch-id. Closing a Beads issue proves intent, not delivery; on 2026-07-27 an audit found three finished, reviewed, closed changes stranded for weeks. `/push-dev` runs it as an advisory step after delivery. Knowingly undelivered branches belong in `.codex/stranded-commit-allowlist.txt` with a recorded reason.
 
+A **delivered** branch is deleted by `/push-dev` itself, locally and on `origin`, once `git merge-base --is-ancestor` confirms `develop` contains it. Left alone, delivery debris accumulates: on 2026-08-22 there were 200 remote and 69 local branches, of which 190 held nothing that was not already in `develop`. Their shas are in `.codex/deleted-branches-2026-08-22.tsv`, because deleting a branch removes a name, not commits.
+
 Typical code-change gates in this repo include:
 
 - `pnpm type-check`

@@ -19,7 +19,11 @@ feature/video-presentation-pipeline	DEFERRED, owner-gated: mc2-hqfc3. The Februa
 
 codex/career-playbook-numeric-provenance	Numeric provenance was deliberately removed from the product on 2026-07-27 (mc2-jc275); this branch is the feature it removed.
 codex/career-playbook-numeric-review	Preservation commit for the abandoned numeric-review worktree, kept only so the 2026-06 exploration is not lost.
-codex/update-career-playbook-landing-e2e	Superseded: `develop`'s landing e2e spec is newer (it asserts `?fresh=1` and the decision-matrix interaction).
-codex/docs-l1-l2-routing-20260609-mc2-140614	Superseded: `develop` carries Docs L1/L2 routing in the agent docs in a cleaner header form.
-codex/vmy-7082-dev-qdrant-repair	One-off temporary April workflow for a Qdrant repair run; never meant for `develop`.
-feature/nlm-enrichments	Landed in evolved form: `develop` carries the NLM audio/video handlers and runbooks (epic mc2-6ye5z).
+
+# The four entries that stood here for `codex/update-career-playbook-landing-e2e`,
+# `codex/docs-l1-l2-routing-20260609-mc2-140614`, `codex/vmy-7082-dev-qdrant-repair` and
+# `feature/nlm-enrichments` were removed on 2026-08-22 together with the branches themselves. Each
+# said "superseded", "landed in evolved form" or "one-off, never meant for develop" — reasons for
+# deleting a branch, not for keeping a permanent exception to a check. The shas are in
+# `.codex/deleted-branches-2026-08-22.tsv`; the entries can come back with the branches if they ever
+# need to.
