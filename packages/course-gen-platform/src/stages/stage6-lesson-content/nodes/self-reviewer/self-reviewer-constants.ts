@@ -31,6 +31,22 @@ export const LLM_PER_ATTEMPT_TIMEOUT_MS = 300_000; // 5 min — OpenRouter LLM c
 // ============================================================================
 
 /**
+ * "There is no replacement" written as JSON is `null`, not an absent key.
+ *
+ * Every other field here degrades — `.catch()` or `.default()` — so one odd
+ * answer costs that field and nothing else. These two did not, and the caller's
+ * "using defaults" branch re-parses with the same schema and therefore throws:
+ * the whole LLM self-review is discarded, including its valid issues and its
+ * patched content, and the lesson falls back to heuristics only. Two of three
+ * lessons lost their review that way on the run of 2026-08-22.
+ */
+const optionalModelText = z
+  .string()
+  .nullish()
+  .transform(value => value ?? undefined)
+  .catch(undefined);
+
+/**
  * Zod schema for validating LLM issue response
  * Validates type and severity against allowed values, with fallback for unknown types
  *
@@ -55,9 +71,9 @@ export const LLMIssueSchema = z.object({
   location: z.string().default('global'),
   description: z.string().default('Unknown issue'),
   /** Exact text with error (for GRAMMAR issues, enables InlineFixer) */
-  quotedText: z.string().optional(),
+  quotedText: optionalModelText,
   /** Corrected text to replace quotedText (for GRAMMAR issues) */
-  inlineReplacement: z.string().optional(),
+  inlineReplacement: optionalModelText,
 });
 
 // ============================================================================
