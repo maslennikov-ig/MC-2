@@ -335,7 +335,9 @@ Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`.
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: epic `mc2-4clyr`.
+Next stage id: `docs/plans/cheaper-verdict-heron.md` — the paid run that turns 2026-08-22's
+calculated savings into measured ones (`mc2-bxmje`), then the writing-phase comparison it unblocks
+(`mc2-tux1y`, with `mc2-oofx5` riding along). Both inside epic `mc2-4clyr`.
 
 `docs/plans/honest-receipt-kestrel.md` is complete: sections A–G delivered, and its acceptance — the
 repeat paid run — passed on 2026-08-22 with every line answered (`mc2-z0xr3`). **The number holds, so
@@ -386,8 +388,10 @@ so the weak tail keeps its second opinion.
 Held by `tests/unit/stages/stage6-lesson-content/judge/cascade/single-verdict-is-accepted.test.ts`,
 written as behaviour so the number can move again without rewriting the contract.
 
-Estimated, at list rates, per lesson past the heuristics: judging **$0.01179 → $0.00204**. An
-estimate, not an invoice — the next paid run is what settles it.
+Estimated, at list rates, per lesson past the heuristics: judging **$0.01173 → $0.00140**, eight-fold.
+An estimate, not an invoice — `mc2-bxmje` is what settles it. One caveat no arithmetic removes: 21.2%
+is the third-judge rate over the _old_ panel population, and at 0.75 the panel sees only worse
+lessons, which may disagree more often.
 
 Measured token shape of one judge pass, from the 2026-08-22 run: 5144 in / 764 out. At list rates
 that is $0.00729 on glm-5.2 (billed $0.01046, served above list), $0.00246 on minimax, $0.00195 on
@@ -437,13 +441,17 @@ rather than chase speed. Key stages may move to `openai/gpt-5.6-luna` at ~8× th
 
 ## Starter prompt for next orchestrator
 
-Open epic `mc2-4clyr` — cutting Stage 6 generation cost. Correct its headline against the 1589-lesson
-figures above before planning from it, and read the 2026-08-22 run's split: on a small course the two
-cover images outweigh the whole text pipeline. Use $orchestrator-stage for the epic itself; single
-tasks are ordinary local work. Ask before spending: the cost ledger is now proven, so a paid run is
-for measuring a change, not for finding holes. Do not enable the cohort, change its threshold,
-reindex, force-push, migrate beyond `mc2-ufpko`, or spend beyond the USD 5 ceiling without separate
-current authorization.
+It is written and checked: **`.codex/next-goal-cheaper-verdict.md`** (`orch-prompts prompt-check`
+passes clean, 1487 chars). Paste that into a fresh session. It is on disk and **untracked** —
+`.gitignore` keeps `.codex/*` out except for the named few — so look for the file, not for a commit.
+Everything it depends on is tracked: `docs/plans/cheaper-verdict-heron.md` and this file.
+
+In short: run the paid acceptance `mc2-bxmje` against
+`docs/plans/cheaper-verdict-heron.md`, then the writing-phase comparison `mc2-tux1y` it unblocks. Use
+$orchestrator-stage for the epic itself; single tasks are ordinary local work. Ask before spending —
+the ledger is proven now, so a paid run is for measuring a change, not for finding holes. Do not
+enable the cohort, change its threshold, reindex, force-push, migrate beyond `mc2-ufpko`, or spend
+beyond the USD 5 ceiling without separate current authorization.
 
 ## Read first
 
