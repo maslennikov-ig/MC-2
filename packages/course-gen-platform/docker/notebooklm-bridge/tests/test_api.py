@@ -1,5 +1,8 @@
 import asyncio
 import base64
+import json
+import pathlib
+import socket
 import time
 from collections.abc import Generator
 
@@ -112,7 +115,89 @@ def test_health_endpoint_returns_status(client: TestClient) -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    payload = response.json()
+    assert payload["service"] == "notebooklm-bridge"
+    # `status` is "degraded" here on purpose: the test app configures no proxy
+    # and no auth. This assertion used to read `== "ok"` and had been failing
+    # since the proxy check was added — unnoticed, because no CI job runs this
+    # suite.
+    assert payload["status"] == "degraded"
+    assert {check["name"] for check in payload["checks"]} >= {"proxy", "auth_expiry"}
+
+
+def test_health_reports_an_unreachable_proxy_as_failing(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A name is not a route.
+
+    On 2026-08-22 the geo-bypass tunnel was down — nothing listening on the
+    forwarded port — and both bridges reported the proxy check as passing,
+    because the check only asked whether the variable was set. NotebookLM was
+    unreachable the whole time and the container said healthy.
+    """
+    # Port 1 on the loopback: nothing listens there, and it refuses instantly.
+    monkeypatch.setenv("HTTPS_PROXY", "socks5h://127.0.0.1:1")
+
+    payload = client.get("/health").json()
+    proxy = next(check for check in payload["checks"] if check["name"] == "proxy")
+
+    assert proxy["passed"] is False
+    assert "unreachable" in proxy["message"]
+    # The port is named so an operator can see which hop died; no credentials.
+    assert "127.0.0.1:1" in proxy["message"]
+    assert payload["status"] == "degraded"
+
+
+def test_health_proxy_check_passes_when_something_is_listening(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        monkeypatch.setenv("HTTPS_PROXY", f"socks5h://127.0.0.1:{listener.getsockname()[1]}")
+
+        payload = client.get("/health").json()
+
+    proxy = next(check for check in payload["checks"] if check["name"] == "proxy")
+    assert proxy["passed"] is True
+    assert "reachable" in proxy["message"]
+
+
+def test_health_reports_cookie_expiry_without_naming_a_cookie(
+    client: TestClient, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expired_at = time.time() - 86_400
+    state = tmp_path / "storage_state.json"
+    state.write_text(
+        json.dumps(
+            {
+                "cookies": [
+                    {"name": "SID", "value": "secret-value", "expires": expired_at},
+                    {"name": "HSID", "value": "another-secret", "expires": time.time() + 86_400},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    app = create_app(
+        settings=Settings(
+            notebooklm_bridge_token="test-token",
+            notebooklm_generation_mode="fallback",
+            notebooklm_allow_fallback=True,
+            notebooklm_storage_path=str(state),
+        )
+    )
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+
+    with TestClient(app) as probe:
+        payload = probe.get("/health").json()
+
+    expiry = next(check for check in payload["checks"] if check["name"] == "auth_expiry")
+    assert expiry["passed"] is False
+    assert "secret-value" not in expiry["message"]
+    assert "SID" not in expiry["message"]
 
 
 def test_auth_required_for_audio_generation(client: TestClient) -> None:
