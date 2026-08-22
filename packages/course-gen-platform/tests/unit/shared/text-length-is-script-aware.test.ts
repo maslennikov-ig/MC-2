@@ -149,3 +149,27 @@ describe('the Stage 4 fields that killed the second Chinese run', () => {
     expect(AnalysisResultSchema).toBeDefined();
   });
 });
+
+describe('the model can still see the constraint', () => {
+  it('renders the weighted minimum into the prompt schema', async () => {
+    const { zodToPromptSchema } = await import('@megacampus/shared-utils');
+    const { atLeastInformationChars } = await import('@megacampus/shared-types');
+    const { z } = await import('zod');
+
+    // This is the whole point of the `.describe()`. `zodToPromptSchema` renders
+    // these schemas into the instruction the model reads, and it can see a
+    // `.min()` check but not a `.refine()`. Replacing one with the other
+    // silently deleted "min 100" from the prompt, the model started writing
+    // short, and phase2_scope failed three times on a live Chinese run.
+    const rendered = zodToPromptSchema(z.object({ bridge: atLeastInformationChars(100) }));
+
+    expect(rendered).toContain('min 100');
+    expect(rendered).toContain('counts as 2');
+  });
+
+  it('does not lose an ordinary min() while doing so', async () => {
+    const { zodToPromptSchema } = await import('@megacampus/shared-utils');
+    const { z } = await import('zod');
+    expect(zodToPromptSchema(z.object({ x: z.string().min(100) }))).toContain('min 100');
+  });
+});

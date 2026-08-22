@@ -70,9 +70,20 @@ export function informationLength(text: string): number {
  * characters.
  */
 export function atLeastInformationChars(minimum: number): z.ZodType<string> {
-  return z.string().refine(value => informationLength(value) >= minimum, {
-    message: `String must carry at least ${minimum} characters' worth of text (a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT})`,
-  });
+  return (
+    z
+      .string()
+      .refine(value => informationLength(value) >= minimum, {
+        message: `String must carry at least ${minimum} characters' worth of text (a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT})`,
+      })
+      // `.describe()` is not documentation here, it is the prompt. `zodToPromptSchema`
+      // renders these schemas into the instruction the model reads, and it can see
+      // a `.min()` check but not a `.refine()`. Without this line the constraint
+      // becomes invisible to the only party that can satisfy it.
+      .describe(
+        `min ${minimum} chars, where a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT}`
+      )
+  );
 }
 
 /**
@@ -90,10 +101,17 @@ export function meaningfulText(options: {
   /** What is being described, for the message. e.g. `'Section title'`. */
   label: string;
 }): z.ZodType<string> {
-  return z
-    .string()
-    .max(options.maximum, `${options.label} too long (max ${options.maximum} chars)`)
-    .refine(value => informationLength(value) >= options.minimum, {
-      message: `${options.label} too short (min ${options.minimum} chars; a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT})`,
-    });
+  return (
+    z
+      .string()
+      .max(options.maximum, `${options.label} too long (max ${options.maximum} chars)`)
+      .refine(value => informationLength(value) >= options.minimum, {
+        message: `${options.label} too short (min ${options.minimum} chars; a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT})`,
+      })
+      // See `atLeastInformationChars`: this is what the model is told. The
+      // maximum is left out because the `.max()` above already renders itself.
+      .describe(
+        `min ${options.minimum} chars, where a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT}`
+      )
+  );
 }

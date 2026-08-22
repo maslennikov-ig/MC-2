@@ -83,9 +83,22 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   // Unwrap ZodEffects (created by .refine(), .transform(), etc.)
   // ZodEffects wraps the actual schema, we need to access the underlying type
   // See: INV-2025-11-19-001 - zodToPromptSchema missing ZodEffects handler
+  //
+  // A refinement's own `.describe()` is kept, because unwrapping otherwise
+  // throws away the only statement of what the refinement requires. That is not
+  // cosmetic: this description IS the prompt, and on 2026-08-22 replacing
+  // `.min(100)` with a script-aware `.refine()` silently deleted "min 100" from
+  // what the model was told, so it started writing short and the phase failed
+  // three times (mc2-v6fqp). A constraint the model cannot see is a constraint
+  // it cannot satisfy.
+  let refinementDescription = '';
   if (currentSchema instanceof z.ZodEffects) {
+    refinementDescription = currentSchema.description ?? '';
     currentSchema = currentSchema._def.schema as z.ZodType;
+    // `.describe()` on the inner schema still counts when the wrapper is silent.
+    if (!refinementDescription) refinementDescription = currentSchema.description ?? '';
   }
+  const refinementSuffix = refinementDescription ? ` (${refinementDescription})` : '';
 
   const optionalSuffix = isOptional ? ' (optional)' : '';
   const nullableSuffix = isNullable ? ' (nullable)' : '';
@@ -148,7 +161,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
     }
 
     const constraintStr = constraints.length > 0 ? ` (${constraints.join(', ')})` : '';
-    return `string${constraintStr}${optionalSuffix}${nullableSuffix}`;
+    return `string${constraintStr}${refinementSuffix}${optionalSuffix}${nullableSuffix}`;
   }
 
   // Handle ZodNumber
