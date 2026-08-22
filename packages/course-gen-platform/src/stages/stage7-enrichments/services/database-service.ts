@@ -9,6 +9,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { randomUUID } from 'crypto';
+import { isSupportedEnrichmentType } from '@megacampus/shared-types';
 import { getCachedLessonMarkdown } from '../../../shared/cache/file-content-cache';
 import type {
   EnrichmentType,
@@ -79,6 +80,19 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
       logger.warn(
         { enrichmentId, courseId: enrichment.course_id, error: courseError?.message },
         'Course not found for enrichment'
+      );
+      return null;
+    }
+
+    // The `enrichment_type` database enum is wider than the types this build
+    // models: a value is added there first so its handler can be written, and to
+    // the application schema only once it exists. A job for an unmodelled type
+    // has no handler to route to, so refusing it here is the truthful answer —
+    // and it is loud, because a silent null would look like a missing row.
+    if (!isSupportedEnrichmentType(enrichment.enrichment_type)) {
+      logger.error(
+        { enrichmentId, enrichmentType: enrichment.enrichment_type },
+        'Enrichment type exists in the database enum but has no handler in this build - cannot process'
       );
       return null;
     }

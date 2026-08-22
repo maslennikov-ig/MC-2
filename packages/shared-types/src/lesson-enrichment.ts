@@ -35,9 +35,34 @@ export const enrichmentTypeSchema = z.enum([
   'nlm_flashcards', // NotebookLM-generated flashcards (JSON Q&A pairs)
   'nlm_mind_map', // NotebookLM-generated mind map (hierarchical JSON)
   'nlm_infographic', // NotebookLM-generated infographic (PNG image)
+  //
+  // Deliberately NOT listed here yet: nlm_slide_deck, nlm_report,
+  // nlm_data_table. The database enum accepts all three from 2026-08-22
+  // (migration 20260822160000) so that the handlers can be written and their
+  // rows stored; this schema is the set the application actually supports, and
+  // it is narrower on purpose.
+  //
+  // The distinction matters because this type feeds exhaustive records —
+  // ENRICHMENT_TYPE_LABELS below, the Stage 7 handler registry, the UI's
+  // grouping. Adding a value here without a handler does not enable a feature,
+  // it produces a type that claims support and a runtime that has none. The
+  // three are added in the same change as their handlers (mc2-6ye5z.4/.5/.8).
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
+
+/**
+ * Whether a value read from the database is a type this application supports.
+ *
+ * The `enrichment_type` database enum is deliberately wider than the schema
+ * above — a value is added there first so its handler can be written and its
+ * rows stored, and only then here. Rows carrying a not-yet-supported type
+ * therefore exist in principle, and a reader that assumes otherwise would be
+ * asserting rather than checking.
+ */
+export function isSupportedEnrichmentType(value: string): value is EnrichmentType {
+  return enrichmentTypeSchema.safeParse(value).success;
+}
 
 /**
  * Enrichment status enum (mirrors database enum with two-stage support)

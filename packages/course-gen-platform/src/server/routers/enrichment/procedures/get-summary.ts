@@ -13,6 +13,7 @@ import { getSummaryByCourseInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { isSupportedEnrichmentType } from '@megacampus/shared-types';
 import type { EnrichmentSummary } from '@megacampus/shared-types';
 
 /**
@@ -64,7 +65,7 @@ export const getSummaryByCourse = protectedProcedure
       const supabase = getSupabaseAdmin();
       const { data: enrichments, error } = await supabase
         .from('lesson_enrichments')
-        .select('lesson_id, enrichment_type, status, error_message, title')
+        .select('id, lesson_id, enrichment_type, status, error_message, title')
         .eq('course_id', courseId)
         .order('lesson_id', { ascending: true })
         .order('order_index', { ascending: true });
@@ -89,6 +90,19 @@ export const getSummaryByCourse = protectedProcedure
       const summaryByLesson: Record<string, EnrichmentSummary[]> = {};
 
       for (const enrichment of enrichments || []) {
+        // The database enum is wider than the types this application models: a
+        // value is added there first so its handler can be written, and here
+        // only once it exists. A row of an unmodelled type cannot be produced
+        // today, so this is a guard rather than a filter — but a silent skip
+        // would be the wrong shape, and a cast would be a lie.
+        if (!isSupportedEnrichmentType(enrichment.enrichment_type)) {
+          logger.warn(
+            { enrichmentId: enrichment.id, enrichmentType: enrichment.enrichment_type },
+            'Enrichment row carries a type this build does not support - omitted from the summary'
+          );
+          continue;
+        }
+
         const lessonId = enrichment.lesson_id;
         if (!summaryByLesson[lessonId]) {
           summaryByLesson[lessonId] = [];
