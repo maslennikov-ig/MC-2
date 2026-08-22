@@ -221,12 +221,15 @@ Answered: `mc2-jz6y0.13.6` (pull-based off-host snapshots), `mc2-lrav0` (no back
 `mc2-db696.61` (closed by instrumenting the path — `career_playbook_sources` has never held a row, so
 the first real `company_specific` run takes the measurement by itself).
 
-**Still open, none blocking today.** `mc2-dgw4u` — Stage 7 audio bills a separate OpenAI account,
-outside every OpenRouter reconciliation by construction; the ticket is closed because the boundary is
-documented, not because the question is settled. `mc2-b7olk.4` — where document-evidence money
-belongs. `mc2-wxun`/`mc2-vjbb` — enabling a cohort, and whether 0.15 moves. `mc2-v6fqp` — a spend
-budget and disposable inputs. `mc2-hqfc3` — when the February video pipeline returns. A new enum or
-table (`mc2-r7udy`, `mc2-6ye5z.4/.5/.8`) is a migration each, approved one at a time.
+**Answered 2026-08-22.** `mc2-dgw4u` — Stage 7 audio stays on its own OpenAI account, **paused, not
+settled**: a reconciliation must keep saying "the OpenRouter spend is accounted for", not "the run
+is". `mc2-b7olk.4` — document-evidence money **does** belong in the course total, as a
+`generation_trace` row like any other paid call, the coverage registry becoming analytics: one call,
+one priced row is the rule the ledger stands on. Migrations approved **when necessary, useful and
+current**, one at a time. `mc2-hqfc3` video stays parked; NotebookLM checked instead (`mc2-rmbwo`).
+
+**Still open.** `mc2-wxun`/`mc2-vjbb` — the shadow cohort is worth enabling, but only in
+**production**: on dev it would measure nothing. `mc2-v6fqp` — a budget and disposable inputs.
 
 ## Safety boundary
 
@@ -249,14 +252,11 @@ report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- `mc2-v6fqp` — live Stage 6 multilingual quality matrix; owner call above.
-- `mc2-wxun`, `mc2-vjbb` — instrumented, disabled, locally accepted; owner call above.
-- `mc2-r7udy`, `mc2-6ye5z.4/.5/.8` — each needs a new enum or table, so a migration each.
+- `mc2-6ye5z.4/.5/.8` — an enum value each, so a migration each; blocked on `mc2-rmbwo`. `mc2-r7udy`
+  probably needs none: `system_metrics` already has `event_type` and a JSONB `metadata`.
 - `mc2-db696.106`/`.107` — PDF fidelity and grounding. Separate deploy accounts: not planned.
 - `mc2-gmab0` mandatory-reasoning recovery — held by unit tests; no model has ever refused.
-- `mc2-b7olk.4` — document evidence keeps its own ledger; owner call above, not a forgotten argument.
-- `mc2-f1tqd` — five attempts died reading an empty provider response instead of naming it; free but
-  slow, hidden behind the retry that saved it.
+- `mc2-f1tqd` — five attempts died reading an empty provider response instead of naming it.
 
 ## Next recommended
 
