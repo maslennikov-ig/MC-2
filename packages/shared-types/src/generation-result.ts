@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { informationLength, meaningfulText } from './text-length';
 
 // Import from common-enums.ts (single source of truth)
 import { courseLevelSchema, type CourseLevel } from './common-enums';
@@ -253,10 +254,7 @@ export type SupportedLanguage = z.infer<typeof SupportedLanguageSchema>;
  */
 const LearningObjectiveBaseSchema = z.object({
   id: z.string().uuid(),
-  text: z
-    .string()
-    .min(10, 'Learning objective too short (min 10 chars)')
-    .max(500, 'Learning objective too long (max 500 chars)'),
+  text: meaningfulText({ minimum: 10, maximum: 500, label: 'Learning objective' }),
   language: SupportedLanguageSchema.describe('Language of the learning objective'),
 });
 
@@ -312,14 +310,11 @@ const LessonBaseSchema = z.object({
     .min(0)
     .optional()
     .describe('Lesson number (optional - can derive from array index)'),
-  lesson_title: z
-    .string()
-    .min(5, 'Lesson title too short (min 5 chars)')
-    .max(500, 'Lesson title too long (max 500 chars - FR-022)'),
+  lesson_title: meaningfulText({ minimum: 5, maximum: 500, label: 'Lesson title' }),
 
   // Technical specifications for Stage 6 lesson generation (FR-011)
   lesson_objectives: z
-    .array(z.string().min(10).max(600))
+    .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Learning objective' }))
     .min(1, 'At least 1 learning objective required')
     .max(5, 'Maximum 5 learning objectives per lesson')
     .describe(
@@ -327,7 +322,7 @@ const LessonBaseSchema = z.object({
     ),
 
   key_topics: z
-    .array(z.string().min(5).max(300))
+    .array(meaningfulText({ minimum: 5, maximum: 300, label: 'Key topic' }))
     .min(2, 'At least 2 key topics required')
     .max(10, 'Maximum 10 key topics per lesson')
     .describe('Key topics covered in this lesson (CRITICAL for Stage 6)'),
@@ -408,16 +403,22 @@ const SectionBaseSchemaForGeneration = z.object({
     .describe('Section number (optional - can derive from array index)'),
   section_title: z
     .string()
-    .min(10, 'Section title too short (min 10 chars)')
-    .max(600, 'Section title too long (max 600 chars - FR-022)'),
+    .max(600, 'Section title too long (max 600 chars - FR-022)')
+    .refine(v => informationLength(v) >= 10, {
+      message:
+        'Section title too short (min 10 chars; a Han, Kana or Hangul character counts as 2)',
+    }),
   section_description: z
     .string()
-    .min(20, 'Section description too short (min 20 chars)')
-    .max(2000, 'Section description too long (max 2000 chars - FR-022)'),
+    .max(2000, 'Section description too long (max 2000 chars - FR-022)')
+    .refine(v => informationLength(v) >= 20, {
+      message:
+        'Section description too short (min 20 chars; a Han, Kana or Hangul character counts as 2)',
+    }),
 
   // Pedagogical structure (FR-012)
   learning_objectives: z
-    .array(z.string().min(10).max(600))
+    .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Section learning objective' }))
     .min(1, 'At least 1 section-level learning objective required')
     .describe(
       'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars)'
@@ -459,15 +460,21 @@ export const SectionSchema = z
     section_number: z.number().int().positive().optional(),
     section_title: z
       .string()
-      .min(10, 'Section title too short (min 10 chars)')
-      .max(600, 'Section title too long (max 600 chars - FR-022)'),
+      .max(600, 'Section title too long (max 600 chars - FR-022)')
+      .refine(v => informationLength(v) >= 10, {
+        message:
+          'Section title too short (min 10 chars; a Han, Kana or Hangul character counts as 2)',
+      }),
     section_description: z
       .string()
-      .min(20, 'Section description too short (min 20 chars)')
-      .max(2000, 'Section description too long (max 2000 chars - FR-022)'),
+      .max(2000, 'Section description too long (max 2000 chars - FR-022)')
+      .refine(v => informationLength(v) >= 20, {
+        message:
+          'Section description too short (min 20 chars; a Han, Kana or Hangul character counts as 2)',
+      }),
 
     learning_objectives: z
-      .array(z.string().min(10).max(600))
+      .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Section learning objective' }))
       .min(1, 'At least 1 section-level learning objective required')
       .describe(
         'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars)'
@@ -523,31 +530,23 @@ export const CourseStructureSchema = z
 
     // ========== METADATA ==========
 
-    course_title: z
-      .string()
-      .min(10, 'Course title too short (min 10 chars)')
-      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-      .describe('Course title (10-1000 characters)'),
+    course_title: meaningfulText({ minimum: 10, maximum: 1000, label: 'Course title' }).describe(
+      'Course title (10-1000 characters)'
+    ),
 
-    course_description: z
-      .string()
-      .min(20, 'Course description too short (min 20 chars)')
-      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: meaningfulText({
+      minimum: 20,
+      maximum: 3000,
+      label: 'Course description',
+    }).describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-    course_overview: z
-      .string()
-      .min(30, 'Course overview too short (min 30 chars)')
-      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+    course_overview: meaningfulText({ minimum: 30, maximum: 10000, label: 'Course overview' })
       .optional()
       .describe(
         'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
       ),
 
-    target_audience: z
-      .string()
-      .min(20, 'Target audience too short (min 20 chars)')
-      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+    target_audience: meaningfulText({ minimum: 20, maximum: 1500, label: 'Target audience' })
       .optional()
       .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
@@ -556,7 +555,7 @@ export const CourseStructureSchema = z
     difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
     prerequisites: z
-      .array(z.string().min(10).max(600))
+      .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Prerequisite' }))
       .min(0)
       .max(10)
       .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
@@ -570,7 +569,7 @@ export const CourseStructureSchema = z
     // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
-      .array(z.string().min(3).max(150))
+      .array(meaningfulText({ minimum: 3, maximum: 150, label: 'Course tag' }))
       .min(5, 'At least 5 course tags required')
       .max(20, 'Maximum 20 course tags')
       .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
@@ -628,31 +627,23 @@ export type CourseStructure = z.infer<typeof CourseStructureSchema>;
  */
 export const CourseMetadataSchema = z
   .object({
-    course_title: z
-      .string()
-      .min(10, 'Course title too short (min 10 chars)')
-      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-      .describe('Course title (10-1000 characters)'),
+    course_title: meaningfulText({ minimum: 10, maximum: 1000, label: 'Course title' }).describe(
+      'Course title (10-1000 characters)'
+    ),
 
-    course_description: z
-      .string()
-      .min(20, 'Course description too short (min 20 chars)')
-      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: meaningfulText({
+      minimum: 20,
+      maximum: 3000,
+      label: 'Course description',
+    }).describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-    course_overview: z
-      .string()
-      .min(30, 'Course overview too short (min 30 chars)')
-      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+    course_overview: meaningfulText({ minimum: 30, maximum: 10000, label: 'Course overview' })
       .optional()
       .describe(
         'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
       ),
 
-    target_audience: z
-      .string()
-      .min(20, 'Target audience too short (min 20 chars)')
-      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+    target_audience: meaningfulText({ minimum: 20, maximum: 1500, label: 'Target audience' })
       .optional()
       .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
@@ -661,7 +652,7 @@ export const CourseMetadataSchema = z
     difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
     prerequisites: z
-      .array(z.string().min(10).max(600))
+      .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Prerequisite' }))
       .min(0)
       .max(10)
       .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
@@ -675,7 +666,7 @@ export const CourseMetadataSchema = z
     // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
-      .array(z.string().min(3).max(150))
+      .array(meaningfulText({ minimum: 3, maximum: 150, label: 'Course tag' }))
       .min(5, 'At least 5 course tags required')
       .max(20, 'Maximum 20 course tags')
       .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
@@ -698,31 +689,23 @@ export type CourseMetadata = z.infer<typeof CourseMetadataSchema>;
  */
 export const CourseMetadataWithoutInjectedFieldsSchema = z
   .object({
-    course_title: z
-      .string()
-      .min(10, 'Course title too short (min 10 chars)')
-      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-      .describe('Course title (10-1000 characters)'),
+    course_title: meaningfulText({ minimum: 10, maximum: 1000, label: 'Course title' }).describe(
+      'Course title (10-1000 characters)'
+    ),
 
-    course_description: z
-      .string()
-      .min(20, 'Course description too short (min 20 chars)')
-      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: meaningfulText({
+      minimum: 20,
+      maximum: 3000,
+      label: 'Course description',
+    }).describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-    course_overview: z
-      .string()
-      .min(30, 'Course overview too short (min 30 chars)')
-      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+    course_overview: meaningfulText({ minimum: 30, maximum: 10000, label: 'Course overview' })
       .optional()
       .describe(
         'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
       ),
 
-    target_audience: z
-      .string()
-      .min(20, 'Target audience too short (min 20 chars)')
-      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+    target_audience: meaningfulText({ minimum: 20, maximum: 1500, label: 'Target audience' })
       .optional()
       .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
@@ -731,7 +714,7 @@ export const CourseMetadataWithoutInjectedFieldsSchema = z
     difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
     prerequisites: z
-      .array(z.string().min(10).max(600))
+      .array(meaningfulText({ minimum: 10, maximum: 600, label: 'Prerequisite' }))
       .min(0)
       .max(10)
       .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
@@ -747,7 +730,7 @@ export const CourseMetadataWithoutInjectedFieldsSchema = z
     // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
-      .array(z.string().min(3).max(150))
+      .array(meaningfulText({ minimum: 3, maximum: 150, label: 'Course tag' }))
       .min(5, 'At least 5 course tags required')
       .max(20, 'Maximum 20 course tags')
       .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
