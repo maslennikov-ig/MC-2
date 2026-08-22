@@ -217,8 +217,16 @@ tracker priority. Complete through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y
 
 ## Owner decisions
 
-- `mc2-jz6y0.13.6` — answered: pull-based off-host snapshots, 14-day retention. `mc2-lrav0` —
-  answered: no backfill of dev Qdrant. `mc2-db696.61` — needs a live run and a cost/quality call.
+Answered: `mc2-jz6y0.13.6` (pull-based off-host snapshots), `mc2-lrav0` (no backfill of dev Qdrant),
+`mc2-db696.61` (closed by instrumenting the path — `career_playbook_sources` has never held a row, so
+the first real `company_specific` run takes the measurement by itself).
+
+**Still open, none blocking today.** `mc2-dgw4u` — Stage 7 audio bills a separate OpenAI account,
+outside every OpenRouter reconciliation by construction; the ticket is closed because the boundary is
+documented, not because the question is settled. `mc2-b7olk.4` — where document-evidence money
+belongs. `mc2-wxun`/`mc2-vjbb` — enabling a cohort, and whether 0.15 moves. `mc2-v6fqp` — a spend
+budget and disposable inputs. `mc2-hqfc3` — when the February video pipeline returns. A new enum or
+table (`mc2-r7udy`, `mc2-6ye5z.4/.5/.8`) is a migration each, approved one at a time.
 
 ## Safety boundary
 
@@ -241,22 +249,14 @@ report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- `mc2-v6fqp` — live Stage 6 multilingual quality matrix; needs an approved spend budget and
-  disposable inputs.
-- `mc2-wxun`, `mc2-vjbb` — instrumented, disabled, locally accepted; enabling a cohort and changing
-  0.15 are owner actions.
-- `mc2-r7udy`, `mc2-6ye5z.4/.5/.8` — each needs a new enum value or table; the only migration the
-  owner approved was `mc2-ufpko` (2026-08-13).
-- `mc2-db696.106`/`.107` — PDF fidelity and content grounding; `.108` partly overtaken.
-- Separate deploy accounts and narrower sudoers — intentionally not planned after `mc2-q1ggs`.
-- `mc2-gmab0` mandatory-reasoning recovery — no model has refused in any run, so it is held by unit
-  tests only. It does now cover the structured call sites (`mc2-148j9` closed).
-- `mc2-b7olk.4` — document evidence prices itself into its own coverage ledger and never reaches the
-  course total; where that money belongs is a decision, not a forgotten argument.
+- `mc2-v6fqp` — live Stage 6 multilingual quality matrix; owner call above.
+- `mc2-wxun`, `mc2-vjbb` — instrumented, disabled, locally accepted; owner call above.
+- `mc2-r7udy`, `mc2-6ye5z.4/.5/.8` — each needs a new enum or table, so a migration each.
+- `mc2-db696.106`/`.107` — PDF fidelity and grounding. Separate deploy accounts: not planned.
+- `mc2-gmab0` mandatory-reasoning recovery — held by unit tests; no model has ever refused.
+- `mc2-b7olk.4` — document evidence keeps its own ledger; owner call above, not a forgotten argument.
 - `mc2-f1tqd` — five attempts died reading an empty provider response instead of naming it; free but
-  slow, and hidden behind the retry that saved it.
-- `mc2-dgw4u` — **owner question:** Stage 7 audio bills a separate OpenAI account, outside every
-  OpenRouter reconciliation by construction; whether it stays there is undecided.
+  slow, hidden behind the retry that saved it.
 
 ## Next recommended
 
