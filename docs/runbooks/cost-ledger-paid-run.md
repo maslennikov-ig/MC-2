@@ -8,10 +8,18 @@ wiring, and only a paid run verifies the behaviour.
 Twice before, a paid run found defects no test had. Expect this one to as well. Finding
 one is the run succeeding, not failing.
 
-**Last result — 2026-08-22, `7c80e479c`: every acceptance line passed.** Report TOTAL
-$0.202480 against a `/credits` delta of $0.202481, and a third figure from summing
-`GET /api/v1/generation` over the 65 recorded ids agreed to the same six decimals. 25 of
-25 billed calls carried a provider receipt. The run still found one defect (`mc2-f1tqd`).
+**Last result — 2026-08-22, `27d4453da`: two runs, every acceptance line passed.**
+
+Course `9a22e60d`, the judge and image acceptance (`mc2-bxmje`): TOTAL $0.030963 against a
+`/credits` delta of $0.030962, 19 of 19 billed calls priced by the provider, one
+`stage_edit` row. Course `04c03c82`, the first run **with an uploaded document**
+(`mc2-b7olk.4`): TOTAL $0.037501 against a delta of $0.037501, 25 of 25 priced. Both found
+a defect, which is the run working: `mc2-80o1t`, one `null` from the model discarding a
+lesson's whole self-review.
+
+Earlier, on `7c80e479c`: TOTAL $0.202480 against $0.202481, with a third figure summed from
+`GET /api/v1/generation` over 65 ids agreeing to the same six decimals.
+
 So the purpose of the next run is to **measure a change**, not to look for holes — and it
 does not need to be this whole runbook unless the change touches the ledger.
 
@@ -99,10 +107,17 @@ excluded. Whether audio stays on a direct OpenAI account is an open question for
    Supabase database. Career playbook lives at `/<locale>/career-playbook`. Keep the
    course small — the point is covering the pipeline, not volume.
 
-   **Upload a document only if the run is about documents.** Evidence extraction keeps its
-   own cost ledger and never reaches the course total (`mc2-b7olk.4`), so an upload puts a
-   knowingly unattributable delta into the window and a reconciliation cannot converge past
-   it. The 2026-08-22 run left it out and said so.
+   **Uploading a document is fine now.** It used not to be: evidence extraction priced
+   itself into the document-evidence coverage registry and nowhere else, so an upload put a
+   knowingly unattributable delta into the window (`mc2-b7olk.4`). It threads `costContext`
+   through `StructuredEvidencePort` since `eb939d21f`, and the run of 2026-08-22 proved it
+   live — course `04c03c82`, one uploaded document, `stage_4_evidence_map` and
+   `stage_4_conflict_detection` each a priced `generation_trace` row carrying
+   `billedByProvider`, window TOTAL $0.037501 against a `/credits` delta of $0.037501.
+   The registry is analytics; the money is in one table.
+
+   Keep the document small, and expect Stage 2 in the window — chunking, embedding, Qdrant
+   upload and one `stage_2_summarization` call.
 
 3. Drive both generations from code (see above). Watch for failures rather than guessing:
 
