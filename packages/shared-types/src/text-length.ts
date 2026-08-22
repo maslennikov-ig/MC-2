@@ -60,6 +60,22 @@ export function informationLength(text: string): number {
 }
 
 /**
+ * A string that must carry at least `minimum` Latin characters' worth of text,
+ * with no upper bound.
+ *
+ * For the Stage 4 analysis fields, which deliberately dropped their maximums so
+ * a model could be as thorough as it liked. Their minimums are the same claim
+ * about a writing system as everywhere else: `min(100)` on `knowledge_bridge`
+ * asks for a paragraph, and a Chinese paragraph reaches it at roughly fifty
+ * characters.
+ */
+export function atLeastInformationChars(minimum: number): z.ZodType<string> {
+  return z.string().refine(value => informationLength(value) >= minimum, {
+    message: `String must carry at least ${minimum} characters' worth of text (a Han, Kana or Hangul character counts as ${DENSE_SCRIPT_WEIGHT})`,
+  });
+}
+
+/**
  * A string that must carry at least `minimum` Latin characters' worth of text.
  *
  * A drop-in replacement for `z.string().min(n, message).max(m, message)` where

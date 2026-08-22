@@ -120,3 +120,32 @@ describe('the whole section the run produced', () => {
     expect(chineseSection.lessons[0].key_topics[2].length).toBeLessThan(5);
   });
 });
+
+describe('the Stage 4 fields that killed the second Chinese run', () => {
+  it('accepts a Chinese paragraph where min(100) previously refused it', async () => {
+    const { atLeastInformationChars } = await import('@megacampus/shared-types');
+    const bridge = atLeastInformationChars(100);
+
+    // From the run that failed: knowledge_bridge, experience_prompt and
+    // practical_benefit_focus are all min(100). This is a complete, thorough
+    // Chinese paragraph at 62 characters — the English equivalent runs past 250.
+    const chinese =
+      '虽然你可能是理财新手，但你一定对花钱和存钱有基本的感知。这门课会把你已有的生活经验与一个系统的财务规划框架连接起来，让专业概念变得一听就懂。';
+    expect(chinese.length).toBeLessThan(100);
+    expect(bridge.safeParse(chinese).success).toBe(true);
+  });
+
+  it('still refuses an English sentence that is genuinely too short', async () => {
+    const { atLeastInformationChars } = await import('@megacampus/shared-types');
+    expect(
+      atLeastInformationChars(100).safeParse('You already know how to spend money.').success
+    ).toBe(false);
+  });
+
+  it('leaves the non-empty checks alone', async () => {
+    // `min(1)` through `min(3)` say "not blank", not "long enough", and were
+    // deliberately not converted.
+    const { AnalysisResultSchema } = await import('@megacampus/shared-types');
+    expect(AnalysisResultSchema).toBeDefined();
+  });
+});
