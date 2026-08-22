@@ -5,6 +5,7 @@
 
 import type { HeuristicFilterConfig, FilterCheckResult } from './types';
 import { calculateFleschKincaidGrade, calculateFleschReadingEase } from './text-metrics';
+import { countWordsScriptAware } from '@megacampus/shared-types';
 
 // ============================================================================
 // INDIVIDUAL FILTER FUNCTIONS
@@ -21,8 +22,11 @@ export function checkWordCount(
   content: string,
   config: HeuristicFilterConfig['wordCount']
 ): FilterCheckResult {
-  const words = content.match(/\b[a-zA-Z]+\b/g) || [];
-  const wordCount = words.length;
+  // Was `content.match(/\b[a-zA-Z]+\b/g)`: ASCII letters only, so a Russian
+  // lesson counted **zero** words and a Chinese one likewise. The same
+  // Latin-calibrated assumption that made the Stage 6 pre-filter reject every
+  // Chinese lesson, in a narrower form (mc2-v6fqp).
+  const wordCount = countWordsScriptAware(content);
 
   // IMPORTANT: Only content BELOW min is a blocking failure
   // Content exceeding max is just a warning (non-blocking)

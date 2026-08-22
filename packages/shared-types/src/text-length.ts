@@ -60,6 +60,41 @@ export function informationLength(text: string): number {
 }
 
 /**
+ * Characters per word in a script that does not put spaces between them.
+ *
+ * ~1.6 is the usual figure for Mandarin; Japanese and Korean are close enough
+ * that one constant beats three guesses.
+ */
+const DENSE_SCRIPT_CHARS_PER_WORD = 1.6;
+
+/**
+ * Count words in text that may be written without spaces between them.
+ *
+ * Splitting on whitespace is not language-agnostic, however often it is
+ * described that way. Chinese puts no space between words, so whitespace
+ * splitting counts punctuation-delimited clauses: a complete Chinese lesson of
+ * some four thousand characters came out at **356 words** against a minimum of
+ * 1200, failed the Stage 6 heuristic pre-filter, scored 0, and was regenerated
+ * the maximum number of times — three lessons at five times the cost of the same
+ * course in Spanish, with nothing wrong with any of them (mc2-v6fqp).
+ *
+ * So dense-script characters are counted and converted, and everything else is
+ * split on whitespace as before. For Latin and Cyrillic text the result is
+ * identical to the old behaviour.
+ */
+export function countWordsScriptAware(text: string): number {
+  let denseCharacters = 0;
+  let rest = '';
+  for (const character of text) {
+    if (DENSE_SCRIPT.test(character)) denseCharacters += 1;
+    else rest += character;
+  }
+
+  const spacedWords = rest.split(/\s+/u).filter(word => word.trim().length > 0).length;
+  return spacedWords + Math.round(denseCharacters / DENSE_SCRIPT_CHARS_PER_WORD);
+}
+
+/**
  * A string that must carry at least `minimum` Latin characters' worth of text,
  * with no upper bound.
  *

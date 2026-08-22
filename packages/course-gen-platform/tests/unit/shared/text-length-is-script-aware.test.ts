@@ -173,3 +173,38 @@ describe('the model can still see the constraint', () => {
     expect(zodToPromptSchema(z.object({ x: z.string().min(100) }))).toContain('min 100');
   });
 });
+
+describe('counting words where there are no spaces', () => {
+  it('does not report a whole Chinese lesson as 356 words', async () => {
+    const { countWordsScriptAware } = await import('@megacampus/shared-types');
+
+    // A Chinese paragraph: whitespace splitting sees one "word" per clause,
+    // which is how a complete lesson came out at 356 against a minimum of 1200
+    // and was regenerated twice for being "critically low".
+    const chinese =
+      '应急基金是一笔专门用于应对突发支出的流动资金。它不是投资工具，也不用于日常消费。当主要收入中断时，这笔钱可以覆盖家庭的必要开支，让你有时间从容处理问题，而不必被迫接受不利的条件。';
+
+    expect(chinese.split(/\s+/u).filter(Boolean).length).toBeLessThan(3);
+    // ~88 characters at ~1.6 per word.
+    expect(countWordsScriptAware(chinese)).toBeGreaterThan(45);
+    expect(countWordsScriptAware(chinese)).toBeLessThan(70);
+  });
+
+  it('counts Latin and Cyrillic exactly as whitespace splitting did', async () => {
+    const { countWordsScriptAware } = await import('@megacampus/shared-types');
+
+    for (const text of [
+      'The emergency fund covers mandatory household expenses when income stops.',
+      'Резервный фонд покрывает обязательные расходы домохозяйства при потере дохода.',
+      'El fondo de emergencia cubre los gastos obligatorios del hogar.',
+    ]) {
+      expect(countWordsScriptAware(text)).toBe(text.split(/\s+/u).filter(Boolean).length);
+    }
+  });
+
+  it('adds both halves of a mixed sentence', async () => {
+    const { countWordsScriptAware } = await import('@megacampus/shared-types');
+    // Three Latin words plus four Han characters ≈ 3 + round(4/1.6) = 3 + 3.
+    expect(countWordsScriptAware('use the API 应急基金')).toBe(3 + 3);
+  });
+});
