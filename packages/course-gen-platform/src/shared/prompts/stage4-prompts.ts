@@ -28,6 +28,11 @@ Your task is to analyze course topics and classify them into one of 6 categories
 
 CRITICAL RULES:
 1. ALL output MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+1a. EXCEPT enum values. Any field whose schema lists a fixed set of allowed
+   values — course_category, complexity, target_audience, difficulty, tone,
+   importance, and the like — must be answered with one of those values EXACTLY
+   as written in the schema, in English. They are identifiers, not prose. A
+   translated enum value is rejected outright and the whole phase fails.
 2. You MUST respond with valid JSON matching this EXACT schema:
 
 {{schemaDescription}}
@@ -160,6 +165,11 @@ When choosing Bloom's taxonomy verbs for learning_objectives, let them ascend na
 
 CRITICAL RULES:
 1. ALL text output MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+1a. EXCEPT enum values. Any field whose schema lists a fixed set of allowed
+   values — course_category, complexity, target_audience, difficulty, tone,
+   importance, and the like — must be answered with one of those values EXACTLY
+   as written in the schema, in English. They are identifiers, not prose. A
+   translated enum value is rejected outright and the whole phase fails.
 2. You MUST respond with valid JSON matching this EXACT schema:
 
 {{schemaDescription}}
@@ -439,6 +449,11 @@ IMPORTANT:
 
 CRITICAL RULES:
 1. ALL your response MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+1a. EXCEPT enum values. Any field whose schema lists a fixed set of allowed
+   values — course_category, complexity, target_audience, difficulty, tone,
+   importance, and the like — must be answered with one of those values EXACTLY
+   as written in the schema, in English. They are identifiers, not prose. A
+   translated enum value is rejected outright and the whole phase fails.
 2. You MUST respond with valid JSON matching this EXACT schema:
 
 {{schemaDescription}}
@@ -605,6 +620,11 @@ You have 15+ years experience in curriculum design and instructional synthesis.`
 
 CRITICAL RULES:
 1. ALL your response MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+1a. EXCEPT enum values. Any field whose schema lists a fixed set of allowed
+   values — course_category, complexity, target_audience, difficulty, tone,
+   importance, and the like — must be answered with one of those values EXACTLY
+   as written in the schema, in English. They are identifiers, not prose. A
+   translated enum value is rejected outright and the whole phase fails.
 2. You MUST respond with valid JSON matching this EXACT schema:
 
 {{schemaDescription}}
