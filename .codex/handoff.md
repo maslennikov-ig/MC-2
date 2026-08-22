@@ -6,11 +6,10 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
-The Career Playbook quality track is **accepted** (`mc2-db696.110`, editorial read 4.4 / 5 against a
-4.0 threshold, run cost USD 0.352; evidence in `.codex/stages/mc2-db696.110/evidence/`). Its two
-process rules are in `06-quality-acceptance.md` and still hold: read the artifact before calling a
-run accepted, and clean up **after** the editorial pass. Epic `mc2-qrdkt` is closed; no stage is
-active.
+No stage is active. `four-doors-marten.md` ran on 2026-08-22 — tracks A, B and D closed, C blocked;
+see the section near the end. The Career Playbook quality track stays **accepted**
+(`mc2-db696.110`), and its two process rules in `06-quality-acceptance.md` still hold: read the
+artifact before calling a run accepted, and clean up **after** the editorial pass.
 
 ## RAG retrieval, chunking and parent expansion (2026-08-12/13)
 
@@ -75,18 +74,14 @@ Stored configuration is clean on the checks that matter. What was open was the s
 Stage 5, metadata generation and `getModelForPhase` each dropped part of a phase config, and all
 three now go through `buildProviderParams`, held by
 `tests/unit/phase-config-provider-contract.test.ts`. Collision fallback: `google/gemini-3.7-flash`.
-Open, none in the current epics: `mc2-s1vg5` (`generate:config-seed` exits 0 on an unreachable
-database), `mc2-9yrgb` (`stage_5_escalation` requested by nothing — do not delete on that alone),
-`mc2-p6u8k` (Stage 5 last-resort constants name retired models).
+Open, none in the current epics: `mc2-s1vg5`, `mc2-9yrgb` (`stage_5_escalation` requested by nothing
+— do not delete on that alone), `mc2-p6u8k`.
 
 ## Cost accounting: where it stands
 
-Epic `mc2-qrdkt` is complete and the ledger **reconciles**: the run of 2026-08-22 came to
-$0.202480 against a `/api/v1/credits` delta of $0.202481, with a third figure — the provider's
-charge summed over all 65 recorded generation ids — agreeing to the same decimals. 25 of 25 billed
-calls carried a provider receipt (`mc2-z0xr3`, `mc2-79lvc`). Evidence is in the `bd` close reasons.
-
-What still constrains work:
+Epic `mc2-qrdkt` is complete and the ledger **reconciles** — three times now, most recently to the
+sixth decimal on two runs of 2026-08-22, one of them with an uploaded document (see the four tracks
+below). What still constrains work:
 
 - **The receipt exists.** `GET /api/v1/generation?id=` returns what OpenRouter actually billed, plus
   `cancelled` and `provider_name`. The id is in the body **and** in the `x-generation-id` header,
@@ -186,8 +181,7 @@ generates synchronously by itself if the batch never lands. Eligibility is decid
 the **live** catalogue: the `:batch` sibling must exist, be cheaper on both legs and fit the request.
 Not a config switch — a `:batch` id posted to the synchronous endpoint breaks the caller, and a
 `:batch` tariff is **not** reliably half the base one. `MODEL_CATALOG` prices are the `/models` base
-rate, which with many providers is a default rather than a promise: `z-ai/glm-5.2` ran $0.49 to $1.40
-per million input on one day.
+rate, a default rather than a promise: `z-ai/glm-5.2` ran $0.49 to $1.40 per million input in a day.
 
 ## Backlog truth and order
 
@@ -208,7 +202,8 @@ tracker priority. Complete through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y
   2026-08-13); do not reopen. Uploads live on the production host, not in Supabase Storage.
 - Monitoring drift is a separate job, never a deploy step: it can trigger rollback.
 - Deploy/rollback entrypoints exit 75 when `/opt/megacampus/.host-operation.lock` is held; manual
-  infra work must use `scripts/with_host_operation_lock.sh`.
+  infra work must use `scripts/with_host_operation_lock.sh`. Production workers take their env from
+  `.env.<active_color>` (`cat /opt/megacampus/active_color`), **not** `.env.production`.
 - The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
   `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` suites run on uid 1000
   only, 120s budget (mc2-bvynv).
@@ -218,18 +213,17 @@ tracker priority. Complete through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y
 ## Owner decisions
 
 Answered: `mc2-jz6y0.13.6` (pull-based off-host snapshots), `mc2-lrav0` (no backfill of dev Qdrant),
-`mc2-db696.61` (closed by instrumenting the path — `career_playbook_sources` has never held a row, so
-the first real `company_specific` run takes the measurement by itself).
+`mc2-db696.61` (`career_playbook_sources` has never held a row, so the first real `company_specific`
+run measures it by itself).
 
 **Answered 2026-08-22.** `mc2-dgw4u` — Stage 7 audio stays on its own OpenAI account, **paused, not
 settled**: a reconciliation must keep saying "the OpenRouter spend is accounted for", not "the run
-is". `mc2-b7olk.4` — document-evidence money **does** belong in the course total, as a
-`generation_trace` row like any other paid call, the coverage registry becoming analytics: one call,
-one priced row is the rule the ledger stands on. Migrations approved **when necessary, useful and
-current**, one at a time. `mc2-hqfc3` video stays parked; NotebookLM checked instead (`mc2-rmbwo`).
+is". `mc2-b7olk.4` — document-evidence money belongs in the course total, one call one priced row,
+the coverage registry becoming analytics; **delivered and accepted live**, see track B below.
+Migrations approved **when necessary, useful and current**, one at a time. `mc2-hqfc3` video stays
+parked; NotebookLM checked instead — and found unreachable (`mc2-xjykw`).
 
-**Still open:** `mc2-v6fqp` needs one word — which third language. "ru and en" is read as the test
-language for everything else, since this task's own acceptance requires a non-ru/en path.
+**Still open:** `mc2-v6fqp` — which third language; `mc2-xjykw` — the geo-bypass host, i.e. track C. "ru and en" stays the test language.
 
 ## Safety boundary
 
@@ -249,58 +243,64 @@ Do not touch `mc2-x72bq`, `mc2-ibzcc`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f`, `m
 Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`. Branches were swept
 2026-08-22 (`mc2-3mq9b`): 200 remote and 69 local down to **11 and 8**, four stashes kept as
 `stash-archive/2026-08-22-*` tags and dropped, every sha in
-`.codex/deleted-branches-2026-08-22.tsv`. `/push-dev` now deletes the branch it delivered, so a
-report naming a branch again means something really was left behind.
+`.codex/deleted-branches-2026-08-22.tsv`. `/push-dev` deletes the branch it delivered, so a report
+naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- `mc2-6ye5z.4/.5/.8` — one `ALTER TYPE` for all three, blocked on `mc2-rmbwo`; `mc2-r7udy` needs
-  none at all (`system_metrics` carries no CHECK).
+- `mc2-6ye5z.4/.5/.8`, `mc2-rmbwo`, `mc2-p99f1` — all blocked on `mc2-xjykw`, below. `mc2-r7udy`
+  needs no migration (`system_metrics` carries no CHECK).
 - `mc2-db696.106`/`.107` — PDF fidelity and grounding. Separate deploy accounts: not planned.
-  `mc2-gmab0` — held by unit tests. `mc2-f1tqd` — an empty provider response crashes the parse.
+  `mc2-gmab0` — held by unit tests. `mc2-f1tqd` — an empty provider response crashes the parse; did
+  **not** recur on the 2026-08-22 runs.
+
+## The four tracks of `four-doors-marten.md`, run 2026-08-22 (numbers in the `bd` close reasons)
+
+**A and B are closed** (`mc2-bxmje`, `mc2-b7olk.4`), both reconciled to the `/credits` delta at the
+sixth decimal. A cut a micro course $0.1027 → $0.030963 and the card image 4.9×; the single judge now
+runs on deepseek. **What A could not show:** all three lessons scored 0.91–0.94, no panel convened,
+so the 0.80 → 0.75 threshold move is still unmeasured — that needs accumulated `singleJudge.score`.
+B was already built (`eb939d21f`); only the live acceptance was missing, and the runbook's "do not
+upload a document" caveat is now lifted.
+
+**C is blocked at the network, not the library (`mc2-xjykw`, P0).** NotebookLM is unreachable from
+both bridges: the SOCKS5 geo-bypass at `172.19.0.1:1080` has no listener and the upstream
+`185.200.177.180` refuses port 22, so restarting autossh cannot help. Without the hop a request lands
+on `https://notebook.google/` and dies extracting a CSRF token — dropping the proxy is not a
+workaround. Cookies are fine (66 of 70 alive, earliest expiry **2026-08-28** — renew soon). Nothing
+has generated since 2026-04-15, so nobody noticed. A third-party host: the owner's call. Fixed
+alongside: the health check passed on a set variable rather than an open socket; `mc2-aqsjj` pinned
+`notebooklm-py==0.8.0` (dev 0.6.0, prod 0.8.0, chosen by build date); `mc2-3d3ku` — the bridge suite
+is in no CI job and was red.
+
+**D — switch live, proof pending (`mc2-wxun` closed).** `RAG_SHADOW_RETRIEVAL_RATE=0.05` is on the
+running production Stage 6 worker, in **both** `.env.green` and `.env.blue` so a colour flip cannot
+drop it. No rows yet — the shadow fires only on a Tier 1 exit and production has not generated since.
+Count `step_name='tier1_shadow'`; raise 0.05 once rows land, then `mc2-vjbb`.
+
+**Two defects the runs found**, which is the runs working. `mc2-80o1t` (fixed): one `null` from the
+model discarded a lesson's entire LLM self-review, and two of three lessons reached the judge on
+heuristics alone while Stage 6 reported success. `mc2-kznfz` (logged, cause open): a course with an
+indexed document produced zero RAG chunks in 143 ms through the only empty path writing neither log
+nor trace row — the lesson's documents and the accepted evidence set did not intersect. That branch
+sits **above** the Tier 1 gate, so track D's cohort cannot see this case at all.
+
+**Three owner decisions of 2026-08-20/21 bind the routing work:** a failing provider is ignored only
+inside the current chain of attempts, never in a standing blocklist; cheapest stays the goal
+(`max_price` a ceiling, `sort=throughput` out); waiting is acceptable, so raise timeouts.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`docs/plans/four-doors-marten.md`** — four independent tracks after six owner
-answers on 2026-08-22. A: the paid acceptance (`mc2-bxmje` against
-`docs/plans/cheaper-verdict-heron.md`), then `mc2-tux1y`. B: document-evidence money into the course
-total (`mc2-b7olk.4`). C: NotebookLM, in order — `mc2-rmbwo`, `mc2-p99f1`, then the three that need
-a migration. D: the shadow cohort in production (`mc2-wxun`, `mc2-vjbb`).
-
-Recommended action: run `mc2-bxmje` against that plan, then `mc2-tux1y`.
-Use $orchestrator-stage for the epic; single tasks are ordinary local work.
-
-**Correct the epic's headline before planning from it.** Across all 1589 judged lessons rather than
-the 490 that reached a judge: 69.2% settled free by heuristics, 6.3% one judge, 17.6% two, 6.9%
-three — the full panel runs _below_ its 15-20% design target, not four times above it. "Stage 6 is
-90%" is a share **by tokens**: by money, on a small course, the two card images were 46% of the
-window until `mc2-xbqz8` cut them by 81%.
-
-**What 2026-08-22 changed in the cascade** is in `cheaper-verdict-heron.md` in full: the
-single-judge seat moved off the pool's dearest model, the threshold went 0.80 → **0.75** off a
-measured distribution (1302 verdicts, median **0.820**), the two judge prompts became one, and only
-because of that a lesson reaching the panel is no longer judged twice. Held by
-`tests/unit/stages/stage6-lesson-content/judge/cascade/single-verdict-is-accepted.test.ts`, written
-as behaviour so the number can move again. Estimated per lesson past the heuristics: judging
-**$0.01173 → $0.00140** — an estimate, not an invoice, and the run cannot show the threshold effect
-at all.
-
-**Three owner decisions of 2026-08-20/21 bind the routing work**, not to be revisited without a new
-one: a failing provider is ignored only inside the current chain of attempts, never in a standing
-blocklist; cheapest stays the goal, so `max_price` is a ceiling and `sort=throughput` is out; waiting
-is acceptable, so raise timeouts rather than chase speed.
+Next stage id: **`mc2-tux1y`** — the comparison run track A unblocks.
+Recommended action: run `mc2-tux1y` (same course twice, one variable, plus an editorial read), then
+`mc2-kznfz`. C waits on the owner. Use $orchestrator-stage for an epic; single tasks are local work.
 
 ## Starter prompt for next orchestrator
 
-It is written and checked: **`.codex/next-goal-four-doors.md`** (`prompt-check` clean, 1442 chars);
-`next-goal-cheaper-verdict.md` beside it covers track A alone. Both are **untracked** — `.gitignore`
-keeps `.codex/*` out bar the named few — so look for the file, not a commit. Everything they depend
-on is tracked, and each repeats the standing authorization for a reader who has only the prompt.
-
-In short: four tracks in `docs/plans/four-doors-marten.md`, independent bar the order inside C.
-$orchestrator-stage for an epic; single tasks are ordinary local work. **Do not ask — act and
-report**, inside the standing authorization under Safety boundary.
+`.codex/next-goal-four-doors.md` is **stale** — three of its four tracks are closed. Start from the
+four-tracks section above and `docs/plans/cheaper-verdict-heron.md` ("The decision this unblocks").
+**Do not ask — act and report**, inside the standing authorization under Safety boundary.
 
 ## Read first
 
