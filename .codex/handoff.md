@@ -316,13 +316,38 @@ the bar on `mc2-4clyr` is lifted.**
 The epic is about cutting generation cost, and its headline needs correcting first: across all 1589
 judged lessons rather than the 490 that reached a judge, 69.2% are settled free by heuristics, 6.3%
 take one judge, 17.6% two and 6.9% three — so the full panel runs _below_ its 15-20% design target,
-not four times above it. `mc2-r31fw` step 1 cannot be done from history: `singleJudge` is null in
-every stored cascade row.
+not four times above it.
 
-What the 2026-08-22 run says about where the money is: of $0.202480, the two cover images are
-$0.093685 — **46%** — against $0.052570 for all of Stage 6 and $0.004523 for Stages 4 and 5 together.
-On a small course an image costs more than the whole text pipeline. Stage 6 remains the target on a
-real course; the images are worth a separate look.
+**Step 1 of `mc2-r31fw` is done, and it changes the whole shape of the epic.** The score _is_ stored
+— `generation_trace.output_data.enrichedOutput.singleJudge.score`, populated on 1302 of 2567
+`judge_complete` rows (an earlier note in this file claimed it was null everywhere; it was wrong).
+Measured distribution: min **0.520**, p10 0.700, median **0.820**, p90 0.880, max 0.930.
+
+- The acceptance rule (`cascade/orchestrator.ts:341-344`) has three clauses and **two are dead**. The
+  lower arm `score < 1 - threshold` (0.2) has never fired: 0 of 1302. `confidence >= medium` has
+  never blocked anything either: 1027 high, 275 medium, **no** `low` in the entire history. What
+  runs is `score >= 0.8` and nothing else.
+- 0.8 sits just under the median, i.e. at the point of maximum sensitivity. Panel rate by threshold:
+  **0.80 → 45.5%**, 0.78 → 32.9%, 0.75 → 24.3%, 0.70 → 9.8%. Two points of threshold move a eighth
+  of the corpus.
+- **The "single cheap judge" is the most expensive model in the pool.** `executeSingleJudge` takes
+  `judgeModels.secondary` under a comment reading "cheapest"/"cheaper"; `secondary` is `z-ai/glm-5.2`
+  at $0.966/$3.036 per million against luna $0.200/$1.200, minimax $0.300/$1.200 and deepseek
+  $0.080/$0.180. It is also the pool's widest provider spread. That inverts `mc2-d1d09`: swapping
+  `secondary` with `tiebreaker` does not shave 40% off an occasional second vote, it moves the
+  **most frequent** judge call from the dearest model to a third of its price.
+- **A lesson that reaches the panel is judged by glm-5.2 twice.** `executeCLEVVoting` re-runs
+  `primary` and `secondary` from scratch and the single judge's verdict — cast by that same
+  `secondary` — is discarded rather than counted as one of the panel's votes.
+
+Measured token shape of one judge pass, from the 2026-08-22 run: 5144 in / 764 out. At list rates
+that is $0.00729 on glm-5.2 (billed $0.01046, served above list), $0.00246 on minimax, $0.00195 on
+luna, $0.00055 on deepseek.
+
+What that run says about where the money is overall: of $0.202480, the two card images are $0.093685
+— **46%** — against $0.052570 for all of Stage 6 and $0.004523 for Stages 4 and 5 together. On a
+small course an image costs more than the whole text pipeline. Stage 6 remains the target on a real
+course; the images are worth a separate look and are **not** in the epic.
 
 **Three owner decisions of 2026-08-20/21 bind the routing work** and must not be revisited without a
 new decision: a provider that fails is ignored only inside the current chain of attempts, never in a
