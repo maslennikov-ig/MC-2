@@ -292,15 +292,15 @@ inside the current chain of attempts, never in a standing blocklist; cheapest st
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`mc2-tux1y`** — the comparison run track A unblocks.
-Recommended action: run `mc2-tux1y` (same course twice, one variable, plus an editorial read), then
-`mc2-kznfz`. C waits on the owner. Use $orchestrator-stage for an epic; single tasks are local work.
+Next stage id: **`docs/plans/snuggly-wiggling-sutton.md`** — five phases, written 2026-08-22, not
+started. Recommended action: phase 0, the SOCKS hop, which unblocks phase 1 entirely. Branch
+`fix/found-defects-2026-08-22` via `/push-dev`. Use $orchestrator-stage for an epic.
 
 ## Starter prompt for next orchestrator
 
-`.codex/next-goal-four-doors.md` is **stale** — three of its four tracks are closed. Start from the
-four-tracks section above and `docs/plans/cheaper-verdict-heron.md` ("The decision this unblocks").
-**Do not ask — act and report**, inside the standing authorization under Safety boundary.
+Read `docs/plans/snuggly-wiggling-sutton.md` whole first — four fresh owner decisions are in it.
+`.codex/next-goal-four-doors.md` is **stale**; ignore it. **Do not ask — act and report**, inside the
+standing authorization under Safety boundary.
 
 ## Read first
 
