@@ -294,6 +294,10 @@ export async function generateImage(
       // stayed an invented constant for as long as the service existed
       // (mc2-l17v5).
       const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
+      // cost-exempt: an image is billed per image token, not per text token, so
+      // this call prices itself with `recordImageCallCost` below rather than
+      // through either LLM wrapper — and then replaces that estimate with the
+      // provider's own figure.
       // @ts-expect-error - OpenRouter extensions not in OpenAI types
       const completion = await client.chat.completions.create(requestOptions, {
         signal: abortController.signal,
