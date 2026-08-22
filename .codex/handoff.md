@@ -33,15 +33,15 @@ constrains work:
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
-Seven live models: the workhorse is `~deepseek/deepseek-v4-flash-latest` with `openai/gpt-5.6-luna`
-as its fallback (owner, 2026-08-22 — see the alias section below), `z-ai/glm-5.2` for the deciding
+Seven live models: the workhorse is `deepseek/deepseek-v4-flash-0731` — a **pinned snapshot** — with
+`openai/gpt-5.6-luna` as its fallback (owner, 2026-08-22), `z-ai/glm-5.2` for the deciding
 judge and Stage 6's last chance, plus `google/gemini-3.7-flash`, `minimax/minimax-m3` and the two
 image models. Four invariants to preserve: judges keep three separate vendors, `emergency` stays off
 OpenAI, every fallback crosses vendors, and the three escalation phases avoid the default model on
 both hops because by the time they run it has already failed.
 
 **Judges, reshuffled 2026-08-22 by price** (`mc2-d1d09`): primary `gpt-5.6-luna`, secondary
-**`deepseek-v4-flash-latest`**, tiebreaker **`glm-5.2`** (fallback `minimax-m3`). The point is not the
+**`deepseek-v4-flash-0731`**, tiebreaker **`glm-5.2`** (fallback `minimax-m3`). The point is not the
 second vote: `executeSingleJudge` takes `judgeModels.secondary`, so that seat is the **most frequent
 judge call in the pipeline** — every lesson past the heuristics, 1318 of 1911 by history, against 608
 that reach a panel. It was on the dearest model of the pool. One judge pass on the measured shape
@@ -61,32 +61,32 @@ against `max_tokens`, so the budget is ADDED, and both the database and the seed
 Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
 generation; Stage 5 ~5.5%, Stage 4 ~1.9%. Epic `mc2-4clyr` holds what follows from that.
 
-**The `~` alias is back, on purpose, and what made it safe.** The owner asked for
-`~deepseek/deepseek-v4-flash-latest` on 2026-08-22. The reason it was pinned in the first place is
-below and still true — but a second, sharper problem had appeared since:
+**The `~` alias was tried again on 2026-08-22 and rejected — with a second reason found on the way.**
 `GET /models/{alias}/endpoints` answers **200 with an empty list** (measured: 0 for the alias, 30 for
 `-0731`, 17 for the undated slug), and this codebase reads an empty list as _could not find out_. So
 routing on an alias silently switched off the per-attempt endpoint pin — the thing that hours earlier
-had moved two hung 238 s calls onto a working provider. `listModelEndpoints` now follows OpenRouter's
-own `alias_target.slug` field to the concrete snapshot, cached for the life of the process and logged
-as `[Routing] Alias resolved to the snapshot it serves today`. Nothing is inferred from context
-length or price. Verified live: the alias yields the same 30 endpoints as the snapshot, and a request
-naming the alias with `provider.order` pinned to one of them is served by that provider.
+had moved two hung 238 s calls onto a working provider. That hole is now closed for good:
+`listModelEndpoints` follows OpenRouter's own `alias_target.slug` to the concrete snapshot, cached
+per process and logged as `[Routing] Alias resolved to the snapshot it serves today`. Nothing is
+inferred from context length or price, and a request naming an alias with `provider.order` pinned to
+one of the resolved endpoints is served by that provider — verified live.
 
-**What is still true of an alias:** it can move without telling us, and the family already has a new
-member — `deepseek/deepseek-v4-flash-vision-exp`, experimental, **5.5× the input price**. The log
-line above is where a move becomes visible; a scheduled check is `mc2-ts9i2`.
+So an alias is no longer _unsafe_; the owner simply does not want one. **Routing stays on the pinned
+snapshot.** The family already carries `deepseek/deepseek-v4-flash-vision-exp` — experimental, at
+5.5× the input price — and a redirect is free to land on it.
 
 **The `~` was never a harmless spelling — root cause, closed 2026-08-21 (`mc2-qch4w`).** OpenRouter
 documents `~deepseek/deepseek-v4-flash-latest` as a redirect that _«always redirects to the latest
 model in the DeepSeek V4 Flash family»_. On 17 August the family moved, the alias followed it to
 `-0731`, median call latency went from 8.7 s to 102 s with no change on our side, and that is what
-aborted Stage 4 and failed the career playbook through 20 August. Routing was pinned to
-`deepseek/deepseek-v4-flash-0731` for a day, then returned to the alias on the owner's decision with
-the endpoint resolution above. What the pin taught and still holds: `DEFAULT_MODEL_ID`, every
-occurrence in `config-seed.json` and the active rows of `llm_model_config` are changed **together**,
-since the database wins over the seed at runtime — `pnpm generate:config-seed` reads the database and
-rewrites the seed, and it is the only correct order.
+aborted Stage 4 and failed the career playbook through 20 August. Routing is pinned to
+`deepseek/deepseek-v4-flash-0731` — chosen because the alias was already resolving to it (same
+1310720 context), so the pin froze the behaviour rather than altering it, and because that snapshot
+carries 30 endpoints against 18 for the undated id, with the same cheapest endpoint at
+$0.065/$0.180. **How to change any of it:** `DEFAULT_MODEL_ID`, every occurrence in
+`config-seed.json` and the active rows of `llm_model_config` move **together**, and the database wins
+over the seed at runtime — so edit the database first, then `pnpm generate:config-seed`, which reads
+it and rewrites the seed. That order is the only correct one.
 
 ## Phase configs audited (2026-08-13, `7ad421986`)
 

@@ -19,30 +19,30 @@
  * Default primary model (used when DB is unavailable)
  * DeepSeek V4 Flash - default fast runtime model for course generation.
  *
- * The `~...-latest` alias, by the owner's decision of 2026-08-22, and the one
- * thing that has to be true for that to be safe is now true.
+ * A pinned snapshot, never a `~...-latest` alias — now for two reasons rather
+ * than one.
  *
- * The history is real: on 2026-08-17 07:03 the alias followed its family to the
- * `-0731` snapshot with no change on our side, median latency went from 8.7s to
- * 102s, and the courses of 12-20 August failed on timeouts nobody had
- * configured. It was pinned on 2026-08-21 (mc2-qch4w).
+ * The first is what it cost. On 2026-08-17 07:03 the alias followed its family
+ * to the `-0731` snapshot with no change on our side, median latency went from
+ * 8.7s to 102s, and the courses of 12-20 August failed on timeouts nobody had
+ * configured. Pinned on 2026-08-21 to the snapshot the alias was already
+ * resolving to, so the change froze the behaviour rather than altering it
+ * (mc2-qch4w).
  *
- * What made the alias newly dangerous, and what was fixed to allow it back:
- * `/models/{alias}/endpoints` answers 200 with an **empty list**, which this
- * codebase reads as "could not find out" — so routing on an alias silently
- * disabled the per-attempt endpoint pin, the thing that on 2026-08-22 moved two
- * hung 238s calls onto a working provider. `listModelEndpoints` now follows
- * OpenRouter's own `alias_target.slug` to the snapshot, so the family is
- * followed and the pin, the price ceiling and the receipt all still work.
- *
- * What is still true of an alias: it can move without telling us. The log line
- * "[Routing] Alias resolved to the snapshot it serves today" is where a move
- * shows up, and a new member already exists in the family —
- * `deepseek-v4-flash-vision-exp`, experimental, at 5.5x the input price.
+ * The second was found on 2026-08-22 while briefly moving back to the alias:
+ * `GET /models/{alias}/endpoints` answers 200 with an **empty list** — 0 against
+ * 30 for this snapshot — and this codebase reads an empty list as "could not
+ * find out". So an alias silently disabled the per-attempt endpoint pin, the
+ * thing that hours earlier had moved two hung 238s calls onto a working
+ * provider. `listModelEndpoints` now follows OpenRouter's own
+ * `alias_target.slug` and that hole is closed, so an alias here would no longer
+ * be unsafe — it is simply not what the owner wants. The family already carries
+ * `deepseek-v4-flash-vision-exp`, experimental, at 5.5x this input price, and a
+ * redirect is free to land on it.
  *
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = '~deepseek/deepseek-v4-flash-latest';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash-0731';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable).
