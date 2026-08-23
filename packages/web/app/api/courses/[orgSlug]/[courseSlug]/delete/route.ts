@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { TRPCClientError } from '@trpc/client'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
-import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { cleanupCourseResourcesBeforeDelete } from '@/lib/helpers/course-cleanup'
 
 interface RouteContext {
   params: Promise<{ orgSlug: string; courseSlug: string }>
@@ -17,50 +16,6 @@ interface DeleteCourseResult {
   deleted_course_id?: string
   deleted_course_title?: string
   lesson_progress_deleted?: number
-}
-
-/**
- * Calls the tRPC cleanup endpoint to clean up external resources
- * (Qdrant vectors, Redis, RAG context, files) before database deletion
- */
-async function cleanupCourseResources(courseId: string): Promise<{
-  success: boolean
-  vectorsDeleted?: number
-  filesDeleted?: number
-  errors?: string[]
-}> {
-  try {
-    const client = await getServerTrpcClient()
-    const result = await client.generation.cleanupCourse.mutate({ courseId })
-
-    return {
-      success: result?.success ?? false,
-      vectorsDeleted: result?.qdrant?.vectorsDeleted,
-      filesDeleted: result?.files?.filesDeleted,
-      errors: result?.errors,
-    }
-  } catch (error) {
-    if (error instanceof TRPCClientError) {
-      logger.warn('Cleanup tRPC call failed', {
-        courseId,
-        code: error.data?.code,
-        message: error.message,
-      })
-      return {
-        success: false,
-        errors: [error.message || 'Cleanup request failed'],
-      }
-    }
-
-    logger.error('Failed to call cleanup endpoint:', {
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return {
-      success: false,
-      errors: [error instanceof Error ? error.message : 'Unknown cleanup error'],
-    }
-  }
 }
 
 async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { params }: RouteContext) {
@@ -126,48 +81,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
 
   // Step 1: Clean up external resources BEFORE database deletion
   // getServerTrpcClient() handles auth internally via Supabase session cookies
-  try {
-    const cleanupResult = await cleanupCourseResources(id)
-
-    if (!cleanupResult.success) {
-      logger.warn('Some cleanup operations failed, proceeding with deletion', {
-        courseId: id,
-        errors: cleanupResult.errors,
-      })
-      // Audit trail for admin follow-up on orphaned resources
-      logPermanentFailure({
-        user_id: user.id,
-        error_message: `Course cleanup partially failed: ${cleanupResult.errors?.join(', ')}`,
-        severity: 'WARNING',
-        job_type: 'COURSE_CLEANUP',
-        metadata: {
-          courseId: id,
-          vectorsDeleted: cleanupResult.vectorsDeleted,
-          filesDeleted: cleanupResult.filesDeleted,
-          errors: cleanupResult.errors,
-        },
-      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
-    } else {
-      logger.info('Course cleanup completed successfully', {
-        courseId: id,
-        vectorsDeleted: cleanupResult.vectorsDeleted,
-        filesDeleted: cleanupResult.filesDeleted,
-      })
-    }
-  } catch (cleanupError) {
-    // Log but don't block deletion - cleanup is best-effort
-    logger.error('Course cleanup failed, proceeding with deletion:', {
-      courseId: id,
-      error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-    })
-    logPermanentFailure({
-      user_id: user.id,
-      error_message: `Course cleanup exception: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown'}`,
-      severity: 'WARNING',
-      job_type: 'COURSE_CLEANUP',
-      metadata: { courseId: id },
-    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
-  }
+  await cleanupCourseResourcesBeforeDelete(id, user.id)
 
   // Step 2: Atomic database deletion via RPC
   // All deletions happen in a single transaction — if any step fails, everything rolls back.
