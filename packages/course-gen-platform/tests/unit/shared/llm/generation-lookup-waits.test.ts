@@ -82,6 +82,40 @@ describe('fetchGenerationFact', () => {
     expect(await pending).toBeNull();
   });
 
+  it('holds the event loop while it waits, so the caller is not abandoned', async () => {
+    // The waits were `unref`'d. Node then treats the loop as empty, fires
+    // `beforeExit` and leaves with code 0 while this `await` is still pending —
+    // which a caller reads as success. Measured on a Career Playbook run:
+    // `beforeExit code=0` at 243.0s, no result, no error, four times out of four
+    // (mc2-avjau). The one caller allowed to opt out is the background settle in
+    // `llm-cost.ts`, which never reads the answer.
+    const unrefs: boolean[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    vi.stubGlobal('setTimeout', (...args: Parameters<typeof setTimeout>) => {
+      const timer = realSetTimeout(...args);
+      const original = timer.unref?.bind(timer);
+      if (original) {
+        timer.unref = () => {
+          unrefs.push(true);
+          return original();
+        };
+      }
+      return timer;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('not found', { status: 404 }))
+    );
+
+    void fetchGenerationFact('gen-default');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(unrefs).toEqual([]);
+
+    void fetchGenerationFact('gen-background', { keepProcessAlive: false });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(unrefs.length).toBeGreaterThan(0);
+  });
+
   it('reads a genuine $0 charge as a measurement, not as an absence', async () => {
     vi.stubGlobal(
       'fetch',

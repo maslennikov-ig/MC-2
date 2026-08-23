@@ -14,12 +14,19 @@
  * Read-only. Never writes.
  *
  * Usage:
- *   pnpm cost:report <courseId> [--json]
- *   pnpm cost:report --since 2026-08-20T12:00:00Z [--json]
+ *   pnpm cost:report <courseId> [--json] [--verify-with-provider]
+ *   pnpm cost:report --since 2026-08-20T12:00:00Z [--json] [--verify-with-provider]
  *
- * The `--since` form is the one to compare against an OpenRouter invoice
- * window: pick the moment before the run started and read the provider's
- * dashboard for the same window.
+ * `--verify-with-provider` asks OpenRouter what it charged for each of THIS
+ * run's calls, by generation id, and sums those. That is the reconciliation to
+ * trust. The delta of `GET /api/v1/credits` is not, and the runbook used to say
+ * it was: the key is shared with production and that traffic never stops, so on
+ * 2026-08-23 two idle samples with no call of ours spent $0.084 in 45 s and
+ * $0.072 in 150 s, while a whole ten-call measurement cost $0.0298 — about one
+ * minute of the background. Over two hours the delta read $1.4739 against a real
+ * $0.03, a factor of 49, and at a $5 ceiling it can report a breach that never
+ * happened. Remaining credit is a ceiling check; it is not attribution
+ * (mc2-yson0).
  */
 
 // The runbook's command is `pnpm cost:report ...` and nothing else in this
@@ -31,6 +38,7 @@
 import 'dotenv/config';
 
 import { getSupabaseAdmin } from '../src/shared/supabase/admin.js';
+import { fetchGenerationFact } from '../src/shared/llm/openrouter-generation.js';
 
 interface TraceRow {
   id: string;
@@ -176,6 +184,8 @@ interface PlaybookCost {
   costUsd: number;
   unknownCostAttempts: number;
   calls: number;
+  /** `nodeCosts[].generation_id`, so playbook spend can be verified like the rest. */
+  generationIds: string[];
 }
 
 async function readPlaybookCosts(filter: { since?: string }): Promise<PlaybookCost[]> {
@@ -201,15 +211,78 @@ async function readPlaybookCosts(filter: { since?: string }): Promise<PlaybookCo
         nodeCosts?: unknown[];
       } | null;
     };
+    const nodeCosts = Array.isArray(raw.cost_breakdown?.nodeCosts)
+      ? raw.cost_breakdown.nodeCosts
+      : [];
     return {
       id: raw.id,
       status: raw.status,
       updatedAt: raw.updated_at,
       costUsd: raw.cost_breakdown?.total_cost_usd ?? 0,
       unknownCostAttempts: raw.cost_breakdown?.unknown_cost_attempts ?? 0,
-      calls: Array.isArray(raw.cost_breakdown?.nodeCosts) ? raw.cost_breakdown.nodeCosts.length : 0,
+      calls: nodeCosts.length,
+      generationIds: nodeCosts
+        .map(node => (node as { generation_id?: unknown }).generation_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
     };
   });
+}
+
+/**
+ * Every generation id this window produced, from both ledgers.
+ *
+ * A generation id is the only thing that makes a charge OURS. The account-level
+ * counter cannot: the key is shared with production, so its delta answers a
+ * question nobody asked.
+ */
+function collectGenerationIds(rows: TraceRow[], playbookIds: string[][]): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const fromInput = (row.input_data as { generationId?: unknown } | null)?.generationId;
+    if (typeof fromInput === 'string' && fromInput.length > 0) ids.add(fromInput);
+    const fromOutput = (row.output_data as { generationId?: unknown } | null)?.generationId;
+    if (typeof fromOutput === 'string' && fromOutput.length > 0) ids.add(fromOutput);
+  }
+  for (const list of playbookIds) for (const id of list) ids.add(id);
+  return [...ids];
+}
+
+interface ProviderReconciliation {
+  asked: number;
+  answered: number;
+  totalUsd: number;
+  /** Ids the provider had no record of. Each one is a charge we cannot confirm. */
+  missing: string[];
+}
+
+/**
+ * Ask the provider what it charged for each of our calls, and add it up.
+ *
+ * Sequential on purpose: the lookup already polls for up to 30 s per id because
+ * a generation record takes ~9.6 s to become readable, and a paid run is a few
+ * dozen calls, not thousands. Never throws — a reconciliation that can fail is
+ * one nobody runs.
+ */
+async function reconcileAgainstProvider(ids: string[]): Promise<ProviderReconciliation> {
+  const result: ProviderReconciliation = {
+    asked: ids.length,
+    answered: 0,
+    totalUsd: 0,
+    missing: [],
+  };
+
+  for (const id of ids) {
+    const fact = await fetchGenerationFact(id);
+    if (!fact) {
+      result.missing.push(id);
+      continue;
+    }
+    result.answered += 1;
+    // `??`, not `||`: a genuine $0 is a measurement (mc2-y452l).
+    result.totalUsd += fact.usageUsd ?? 0;
+  }
+
+  return result;
 }
 
 function printTable(title: string, buckets: Bucket[]): void {
@@ -232,6 +305,7 @@ function printTable(title: string, buckets: Bucket[]): void {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
+  const verifyWithProvider = args.includes('--verify-with-provider');
   const sinceIndex = args.indexOf('--since');
   const since = sinceIndex === -1 ? undefined : args[sinceIndex + 1];
   const courseId = args.find(a => !a.startsWith('--') && a !== since);
@@ -271,6 +345,12 @@ async function main(): Promise<void> {
   const unknownCostAttempts = playbooks.reduce((sum, p) => sum + p.unknownCostAttempts, 0);
   const times = rows.map(r => r.created_at).sort();
 
+  const generationIds = collectGenerationIds(
+    rows,
+    playbooks.map(p => p.generationIds)
+  );
+  const provider = verifyWithProvider ? await reconcileAgainstProvider(generationIds) : null;
+
   if (json) {
     console.log(
       JSON.stringify(
@@ -296,6 +376,17 @@ async function main(): Promise<void> {
             unknownCostAttempts: p.unknownCostAttempts,
           })),
           unknownCostAttempts,
+          generationIds: generationIds.length,
+          ...(provider
+            ? {
+                provider: {
+                  asked: provider.asked,
+                  answered: provider.answered,
+                  totalUsd: Number(provider.totalUsd.toFixed(6)),
+                  missing: provider.missing,
+                },
+              }
+            : {}),
           firstAt: times[0],
           lastAt: times[times.length - 1],
           byStage: bucketBy(rows, r => r.stage),
@@ -409,11 +500,39 @@ async function main(): Promise<void> {
     }
   }
 
+  if (provider) {
+    console.log('\n══ PROVIDER RECONCILIATION ══');
+    console.log(`generation ids in this window   ${provider.asked}`);
+    console.log(`answered by /api/v1/generation  ${provider.answered}`);
+    console.log(`sum of what OpenRouter charged  ${usd(provider.totalUsd)}`);
+    console.log(`recorded TOTAL                  ${usd(total)}`);
+
+    // Half a cent per hundred calls is rounding; anything above it is a real
+    // difference and worth naming.
+    const gap = total - provider.totalUsd;
+    const tolerance = Math.max(1e-6, provider.answered * 1e-6);
+    if (provider.missing.length > 0) {
+      console.log(
+        `\n${provider.missing.length} id(s) the provider has no record of — each is a charge that cannot be confirmed:`
+      );
+      for (const id of provider.missing.slice(0, 10)) console.log(`  ${id}`);
+    }
+    if (Math.abs(gap) > tolerance) {
+      console.log(
+        `\nGAP ${usd(gap)}. A positive gap is a row priced above what was charged; a\n` +
+          'negative one is a call the provider billed and this ledger did not see.'
+      );
+    } else {
+      console.log('\nmatch — the recorded total is what OpenRouter charged for these calls.');
+    }
+  }
+
   console.log(
-    '\nCompare TOTAL against the OpenRouter dashboard, or the delta of /api/v1/credits,\n' +
-      'for the same window. Since 2026-08-21 most rows are priced from\n' +
-      "/api/v1/generation — the provider's own charge — so a gap now points at a call\n" +
-      'that left no row at all rather than at a wrong catalogue price (mc2-z0xr3).\n'
+    '\nReconcile with --verify-with-provider, which sums /api/v1/generation over the\n' +
+      'generation ids THIS window produced. Do not use the delta of /api/v1/credits:\n' +
+      'the key is shared with production, and on 2026-08-23 its delta read $1.4739\n' +
+      'against a real $0.03 over the same two hours (mc2-yson0). Remaining credit is a\n' +
+      'ceiling check, not attribution.\n'
   );
 }
 

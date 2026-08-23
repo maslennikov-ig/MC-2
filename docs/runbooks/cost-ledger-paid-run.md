@@ -133,8 +133,14 @@ excluded. Whether audio stays on a direct OpenAI account is an open question for
    ```bash
    cd packages/course-gen-platform
    pnpm cost:report <courseId>
-   pnpm cost:report --since <T0>
+   pnpm cost:report --since <T0> --verify-with-provider
    ```
+
+   `--verify-with-provider` is the reconciliation. It collects the generation ids this
+   window produced — from `generation_trace` and from `career_playbooks.cost_breakdown`
+   alike — asks `GET /api/v1/generation` what OpenRouter charged for each, and sums those.
+   It takes a few seconds per id, because a generation record needs ~9.6 s to become
+   readable.
 
 5. Then make one chat edit to the finished course — `generation.chat` with
    `chatType:'node'` and `blockPath: 'sections[0].lessons[0]'`, then `applyProposal`. That
@@ -158,11 +164,20 @@ Report pass or fail on each line, naming what failed.
 - `stage_edit rows` is above 0 after the chat edit, and their cost is not null.
 - `courses.estimated_cost_usd` matches the trace sum. The report prints both and says
   `match` or `MISMATCH`.
-- The report's TOTAL is compared against the OpenRouter figure for T0 → now, either the
-  dashboard or the delta of `GET /api/v1/credits`. Ask the user for that figure; do not
-  estimate it. A gap is the finding — and now that most rows carry the provider's own
-  charge, a gap points at a call that left no row rather than at a wrong price. Stage 7
-  audio is outside this comparison by construction; see the section above.
+- The report's TOTAL matches `sum of what OpenRouter charged` under
+  `--verify-with-provider`, and every generation id was answered. A gap is the finding —
+  and now that most rows carry the provider's own charge, a gap points at a call that left
+  no row rather than at a wrong price. Stage 7 audio is outside this comparison by
+  construction; see the section above.
+
+  **Do not reconcile against the delta of `GET /api/v1/credits`.** This runbook said to,
+  and it cannot work: the key is shared with production and that traffic never stops.
+  Measured 2026-08-23 with no call of our own in flight — $0.084037 in 45 s of idling,
+  $0.071940 in 150 s. A ten-call measurement that cost $0.0298 sat inside a two-hour
+  credits delta of $1.4739, a factor of 49. At a $5 ceiling the delta can report a breach
+  that never happened, and it can hide a real one. Remaining credit is a ceiling check;
+  the sum over your own generation ids is the attribution (`mc2-yson0`).
+
 - The card image and the playbook cover carry the provider's charge, not an estimate. In
   `generation_trace`, `output_data.billedByProvider` is true for `step_name='image_call'`;
   in `career_playbooks.cost_breakdown`, the `cardImage` node has `billed_by_provider`.
