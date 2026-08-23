@@ -17,9 +17,9 @@ CREATE TABLE helixa_course_creation_commands (
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
   environment TEXT NOT NULL,
   destination_binding_id TEXT NOT NULL,
-  command_id TEXT NOT NULL CHECK (btrim(command_id) <> ''),
-  proposal_id TEXT NOT NULL CHECK (btrim(proposal_id) <> ''),
-  approved_revision INTEGER NOT NULL CHECK (approved_revision > 0),
+  command_id TEXT NOT NULL CHECK (command_id ~ '^megacampus_course_command:[a-f0-9]{64}$'),
+  proposal_id TEXT NOT NULL CHECK (btrim(proposal_id) <> '' AND char_length(proposal_id) <= 300),
+  approved_revision BIGINT NOT NULL CHECK (approved_revision BETWEEN 1 AND 9007199254740991),
   payload_hash TEXT NOT NULL CHECK (payload_hash ~ '^[a-f0-9]{64}$'),
   course_id UUID NOT NULL DEFAULT gen_random_uuid(),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'action_required')),
@@ -42,10 +42,12 @@ ALTER TABLE helixa_course_creation_commands ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION reserve_helixa_course_creation_command(
   p_binding_id TEXT, p_organization_id UUID, p_environment TEXT,
   p_destination_binding_id TEXT, p_command_id TEXT, p_proposal_id TEXT,
-  p_approved_revision INTEGER, p_payload_hash TEXT
-) RETURNS TABLE(command_id TEXT, payload_hash TEXT, course_id UUID, status TEXT, conflict BOOLEAN)
+  p_approved_revision BIGINT, p_payload_hash TEXT
+) RETURNS TABLE(command_id TEXT, payload_hash TEXT, course_id UUID, status TEXT, conflict BOOLEAN, mutation_owner BOOLEAN)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE existing helixa_course_creation_commands%ROWTYPE;
+DECLARE
+  existing helixa_course_creation_commands%ROWTYPE;
+  inserted INTEGER;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM helixa_knowledge_sync_bindings binding
@@ -60,10 +62,11 @@ BEGIN
     p_binding_id, p_organization_id, p_environment, p_destination_binding_id, p_command_id,
     p_proposal_id, p_approved_revision, p_payload_hash
   ) ON CONFLICT ON CONSTRAINT helixa_course_creation_commands_binding_command_key DO NOTHING;
+  GET DIAGNOSTICS inserted = ROW_COUNT;
   SELECT * INTO existing FROM helixa_course_creation_commands AS command
   WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id;
   RETURN QUERY SELECT existing.command_id, existing.payload_hash, existing.course_id,
-    existing.status, existing.payload_hash <> p_payload_hash;
+    existing.status, existing.payload_hash <> p_payload_hash, inserted = 1;
 END;
 $$;
 
@@ -95,10 +98,10 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION reserve_helixa_course_creation_command(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION reserve_helixa_course_creation_command(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, BIGINT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION complete_helixa_course_creation_command(TEXT, TEXT, UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION action_required_helixa_course_creation_command(TEXT, TEXT, UUID, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION reserve_helixa_course_creation_command(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, INTEGER, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION reserve_helixa_course_creation_command(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, BIGINT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION complete_helixa_course_creation_command(TEXT, TEXT, UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION action_required_helixa_course_creation_command(TEXT, TEXT, UUID, TEXT) TO service_role;
 

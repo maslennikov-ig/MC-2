@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
+const commandId = z.string().regex(/^megacampus_course_command:[a-f0-9]{64}$/);
 
 export const HelixaCourseCreationCommandSchema = z
   .object({
     schemaVersion: z.literal('helixa.megacampus-course-create.v1'),
-    commandId: z.string().trim().min(1).max(200),
-    proposalId: z.string().trim().min(1).max(200),
-    approvedRevision: z.number().int().positive(),
+    commandId,
+    proposalId: z.string().trim().min(1).max(300),
+    approvedRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     course: z
       .object({
         title: z.string().trim().min(1).max(1000),
@@ -74,6 +75,7 @@ export interface HelixaCourseCreationRepository {
         payloadHash: string;
         courseId: string;
         status: 'pending' | 'completed' | 'action_required';
+        mutationOwner: boolean;
         receipt?: HelixaCourseCreationReceipt;
       }
   >;
@@ -148,6 +150,7 @@ type CourseCommandRow = {
   course_id: string;
   status: 'pending' | 'completed' | 'action_required';
   conflict: boolean;
+  mutation_owner: boolean;
 };
 
 export function createPostgresHelixaCourseCreationRepository(
@@ -178,6 +181,7 @@ export function createPostgresHelixaCourseCreationRepository(
         payloadHash: row.payload_hash,
         courseId: row.course_id,
         status: row.status,
+        mutationOwner: row.mutation_owner,
         ...(row.status === 'completed'
           ? {
               receipt: {
@@ -241,15 +245,30 @@ export async function executeHelixaCourseCreationCommand(input: {
 }): Promise<HelixaCourseCreationReceipt | { commandId: string; status: 'conflict' }> {
   if (input.composition.mode !== 'fake') throw new Error('Helixa course creation is disabled');
   const command = parseHelixaCourseCreationCommand(input.command);
-  const reservation = await input.repository.reserve({
+  const reservationInput = {
     command,
     payloadHash: helixaCourseCreationPayloadHash(command),
     ...input.composition.binding,
-  });
+  };
+  let reservation = await input.repository.reserve(reservationInput);
   if (reservation.kind === 'conflict') return { commandId: command.commandId, status: 'conflict' };
   if (reservation.status === 'completed' && reservation.receipt) return reservation.receipt;
   if (reservation.status === 'action_required') {
     throw new Error('Helixa course creation requires operator action');
+  }
+
+  if (!reservation.mutationOwner) {
+    const deadline = Date.now() + 30_000;
+    do {
+      await new Promise(resolve => setTimeout(resolve, 25));
+      reservation = await input.repository.reserve(reservationInput);
+      if (reservation.kind === 'conflict')
+        return { commandId: command.commandId, status: 'conflict' };
+      if (reservation.status === 'completed' && reservation.receipt) return reservation.receipt;
+      if (reservation.status === 'action_required')
+        throw new Error('Helixa course creation requires operator action');
+    } while (Date.now() < deadline);
+    throw new Error('Helixa course creation is still pending');
   }
 
   try {

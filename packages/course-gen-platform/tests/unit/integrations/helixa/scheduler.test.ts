@@ -38,7 +38,7 @@ describe('Helixa knowledge-sync local scheduler', () => {
 
   it('does not overlap ticks and stop clears future work', async () => {
     let tick!: () => void;
-    const release = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<ReadonlyArray<{ result: 'delivered' }>>();
     const runBatch = vi.fn(() => release.promise);
     const clearInterval = vi.fn();
     const scheduler = createKnowledgeSyncDeliveryScheduler({
@@ -61,10 +61,61 @@ describe('Helixa knowledge-sync local scheduler', () => {
 
     scheduler.stop();
     expect(clearInterval).toHaveBeenCalledWith('timer');
-    release.resolve();
+    release.resolve([]);
     await Promise.resolve();
     tick();
     expect(runBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a rejected batch and allows the next tick to run', async () => {
+    let tick!: () => void;
+    const failure = new Error('batch failed');
+    const runBatch = vi
+      .fn<() => Promise<ReadonlyArray<{ result: 'delivered' }>>>()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce([{ result: 'delivered' }]);
+    const onCounters = vi.fn();
+    const scheduler = createKnowledgeSyncDeliveryScheduler({
+      enabled: true,
+      intervalMs: 100,
+      runBatch,
+      onCounters,
+      timers: {
+        setInterval: vi.fn(callback => {
+          tick = callback as () => void;
+          return 'timer' as never;
+        }),
+        clearInterval: vi.fn(),
+      },
+    });
+
+    scheduler.start();
+    tick();
+    await vi.waitFor(() => {
+      expect(onCounters).toHaveBeenCalledWith(
+        {
+          delivered: 0,
+          retryable: 0,
+          terminal: 0,
+          lostLease: 0,
+          batchFailures: 1,
+        },
+        failure
+      );
+    });
+
+    tick();
+    await vi.waitFor(() => expect(runBatch).toHaveBeenCalledTimes(2));
+    expect(onCounters).toHaveBeenLastCalledWith(
+      {
+        delivered: 1,
+        retryable: 0,
+        terminal: 0,
+        lostLease: 0,
+        batchFailures: 0,
+      },
+      undefined
+    );
   });
 });
 

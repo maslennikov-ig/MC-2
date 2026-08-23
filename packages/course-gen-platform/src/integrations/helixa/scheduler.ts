@@ -8,6 +8,7 @@ export interface KnowledgeSyncDeliveryCounters {
   retryable: number;
   terminal: number;
   lostLease: number;
+  batchFailures: number;
 }
 
 export interface KnowledgeSyncDeliveryScheduler {
@@ -22,7 +23,7 @@ export interface KnowledgeSyncDeliverySchedulerOptions {
   enabled?: boolean;
   intervalMs?: number;
   runBatch(): Promise<ReadonlyArray<{ result: KnowledgeSyncDeliveryResult }>>;
-  onCounters?(counters: KnowledgeSyncDeliveryCounters): void;
+  onCounters?(counters: KnowledgeSyncDeliveryCounters, error?: unknown): void;
   timers?: {
     setInterval(callback: () => void, intervalMs: number): TimerHandle;
     clearInterval(handle: TimerHandle): void;
@@ -46,8 +47,12 @@ function counters(
       if (item.result === 'lost_lease') total.lostLease += 1;
       return total;
     },
-    { delivered: 0, retryable: 0, terminal: 0, lostLease: 0 }
+    { delivered: 0, retryable: 0, terminal: 0, lostLease: 0, batchFailures: 0 }
   );
+}
+
+function failedBatchCounters(): KnowledgeSyncDeliveryCounters {
+  return { delivered: 0, retryable: 0, terminal: 0, lostLease: 0, batchFailures: 1 };
 }
 
 export function createKnowledgeSyncDeliveryScheduler(
@@ -63,12 +68,30 @@ export function createKnowledgeSyncDeliveryScheduler(
   let runningTick = false;
   let stopped = false;
 
+  const report = (snapshot: KnowledgeSyncDeliveryCounters, error?: unknown): void => {
+    try {
+      options.onCounters?.(snapshot, error);
+    } catch {
+      // An observer must not escape the fire-and-forget scheduler boundary.
+    }
+  };
+
   const tick = (): void => {
     if (stopped || runningTick) return;
     runningTick = true;
-    void options
-      .runBatch()
-      .then(results => options.onCounters?.(counters(results)))
+    let batch: Promise<ReadonlyArray<{ result: KnowledgeSyncDeliveryResult }>>;
+    try {
+      batch = options.runBatch();
+    } catch (error) {
+      report(failedBatchCounters(), error);
+      runningTick = false;
+      return;
+    }
+    void batch
+      .then(
+        results => report(counters(results)),
+        error => report(failedBatchCounters(), error)
+      )
       .finally(() => {
         runningTick = false;
       });
