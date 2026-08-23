@@ -74,7 +74,7 @@ services:
           memory: 4G
 
   docling-cache-init:
-    image: mc2/docling-mcp:3.0.0-docling-2.118.0
+    image: mc2/docling-mcp:3.1.0-docling-2.118.0
     user: '0:0'
     command:
       [
@@ -90,7 +90,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: mc2/docling-mcp:3.0.0-docling-2.118.0
+    image: mc2/docling-mcp:3.1.0-docling-2.118.0
     volumes:
       - ../../uploads:/app/uploads:ro
       - ../../tests:/app/tests:ro
