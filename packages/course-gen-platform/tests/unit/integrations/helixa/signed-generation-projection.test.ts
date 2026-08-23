@@ -7,6 +7,7 @@ vi.mock('@/stages/stage1-document-upload/storage-paths', () => ({ getUploadStora
 vi.mock('@/integrations/helixa/storage-reader', () => ({ createUploadStorageReader: () => () => Promise.resolve(Buffer.from('approved source')) }));
 
 import { buildKnowledgeSyncPackage, serializeKnowledgeSyncPackage } from '@/integrations/helixa/package-builder';
+import { canonicalGenerationJsonV1 } from '@/integrations/helixa/generation-canonical-json';
 import { loadKnowledgeSnapshot } from '@/integrations/helixa/runtime-repository';
 import { mapCompletedCourse, mapCompletedRoleGuide } from '@/integrations/helixa/snapshot-loader';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -84,6 +85,28 @@ describe('signed Helixa generation projection', () => {
     expect(result.relations).toEqual([]);
   });
 
+  it('keeps legacy package bytes on the legacy canonicalizer while new origins reject fractional proof content', async () => {
+    const legacy = await buildKnowledgeSyncPackage({
+      kind: 'ROLE_GUIDE', id: roleGuideId, organizationId, completedAt,
+      title: 'Legacy', language: 'en', summaryMarkdown: '# Legacy',
+      structure: { '\u{10000}': 1, '\uE000': 1.5 }, blocks: [], lessons: [],
+    }, { environment: 'test', externalProjectId: null });
+    const legacyBytes = serializeKnowledgeSyncPackage(legacy);
+    expect(legacyBytes.toString('utf8')).toContain('1.5');
+    expect(createHash('sha256').update(legacyBytes).digest('hex')).toBe('077efac7339bd3061582e57111bfbdeaeda6b8fb25e08d131ac26ba6da91dfbd');
+
+    await expect(buildKnowledgeSyncPackage({
+      kind: 'ROLE_GUIDE', id: roleGuideId, organizationId, completedAt,
+      title: 'Generated', language: 'en', summaryMarkdown: '# Generated',
+      structure: { '\u{10000}': 1, '\uE000': 1.5 }, blocks: [], lessons: [],
+      originCommand: {
+        schemaVersion: 'helixa.megacampus-generation-origin.v1', operation: 'CREATE_JOB_INSTRUCTION',
+        commandId: jobInstructionOriginRow.command_id, proposalId: 'proposal-a', approvedRevision: 3,
+        payloadHash: jobInstructionOriginRow.proposal_payload_hash,
+      },
+    }, { environment: 'test', externalProjectId: null })).rejects.toThrow(/contract/i);
+  });
+
   it('projects authoritative ROLE_GUIDE command origin into signed package bytes', async () => {
     const snapshot = await mapCompletedRoleGuide({
       playbook: {
@@ -108,6 +131,21 @@ describe('signed Helixa generation projection', () => {
     expect(JSON.parse(serializeKnowledgeSyncPackage(result).toString('utf8'))).toHaveProperty(
       'originCommand.commandId', jobInstructionOriginRow.command_id,
     );
+  });
+
+  it('uses the generation canonical contract for Unicode content proof without changing semantic block order', async () => {
+    const snapshot = await mapCompletedRoleGuide({
+      playbook: {
+        id: roleGuideId, organization_id: organizationId, status: 'completed', completed_at: completedAt,
+        position_title: 'Sales Manager', language: 'en', final_markdown: '# Sales Manager',
+        role_profile_spec: { '\u{10000}': 1, '\uE000': 2 },
+        generated_blocks: { '\u{10000}': { score: 1 }, '\uE000': { score: 2 } },
+      },
+      sources: [], readBytes: vi.fn(), generationOrigin: jobInstructionOriginRow,
+    });
+    expect(snapshot.blocks.map(block => block.key)).toEqual(['\uE000', '\u{10000}']);
+    const result = await buildKnowledgeSyncPackage(snapshot, { environment: 'test', externalProjectId: null });
+    expect(result.hashes.contentHash).toBe(createHash('sha256').update(canonicalGenerationJsonV1(result.content), 'utf8').digest('hex'));
   });
 
   it('projects the exact immutable COURSE_FROM_ROLE_GUIDE row and signs it', async () => {

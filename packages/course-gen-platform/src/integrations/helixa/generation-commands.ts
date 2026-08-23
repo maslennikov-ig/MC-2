@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { canonicalJson, sha256 } from './canonical-json';
+import { sha256 } from './canonical-json';
+import { canonicalGenerationJsonV1 } from './generation-canonical-json';
 
 const identifier = z.string().trim().min(1).max(300);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -101,7 +102,7 @@ export function parseHelixaGenerationLookupQuery(value: unknown): HelixaGenerati
 }
 
 export function generationCommandHash(command: HelixaGenerationCommand): string {
-  return sha256(canonicalJson(command));
+  return sha256(canonicalGenerationJsonV1(command));
 }
 
 export function readHelixaGenerationMode(environment: NodeJS.ProcessEnv = process.env): 'disabled' | 'fake' {
@@ -133,8 +134,56 @@ export interface HelixaGenerationBindingAuthority {
   resolve(bindingId: string): Promise<ResolvedHelixaGenerationBinding | null>;
 }
 
-interface GenerationRpcClient {
+export interface GenerationRpcClient {
   rpc<T>(name: string, args: Record<string, unknown>): Promise<{ data: T | null; error: { message: string } | null }>;
+}
+
+export function createPostgresHelixaCourseFromRoleGuideScheduler(client: GenerationRpcClient): HelixaGenerationNativeDependencies['scheduleCourseFromRoleGuide'] {
+  return async input => {
+    const result = await client.rpc<boolean>('schedule_helixa_course_from_role_guide', {
+      p_binding_id: input.originBindingId,
+      p_command_id: input.originCommandId,
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_user_id: input.userId,
+      p_course: input.course,
+      p_source_job_instruction: input.sourceJobInstruction,
+      p_lease_token: input.leaseToken,
+      p_claim_generation: input.claimGeneration,
+    });
+    if (result.error) throw new Error(result.error.message);
+    if (result.data !== true) throw new Error('ROLE_GUIDE_SOURCE_UNAVAILABLE');
+  };
+}
+
+type NativeObservationRow = { outcome: 'missing' | 'running' | 'succeeded_awaiting_signed_import' | 'completed' | 'failed'; native_completed_at: string | null; outbox_event_id: string | null };
+export function createPostgresHelixaNativeObserver(client: GenerationRpcClient): NonNullable<HelixaGenerationNativeDependencies['observe']> {
+  return async input => {
+    const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_organization_id: input.organizationId, p_object_kind: input.objectKind, p_object_id: input.objectId,
+    });
+    if (result.error) throw new Error('Failed to observe native MegaCampus generation');
+    const row = result.data?.[0];
+    if (!row || row.outcome === 'missing' || row.outcome === 'running') return 'running';
+    if (row.outcome === 'failed') return { kind: 'failed' };
+    if (row.outcome === 'succeeded_awaiting_signed_import') return 'succeeded_awaiting_signed_import';
+    if (!row.native_completed_at || !row.outbox_event_id) throw new Error('Native completion observation omitted proof');
+    return { kind: 'completed', nativeCompletedAt: row.native_completed_at, outboxEventId: row.outbox_event_id };
+  };
+}
+
+export function createPostgresHelixaNativeReconciler(client: GenerationRpcClient): HelixaGenerationNativeDependencies['reconcile'] {
+  return async input => {
+    const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_organization_id: input.organizationId, p_object_kind: input.objectKind, p_object_id: input.objectId,
+    });
+    if (result.error) throw new Error('Failed to reconcile native MegaCampus generation');
+    const row = result.data?.[0];
+    if (!row || row.outcome === 'missing') return 'missing';
+    if (row.outcome !== 'completed') return 'uncertain';
+    if (!row.native_completed_at || !row.outbox_event_id) return 'uncertain';
+    return { kind: 'completed', nativeCompletedAt: row.native_completed_at, outboxEventId: row.outbox_event_id };
+  };
 }
 
 type ResolvedBindingRow = {
@@ -198,6 +247,10 @@ export interface HelixaGenerationRepository {
   markScheduled(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number }): Promise<HelixaGenerationRow | null>;
   reconcileCompleted(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number; nativeCompletedAt: string; outboxEventId: string }): Promise<HelixaGenerationRow | null>;
   actionRequired(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number; safeErrorCode: string }): Promise<boolean>;
+  claimScheduled?(input: { bindingId: string; commandId: string }): Promise<HelixaGenerationRow | null>;
+  returnScheduled?(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number }): Promise<boolean>;
+  failObserved?(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number }): Promise<boolean>;
+  completeObserved?(input: { bindingId: string; commandId: string; objectId: string; leaseToken: string; claimGeneration: number; nativeCompletedAt: string; outboxEventId: string }): Promise<boolean>;
   lookup(bindingId: string, commandId: string): Promise<HelixaGenerationRow | null>;
 }
 
@@ -288,6 +341,33 @@ export function createPostgresHelixaGenerationRepository(client: GenerationRpcCl
       const row = result.data?.[0];
       return row ? mapCommandRow(row, bindingId) : null;
     },
+    async claimScheduled(input) {
+      const result = await client.rpc<GenerationCommandRow[]>('claim_scheduled_helixa_generation_command', {
+        p_binding_id: input.bindingId, p_command_id: input.commandId,
+      });
+      if (result.error) throw new Error('Failed to claim scheduled MegaCampus generation command');
+      const row = result.data?.[0];
+      return row ? mapCommandRow(row, input.bindingId) : null;
+    },
+    returnScheduled(input) {
+      return booleanRpc('return_scheduled_helixa_generation_command', {
+        p_binding_id: input.bindingId, p_command_id: input.commandId, p_object_id: input.objectId,
+        p_lease_token: input.leaseToken, p_claim_generation: input.claimGeneration,
+      }, 'Failed to return MegaCampus generation command to scheduled');
+    },
+    failObserved(input) {
+      return booleanRpc('fail_observed_helixa_generation_command', {
+        p_binding_id: input.bindingId, p_command_id: input.commandId, p_object_id: input.objectId,
+        p_lease_token: input.leaseToken, p_observation_generation: input.claimGeneration,
+      }, 'Failed to record observed MegaCampus generation failure');
+    },
+    completeObserved(input) {
+      return booleanRpc('complete_observed_helixa_generation_command', {
+        p_binding_id: input.bindingId, p_command_id: input.commandId, p_object_id: input.objectId,
+        p_lease_token: input.leaseToken, p_observation_generation: input.claimGeneration,
+        p_native_completed_at: input.nativeCompletedAt, p_outbox_event_id: input.outboxEventId,
+      }, 'Failed to record observed MegaCampus generation completion');
+    },
   };
 }
 
@@ -299,6 +379,8 @@ export interface HelixaGenerationNativePort {
     objectKind: HelixaGenerationObjectKind;
     objectId: string;
     servicePrincipalUserId: string;
+    leaseToken: string;
+    claimGeneration: number;
     jobInstruction?: Extract<HelixaGenerationCommand, { operation: 'CREATE_JOB_INSTRUCTION' }>['jobInstruction'];
     selectedSources?: Extract<HelixaGenerationCommand, { operation: 'CREATE_JOB_INSTRUCTION' }>['selectedSources'];
     course?: Extract<HelixaGenerationCommand, { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }>['course'];
@@ -306,6 +388,9 @@ export interface HelixaGenerationNativePort {
     includeWebResearch: false;
     includeBusinessContextSources: false;
   }): Promise<{ objectId: string }>;
+  observe?(input: { binding: ResolvedHelixaGenerationBinding; objectKind: HelixaGenerationObjectKind; objectId: string }): Promise<
+    'running' | 'succeeded_awaiting_signed_import' | { kind: 'completed'; nativeCompletedAt: string; outboxEventId: string } | { kind: 'failed' }
+  >;
 }
 
 export interface HelixaGenerationNativeDependencies {
@@ -316,22 +401,20 @@ export interface HelixaGenerationNativeDependencies {
     selectedSources: ReadonlyArray<{ documentId: string; sourceRevisionHash: string; citationId: string }>;
     qAData: Record<string, unknown>;
   }): Promise<void>;
-  loadRoleGuideProof(input: { id: string; organizationId: string }): Promise<{
-    id: string; organizationId: string; status: string;
-    sourceVersion: string; contentHash: string;
-  } | null>;
-  scheduleCourse(input: {
+  scheduleCourseFromRoleGuide(input: {
     courseId: string; organizationId: string; userId: string;
+    leaseToken: string; claimGeneration: number;
     course: Extract<HelixaGenerationCommand, { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }>['course'];
     sourceJobInstruction: Extract<HelixaGenerationCommand, { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }>['sourceJobInstruction'];
     originBindingId: string; originCommandId: string;
     includeWebResearch: false; includeBusinessContextSources: false;
   }): Promise<void>;
   reconcile(input: { objectKind: HelixaGenerationObjectKind; objectId: string; organizationId: string }): Promise<'missing' | 'uncertain' | { kind: 'completed'; nativeCompletedAt: string; outboxEventId: string }>;
+  observe?(input: { objectKind: HelixaGenerationObjectKind; objectId: string; organizationId: string }): Promise<'running' | 'succeeded_awaiting_signed_import' | { kind: 'completed'; nativeCompletedAt: string; outboxEventId: string } | { kind: 'failed' }>;
 }
 
 export class HelixaGenerationPreMutationError extends Error {
-  constructor(readonly safeErrorCode: 'megacampus_generation_source_unavailable' | 'megacampus_generation_source_stale' | 'megacampus_generation_native_failed') {
+  constructor(readonly safeErrorCode: 'megacampus_generation_service_principal_invalid' | 'megacampus_generation_source_unavailable' | 'megacampus_generation_source_stale' | 'megacampus_generation_native_failed') {
     super(safeErrorCode.replaceAll('_', ' '));
     this.name = 'HelixaGenerationPreMutationError';
   }
@@ -342,6 +425,9 @@ export function createHelixaGenerationNativePort(dependencies: HelixaGenerationN
   return {
     reconcile(input) {
       return dependencies.reconcile({ objectKind: input.objectKind, objectId: input.objectId, organizationId: input.binding.organizationId });
+    },
+    observe(input) {
+      return dependencies.observe?.({ objectKind: input.objectKind, objectId: input.objectId, organizationId: input.binding.organizationId }) ?? Promise.resolve('running');
     },
     async schedule(input) {
       if (input.command.operation === 'CREATE_JOB_INSTRUCTION') {
@@ -369,25 +455,27 @@ export function createHelixaGenerationNativePort(dependencies: HelixaGenerationN
       }
 
       const source = input.command.sourceJobInstruction;
-      const proof = await dependencies.loadRoleGuideProof({ id: source.id, organizationId: input.binding.organizationId });
-      if (!proof || proof.id !== source.id || proof.organizationId !== input.binding.organizationId
-        || proof.status !== 'completed') {
-        throw new HelixaGenerationPreMutationError('megacampus_generation_source_unavailable');
+      try {
+        await dependencies.scheduleCourseFromRoleGuide({
+          courseId: input.objectId,
+          organizationId: input.binding.organizationId,
+          userId: input.servicePrincipalUserId,
+          leaseToken: input.leaseToken,
+          claimGeneration: input.claimGeneration,
+          course: input.command.course,
+          sourceJobInstruction: source,
+          originBindingId: input.binding.bindingId,
+          originCommandId: input.command.commandId,
+          includeWebResearch: false,
+          includeBusinessContextSources: false,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('ROLE_GUIDE_SOURCE_UNAVAILABLE')) throw new HelixaGenerationPreMutationError('megacampus_generation_source_unavailable');
+        if (message.includes('ROLE_GUIDE_SOURCE_STALE')) throw new HelixaGenerationPreMutationError('megacampus_generation_source_stale');
+        if (message.includes('GENERATION_SERVICE_PRINCIPAL_INVALID')) throw new HelixaGenerationPreMutationError('megacampus_generation_service_principal_invalid');
+        throw error;
       }
-      if (proof.sourceVersion !== source.sourceVersion || proof.contentHash !== source.contentHash) {
-        throw new HelixaGenerationPreMutationError('megacampus_generation_source_stale');
-      }
-      await dependencies.scheduleCourse({
-        courseId: input.objectId,
-        organizationId: input.binding.organizationId,
-        userId: input.servicePrincipalUserId,
-        course: input.command.course,
-        sourceJobInstruction: source,
-        originBindingId: input.binding.bindingId,
-        originCommandId: input.command.commandId,
-        includeWebResearch: false,
-        includeBusinessContextSources: false,
-      });
       return { objectId: input.objectId };
     },
   };
@@ -483,6 +571,8 @@ export function createInMemoryHelixaGenerationRepository(options: { objectId?: (
       const row = rows.get(key(bindingId, commandId));
       return row ? { ...row } : null;
     },
+    claimScheduled() { return Promise.resolve(null); },
+    returnScheduled() { return Promise.resolve(false); },
   };
 }
 
@@ -565,6 +655,8 @@ export async function dispatchHelixaGenerationCommand(input: {
     const result = await input.nativePort.schedule({
       binding, command, objectKind, objectId: row.objectId,
       servicePrincipalUserId: binding.servicePrincipalUserId,
+      leaseToken: row.leaseToken,
+      claimGeneration: row.claimGeneration,
       ...(command.operation === 'CREATE_JOB_INSTRUCTION'
         ? { jobInstruction: command.jobInstruction, selectedSources: command.selectedSources }
         : { course: command.course, sourceJobInstruction: command.sourceJobInstruction }),
@@ -616,4 +708,51 @@ export async function lookupHelixaGenerationCommand(input: {
     state: row.status === 'scheduled' ? 'scheduled' as const : 'executing' as const,
     object: { kind: row.objectKind, id: row.objectId }, updatedAt: row.updatedAt,
   };
+}
+
+export async function observeHelixaScheduledGenerationCommand(input: {
+  bindingLocator: { bindingId: string };
+  commandId: string;
+  mode: 'disabled' | 'fake';
+  authority: HelixaGenerationBindingAuthority;
+  repository: HelixaGenerationRepository;
+  nativePort: HelixaGenerationNativePort;
+}): Promise<'not_found' | 'busy' | 'scheduled' | 'native_completed' | 'action_required'> {
+  if (input.mode !== 'fake') throw new Error('MegaCampus generation is disabled');
+  const binding = await input.authority.resolve(input.bindingLocator.bindingId);
+  assertPrincipalBinding(binding);
+  if (binding.bindingId !== input.bindingLocator.bindingId) throw new Error('MegaCampus generation binding unavailable');
+  if (!input.repository.claimScheduled || !input.repository.returnScheduled || !input.repository.failObserved
+    || !input.repository.completeObserved || !input.nativePort.observe) {
+    throw new Error('MegaCampus generation observer unavailable');
+  }
+  const row = await input.repository.claimScheduled({ bindingId: binding.bindingId, commandId: input.commandId });
+  if (!row) {
+    const current = await input.repository.lookup(binding.bindingId, input.commandId);
+    if (!current) return 'not_found';
+    if (current.status === 'native_completed') return 'native_completed';
+    if (current.status === 'action_required') return 'action_required';
+    return 'busy';
+  }
+  if (!row.leaseToken) throw new Error('MegaCampus generation observer claim omitted lease');
+  const fence = {
+    bindingId: binding.bindingId, commandId: row.commandId, objectId: row.objectId,
+    leaseToken: row.leaseToken, claimGeneration: row.claimGeneration,
+  };
+  const observed = await input.nativePort.observe({ binding, objectKind: row.objectKind, objectId: row.objectId });
+  if (typeof observed === 'object' && observed.kind === 'failed') {
+    if (!await input.repository.failObserved(fence)) {
+      throw new Error('MegaCampus generation observer lease lost');
+    }
+    return 'action_required';
+  }
+  if (typeof observed === 'object' && observed.kind === 'completed') {
+    const completed = await input.repository.completeObserved({
+      ...fence, nativeCompletedAt: observed.nativeCompletedAt, outboxEventId: observed.outboxEventId,
+    });
+    if (!completed) throw new Error('MegaCampus generation observer lease lost');
+    return 'native_completed';
+  }
+  if (!await input.repository.returnScheduled(fence)) throw new Error('MegaCampus generation observer lease lost');
+  return 'scheduled';
 }

@@ -197,12 +197,14 @@ export async function mapCompletedRoleGuide(input: { playbook: CompletedRoleGuid
     }
   }
   const generatedBlocks = jsonObject(playbook.generated_blocks);
+  const blockEntries = Object.entries(generatedBlocks);
+  if (originCommand) blockEntries.sort(([left], [right]) => Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8')));
   return {
     kind: 'ROLE_GUIDE', id: playbook.id, organizationId: playbook.organization_id, completedAt: playbook.completed_at,
     title: playbook.position_title?.trim() || 'Role Guide', language: playbook.language,
     summaryMarkdown: playbook.final_markdown,
     structure: { roleProfileSpec: jsonObject(playbook.role_profile_spec) },
-    blocks: Object.entries(generatedBlocks).map(([key, value]) => ({ key, value })), lessons: [], sources,
+    blocks: blockEntries.map(([key, value]) => ({ key, value })), lessons: [], sources,
     ...(originCommand ? { originCommand } : {}),
   };
 }

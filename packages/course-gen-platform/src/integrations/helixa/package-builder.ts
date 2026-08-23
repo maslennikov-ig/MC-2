@@ -1,4 +1,5 @@
 import { canonicalJson, computePayloadHash, sha256 } from './canonical-json';
+import { canonicalGenerationJsonV1 } from './generation-canonical-json';
 import { KNOWLEDGE_SYNC_SCHEMA_VERSION, type GenerationOriginCommandV1, type JsonValue, type KnowledgeObjectKind, type KnowledgeRelation, type KnowledgeSyncPackage, type ProcessingRoute, type SourceDocument } from './contract';
 import { KnowledgeSyncPreparationError } from './errors';
 
@@ -164,6 +165,12 @@ export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapsho
 
   const routeCounts = Object.fromEntries((['docling', 'local_text', 'content_rss', 'meetings_media', 'unsupported'] as const).map(route => [route, sourceDocuments.filter(document => document.route.family === route).length]));
   const eventType = snapshot.kind === 'COURSE' ? 'COURSE_COMPLETED' : 'ROLE_GUIDE_COMPLETED';
+  let contentHash: string;
+  try {
+    contentHash = sha256(snapshot.originCommand ? canonicalGenerationJsonV1(content) : canonicalJson(content));
+  } catch {
+    throw new KnowledgeSyncPreparationError('contract', false);
+  }
   const base = {
     schemaVersion: KNOWLEDGE_SYNC_SCHEMA_VERSION,
     eventId: knowledgeEventId(snapshot), eventType, sentAt: new Date(snapshot.completedAt).toISOString(),
@@ -171,7 +178,7 @@ export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapsho
     object: { kind: snapshot.kind, id: snapshot.id, version: new Date(snapshot.completedAt).toISOString(), title: snapshot.title, language: snapshot.language, status: 'completed' as const, ...(snapshot.url ? { url: snapshot.url } : {}) },
     scope: { externalOrganizationId: snapshot.organizationId, externalProjectId: options.externalProjectId, destinationPolicy: 'DEFAULT_ORG_KNOWLEDGE_PROJECT' as const },
     content, sourceDocuments, evidenceSegments, candidateClaims: [], relations: snapshot.relations ?? [],
-    hashes: { payloadHash: '', contentHash: sha256(canonicalJson(content)) }, metadata: { routeCounts },
+    hashes: { payloadHash: '', contentHash }, metadata: { routeCounts },
     ...(snapshot.originCommand ? { originCommand: snapshot.originCommand } : {}),
   } satisfies KnowledgeSyncPackage;
   base.hashes.payloadHash = computePayloadHash(base);

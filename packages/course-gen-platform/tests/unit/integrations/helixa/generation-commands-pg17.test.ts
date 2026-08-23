@@ -47,12 +47,15 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       CREATE TABLE users(id uuid PRIMARY KEY REFERENCES auth.users(id), organization_id uuid NOT NULL REFERENCES organizations(id), email text NOT NULL UNIQUE);
       CREATE TABLE organization_members(organization_id uuid NOT NULL REFERENCES organizations(id), user_id uuid NOT NULL REFERENCES auth.users(id), role org_role NOT NULL, UNIQUE(organization_id,user_id));
       CREATE TABLE career_playbooks(id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL, completed_at timestamptz, final_markdown text, role_profile_spec jsonb, generated_blocks jsonb);
-      CREATE TABLE courses(id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id), organization_id uuid NOT NULL REFERENCES organizations(id), generation_status text, generation_completed_at timestamptz);
+      CREATE TABLE courses(id uuid PRIMARY KEY, title text NOT NULL DEFAULT 'fixture', slug text NOT NULL DEFAULT 'fixture', user_id uuid NOT NULL REFERENCES users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL DEFAULT 'draft', course_description text, target_audience text, learning_outcomes text, language text, course_size text, style text, generation_mode text, settings jsonb, has_files boolean, created_at timestamptz, updated_at timestamptz, generation_status text, generation_completed_at timestamptz);
       CREATE TABLE helixa_knowledge_sync_bindings(binding_id text PRIMARY KEY, organization_id uuid NOT NULL REFERENCES organizations(id), environment text NOT NULL, destination_binding_id text NOT NULL, enabled boolean NOT NULL DEFAULT true, UNIQUE(binding_id,organization_id,environment,destination_binding_id));
       CREATE TABLE helixa_knowledge_sync_outbox(binding_id text NOT NULL, event_id text NOT NULL, object_kind text NOT NULL, object_id uuid NOT NULL, completed_at timestamptz NOT NULL);
+      CREATE TABLE job_outbox(outbox_id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entity_id uuid NOT NULL REFERENCES courses(id), queue_name text NOT NULL, job_data jsonb NOT NULL, job_options jsonb NOT NULL, target_queue text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
     `);
     const migration = await readFile(new URL('../../../../supabase/migrations/20260823120000_helixa_generation_commands.sql', import.meta.url), 'utf8');
     await pool.query(migration);
+    const nativeMigration = await readFile(new URL('../../../../supabase/migrations/20260823130000_helixa_generation_native_transactions.sql', import.meta.url), 'utf8');
+    await pool.query(nativeMigration);
   }, 120_000);
 
   afterAll(async () => {
@@ -61,7 +64,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
   });
 
   beforeEach(async () => {
-    await pool.query('TRUNCATE course_job_instruction_sources, role_guide_generation_proofs, helixa_generation_commands, helixa_knowledge_sync_outbox, career_playbooks, courses, helixa_knowledge_sync_bindings, organization_members, users, auth.users, organizations CASCADE');
+    await pool.query('TRUNCATE job_outbox, course_job_instruction_sources, role_guide_generation_proofs, helixa_generation_commands, helixa_knowledge_sync_outbox, career_playbooks, courses, helixa_knowledge_sync_bindings, organization_members, users, auth.users, organizations CASCADE');
     await pool.query('INSERT INTO organizations(id) VALUES ($1)', [ORGANIZATION_ID]);
     await pool.query(`INSERT INTO auth.users(id,raw_app_meta_data) VALUES ($1,'{"kind":"service_principal","interactive_login_allowed":false}')`, [PRINCIPAL_ID]);
     await pool.query(`INSERT INTO users(id,organization_id,email) VALUES ($1,$2,'principal@example.test')`, [PRINCIPAL_ID, ORGANIZATION_ID]);
@@ -145,5 +148,71 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     await pool.query(`INSERT INTO courses(id,user_id,organization_id) VALUES ($1,$2,$3)`, [foreignCourseId, PRINCIPAL_ID, foreignOrganizationId]);
     await expect(pool.query(`INSERT INTO course_job_instruction_sources(course_id,organization_id,job_instruction_id,source_version,source_content_hash,origin_binding_id,origin_command_id) VALUES ($1,$2,$3,$4,$5,'binding-a',$6)`, [foreignCourseId, ORGANIZATION_ID, guide.object_id, proof.source_version, proof.content_hash, foreignCommandId])).rejects.toThrow(/source relation/i);
     await expect(pool.query(`INSERT INTO helixa_generation_commands(binding_id,organization_id,environment,destination_binding_id,command_id,command_kind,proposal_id,approved_revision,proposal_payload_hash,command_hash,command_payload,object_kind,status,safe_error_code,lease_token,lease_expires_at) VALUES ('binding-a',$1,'test','destination-a',$2,'CREATE_JOB_INSTRUCTION','proposal-x',1,$3,$4,'{}','ROLE_GUIDE','action_required','arbitrary_internal_error',NULL,NULL)`, [ORGANIZATION_ID, `megacampus_generation_command:create_job_instruction:v1:${'9'.repeat(64)}`, '8'.repeat(64), '7'.repeat(64)])).rejects.toThrow(/check constraint/i);
+  });
+
+  it('atomically locks current ROLE_GUIDE content, creates one Course relation, and enqueues native generation', async () => {
+    const guide = (await reserve()).rows[0];
+    await pool.query(`INSERT INTO career_playbooks(id,user_id,organization_id,status,completed_at,final_markdown,role_profile_spec,generated_blocks) VALUES ($1,$2,$3,'completed','2026-08-23T10:15:30Z','# Guide','{"z":1,"\uE000":2,"\uD800\uDC00":3}','{"second":{"score":2},"first":{"score":1}}')`, [guide.object_id, PRINCIPAL_ID, ORGANIZATION_ID]);
+    const proof = (await pool.query('SELECT * FROM role_guide_generation_proofs WHERE playbook_id=$1', [guide.object_id])).rows[0];
+    const commandId = `megacampus_generation_command:create_course_from_job_instruction:v1:${'e'.repeat(64)}`;
+    const course = { title: 'Onboarding', courseDescription: 'Derived course', targetAudience: 'Managers', learningOutcomes: ['Apply guide'], language: 'en', courseSize: 'mini', style: 'practical' };
+    const source = { kind: 'ROLE_GUIDE', id: guide.object_id, sourceVersion: proof.source_version, contentHash: proof.content_hash };
+    const reserved = (await pool.query(`SELECT * FROM reserve_helixa_generation_command($1,$2,'CREATE_COURSE_FROM_JOB_INSTRUCTION','proposal-b',4,$3,$4,$5,'COURSE')`, ['binding-a', commandId, 'f'.repeat(64), '1'.repeat(64), { schemaVersion: 'helixa.megacampus-generation-command.v1', operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION', commandId, proposalId: 'proposal-b', approvedRevision: 4, payloadHash: 'f'.repeat(64), course, sourceJobInstruction: source }])).rows[0];
+    const scheduled = await pool.query(`SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9) value`, ['binding-a', commandId, reserved.object_id, ORGANIZATION_ID, PRINCIPAL_ID, course, source, reserved.lease_token, reserved.claim_generation]);
+    expect(scheduled.rows[0].value).toBe(true);
+    expect((await pool.query('SELECT count(*)::int count FROM courses WHERE id=$1', [reserved.object_id])).rows[0].count).toBe(1);
+    expect((await pool.query('SELECT * FROM course_job_instruction_sources WHERE course_id=$1', [reserved.object_id])).rows[0]).toMatchObject({ job_instruction_id: guide.object_id, source_version: proof.source_version, source_content_hash: proof.content_hash });
+    expect((await pool.query('SELECT count(*)::int count FROM job_outbox WHERE entity_id=$1', [reserved.object_id])).rows[0].count).toBe(1);
+  });
+
+  it('recomputes current ROLE_GUIDE content in the Course transaction and rolls back all mutation when stale', async () => {
+    const guide = (await reserve()).rows[0];
+    await pool.query(`INSERT INTO career_playbooks(id,user_id,organization_id,status,completed_at,final_markdown,role_profile_spec,generated_blocks) VALUES ($1,$2,$3,'completed','2026-08-23T10:15:30Z','# Original','{}','{}')`, [guide.object_id, PRINCIPAL_ID, ORGANIZATION_ID]);
+    const proof = (await pool.query('SELECT * FROM role_guide_generation_proofs WHERE playbook_id=$1', [guide.object_id])).rows[0];
+    await pool.query(`UPDATE career_playbooks SET final_markdown='# Mutated after proof' WHERE id=$1`, [guide.object_id]);
+    const commandId = `megacampus_generation_command:create_course_from_job_instruction:v1:${'7'.repeat(64)}`;
+    const course = { title: 'Onboarding', courseDescription: 'Derived course', targetAudience: 'Managers', learningOutcomes: ['Apply guide'], language: 'en', courseSize: 'mini', style: 'practical' };
+    const source = { kind: 'ROLE_GUIDE', id: guide.object_id, sourceVersion: proof.source_version, contentHash: proof.content_hash };
+    const commandPayload = { schemaVersion: 'helixa.megacampus-generation-command.v1', operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION', commandId, proposalId: 'proposal-c', approvedRevision: 5, payloadHash: '6'.repeat(64), course, sourceJobInstruction: source };
+    const reserved = (await pool.query(`SELECT * FROM reserve_helixa_generation_command($1,$2,'CREATE_COURSE_FROM_JOB_INSTRUCTION','proposal-c',5,$3,$4,$5,'COURSE')`, ['binding-a', commandId, '6'.repeat(64), '5'.repeat(64), commandPayload])).rows[0];
+    await expect(pool.query(`SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9)`, ['binding-a', commandId, reserved.object_id, ORGANIZATION_ID, PRINCIPAL_ID, course, source, reserved.lease_token, reserved.claim_generation])).rejects.toThrow(/ROLE_GUIDE_SOURCE_STALE/);
+    expect((await pool.query('SELECT count(*)::int count FROM courses WHERE id=$1', [reserved.object_id])).rows[0].count).toBe(0);
+    expect((await pool.query('SELECT count(*)::int count FROM course_job_instruction_sources WHERE course_id=$1', [reserved.object_id])).rows[0].count).toBe(0);
+    expect((await pool.query('SELECT count(*)::int count FROM job_outbox WHERE entity_id=$1', [reserved.object_id])).rows[0].count).toBe(0);
+  });
+
+  it('uses UTF-8 key order and rejects fractional numbers in SQL canonicalJson/v1', async () => {
+    const canonical = await pool.query(`SELECT helixa_canonical_json_v1($1::jsonb) value`, [{ '\u{10000}': 1, '\uE000': 2 }]);
+    expect(canonical.rows[0].value).toBe('{"":2,"𐀀":1}');
+    await expect(pool.query(`SELECT helixa_canonical_json_v1('1.5'::jsonb)`)).rejects.toThrow(/safe integers/i);
+  });
+
+  it('fences scheduled observation, permits lost-response takeover, and records terminal failure without mutation replay', async () => {
+    const initial = (await reserve()).rows[0];
+    await pool.query(`SELECT * FROM schedule_helixa_generation_command($1,$2,$3,$4,$5)`, ['binding-a', initial.command_id, initial.object_id, initial.lease_token, initial.claim_generation]);
+    const first = (await pool.query(`SELECT * FROM claim_scheduled_helixa_generation_command($1,$2)`, ['binding-a', initial.command_id])).rows[0];
+    expect(first.status).toBe('scheduled');
+    expect((await pool.query(`SELECT * FROM claim_scheduled_helixa_generation_command($1,$2)`, ['binding-a', initial.command_id])).rows).toEqual([]);
+    await pool.query(`UPDATE helixa_generation_commands SET observation_lease_expires_at=NOW()-INTERVAL '1 second' WHERE command_id=$1`, [initial.command_id]);
+    const takeover = (await pool.query(`SELECT * FROM claim_scheduled_helixa_generation_command($1,$2)`, ['binding-a', initial.command_id])).rows[0];
+    expect(takeover.claim_generation).toBe(first.claim_generation + 1);
+    const stale = await pool.query(`SELECT fail_observed_helixa_generation_command($1,$2,$3,$4,$5) value`, ['binding-a', initial.command_id, initial.object_id, first.lease_token, first.claim_generation]);
+    expect(stale.rows[0].value).toBe(false);
+    const failed = await pool.query(`SELECT fail_observed_helixa_generation_command($1,$2,$3,$4,$5) value`, ['binding-a', initial.command_id, initial.object_id, takeover.lease_token, takeover.claim_generation]);
+    expect(failed.rows[0].value).toBe(true);
+    expect((await pool.query(`SELECT status,safe_error_code FROM helixa_generation_commands WHERE command_id=$1`, [initial.command_id])).rows[0]).toEqual({ status: 'action_required', safe_error_code: 'megacampus_generation_native_failed' });
+  });
+
+  it('observes terminal native failure and keeps success waiting until signed outbox proof exists', async () => {
+    const failedCourseId = '44444444-4444-4444-8444-444444444444';
+    await pool.query(`INSERT INTO courses(id,user_id,organization_id,generation_status) VALUES ($1,$2,$3,'failed')`, [failedCourseId, PRINCIPAL_ID, ORGANIZATION_ID]);
+    expect((await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [ORGANIZATION_ID, failedCourseId])).rows[0].outcome).toBe('failed');
+
+    const completedCourseId = '55555555-5555-4555-8555-555555555555';
+    const completedAt = '2026-08-23T10:40:00.000Z';
+    await pool.query(`INSERT INTO courses(id,user_id,organization_id,generation_status,generation_completed_at) VALUES ($1,$2,$3,'completed',$4)`, [completedCourseId, PRINCIPAL_ID, ORGANIZATION_ID, completedAt]);
+    expect((await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [ORGANIZATION_ID, completedCourseId])).rows[0].outcome).toBe('succeeded_awaiting_signed_import');
+    await pool.query(`INSERT INTO helixa_knowledge_sync_outbox(binding_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a','mc2:COURSE:observed','COURSE',$1,$2)`, [completedCourseId, completedAt]);
+    expect((await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [ORGANIZATION_ID, completedCourseId])).rows[0]).toMatchObject({ outcome: 'completed', outbox_event_id: 'mc2:COURSE:observed' });
   });
 });

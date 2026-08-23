@@ -7,14 +7,18 @@ import {
   createHelixaGenerationNativePort,
   createPostgresHelixaGenerationBindingAuthority,
   createPostgresHelixaGenerationRepository,
+  createPostgresHelixaNativeObserver,
+  createPostgresHelixaNativeReconciler,
   dispatchHelixaGenerationCommand,
   generationCommandHash,
+  observeHelixaScheduledGenerationCommand,
   parseHelixaGenerationCommand,
   parseHelixaGenerationLookupQuery,
   readHelixaGenerationMode,
   type HelixaGenerationBindingAuthority,
   type HelixaGenerationNativePort,
 } from '@/integrations/helixa/generation-commands';
+import { canonicalGenerationJsonV1 } from '@/integrations/helixa/generation-canonical-json';
 
 const jobCommand = {
   schemaVersion: 'helixa.megacampus-generation-command.v1',
@@ -87,7 +91,32 @@ function authority(overrides: Record<string, unknown> = {}): HelixaGenerationBin
   };
 }
 
+function scheduledObserverRepository(claimGeneration: number) {
+  return {
+    claimScheduled: vi.fn(async () => ({
+      bindingId: binding.bindingId, commandId: courseCommand.commandId,
+      commandHash: generationCommandHash(parseHelixaGenerationCommand(courseCommand)),
+      operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' as const, payloadHash: courseCommand.payloadHash,
+      proposalId: courseCommand.proposalId, approvedRevision: courseCommand.approvedRevision,
+      objectKind: 'COURSE' as const, objectId: '44444444-4444-4444-8444-444444444444',
+      status: 'executing' as const, acceptedAt: '2026-08-23T10:16:00.000Z',
+      updatedAt: '2026-08-23T10:20:00.000Z', claimGeneration,
+      leaseToken: '77777777-7777-4777-8777-777777777777',
+    })),
+    actionRequired: vi.fn(async () => true), reconcileCompleted: vi.fn(),
+    failObserved: vi.fn(async () => true), completeObserved: vi.fn(async () => true),
+    returnScheduled: vi.fn(async () => true), lookup: vi.fn(),
+  };
+}
+
 describe('server-only Helixa generation commands', () => {
+  it('canonicalizes keys by unsigned UTF-8 bytes and rejects non-safe-integer numbers', () => {
+    const supplementary = '\u{10000}';
+    const bmp = '\uE000';
+    expect(canonicalGenerationJsonV1({ [supplementary]: 1, [bmp]: 2 })).toBe(`{"${bmp}":2,"${supplementary}":1}`);
+    expect(() => canonicalGenerationJsonV1(1.5)).toThrow(/safe integers/i);
+    expect(() => canonicalGenerationJsonV1(-0)).toThrow(/safe integers/i);
+  });
   it('matches both accepted golden command hashes', () => {
     expect(generationCommandHash(parseHelixaGenerationCommand(jobCommand))).toBe(
       '123b969a686c8db53a5b576e10ac895d1f79ac1570411efce3e08f5084c45d60'
@@ -144,6 +173,15 @@ describe('server-only Helixa generation commands', () => {
     expect(sql).toContain('CREATE TABLE course_job_instruction_sources');
     expect(sql.match(/prevent_helixa_generation_proof_mutation/g)?.length).toBeGreaterThanOrEqual(3);
     expect(sql).not.toMatch(/DROP TABLE helixa_course_creation_commands|ALTER TABLE helixa_course_creation_commands/);
+    const nativeSql = await readFile(
+      new URL('../../../../supabase/migrations/20260823130000_helixa_generation_native_transactions.sql', import.meta.url),
+      'utf8'
+    );
+    expect(nativeSql).toContain('schedule_helixa_course_from_role_guide');
+    expect(nativeSql).toContain('FOR SHARE');
+    expect(nativeSql).toContain('INSERT INTO course_job_instruction_sources');
+    expect(nativeSql).toContain('INSERT INTO job_outbox');
+    expect(nativeSql).toContain('observation_lease_token');
   });
 
   it('closes binding scope in Postgres adapters and never accepts caller identity', async () => {
@@ -199,6 +237,16 @@ describe('server-only Helixa generation commands', () => {
     });
   });
 
+  it('maps concrete native observation to uncertain takeover or signed completion proof', async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: [{ outcome: 'running', native_completed_at: null, outbox_event_id: null }], error: null })
+      .mockResolvedValueOnce({ data: [{ outcome: 'completed', native_completed_at: '2026-08-23T10:30:00.000Z', outbox_event_id: 'mc2:COURSE:event' }], error: null });
+    const reconciler = createPostgresHelixaNativeReconciler({ rpc });
+    const observer = createPostgresHelixaNativeObserver({ rpc });
+    await expect(reconciler({ objectKind: 'COURSE', objectId: '44444444-4444-4444-8444-444444444444', organizationId: binding.organizationId })).resolves.toBe('uncertain');
+    await expect(observer({ objectKind: 'COURSE', objectId: '44444444-4444-4444-8444-444444444444', organizationId: binding.organizationId })).resolves.toEqual({ kind: 'completed', nativeCompletedAt: '2026-08-23T10:30:00.000Z', outboxEventId: 'mc2:COURSE:event' });
+  });
+
   it.each([
     ['missing auth row', { principal: { existsInAuth: false, existsInPublic: true, organizationId: binding.organizationId, role: 'admin', kind: 'service_principal', interactiveLoginAllowed: false } }],
     ['foreign organization', { principal: { existsInAuth: true, existsInPublic: true, organizationId: 'other', role: 'admin', kind: 'service_principal', interactiveLoginAllowed: false } }],
@@ -249,6 +297,7 @@ describe('server-only Helixa generation commands', () => {
     expect(schedule).toHaveBeenCalledWith(expect.objectContaining({
       objectKind: 'COURSE', objectId: '44444444-4444-4444-8444-444444444444',
       servicePrincipalUserId: binding.servicePrincipalUserId,
+      leaseToken: expect.any(String), claimGeneration: 1,
       course: courseCommand.course,
       sourceJobInstruction: courseCommand.sourceJobInstruction,
       includeWebResearch: false,
@@ -260,8 +309,7 @@ describe('server-only Helixa generation commands', () => {
     const scheduleRoleGuide = vi.fn(async () => undefined);
     const port = createHelixaGenerationNativePort({
       scheduleRoleGuide,
-      loadRoleGuideProof: vi.fn(),
-      scheduleCourse: vi.fn(),
+      scheduleCourseFromRoleGuide: vi.fn(),
       reconcile: vi.fn(async () => 'missing'),
     });
     await port.schedule({
@@ -269,6 +317,7 @@ describe('server-only Helixa generation commands', () => {
       command: parseHelixaGenerationCommand(jobCommand), objectKind: 'ROLE_GUIDE',
       objectId: '33333333-3333-4333-8333-333333333333',
       servicePrincipalUserId: binding.servicePrincipalUserId,
+      leaseToken: '66666666-6666-4666-8666-666666666666', claimGeneration: 1,
       jobInstruction: jobCommand.jobInstruction, selectedSources: jobCommand.selectedSources,
       includeWebResearch: false, includeBusinessContextSources: false,
     });
@@ -285,27 +334,75 @@ describe('server-only Helixa generation commands', () => {
     }));
   });
 
-  it('rejects a stale ROLE_GUIDE proof before native Course mutation', async () => {
-    const scheduleCourse = vi.fn();
+  it('uses one atomic native Course transaction and maps a stale current ROLE_GUIDE before mutation', async () => {
+    const scheduleCourseFromRoleGuide = vi.fn(async () => { throw new Error('ROLE_GUIDE_SOURCE_STALE'); });
     const port = createHelixaGenerationNativePort({
-      scheduleRoleGuide: vi.fn(), scheduleCourse,
-      loadRoleGuideProof: vi.fn(async () => ({
-        id: courseCommand.sourceJobInstruction.id,
-        organizationId: binding.organizationId,
-        status: 'completed' as const,
-        sourceVersion: courseCommand.sourceJobInstruction.sourceVersion,
-        contentHash: 'c'.repeat(64),
-      })),
+      scheduleRoleGuide: vi.fn(), scheduleCourseFromRoleGuide,
       reconcile: vi.fn(async () => 'missing'),
+      observe: vi.fn(async () => 'running'),
     });
     await expect(port.schedule({
       binding: { ...binding, principal: { existsInAuth: true, existsInPublic: true, organizationId: binding.organizationId, role: 'admin', kind: 'service_principal', interactiveLoginAllowed: false } },
       command: parseHelixaGenerationCommand(courseCommand), objectKind: 'COURSE',
       objectId: '44444444-4444-4444-8444-444444444444', servicePrincipalUserId: binding.servicePrincipalUserId,
+      leaseToken: '66666666-6666-4666-8666-666666666666', claimGeneration: 1,
       course: courseCommand.course, sourceJobInstruction: courseCommand.sourceJobInstruction,
       includeWebResearch: false, includeBusinessContextSources: false,
     })).rejects.toThrow(/source stale/i);
-    expect(scheduleCourse).not.toHaveBeenCalled();
+    expect(scheduleCourseFromRoleGuide).toHaveBeenCalledOnce();
+    expect(scheduleCourseFromRoleGuide).toHaveBeenCalledWith(expect.objectContaining({
+      courseId: '44444444-4444-4444-8444-444444444444',
+      sourceJobInstruction: courseCommand.sourceJobInstruction,
+      originBindingId: binding.bindingId,
+      originCommandId: courseCommand.commandId,
+    }));
+  });
+
+  it('observes a fenced scheduled terminal failure without replaying native mutation', async () => {
+    const schedule = vi.fn();
+    const repository = scheduledObserverRepository(2);
+    const result = await observeHelixaScheduledGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, commandId: courseCommand.commandId,
+      mode: 'fake', authority: authority(), repository: repository as never,
+      nativePort: { schedule, observe: vi.fn(async () => ({ kind: 'failed' as const })) },
+    });
+    expect(result).toBe('action_required');
+    expect(repository.failObserved).toHaveBeenCalledWith(expect.objectContaining({ claimGeneration: 2 }));
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('returns native success to scheduled while waiting for signed completion proof', async () => {
+    const repository = scheduledObserverRepository(3);
+    const result = await observeHelixaScheduledGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, commandId: courseCommand.commandId,
+      mode: 'fake', authority: authority(), repository: repository as never,
+      nativePort: { schedule: vi.fn(), observe: vi.fn(async () => 'succeeded_awaiting_signed_import' as const) },
+    });
+    expect(result).toBe('scheduled');
+    expect(repository.returnScheduled).toHaveBeenCalledOnce();
+    expect(repository.reconcileCompleted).not.toHaveBeenCalled();
+  });
+
+  it('leaves a lost observer response fenced and reconciles on lease takeover without scheduling again', async () => {
+    const first = scheduledObserverRepository(4);
+    const schedule = vi.fn();
+    await expect(observeHelixaScheduledGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, commandId: courseCommand.commandId,
+      mode: 'fake', authority: authority(), repository: first as never,
+      nativePort: { schedule, observe: vi.fn(async () => { throw new Error('observer response lost'); }) },
+    })).rejects.toThrow(/response lost/i);
+    expect(first.returnScheduled).not.toHaveBeenCalled();
+    expect(first.failObserved).not.toHaveBeenCalled();
+
+    const takeover = scheduledObserverRepository(5);
+    const result = await observeHelixaScheduledGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, commandId: courseCommand.commandId,
+      mode: 'fake', authority: authority(), repository: takeover as never,
+      nativePort: { schedule, observe: vi.fn(async () => ({ kind: 'completed' as const, nativeCompletedAt: '2026-08-23T10:30:00.000Z', outboxEventId: 'mc2:COURSE:event' })) },
+    });
+    expect(result).toBe('native_completed');
+    expect(takeover.completeObserved).toHaveBeenCalledOnce();
+    expect(schedule).not.toHaveBeenCalled();
   });
 
   it('preserves an ambiguous lost response for takeover reconciliation without a second native mutation', async () => {
