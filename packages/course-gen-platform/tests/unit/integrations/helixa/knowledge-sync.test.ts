@@ -333,6 +333,8 @@ describe('delivery and durable intent', () => {
     expect(sql).toContain('destination_binding_id');
     expect(sql).toContain('claim_generation');
     expect(sql).toContain('lease_token');
+    expect(sql).toContain('attempts = item.attempts + 1');
+    expect(sql).toContain('claim_generation = item.claim_generation + 1');
     expect(sql).toContain('WHERE item.binding_id = p_binding_id');
     expect(sql).toContain("status = 'processing' AND lease_token = p_lease_token");
     expect(sql).toContain('reset_helixa_knowledge_sync_intent');

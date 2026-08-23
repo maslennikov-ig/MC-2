@@ -100,8 +100,8 @@ BEGIN
     FOR UPDATE SKIP LOCKED LIMIT LEAST(GREATEST(p_batch_size, 1), 100)
   )
   UPDATE helixa_knowledge_sync_outbox item
-  SET status = 'processing', attempts = attempts + 1,
-      claim_generation = claim_generation + 1, lease_token = gen_random_uuid(),
+  SET status = 'processing', attempts = item.attempts + 1,
+      claim_generation = item.claim_generation + 1, lease_token = gen_random_uuid(),
       last_attempt_at = NOW(), updated_at = NOW()
   FROM claimed WHERE item.id = claimed.id
   RETURNING item.id, item.event_id, item.object_kind, item.object_id, item.organization_id,
