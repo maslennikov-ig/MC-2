@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   executeHelixaCourseCreationCommand,
   createInMemoryFakeHelixaCourseCreationPort,
+  createPostgresHelixaCourseCreationRepository,
+  readHelixaCourseCreationMode,
   parseHelixaCourseCreationCommand,
   type HelixaCourseCreationRepository,
 } from '@/integrations/helixa/course-creation';
@@ -57,6 +59,76 @@ function repository(): HelixaCourseCreationRepository {
 }
 
 describe('Helixa fake course creation command', () => {
+  it('allows only the exact fake runtime mode', () => {
+    expect(readHelixaCourseCreationMode({})).toBe('disabled');
+    expect(readHelixaCourseCreationMode({ HELIXA_MEGACAMPUS_COURSE_CREATION_MODE: 'fake' })).toBe(
+      'fake'
+    );
+    expect(() =>
+      readHelixaCourseCreationMode({ HELIXA_MEGACAMPUS_COURSE_CREATION_MODE: 'FAKE' })
+    ).toThrow(/mode/i);
+  });
+
+  it('closes Postgres RPC authority over the server binding and maps replay/conflict', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: [
+          {
+            command_id: 'command-1',
+            payload_hash: 'a'.repeat(64),
+            course_id: 'course-1',
+            status: 'completed',
+            conflict: false,
+          },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            command_id: 'command-1',
+            payload_hash: 'a'.repeat(64),
+            course_id: 'course-1',
+            status: 'pending',
+            conflict: true,
+          },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: false, error: null });
+    const durable = createPostgresHelixaCourseCreationRepository({ rpc } as never, {
+      bindingId: 'binding-1',
+      organizationId: 'mc2-org',
+      environment: 'test',
+      destinationBindingId: 'destination-1',
+    });
+    const replay = await durable.reserve({
+      command: parseHelixaCourseCreationCommand(command),
+      payloadHash: 'a'.repeat(64),
+      bindingId: 'ignored',
+      organizationId: 'ignored',
+      destinationBindingId: 'ignored',
+    });
+    const conflict = await durable.reserve({
+      command: parseHelixaCourseCreationCommand(command),
+      payloadHash: 'b'.repeat(64),
+      bindingId: 'ignored',
+      organizationId: 'ignored',
+      destinationBindingId: 'ignored',
+    });
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({
+      p_binding_id: 'binding-1',
+      p_organization_id: 'mc2-org',
+      p_environment: 'test',
+      p_destination_binding_id: 'destination-1',
+    });
+    expect(replay).toMatchObject({ status: 'completed', receipt: { courseId: 'course-1' } });
+    expect(conflict).toEqual({ kind: 'conflict' });
+    await expect(
+      durable.complete({ commandId: 'command-1', courseId: 'other-course' })
+    ).resolves.toBeNull();
+  });
   it('rejects unknown fields and raw source material', () => {
     expect(() =>
       parseHelixaCourseCreationCommand({ ...command, organizationId: 'caller-owned' })
@@ -76,8 +148,9 @@ describe('Helixa fake course creation command', () => {
       mode: 'fake' as const,
       binding: {
         bindingId: 'binding-1',
-        externalOrganizationId: 'helixa-org',
-        externalProjectId: 'helixa-project',
+        organizationId: 'mc2-org',
+        environment: 'test',
+        destinationBindingId: 'destination-1',
       },
     };
 
@@ -120,8 +193,9 @@ describe('Helixa fake course creation command', () => {
           mode: 'disabled',
           binding: {
             bindingId: 'binding-1',
-            externalOrganizationId: 'helixa-org',
-            externalProjectId: 'helixa-project',
+            organizationId: 'mc2-org',
+            environment: 'test',
+            destinationBindingId: 'destination-1',
           },
         },
         repository: repository(),
@@ -140,8 +214,9 @@ describe('Helixa fake course creation command', () => {
         command,
         binding: {
           bindingId: 'binding-1',
-          externalOrganizationId: 'helixa-org',
-          externalProjectId: 'helixa-project',
+          organizationId: 'mc2-org',
+          environment: 'test',
+          destinationBindingId: 'destination-1',
         },
       }),
       port.create({
@@ -149,8 +224,9 @@ describe('Helixa fake course creation command', () => {
         command,
         binding: {
           bindingId: 'binding-1',
-          externalOrganizationId: 'helixa-org',
-          externalProjectId: 'helixa-project',
+          organizationId: 'mc2-org',
+          environment: 'test',
+          destinationBindingId: 'destination-1',
         },
       }),
     ]);

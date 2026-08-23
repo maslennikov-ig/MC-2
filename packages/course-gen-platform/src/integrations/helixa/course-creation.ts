@@ -115,13 +115,121 @@ export function createInMemoryFakeHelixaCourseCreationPort(options: {
 
 export interface HelixaCourseCreationBinding {
   bindingId: string;
-  externalOrganizationId: string;
-  externalProjectId: string;
+  organizationId: string;
+  environment: string;
+  destinationBindingId: string;
 }
 
 export interface HelixaCourseCreationComposition {
   mode: 'disabled' | 'fake';
   binding: HelixaCourseCreationBinding;
+}
+
+export function readHelixaCourseCreationMode(
+  environment: NodeJS.ProcessEnv = process.env
+): 'disabled' | 'fake' {
+  const value = environment.HELIXA_MEGACAMPUS_COURSE_CREATION_MODE;
+  if (value === undefined || value === '' || value === 'disabled') return 'disabled';
+  if (value === 'fake') return 'fake';
+  throw new Error('Invalid Helixa course creation mode');
+}
+
+interface CourseCreationRpcClient {
+  rpc<T>(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ data: T | null; error: { message: string } | null }>;
+}
+
+type CourseCommandRow = {
+  command_id: string;
+  payload_hash: string;
+  course_id: string;
+  status: 'pending' | 'completed' | 'action_required';
+  conflict: boolean;
+};
+
+export function createPostgresHelixaCourseCreationRepository(
+  client: CourseCreationRpcClient,
+  binding: HelixaCourseCreationBinding
+): HelixaCourseCreationRepository {
+  return {
+    async reserve(input) {
+      const result = await client.rpc<CourseCommandRow[]>(
+        'reserve_helixa_course_creation_command',
+        {
+          p_binding_id: binding.bindingId,
+          p_organization_id: binding.organizationId,
+          p_environment: binding.environment,
+          p_destination_binding_id: binding.destinationBindingId,
+          p_command_id: input.command.commandId,
+          p_proposal_id: input.command.proposalId,
+          p_approved_revision: input.command.approvedRevision,
+          p_payload_hash: input.payloadHash,
+        }
+      );
+      if (result.error || !result.data?.[0])
+        throw new Error('Failed to reserve Helixa course creation command');
+      const row = result.data[0];
+      if (row.conflict) return { kind: 'conflict' };
+      return {
+        kind: 'reserved',
+        payloadHash: row.payload_hash,
+        courseId: row.course_id,
+        status: row.status,
+        ...(row.status === 'completed'
+          ? {
+              receipt: {
+                commandId: row.command_id,
+                courseId: row.course_id,
+                status: 'completed' as const,
+              },
+            }
+          : {}),
+      };
+    },
+    async complete(input) {
+      const result = await client.rpc<boolean>('complete_helixa_course_creation_command', {
+        p_binding_id: binding.bindingId,
+        p_command_id: input.commandId,
+        p_course_id: input.courseId,
+      });
+      if (result.error || result.data !== true) return null;
+      return { commandId: input.commandId, courseId: input.courseId, status: 'completed' };
+    },
+    async actionRequired(input) {
+      const result = await client.rpc<boolean>('action_required_helixa_course_creation_command', {
+        p_binding_id: binding.bindingId,
+        p_command_id: input.commandId,
+        p_course_id: input.courseId,
+        p_safe_error: input.safeError,
+      });
+      if (result.error || result.data !== true)
+        throw new Error('Failed to record Helixa course creation failure');
+    },
+  };
+}
+
+/** Server composition: the caller supplies only a command; binding authority is closed over here. */
+export function createFakeHelixaCourseCreationComposition(input: {
+  client: CourseCreationRpcClient;
+  binding: HelixaCourseCreationBinding;
+  fakePort: FakeHelixaCourseCreationPort;
+  environment?: NodeJS.ProcessEnv;
+}) {
+  const mode = readHelixaCourseCreationMode(input.environment);
+  const repository = createPostgresHelixaCourseCreationRepository(input.client, input.binding);
+  return {
+    mode,
+    execute(command: unknown) {
+      return executeHelixaCourseCreationCommand({
+        command,
+        composition: { mode, binding: input.binding },
+        repository,
+        fakePort: input.fakePort,
+      });
+    },
+  };
 }
 
 export async function executeHelixaCourseCreationCommand(input: {
