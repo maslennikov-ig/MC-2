@@ -514,6 +514,24 @@ for (const job of ['deploy', 'deploy-dev']) {
     `${job} must refuse a heading-hierarchy value that is not exactly true or false`
   );
 }
+// Every SSH-driven job must survive a silent remote step. `docker compose up`
+// waits on `docling-serve: service_healthy` — a ~330s start_period while the
+// image loads its models — and with no keepalive the session is torn down
+// mid-wait: "client_loop: send disconnect: Broken pipe", exit 255, a whole
+// pipeline spent (run 32659118735, 2026-08-23). The setup step is where this
+// belongs, because the twenty ssh/scp invocations that follow all inherit it.
+for (const [job, expected] of Object.entries(jobs).flatMap(([name, job]) =>
+  (job?.steps ?? []).some(step => step?.run?.includes('ssh-keyscan')) ? [[name, true]] : []
+)) {
+  const setup = (jobs[job]?.steps ?? []).find(step => step?.run?.includes('ssh-keyscan'))?.run ?? '';
+  assert(
+    expected &&
+      setup.includes('ServerAliveInterval 30') &&
+      setup.includes('ServerAliveCountMax 20'),
+    `${job} must configure an SSH keepalive before running deploy commands`
+  );
+}
+
 const infraCompose = readFileSync(resolve(rootDir, 'docker-compose.infra.yml'), 'utf8');
 for (const [name, text] of [
   ['docker-compose.production.yml', productionCompose],
