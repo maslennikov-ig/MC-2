@@ -32,7 +32,7 @@ CREATE TABLE helixa_course_creation_commands (
   ) REFERENCES helixa_knowledge_sync_bindings (
     binding_id, organization_id, environment, destination_binding_id
   ) ON DELETE RESTRICT,
-  UNIQUE (binding_id, command_id),
+  CONSTRAINT helixa_course_creation_commands_binding_command_key UNIQUE (binding_id, command_id),
   UNIQUE (course_id),
   CHECK ((status = 'completed') = (completed_at IS NOT NULL))
 );
@@ -59,9 +59,9 @@ BEGIN
   ) VALUES (
     p_binding_id, p_organization_id, p_environment, p_destination_binding_id, p_command_id,
     p_proposal_id, p_approved_revision, p_payload_hash
-  ) ON CONFLICT (binding_id, command_id) DO NOTHING;
-  SELECT * INTO existing FROM helixa_course_creation_commands
-  WHERE binding_id = p_binding_id AND command_id = p_command_id;
+  ) ON CONFLICT ON CONSTRAINT helixa_course_creation_commands_binding_command_key DO NOTHING;
+  SELECT * INTO existing FROM helixa_course_creation_commands AS command
+  WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id;
   RETURN QUERY SELECT existing.command_id, existing.payload_hash, existing.course_id,
     existing.status, existing.payload_hash <> p_payload_hash;
 END;
@@ -72,10 +72,10 @@ CREATE OR REPLACE FUNCTION complete_helixa_course_creation_command(
 ) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE changed INTEGER;
 BEGIN
-  UPDATE helixa_course_creation_commands
+  UPDATE helixa_course_creation_commands AS command
   SET status = 'completed', completed_at = NOW(), safe_error = NULL, updated_at = NOW()
-  WHERE binding_id = p_binding_id AND command_id = p_command_id
-    AND course_id = p_course_id AND status = 'pending';
+  WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id
+    AND command.course_id = p_course_id AND command.status = 'pending';
   GET DIAGNOSTICS changed = ROW_COUNT;
   RETURN changed = 1;
 END;
@@ -86,10 +86,10 @@ CREATE OR REPLACE FUNCTION action_required_helixa_course_creation_command(
 ) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE changed INTEGER;
 BEGIN
-  UPDATE helixa_course_creation_commands
+  UPDATE helixa_course_creation_commands AS command
   SET status = 'action_required', safe_error = left(COALESCE(p_safe_error, 'Unspecified failure'), 300), updated_at = NOW()
-  WHERE binding_id = p_binding_id AND command_id = p_command_id
-    AND course_id = p_course_id AND status = 'pending';
+  WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id
+    AND command.course_id = p_course_id AND command.status = 'pending';
   GET DIAGNOSTICS changed = ROW_COUNT;
   RETURN changed = 1;
 END;

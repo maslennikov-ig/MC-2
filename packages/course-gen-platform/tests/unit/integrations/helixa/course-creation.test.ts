@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
 
 import {
   executeHelixaCourseCreationCommand,
@@ -59,6 +60,38 @@ function repository(): HelixaCourseCreationRepository {
 }
 
 describe('Helixa fake course creation command', () => {
+  it('uses a named constraint for the SQL reserve conflict target', async () => {
+    const sql = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260823060000_helixa_course_creation_commands.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(sql).toContain(
+      'CONSTRAINT helixa_course_creation_commands_binding_command_key UNIQUE (binding_id, command_id)'
+    );
+    expect(sql).toContain(
+      'ON CONFLICT ON CONSTRAINT helixa_course_creation_commands_binding_command_key DO NOTHING'
+    );
+    expect(sql).not.toContain('ON CONFLICT (binding_id, command_id) DO NOTHING');
+  });
+  it('qualifies command ledger identifiers in every RPC', async () => {
+    const sql = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260823060000_helixa_course_creation_commands.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(sql).toContain(
+      'FROM helixa_course_creation_commands AS command\n  WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id;'
+    );
+    expect(sql.match(/UPDATE helixa_course_creation_commands AS command/g)).toHaveLength(2);
+    expect(
+      sql.match(/WHERE command\.binding_id = p_binding_id AND command\.command_id = p_command_id/g)
+    ).toHaveLength(3);
+  });
   it('allows only the exact fake runtime mode', () => {
     expect(readHelixaCourseCreationMode({})).toBe('disabled');
     expect(readHelixaCourseCreationMode({ HELIXA_MEGACAMPUS_COURSE_CREATION_MODE: 'fake' })).toBe(
