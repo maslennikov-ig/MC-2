@@ -6,6 +6,28 @@ export type KnowledgeEventType = 'COURSE_COMPLETED' | 'COURSE_UPDATED' | 'ROLE_G
 export type ProcessingRoute = 'docling' | 'local_text' | 'content_rss' | 'meetings_media' | 'unsupported';
 export type EvidenceAuthority = 'primary_source' | 'derived_training' | 'derived_role_guide';
 
+export interface GenerationOriginCommandV1 {
+  schemaVersion: 'helixa.megacampus-generation-origin.v1';
+  operation: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE_FROM_JOB_INSTRUCTION';
+  commandId: string;
+  proposalId: string;
+  approvedRevision: number;
+  payloadHash: string;
+}
+
+export interface KnowledgeRelation {
+  relationKey: string;
+  type: string;
+  fromKey: string;
+  toKey: string;
+  metadata?: Record<string, JsonValue>;
+}
+
+export interface CourseFromRoleGuideRelation extends KnowledgeRelation {
+  type: 'COURSE_FROM_ROLE_GUIDE';
+  metadata: { sourceVersion: string; contentHash: string };
+}
+
 export interface EmbeddedArtifact {
   artifactKey: string;
   mediaType: string;
@@ -44,7 +66,8 @@ export interface KnowledgeSyncPackage {
   sourceDocuments: SourceDocument[];
   evidenceSegments: Array<{ segmentKey: string; documentKey: string; artifactKey: string; authority: EvidenceAuthority; text: string; locator: { kind: 'whole_artifact' | 'json_pointer'; pointer?: string } }>;
   candidateClaims: Array<{ claimKey: string; text: string; evidenceRefs: string[]; metadata?: Record<string, JsonValue> }>;
-  relations: Array<{ relationKey: string; type: string; fromKey: string; toKey: string; metadata?: Record<string, JsonValue> }>;
+  relations: KnowledgeRelation[];
   hashes: { payloadHash: string; contentHash: string };
   metadata?: Record<string, JsonValue>;
+  originCommand?: GenerationOriginCommandV1;
 }

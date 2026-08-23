@@ -3,7 +3,7 @@ import { getUploadStorageRootPath } from '@/stages/stage1-document-upload/storag
 
 import type { KnowledgeObjectKind } from './contract';
 import type { KnowledgeSyncOutboxEntry, KnowledgeSyncOutboxRepository } from './outbox';
-import { bindAcceptedCourseSources, mapCompletedCourse, mapCompletedRoleGuide, parseAcceptedCourseSourceManifest } from './snapshot-loader';
+import { bindAcceptedCourseSources, mapCompletedCourse, mapCompletedRoleGuide, parseAcceptedCourseSourceManifest, type CourseJobInstructionSourceRow, type GenerationOriginRow } from './snapshot-loader';
 import { createUploadStorageReader } from './storage-reader';
 import type { CompletedObject, ReconcileRepository } from './reconciler';
 
@@ -70,23 +70,45 @@ export function createKnowledgeSyncOutboxRepository(): KnowledgeSyncOutboxReposi
   };
 }
 
-export async function loadKnowledgeSnapshot(entry: Pick<KnowledgeSyncOutboxEntry, 'objectKind' | 'objectId' | 'organizationId' | 'completedAt'>) {
+export async function loadKnowledgeSnapshot(entry: Pick<KnowledgeSyncOutboxEntry, 'objectKind' | 'objectId' | 'organizationId' | 'completedAt' | 'bindingId'>) {
   const db = client();
   const readBytes = createUploadStorageReader(getUploadStorageRootPath());
+  const originResult = await db.from<GenerationOriginRow>('helixa_generation_commands')
+    .select('binding_id, command_id, command_kind, proposal_id, approved_revision, proposal_payload_hash, object_kind, object_id, organization_id, status')
+    .eq('binding_id', entry.bindingId)
+    .eq('object_kind', entry.objectKind)
+    .eq('object_id', entry.objectId)
+    .eq('organization_id', entry.organizationId)
+    .eq('status', 'native_completed')
+    .maybeSingle();
+  if (originResult.error) throw new Error(`Failed to load Helixa generation origin: ${originResult.error.message}`);
   if (entry.objectKind === 'COURSE') {
     const course = expectData(await db.from('courses').select('id, organization_id, generation_status, generation_completed_at, title, language, course_structure, course_description, slug').eq('id', entry.objectId).eq('organization_id', entry.organizationId).single(), 'Failed to load completed Course');
     const lessons = expectData(await db.from('lesson_contents').select('lesson_id, status, content, metadata').eq('course_id', entry.objectId), 'Failed to load Course lesson content');
     const acceptedRunResult = await db.from<{ source_manifest: Array<{ document_id: string; source_version_hash: string; document_name: string }> }>('document_evidence_runs').select('source_manifest').eq('course_id', entry.objectId).eq('organization_id', entry.organizationId).eq('status', 'accepted').order('completed_at', { ascending: false }).limit(1).maybeSingle();
     if (acceptedRunResult.error) throw new Error(`Failed to load accepted Course provenance: ${acceptedRunResult.error.message}`);
     const manifest = parseAcceptedCourseSourceManifest(acceptedRunResult.data?.source_manifest);
-    const sourceIds = manifest.map(item => item.document_id);
+    const sourceIds = manifest.map((item: { document_id: string }) => item.document_id);
     const files = sourceIds.length === 0 ? [] : expectData(await db.from('file_catalog').select('id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, parsed_content').in('id', sourceIds).eq('organization_id', entry.organizationId).eq('course_id', entry.objectId), 'Failed to load approved Course sources');
     const approvedFiles = bindAcceptedCourseSources(manifest, files as Array<{ id: string; hash: string }>);
-    return mapCompletedCourse({ course: course as never, lessonContents: lessons as never[], files: approvedFiles as never[], readBytes });
+    const relationResult = await db.from<CourseJobInstructionSourceRow>('course_job_instruction_sources')
+      .select('course_id, organization_id, job_instruction_id, source_version, source_content_hash, origin_binding_id, origin_command_id')
+      .eq('course_id', entry.objectId)
+      .eq('organization_id', entry.organizationId)
+      .maybeSingle();
+    if (relationResult.error) throw new Error(`Failed to load Course Job Instruction source: ${relationResult.error.message}`);
+    return mapCompletedCourse({
+      course: course as never,
+      lessonContents: lessons as never[],
+      files: approvedFiles as never[],
+      readBytes,
+      generationOrigin: originResult.data,
+      jobInstructionSource: relationResult.data,
+    });
   }
   const playbook = expectData(await db.from('career_playbooks').select('id, organization_id, status, completed_at, position_title, language, final_markdown, role_profile_spec, generated_blocks').eq('id', entry.objectId).eq('organization_id', entry.organizationId).single(), 'Failed to load completed Role Guide');
   const sources = expectData(await db.from('career_playbook_sources').select('id, playbook_id, organization_id, source_type, status, filename, text, file:file_catalog(id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, parsed_content)').eq('playbook_id', entry.objectId).eq('organization_id', entry.organizationId).eq('status', 'ready'), 'Failed to load Role Guide sources');
-  return mapCompletedRoleGuide({ playbook: playbook as never, sources: sources as never[], readBytes });
+  return mapCompletedRoleGuide({ playbook: playbook as never, sources: sources as never[], readBytes, generationOrigin: originResult.data });
 }
 
 export function createSupabaseReconcileRepository(binding: KnowledgeSyncRuntimeConfig): ReconcileRepository {

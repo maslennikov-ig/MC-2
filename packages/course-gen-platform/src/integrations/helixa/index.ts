@@ -10,4 +10,5 @@ export * from './runtime-repository';
 export * from './service';
 export * from './scheduler';
 export * from './course-creation';
+export * from './generation-commands';
 export * from './errors';

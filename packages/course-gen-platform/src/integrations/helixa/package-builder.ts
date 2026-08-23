@@ -1,5 +1,5 @@
 import { canonicalJson, computePayloadHash, sha256 } from './canonical-json';
-import { KNOWLEDGE_SYNC_SCHEMA_VERSION, type JsonValue, type KnowledgeObjectKind, type KnowledgeSyncPackage, type ProcessingRoute, type SourceDocument } from './contract';
+import { KNOWLEDGE_SYNC_SCHEMA_VERSION, type GenerationOriginCommandV1, type JsonValue, type KnowledgeObjectKind, type KnowledgeRelation, type KnowledgeSyncPackage, type ProcessingRoute, type SourceDocument } from './contract';
 import { KnowledgeSyncPreparationError } from './errors';
 
 export interface ExportSource {
@@ -32,6 +32,8 @@ export interface KnowledgeExportSnapshot {
   blocks: Record<string, JsonValue>[];
   lessons: Record<string, JsonValue>[];
   sources?: ExportSource[];
+  relations?: KnowledgeRelation[];
+  originCommand?: GenerationOriginCommandV1;
 }
 
 export interface PackageBuildOptions { environment: string; externalProjectId: string | null }
@@ -168,8 +170,9 @@ export async function buildKnowledgeSyncPackage(snapshot: KnowledgeExportSnapsho
     producer: { system: 'megacampus' as const, environment: options.environment, organizationId: snapshot.organizationId },
     object: { kind: snapshot.kind, id: snapshot.id, version: new Date(snapshot.completedAt).toISOString(), title: snapshot.title, language: snapshot.language, status: 'completed' as const, ...(snapshot.url ? { url: snapshot.url } : {}) },
     scope: { externalOrganizationId: snapshot.organizationId, externalProjectId: options.externalProjectId, destinationPolicy: 'DEFAULT_ORG_KNOWLEDGE_PROJECT' as const },
-    content, sourceDocuments, evidenceSegments, candidateClaims: [], relations: [],
+    content, sourceDocuments, evidenceSegments, candidateClaims: [], relations: snapshot.relations ?? [],
     hashes: { payloadHash: '', contentHash: sha256(canonicalJson(content)) }, metadata: { routeCounts },
+    ...(snapshot.originCommand ? { originCommand: snapshot.originCommand } : {}),
   } satisfies KnowledgeSyncPackage;
   base.hashes.payloadHash = computePayloadHash(base);
   return base;
