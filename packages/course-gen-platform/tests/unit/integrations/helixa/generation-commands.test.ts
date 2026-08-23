@@ -11,6 +11,7 @@ import {
   createPostgresHelixaNativeReconciler,
   dispatchHelixaGenerationCommand,
   generationCommandHash,
+  lookupHelixaGenerationCommand,
   observeHelixaScheduledGenerationCommand,
   parseHelixaGenerationCommand,
   parseHelixaGenerationLookupQuery,
@@ -182,6 +183,13 @@ describe('server-only Helixa generation commands', () => {
     expect(nativeSql).toContain('INSERT INTO course_job_instruction_sources');
     expect(nativeSql).toContain('INSERT INTO job_outbox');
     expect(nativeSql).toContain('observation_lease_token');
+    const sourceSql = await readFile(
+      new URL('../../../../supabase/migrations/20260823140000_helixa_generation_course_source.sql', import.meta.url),
+      'utf8'
+    );
+    expect(sourceSql).toContain('CREATE TABLE course_job_instruction_native_sources');
+    expect(sourceSql).toContain('INSERT INTO file_catalog');
+    expect(sourceSql).toContain('processed_content');
   });
 
   it('closes binding scope in Postgres adapters and never accepts caller identity', async () => {
@@ -381,6 +389,61 @@ describe('server-only Helixa generation commands', () => {
     expect(result).toBe('scheduled');
     expect(repository.returnScheduled).toHaveBeenCalledOnce();
     expect(repository.reconcileCompleted).not.toHaveBeenCalled();
+  });
+
+  it('runs fenced native failure observation through the server lookup entrypoint', async () => {
+    const repository = scheduledObserverRepository(6);
+    repository.lookup
+      .mockResolvedValueOnce({
+        ...(await repository.claimScheduled()), status: 'scheduled', leaseToken: null,
+      })
+      .mockResolvedValueOnce({
+        ...(await repository.claimScheduled()), status: 'action_required', leaseToken: null,
+        safeErrorCode: 'megacampus_generation_native_failed',
+      });
+    repository.claimScheduled.mockClear();
+    const result = await lookupHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId },
+      query: { schemaVersion: 'helixa.megacampus-generation-lookup.v1', commandId: courseCommand.commandId, payloadHash: courseCommand.payloadHash },
+      mode: 'fake', authority: authority(), repository: repository as never,
+      nativePort: { schedule: vi.fn(), observe: vi.fn(async () => ({ kind: 'failed' as const })) },
+    });
+    expect(result).toMatchObject({ state: 'action_required', error: { code: 'megacampus_generation_native_failed' } });
+    expect(repository.failObserved).toHaveBeenCalledOnce();
+  });
+
+  it('keeps lookup scheduled when native succeeded but signed import proof is absent', async () => {
+    const repository = scheduledObserverRepository(7);
+    const scheduled = { ...(await repository.claimScheduled()), status: 'scheduled' as const, leaseToken: null };
+    repository.claimScheduled.mockClear();
+    repository.lookup.mockResolvedValue(scheduled);
+    const result = await lookupHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId },
+      query: { schemaVersion: 'helixa.megacampus-generation-lookup.v1', commandId: courseCommand.commandId, payloadHash: courseCommand.payloadHash },
+      mode: 'fake', authority: authority(), repository: repository as never,
+      nativePort: { schedule: vi.fn(), observe: vi.fn(async () => 'succeeded_awaiting_signed_import' as const) },
+    });
+    expect(result).toMatchObject({ state: 'scheduled' });
+    expect(repository.returnScheduled).toHaveBeenCalledOnce();
+  });
+
+  it('observes through lookup with the in-memory contract repository used by cross-repository proof', async () => {
+    const repository = createInMemoryHelixaGenerationRepository({
+      objectId: () => '44444444-4444-4444-8444-444444444444',
+      now: () => new Date('2026-08-23T10:20:00.000Z'),
+    });
+    await dispatchHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, command: courseCommand,
+      mode: 'fake', authority: authority(), repository,
+      nativePort: { schedule: vi.fn(async input => ({ objectId: input.objectId })) },
+    });
+    const result = await lookupHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId },
+      query: { schemaVersion: 'helixa.megacampus-generation-lookup.v1', commandId: courseCommand.commandId, payloadHash: courseCommand.payloadHash },
+      mode: 'fake', authority: authority(), repository,
+      nativePort: { schedule: vi.fn(), observe: vi.fn(async () => ({ kind: 'failed' as const })) },
+    });
+    expect(result).toMatchObject({ state: 'action_required', error: { code: 'megacampus_generation_native_failed' } });
   });
 
   it('leaves a lost observer response fenced and reconciles on lease takeover without scheduling again', async () => {

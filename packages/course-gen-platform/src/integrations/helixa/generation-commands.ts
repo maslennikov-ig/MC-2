@@ -571,8 +571,52 @@ export function createInMemoryHelixaGenerationRepository(options: { objectId?: (
       const row = rows.get(key(bindingId, commandId));
       return row ? { ...row } : null;
     },
-    claimScheduled() { return Promise.resolve(null); },
-    returnScheduled() { return Promise.resolve(false); },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async claimScheduled(input) {
+      const row = rows.get(key(input.bindingId, input.commandId));
+      if (!row || row.status !== 'scheduled' || row.leaseToken !== null) return null;
+      Object.assign(row, {
+        claimGeneration: row.claimGeneration + 1,
+        leaseToken: randomUUID(),
+        updatedAt: now().toISOString(),
+      });
+      return { ...row };
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async returnScheduled(input) {
+      const row = rows.get(key(input.bindingId, input.commandId));
+      if (!row || row.status !== 'scheduled' || row.objectId !== input.objectId
+        || row.leaseToken !== input.leaseToken || row.claimGeneration !== input.claimGeneration) return false;
+      Object.assign(row, { leaseToken: null, updatedAt: now().toISOString() });
+      return true;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async failObserved(input) {
+      const row = rows.get(key(input.bindingId, input.commandId));
+      if (!row || row.status !== 'scheduled' || row.objectId !== input.objectId
+        || row.leaseToken !== input.leaseToken || row.claimGeneration !== input.claimGeneration) return false;
+      Object.assign(row, {
+        status: 'action_required' as const,
+        safeErrorCode: 'megacampus_generation_native_failed',
+        leaseToken: null,
+        updatedAt: now().toISOString(),
+      });
+      return true;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async completeObserved(input) {
+      const row = rows.get(key(input.bindingId, input.commandId));
+      if (!row || row.status !== 'scheduled' || row.objectId !== input.objectId
+        || row.leaseToken !== input.leaseToken || row.claimGeneration !== input.claimGeneration) return false;
+      Object.assign(row, {
+        status: 'native_completed' as const,
+        nativeCompletedAt: input.nativeCompletedAt,
+        outboxEventId: input.outboxEventId,
+        leaseToken: null,
+        updatedAt: now().toISOString(),
+      });
+      return true;
+    },
   };
 }
 
@@ -681,13 +725,14 @@ export async function lookupHelixaGenerationCommand(input: {
   mode: 'disabled' | 'fake';
   authority: HelixaGenerationBindingAuthority;
   repository: HelixaGenerationRepository;
+  nativePort: HelixaGenerationNativePort;
 }) {
   if (input.mode !== 'fake') throw new Error('MegaCampus generation is disabled');
   const query = parseHelixaGenerationLookupQuery(input.query);
   const binding = await input.authority.resolve(input.bindingLocator.bindingId);
   assertPrincipalBinding(binding);
   if (binding.bindingId !== input.bindingLocator.bindingId) throw new Error('MegaCampus generation binding unavailable');
-  const row = await input.repository.lookup(binding.bindingId, query.commandId);
+  let row = await input.repository.lookup(binding.bindingId, query.commandId);
   const common = {
     schemaVersion: 'helixa.megacampus-generation-result.v1' as const,
     commandId: query.commandId, payloadHash: query.payloadHash,
@@ -697,6 +742,18 @@ export async function lookupHelixaGenerationCommand(input: {
     ...common, state: 'conflict' as const,
     error: { code: 'megacampus_generation_command_conflict' as const, retryable: false as const },
   };
+  if (row.status === 'scheduled') {
+    await observeHelixaScheduledGenerationCommand({
+      bindingLocator: input.bindingLocator,
+      commandId: query.commandId,
+      mode: input.mode,
+      authority: input.authority,
+      repository: input.repository,
+      nativePort: input.nativePort,
+    });
+    row = await input.repository.lookup(binding.bindingId, query.commandId);
+    if (!row) throw new Error('MegaCampus generation command disappeared during observation');
+  }
   if (row.status === 'native_completed') return nativeCompleted(row);
   if (row.status === 'action_required') return {
     ...common, operation: row.operation, state: 'action_required' as const,
