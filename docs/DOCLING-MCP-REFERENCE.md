@@ -6,9 +6,9 @@
 Backend workers
   -> http://docling-mcp:8000/mcp
   -> nginx facade
-  -> Docling MCP 3.0.0
+  -> Docling MCP 3.1.0
   -> http://docling-serve:5001
-  -> Docling Serve 1.29.0 / Docling 2.118.0 / Core 2.90.0
+  -> Docling Serve 1.31.0 / Docling 2.121.0 / Core 2.92.0
 ```
 
 `docling-serve` has no published host port. The stable application endpoint is
@@ -47,7 +47,7 @@ and `.md` artifacts.
 | MCP                 |      0.5 CPU / 512 MiB |
 
 OCR and table structure are enabled, image scale is 2.0, and local fallback is
-disabled. MCP 3.0.0 does not forward the Serve OCR preset/language fields, so
+disabled. MCP 3.1.0 does not forward the Serve OCR preset/language fields, so
 the thin runtime wrapper supplies `ocr_preset=easyocr` and
 `ocr_lang=[ru,en]`. Both EasyOCR language models are downloaded while building
 the Serve image. `force_ocr` remains disabled so PDFs with an existing text
@@ -109,14 +109,23 @@ so the upstream fix is strictly better and the wrapper is gone. The Dockerfile
 now asserts at build time that the passthrough is still there; a base image that
 regressed would fail the build rather than quietly ignore the request again.
 
-One wrapper remains, and it is NOT removable yet:
-`docling_mcp.docling_cache.get_cache_key` hashes only the source string and the
-OCR flags, so two conversions of the same source with different pipeline options
-share a cache entry. `docker/docling-mcp/runtime.py` folds the conversion
-profile into the key, which makes any profile change a cache miss and a
-reconversion rather than a stale artifact. `docling-mcp` has published nothing
-since 3.0.0; the same wrapper also supplies `service_timeout` and
-`service_max_retries`, which MCP 3.0.0 declares and never passes on.
+Most of the cache-key wrapper went the same way in `docling-mcp` 3.1.0. Until
+then `get_cache_key` hashed only the source string and the OCR flags, so two
+conversions of one file under different pipeline options shared an entry and the
+second was served the first one's artifact. 3.1.0 keys a local file by its
+content digest rather than its path, folds in every setting of its own model bar
+an explicit not-output-relevant list, and stamps the installed package versions.
+On the production corpus that digest keying is worth something concrete: of 108
+convertible uploads measured on 2026-08-23, 39 are byte-identical copies of
+another, and they now share one conversion instead of paying for it each.
+
+What upstream still cannot see is the three options `runtime.py` forces onto
+`ConvertDocumentsOptions` — `ocr_preset`, `ocr_lang` and
+`do_pdf_heading_hierarchy` — because they are not docling-mcp settings, so
+flipping `DOCLING_MCP_PDF_HEADING_HIERARCHY` would otherwise leave the key
+unchanged and serve the artifact produced without it. That much of the wrapper
+stays, along with `service_timeout` and `service_max_retries`, which MCP 3.1.0
+still declares and never passes on (mc2-vlskb).
 
 Measured effect on `numbered-sections.pdf`: without inference the Markdown has
 one distinct heading level (`##` only); with it, two (`##` and `###`), and

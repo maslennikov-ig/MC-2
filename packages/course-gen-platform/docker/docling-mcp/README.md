@@ -3,9 +3,9 @@
 MegaCampus runs document conversion as two independently versioned services:
 
 ```text
-workers -> nginx :8000/mcp -> Docling MCP 3.1.0 -> Docling Serve 1.29.0
-                                                    Docling 2.118.0
-                                                    Core 2.90.0
+workers -> nginx :8000/mcp -> Docling MCP 3.1.0 -> Docling Serve 1.31.0
+                                                    Docling 2.121.0
+                                                    Core 2.92.0
 ```
 
 The MCP image is a thin remote client. It contains no conversion models and
@@ -28,8 +28,8 @@ The shared cache is `.tmp/docling-cache/` on the host and
 
 - `docling-mcp==3.1.0`
 - `mcp[cli]==2.0.0`
-- `docling-slim[service-client]==2.118.0`
-- `docling-core==2.90.0`
+- `docling-slim[service-client]==2.121.0`
+- `docling-core==2.92.0`
 
 `requirements.lock` is hash-locked. The small `runtime.py` wrapper maps the
 timeout/retry settings declared by Docling MCP into `DoclingServiceClient`;

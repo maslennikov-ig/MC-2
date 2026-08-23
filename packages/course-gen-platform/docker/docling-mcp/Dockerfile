@@ -2,7 +2,7 @@
 FROM python:3.12-slim@sha256:9e869b0816f5537709825b49e62dc86d1c2691eff19b05c1d4dc3a07992cc052
 
 LABEL org.opencontainers.image.title="MegaCampus Docling MCP"
-LABEL org.opencontainers.image.version="3.1.0-docling-2.118.0"
+LABEL org.opencontainers.image.version="3.1.0-docling-2.121.0"
 LABEL org.opencontainers.image.source="https://github.com/maslennikov-ig/mc-2"
 
 ENV PYTHONUNBUFFERED=1 \
@@ -25,7 +25,7 @@ WORKDIR /app
 COPY requirements.lock /tmp/requirements.lock
 RUN python -m pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
     && python -m pip check \
-    && python -c "import importlib.metadata as m; assert m.version('docling-mcp') == '3.1.0'; assert m.version('mcp') == '2.0.0'; assert m.version('docling-slim') == '2.118.0'; assert m.version('docling-core') == '2.90.0'" \
+    && python -c "import importlib.metadata as m; assert m.version('docling-mcp') == '3.1.0'; assert m.version('mcp') == '2.0.0'; assert m.version('docling-slim') == '2.121.0'; assert m.version('docling-core') == '2.92.0'" \
     && rm /tmp/requirements.lock \
     && groupadd --gid 1001 app \
     && useradd --uid 1001 --gid 1001 --create-home app \

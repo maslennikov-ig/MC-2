@@ -1,6 +1,12 @@
 # Direct runtime contract. Transitive versions and hashes are generated into
 # requirements.lock with the command recorded in that file's header.
+#
+# `docling-mcp 3.1.0` asks for `docling-slim[service-client]~=2.92`, so the
+# engine version here is ours to choose; it is pinned to the same 2.121.0 /
+# 2.92.0 pair the Serve image carries. Two conversion engines in one stack that
+# disagree on their core would produce documents this repository has no way to
+# tell apart.
 docling-mcp==3.1.0
-docling-slim[service-client]==2.118.0
-docling-core==2.90.0
+docling-slim[service-client]==2.121.0
+docling-core==2.92.0
 mcp[cli]==2.0.0

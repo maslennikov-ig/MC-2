@@ -20,12 +20,12 @@ jobs:
             registry_image: docling-serve
             dockerfile: packages/course-gen-platform/docker/docling-serve/Dockerfile
             context: packages/course-gen-platform/docker/docling-serve
-            version: 1.30.0-docling-2.118.0
+            version: 1.31.0-docling-2.121.0
           - image: docling-mcp
             registry_image: docling-mcp-v3
             dockerfile: packages/course-gen-platform/docker/docling-mcp/Dockerfile
             context: packages/course-gen-platform/docker/docling-mcp
-            version: 3.1.0-docling-2.118.0
+            version: 3.1.0-docling-2.121.0
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v4
