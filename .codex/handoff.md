@@ -210,13 +210,15 @@ run measures it by itself).
 
 **Answered 2026-08-22.** `mc2-dgw4u` — Stage 7 audio stays on its own OpenAI account, **paused, not
 settled**: a reconciliation must keep saying "the OpenRouter spend is accounted for", not "the run
-is". `mc2-b7olk.4` — document-evidence money belongs in the course total; delivered and accepted
-live. Migrations approved when necessary, useful and current, one at a time. `mc2-hqfc3` video stays
-parked.
+is". `mc2-b7olk.4` — delivered and accepted live. Migrations approved when necessary, useful and
+current, one at a time. `mc2-hqfc3` video stays parked.
 
-**Answered 2026-08-23, all three delivered:** `stage_5_escalation` joins the Stage 5 chain
-(`mc2-9yrgb`); course edits count inside the course total (`mc2-b7olk.5`); the playbook model is
-decided by measurement, not analogy (`mc2-gg65o`) — see Routing.
+**Answered 2026-08-23, all delivered:** `stage_5_escalation` joins the Stage 5 chain (`mc2-9yrgb`);
+course edits count inside the course total (`mc2-b7olk.5`); the playbook model is decided by
+measurement (`mc2-gg65o`) — see Routing; the 14 `course_override` rows are **deleted**, both courses
+follow global policy, contents preserved in `mc2-sjwm0` (closed).
+
+**Answered 2026-08-23, shaping the next session:** cookies are **not** updated, so no live NLM proof is in scope; `mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own `generation_id`s, not by a second key; the job-description rework (plan 4.5) **stays parked**.
 
 **Still open:** `mc2-v6fqp` — which third language. "ru and en" stays the test language.
 
@@ -273,24 +275,20 @@ never lower the number.
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`mc2-51epl`** — phase 2 of `docs/plans/brawny-mellow-quokka.md`, the only phase of
-that plan left substantially undone. Two of its eight warnings are fixed (`a0a941dfc`): "Orphaned job
-detected" fired on every fresh course — 425 rows in `system_metrics`, the second most frequent event
-in that table — and the Docling chunking warning fired at warn on `.md` uploads Docling never
-converts. Warning 1 was already repaired on 2026-08-22 by `cd9b60138`; whether it now RUNS is a
-question for a log. Warnings 2, 3, 5, 6 and 8 are untouched. Recommended action: diagnose those from
-the code as 4 and 7 were, then meet the acceptance the phase states — one paid run whose log carries
-none of the eight lines without an explanation of why it is legitimate. Budget it against your OWN
-generation ids, not the credit delta. Use $orchestrator-stage for an epic.
+Next stage id: **`mc2-51epl`** — phase 2 of `docs/plans/brawny-mellow-quokka.md`, the only phase left
+substantially undone. Two of its eight warnings are fixed (`a0a941dfc`): "Orphaned job detected"
+fired on every fresh course (425 rows in `system_metrics`) and the Docling chunking warning fired at
+warn on `.md` uploads Docling never converts. Warning 1 was repaired 2026-08-22 by `cd9b60138`;
+whether it now RUNS is a question for a log. Warnings 2, 3, 5, 6, 8 untouched. Recommended action:
+diagnose those from the code as 4 and 7 were, then meet the stated acceptance — one paid run whose
+log carries none of the eight lines without an explanation of why it is legitimate. Budget against
+your OWN generation ids. Use $orchestrator-stage for an epic.
 
-Also open: `mc2-avjau` (DeepSeek never returns on `group_6`), `mc2-yson0`, `mc2-sjwm0` (8
-`course_override` rows differ from global on budgets with no recorded reason), `mc2-ipc80` — three
+Also open: `mc2-avjau` (DeepSeek never returns on `group_6`), `mc2-yson0`, `mc2-ipc80` — three
 course-delete paths, and the DELETE on `app/api/courses/[orgSlug]/[courseSlug]/route.ts` never cleans
 Qdrant, Redis or files at all, which is the reported symptom; located, not fixed. `mc2-ibzcc`'s
-upstream gate has **opened**: docling-mcp 3.1.0 (2026-08-14) fixes the cache key its wrapper exists
-for, the timeout half is still unfixed, and the pin bump is an owner call on a production image.
-`mc2-8m90f` moved without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none
-on the six affected courses.
+upstream gate has **opened**: docling-mcp 3.1.0 (2026-08-14) fixes the cache key its wrapper exists for; the timeout half is unfixed and the pin bump is an owner call on a production image.
+`mc2-8m90f` moved without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none on the six affected courses.
 
 ## Starter prompt for next orchestrator
 
