@@ -129,7 +129,38 @@ still declares and never passes on (mc2-vlskb).
 
 Measured effect on `numbered-sections.pdf`: without inference the Markdown has
 one distinct heading level (`##` only); with it, two (`##` and `###`), and
-`1.1./1.2.` become level-2 section headers.
+`1.1./1.2.` become level-2 section headers. Re-measured on 2026-08-23 against
+Serve 1.31.0 / Docling 2.121.0: unchanged — expected levels `[2]` without the
+flag and `[2, 3]` with it, counted as DISTINCT levels rather than `#` depth.
+
+## What the 1.31.0 set changed, measured
+
+The whole corpus was converted on both stacks on 2026-08-23, one case per
+process, free channel only (no `--dense`). All 18 cases passed on both and no
+structural assertion moved. Three differences are real and each has a cause:
+
+- **docx content controls.** Docling 2.121.0 descends into a `w:sdt` that holds
+  a drawing; 2.118.0 kept the image placeholder and dropped the text beside it.
+  The corpus could not see this — no fixture had the construct — so
+  `content-control-image.docx` was added and measured directly: 194 characters
+  of Markdown without the caption on the old engine, 271 with it on the new one.
+  docx is more than half of what production uploads.
+- **Chunk context grew.** On the 20-page scientific PDF the number of chunks
+  containing a question's ground-truth tokens rose from 8-9 to 27-40 with the
+  chunk count unchanged, because core 2.92.0 carries content layers into the
+  chunk's contextualised text (#593). `recallAtK` therefore falls while nothing
+  about the answer does: atom coverage, aMRR, aDCG and `firstRelevantRank` are
+  identical on both stacks. This is the reason `R@5` is documented as a
+  description and not a gate.
+- **Russian OCR did not move.** The scored OCR files are byte-identical across
+  the two stacks on all three cases — mean phrase similarity, table cell
+  accuracy and homoglyph counts alike.
+
+One local observation that is NOT a claim about production: converting the
+20-page scientific PDF inside one long-running process was OOM-killed at the
+production 4 GiB envelope and again at 12 GiB on a machine holding 17 of 30 GB
+elsewhere. Converted on its own it completes. Worth re-checking on the host
+before assuming the envelope is untouched.
 
 ## Rollout gate
 
@@ -363,7 +394,9 @@ widens by editing that list and not by upgrading Docling.
 ### What each family actually keeps
 
 Measured 2026-08-07 against Docling 2.118.0 / Serve 1.29.0, not read from
-documentation:
+documentation. Re-checked on 2026-08-23 against Docling 2.121.0 / Serve 1.31.0:
+every one of these seven families produced byte-identical Markdown and the same
+structural assertions on both stacks, so the table stands as written.
 
 | family | structure that survives                                                          | provenance     |
 | ------ | -------------------------------------------------------------------------------- | -------------- |
