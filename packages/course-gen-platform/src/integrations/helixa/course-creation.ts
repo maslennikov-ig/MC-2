@@ -11,8 +11,8 @@ export const HelixaCourseCreationCommandSchema = z
     approvedRevision: z.number().int().positive(),
     course: z
       .object({
-        title: z.string().trim().min(1).max(200),
-        brief: z.string().trim().min(1).max(7000),
+        title: z.string().trim().min(1).max(1000),
+        brief: z.string().trim().min(1).max(8000),
         language: z.enum(['ru', 'en']),
       })
       .strict(),
@@ -26,7 +26,8 @@ export const HelixaCourseCreationCommandSchema = z
           })
           .strict()
       )
-      .max(50),
+      .min(1)
+      .max(64),
   })
   .strict();
 

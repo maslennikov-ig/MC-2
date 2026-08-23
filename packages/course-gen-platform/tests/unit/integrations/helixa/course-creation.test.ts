@@ -141,6 +141,16 @@ describe('Helixa fake course creation command', () => {
     ).toThrow(/unrecognized/i);
   });
 
+  it('accepts Helixa maximum title/brief and requires at least one source', () => {
+    expect(
+      parseHelixaCourseCreationCommand({
+        ...command,
+        course: { title: 't'.repeat(1000), brief: 'b'.repeat(8000), language: 'en' },
+      })
+    ).toMatchObject({ course: { title: 't'.repeat(1000), brief: 'b'.repeat(8000) } });
+    expect(() => parseHelixaCourseCreationCommand({ ...command, selectedSources: [] })).toThrow();
+  });
+
   it('reserves before fake mutation, replays one receipt, and conflicts on a changed payload', async () => {
     const durable = repository();
     const create = vi.fn(async ({ courseId }: { courseId: string }) => ({ courseId }));
