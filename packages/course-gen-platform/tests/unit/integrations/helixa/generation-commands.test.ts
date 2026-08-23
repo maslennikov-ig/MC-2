@@ -281,6 +281,7 @@ describe('server-only Helixa generation commands', () => {
     const nativePort: HelixaGenerationNativePort = {
       schedule: vi.fn(async input => ({ objectId: input.objectId })),
       reconcile: vi.fn(async () => 'missing'),
+      observe: vi.fn(async () => 'running'),
     };
     const input = { bindingLocator: { bindingId: binding.bindingId }, command: jobCommand, mode: 'fake' as const, authority: authority(), repository, nativePort };
     const [first, replay] = await Promise.all([
@@ -445,6 +446,54 @@ describe('server-only Helixa generation commands', () => {
     });
     expect(result).toMatchObject({ state: 'action_required', error: { code: 'megacampus_generation_native_failed' } });
   });
+
+  it('observes native failure on exact dispatch replay and never schedules a second mutation', async () => {
+    const repository = createInMemoryHelixaGenerationRepository({
+      objectId: () => '44444444-4444-4444-8444-444444444444',
+      now: () => new Date('2026-08-23T10:20:00.000Z'),
+    });
+    const schedule = vi.fn(async input => ({ objectId: input.objectId }));
+    const nativePort: HelixaGenerationNativePort = {
+      schedule,
+      observe: vi.fn(async () => ({ kind: 'failed' as const })),
+    };
+    const dispatch = () => dispatchHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId }, command: courseCommand,
+      mode: 'fake', authority: authority(), repository, nativePort,
+    });
+
+    await expect(dispatch()).resolves.toMatchObject({ state: 'accepted' });
+    await expect(dispatch()).resolves.toMatchObject({
+      state: 'action_required',
+      error: { code: 'megacampus_generation_native_failed', retryable: false },
+    });
+    expect(schedule).toHaveBeenCalledOnce();
+    expect(nativePort.observe).toHaveBeenCalledOnce();
+  });
+
+  it.each(['running', 'succeeded_awaiting_signed_import'] as const)(
+    'keeps exact dispatch replay accepted when native observation is %s',
+    async observed => {
+      const repository = createInMemoryHelixaGenerationRepository({
+        objectId: () => '44444444-4444-4444-8444-444444444444',
+        now: () => new Date('2026-08-23T10:20:00.000Z'),
+      });
+      const schedule = vi.fn(async input => ({ objectId: input.objectId }));
+      const nativePort: HelixaGenerationNativePort = {
+        schedule,
+        observe: vi.fn(async () => observed),
+      };
+      const input = {
+        bindingLocator: { bindingId: binding.bindingId }, command: courseCommand,
+        mode: 'fake' as const, authority: authority(), repository, nativePort,
+      };
+      await dispatchHelixaGenerationCommand(input);
+
+      await expect(dispatchHelixaGenerationCommand(input)).resolves.toMatchObject({ state: 'accepted' });
+      expect(schedule).toHaveBeenCalledOnce();
+      expect(nativePort.observe).toHaveBeenCalledOnce();
+    }
+  );
 
   it('leaves a lost observer response fenced and reconciles on lease takeover without scheduling again', async () => {
     const first = scheduledObserverRepository(4);

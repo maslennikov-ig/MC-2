@@ -642,6 +642,31 @@ function nativeCompleted(row: HelixaGenerationRow) {
   };
 }
 
+function actionRequiredResult(row: HelixaGenerationRow) {
+  return {
+    schemaVersion: 'helixa.megacampus-generation-result.v1' as const,
+    operation: row.operation, commandId: row.commandId, payloadHash: row.payloadHash,
+    state: 'action_required' as const,
+    object: { kind: row.objectKind, id: row.objectId },
+    error: { code: row.safeErrorCode!, retryable: false as const },
+  };
+}
+
+async function observeScheduledDispatchReplay(input: {
+  bindingLocator: { bindingId: string };
+  commandId: string;
+  mode: 'disabled' | 'fake';
+  authority: HelixaGenerationBindingAuthority;
+  repository: HelixaGenerationRepository;
+  nativePort: HelixaGenerationNativePort;
+}): Promise<ReturnType<typeof accepted> | ReturnType<typeof actionRequiredResult>> {
+  await observeHelixaScheduledGenerationCommand(input);
+  const row = await input.repository.lookup(input.bindingLocator.bindingId, input.commandId);
+  if (!row) throw new Error('MegaCampus generation command disappeared during replay observation');
+  if (row.status === 'action_required') return actionRequiredResult(row);
+  return accepted(row);
+}
+
 export async function dispatchHelixaGenerationCommand(input: {
   bindingLocator: { bindingId: string };
   command: unknown;
@@ -665,16 +690,30 @@ export async function dispatchHelixaGenerationCommand(input: {
     state: 'conflict' as const,
     error: { code: 'megacampus_generation_command_conflict' as const, retryable: false as const },
   };
-  if (reservation.row.status === 'scheduled') return accepted(reservation.row);
+  if (reservation.row.status === 'scheduled') return observeScheduledDispatchReplay({
+    bindingLocator: input.bindingLocator,
+    commandId: command.commandId,
+    mode: input.mode,
+    authority: input.authority,
+    repository: input.repository,
+    nativePort: input.nativePort,
+  });
   if (reservation.row.status === 'native_completed') return accepted(reservation.row);
-  if (reservation.row.status === 'action_required') throw new Error('MegaCampus generation requires operator action');
+  if (reservation.row.status === 'action_required') return actionRequiredResult(reservation.row);
   if (!reservation.mutationOwner) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1));
       const replay = await input.repository.lookup(binding.bindingId, command.commandId);
-      if (replay?.status === 'scheduled') return accepted(replay);
+      if (replay?.status === 'scheduled') return observeScheduledDispatchReplay({
+        bindingLocator: input.bindingLocator,
+        commandId: command.commandId,
+        mode: input.mode,
+        authority: input.authority,
+        repository: input.repository,
+        nativePort: input.nativePort,
+      });
       if (replay?.status === 'native_completed') return accepted(replay);
-      if (replay?.status === 'action_required') throw new Error('MegaCampus generation requires operator action');
+      if (replay?.status === 'action_required') return actionRequiredResult(replay);
     }
     throw new Error('MegaCampus generation is still reserving');
   }
