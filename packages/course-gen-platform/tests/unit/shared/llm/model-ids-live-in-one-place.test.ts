@@ -26,6 +26,22 @@ const SHARED_TYPES_SRC = fileURLToPath(
   new URL('../../../../../shared-types/src/', import.meta.url)
 );
 
+const PLATFORM_SRC = fileURLToPath(new URL('../../../../src/', import.meta.url));
+
+/**
+ * The Stage 5 last-resort blocks (mc2-p6u8k).
+ *
+ * These two ran only when `llm_model_config` could not be read, so a wrong id
+ * here was invisible until the worst possible moment. They named
+ * `kimi-k2-thinking`, `qwen3.7-plus`, `qwen3-235b-a22b-2507` and
+ * `deepseek-v3.1-terminus` for four months after the 2026-08-12 cut left seven
+ * live routing models, because nothing compared the two lists.
+ */
+const LAST_RESORT_BLOCKS = [
+  'stages/stage5-generation/utils/section-batch/constants.ts',
+  'stages/stage5-generation/utils/metadata-generator.ts',
+] as const;
+
 /** `vendor/model-name` as it appears in source, quoted. */
 const MODEL_ID_LITERAL = /'[a-z0-9-]+\/[a-z0-9][a-z0-9.\-:]*'/g;
 
@@ -42,6 +58,20 @@ describe('model identifiers are declared once', () => {
   it('stage6-model-config.ts names no model except the grandfathered escalation one', () => {
     const source = readFileSync(`${SHARED_TYPES_SRC}stage6-model-config.ts`, 'utf8');
     const found = (source.match(MODEL_ID_LITERAL) ?? []).filter(
+      literal => !GRANDFATHERED.has(literal)
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  it.each(LAST_RESORT_BLOCKS)('%s names no model literally', relativePath => {
+    const source = readFileSync(`${PLATFORM_SRC}${relativePath}`, 'utf8');
+
+    // Comments are where the history lives — "it used to name kimi-k2-thinking"
+    // is worth keeping and is not a routing decision. Only code counts.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+    const found = (code.match(MODEL_ID_LITERAL) ?? []).filter(
       literal => !GRANDFATHERED.has(literal)
     );
 

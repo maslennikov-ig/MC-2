@@ -16,6 +16,7 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import type { GenerationJobInput, CourseStructure } from '@megacampus/shared-types';
+import { DEFAULT_FALLBACK_MODEL_ID, DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import {
   CourseMetadataSchema,
   CourseMetadataWithoutInjectedFieldsSchema,
@@ -61,26 +62,42 @@ const QUALITY_THRESHOLDS = {
 } as const;
 
 /**
- * Model configurations for metadata generation (Updated 2025-11-19)
- * Based on quality testing results (DEEPSEEK-V31-TERMINUS-QUALITY-REPORT.md)
+ * LAST-RESORT model configuration for metadata generation.
  *
- * Using regular model (not -thinking variant) for performance (INV-2025-11-19-003)
- * Regular: 15-29s, Thinking: 30-110s (test), 521s (production context)
- * Both achieve 100% success rate, no quality difference for structured generation
+ * Only reached when `getModelForPhase('stage_5_metadata')` cannot read
+ * `llm_model_config`; the database wins whenever it answers.
+ *
+ * Named roles as of 2026-08-23 (mc2-p6u8k). This block used to name
+ * `qwen3-235b-a22b-2507`, `deepseek-v3.1-terminus` and `kimi-k2-thinking`,
+ * chosen on 2025-11-19 by DEEPSEEK-V31-TERMINUS-QUALITY-REPORT.md and never
+ * revisited when the 2026-08-12 cut reduced routing to seven live models. None
+ * of the three was delisted, so the path stayed silently wrong rather than
+ * broken — and it is the path that runs when the database is down, i.e. the
+ * worst moment to discover it.
+ *
+ * Two consequences of the old ids are worth naming, because they are why this
+ * is more than tidying:
+ *   - `qwen3-235b-a22b-2507` carries the smallest output ceiling in the
+ *     catalogue, 16384, so a database outage also silently shrank what metadata
+ *     generation could produce;
+ *   - the RU and EN seats named different vendors, so an outage behaved
+ *     differently depending on the course's language.
+ *
+ * No quality claim is re-made here. The report judged models; a role says which
+ * seat, and `model-defaults.ts` says who sits in it.
  */
 const MODELS = {
-  // RU Metadata: Qwen3 235B A22B-2507 (9.0/10 - Silver)
-  // NOTE: Using regular model (not -thinking) for 17-35x performance improvement
-  ru_metadata_primary: 'qwen/qwen3-235b-a22b-2507',
+  /** RU metadata: the careful model, as `stage_5_metadata` carries in the database. */
+  ru_metadata_primary: DEFAULT_FALLBACK_MODEL_ID,
 
-  // EN Metadata: DeepSeek v3.1 Terminus (9.0/10 - Silver, -0.2 from leader)
-  en_metadata_primary: 'deepseek/deepseek-v3.1-terminus',
+  /** EN metadata: the same seat. One vendor per role, whatever the language. */
+  en_metadata_primary: DEFAULT_FALLBACK_MODEL_ID,
 
-  // Fallback for all languages: Kimi K2-0905 (9.2 EN / 9.5 RU - Gold)
-  metadata_fallback: 'moonshotai/kimi-k2-thinking',
+  /** Fallback for all languages — a different vendor, so one outage cannot take both. */
+  metadata_fallback: DEFAULT_MODEL_ID,
 
   // Legacy (for emergency cases)
-  oss120b: 'deepseek/deepseek-v4-flash',
+  oss120b: DEFAULT_MODEL_ID,
 } as const;
 
 // ============================================================================

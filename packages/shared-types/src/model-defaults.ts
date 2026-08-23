@@ -52,6 +52,19 @@ export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash-0731';
  */
 export const DEFAULT_FALLBACK_MODEL_ID = 'openai/gpt-5.6-luna';
 
+/**
+ * The seat for a request too large for the model that would otherwise take it,
+ * and the emergency route when nothing else is reachable.
+ *
+ * A third vendor on purpose. This one is reached exactly when the primary and
+ * its cross-vendor fallback have both failed or been outgrown, so sharing a
+ * vendor with either would make the last hop the same bet as the one that just
+ * lost.
+ *
+ * @see llm_model_config — `emergency`, and the Stage 5 context-overflow path.
+ */
+export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
+
 // ============================================================================
 // PROSE MODEL IDS (Single Source of Truth)
 // ============================================================================

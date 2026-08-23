@@ -124,7 +124,7 @@ export async function escalateToLargerModel(
  *
  * // For Generation stage
  * const genChain = getEscalationChain('generation');
- * console.log(genChain); // ['stage_4_expert']
+ * console.log(genChain); // ['stage_5_escalation', 'stage_4_expert']
  * ```
  */
 export function getEscalationChain(stage: string, currentPhase?: string): PhaseName[] {
@@ -146,9 +146,30 @@ export function getEscalationChain(stage: string, currentPhase?: string): PhaseN
   }
 
   if (stage === 'generation') {
-    // Generation uses cost-optimized models
-    // Escalate to expert model if needed
-    return ['stage_4_expert'];
+    // Stage 5 escalates to the phase configured for exactly this, then keeps the
+    // old expert hop behind it (mc2-9yrgb, owner's decision 2026-08-23).
+    //
+    // `stage_5_escalation` had six active rows, a screen in pipeline-admin, and
+    // no caller: every caller of `escalateToLargerModel` passed a chain, and none
+    // of them passed this one. Escalating a failed Stage 5 section to
+    // `stage_4_expert` instead meant retrying on `openai/gpt-5.6-luna` — the
+    // model that had just failed — with an 8000-token output budget, which is
+    // below what `stage_5_simple` and `stage_5_complex` are given on a normal
+    // attempt. `stage_5_escalation` carries 30000 output tokens, reasoning with
+    // a reserved 8000-token budget, and `z-ai/glm-5.2` as its fallback, so the
+    // second hop is a different vendor rather than the losing bet again.
+    //
+    // Output ceilings checked before wiring this up, because a budget above the
+    // model's ceiling trades silent inaction for a loud refusal on a live course:
+    // luna 128000, glm-5.2 262144, deepseek-v4-flash-0731 384000 — all far above
+    // 30000. The 16384-capped model the warning in
+    // `pipeline-admin/model-budget-validation.ts` describes left these rows on
+    // 2026-08-12 and `assertBudgetFitsModel` now refuses to save such a pair.
+    //
+    // `stage_4_expert` stays second rather than being replaced: if
+    // `stage_5_escalation` cannot be resolved, the behaviour is the one that has
+    // been running, not an exception.
+    return ['stage_5_escalation', 'stage_4_expert'];
   }
 
   return defaultChain;

@@ -392,8 +392,12 @@ async function main(): Promise<void> {
       .sort((a, b) => a.phase_name.localeCompare(b.phase_name))
       .map(toSeedConfig);
 
-    // Write to source file (will be committed)
-    const content = JSON.stringify(sortedData, null, 2);
+    // Write to source file (will be committed). The trailing newline is not
+    // cosmetic: prettier adds one at commit time, so without it every refresh
+    // produced a one-line diff whether or not the routing had changed — and an
+    // empty `git diff` is exactly the signal mc2-s1vg5 relies on to tell "the
+    // seed already matched" from "the database was never read".
+    const content = `${JSON.stringify(sortedData, null, 2)}\n`;
 
     // Validate file size to prevent corrupted database from creating giant seed
     const contentSize = Buffer.byteLength(content, 'utf-8');
