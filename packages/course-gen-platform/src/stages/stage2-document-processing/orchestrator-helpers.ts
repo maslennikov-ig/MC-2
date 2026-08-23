@@ -98,9 +98,14 @@ export async function initializeProcessing(context: {
 }
 
 /**
- * Check if plain text processing should be used
+ * Check if plain text processing should be used.
+ *
+ * Exported because it is also the answer to "was Docling ever going to convert
+ * this?" — a `basic`-tier upload, plain text and markdown all skip it, so the
+ * absence of a Docling conversion downstream is expected rather than a fault
+ * (mc2-51epl). One declaration, so the two cannot disagree.
  */
-function shouldUsePlainTextProcessing(tier: string, mimeType: string): boolean {
+export function shouldUsePlainTextProcessing(tier: string, mimeType: string): boolean {
   if (tier === 'basic') {
     return true;
   }

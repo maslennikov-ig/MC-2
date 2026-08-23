@@ -501,10 +501,12 @@ export abstract class BaseJobHandler<T extends CourseJobData = CourseJobData> {
   }
 
   /**
-   * T020: Check and recover orphaned step 1
+   * T020: Complete step 1, and say so only when it was really orphaned
    *
-   * Detects if the orchestrator failed to complete step 1 (initialization)
-   * and recovers by marking it completed.
+   * Marks step 1 (initialization) completed. When an entry for it already
+   * exists and is unfinished, the orchestrator abandoned it and that is worth a
+   * warning and a metric row; when no entry exists at all, this is an ordinary
+   * first start and neither is warranted.
    *
    * @private
    * @param {Job<T>} job - The BullMQ job instance
@@ -536,24 +538,52 @@ export abstract class BaseJobHandler<T extends CourseJobData = CourseJobData> {
       const steps = progress?.steps as Array<{ id: number; status: string }> | undefined;
       const step1 = steps?.find(s => s.id === 1);
 
-      // Check if step 1 is orphaned (status !== 'completed')
-      if (!step1 || step1.status !== 'completed') {
-        jobLogger.warn({ courseId, userId }, 'Orphaned job detected - recovering step 1');
+      if (step1?.status === 'completed') return;
 
-        // Call RPC to complete step 1
-        await supabase.rpc('update_course_progress', {
-          p_course_id: courseId,
-          p_step_id: 1,
-          p_status: 'completed',
-          p_message: 'Инициализация завершена (восстановлено воркером)',
-          p_metadata: {
-            recovered_by_worker: true,
-            job_id: job.id,
-            recovery_timestamp: new Date().toISOString(),
-          },
-        });
+      // Two different situations reached this line, and until 2026-08-23 both
+      // were reported as "Orphaned job detected" at warn (mc2-51epl):
+      //
+      //   - step 1 has no entry at all. That is EVERY fresh course: nothing has
+      //     written a step yet, and this worker is the thing that completes it.
+      //     Routine, and by far the common case.
+      //   - step 1 exists and is `in_progress` or `failed`. Something started it
+      //     and did not finish. That is the orphan this check was written for.
+      //
+      // Calling both an orphan produced 425 `orphaned_job_recovery` rows — the
+      // second most frequent event in `system_metrics` across the project's
+      // whole history — and a warn line on every ordinary run. A line that fires
+      // when nothing is wrong stops meaning anything when something is.
+      const isGenuineOrphan = step1 !== undefined;
 
-        // Write to system_metrics
+      if (isGenuineOrphan) {
+        jobLogger.warn(
+          { courseId, userId, step1Status: step1.status },
+          'Orphaned job detected - recovering step 1'
+        );
+      } else {
+        jobLogger.debug(
+          { courseId, userId },
+          'Step 1 has no entry yet - completing it as part of normal startup'
+        );
+      }
+
+      // Call RPC to complete step 1
+      await supabase.rpc('update_course_progress', {
+        p_course_id: courseId,
+        p_step_id: 1,
+        p_status: 'completed',
+        p_message: 'Инициализация завершена (восстановлено воркером)',
+        p_metadata: {
+          recovered_by_worker: true,
+          job_id: job.id,
+          recovery_timestamp: new Date().toISOString(),
+        },
+      });
+
+      // Only a genuine orphan is worth a row. The metric is read to answer "how
+      // often does the orchestrator abandon step 1", and an entry written on
+      // every successful start cannot answer it.
+      if (isGenuineOrphan) {
         await supabase.from('system_metrics').insert({
           event_type: 'orphaned_job_recovery',
           severity: 'warn',
@@ -563,6 +593,7 @@ export abstract class BaseJobHandler<T extends CourseJobData = CourseJobData> {
           metadata: {
             step_recovered: 1,
             reason: 'step_1_not_completed_by_orchestrator',
+            step_1_status: step1.status,
           },
         });
 
