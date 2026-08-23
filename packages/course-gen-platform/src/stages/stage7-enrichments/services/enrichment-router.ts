@@ -26,6 +26,9 @@ import {
   nlmFlashcardsHandler,
   nlmMindMapHandler,
   nlmInfographicHandler,
+  nlmSlideDeckHandler,
+  nlmReportHandler,
+  nlmDataTableHandler,
 } from '../handlers';
 
 /**
@@ -126,6 +129,9 @@ const handlers: Record<Stage7EnrichmentType, EnrichmentHandler> = {
   nlm_flashcards: nlmFlashcardsHandler,
   nlm_mind_map: nlmMindMapHandler,
   nlm_infographic: nlmInfographicHandler,
+  nlm_slide_deck: nlmSlideDeckHandler,
+  nlm_report: nlmReportHandler,
+  nlm_data_table: nlmDataTableHandler,
 };
 
 /**

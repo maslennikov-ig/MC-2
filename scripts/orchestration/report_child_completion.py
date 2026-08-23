@@ -48,7 +48,7 @@ def exact_identity_required(contract: dict) -> bool:
     stage_state = contract.get("stage_state")
     return (
         isinstance(baseline, dict)
-        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19"}
+        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19", "balanced-v2.20"}
     ) or (
         isinstance(stage_state, dict)
         and stage_state.get("exact_identity_required") is True
@@ -77,14 +77,14 @@ def parse_artifact_metadata(path: pathlib.Path) -> dict[str, str]:
     return values
 
 
-def require_v219_stream_aggregation(
+def require_current_stream_aggregation(
     repo_root: pathlib.Path,
     contract: dict,
     artifact: pathlib.Path,
     metadata: dict[str, str],
 ) -> None:
     baseline = contract.get("baseline")
-    if not isinstance(baseline, dict) or baseline.get("profile") != "balanced-v2.19":
+    if not isinstance(baseline, dict) or baseline.get("profile") != "balanced-v2.20":
         return
     stage_id = metadata["stage_id"]
     manifest_path = repo_root / ".codex" / "stages" / stage_id / "stage-manifest.json"
@@ -93,9 +93,9 @@ def require_v219_stream_aggregation(
     if not manifest_path.is_file():
         if legacy == stage_id:
             return
-        raise SystemExit(f"new v2.19 delegated stage {stage_id!r} requires a stage manifest")
+        raise SystemExit(f"new v2.20 delegated stage {stage_id!r} requires a stage manifest")
     if metadata.get("schema_version") != "orchestration-artifact/v3":
-        raise SystemExit("newly reported delegated artifacts in a v2.19 stage must use orchestration-artifact/v3")
+        raise SystemExit("newly reported delegated artifacts in a v2.20 stage must use orchestration-artifact/v3")
     expected_manifest = f".codex/stages/{stage_id}/stage-manifest.json"
     if metadata.get("stage_manifest") != expected_manifest:
         raise SystemExit("artifact stage_manifest does not match the owning stage")
@@ -160,7 +160,7 @@ def require_exact_artifact(
             f"CLI task/stage={task_id}/{stage_id}, "
             f"artifact task/stage={artifact_task}/{artifact_stage}"
         )
-    require_v219_stream_aggregation(repo_root, contract, artifact, metadata)
+    require_current_stream_aggregation(repo_root, contract, artifact, metadata)
     return artifact
 
 

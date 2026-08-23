@@ -78,12 +78,61 @@ async function resolveAuthenticatedSession() {
   return data.session
 }
 
+/**
+ * The backend the authenticated viewer reads through.
+ *
+ * `Failed to fetch` in the browser says nothing about which of the two servers
+ * is missing, and the Playwright report then blames an assertion on a heading.
+ * Checking it here turns that into one sentence naming the URL (mc2-5e4ek.1).
+ */
+async function assertBackendIsReachable() {
+  const backendUrl = firstEnv('COURSEGEN_BACKEND_URL', 'NEXT_PUBLIC_API_URL')
+  if (!backendUrl) {
+    throw new Error(
+      '[Global Setup] COURSEGEN_BACKEND_URL is not set. The authenticated Career Playbook ' +
+        'tests read the playbook through the platform API; without it the browser reports ' +
+        '"Failed to fetch" and the failure looks like a missing heading.'
+    )
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${backendUrl.replace(/\/$/, '')}/health`, {
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch (error) {
+    throw new Error(
+      `[Global Setup] The platform API at ${backendUrl} is not answering ` +
+        `(${error instanceof Error ? error.message : String(error)}). ` +
+        'Start it with `pnpm -F course-gen-platform dev` before running the authenticated ' +
+        'Playwright suites.'
+    )
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `[Global Setup] The platform API at ${backendUrl} answered ${response.status} on /health. ` +
+        'The authenticated Career Playbook tests cannot pass against it.'
+    )
+  }
+}
+
 async function seedCareerPlaybookViewerFixture() {
   const supabaseUrl = firstEnv('NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL')
   const serviceKey = firstEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY')
   if (!supabaseUrl || !serviceKey) {
-    console.warn('[Global Setup] Supabase service key not available; viewer fixture not seeded')
-    return
+    // Was a `console.warn` and a `return` (mc2-5e4ek.1). Setup then reported
+    // success, the browser opened a page whose playbook did not exist, and the
+    // suite failed on a missing "Sales Director" heading — a diagnostic that
+    // points at the viewer instead of at the absent credential. A precondition
+    // that cannot be met is a failure of setup, not a note in the log.
+    throw new Error(
+      '[Global Setup] Cannot seed the Career Playbook viewer fixture: ' +
+        `${supabaseUrl ? '' : 'NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL missing. '}` +
+        `${serviceKey ? '' : 'SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SERVICE_KEY missing. '}` +
+        'The authenticated viewer tests assert on this row, so running them without it ' +
+        'would fail in the browser for the wrong reason.'
+    )
   }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
@@ -138,6 +187,35 @@ async function seedCareerPlaybookViewerFixture() {
   if (error) {
     throw new Error(`Failed to seed Career Playbook viewer fixture: ${error.message}`)
   }
+
+  // Read it back. An upsert that reports success and a row the viewer can find
+  // are two different claims, and the gap between them is what the browser was
+  // discovering instead of this function.
+  const { data: seeded, error: readError } = await supabase
+    .from('career_playbooks')
+    .select('id, status, position_title, final_markdown')
+    .eq('id', E2E_VIEWER_PLAYBOOK_ID)
+    .maybeSingle()
+
+  if (readError) {
+    throw new Error(
+      `[Global Setup] Seeded the viewer fixture but could not read it back: ${readError.message}`
+    )
+  }
+  if (!seeded) {
+    throw new Error(
+      `[Global Setup] The viewer fixture ${E2E_VIEWER_PLAYBOOK_ID} is absent immediately after ` +
+        'a successful upsert. The tests would fail on a missing heading rather than on this.'
+    )
+  }
+  if (seeded.position_title !== 'Sales Director' || seeded.status !== 'completed') {
+    // The viewer test asserts on exactly these two, so state the mismatch here
+    // rather than letting it read as a rendering fault.
+    throw new Error(
+      `[Global Setup] The viewer fixture is present but not what the tests assert on: ` +
+        `status=${seeded.status}, position_title=${seeded.position_title}.`
+    )
+  }
 }
 
 async function globalSetup(config: FullConfig) {
@@ -154,6 +232,9 @@ async function globalSetup(config: FullConfig) {
   console.log('[Global Setup] Setting up authenticated state...')
 
   try {
+    // Order matters: prove the preconditions before saving an auth state that
+    // would let the suite reach the browser and fail there instead.
+    await assertBackendIsReachable()
     await seedCareerPlaybookViewerFixture()
     const session = await resolveAuthenticatedSession()
 

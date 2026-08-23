@@ -388,6 +388,119 @@ describe('CareerPlaybookHandler', () => {
     expect(result.error).toBeUndefined();
   });
 
+  it('keeps what the playbook spent before the graph ran', async () => {
+    // `requestFollowups` makes an LLM call and appends its node cost to the row
+    // before this job exists. The success path built the breakdown from the
+    // graph result alone and wrote it whole, so that call vanished the moment
+    // the graph finished — $0.00029784 on 2026-08-21, and the same on every
+    // playbook ever generated (mc2-ai4a8). The failure path had always merged.
+    const followupCost = {
+      node: 'followupGenerator',
+      model: 'mock-model',
+      input_tokens: 519,
+      output_tokens: 1424,
+      cost_usd: 0.00029784,
+      generation_id: 'gen-followup-1',
+      // Already settled, so the merge is what this measures, not the lookup.
+      billed_by_provider: true,
+    };
+    const graphCost = {
+      node: 'specBuilder',
+      model: 'mock-model',
+      input_tokens: 10,
+      output_tokens: 20,
+      cost_usd: 0.01,
+      generation_id: 'gen-spec-1',
+      // Already settled, so the merge is what this measures, not the lookup.
+      billed_by_provider: true,
+    };
+    const existingQAData = { fixed: [], followups: [], freeform: [] };
+    // The handler loads the QA data and writes progress before the graph runs,
+    // then reads the stored costs and writes the final row.
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      {
+        data: {
+          cost_breakdown: { nodeCosts: [followupCost], total_cost_usd: 0.00029784 },
+        },
+        error: null,
+      },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks: {},
+        finalMarkdown: '# B2B Sales Manager',
+        costBreakdown: { nodeCosts: [graphCost], total_cost_usd: 0.01 },
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    const persisted = builder.update.mock.calls
+      .map(call => call[0] as { cost_breakdown?: { nodeCosts: unknown[]; total_cost_usd: number } })
+      .find(payload => payload.cost_breakdown);
+
+    expect(persisted?.cost_breakdown?.nodeCosts).toEqual([followupCost, graphCost]);
+    expect(persisted?.cost_breakdown?.total_cost_usd).toBeCloseTo(0.01029784, 8);
+  });
+
+  it('counts a call once when the graph already carries it', async () => {
+    // The merge is by `generation_id`, so a graph that ever does start from the
+    // stored costs cannot bill the same call twice.
+    const shared = {
+      node: 'specBuilder',
+      model: 'mock-model',
+      input_tokens: 10,
+      output_tokens: 20,
+      cost_usd: 0.01,
+      generation_id: 'gen-shared-1',
+      // Already settled, so the merge is what this measures, not the lookup.
+      billed_by_provider: true,
+    };
+    const builder = createBuilder([
+      { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { cost_breakdown: { nodeCosts: [shared], total_cost_usd: 0.01 } }, error: null },
+      { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        generatedBlocks: {},
+        finalMarkdown: '# B2B Sales Manager',
+        costBreakdown: { nodeCosts: [shared], total_cost_usd: 0.01 },
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await new CareerPlaybookHandler().process(
+      job({
+        ...baseJobData(),
+        operation: 'GENERATE_PLAYBOOK',
+        qaData: { fixed: [], followups: [], freeform: [] },
+      })
+    );
+
+    const persisted = builder.update.mock.calls
+      .map(call => call[0] as { cost_breakdown?: { nodeCosts: unknown[]; total_cost_usd: number } })
+      .find(payload => payload.cost_breakdown);
+
+    expect(persisted?.cost_breakdown?.nodeCosts).toHaveLength(1);
+    expect(persisted?.cost_breakdown?.total_cost_usd).toBeCloseTo(0.01, 8);
+  });
+
   it('persists generated playbook output on GENERATE_PLAYBOOK success', async () => {
     const generatedBlocks = {
       header: {
@@ -419,6 +532,10 @@ describe('CareerPlaybookHandler', () => {
     const builder = createBuilder([
       { data: { q_a_data: existingQAData }, error: null },
       { data: { id: playbookId }, error: null },
+      // What the row already carries. Read since 2026-08-21, because building
+      // the breakdown from the graph alone discarded the follow-up call that
+      // ran before the job (mc2-ai4a8).
+      { data: { cost_breakdown: null }, error: null },
       { data: { q_a_data: existingQAData }, error: null },
       { data: { id: playbookId }, error: null },
     ]);
@@ -449,7 +566,15 @@ describe('CareerPlaybookHandler', () => {
         generated_blocks: generatedBlocks,
         final_markdown: '# B2B Sales Manager',
         role_profile_spec: roleProfileSpec,
-        cost_breakdown: costBreakdown,
+        // Recomputed rather than passed through: since 2026-08-21 the handler
+        // settles every node against `/api/v1/generation` before persisting, so
+        // the stored breakdown is the graph's plus the derived counters. With no
+        // `generation_id` on these fixtures there is nothing to look up, and the
+        // estimate stands.
+        cost_breakdown: {
+          ...costBreakdown,
+          unknown_cost_attempts: 0,
+        },
         q_a_data: {
           fixed: [{ question_key: 'position', value: 'B2B Sales Manager' }],
           followups: [],

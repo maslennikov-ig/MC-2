@@ -78,6 +78,7 @@ import { getOpenRouterApiKey, getApiKeySync } from '@/shared/services/api-key-se
 import OpenAI from 'openai';
 import logger from '@/shared/logger';
 import { retryWithBackoff } from '@megacampus/shared-utils';
+import { getModelCapabilities } from '@megacampus/shared-types';
 
 describe('LLMClient', () => {
   beforeEach(() => {
@@ -335,8 +336,16 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.14/1M input + $0.28/1M output = $0.42
-      expect(cost).toBeCloseTo(0.42, 4);
+      // One million tokens each way, so the expected cost IS the two catalogue
+      // rates added. Read from the catalogue rather than retyped: this case is
+      // about the arithmetic, and the rates themselves are held by
+      // `model-catalog-coverage.test.ts` and re-read nightly by the drift check.
+      // Retyped here they went stale three times in three days (mc2-ts9i2).
+      const rates = getModelCapabilities('deepseek/deepseek-v4-flash');
+      expect(cost).toBeCloseTo(
+        (rates?.inputPricePerMillion ?? 0) + (rates?.outputPricePerMillion ?? 0),
+        4
+      );
     });
 
     it('should estimate cost for google/gemini-3.7-flash', () => {

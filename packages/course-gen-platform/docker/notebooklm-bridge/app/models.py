@@ -47,6 +47,17 @@ class MediaGenerationRequest(BaseModel):
     mind_map_depth: int | None = Field(default=None, ge=2, le=5)
     infographic_orientation: str | None = Field(default=None, max_length=64)
     infographic_detail: str | None = Field(default=None, max_length=64)
+    # Slide deck (mc2-6ye5z.4). notebooklm-py 0.8.0 takes SlideDeckFormat
+    # (DETAILED_DECK=1, PRESENTER_SLIDES=2) and SlideDeckLength (DEFAULT=1,
+    # SHORT=2); these carry the member NAME and the generator resolves it, so a
+    # value the installed version does not know is refused by name rather than
+    # sent as an integer that means something else.
+    slide_deck_format: str | None = Field(default=None, max_length=64)
+    slide_deck_length: str | None = Field(default=None, max_length=64)
+    # `pdf` or `pptx` — the download format, not a generation option.
+    slide_deck_output_format: str | None = Field(default=None, max_length=16)
+    # Free-text steer, shared by slide deck and data table (mc2-6ye5z.4/.8).
+    artifact_instructions: str | None = Field(default=None, max_length=4000)
 
     @field_validator(
         "lesson_title",
@@ -63,6 +74,10 @@ class MediaGenerationRequest(BaseModel):
         "flashcard_difficulty",
         "infographic_orientation",
         "infographic_detail",
+        "slide_deck_format",
+        "slide_deck_length",
+        "slide_deck_output_format",
+        "artifact_instructions",
         mode="before",
     )
     @classmethod
@@ -123,7 +138,18 @@ class VideoGenerationResponse(BaseModel):
 
 
 TaskStatus = Literal["queued", "in_progress", "completed", "failed"]
-MediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
+MediaType = Literal[
+    "audio",
+    "video",
+    "study_guide",
+    "flashcards",
+    "mind_map",
+    "infographic",
+    # mc2-6ye5z.4/.5/.8
+    "slide_deck",
+    "report",
+    "data_table",
+]
 
 
 class MediaGenerationTaskStartResponse(BaseModel):
@@ -184,4 +210,27 @@ class InfographicGenerationTaskResultResponse(BaseModel):
     media_type: Literal["infographic"]
     status: TaskStatus
     artifact: InfographicGenerationResponse | None = None
+    error: str | None = None
+
+
+class BinaryArtifactGenerationResponse(BaseModel):
+    """A downloaded artifact that is not text and not an image (mc2-6ye5z.4).
+
+    The slide deck arrives as PDF or PPTX, so unlike the infographic the mime
+    type and extension are not fixed: which one the caller gets depends on
+    `slide_deck_output_format`, and a consumer that assumed PDF would mislabel
+    a PPTX.
+    """
+
+    artifact_base64: str
+    mime_type: str
+    extension: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BinaryArtifactTaskResultResponse(BaseModel):
+    task_id: str
+    media_type: Literal["slide_deck"]
+    status: TaskStatus
+    artifact: BinaryArtifactGenerationResponse | None = None
     error: str | None = None

@@ -55,10 +55,26 @@ export interface ModelCapabilities {
   /** Unified rate for models that charge the same for input and output */
   combinedPricePerMillion?: number;
   /**
-   * Billed per generated image upstream. Token-based cost maths is structurally
-   * wrong for these and only approximates the real charge.
+   * Billed per generated image upstream, at {@link imageOutputPricePerMillion}
+   * rather than at `outputPricePerMillion`.
    */
   billedPerImage?: boolean;
+  /**
+   * USD per 1M **image output** tokens — OpenRouter's `pricing.image_output`.
+   *
+   * This rate existed all along and nothing read it. Image prices lived in a
+   * second table inside `image-generation-service.ts`, which is exactly what the
+   * header of `shared/metrics/llm-cost.ts` forbids, and it drifted: one 1024x1024
+   * `openai/gpt-5-image-mini` card was booked at that table's $0.007 against a
+   * real $0.045080 on 2026-08-21 — 6.4x low, and the entire residual of that
+   * run's reconciliation (mc2-5mhlb).
+   *
+   * An image call's output tokens are image tokens, so the estimate is the same
+   * arithmetic as any other call, with this rate in place of the text one. The
+   * estimate only has to hold for the ~10s until `GET /api/v1/generation`
+   * answers with the charge itself.
+   */
+  imageOutputPricePerMillion?: number;
   /** No longer offered by OpenRouter; retained so old cost reports still resolve */
   delisted?: true;
 }
@@ -73,6 +89,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: false,
     billedPerImage: true,
+    imageOutputPricePerMillion: 30,
   },
   'google/gemini-3.7-flash': {
     inputPricePerMillion: 0.375,
@@ -101,10 +118,14 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: true,
   },
-  /** Async Batch API tariff; currently half the base token rates. */
+  /**
+   * Re-read 2026-08-21: $0.30/$1.20 — identical to the base rate above, not half
+   * it. The entry had carried $0.15/$0.60 on the same wrong "half the base
+   * tariff" premise as `z-ai/glm-5.2:batch` (mc2-hc91g).
+   */
   'minimax/minimax-m3:batch': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.6,
+    inputPricePerMillion: 0.3,
+    outputPricePerMillion: 1.2,
     contextLength: 524288,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -118,16 +139,26 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: true,
     billedPerImage: true,
+    imageOutputPricePerMillion: 8,
   },
+  /**
+   * Re-read from `/api/v1/models` on 2026-08-21: $0.20/$1.20. The entry had
+   * carried $0.10/$0.60 — exactly the Batch tariff below, so the synchronous
+   * rate had been recorded at half its real value. Every luna call in the
+   * 2026-08-20 run was therefore under-counted by half, and because luna is the
+   * primary for the Career Playbook's spec and proofreading phases, that
+   * mispricing was the single largest catalogue contribution to the $0.066839
+   * gap against the invoice (mc2-v1pn2).
+   */
   'openai/gpt-5.6-luna': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.6,
+    inputPricePerMillion: 0.2,
+    outputPricePerMillion: 1.2,
     contextLength: 1050000,
     maxOutputTokens: 128000,
     supportsTemperature: false,
     supportsReasoning: true,
   },
-  /** Available through Batch API, but currently has no token-price discount. */
+  /** Async Batch API tariff: half the synchronous rate above, confirmed 2026-08-21. */
   'openai/gpt-5.6-luna:batch': {
     inputPricePerMillion: 0.1,
     outputPricePerMillion: 0.6,
@@ -137,36 +168,83 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   /**
-   * The `/models` base rate, re-read 2026-08-14. An earlier entry recorded
-   * $0.63/$1.98, which is one provider's rate (DigitalOcean), not the base one.
-   * This model is served by many providers and they disagree widely — on that
-   * date the endpoint list ran from $0.49/$1.54 to $1.40/$4.40 — so the base
-   * rate is the catalogue default, not a guarantee of what a call is charged.
+   * The `/models` base rate, re-read 2026-08-21: $0.966/$3.036. The entry had
+   * carried $1.19/$3.74, which is 1.23x too dear — an overstatement, and
+   * therefore one that hid the luna understatement above rather than adding to
+   * it, which is why the invoice gap looked smaller than its causes (mc2-156kg).
+   *
+   * This model is served by many providers and they disagree widely — the
+   * endpoint list has run from $0.49/$1.54 to $1.40/$4.40 — so the base rate is
+   * the catalogue default, not a guarantee of what a call is charged. Since
+   * 2026-08-21 the charge itself is read back from `/api/v1/generation`, and
+   * this figure is what a price ceiling and a budget estimate are built from.
    */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 1.19,
-    outputPricePerMillion: 3.74,
+    inputPricePerMillion: 0.966,
+    outputPricePerMillion: 3.036,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   /**
-   * Async Batch API tariff: exactly half the first-party Z.AI rate ($1.40/$4.40),
-   * which is above the base rate above. Cheaper than the base on both legs, but
-   * with half the context window, so a long request stays synchronous.
+   * Re-read 2026-08-21: $1.40/$4.40. The entry had carried $0.70/$2.20 on the
+   * belief that the Batch tariff is half the base rate — true for luna, false
+   * here. This id is *dearer* than the synchronous `z-ai/glm-5.2` above, not
+   * cheaper, so the halving was not a rounding error but a wrong premise
+   * (mc2-hc91g).
    */
   'z-ai/glm-5.2:batch': {
-    inputPricePerMillion: 0.7,
-    outputPricePerMillion: 2.2,
+    inputPricePerMillion: 1.4,
+    outputPricePerMillion: 4.4,
     contextLength: 512000,
     maxOutputTokens: null,
     supportsTemperature: true,
     supportsReasoning: true,
   },
-  '~deepseek/deepseek-v4-flash-latest': {
+  /**
+   * The pinned snapshot that replaced the `~...-latest` alias on 2026-08-21.
+   *
+   * Chosen from measurement, not from its date. On 2026-08-21 the alias resolved
+   * to exactly this snapshot — same 1310720 context window — so pinning changed
+   * nothing about what runs; it only stopped it moving again. It carries 30
+   * endpoints against 18 for the undated `deepseek/deepseek-v4-flash` id, and
+   * its cheapest endpoint (Sail Research, $0.065/$0.180) is the same one the
+   * alias was reaching, so the cheapest route is unchanged.
+   *
+   * $0.08/$0.18 is the published list rate for the snapshot, which is what the
+   * 1.5x ceiling is built from: $0.12/$0.27 keeps the cheap end of the pool —
+   * Sail Research, Relace, DeepInfra, StreamLake — and removes only the 6.8x
+   * tail. A ceiling under every endpoint is a refusal, not a saving (mc2-qch4w).
+   */
+  'deepseek/deepseek-v4-flash-0731': {
     inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.252,
+    outputPricePerMillion: 0.18,
+    contextLength: 1310720,
+    maxOutputTokens: 384000,
+    supportsTemperature: true,
+    supportsReasoning: true,
+  },
+  /**
+   * Re-read 2026-08-21: $0.065/$0.140. The entry had carried $0.08/$0.252, over
+   * by 1.23x on input and 1.80x on output (mc2-156kg).
+   *
+   * Retired from routing on 2026-08-21 in favour of the pinned snapshot above,
+   * and kept only so the rows it already wrote still resolve. A `~` alias is a
+   * redirect, not a model: it follows its family to whatever snapshot is
+   * current, and on 2026-08-17 07:03 it followed DeepSeek V4 Flash to
+   * `-20260731`, taking median latency from 8.7s to 102s without a single
+   * configuration change on our side. Its price can move the same way. That is
+   * the root cause of the 12-20 August failures and the reason nothing
+   * downstream treats this number as the charge (mc2-qch4w).
+   */
+  '~deepseek/deepseek-v4-flash-latest': {
+    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05/
+    // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
+    // a cheaper snapshot, which is the same mechanism that made it unsafe to
+    // route on.
+    inputPricePerMillion: 0.05,
+    outputPricePerMillion: 0.13,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -194,23 +272,38 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
   'deepseek/deepseek-v3.1-terminus': {
     inputPricePerMillion: 0.27,
-    outputPricePerMillion: 0.95,
+    outputPricePerMillion: 1.0,
     contextLength: 163840,
     maxOutputTokens: 32768,
     supportsTemperature: true,
     supportsReasoning: true,
   },
+  /**
+   * Re-read twice on 2026-08-21: $0.14/$0.28 was 1.7x over, and the $0.0826/
+   * $0.1652 that replaced it was still 1.04x over. It matters more than a
+   * retired entry normally would, because `normalizeModelId` prices every dated
+   * V4 Flash snapshot from here when the snapshot has no entry of its own
+   * (mc2-hc91g).
+   */
   'deepseek/deepseek-v4-flash': {
-    inputPricePerMillion: 0.14,
-    outputPricePerMillion: 0.28,
+    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05306/
+    // $0.10612, against $0.0798/$0.1596 here — 1.50x over on both legs. Third
+    // correction to this one entry in three days, which is the argument for the
+    // check running nightly instead of when somebody remembers.
+    inputPricePerMillion: 0.05306,
+    outputPricePerMillion: 0.10612,
     contextLength: 1048576,
-    maxOutputTokens: 393216,
+    maxOutputTokens: 384000,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'deepseek/deepseek-v4-pro': {
-    inputPricePerMillion: 1.168,
-    outputPricePerMillion: 2.336,
+    // Re-read 2026-08-23: $0.396894/$0.793788, against $1.60/$3.20 here — 4.03x
+    // over, the largest gap the catalogue has held. Not on a live route, so it
+    // cost nothing; had it been, `provider.max_price` would have been built four
+    // times too high and bought nothing.
+    inputPricePerMillion: 0.396894,
+    outputPricePerMillion: 0.793788,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
@@ -341,8 +434,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   'z-ai/glm-5': {
-    inputPricePerMillion: 0.95,
-    outputPricePerMillion: 2.55,
+    inputPricePerMillion: 0.6,
+    outputPricePerMillion: 1.92,
     contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -413,7 +506,7 @@ export function isModelInCatalog(modelId: string): boolean {
  * may simply be legacy — but a routing row naming one is.
  */
 export const LIVE_ROUTING_MODEL_IDS = [
-  '~deepseek/deepseek-v4-flash-latest',
+  'deepseek/deepseek-v4-flash-0731',
   'openai/gpt-5.6-luna',
   'z-ai/glm-5.2',
   'minimax/minimax-m3',

@@ -57,6 +57,12 @@ export interface ChunkingSource {
   docling?: NativeChunkingInput;
   /** Normalized Docling document, used to enrich chunk metadata. */
   docling_json?: DoclingDocument;
+  /**
+   * Whether Docling was going to convert this input at all. `false` for the
+   * plain-text and markdown paths, where an absent conversion is expected and
+   * the warning about it was noise (mc2-51epl).
+   */
+  doclingApplicable?: boolean;
 }
 
 /**
@@ -79,6 +85,9 @@ export async function executeChunking(
   const chunkingResult = await chunkWithStrategy(markdown, {
     source: source.docling,
     config: DEFAULT_CHUNKING_CONFIG,
+    ...(source.doclingApplicable === undefined
+      ? {}
+      : { doclingApplicable: source.doclingApplicable }),
   });
 
   // Only the child grain is indexed. Parents carry no text of their own — the

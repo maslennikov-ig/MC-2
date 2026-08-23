@@ -35,9 +35,33 @@ export const enrichmentTypeSchema = z.enum([
   'nlm_flashcards', // NotebookLM-generated flashcards (JSON Q&A pairs)
   'nlm_mind_map', // NotebookLM-generated mind map (hierarchical JSON)
   'nlm_infographic', // NotebookLM-generated infographic (PNG image)
+  //
+  // The three below arrived on 2026-08-23 WITH their handlers, which is the
+  // rule this list exists to enforce. Their database enum values were applied
+  // on 2026-08-22 (migration 20260822160000) and for a day the schema stayed
+  // narrower on purpose: this type feeds exhaustive records — the title table
+  // below, the Stage 7 handler registry, the UI's grouping — so a value added
+  // here without a handler does not enable a feature, it produces a type that
+  // claims support and a runtime that has none.
+  'nlm_slide_deck', // NotebookLM-generated slide deck (PDF or PPTX file)
+  'nlm_report', // NotebookLM-generated report (Markdown; briefing doc, blog post, custom)
+  'nlm_data_table', // NotebookLM-generated data table (CSV)
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
+
+/**
+ * Whether a value read from the database is a type this application supports.
+ *
+ * The `enrichment_type` database enum is deliberately wider than the schema
+ * above — a value is added there first so its handler can be written and its
+ * rows stored, and only then here. Rows carrying a not-yet-supported type
+ * therefore exist in principle, and a reader that assumes otherwise would be
+ * asserting rather than checking.
+ */
+export function isSupportedEnrichmentType(value: string): value is EnrichmentType {
+  return enrichmentTypeSchema.safeParse(value).success;
+}
 
 /**
  * Enrichment status enum (mirrors database enum with two-stage support)
@@ -341,6 +365,9 @@ export function getDefaultEnrichmentTitle(
     nlm_flashcards: { en: 'Flashcards', ru: 'Карточки для запоминания' },
     nlm_mind_map: { en: 'Mind Map', ru: 'Карта знаний' },
     nlm_infographic: { en: 'Infographic', ru: 'Инфографика' },
+    nlm_slide_deck: { en: 'Slide Deck', ru: 'Слайды' },
+    nlm_report: { en: 'Report', ru: 'Отчёт' },
+    nlm_data_table: { en: 'Data Table', ru: 'Таблица данных' },
   };
 
   return titles[type][locale];

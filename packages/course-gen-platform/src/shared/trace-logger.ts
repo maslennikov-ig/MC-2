@@ -89,8 +89,13 @@ async function writePromptsToFile(
  * Log detailed generation trace to Supabase
  * This function is fire-and-forget (does not block execution) but logs errors if insertion fails.
  * prompt_text/completion_text are written to local files by default (set TRACE_STORE_PROMPTS=true to store in DB).
+ *
+ * Returns the id of the row it wrote, or `null` when it wrote none. Callers that
+ * price a call from an estimate use it to come back and replace that estimate
+ * with the provider's own figure once OpenRouter will tell us
+ * (see `settleTraceCostFromProvider`).
  */
-export async function logTrace(params: TraceLogParams): Promise<void> {
+export async function logTrace(params: TraceLogParams): Promise<string | null> {
   // Don't await this in critical path, but catch errors
   try {
     const supabase = getSupabaseAdmin();
@@ -160,13 +165,21 @@ export async function logTrace(params: TraceLogParams): Promise<void> {
       quality_score: params.qualityScore ?? null,
     };
 
-    const { error } = await supabase.from('generation_trace').insert(insertPayload);
+    const { data, error } = await supabase
+      .from('generation_trace')
+      .insert(insertPayload)
+      .select('id')
+      .single();
 
     if (error) {
       logger.error({ error, params }, 'Failed to log generation trace');
+      return null;
     }
+
+    return (data as { id: string } | null)?.id ?? null;
   } catch (err) {
     // Don't throw - logging should never crash the app
     logger.error({ err, params }, 'Exception in trace logging');
+    return null;
   }
 }

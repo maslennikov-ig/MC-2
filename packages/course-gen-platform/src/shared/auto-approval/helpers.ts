@@ -188,7 +188,23 @@ export function convertToLessonSpecV2(
     sections,
     exercises: [],
     rag_context: {
-      primary_documents: ['auto-generated'],
+      // Empty means "search every document this course has", which is the whole
+      // truth available here: this converter builds a spec from
+      // `course_structure` alone and has no document ids to name.
+      //
+      // It used to say `['auto-generated']`, and that string is not an id of
+      // anything. Stage 6 intersects `primary_documents` with the accepted
+      // evidence set, one placeholder never matches a UUID, and the result was
+      // that every automatic-mode course with an uploaded document was written
+      // **without that document** — the exact thing the user uploaded it for. It
+      // failed silently: zero chunks in ~140 ms, `success: true`, and no line to
+      // tell it apart from a course that has no documents at all (mc2-kznfz).
+      //
+      // Both other builders of this field already document the sentinel and one
+      // of them says outright "do not use 'default' sentinel"
+      // (phase3-v2-spec-generator, v2-converter). This was the same mistake
+      // wearing a different word.
+      primary_documents: [],
       search_queries: [lesson.title, ...lesson.topics.slice(0, 2)].filter(Boolean),
       expected_chunks: 5,
     },

@@ -799,6 +799,93 @@ export const infographicEnrichmentContentSchema = z.object({
 export type InfographicEnrichmentContent = z.infer<typeof infographicEnrichmentContentSchema>;
 
 // ============================================================================
+// NLM SLIDE DECK ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Slide deck enrichment content (NotebookLM-generated PDF or PPTX).
+ *
+ * A file, not text and not an image: it is uploaded like the cover and the
+ * infographic, and the URL points at Supabase Storage. Both formats are
+ * carried because `download_slide_deck` produces either, and a consumer that
+ * assumed PDF would offer a PPTX under the wrong name (mc2-6ye5z.4).
+ */
+export const slideDeckEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_slide_deck'),
+
+  /** Generated file URL (Supabase Storage public URL) */
+  fileUrl: z.string().url(),
+
+  /** Which of the two the file actually is. */
+  format: z.enum(['pdf', 'pptx']).default('pdf'),
+
+  /** Slide count, when the generator reports one */
+  slide_count: z.number().int().positive().optional(),
+
+  /** File size in bytes */
+  file_size_bytes: z.number().int().positive().optional(),
+});
+
+export type SlideDeckEnrichmentContent = z.infer<typeof slideDeckEnrichmentContentSchema>;
+
+// ============================================================================
+// NLM REPORT ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Report enrichment content (NotebookLM-generated Markdown).
+ *
+ * The study guide's sibling: NotebookLM makes every report the same artifact
+ * type and differs only by format, so this one carries the format explicitly
+ * and the bridge refuses `study_guide` here. Without that the two enrichment
+ * types would be indistinguishable once stored (mc2-6ye5z.5).
+ */
+export const reportEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_report'),
+
+  /** Markdown content of the report */
+  markdown: z.string().min(10).max(200_000),
+
+  /** Which report NotebookLM was asked for. `study_guide` is not one of them. */
+  report_format: z.enum(['briefing_doc', 'blog_post', 'custom']).default('briefing_doc'),
+
+  /** Approximate word count */
+  word_count: z.number().int().positive().optional(),
+});
+
+export type ReportEnrichmentContent = z.infer<typeof reportEnrichmentContentSchema>;
+
+// ============================================================================
+// NLM DATA TABLE ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Data table enrichment content (NotebookLM-generated CSV).
+ *
+ * Stored inline as CSV rather than parsed into rows: the bridge downloads CSV,
+ * and re-encoding it into JSON here would make this schema the second place
+ * that decides what a cell is. Parsed `headers` are optional and advisory —
+ * the `csv` field is the artifact (mc2-6ye5z.8).
+ */
+export const dataTableEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_data_table'),
+
+  /** The CSV as generated */
+  csv: z.string().min(3).max(200_000),
+
+  /** Column headers, when the first row could be read as such */
+  headers: z.array(z.string()).optional(),
+
+  /** Data row count, excluding the header */
+  row_count: z.number().int().nonnegative().optional(),
+});
+
+export type DataTableEnrichmentContent = z.infer<typeof dataTableEnrichmentContentSchema>;
+
+// ============================================================================
 // DISCRIMINATED UNION OF ALL CONTENT TYPES
 // ============================================================================
 
@@ -821,6 +908,9 @@ export const enrichmentContentSchema = z.discriminatedUnion('type', [
   flashcardsEnrichmentContentSchema,
   mindMapEnrichmentContentSchema,
   infographicEnrichmentContentSchema,
+  slideDeckEnrichmentContentSchema,
+  reportEnrichmentContentSchema,
+  dataTableEnrichmentContentSchema,
 ]);
 
 export type EnrichmentContent = z.infer<typeof enrichmentContentSchema>;

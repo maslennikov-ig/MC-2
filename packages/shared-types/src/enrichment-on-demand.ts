@@ -26,6 +26,14 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
  * - nlm_video: NotebookLM video overview
  * - cover: Lesson hero images (16:9 banners)
  * - card: Lesson thumbnails (1:1 square images)
+ * - nlm_study_guide, nlm_flashcards, nlm_mind_map, nlm_infographic:
+ *   NotebookLM study aids
+ *
+ * This list is the gate `isOnDemandType` enforces, and it is the only one in the
+ * platform that decides what a user may order. Not `ON_DEMAND_ENRICHMENT_TYPES`
+ * in the Stage 7 config, which names five types and is re-exported without ever
+ * being read (mc2-p99f1). If you are changing what can be generated, change this
+ * enum; changing the other list is a no-op that reads like a fix.
  */
 export const onDemandEnrichmentTypeSchema = z.enum([
   'quiz',

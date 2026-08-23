@@ -1,16 +1,36 @@
-"""Runtime glue for declared Docling MCP 3 service-client settings.
+"""Runtime glue for declared Docling MCP service-client settings.
 
-Docling MCP 3.0.0 declares ``service_timeout`` and ``service_max_retries`` but
-does not pass them to ``DoclingServiceClient``. Keep the upstream package
-unmodified and remove this wrapper after an upstream release wires both fields.
+Docling MCP declares ``service_timeout`` and ``service_max_retries`` and does
+not pass them to ``DoclingServiceClient``. Verified still true in 3.1.0, whose
+remote converter constructs the client with ``url`` and ``api_key`` alone. Keep
+the upstream package unmodified and remove this wrapper after a release wires
+both fields (mc2-vlskb).
 
-It also narrows one cache-correctness gap. MEASURED 2026-08-05:
-``docling_mcp.docling_cache.get_cache_key`` hashes only the source string and
-the OCR flags, so two conversions of the same source with different pipeline
-options — heading-hierarchy inference, table mode, image scale — share a cache
-entry and the second silently returns the first one's artifact. The wrapper
-folds the behaviour-affecting conversion profile into the key. Delete it once
-upstream keys the cache on the options it actually converted with.
+**Most of the cache-key half is gone, because upstream fixed it** (mc2-ibzcc).
+Until 3.1.0, ``docling_mcp.docling_cache.get_cache_key`` hashed only the source
+string and the OCR flags, so two conversions of one source under different
+pipeline options shared an entry and the second silently returned the first
+one's artifact; this file folded a fingerprint of seven environment variables
+into the key. 3.1.0 does more than that fingerprint did — a local file is keyed
+by its content digest rather than its path, every setting in the model enters
+the key except an explicit not-output-relevant list, and the installed package
+versions are stamped in — and it changed the signature to
+``get_cache_key(source, conversion=None)``.
+
+What upstream cannot see is what THIS file injects. MEASURED at build time
+against 3.1.0: ``remote_conversion_context()["options"]`` is exactly
+``service_url``, ``keep_images``, ``images_scale``, ``do_ocr`` and
+``do_table_structure``. ``ocr_preset``, ``ocr_lang`` and
+``do_pdf_heading_hierarchy`` are absent from it because they are not docling-mcp
+settings at all — they are forced onto ``ConvertDocumentsOptions`` above, so
+docling-mcp has no way of knowing a conversion used them. Flipping
+``DOCLING_MCP_PDF_HEADING_HIERARCHY`` would leave the key unchanged and serve
+the artifact produced without it, which is the original defect in miniature.
+
+So the wrapper keeps exactly the three options it is responsible for and hands
+everything else to upstream. It shrinks when the wrapper above shrinks, and it
+disappears with it. The build-time test asserts both halves, and it is what
+caught this: the first attempt at this commit deleted the whole thing.
 """
 
 import os
@@ -86,32 +106,37 @@ def apply_service_client_settings() -> None:
     ConvertDocumentsOptions.__init__ = configured_options_init
 
 
-def conversion_profile_fingerprint() -> str:
-    """Every environment setting that changes what a conversion produces."""
-    parts = [
-        f"ocr={os.environ.get('DOCLING_MCP_DO_OCR', 'true')}",
-        f"preset={os.environ.get('DOCLING_MCP_OCR_PRESET', 'easyocr')}",
-        f"lang={os.environ.get('DOCLING_MCP_OCR_LANG', 'ru,en')}",
-        f"tables={os.environ.get('DOCLING_MCP_DO_TABLE_STRUCTURE', 'true')}",
-        f"scale={os.environ.get('DOCLING_MCP_IMAGES_SCALE', '2.0')}",
-        f"images={os.environ.get('DOCLING_MCP_KEEP_IMAGES', 'false')}",
-        f"headings={os.environ.get('DOCLING_MCP_PDF_HEADING_HIERARCHY', 'false')}",
-    ]
-    return ";".join(parts)
+def injected_conversion_options() -> dict[str, object]:
+    """The options this file forces on, which docling-mcp cannot see."""
+    return {
+        "ocr_preset": os.environ.get("DOCLING_MCP_OCR_PRESET", "easyocr"),
+        "ocr_lang": os.environ.get("DOCLING_MCP_OCR_LANG", "ru,en"),
+        "pdf_heading_hierarchy": os.environ.get(
+            "DOCLING_MCP_PDF_HEADING_HIERARCHY", "false"
+        ),
+    }
 
 
 def apply_cache_key_settings() -> None:
-    """Include the conversion profile in the document cache key."""
+    """Add the injected options to upstream's conversion context."""
     from docling_mcp import docling_cache
 
     original = docling_cache.get_cache_key
-    profile = conversion_profile_fingerprint()
+    injected = injected_conversion_options()
 
     @wraps(original)
-    def keyed_by_profile(source, enable_ocr=False, ocr_language=None):
-        return original(f"{source}\nprofile:{profile}", enable_ocr, ocr_language)
+    def keyed_with_injected_options(source, conversion=None):
+        # A converter that passes its own context is keyed by the converter that
+        # actually ran, and that has to be preserved rather than replaced.
+        context = (
+            dict(conversion)
+            if conversion is not None
+            else docling_cache._default_conversion_context()
+        )
+        context["mc2_injected_options"] = injected
+        return original(source, context)
 
-    docling_cache.get_cache_key = keyed_by_profile
+    docling_cache.get_cache_key = keyed_with_injected_options
 
 
 if __name__ == "__main__":

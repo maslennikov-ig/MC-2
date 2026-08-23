@@ -24,6 +24,7 @@ import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
 import { processPlainTextDocument } from './plain-text-processing';
+import { shouldUsePlainTextProcessing } from './orchestrator-helpers';
 import { updateDocumentProcessingProgress } from './orchestrator-progress-helpers';
 import { updateCourseProgressForJob } from './orchestrator-job-origin';
 import {
@@ -184,6 +185,11 @@ export async function executeVectorIndexing(
           }
         : {}),
       docling_json: processingResult.json,
+      // A source that is already markdown or plain text never goes through
+      // Docling, so having no conversion is the expected outcome for it rather
+      // than a converter fault (mc2-51epl). Passing this only changes the log
+      // level of one line; the chunking decision is unchanged.
+      doclingApplicable: !shouldUsePlainTextProcessing(context.tier, context.mimeType),
     }
   );
 

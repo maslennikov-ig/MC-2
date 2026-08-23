@@ -44,6 +44,14 @@ export interface NotebookLMBridgeGenerateRequest {
   mindMapDepth?: number;
   infographicOrientation?: string;
   infographicDetail?: string;
+  /** Slide deck: `detailed_deck` | `presenter_slides` (mc2-6ye5z.4). */
+  slideDeckFormat?: string;
+  /** Slide deck: `default` | `short`. */
+  slideDeckLength?: string;
+  /** Slide deck download format: `pdf` | `pptx`. Defaults to PDF at the bridge. */
+  slideDeckOutputFormat?: string;
+  /** Free-text steer, shared by the slide deck and the data table. */
+  artifactInstructions?: string;
 }
 
 export interface NotebookLMBridgeMediaResult {
@@ -110,6 +118,15 @@ export interface NotebookLMBridgeConfig {
   infographicStartPath: string;
   infographicTaskStatusPath: string;
   infographicTaskResultPath: string;
+  slideDeckStartPath: string;
+  slideDeckTaskStatusPath: string;
+  slideDeckTaskResultPath: string;
+  reportStartPath: string;
+  reportTaskStatusPath: string;
+  reportTaskResultPath: string;
+  dataTableStartPath: string;
+  dataTableTaskStatusPath: string;
+  dataTableTaskResultPath: string;
   defaultWaitOptions: NotebookLMBridgeWaitOptions;
 }
 
@@ -119,4 +136,9 @@ export type NotebookLMBridgeMediaType =
   | 'study_guide'
   | 'flashcards'
   | 'mind_map'
-  | 'infographic';
+  | 'infographic'
+  // mc2-6ye5z.4/.5/.8. `slide_deck` is binary (PDF or PPTX), the other two are
+  // text (Markdown and CSV) — see `isTextMediaType`.
+  | 'slide_deck'
+  | 'report'
+  | 'data_table';

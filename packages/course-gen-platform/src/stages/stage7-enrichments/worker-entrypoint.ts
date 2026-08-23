@@ -24,6 +24,7 @@ import { cache, REDIS_UNAVAILABLE_EVENT } from '@/shared/cache/redis';
 import { createStage7Worker, gracefulShutdown, STAGE7_CONFIG } from './index';
 import type { Worker } from 'bullmq';
 import type { Stage7JobInput, Stage7JobResult } from './types';
+import { recordWorkerStart } from '@/orchestrator/worker-start-marker';
 
 let worker: Worker<Stage7JobInput, Stage7JobResult> | null = null;
 
@@ -318,6 +319,15 @@ async function main(): Promise<void> {
       },
       'Stage 7 Enrichment Worker started successfully'
     );
+
+    // Stage 7 has its own entrypoint, so anything added to the general one
+    // misses it — the mistake that got the cost ledger wrong three separate
+    // times. The restart marker goes in both (mc2-r7udy).
+    await recordWorkerStart({
+      role: 'stage7',
+      concurrency: STAGE7_CONFIG.CONCURRENCY,
+      queueName: STAGE7_CONFIG.QUEUE_NAME,
+    });
   } catch (error) {
     logger.error(
       {

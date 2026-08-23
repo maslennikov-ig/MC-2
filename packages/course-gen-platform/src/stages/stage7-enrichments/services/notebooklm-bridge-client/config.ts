@@ -25,6 +25,15 @@ import {
   INFOGRAPHIC_START_DEFAULT_PATH,
   INFOGRAPHIC_TASK_STATUS_DEFAULT_PATH,
   INFOGRAPHIC_TASK_RESULT_DEFAULT_PATH,
+  SLIDE_DECK_START_DEFAULT_PATH,
+  SLIDE_DECK_TASK_STATUS_DEFAULT_PATH,
+  SLIDE_DECK_TASK_RESULT_DEFAULT_PATH,
+  REPORT_START_DEFAULT_PATH,
+  REPORT_TASK_STATUS_DEFAULT_PATH,
+  REPORT_TASK_RESULT_DEFAULT_PATH,
+  DATA_TABLE_START_DEFAULT_PATH,
+  DATA_TABLE_TASK_STATUS_DEFAULT_PATH,
+  DATA_TABLE_TASK_RESULT_DEFAULT_PATH,
 } from './constants.js';
 
 import type { NotebookLMBridgeConfig } from './types.js';
@@ -164,6 +173,15 @@ export function getBridgeConfig(): NotebookLMBridgeConfig {
     infographicStartPath: normalizePath('', INFOGRAPHIC_START_DEFAULT_PATH),
     infographicTaskStatusPath: normalizePath('', INFOGRAPHIC_TASK_STATUS_DEFAULT_PATH),
     infographicTaskResultPath: normalizePath('', INFOGRAPHIC_TASK_RESULT_DEFAULT_PATH),
+    slideDeckStartPath: normalizePath('', SLIDE_DECK_START_DEFAULT_PATH),
+    slideDeckTaskStatusPath: normalizePath('', SLIDE_DECK_TASK_STATUS_DEFAULT_PATH),
+    slideDeckTaskResultPath: normalizePath('', SLIDE_DECK_TASK_RESULT_DEFAULT_PATH),
+    reportStartPath: normalizePath('', REPORT_START_DEFAULT_PATH),
+    reportTaskStatusPath: normalizePath('', REPORT_TASK_STATUS_DEFAULT_PATH),
+    reportTaskResultPath: normalizePath('', REPORT_TASK_RESULT_DEFAULT_PATH),
+    dataTableStartPath: normalizePath('', DATA_TABLE_START_DEFAULT_PATH),
+    dataTableTaskStatusPath: normalizePath('', DATA_TABLE_TASK_STATUS_DEFAULT_PATH),
+    dataTableTaskResultPath: normalizePath('', DATA_TABLE_TASK_RESULT_DEFAULT_PATH),
     defaultWaitOptions: {
       timeoutMs: parsePositiveNumber(process.env.NOTEBOOKLM_BRIDGE_TASK_TIMEOUT_MS, timeoutMs),
       initialPollDelayMs,

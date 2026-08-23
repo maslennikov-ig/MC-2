@@ -1,10 +1,20 @@
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shared/llm/client';
+import { buildProviderPriceCeiling } from '@/shared/llm/client-helpers';
+import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
+import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
+import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
+import {
+  selectAttemptModel,
+  settleSuccessfulAttempt,
+  recordFailedAttempt,
+} from './runtime-attempt';
 import {
   createModelConfigService,
   EMERGENCY_FALLBACK_MODEL,
 } from '@/shared/llm/model-config-service';
 import type { PhaseModelConfig } from '@/shared/llm/model-config-db';
-import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
+import { estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { logger } from '@/shared/logger';
 import type { CareerPlaybookNodeCost } from '@megacampus/shared-types';
@@ -42,6 +52,16 @@ export interface CareerPlaybookAbortedAttempt {
   attempt: number;
   durationMs: number;
   error: string;
+  /**
+   * OpenRouter's id for the attempt, captured from the response headers before
+   * the body — and therefore before the abort. It is what makes the sentence
+   * above ("its cost is unknown") no longer true.
+   */
+  generationId?: string;
+  /** Display name of the endpoint that served it, from the generation record. */
+  providerName?: string;
+  /** What OpenRouter actually billed for the attempt we walked away from. */
+  costUsd?: number;
 }
 
 export interface CareerPlaybookLLMResult {
@@ -57,6 +77,10 @@ export interface CareerPlaybookLLMResult {
   attemptCount: number;
   /** Attempts that failed before this call eventually succeeded. */
   abortedAttempts: CareerPlaybookAbortedAttempt[];
+  /** OpenRouter's id for the attempt that succeeded, when one was captured. */
+  generationId?: string;
+  /** Display name of the endpoint that served the successful attempt. */
+  providerName?: string;
 }
 
 /** Thrown when every attempt failed, so the aborted attempts still reach the receipt. */
@@ -72,26 +96,40 @@ export class CareerPlaybookLLMCallError extends Error {
 }
 
 /**
- * Convert aborted attempts into node-cost rows carrying an explicit unknown cost.
- * They are never summed into the total; `unknown_cost_attempts` reports how many
- * exist so a reader knows the total is a lower bound.
+ * Convert aborted attempts into node-cost rows.
+ *
+ * An attempt whose generation record came back is priced from it and counts
+ * towards the total like any other call — because it was billed like any other
+ * call. On 2026-08-20 four such attempts cost 120s each and appeared nowhere,
+ * which is most of why a $0.077338 ledger met a $0.144177 invoice (mc2-64n8i).
+ *
+ * An attempt whose record never came back keeps the old honest shape: zero, and
+ * `cost_unknown` so a reader knows the total is a lower bound.
  */
 export function buildCareerPlaybookAbortedAttemptCosts(
   node: string,
   abortedAttempts: readonly CareerPlaybookAbortedAttempt[] | undefined
 ): CareerPlaybookNodeCost[] {
-  return (abortedAttempts ?? []).map(attempt => ({
-    node,
-    model: attempt.model,
-    input_tokens: 0,
-    output_tokens: 0,
-    cost_usd: 0,
-    duration_ms: attempt.durationMs,
-    attempts: attempt.attempt + 1,
-    outcome: 'aborted' as const,
-    cost_unknown: true,
-    error: attempt.error,
-  }));
+  return (abortedAttempts ?? []).map(attempt => {
+    // `typeof`, not truthiness: a provider that billed exactly $0 measured that,
+    // and filing it as unknown would put it back among the holes we are closing.
+    const billed = typeof attempt.costUsd === 'number';
+    return {
+      node,
+      model: attempt.model,
+      input_tokens: 0,
+      output_tokens: 0,
+      cost_usd: billed ? (attempt.costUsd as number) : 0,
+      duration_ms: attempt.durationMs,
+      attempts: attempt.attempt + 1,
+      outcome: 'aborted' as const,
+      cost_unknown: !billed,
+      error: attempt.error,
+      ...(attempt.generationId ? { generation_id: attempt.generationId } : {}),
+      ...(attempt.providerName ? { provider_name: attempt.providerName } : {}),
+      ...(billed ? { billed_by_provider: true } : {}),
+    };
+  });
 }
 
 export interface CareerPlaybookRuntime {
@@ -126,7 +164,7 @@ interface CareerPlaybookModelUsage {
   output_tokens?: number;
 }
 
-interface CareerPlaybookModelInvocation {
+export interface CareerPlaybookModelInvocation {
   content: string;
   usage?: CareerPlaybookModelUsage;
 }
@@ -153,7 +191,9 @@ export interface CareerPlaybookRuntimeDependencies {
     modelId: string,
     temperature: number,
     maxTokens: number,
-    timeoutMs?: number
+    timeoutMs?: number,
+    reasoning?: undefined,
+    providerRouting?: OpenRouterProviderRouting
   ) => CareerPlaybookModel;
 }
 
@@ -228,13 +268,31 @@ export function createCareerPlaybookRuntime(
       const callStartedAt = Date.now();
       const abortedAttempts: CareerPlaybookAbortedAttempt[] = [];
 
+      // Both live and die with this call, deliberately. The owner's decision of
+      // 2026-08-20: no standing blocklist, because a provider that is degraded
+      // now may be the cheapest working one next time, and a list nobody prunes
+      // goes stale in silence. The next call starts at the cheapest again.
+      //
+      // `triedEndpointTags` is the same rule stated forwards: the endpoints this
+      // chain has already spent an attempt on. `ignoredProviderSlugs` remains
+      // for the path where no endpoint list could be fetched, where the only way
+      // to learn the provider is still to ask afterwards.
+      const triedEndpointTags = new Set<string>();
+      const ignoredProviderSlugs = new Set<string>();
+
+      // A ceiling no endpoint can meet is a refusal, not a cheaper route —
+      // OpenRouter answers "No endpoints found that satisfy the max price for
+      // this request". One wrong catalogue price would otherwise fail every
+      // attempt identically, so the ceiling gives way and the generation lives.
+      let priceCeilingRefused = false;
+
       for (let attempt = 0; attempt < attempts; attempt += 1) {
-        const useFallback =
-          Boolean(options.preferFallbackModel) || startOnFallbackForLargeInput || attempt > 0;
-        const modelId =
-          useFallback && phaseConfig.fallbackModelId
-            ? phaseConfig.fallbackModelId
-            : phaseConfig.modelId;
+        const modelId = selectAttemptModel(
+          phaseConfig,
+          options,
+          attempt,
+          startOnFallbackForLargeInput
+        );
         const tokenMultiplier = options.maxTokensMultiplier ?? (attempt >= 2 ? 1.25 : 1);
         const requestedMaxTokens = Math.ceil(
           (options.maxTokens ?? phaseConfig.maxTokens ?? 12_000) * tokenMultiplier
@@ -249,74 +307,103 @@ export function createCareerPlaybookRuntime(
         const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
         const attemptStartedAt = Date.now();
 
-        try {
-          const model = createModel(modelId, temperature, maxTokens, timeoutMs);
-          const invocation = await withLLMTimeout(
-            invokeModelWithOptionalStructuredOutput(model, prompt, options),
-            timeoutMs,
-            options
-          );
+        const priceCeiling = priceCeilingRefused
+          ? undefined
+          : buildProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
 
-          // Prefer real OpenRouter usage (requested via usage.include); fall back to
-          // the already-computed length/4 estimate when the provider/structured-output
-          // path omits it.
-          const inputTokens = invocation.usage?.input_tokens ?? promptTokens;
-          const outputTokens =
-            invocation.usage?.output_tokens ?? estimateTokenCount(invocation.content);
-          const costUsd = estimateCost(modelId, inputTokens + outputTokens, inputTokens);
-          const durationMs = Date.now() - attemptStartedAt;
-          const totalDurationMs = Date.now() - callStartedAt;
+        // Pin this attempt to one endpoint, so that whatever happens to it is
+        // attributable without asking anyone afterwards. Routing around a
+        // provider used to depend on `GET /api/v1/generation` naming it, and
+        // that record is unreadable while the call is still running — which is
+        // exactly what a timeout is (mc2-6crnj).
+        const endpoint = pickCheapestUntriedEndpoint(
+          await listModelEndpoints(modelId),
+          triedEndpointTags,
+          priceCeiling
+        );
+        if (endpoint) triedEndpointTags.add(endpoint.tag);
 
-          logger.info(
+        const providerRouting: OpenRouterProviderRouting = {
+          ...(endpoint ? { order: [endpoint.tag], allow_fallbacks: false } : {}),
+          // Only when there is no pin: with one, the endpoints already tried are
+          // excluded by not being chosen, and `ignore` would say the same thing
+          // twice. Without one — an unreachable endpoint list — this is the old
+          // behaviour, unchanged, learning the provider after the fact.
+          ...(!endpoint && ignoredProviderSlugs.size > 0
+            ? { ignore: [...ignoredProviderSlugs] }
+            : {}),
+          ...(priceCeiling ? { max_price: priceCeiling } : {}),
+        };
+
+        if (endpoint) {
+          logger.debug(
             {
               phaseName: options.phaseName,
               node: options.node,
-              promptKey: options.promptKey,
               modelId,
               attempt,
-              durationMs,
-              totalDurationMs,
-              inputTokens,
-              outputTokens,
-              costUsd,
+              endpoint: endpoint.tag,
+              providerName: endpoint.providerName,
+              promptPricePerMillion: endpoint.promptPricePerMillion,
             },
-            'Career Playbook LLM call succeeded'
+            'Career Playbook attempt pinned to one endpoint'
           );
+        }
 
-          return {
-            content: invocation.content,
-            model: modelId,
-            inputTokens,
-            outputTokens,
-            costUsd,
-            durationMs: totalDurationMs,
-            attemptCount: attempt + 1,
+        // Hoisted so the id survives the throw: on an abort it is the only thing
+        // the attempt leaves behind, and it is what identifies both the provider
+        // to route around and the amount actually billed.
+        let slotRef: GenerationIdSlot | undefined;
+
+        try {
+          const invocation = await withGenerationIdCapture(async slot => {
+            slotRef = slot;
+            const model = createModel(
+              modelId,
+              temperature,
+              maxTokens,
+              timeoutMs,
+              undefined,
+              providerRouting
+            );
+            return await withLLMTimeout(
+              invokeModelWithOptionalStructuredOutput(model, prompt, options),
+              timeoutMs,
+              options
+            );
+          });
+
+          return settleSuccessfulAttempt({
+            invocation,
+            options,
+            modelId,
+            attempt,
+            promptTokens,
+            generationId: slotRef?.generationId,
+            attemptStartedAt,
+            callStartedAt,
             abortedAttempts,
-          };
+          });
         } catch (error) {
           lastError = error;
-          const failedDurationMs = Date.now() - attemptStartedAt;
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          abortedAttempts.push({
-            model: modelId,
+          if (priceCeiling && isPriceCeilingRefusal(error)) {
+            priceCeilingRefused = true;
+            logger.error(
+              { phaseName: options.phaseName, node: options.node, modelId, priceCeiling },
+              'No provider is within the Career Playbook price ceiling; retrying without it and leaving the catalogue price to be corrected'
+            );
+          }
+
+          await recordFailedAttempt({
+            error,
+            options,
+            modelId,
             attempt,
-            durationMs: failedDurationMs,
-            error: errorMessage,
+            generationId: slotRef?.generationId,
+            durationMs: Date.now() - attemptStartedAt,
+            abortedAttempts,
+            ignoredProviderSlugs,
           });
-          // The pre-instrumentation catch swallowed retries silently; the failed-attempt
-          // warning is the single most valuable diagnostic line for latency/cost runaways.
-          logger.warn(
-            {
-              phaseName: options.phaseName,
-              node: options.node,
-              promptKey: options.promptKey,
-              modelId,
-              attempt,
-              durationMs: failedDurationMs,
-              error: errorMessage,
-            },
-            'Career Playbook LLM call attempt failed'
-          );
         }
       }
 

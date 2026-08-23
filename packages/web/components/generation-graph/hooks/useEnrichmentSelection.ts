@@ -85,6 +85,9 @@ export function useEnrichmentSelection(
       nlm_flashcards: 0,
       nlm_mind_map: 0,
       nlm_infographic: 0,
+      nlm_slide_deck: 0,
+      nlm_report: 0,
+      nlm_data_table: 0,
     }
 
     for (const enrichment of items) {

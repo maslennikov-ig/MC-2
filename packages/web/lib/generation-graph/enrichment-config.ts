@@ -17,27 +17,22 @@ import {
   Layers,
   Network,
   ImageIcon,
+  Table,
   type LucideIcon,
 } from 'lucide-react'
+import type { EnrichmentType as SharedEnrichmentType } from '@megacampus/shared-types'
 
 /**
- * Enrichment type (matches database enum)
+ * Enrichment type.
+ *
+ * Re-exported from `@megacampus/shared-types` rather than restated
+ * (mc2-6ye5z.4/.5/.8). This was a hand-kept copy of the same union and it had
+ * already drifted: the record below is typed `Record<EnrichmentType, ...>`, so
+ * a copy that is one value short does not fail — it silently narrows what the
+ * UI can describe, and the gap only surfaces when something indexes the record
+ * with the real type.
  */
-export type EnrichmentType =
-  | 'video'
-  | 'nlm_video'
-  | 'audio'
-  | 'nlm_audio'
-  | 'presentation'
-  | 'quiz'
-  | 'document'
-  | 'cover'
-  | 'card'
-  | 'banner'
-  | 'nlm_study_guide'
-  | 'nlm_flashcards'
-  | 'nlm_mind_map'
-  | 'nlm_infographic'
+export type EnrichmentType = SharedEnrichmentType
 
 /**
  * Enrichment status (matches database enum)
@@ -232,6 +227,39 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     labelRu: 'Инфографика',
     twoStage: false,
     order: 13,
+  },
+  nlm_slide_deck: {
+    icon: Presentation,
+    color: 'text-amber-500 dark:text-amber-400',
+    colorClass: 'text-amber-500 dark:text-amber-400',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    bgClass: 'bg-amber-100 dark:bg-amber-900/30',
+    label: 'Slide Deck',
+    labelRu: 'Слайды',
+    twoStage: false,
+    order: 14,
+  },
+  nlm_report: {
+    icon: FileText,
+    color: 'text-sky-500 dark:text-sky-400',
+    colorClass: 'text-sky-500 dark:text-sky-400',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+    bgClass: 'bg-sky-100 dark:bg-sky-900/30',
+    label: 'Report',
+    labelRu: 'Отчёт',
+    twoStage: false,
+    order: 15,
+  },
+  nlm_data_table: {
+    icon: Table,
+    color: 'text-teal-500 dark:text-teal-400',
+    colorClass: 'text-teal-500 dark:text-teal-400',
+    bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+    bgClass: 'bg-teal-100 dark:bg-teal-900/30',
+    label: 'Data Table',
+    labelRu: 'Таблица данных',
+    twoStage: false,
+    order: 16,
   },
 }
 

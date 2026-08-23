@@ -1,21 +1,25 @@
 # The official Serve image digest pins the full transitive runtime. These are
 # the overlay packages applied on top of it.
 #
-# The overlay used to RAISE the base (v1.29.0 shipped Docling 2.117 / Core
-# 2.88). Since the base moved to v1.30.0 it does the opposite for one package:
-# that image ships docling-core 2.91.0 and this pins it back to 2.90.0.
+# The overlay used to hold `docling-core` BACK: the v1.30.0 base shipped 2.91.0
+# and this pinned 2.90.0, so that the jobkit heading-hierarchy fix would be the
+# only library change a behaviour difference could be attributed to.
 #
-# On purpose. The point of the v1.30.0 bump was to take the jobkit
-# heading-hierarchy fix, and holding docling-core still keeps that the only
-# library change to attribute a behaviour difference to. Nothing is violated by
-# doing so: docling-slim 2.118.0 asks for >=2.90.0 and docling-parse 7.10.0 for
-# >=2.85.0, so `pip check` is satisfied. 2.91.0 carries one feature — uniform
-# `source` on the `add_<...>` constructors — that this service does not call.
+# That hold is now impossible, and this is the entry that says why: docling-slim
+# 2.121.0 declares `docling-core>=2.91.0`, and the Dockerfile runs `pip check`.
+# The engine takes the core with it. So the comment's own instruction — re-measure
+# the Stage A-D structure evidence when Core moves — came due and was paid: the
+# A/B on `tests/integration/fixtures/docling-quality/` is what accepted 2.92.0.
 #
-# Revisit when there is a reason to move Core, and re-measure the Stage A-D
-# structure evidence when you do: docling-core is what defines DoclingDocument,
-# and `groups[]`/`label`/`name`/parent chains are read directly by our
-# provenance and container extraction.
-docling-slim[standard,service-client,models-remote,format-opendocument]==2.118.0
-docling-core==2.90.0
+# What moves with it, and what the measurement was watching for:
+#   - core 2.92.0 serialises markdown with GFM line breaks (#721) and lets the
+#     chunker carry content layers past the document (#593). Both change text,
+#     which moves chunk boundaries.
+#   - docling 2.121.0 descends into a content control that holds an image
+#     (#3952) — docx is more than half of what this service converts.
+#   - docling 2.120.0 infers PDF heading level from font weight, slant and case
+#     (#3984), which is the capability `DOCLING_MCP_PDF_HEADING_HIERARCHY` asks
+#     for per conversion.
+docling-slim[standard,service-client,models-remote,format-opendocument]==2.121.0
+docling-core==2.92.0
 grpcio==1.67.1

@@ -79,13 +79,17 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
 
     // Fail-open: review-required outcomes should not trigger outer fallback loops.
     //
-    // SAFETY NET (defensive): the self-reviewer node already sets needsHumanReview
-    // and reviewInfo through channel-safe state updates (applyChannelSafeEscalation).
-    // This block is a last-resort recovery for edge cases where the node path might
-    // not fire — e.g. future refactors that add new terminal conditions without
-    // routing them through the node. Since channel-safety chain landed (commits
-    // 67725d56 → 020bed88), the node path is authoritative; this safety net should
-    // rarely trigger in production.
+    // SAFETY NET (defensive): both nodes that can exhaust a budget now set
+    // needsHumanReview and reviewInfo through channel-safe state updates — the
+    // self-reviewer since the channel-safety chain (67725d56 → 020bed88), the
+    // judge since 2026-08-23 (mc2-51epl). This block is a last-resort recovery
+    // for edge cases where neither node path fires — e.g. future refactors that
+    // add new terminal conditions without routing them through a node.
+    //
+    // "Rarely" was not true before the judge was fixed: the judge reached its
+    // cap on every exhausted lesson and set nothing, so this net was the primary
+    // path and its warning fired on ordinary runs. If the line below appears
+    // now, a node really did leave without saying why.
     //
     // IMPORTANT: this block does NOT mutate `result`. Instead it computes a local
     // recoveredReviewInfo that's used only if `result.reviewInfo` is absent.

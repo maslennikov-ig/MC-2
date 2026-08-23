@@ -7,8 +7,7 @@
  */
 
 import { logger } from '@/shared/logger';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { attachCostRecording } from '@/shared/llm/model-cost-callbacks';
+import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   getRecommendedTemperatureV2,
@@ -129,9 +128,10 @@ export async function generateSection(
   // Create LLM instance with section-specific temperature and dynamic token limit.
   // Section regeneration is a paid call like any other: without the cost
   // callback its trace row carried tokens and no price (mc2-4wiot).
-  const model = attachCostRecording(
-    createOpenRouterModel(modelId, temperature, maxTokens),
+  const model = createCostRecordingModel(
     modelId,
+    temperature,
+    maxTokens,
     'stage_6_section_expander',
     courseId ?? undefined
   );

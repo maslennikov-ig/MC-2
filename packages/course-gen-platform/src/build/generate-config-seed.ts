@@ -16,8 +16,18 @@
  * Flow:
  * 1. Try to connect to Supabase and fetch active llm_model_config rows
  * 2. If successful, write to src/config/config-seed.json (Git-tracked)
- * 3. If DB unavailable, use existing committed seed file
+ * 3. If the database is unreachable, FAIL — unless `--allow-stale` was passed
  * 4. Copy seed to dist/ if dist directory exists
+ *
+ * `--allow-stale` (mc2-s1vg5): fail-open is right for a build that only needs
+ * the seed to exist, and wrong for an explicit run whose whole purpose is to
+ * refresh it. Until 2026-08-23 there was one mode: a run with no credentials
+ * printed "Generation complete!" and exited 0 having read nothing, so an
+ * operator learned the seed was stale only from an empty `git diff`. The
+ * default is now strict and the concession is a flag, so whoever wants it has
+ * to say so in the file that asks. No build asks today — the Dockerfile copies
+ * the committed `src/config/config-seed.json` straight into the image and never
+ * runs this script — so every current caller is an explicit refresh.
  *
  * Environment variables:
  * - SUPABASE_URL: Supabase project URL
@@ -81,6 +91,37 @@ const REQUIRED_PHASES = [
   'stage_6_normal',
   'stage_6_complex',
 ];
+
+export const ALLOW_STALE_FLAG = '--allow-stale';
+
+/**
+ * Thrown when the database could not be read and the caller did not opt into a
+ * stale seed. Named so the exit path can tell it from a genuine crash.
+ */
+export class StaleSeedRefusedError extends Error {
+  constructor(reason: string) {
+    super(
+      `[Config Seed] Refused: the database was not read, so the seed was NOT refreshed. ` +
+        `Reason: ${reason}. ` +
+        `Set SUPABASE_URL and SUPABASE_SERVICE_KEY, or pass ${ALLOW_STALE_FLAG} if you ` +
+        `only need the committed seed to exist.`
+    );
+    this.name = 'StaleSeedRefusedError';
+  }
+}
+
+export function parseAllowStale(argv: readonly string[]): boolean {
+  return argv.includes(ALLOW_STALE_FLAG);
+}
+
+/**
+ * Decide what a failed refresh means. Exported so the decision is testable
+ * without a database, a build, or a subprocess.
+ */
+export function assertStaleSeedAllowed(allowStale: boolean, reason: string): void {
+  if (allowStale) return;
+  throw new StaleSeedRefusedError(reason);
+}
 
 /**
  * Minimal schema for seed config validation
@@ -275,7 +316,10 @@ function toSeedConfig(config: LLMModelConfigFull): LLMModelConfigSeed {
 }
 
 async function main(): Promise<void> {
-  logger.info('[Config Seed] Starting generation...');
+  const allowStale = parseAllowStale(process.argv.slice(2));
+  logger.info(
+    `[Config Seed] Starting generation${allowStale ? ` (${ALLOW_STALE_FLAG})` : ''}...`
+  );
 
   // Ensure directories exist
   const srcConfigDir = path.dirname(SEED_PATH);
@@ -327,7 +371,10 @@ async function main(): Promise<void> {
     for (const row of rows) {
       const result = SeedConfigSchema.safeParse(row);
       if (!result.success) {
-        logger.error({ errors: result.error.errors }, `[Config Seed] Invalid config: ${row.phase_name}`);
+        logger.error(
+          { errors: result.error.errors },
+          `[Config Seed] Invalid config: ${row.phase_name}`
+        );
         invalidCount++;
       }
     }
@@ -336,15 +383,21 @@ async function main(): Promise<void> {
       throw new Error(`VALIDATION FAILED: ${invalidCount} invalid config(s) found`);
     }
 
-    logger.info(`[Config Seed] Validation passed: ${rows.length} configs, all required phases present`);
+    logger.info(
+      `[Config Seed] Validation passed: ${rows.length} configs, all required phases present`
+    );
 
     // Sort by phase_name for consistent output
     const sortedData = rows
       .sort((a, b) => a.phase_name.localeCompare(b.phase_name))
       .map(toSeedConfig);
 
-    // Write to source file (will be committed)
-    const content = JSON.stringify(sortedData, null, 2);
+    // Write to source file (will be committed). The trailing newline is not
+    // cosmetic: prettier adds one at commit time, so without it every refresh
+    // produced a one-line diff whether or not the routing had changed — and an
+    // empty `git diff` is exactly the signal mc2-s1vg5 relies on to tell "the
+    // seed already matched" from "the database was never read".
+    const content = `${JSON.stringify(sortedData, null, 2)}\n`;
 
     // Validate file size to prevent corrupted database from creating giant seed
     const contentSize = Buffer.byteLength(content, 'utf-8');
@@ -366,7 +419,9 @@ async function main(): Promise<void> {
 
       if (stat.size !== expectedSize) {
         fs.unlinkSync(tmpPath);
-        throw new Error(`File write verification failed: expected ${expectedSize} bytes, got ${stat.size}`);
+        throw new Error(
+          `File write verification failed: expected ${expectedSize} bytes, got ${stat.size}`
+        );
       }
 
       // Atomic rename
@@ -379,9 +434,16 @@ async function main(): Promise<void> {
       throw writeErr;
     }
 
-    logger.info(`[Config Seed] Refreshed: ${sortedData.length} configs fetched and saved to ${SEED_PATH}`);
+    logger.info(
+      `[Config Seed] Refreshed: ${sortedData.length} configs fetched and saved to ${SEED_PATH}`
+    );
   } catch (err) {
+    if (err instanceof StaleSeedRefusedError) throw err;
     const errorMsg = err instanceof Error ? err.message : String(err);
+
+    // Strict by default: an explicit refresh that read nothing must not exit 0.
+    assertStaleSeedAllowed(allowStale, errorMsg);
+
     logger.warn(`[Config Seed] DB unavailable during build. Using committed config-seed.json.`);
     logger.warn(`   Reason: ${errorMsg}`);
 
@@ -409,7 +471,18 @@ async function main(): Promise<void> {
   logger.info('[Config Seed] Generation complete!');
 }
 
-main().catch((err) => {
-  logger.error({ err }, '[Config Seed] Fatal error:');
-  process.exit(1);
-});
+// Only run when invoked as a script. A test that imports the exported decision
+// helpers must not open a database connection as a side effect of the import.
+const invokedDirectly = process.argv[1] ? path.resolve(process.argv[1]) === __filename : false;
+
+if (invokedDirectly) {
+  main().catch(err => {
+    if (err instanceof StaleSeedRefusedError) {
+      // The cause is the message here; a stack trace would bury it.
+      logger.error(err.message);
+    } else {
+      logger.error({ err }, '[Config Seed] Fatal error:');
+    }
+    process.exit(1);
+  });
+}

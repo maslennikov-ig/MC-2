@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
+import { validateLocale } from '@/shared/validation/locale-validator';
 import {
   DocumentConflictSchema,
   DocumentEvidenceCardsSchema,
@@ -120,7 +122,7 @@ export interface ResolveDocumentEvidenceDecisionsInput {
   runId: string;
   courseId: string;
   organizationId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   mode: 'manual' | 'automatic';
   maxUiExcerptChars: number;
   maxSourceRefsPerSide: number;
@@ -196,7 +198,7 @@ function uniqueAnswers(
 
 function conflictQuestion(input: {
   runId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   subjectKey: string;
   conflict: DocumentConflict;
   documentNames: Map<string, string>;
@@ -327,7 +329,7 @@ function isTerminalUnrecoverableSource(card: DocumentEvidenceCard): boolean {
 
 function degradedQuestion(input: {
   runId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   subjectKey: string;
   card: DocumentEvidenceCard;
   attempt: number;
@@ -350,7 +352,10 @@ function degradedQuestion(input: {
     max_attempts: input.maxAttempts,
     choices,
   });
-  const copy = degradedCopy[input.language];
+  // Only Russian and English copy exists for this question. A course in any
+  // other language gets the English wording — stated here rather than implied by
+  // an index that would silently return `undefined` (mc2-v6fqp).
+  const copy = degradedCopy[validateLocale(input.language, 'en')];
   return {
     category: 'document_conflicts',
     priority: 'important',
@@ -372,7 +377,7 @@ function degradedQuestion(input: {
 
 function capacityQuestion(input: {
   runId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   subjectKey: string;
   issue: DetectorCapacityIssue;
 }): Omit<DocumentEvidenceQuestion, 'questionId' | 'subjectKey' | 'subjectKind'> {
@@ -424,7 +429,7 @@ function capacityQuestion(input: {
 
 export function buildDocumentEvidenceQuestion(input: {
   runId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   subject: DocumentEvidenceDecisionSubject;
   documentNames: Map<string, string>;
   maxUiExcerptChars: number;

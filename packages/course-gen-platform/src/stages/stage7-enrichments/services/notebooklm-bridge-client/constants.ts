@@ -25,6 +25,18 @@ export const MIND_MAP_TASK_RESULT_DEFAULT_PATH = '/artifacts/mind-map/{taskId}/r
 export const INFOGRAPHIC_START_DEFAULT_PATH = '/artifacts/infographic/start';
 export const INFOGRAPHIC_TASK_STATUS_DEFAULT_PATH = '/artifacts/infographic/{taskId}/status';
 export const INFOGRAPHIC_TASK_RESULT_DEFAULT_PATH = '/artifacts/infographic/{taskId}/result';
+
+// mc2-6ye5z.4/.5/.8. Kebab-case in the URL, snake_case in the media type — the
+// same split the mind-map paths already use.
+export const SLIDE_DECK_START_DEFAULT_PATH = '/artifacts/slide-deck/start';
+export const SLIDE_DECK_TASK_STATUS_DEFAULT_PATH = '/artifacts/slide-deck/{taskId}/status';
+export const SLIDE_DECK_TASK_RESULT_DEFAULT_PATH = '/artifacts/slide-deck/{taskId}/result';
+export const REPORT_START_DEFAULT_PATH = '/artifacts/report/start';
+export const REPORT_TASK_STATUS_DEFAULT_PATH = '/artifacts/report/{taskId}/status';
+export const REPORT_TASK_RESULT_DEFAULT_PATH = '/artifacts/report/{taskId}/result';
+export const DATA_TABLE_START_DEFAULT_PATH = '/artifacts/data-table/start';
+export const DATA_TABLE_TASK_STATUS_DEFAULT_PATH = '/artifacts/data-table/{taskId}/status';
+export const DATA_TABLE_TASK_RESULT_DEFAULT_PATH = '/artifacts/data-table/{taskId}/result';
 export const INLINE_TASK_ID = 'inline-result';
 
 export const SUCCESS_TASK_STATUSES = new Set([

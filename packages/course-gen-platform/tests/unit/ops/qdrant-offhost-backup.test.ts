@@ -121,9 +121,26 @@ describe('off-host Qdrant backup contract', () => {
     const backupTimer = source(`${BASE}/megacampus-qdrant-offhost-backup.timer`);
     const restoreService = source(`${BASE}/megacampus-qdrant-offhost-restore.service`);
     const restoreTimer = source(`${BASE}/megacampus-qdrant-offhost-restore.timer`);
+    const exporter = source(`${BASE}/source-command.sh`);
 
-    expect(backup).toContain('KEEP="${KEEP:-14}"');
-    expect(backup).toContain('RETENTION_DAYS="${RETENTION_DAYS:-14}"');
+    // Retention is one number in two programs, and they disagreed once. A
+    // drop-in set RETENTION_DAYS=7 on the backup host on 2026-08-22 while the
+    // production forced command still accepted only 14; the next pull verified
+    // its copy and then could not publish the freshness metric at all, because
+    // the report ended in a value the allow-list rejected as an unknown command.
+    // Nothing was lost and nothing looked wrong until the stale-snapshot alert
+    // fired 36 hours later. So the number is read from the production side and
+    // every other statement of it has to follow.
+    const retention = exporter.match(/^readonly EXPECTED_RETENTION_DAYS=(\d+)$/mu)?.[1];
+    expect(retention, 'the forced command must state one expected retention').toBeDefined();
+    expect(backup).toContain(`KEEP="\${KEEP:-${retention}}"`);
+    expect(backup).toContain(`RETENTION_DAYS="\${RETENTION_DAYS:-${retention}}"`);
+    // And the allow-list must interpolate that constant rather than repeat it,
+    // which is what let the two drift inside a single file.
+    expect(exporter).toContain('publish-backup\\ [0-9]*\\ [0-9]*\\ "$EXPECTED_RETENTION_DAYS"');
+    expect(source(`${BASE}/README.md`)).toContain(
+      `no more than ${retention} daily generations and no generation older than ${retention} days`
+    );
     expect(backup).toContain('MIN_FREE_MB="${MIN_FREE_MB:-10240}"');
     expect(backup).toContain('source_metadata=$(ssh_command metadata)');
     expect(backup).toContain('require_free_space_for_snapshot "$source_size"');
@@ -187,7 +204,10 @@ describe('off-host Qdrant backup contract', () => {
     expect(alerts).toContain(
       'megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds'
     );
-    expect(runbook).toMatch(/14 days/iu);
+    const retention = source(`${BASE}/source-command.sh`).match(
+      /^readonly EXPECTED_RETENTION_DAYS=(\d+)$/mu
+    )?.[1];
+    expect(runbook).toContain(`${retention} days`);
     expect(runbook).toMatch(/rollback/iu);
     expect(runbook).toMatch(/not.*disaster recovery/iu);
   });

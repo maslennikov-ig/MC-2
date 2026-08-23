@@ -1,0 +1,238 @@
+# Branches deleted from origin on 2026-08-22, with the sha each pointed at.
+#
+# Deleting a branch does not delete its commits: `git branch <name> <sha>` or
+# `git push origin <sha>:refs/heads/<name>` brings any of these back byte for byte, as long as the
+# sha is written down. That is what this file is for, and it is why the cleanup was safe to do.
+#
+# Every entry was checked against `develop` by COMMIT SUBJECT, using
+# `check_stranded_commits.py`'s own definition of delivered — cherry-pick and squash change sha,
+# tree and patch-id, so subject is the only thing that survives delivery. Merge commits are excluded
+# the same way the checker excludes them (`--no-merges`): a merge subject never survives a squash.
+#
+# Kept deliberately, NOT in this list: archive/*, backup/*, codex/checkpoint-2026-04-12,
+# feature/video-presentation-pipeline (owner-gated, mc2-hqfc3), codex/career-playbook-numeric-*
+# (the branch IS the preserved exploration), develop, master.
+#
+# branch<TAB>sha
+chore/orchestration-baseline-career-playbook	b738ecfcc
+codex/career-playbook-active-toc	615e7da59
+codex/career-playbook-authoritative-roles-flow	e116f3034
+codex/career-playbook-auto-course-size	72ec70cff
+codex/career-playbook-business-context	90cfc831e
+codex/career-playbook-canonical-public-url	da2636c4a
+codex/career-playbook-card-actions-ux	c0dd0f240
+codex/career-playbook-center-input-ux	693b521c6
+codex/career-playbook-clickable-options	b463031f3
+codex/career-playbook-course-markdown-preview	43073cbf1
+codex/career-playbook-course-preview-bridge	a408ce857
+codex/career-playbook-department-card-selection	b42da2d1b
+codex/career-playbook-document-milk	8ad41e8a4
+codex/career-playbook-document-milk-closeout	c6de8d6bb
+codex/career-playbook-e2e-audit	f2b9c218e
+codex/career-playbook-e2e-quality-fixes	3d6e7f443
+codex/career-playbook-e2e-smoke	8888d2f7d
+codex/career-playbook-esco-role-suggestions	5d88716e4
+codex/career-playbook-followup-language	1ef09facc
+codex/career-playbook-generation-enqueue-500	912f0c17e
+codex/career-playbook-generation-progress	c99ccdf4f
+codex/career-playbook-generation-status	dfe65ee92
+codex/career-playbook-jd-bridge	def0f2074
+codex/career-playbook-landing-demo-fix	2cd3386b7
+codex/career-playbook-library-catalog-unification	016888804
+codex/career-playbook-live-smoke	ad9d6b5af
+codex/career-playbook-live-smoke-fixes	4f13aa4b4
+codex/career-playbook-load-test	94eaac613
+codex/career-playbook-mermaid-labels	95c8c0034
+codex/career-playbook-open-course	de3a81f50
+codex/career-playbook-open-followups	f0b37ce9c
+codex/career-playbook-option-caret-fix	2c5193383
+codex/career-playbook-phase11	e84fa3e34
+codex/career-playbook-pr35-handoff	488026f3a
+codex/career-playbook-quality-urls	94c0716b6
+codex/career-playbook-reader-variants	4845cf14c
+codex/career-playbook-resume-text-header	f01a1eb2f
+codex/career-playbook-role-suggestions	99786e8ce
+codex/career-playbook-smart-department	d86fad5d3
+codex/career-playbook-source-evidence	eb127d21c
+codex/career-playbook-staging-smoke	e56bcb6b2
+codex/career-playbook-ui-mock-variants	a64d9ccdb
+codex/career-playbook-ui-polish	65b4b5b62
+codex/career-playbook-v4-pro-routing	ab54c7558
+codex/career-playbook-viewer-library-snapshot	8127fbee0
+codex/career-playbook-visibility-owner	8813cfb61
+codex/career-playbook-wikidata-role-suggestions	c0f957b46
+codex/compact-catalog-statistics	7aafe6f60
+codex/cp-landing-26-demo	2646f5662
+codex/deploy-career-playbook-open-course-ui	fc679d3cb
+codex/deploy-workflow-changes-trigger-dev	2c30890e2
+codex/docs-l1-l2-routing-20260609-mc2-140614	54bb57a89
+codex/document-evidence-e1	fc0d56203
+codex/document-evidence-e2	14277d8ad
+codex/document-evidence-e3	89a7948eb
+codex/document-evidence-e4	c27b9eb47
+codex/document-evidence-e5	cf4388269
+codex/document-evidence-e6	a6c39e7a0
+codex/e7-dev-activation	d34176104
+codex/e7-evidence-docs	82831b6f2
+codex/e7-evidence-observability	7a7d54aeb
+codex/e7-stage5-rollout	b7359f32d
+codex/fix-career-playbook-dev-visibility	1e54d9201
+codex/fix-career-playbook-library-search	2e6b47e97
+codex/fix-career-playbook-lint-budget	c8b5dfd27
+codex/fix-career-playbook-new-prefill	43c604a31
+codex/fix-career-playbook-router-test-mock	68eae8af7
+codex/fix-course-landing-light-theme	89eff6c7e
+codex/fix-develop-self-reviewer-tests	a315f29c0
+codex/fix-existing-web-lint-warnings	389dd0807
+codex/fix-integration-ci-timeout	e50fc3354
+codex/fix-push-dev-beads-sync	c01ad33df
+codex/fix-qdrant-integration-service	b34e1eeb9
+codex/generation-stage-preview-action	8a1496f2b
+codex/hero-card-typography-scale	7f3fb28f2
+codex/job-instruction-ui-entry	72baa597f
+codex/primary-worktree-cleanup	b5a0aae69
+codex/product-ia-course-landing	da21e9c25
+codex/product-ia-review-fixes	a81c0801e
+codex/production-reader-shell	67758fe6c
+codex/propagate-tavily-deploy-secret	25976b2af
+codex/q10-docs	42ed13227
+codex/q11-focused	4f94cebf4
+codex/q11-infra	56cbccd75
+codex/q11-postgres	ec68b8a57
+codex/q12-acceptance-gate	c8eaf0394
+codex/q12-activation-contract-fix	5f7eb8b5e
+codex/q12-activation-contract-review	e540871ca
+codex/q12-authoritative-docs	d695db997
+codex/q12-backup-pg17-pin	a25f01a04
+codex/q12-backup-pg17-rereview	dee0b4265
+codex/q12-backup-pg17-review	4e32dcf9d
+codex/q12-current-truth-docs-review	38da2255a
+codex/q12-d5-root-producer	fa6172fc7
+codex/q12-d5-w-fixture-seam	3dd9ad53a
+codex/q12-d5j-joined-fixture	bf27f5952
+codex/q12-d6-activation-truth	d1627f1c5
+codex/q12-db-credential-discovery	5625f47c8
+codex/q12-deploy-preflight	866eee229
+codex/q12-docs-review	9bcca13a1
+codex/q12-final-docs-correction	bc76f7208
+codex/q12-final-docs-rereview	5c5f937ae
+codex/q12-final-docs-review	69fd56108
+codex/q12-final-focused	ffed83003
+codex/q12-final-infra	b4bc78789
+codex/q12-final-postgres	6c10ab4ec
+codex/q12-g7-backup-restore	31b9e6eb1
+codex/q12-h-handoff	70bf61037
+codex/q12-local-snapshot-review	8749a1c49
+codex/q12-local-snapshots	c355d895d
+codex/q12-m-migration-cli	29d73d045
+codex/q12-migrations	16d84cd9f
+codex/q12-operator-runtime	843465b83
+codex/q12-p-operator-publisher	7c88781f4
+codex/q12-pg17-restore-pin	1da2a448b
+codex/q12-pg17-restore-pin-rereview	0bbc50d2e
+codex/q12-pg17-restore-pin-review	2e7360674
+codex/q12-source-recovery	726b2b5d5
+codex/q12-source-recovery-acceptance	7cdc0b359
+codex/q12-source-recovery-acceptance-rereview	32db2c3d4
+codex/q12-source-recovery-acceptance-review	2c861d34d
+codex/q12-source-recovery-adapters	a8380e7ed
+codex/q12-source-recovery-adapters-rereview	4dc3edd24
+codex/q12-source-recovery-adapters-review	fffbfc603
+codex/q12-source-recovery-core	c1ef4f86c
+codex/q12-source-recovery-core-final-review	5ebed6dc3
+codex/q12-source-recovery-core-rereview	1e365eaa9
+codex/q12-source-recovery-core-review	9796c3d15
+codex/q12-source-recovery-crash-matrix	6f237f1e6
+codex/q12-source-recovery-crash-matrix-final-review	4d22f7d84
+codex/q12-source-recovery-crash-matrix-rereview	8a6a3b15f
+codex/q12-source-recovery-crash-matrix-review	122f32070
+codex/q12-source-recovery-evidence	b9b92eaed
+codex/q12-source-recovery-evidence-db	03f1b6caa
+codex/q12-source-recovery-evidence-db-final-review	b6ee03fb1
+codex/q12-source-recovery-evidence-db-review	845dc0ee1
+codex/q12-source-recovery-evidence-final-review	60d1ae429
+codex/q12-source-recovery-evidence-rereview	ad6ce7845
+codex/q12-source-recovery-evidence-review	254a8b83b
+codex/q12-source-recovery-reindex	be58c34c5
+codex/q12-source-recovery-reindex-final-review	4302542a4
+codex/q12-source-recovery-reindex-rereview	8b419f194
+codex/q12-source-recovery-reindex-review	b82a09f85
+codex/q12-source-recovery-review	233916301
+codex/q12-source-recovery-runtime	f99545a46
+codex/q12-source-recovery-runtime-rereview	26d6559ef
+codex/q12-source-recovery-runtime-review	03c32ef7d
+codex/q12-source-recovery-workflow	5d1245812
+codex/q12-source-recovery-workflow-rereview	61c0fca11
+codex/q12-source-recovery-workflow-review	b54ba6672
+codex/q12-supabase-backup-gate	ba2072826
+codex/q12-supabase-backup-gate-rereview	0276607b5
+codex/q12-supabase-backup-gate-review	cfc818d32
+codex/q12-supabase-docs-rereview	0b7ffe679
+codex/q12-supabase-docs-review	6f80e87f5
+codex/q12-w-activation-tuple	43fddcea8
+codex/q12-w-writer-barrier	609100534
+codex/qdrant-formula-index-fix	d9e01ac00
+codex/qdrant-observability-docs-preflight	7d3951b34
+codex/qdrant-q1-schema	91ecd1157
+codex/qdrant-q2-collection-manager	7c3702d3b
+codex/qdrant-q3-native-ingestion	bc0ceacfe
+codex/qdrant-q4-hybrid-formula	4159c2f43
+codex/qdrant-q5-pinned-integration	3c36a6a1b
+codex/qdrant-q6-runtime	14322c8f6
+codex/qdrant-q7-reindex	49e5e8d75
+codex/qdrant-q8-recovery	c4e0a0f34
+codex/qdrant-q9-observability	9f64b59b2
+codex/qdrant-runtime-preflight	f77575bd8
+codex/security-audit-deps-20260612	e66e3c1a1
+codex/self-hosted-qdrant-platform	75074f85c
+codex/self-hosted-qdrant-platform-plan	54957ccfa
+codex/single-source-course-generation-flow	729cc917e
+codex/token-efficiency-rollout	71cfa9356
+codex/trigger-career-playbook-dev-deploy	68ca9b97a
+codex/trigger-linked-course-web-dev-deploy	a6e97dfc0
+codex/update-career-playbook-landing-e2e	cbd69af31
+codex/vmy-7082-dev-qdrant-repair	22e872106
+feature/career-playbook-backend	4e7386a8e
+feature/career-playbook-backend-2	df7ba8008
+feature/career-playbook-backend-3	8e0f28a24
+feature/career-playbook-frontend-phase-b	4bc389646
+feature/career-playbook-frontend-wizard	6d6448b7c
+feature/career-playbook-landing	0e2287616
+feature/career-playbook-library-share	778ccaf71
+feature/career-playbook-pdf	3d5c9d8d3
+feature/career-playbook-phase-b-transport	179db3173
+feature/career-playbook-viewer-editor	e5000482b
+feature/nlm-enrichments	364ec5803
+fix/stage6-token-model-ladder	f5c71345f
+
+# Local-only tips, recorded 2026-08-22: these differed from the origin sha above,
+# or the branch existed only on this machine.
+codex/career-playbook-live-smoke-fixes	6379fd1fa
+codex/career-playbook-quality-review	7de9ff9d6
+codex/hallmark-hero-redesign	bb51e53a4
+codex/hero-typography-closeout	5d80fb27e
+codex/mc2-rag-retry-fix	fe928ffba
+codex/q12-live-controller	516e4adf8
+codex/self-hosted-qdrant-platform	c8624cd9b
+codex/update-github-actions-node24	907406fd4
+codex/verification-evidence-v2	b46c01fe8
+
+# Local-only leftovers, cleared the same day after the origin sweep.
+#
+# Both `backup/*` branches pointed at EXACTLY the commits `origin/archive/*` already carries —
+# the same sha under a second name, on one laptop. Removing the local name loses nothing; the
+# archives on origin are the copy that matters.
+backup/checkpoint-2026-04-12_2026-05-10	7ffa264cf	= origin/archive/checkpoint-pre-sync-2026-05-10
+backup/develop_pre-sync_2026-05-10	84055f862	= origin/archive/develop-pre-sync-2026-05-10
+#
+# `codex/career-playbook-numeric-review` was NOT deleted. The allowlist promises it is kept "so the
+# 2026-06 exploration is not lost", and it existed on one disk only — a promise a disk failure would
+# have broken. It was pushed to origin instead, which is what keeping it actually means.
+#
+# Four stashes, all from June-July 2026 and all taken on branches that no longer exist, were kept as
+# annotated tags and then dropped. None applied cleanly to develop in either direction any more, so
+# none was restorable as a patch; the tags keep the commits themselves.
+stash-archive/2026-08-22-0	0376d5698	WIP on stage/cp-imp-2-judge: 43070a6f fix(career-playbook): record rea
+stash-archive/2026-08-22-1	e154dfa45	On codex/career-playbook-e2e-quality-fixes: backup career-playbook-e2e
+stash-archive/2026-08-22-2	23b0e7b10	On develop: cleanup-backup career-playbook-generation-progress before
+stash-archive/2026-08-22-3	11cf60c7b	On codex/fix-dev-lint-business-context: cleanup-backup career-playbook

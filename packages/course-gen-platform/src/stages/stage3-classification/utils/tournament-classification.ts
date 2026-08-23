@@ -17,8 +17,7 @@
 
 import { logger } from '../../../shared/logger/index.js';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { createOpenRouterModel } from '../../../shared/llm/langchain-models';
-import { attachCostRecording } from '../../../shared/llm/model-cost-callbacks';
+import { createCostRecordingModel } from '../../../shared/llm/langchain-models';
 import { z } from 'zod';
 import { DocumentPriorityLevelSchema } from '@megacampus/shared-types';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
@@ -347,9 +346,10 @@ async function executeSingleStageClassification(
   courseId?: string
 ): Promise<TournamentClassificationResult> {
   const modelConfig = await getClassificationModelConfig();
-  const model = attachCostRecording(
-    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
+  const model = createCostRecordingModel(
     modelConfig.modelId,
+    modelConfig.temperature,
+    modelConfig.maxTokens,
     'stage_3_classification',
     courseId
   );
@@ -385,9 +385,10 @@ async function classifyDocumentGroup(
   courseId?: string
 ): Promise<GroupClassificationResult[]> {
   const modelConfig = await getClassificationModelConfig();
-  const model = attachCostRecording(
-    createOpenRouterModel(modelConfig.modelId, modelConfig.temperature, modelConfig.maxTokens),
+  const model = createCostRecordingModel(
     modelConfig.modelId,
+    modelConfig.temperature,
+    modelConfig.maxTokens,
     'stage_3_classification',
     courseId
   );

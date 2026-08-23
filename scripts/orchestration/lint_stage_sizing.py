@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate cohesive v2.19 stage manifests, scope ledgers, and active-stage state."""
+"""Validate cohesive current-profile stage manifests, scope ledgers, and active-stage state."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ MANIFEST_SCHEMA = "orchestration-stage/v1"
 LEDGER_SCHEMA = "scope-preservation-ledger/v1"
 ANCHOR_SCHEMA = "scope-criterion-snapshot/v1"
 ARTIFACT_SCHEMA = "orchestration-artifact/v3"
-PROFILE = "balanced-v2.19"
+PROFILE = "balanced-v2.20"
 LIFECYCLE_STATUSES = {
     "planned",
     "in_progress",
@@ -494,7 +494,7 @@ def _validate_stream_aggregation(
             schema = values.get("schema_version")
             if schema in {"orchestration-artifact/v1", "orchestration-artifact/v2"}:
                 errors.append(
-                    f"{label}: newly reported delegated {schema} artifact is not allowed in a v2.19 stage: {relative}"
+                    f"{label}: newly reported delegated {schema} artifact is not allowed in a v2.20 stage: {relative}"
                 )
             if schema == ARTIFACT_SCHEMA:
                 actual_paths.add(relative)
@@ -633,12 +633,12 @@ def lint_stage(repo: pathlib.Path, stage_id: str) -> list[str]:
     contract, profile = _profile(repo)
     if profile != PROFILE:
         return []
+    sizing = contract.get("stage_sizing")
+    legacy = sizing.get("legacy_active_stage_id") if isinstance(sizing, dict) else None
+    if legacy == stage_id:
+        return []
     manifest_path = repo / ".codex" / "stages" / stage_id / "stage-manifest.json"
     if not manifest_path.is_file():
-        sizing = contract.get("stage_sizing")
-        legacy = sizing.get("legacy_active_stage_id") if isinstance(sizing, dict) else None
-        if legacy == stage_id:
-            return []
         return [
             f"new {PROFILE} stage {stage_id!r} requires .codex/stages/{stage_id}/stage-manifest.json; "
             "only stage_sizing.legacy_active_stage_id may finish under the pre-upgrade contract"
@@ -650,8 +650,6 @@ def lint_stage(repo: pathlib.Path, stage_id: str) -> list[str]:
     if not isinstance(goal_id, str):
         return errors + ["stage manifest goal_id must be a stable token"]
     errors.extend(validate_goal(repo, goal_id))
-    sizing = contract.get("stage_sizing")
-    legacy = sizing.get("legacy_active_stage_id") if isinstance(sizing, dict) else None
     if (
         isinstance(legacy, str)
         and legacy.strip()

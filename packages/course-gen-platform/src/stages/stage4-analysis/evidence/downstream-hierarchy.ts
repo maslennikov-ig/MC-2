@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import type { DocumentEvidenceCard } from '@megacampus/shared-types';
 import { get_encoding, type Tiktoken } from 'tiktoken';
 import { STRUCTURED_REDUCE_SYSTEM_PROMPT } from './card-generator';
@@ -53,7 +54,7 @@ function hash(value: string): string {
 export function estimateDownstreamReduceInputTokens(
   units: DownstreamSummaryUnit[],
   topic: string,
-  _language: 'ru' | 'en'
+  _language: LanguageCode
 ): number {
   return withEncoder(encoder => countRequestWithEncoder(encoder, units, topic));
 }
@@ -72,7 +73,7 @@ export function groupDownstreamUnits(
   units: DownstreamSummaryUnit[],
   topic: string,
   maxBatchTokens: number,
-  _language: 'ru' | 'en'
+  _language: LanguageCode
 ): DownstreamSummaryUnit[][] {
   return withEncoder(encoder => {
     const groups: DownstreamSummaryUnit[][] = [];
@@ -98,7 +99,7 @@ export function splitDownstreamUnit(
   unit: DownstreamSummaryUnit,
   topic: string,
   maxBatchTokens: number,
-  _language: 'ru' | 'en'
+  _language: LanguageCode
 ): DownstreamSummaryUnit[] {
   return withEncoder(encoder => {
     if (countRequestWithEncoder(encoder, [unit], topic) <= maxBatchTokens) {
@@ -251,7 +252,7 @@ function splitMaterialItem(
 export function buildCardMaterialUnits(
   card: DocumentEvidenceCard,
   maxBatchTokens: number,
-  _language: 'ru' | 'en'
+  _language: LanguageCode
 ): DownstreamSummaryUnit[] {
   return withEncoder(encoder =>
     materialItems(card).flatMap(item => splitMaterialItem(card, item, maxBatchTokens, encoder))

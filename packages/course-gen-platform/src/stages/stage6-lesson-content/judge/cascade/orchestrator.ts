@@ -339,9 +339,14 @@ export async function executeCascadeEvaluation(
       // Check confidence threshold
       const confidenceRank: Record<JudgeConfidence, number> = { high: 2, medium: 1, low: 0 };
       const isHighConfidence = confidenceRank[singleJudgeVerdict.confidence] >= 1; // medium or high
+      // One threshold, one direction. The rule used to carry a second arm —
+      // `score < 1 - threshold`, "so bad there is nothing to deliberate about" —
+      // and across 1302 stored verdicts it never once fired: the lowest score
+      // this judge has ever given is 0.520. It was not a safety valve, it was a
+      // clause that made a one-sided rule read as a band, which is how the
+      // threshold ended up sitting on the median (mc2-r31fw).
       const isAboveThreshold =
-        singleJudgeVerdict.overallScore >= finalConfig.singleJudgeConfidenceThreshold ||
-        singleJudgeVerdict.overallScore < 1 - finalConfig.singleJudgeConfidenceThreshold;
+        singleJudgeVerdict.overallScore >= finalConfig.singleJudgeConfidenceThreshold;
 
       if (isHighConfidence && isAboveThreshold) {
         logger.info({
@@ -395,15 +400,24 @@ export async function executeCascadeEvaluation(
     lessonUuid: input.lessonUuid,
   };
 
-  const clevResult = await executeCLEVVoting(clevInput, {
-    rubric: finalConfig.rubric,
-  });
+  const clevResult = await executeCLEVVoting(
+    clevInput,
+    { rubric: finalConfig.rubric },
+    // The single judge is the `secondary` model on the same lesson with the same
+    // prompt, so its verdict is admitted as that vote instead of being cast a
+    // second time.
+    singleJudgeVerdict
+  );
 
-  // Sum tokens from all CLEV verdicts
-  const clevTokens = clevResult.verdicts.reduce((sum, v) => sum + v.tokensUsed, 0);
-  totalTokensUsed += clevTokens;
-  totalInputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.inputTokens ?? 0), 0);
-  totalOutputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.outputTokens ?? 0), 0);
+  // Sum tokens from all CLEV verdicts. A reused verdict's tokens were counted
+  // when it was cast, so counting them again here would report a call that was
+  // never made — the shape of double counting `cost:report` already had to
+  // unpick once.
+  const isReused = (verdict: JudgeVerdict): boolean => verdict === singleJudgeVerdict;
+  const freshVerdicts = clevResult.verdicts.filter(verdict => !isReused(verdict));
+  totalTokensUsed += freshVerdicts.reduce((sum, v) => sum + v.tokensUsed, 0);
+  totalInputTokens += freshVerdicts.reduce((sum, v) => sum + (v.inputTokens ?? 0), 0);
+  totalOutputTokens += freshVerdicts.reduce((sum, v) => sum + (v.outputTokens ?? 0), 0);
 
   const vetoedClevResult = applyFactualIssueVeto(clevResult);
   const factualIssueVetoApplied = Boolean(vetoedClevResult.blockingFactualIssue);

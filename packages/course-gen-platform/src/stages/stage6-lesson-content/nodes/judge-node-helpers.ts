@@ -43,6 +43,7 @@ import {
   buildFactualWarnings,
   buildReviewInfo,
 } from './judge-refinement-helpers';
+import { HANDLER_CONFIG } from '../config';
 
 /**
  * Context object passed between judge phases
@@ -924,6 +925,67 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     decision?.action === DecisionAction.TARGETED_FIX ||
     decision?.action === DecisionAction.ITERATIVE_REFINEMENT;
 
+  const nextRetryCount = needsRegeneration ? state.retryCount + 1 : state.retryCount;
+
+  // The last regeneration this lesson is allowed is not a regeneration — it is
+  // the end. The node has to say so itself, because the routing function that
+  // notices the cap is pure and its return value cannot carry state: a channel
+  // update written anywhere else is dropped by LangGraph. Until 2026-08-23 the
+  // judge asked for a regeneration it knew could not happen, routing logged
+  // `Max regeneration retries exceeded - ending graph`, and the graph ended with
+  // needsHumanReview false, no reviewInfo and no content. `executeStage6`'s
+  // safety net then reconstructed all three and said it "should be rare" — it
+  // was the only path. 76 of the 154 review_required rows in this database were
+  // written that way. The self-reviewer has done this correctly since the
+  // channel-safety chain landed (`applyChannelSafeEscalation`); this is the same
+  // move for the other node that can exhaust the same budget.
+  const capReached = needsRegeneration && nextRetryCount >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+
+  if (capReached) {
+    const scoreText =
+      finalScore === null || finalScore === undefined
+        ? 'not scored'
+        : `${(finalScore * 100).toFixed(1)}%`;
+    const reason =
+      `Judge regeneration retries exceeded (${HANDLER_CONFIG.MAX_REGENERATION_RETRIES}). ` +
+      `Latest quality score: ${scoreText}.`;
+
+    logger.warn(
+      {
+        lessonId: state.lessonSpec.lesson_id,
+        retryCount: nextRetryCount,
+        maxRetries: HANDLER_CONFIG.MAX_REGENERATION_RETRIES,
+        qualityScore: finalScore,
+        finalRecommendation,
+      },
+      'Judge node: regeneration budget exhausted, ending as review_required'
+    );
+
+    return {
+      currentNode: 'judge',
+      lessonContent: null,
+      qualityScore: finalScore,
+      judgeRecommendation: finalRecommendation,
+      needsRegeneration: false,
+      needsHumanReview: true,
+      reviewInfo: { needsReview: true, reasons: [reason] },
+      errors: [reason],
+      factualWarnings: factualWarnings ?? undefined,
+      regenerationMode: null,
+      regenerateCount: (state.regenerateCount ?? 0) + 1,
+      retryCount: nextRetryCount,
+      tokensUsed: totalTokensUsed,
+      durationMs,
+      progressSummary: completionProgress,
+      qaSignals: qaSignals ?? undefined,
+      ...(usedTargetedRefinement && {
+        arbiterOutput,
+        targetedRefinementStatus: finalContent ? ('accepted' as const) : ('escalated' as const),
+        targetedRefinementTokensUsed: refinementTokensUsed,
+      }),
+    };
+  }
+
   return {
     currentNode: 'judge',
     lessonContent: finalLessonContent,
@@ -937,7 +999,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     regenerateCount: needsRegeneration
       ? (state.regenerateCount ?? 0) + 1
       : (state.regenerateCount ?? 0),
-    retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
+    retryCount: nextRetryCount,
     tokensUsed: totalTokensUsed,
     durationMs,
     progressSummary: completionProgress,

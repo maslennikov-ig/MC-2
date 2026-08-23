@@ -6,42 +6,58 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
-import { buildProviderParams } from '@/shared/llm/langchain-models';
+import { createCostRecordingModelAsync } from '@/shared/llm/langchain-models';
 import { normalizeLanguageCode } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { ModelTier, SectionBatchResult } from './types';
-import { MODELS, OPENROUTER_BASE_URL } from './constants';
+import { MODELS } from './constants';
 import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
 import { estimateTokens } from './utils';
 
+/** How long a section batch is allowed to take. */
+const SECTION_BATCH_TIMEOUT_MS = 300_000;
+
 /**
- * Create ChatOpenAI model instance for OpenRouter.
+ * The catalogue phase a tier is billed under.
  *
- * Goes through `buildProviderParams` rather than setting `temperature` and
- * `maxTokens` directly, because two provider facts decide whether the numbers
- * the configuration carries are the numbers the request carries: GPT-5.6
- * ignores `temperature`, and OpenRouter bills reasoning tokens against
- * `max_tokens`, so a reasoning budget has to be added to the answer budget.
- * Setting the fields here bypassed both checks.
+ * Written out rather than built from the tier name, so the phases a trace row
+ * can carry are greppable: a phase assembled at runtime has twice been declared
+ * dead while it was live (mc2-tp61k). `tier3_gemini` is the context-overflow
+ * escalation, which is what `stage_5_escalation` is.
  */
-function createModel(tier: ModelTier): ChatOpenAI {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+const PHASE_BY_TIER: Record<ModelTier['tier'], string> = {
+  simple: 'stage_5_simple',
+  normal: 'stage_5_normal',
+  complex: 'stage_5_complex',
+  tier3_gemini: 'stage_5_escalation',
+};
 
-  if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY environment variable is required for section generation');
-  }
-
-  return new ChatOpenAI({
-    modelName: tier.model,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-    },
-    apiKey: apiKey,
-    timeout: 300000,
-    ...buildProviderParams(tier.model, tier.temperature, tier.maxTokens, tier.reasoning),
-  });
+/**
+ * Build the model for a section batch.
+ *
+ * Goes through the shared factory rather than assembling its own `ChatOpenAI`.
+ * That decides three things this file used to get wrong on its own: the key
+ * comes from the admin panel instead of `process.env`, the transport is the
+ * instrumented one, and the call records its own price — this is Stage 5 section
+ * generation, which is paid for (mc2-me7nx).
+ *
+ * `temperature` and `maxTokens` still travel through `buildProviderParams`
+ * inside the factory, because two provider facts decide whether the numbers the
+ * configuration carries are the numbers the request carries: GPT-5.6 ignores
+ * `temperature`, and OpenRouter bills reasoning tokens against `max_tokens`.
+ */
+async function createModel(tier: ModelTier, courseId?: string): Promise<ChatOpenAI> {
+  return createCostRecordingModelAsync(
+    tier.model,
+    tier.temperature,
+    tier.maxTokens,
+    PHASE_BY_TIER[tier.tier],
+    courseId,
+    tier.reasoning,
+    SECTION_BATCH_TIMEOUT_MS
+  );
 }
 
 /**
@@ -312,7 +328,7 @@ export async function generateWithRetry(
         previousSectionsDigest
       );
 
-      const model = createModel(currentModelTier);
+      const model = await createModel(currentModelTier, input.course_id);
       const response = await model.invoke(prompt);
 
       let rawContent: string;

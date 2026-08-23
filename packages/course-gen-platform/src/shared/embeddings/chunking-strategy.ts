@@ -166,16 +166,29 @@ export async function chunkWithStrategy(
     source?: NativeChunkingInput;
     config?: ChunkingConfig;
     chunker?: DoclingServeChunker;
+    /**
+     * Whether Docling was ever going to convert this input (mc2-51epl).
+     *
+     * A `.md` or `.txt` upload is already markdown, so Docling does not touch
+     * it and the absence of a conversion is the expected outcome, not a fault.
+     * Without this the same line was printed at warn either way, and a run over
+     * markdown sources looked like a run with a broken converter. `false` means
+     * "expected", `true` or omitted keeps the warning.
+     */
+    doclingApplicable?: boolean;
   } = {}
 ): Promise<StrategyChunkingResult> {
   const config = options.config ?? DEFAULT_CHUNKING_CONFIG;
   const requested = options.strategy ?? resolveChunkingStrategy();
 
   if (requested !== 'legacy_markdown' && !options.source) {
-    logger.warn(
-      { requested },
-      'Native Docling chunking requires an accepted Docling conversion; using legacy_markdown'
-    );
+    const message =
+      'Native Docling chunking requires an accepted Docling conversion; using legacy_markdown';
+    if (options.doclingApplicable === false) {
+      logger.debug({ requested }, message);
+    } else {
+      logger.warn({ requested }, message);
+    }
   }
 
   if (requested === 'legacy_markdown' || !options.source) {

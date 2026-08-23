@@ -19,3 +19,6 @@ export { nlmStudyGuideHandler } from './nlm-study-guide-handler';
 export { nlmFlashcardsHandler } from './nlm-flashcards-handler';
 export { nlmMindMapHandler } from './nlm-mind-map-handler';
 export { nlmInfographicHandler } from './nlm-infographic-handler';
+export { nlmSlideDeckHandler } from './nlm-slide-deck-handler';
+export { nlmReportHandler } from './nlm-report-handler';
+export { nlmDataTableHandler } from './nlm-data-table-handler';

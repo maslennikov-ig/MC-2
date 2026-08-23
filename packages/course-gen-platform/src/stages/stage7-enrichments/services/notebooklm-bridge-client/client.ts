@@ -64,6 +64,10 @@ export class NotebookLMBridgeClient {
       mind_map_depth: request.mindMapDepth,
       infographic_orientation: request.infographicOrientation,
       infographic_detail: request.infographicDetail,
+      slide_deck_format: request.slideDeckFormat,
+      slide_deck_length: request.slideDeckLength,
+      slide_deck_output_format: request.slideDeckOutputFormat,
+      artifact_instructions: request.artifactInstructions,
     };
   }
 
@@ -231,6 +235,12 @@ export class NotebookLMBridgeClient {
         return config.mindMapTaskStatusPath;
       case 'infographic':
         return config.infographicTaskStatusPath;
+      case 'slide_deck':
+        return config.slideDeckTaskStatusPath;
+      case 'report':
+        return config.reportTaskStatusPath;
+      case 'data_table':
+        return config.dataTableTaskStatusPath;
     }
   }
 
@@ -251,6 +261,12 @@ export class NotebookLMBridgeClient {
         return config.mindMapTaskResultPath;
       case 'infographic':
         return config.infographicTaskResultPath;
+      case 'slide_deck':
+        return config.slideDeckTaskResultPath;
+      case 'report':
+        return config.reportTaskResultPath;
+      case 'data_table':
+        return config.dataTableTaskResultPath;
     }
   }
 
@@ -410,6 +426,37 @@ export class NotebookLMBridgeClient {
   ): Promise<NotebookLMBridgeTaskStartResult> {
     const config = getOrCreateBridgeConfig();
     return this.startArtifact(request, 'infographic', config.infographicStartPath);
+  }
+
+  /**
+   * Slide deck (mc2-6ye5z.4). Unlike its neighbours the result is binary — PDF
+   * or PPTX — so `isTextMediaType` deliberately excludes it.
+   */
+  async startSlideDeck(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'slide_deck', config.slideDeckStartPath);
+  }
+
+  /**
+   * Report (mc2-6ye5z.5). NotebookLM makes every report the same artifact type
+   * and differs only by format, so this is the study guide's sibling; the
+   * bridge refuses `report_format: 'study_guide'` here to keep the two apart.
+   */
+  async startReport(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'report', config.reportStartPath);
+  }
+
+  /** Data table (mc2-6ye5z.8). CSV, stored inline like the study guide. */
+  async startDataTable(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'data_table', config.dataTableStartPath);
   }
 
   private async generateArtifact(

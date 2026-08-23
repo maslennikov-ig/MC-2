@@ -203,6 +203,31 @@
       ]
     },
     {
+      "id": "content-control-docx",
+      "source": "content-control-image.docx",
+      "expectedTokens": [
+        "Договор с шаблонными блоками",
+        "Внутриконтрольная подпись",
+        "512",
+        "Заключительный абзац вне контрола"
+      ],
+      "provenance": {
+        "minimumRefCoverage": 0.95
+      },
+      "retrieval": [
+        {
+          "id": "attachment-checksum",
+          "query": "контрольная сумма приложения значение",
+          "evidence": [
+            {
+              "id": "checksum-512",
+              "tokens": ["Внутриконтрольная подпись", "512"]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "structured-docx",
       "source": "structured-lists-and-table.docx",
       "expectedTokens": [

@@ -1104,35 +1104,47 @@ describe('runDocumentEvidencePreflight', () => {
     expect(result.cards[0].token_counts.summary).toBeLessThan(400);
   });
 
-  it('rejects an out-of-scope extraction reference instead of accepting a poisoned card', async () => {
-    await expect(
-      runDocumentEvidencePreflight(
-        { ...baseOptions, sources: [source(1)] },
-        {
-          repository: new MemoryRepository(),
-          extractor: {
-            async extract() {
-              return {
-                courseRelevance: 0.8,
-                claims: [
-                  {
-                    statement: 'Poisoned claim.',
-                    confidence: 0.9,
-                    sourceRefs: [{ documentId: documentId(999), versionHash: 'sha256:foreign' }],
-                  },
-                ],
-                terminology: [],
-                constraints: [],
-                limitations: [],
-                inputTokens: 10,
-                outputTokens: 10,
-                costUsd: 0,
-              };
-            },
+  it('fails the card on an out-of-scope extraction reference, and does not fail the run', async () => {
+    // The poisoned claim is still refused — that has never been negotiable. What
+    // changed is the blast radius: refusing it used to throw out of the whole
+    // preflight and take Stage 4 with it, so one bad unit cost an 18.9-minute
+    // job (mc2-gqhws). The card is the unit of failure now.
+    const result = await runDocumentEvidencePreflight(
+      { ...baseOptions, sources: [source(1)] },
+      {
+        repository: new MemoryRepository(),
+        extractor: {
+          async extract() {
+            return {
+              courseRelevance: 0.8,
+              claims: [
+                {
+                  statement: 'Poisoned claim.',
+                  confidence: 0.9,
+                  sourceRefs: [{ documentId: documentId(999), versionHash: 'sha256:foreign' }],
+                },
+              ],
+              terminology: [],
+              constraints: [],
+              limitations: [],
+              inputTokens: 10,
+              outputTokens: 10,
+              costUsd: 0,
+            };
           },
-        }
-      )
-    ).rejects.toThrow(/out-of-scope source reference/i);
+        },
+      }
+    );
+
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0]).toEqual(
+      expect.objectContaining({
+        coverage_status: 'failed',
+        coverage_reason: 'card_generation_returned_out_of_scope_evidence',
+        key_claims: [],
+      })
+    );
+    expect(JSON.stringify(result.cards[0])).not.toContain('Poisoned claim');
   });
 
   it('bounds targeted verification batches and degrades honestly during a Qdrant outage', async () => {

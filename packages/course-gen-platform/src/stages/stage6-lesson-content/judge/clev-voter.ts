@@ -395,7 +395,17 @@ function parseJudgeResponse(content: string): {
  */
 export async function executeCLEVVoting(
   input: CLEVEvaluationInput,
-  config: Partial<CLEVVoterConfig> = {}
+  config: Partial<CLEVVoterConfig> = {},
+  /**
+   * The `secondary` verdict, when one already exists.
+   *
+   * The cascade's single-judge pass *is* a `secondary` vote — same model, same
+   * lesson, and since 2026-08-22 the same prompt. It used to be thrown away and
+   * cast again from scratch, so every lesson that reached the panel paid the
+   * secondary judge twice. Nothing else changes: the vote counts exactly as it
+   * would have (mc2-r31fw).
+   */
+  existingSecondaryVerdict?: JudgeVerdict
 ): Promise<JudgeAggregatedResult> {
   const finalConfig: CLEVVoterConfig = {
     ...DEFAULT_CLEV_CONFIG,
@@ -423,10 +433,13 @@ export async function executeCLEVVoting(
 
   const startTime = Date.now();
 
-  // Phase 1: Run primary and secondary judges in parallel
+  // Phase 1: Run primary and secondary judges in parallel — or only the primary,
+  // when the cascade already holds the secondary's vote.
   const [primaryResult, secondaryResult] = await Promise.all([
     executeJudge(input, judgeModels.primary, rubric),
-    executeJudge(input, judgeModels.secondary, rubric),
+    existingSecondaryVerdict
+      ? Promise.resolve(existingSecondaryVerdict)
+      : executeJudge(input, judgeModels.secondary, rubric),
   ]);
 
   // Handle failures - graceful degradation

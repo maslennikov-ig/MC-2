@@ -6,9 +6,9 @@
 Backend workers
   -> http://docling-mcp:8000/mcp
   -> nginx facade
-  -> Docling MCP 3.0.0
+  -> Docling MCP 3.1.0
   -> http://docling-serve:5001
-  -> Docling Serve 1.29.0 / Docling 2.118.0 / Core 2.90.0
+  -> Docling Serve 1.31.0 / Docling 2.121.0 / Core 2.92.0
 ```
 
 `docling-serve` has no published host port. The stable application endpoint is
@@ -47,7 +47,7 @@ and `.md` artifacts.
 | MCP                 |      0.5 CPU / 512 MiB |
 
 OCR and table structure are enabled, image scale is 2.0, and local fallback is
-disabled. MCP 3.0.0 does not forward the Serve OCR preset/language fields, so
+disabled. MCP 3.1.0 does not forward the Serve OCR preset/language fields, so
 the thin runtime wrapper supplies `ocr_preset=easyocr` and
 `ocr_lang=[ru,en]`. Both EasyOCR language models are downloaded while building
 the Serve image. `force_ocr` remains disabled so PDFs with an existing text
@@ -109,18 +109,58 @@ so the upstream fix is strictly better and the wrapper is gone. The Dockerfile
 now asserts at build time that the passthrough is still there; a base image that
 regressed would fail the build rather than quietly ignore the request again.
 
-One wrapper remains, and it is NOT removable yet:
-`docling_mcp.docling_cache.get_cache_key` hashes only the source string and the
-OCR flags, so two conversions of the same source with different pipeline options
-share a cache entry. `docker/docling-mcp/runtime.py` folds the conversion
-profile into the key, which makes any profile change a cache miss and a
-reconversion rather than a stale artifact. `docling-mcp` has published nothing
-since 3.0.0; the same wrapper also supplies `service_timeout` and
-`service_max_retries`, which MCP 3.0.0 declares and never passes on.
+Most of the cache-key wrapper went the same way in `docling-mcp` 3.1.0. Until
+then `get_cache_key` hashed only the source string and the OCR flags, so two
+conversions of one file under different pipeline options shared an entry and the
+second was served the first one's artifact. 3.1.0 keys a local file by its
+content digest rather than its path, folds in every setting of its own model bar
+an explicit not-output-relevant list, and stamps the installed package versions.
+On the production corpus that digest keying is worth something concrete: of 108
+convertible uploads measured on 2026-08-23, 39 are byte-identical copies of
+another, and they now share one conversion instead of paying for it each.
+
+What upstream still cannot see is the three options `runtime.py` forces onto
+`ConvertDocumentsOptions` — `ocr_preset`, `ocr_lang` and
+`do_pdf_heading_hierarchy` — because they are not docling-mcp settings, so
+flipping `DOCLING_MCP_PDF_HEADING_HIERARCHY` would otherwise leave the key
+unchanged and serve the artifact produced without it. That much of the wrapper
+stays, along with `service_timeout` and `service_max_retries`, which MCP 3.1.0
+still declares and never passes on (mc2-vlskb).
 
 Measured effect on `numbered-sections.pdf`: without inference the Markdown has
 one distinct heading level (`##` only); with it, two (`##` and `###`), and
-`1.1./1.2.` become level-2 section headers.
+`1.1./1.2.` become level-2 section headers. Re-measured on 2026-08-23 against
+Serve 1.31.0 / Docling 2.121.0: unchanged — expected levels `[2]` without the
+flag and `[2, 3]` with it, counted as DISTINCT levels rather than `#` depth.
+
+## What the 1.31.0 set changed, measured
+
+The whole corpus was converted on both stacks on 2026-08-23, one case per
+process, free channel only (no `--dense`). All 18 cases passed on both and no
+structural assertion moved. Three differences are real and each has a cause:
+
+- **docx content controls.** Docling 2.121.0 descends into a `w:sdt` that holds
+  a drawing; 2.118.0 kept the image placeholder and dropped the text beside it.
+  The corpus could not see this — no fixture had the construct — so
+  `content-control-image.docx` was added and measured directly: 194 characters
+  of Markdown without the caption on the old engine, 271 with it on the new one.
+  docx is more than half of what production uploads.
+- **Chunk context grew.** On the 20-page scientific PDF the number of chunks
+  containing a question's ground-truth tokens rose from 8-9 to 27-40 with the
+  chunk count unchanged, because core 2.92.0 carries content layers into the
+  chunk's contextualised text (#593). `recallAtK` therefore falls while nothing
+  about the answer does: atom coverage, aMRR, aDCG and `firstRelevantRank` are
+  identical on both stacks. This is the reason `R@5` is documented as a
+  description and not a gate.
+- **Russian OCR did not move.** The scored OCR files are byte-identical across
+  the two stacks on all three cases — mean phrase similarity, table cell
+  accuracy and homoglyph counts alike.
+
+One local observation that is NOT a claim about production: converting the
+20-page scientific PDF inside one long-running process was OOM-killed at the
+production 4 GiB envelope and again at 12 GiB on a machine holding 17 of 30 GB
+elsewhere. Converted on its own it completes. Worth re-checking on the host
+before assuming the envelope is untouched.
 
 ## Rollout gate
 
@@ -354,7 +394,9 @@ widens by editing that list and not by upgrading Docling.
 ### What each family actually keeps
 
 Measured 2026-08-07 against Docling 2.118.0 / Serve 1.29.0, not read from
-documentation:
+documentation. Re-checked on 2026-08-23 against Docling 2.121.0 / Serve 1.31.0:
+every one of these seven families produced byte-identical Markdown and the same
+structural assertions on both stacks, so the table stands as written.
 
 | family | structure that survives                                                          | provenance     |
 | ------ | -------------------------------------------------------------------------------- | -------------- |

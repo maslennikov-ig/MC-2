@@ -20,6 +20,8 @@ import {
 
 import logger from '../logger';
 import { logTrace } from '../trace-logger';
+import { fetchGenerationFact } from '../llm/openrouter-generation';
+import { getSupabaseAdmin } from '../supabase/admin';
 
 /** Where a call belongs, so its cost lands on the right course and stage. */
 export interface LlmCostContext {
@@ -56,6 +58,97 @@ export interface LlmCallUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * OpenRouter's `x-generation-id` for this call, when the transport captured
+   * one. Present even for calls that aborted — the header arrives before the
+   * body does.
+   */
+  generationId?: string;
+  /** Display name of the endpoint that served the call, when it is known. */
+  providerName?: string;
+}
+
+/**
+ * Replace an estimated price with what OpenRouter actually charged.
+ *
+ * `MODEL_CATALOG` is a plan, and on 2026-08-20 it was wrong in three places at
+ * once — `openai/gpt-5.6-luna` at exactly half its tariff, `z-ai/glm-5.2` 1.23x
+ * over, `~deepseek/...-latest` 1.45x over — so a ledger built on it could only
+ * ever be argued with, never reconciled. `GET /api/v1/generation` answers with
+ * the charge itself.
+ *
+ * Deferred, never awaited by a caller, one retry inside the lookup, and it
+ * cannot fail a generation: the estimate is already in the row, so the worst
+ * outcome here is that the row keeps it.
+ */
+export function settleTraceCostFromProvider(
+  traceId: string | null,
+  generationId: string | undefined,
+  model: string
+): void {
+  if (!traceId || !generationId) return;
+
+  const timer = setTimeout(() => {
+    void (async () => {
+      try {
+        // Nobody awaits this one, so its waits stay unreferenced: the row keeps
+        // its catalogue estimate if the process leaves first, which is the trade
+        // the `unref` below already accepted. Every other caller does await, and
+        // the default is to hold the loop (mc2-avjau).
+        const fact = await fetchGenerationFact(generationId, { keepProcessAlive: false });
+        // `=== null` and not falsy: a genuine $0 is a measurement, and filing it
+        // as "not measured" is the bug that once corrupted the very metric used
+        // to find unpriced calls (mc2-y452l).
+        if (!fact || fact.usageUsd === null) return;
+
+        const { error } = await getSupabaseAdmin()
+          .from('generation_trace')
+          .update({
+            cost_usd: fact.usageUsd,
+            output_data: {
+              billedByProvider: true,
+              generationId: fact.generationId,
+              providerName: fact.providerName,
+              servedModel: fact.model,
+              router: fact.router,
+              cancelled: fact.cancelled,
+              finishReason: fact.finishReason,
+              nativeTokensPrompt: fact.nativeTokensPrompt,
+              nativeTokensCompletion: fact.nativeTokensCompletion,
+            },
+          })
+          .eq('id', traceId);
+
+        if (error) {
+          logger.debug(
+            { error: error.message, traceId, generationId },
+            '[Cost] Could not write the provider figure onto the trace row'
+          );
+          return;
+        }
+
+        logger.info(
+          {
+            model,
+            servedModel: fact.model,
+            providerName: fact.providerName,
+            billedUsd: fact.usageUsd,
+            cancelled: fact.cancelled,
+            generationId,
+          },
+          '[Cost] Priced from the provider instead of the catalogue'
+        );
+      } catch (error) {
+        logger.debug(
+          { error: error instanceof Error ? error.message : String(error), generationId },
+          '[Cost] Provider price lookup failed; the row keeps its estimate'
+        );
+      }
+    })();
+  }, 0);
+
+  // A receipt still to be collected is not a reason to keep a process alive.
+  timer.unref?.();
 }
 
 /**
@@ -73,39 +166,105 @@ export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
   );
 }
 
+/** What an image call reports about itself. */
+export interface ImageCallUsage {
+  model: string;
+  /**
+   * Prompt tokens, priced at the ordinary input rate. Small next to the image
+   * but not zero: a card prompt is several hundred tokens.
+   */
+  inputTokens?: number;
+  /**
+   * Output tokens. For an image call these are **image** tokens, so they price
+   * at `imageOutputPricePerMillion` rather than at the text output rate.
+   */
+  outputTokens?: number;
+  generationId?: string;
+}
+
+/**
+ * Estimated price of one image call, or `undefined` when it cannot be estimated.
+ *
+ * `undefined` for a model the catalogue does not price *as an image model*, and
+ * for a call whose response reported no token counts. Both are absences, not
+ * zeroes, and the old code had no way to say so: it looked its model up in a
+ * private `MODEL_COSTS` table inside the image service and fell back to a flat
+ * `DEFAULT_COST_USD = 0.04` for anything unknown, so an unrecognised model
+ * produced a confident wrong number instead of a visible hole (mc2-5mhlb).
+ *
+ * This is only ever a placeholder. `settleTraceCostFromProvider` replaces it
+ * with OpenRouter's own charge about ten seconds later.
+ */
+export function calculateImageCostUsd(usage: ImageCallUsage): number | undefined {
+  const capabilities = getModelCapabilities(usage.model);
+  if (!capabilities?.imageOutputPricePerMillion) return undefined;
+  // `== null`, not falsy: a call that genuinely reported zero output tokens is a
+  // measurement, and pricing it as "unknown" is the shape that once corrupted
+  // the unpriced-rows metric (mc2-y452l).
+  if (usage.outputTokens == null) return undefined;
+
+  return (
+    ((usage.inputTokens ?? 0) * capabilities.inputPricePerMillion) / 1_000_000 +
+    (usage.outputTokens * capabilities.imageOutputPricePerMillion) / 1_000_000
+  );
+}
+
 /**
  * Records one image generation against a course.
  *
- * An image is billed per picture, not per token, so its price comes from the
- * provider's own figure rather than from `MODEL_CATALOG`. It still belongs in
- * the trace: the course total is a sum over that table, and a card image that
- * recorded its price only in `lesson_enrichments.metadata` was 18% of the
- * course it was billed to and invisible in the total (mc2-acjgd).
+ * An image is billed per image token, not per text token, and the only figure
+ * worth keeping is the provider's own — so this writes the estimate and then
+ * settles it against `GET /api/v1/generation` exactly as a token call does. It
+ * could not do that before: the image service built its own OpenAI client, the
+ * transport was never wrapped, no `x-generation-id` ever reached us, and the
+ * price stayed whatever the private table said (mc2-l17v5).
+ *
+ * It belongs in the trace regardless: the course total is a sum over that table,
+ * and a card image that recorded its price only in `lesson_enrichments.metadata`
+ * was 18% of the course it was billed to and invisible in the total (mc2-acjgd).
  */
 export async function recordImageCallCost(
-  usage: { model: string; costUsd: number },
+  usage: ImageCallUsage,
   context?: LlmCostContext
 ): Promise<void> {
+  const costUsd = calculateImageCostUsd(usage);
+
   if (!context) {
     logger.debug(
-      { model: usage.model, costUsd: usage.costUsd },
+      { model: usage.model, costUsd, generationId: usage.generationId },
       '[Cost] Image generated without a course context; its cost is not attributed'
     );
     return;
   }
 
+  if (costUsd === undefined) {
+    logger.warn(
+      { model: usage.model, courseId: context.courseId, outputTokens: usage.outputTokens },
+      '[Cost] Image model has no image rate in MODEL_CATALOG; the call is traced without an estimate'
+    );
+  }
+
   try {
-    await logTrace({
+    const traceId = await logTrace({
       courseId: context.courseId,
       stage: context.stage,
       phase: context.phase,
       stepName: context.stepName ?? 'image_call',
       ...(context.lessonId ? { lessonId: context.lessonId } : {}),
       modelUsed: usage.model,
-      costUsd: usage.costUsd,
+      ...(costUsd === undefined ? {} : { costUsd }),
       durationMs: context.durationMs ?? 0,
-      inputData: { billedPerImage: true },
+      inputData: {
+        billedCall: true,
+        billedPerImage: true,
+        ...(usage.inputTokens === undefined ? {} : { inputTokens: usage.inputTokens }),
+        ...(usage.outputTokens === undefined ? {} : { outputTokens: usage.outputTokens }),
+        ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
+        ...(usage.generationId ? { generationId: usage.generationId } : {}),
+      },
     });
+
+    settleTraceCostFromProvider(traceId, usage.generationId, usage.model);
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : String(error), model: usage.model },
@@ -161,7 +320,7 @@ export async function recordLlmCallCost(
   }
 
   try {
-    await logTrace({
+    const traceId = await logTrace({
       courseId: context.courseId,
       stage: context.stage,
       phase: context.phase,
@@ -172,8 +331,26 @@ export async function recordLlmCallCost(
       ...(costUsd === undefined ? {} : { costUsd }),
       durationMs: context.durationMs ?? 0,
       ...(context.retryAttempt === undefined ? {} : { retryAttempt: context.retryAttempt }),
-      inputData: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+      inputData: {
+        // Says "a provider charged for this", so a reconciliation can tell a
+        // call from a stage progress marker. Token counts cannot: `judge_complete`
+        // records the cascade's totals and is unpriced on purpose, because each
+        // judge call prices itself where it is made. Counting those as holes is
+        // what made "money the ledger missed" read 21 when the true answer was 0
+        // (mc2-wjmrd).
+        billedCall: true,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        // The catalogue figure is kept alongside the provider's so a wrong
+        // catalogue entry stays visible after the row is settled, instead of
+        // being quietly overwritten by the truth it should have matched.
+        ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
+        ...(usage.generationId ? { generationId: usage.generationId } : {}),
+        ...(usage.providerName ? { providerName: usage.providerName } : {}),
+      },
     });
+
+    settleTraceCostFromProvider(traceId, usage.generationId, usage.model);
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : String(error), model: usage.model },

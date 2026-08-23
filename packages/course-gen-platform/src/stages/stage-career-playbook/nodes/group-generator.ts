@@ -541,6 +541,7 @@ export async function generateCareerPlaybookGroup(
       input_tokens: llmResult.inputTokens,
       output_tokens: llmResult.outputTokens,
       cost_usd: llmResult.costUsd,
+      ...(llmResult.generationId ? { generation_id: llmResult.generationId } : {}),
       duration_ms: llmResult.durationMs,
       attempts: llmResult.attemptCount,
       outcome: 'succeeded',

@@ -1053,7 +1053,7 @@ function refreshDerivedHashes(view: JsonObject): void {
   }
 }
 
-const GUARD_TABLES = new Set(['active_run', 'baseline', 'migration_guards', 'probe']);
+export const GUARD_TABLES = new Set(['active_run', 'baseline', 'migration_guards', 'probe']);
 // Exact-set, fail-closed: this is every CREATE FUNCTION q12_guard.* the barrier
 // installs (deploy/qdrant/q12-database-barrier.sh install), reconciled to the
 // barrier's real CREATE bytes -- 10 functions, no more, no fewer. The five
@@ -1061,7 +1061,7 @@ const GUARD_TABLES = new Set(['active_run', 'baseline', 'migration_guards', 'pro
 // verify_expected_guards keep their full identity-argument lists (the barrier
 // declares `p_after_migration text DEFAULT NULL`, but pg_get_function_identity_
 // arguments strips the DEFAULT clause from the identity).
-const GUARD_FUNCTIONS = new Set([
+export const GUARD_FUNCTIONS = new Set([
   'assert_capability()',
   'assert_controller_binding()',
   'enforce_ddl_barrier()',
@@ -1084,7 +1084,7 @@ const GUARD_INDEXES = new Set([...GUARD_TABLES].map(name => `${name}_pkey`));
 // verify_expected_guards both exclude typcategory='A' for exactly this
 // reason -- this constant reconciles to that authority, not a new exemption).
 const ARRAY_TYPE_NAMES = new Set([...GUARD_TABLES].map(name => `_${name}`));
-const GUARD_COLUMNS = new Set([
+export const GUARD_COLUMNS = new Set([
   'active_run.singleton',
   'active_run.run_id',
   'active_run.capability_sha256',
@@ -1102,7 +1102,7 @@ const GUARD_COLUMNS = new Set([
   'probe.probe_id',
   'probe.touched_at',
 ]);
-const GUARD_CONSTRAINTS = new Set([
+export const GUARD_CONSTRAINTS = new Set([
   'active_run.active_run_pkey',
   'active_run.active_run_singleton_check',
   'active_run.active_run_capability_sha256_check',
@@ -1123,7 +1123,7 @@ const GUARD_CONSTRAINTS = new Set([
 // durable, append-only guard tables. This is distinct from the EXTERNAL
 // q12_guard_row/q12_guard_truncate triggers the barrier installs on the 75
 // guarded relations outside q12_guard (see isExternalGuardTrigger).
-const GUARD_TRIGGERS = new Set([
+export const GUARD_TRIGGERS = new Set([
   'active_run.q12_guard_immutable',
   'active_run.q12_guard_immutable_truncate',
   'baseline.q12_guard_immutable',

@@ -1,7 +1,15 @@
 fastapi>=0.115.0,<1.0.0
 uvicorn[standard]>=0.30.0,<1.0.0
 pydantic-settings>=2.5.0,<3.0.0
-notebooklm-py>=0.1.0
+# Pinned exactly, not a floor. `notebooklm-py>=0.1.0` let the build date decide
+# the version: the `:latest` image built 2026-08-10 got 0.8.0, the `:develop`
+# image built 2026-06-04 got 0.6.0, and on 2026-08-22 production and dev were
+# two minor versions apart with nobody having chosen either. 0.8.0 is a breaking
+# release — error handling restructured, dict-subscript and get-returns-None
+# access removed — so crossing it must be a decision with a run behind it.
+# 0.8.0 is what production already carries. The move to 0.8.1 is mc2-rmbwo and
+# needs a real generation to verify, which needs the geo-bypass hop back up.
+notebooklm-py==0.8.0
 pytest>=8.0.0,<9.0.0
 httpx>=0.27.0,<1.0.0
 socksio>=1.0.0,<2.0.0

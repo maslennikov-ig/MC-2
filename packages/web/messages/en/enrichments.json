@@ -21,7 +21,10 @@
     "nlm_study_guide": "Study Guide",
     "nlm_flashcards": "Flashcards",
     "nlm_mind_map": "Mind Map",
-    "nlm_infographic": "Infographic"
+    "nlm_infographic": "Infographic",
+    "nlm_slide_deck": "Slide Deck",
+    "nlm_report": "Report",
+    "nlm_data_table": "Data Table"
   },
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
@@ -426,7 +429,7 @@
       "exitFullscreen": "Exit Study Mode",
       "previousCard": "Previous card",
       "nextCard": "Next card",
-      "fullscreenHint": "Arrow keys to navigate \u00b7 Space to flip \u00b7 Esc to exit",
+      "fullscreenHint": "Arrow keys to navigate · Space to flip · Esc to exit",
       "greatJob": "Excellent work! You know most of the material.",
       "keepPracticing": "Keep practicing to improve your score."
     },

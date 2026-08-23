@@ -9,6 +9,11 @@ Promote the current working branch into `develop` and push `develop` to Dev. Thi
 - For **Staging deploy**: use `/deploy`
 - For **Release** (version bump + changelog): use `/push`
 
+After a successful delivery the source branch is **deleted**, locally and on `origin`, and you
+are left on `develop`. Its commits are in `develop`; the branch name is not history. Nothing is
+deleted unless `git merge-base --is-ancestor` confirms `develop` contains the branch, and
+`archive/*`, `backup/*` and anything in `.codex/stranded-commit-allowlist.txt` are never touched.
+
 **Usage:**
 
 ```bash

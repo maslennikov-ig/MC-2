@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { LanguageCode } from '@/shared/workspace-utils';
 import { z } from 'zod';
 import { get_encoding } from 'tiktoken';
 import {
@@ -207,14 +208,14 @@ export interface ConflictMapClaim {
 export interface ConflictDetectionPort {
   retryOwner: 'port';
   mapBatch(input: {
-    language: 'ru' | 'en';
+    language: LanguageCode;
     claims: ConflictMapClaim[];
     max_input_tokens: number;
     max_output_tokens: number;
     max_model_calls: number;
   }): Promise<unknown>;
   reduceValueGroups(input: {
-    language: 'ru' | 'en';
+    language: LanguageCode;
     proposition_key: string;
     clusters: Array<ConflictCluster & { representative_claims: ConflictMapClaim[] }>;
     max_input_tokens: number;
@@ -222,7 +223,7 @@ export interface ConflictDetectionPort {
     max_model_calls: number;
   }): Promise<unknown>;
   classifyProposition(input: {
-    language: 'ru' | 'en';
+    language: LanguageCode;
     proposition_key: string;
     clusters: Array<ConflictCluster & { representative_claims: ConflictMapClaim[] }>;
     max_input_tokens: number;
@@ -343,7 +344,7 @@ export interface DetectDocumentConflictsInput {
   runId: string;
   courseId: string;
   organizationId: string;
-  language: 'ru' | 'en';
+  language: LanguageCode;
   detectionModel: string;
   detectionVersion: string;
   maxClaimsPerMapBatch: number;

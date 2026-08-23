@@ -209,46 +209,74 @@ export async function validateAndInitializeStage4(
     throw new Error(`Course not found: ${courseError?.message || 'No data returned'}`);
   }
 
-  const validStage4States = ['stage_4_init', 'stage_4_analyzing', 'stage_4_awaiting_approval'];
-  if (!validStage4States.includes(course.generation_status as string)) {
+  const status = course.generation_status as string | null;
+
+  // Every Stage 4 status counts as initialized, including the two this list used
+  // to omit: `stage_4_clarifying`, where Phase 0.5 is waiting on the user, and
+  // `stage_4_complete`, which is what a re-analysis of a finished stage starts
+  // from. Both were reported as "not initialized" and then handed to a fallback
+  // that could not run — see below (mc2-51epl warning 5).
+  if (status?.startsWith('stage_4_')) {
+    return;
+  }
+
+  // What `initialize_fsm_with_outbox` will accept. Its own guard updates
+  // `courses` only `WHERE generation_status IS NULL OR IN ('pending',
+  // 'completed', 'failed', 'cancelled')` and raises 23505 otherwise, so for a
+  // course parked mid-pipeline — `stage_2_processing`, `stage_5_generating` —
+  // the call is a round trip that provably ends in the catch below. It was made
+  // anyway, which is how one course produced two warnings and no change.
+  //
+  // This is not a dead branch: 37 of the 182 FSM initialisations in this
+  // database came from here, 5 of them in August. The pipeline can genuinely
+  // reach Stage 4 with a course still at `pending` — that is what happened on
+  // 2026-08-20 to course bf1151ca — and recovering it is the whole point.
+  const FSM_INITIALIZABLE_STATES = ['pending', 'completed', 'failed', 'cancelled'];
+  if (status !== null && !FSM_INITIALIZABLE_STATES.includes(status)) {
     logger.warn(
-      { courseId, jobId, currentStatus: course.generation_status },
-      'Worker validation: Stage 4 not initialized, initializing as fallback'
+      { courseId, jobId, currentStatus: status, fsmInitializableFrom: FSM_INITIALIZABLE_STATES },
+      'Worker validation: Stage 4 job for a course parked outside Stage 4; the FSM cannot be re-initialized from here, continuing processing'
     );
+    return;
+  }
 
-    try {
-      const { InitializeFSMCommandHandler } = await import(
-        '../../shared/fsm/fsm-initialization-command-handler'
-      );
-      const { metricsStore } = await import('../../orchestrator/metrics');
+  logger.warn(
+    { courseId, jobId, currentStatus: status },
+    'Worker validation: Stage 4 not initialized, initializing as fallback'
+  );
 
-      const commandHandler = new InitializeFSMCommandHandler();
-      await commandHandler.handle({
-        entityId: courseId,
-        userId: userId || 'system',
-        organizationId: organizationId || 'unknown',
-        idempotencyKey: `worker-fallback-stage4-${jobId}`,
-        initiatedBy: 'WORKER',
-        initialState: 'stage_4_init',
-        data: { trigger: 'worker_fallback_stage4' },
-        jobs: [],
-      });
+  try {
+    const { InitializeFSMCommandHandler } = await import(
+      '../../shared/fsm/fsm-initialization-command-handler'
+    );
+    const { metricsStore } = await import('../../orchestrator/metrics');
 
-      metricsStore.recordLayer3Activation(true, courseId);
-      logger.info({ courseId, jobId }, 'Worker fallback: Stage 4 initialized successfully');
-    } catch (error) {
-      const { metricsStore } = await import('../../orchestrator/metrics');
-      metricsStore.recordLayer3Activation(false, courseId);
+    const commandHandler = new InitializeFSMCommandHandler();
+    await commandHandler.handle({
+      entityId: courseId,
+      userId: userId || 'system',
+      organizationId: organizationId || 'unknown',
+      idempotencyKey: `worker-fallback-stage4-${jobId}`,
+      initiatedBy: 'WORKER',
+      initialState: 'stage_4_init',
+      data: { trigger: 'worker_fallback_stage4' },
+      jobs: [],
+    });
 
-      logger.warn(
-        {
-          courseId,
-          jobId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'Worker fallback initialization failed (continuing processing)'
-      );
-    }
+    metricsStore.recordLayer3Activation(true, courseId);
+    logger.info({ courseId, jobId }, 'Worker fallback: Stage 4 initialized successfully');
+  } catch (error) {
+    const { metricsStore } = await import('../../orchestrator/metrics');
+    metricsStore.recordLayer3Activation(false, courseId);
+
+    logger.warn(
+      {
+        courseId,
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Worker fallback initialization failed (continuing processing)'
+    );
   }
 }
 

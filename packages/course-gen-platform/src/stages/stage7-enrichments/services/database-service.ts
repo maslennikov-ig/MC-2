@@ -9,6 +9,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { randomUUID } from 'crypto';
+import { isSupportedEnrichmentType } from '@megacampus/shared-types';
 import { getCachedLessonMarkdown } from '../../../shared/cache/file-content-cache';
 import type {
   EnrichmentType,
@@ -17,7 +18,7 @@ import type {
   EnrichmentMetadata,
   Json,
 } from '@megacampus/shared-types';
-import type { EnrichmentWithContext } from '../types';
+import type { EnrichmentWithContext, NotebookLMMediaType } from '../types';
 
 /**
  * Fetch enrichment with lesson and course context
@@ -83,6 +84,19 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
       return null;
     }
 
+    // The `enrichment_type` database enum is wider than the types this build
+    // models: a value is added there first so its handler can be written, and to
+    // the application schema only once it exists. A job for an unmodelled type
+    // has no handler to route to, so refusing it here is the truthful answer —
+    // and it is loud, because a silent null would look like a missing row.
+    if (!isSupportedEnrichmentType(enrichment.enrichment_type)) {
+      logger.error(
+        { enrichmentId, enrichmentType: enrichment.enrichment_type },
+        'Enrichment type exists in the database enum but has no handler in this build - cannot process'
+      );
+      return null;
+    }
+
     // Handle nullable content from lesson_contents - can be Json type
     const lessonContent = lessonContentData?.content
       ? typeof lessonContentData.content === 'string'
@@ -141,7 +155,7 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
 
 export interface NotebookLMAsyncMetadataState {
   taskId: string;
-  mediaType: 'audio' | 'video' | 'study_guide' | 'flashcards' | 'mind_map' | 'infographic';
+  mediaType: NotebookLMMediaType;
   status: string;
   pollAttempt: number;
   startedAt: string;

@@ -21,6 +21,8 @@ import {
   isMissingChatPhaseConfigError,
 } from '../llm/model-config-service.js';
 import { recordLlmCallCost } from '../metrics/llm-cost';
+import { createOpenRouterClient } from '../llm/openrouter-client';
+import { withGenerationIdCapture } from '../llm/generation-id-capture';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
@@ -201,13 +203,6 @@ export async function classifyIntent(
   nodeContext?: NodeContextForClassification,
   client?: OpenAI
 ): Promise<ClassifiedIntent> {
-  const openai =
-    client ||
-    new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY,
-    });
-
   const contextDescription = nodeContext
     ? `${nodeContext.elementType || 'element'} at ${nodeContext.path || 'course level'}`
     : 'course overview';
@@ -237,25 +232,38 @@ export async function classifyIntent(
     const temperature = phaseConfig.temperature;
     const maxTokens = phaseConfig.maxTokens;
 
-    // Using zodResponseFormat to generate JSON Schema from Zod schema.
-    // Note: We use chat.completions.create() instead of chat.completions.parse()
-    // because parse() is an OpenAI-specific extension that may not work with OpenRouter.
-    // zodResponseFormat() is just a helper that converts Zod to JSON Schema - fully compatible.
-    //
-    // cost-exempt: this call goes to the SDK directly rather than through either
-    // LLM wrapper, so it prices itself with `recordLlmCallCost` below. It had no
-    // course to charge and recorded nothing at all, which made every cache miss
-    // in a chat turn spend money that left no row (mc2-b5a2r).
+    // Resolved here rather than at the top of the function so a cache hit does
+    // not go to the database for a key it will not use. `createOpenRouterClient`
+    // rather than a local `new OpenAI`: this call used to read
+    // `process.env.OPENROUTER_API_KEY` directly, ignoring a key rotated in the
+    // admin panel, and its transport saw no `x-generation-id` (mc2-l17v5).
+    const openai = client ?? (await createOpenRouterClient());
+
     const startedAt = Date.now();
-    const response = await openai.chat.completions.create({
-      model: modelId,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      max_tokens: maxTokens,
-      temperature,
-      response_format: zodResponseFormat(IntentSchema, 'intent_classification'),
+    // The slot is filled by the wrapped transport as the response headers
+    // arrive, so `recordLlmCallCost` can hand the id to the provider lookup and
+    // the row gets the real charge rather than the catalogue's guess.
+    const { response, generationId } = await withGenerationIdCapture(async slot => {
+      // Using zodResponseFormat to generate JSON Schema from Zod schema.
+      // Note: We use chat.completions.create() instead of chat.completions.parse()
+      // because parse() is an OpenAI-specific extension that may not work with
+      // OpenRouter. zodResponseFormat() only converts Zod to JSON Schema.
+      //
+      // cost-exempt: this call goes to the SDK directly rather than through
+      // either LLM wrapper, so it prices itself with `recordLlmCallCost` below.
+      // It had no course to charge and recorded nothing at all, which made every
+      // cache miss in a chat turn spend money that left no row (mc2-b5a2r).
+      const completion = await openai.chat.completions.create({
+        model: modelId,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: maxTokens,
+        temperature,
+        response_format: zodResponseFormat(IntentSchema, 'intent_classification'),
+      });
+      return { response: completion, generationId: slot.generationId };
     });
 
     // Priced before the answer is read, because the returns just below — a
@@ -267,6 +275,7 @@ export async function classifyIntent(
         model: response.model || modelId,
         inputTokens: response.usage?.prompt_tokens ?? 0,
         outputTokens: response.usage?.completion_tokens ?? 0,
+        ...(generationId ? { generationId } : {}),
       },
       {
         courseId,

@@ -15,7 +15,7 @@ def exact_identity_required(contract: dict) -> bool:
     stage_state = contract.get("stage_state")
     return (
         isinstance(baseline, dict)
-        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19"}
+        and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19", "balanced-v2.20"}
     ) or (
         isinstance(stage_state, dict)
         and stage_state.get("exact_identity_required") is True
@@ -64,7 +64,7 @@ def main(argv: list[str]) -> int:
 
     errors: list[str] = []
 
-    if profile == "balanced-v2.19":
+    if profile == "balanced-v2.20":
         sizing_linter = repo_root / "scripts" / "orchestration" / "lint_stage_sizing.py"
         if not sizing_linter.is_file():
             errors.append(f"missing stage sizing linter: {sizing_linter}")

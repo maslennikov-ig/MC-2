@@ -25,6 +25,7 @@ import {
   estimateCost,
   validateQwen3MaxContext,
 } from '@/shared/llm/cost-calculator';
+import { MODEL_CATALOG } from '@megacampus/shared-types';
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
 
 describe('Stage 5 Cost Calculator Service', () => {
@@ -32,40 +33,41 @@ describe('Stage 5 Cost Calculator Service', () => {
   // OPENROUTER_PRICING VALIDATION
   // ============================================================================
 
+  // `OPENROUTER_PRICING` is a projection of `MODEL_CATALOG`, not a second table,
+  // so what is worth holding here is the projection — that each model arrives
+  // with the rates the catalogue has and with split-vs-combined preserved.
+  //
+  // These cases used to retype the rates. That made this the THIRD copy of the
+  // same numbers, after the catalogue itself and the snapshot in
+  // `model-catalog-coverage.test.ts`, and on 2026-08-23 a single re-read of
+  // three DeepSeek entries turned eight tests in five files red without any of
+  // them having found a defect (mc2-ts9i2). The rates have one owner: the
+  // catalogue, its deliberate offline snapshot, and the nightly drift check
+  // against the published list.
   describe('OPENROUTER_PRICING configuration', () => {
-    it('should have pricing for qwen/qwen3-max with split pricing', () => {
-      const pricing = OPENROUTER_PRICING['qwen/qwen3-max'];
+    it.each([
+      'qwen/qwen3-max',
+      'openai/gpt-oss-20b',
+      'deepseek/deepseek-v4-flash',
+      'google/gemini-3.7-flash',
+    ])('projects %s straight from the catalogue', modelId => {
+      const pricing = OPENROUTER_PRICING[modelId];
+      const catalogued = MODEL_CATALOG[modelId];
+
       expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(0.78);
-      expect(pricing.outputPricePerMillion).toBe(3.9);
+      expect(pricing.inputPricePerMillion).toBe(catalogued.inputPricePerMillion);
+      expect(pricing.outputPricePerMillion).toBe(catalogued.outputPricePerMillion);
+      // Split pricing, not a single blended rate: a combined figure here would
+      // silently double-count whichever leg is dearer.
       expect(pricing.combinedPricePerMillion).toBeUndefined();
     });
 
-    it('should have split pricing for openai/gpt-oss-20b', () => {
-      const pricing = OPENROUTER_PRICING['openai/gpt-oss-20b'];
-      expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBeUndefined();
-      expect(pricing.inputPricePerMillion).toBe(0.03);
-      expect(pricing.outputPricePerMillion).toBe(0.13);
-    });
-
-    it('should have pricing for deepseek/deepseek-v4-flash with split pricing', () => {
-      const pricing = OPENROUTER_PRICING['deepseek/deepseek-v4-flash'];
-      expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBeUndefined();
-      expect(pricing.inputPricePerMillion).toBe(0.14);
-      expect(pricing.outputPricePerMillion).toBe(0.28);
-    });
-
-    it('should have pricing for google/gemini-3.7-flash with split pricing', () => {
-      const pricing = OPENROUTER_PRICING['google/gemini-3.7-flash'];
-      expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(0.375);
-      expect(pricing.outputPricePerMillion).toBe(1.875);
+    it('carries every catalogued model, so a new one cannot be priced at zero', () => {
+      expect(Object.keys(OPENROUTER_PRICING).sort()).toEqual(Object.keys(MODEL_CATALOG).sort());
     });
 
     it('should have positive pricing values for all models', () => {
-      Object.entries(OPENROUTER_PRICING).forEach(([model, pricing]) => {
+      Object.entries(OPENROUTER_PRICING).forEach(([, pricing]) => {
         expect(pricing.inputPricePerMillion).toBeGreaterThan(0);
         expect(pricing.outputPricePerMillion).toBeGreaterThan(0);
       });
@@ -125,17 +127,22 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50 split): (2500/1M * 0.78) + (2500/1M * 3.90) = 0.0117
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.0117, 6);
+      // What this case holds is the 50/50 token split and the summing, not the
+      // rates — those belong to the catalogue (see the projection cases above).
+      const half = (modelId: string, tokens: number): number =>
+        ((tokens / 2) * MODEL_CATALOG[modelId].inputPricePerMillion) / 1e6 +
+        ((tokens / 2) * MODEL_CATALOG[modelId].outputPricePerMillion) / 1e6;
 
-      // Sections cost (deepseek-v4-flash, 50/50 split): (22500/1M * 0.14) + (22500/1M * 0.28) = 0.00945
-      expect(cost.sections_cost_usd).toBeCloseTo(0.00945, 6);
+      const expectedMetadata = half('qwen/qwen3-max', 5000);
+      const expectedSections = half('deepseek/deepseek-v4-flash', 45000);
+
+      expect(cost.metadata_cost_usd).toBeCloseTo(expectedMetadata, 6);
+      expect(cost.sections_cost_usd).toBeCloseTo(expectedSections, 6);
 
       // Validation cost: 0
       expect(cost.validation_cost_usd).toBe(0);
 
-      // Total cost: 0.0117 + 0.00945 = 0.02115
-      expect(cost.total_cost_usd).toBeCloseTo(0.02115, 6);
+      expect(cost.total_cost_usd).toBeCloseTo(expectedMetadata + expectedSections, 6);
 
       // Token breakdown
       expect(cost.token_breakdown.metadata_tokens).toBe(5000);

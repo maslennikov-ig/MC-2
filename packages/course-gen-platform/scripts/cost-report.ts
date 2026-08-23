@@ -14,15 +14,31 @@
  * Read-only. Never writes.
  *
  * Usage:
- *   pnpm cost:report <courseId> [--json]
- *   pnpm cost:report --since 2026-08-20T12:00:00Z [--json]
+ *   pnpm cost:report <courseId> [--json] [--verify-with-provider]
+ *   pnpm cost:report --since 2026-08-20T12:00:00Z [--json] [--verify-with-provider]
  *
- * The `--since` form is the one to compare against an OpenRouter invoice
- * window: pick the moment before the run started and read the provider's
- * dashboard for the same window.
+ * `--verify-with-provider` asks OpenRouter what it charged for each of THIS
+ * run's calls, by generation id, and sums those. That is the reconciliation to
+ * trust. The delta of `GET /api/v1/credits` is not, and the runbook used to say
+ * it was: the key is shared with production and that traffic never stops, so on
+ * 2026-08-23 two idle samples with no call of ours spent $0.084 in 45 s and
+ * $0.072 in 150 s, while a whole ten-call measurement cost $0.0298 — about one
+ * minute of the background. Over two hours the delta read $1.4739 against a real
+ * $0.03, a factor of 49, and at a $5 ceiling it can report a breach that never
+ * happened. Remaining credit is a ceiling check; it is not attribution
+ * (mc2-yson0).
  */
 
+// The runbook's command is `pnpm cost:report ...` and nothing else in this
+// script reads a config file, so without this it exits 1 on
+// "Missing Supabase configuration" and the reconciliation stops before it
+// starts. The 2026-08-20 run worked around it with `set -a && . ./.env`, which
+// is exactly the kind of undocumented step that makes a runbook untrustworthy
+// (mc2-wjdfe).
+import 'dotenv/config';
+
 import { getSupabaseAdmin } from '../src/shared/supabase/admin.js';
+import { fetchGenerationFact } from '../src/shared/llm/openrouter-generation.js';
 
 interface TraceRow {
   id: string;
@@ -34,9 +50,53 @@ interface TraceRow {
   tokens_used: number | null;
   cost_usd: number | null;
   created_at: string;
+  input_data: Record<string, unknown> | null;
+  /**
+   * Where the settled figure lands. `settleTraceCostFromProvider` writes
+   * `billedByProvider` here, not into `input_data` — and this column was not
+   * even selected, so `priced by the provider` could only ever read 0. It did,
+   * on a run whose image row was demonstrably settled (mc2-r0vhq).
+   */
+  output_data: Record<string, unknown> | null;
+  error_data: Record<string, unknown> | null;
 }
 
 const PAGE = 1000;
+
+/**
+ * Whether this row represents a call somebody was billed for.
+ *
+ * The cost recorders stamp `input_data.billedCall`, and a call that died
+ * mid-flight carries `error_data.spentButUnpriced`. Everything else with a token
+ * count is a stage progress marker — `generator_complete`, `phase_complete`,
+ * `judge_complete` — or a Jina embedding, which is not billed through OpenRouter
+ * at all.
+ *
+ * The stamp is deliberate rather than inferred, because inference gets this
+ * wrong in both directions. Token counts do not identify a call: `judge_complete`
+ * records the whole cascade's totals and is unpriced *on purpose*, since each
+ * judge call prices itself where it is made. Step names do not either: a caller
+ * may pass its own, and `selfReviewer_complete` is a real priced call.
+ *
+ * The distinction is the difference between a metric and a rumour. On 2026-08-20
+ * the report announced 21 rows of "money the ledger missed" and every one was a
+ * marker or an embedding, which made the runbook's acceptance line "rows with
+ * tokens but NO price = 0" unreachable by construction (mc2-wjmrd).
+ */
+function isBilledCallRow(row: TraceRow): boolean {
+  if (row.input_data?.billedCall === true) return true;
+  if (row.error_data?.spentButUnpriced === true) return true;
+  // Rows written before the stamp existed. `llm_call` and `image_call` are the
+  // recorders' defaults, so this classifies an older window correctly without
+  // pretending a marker is a call.
+  return row.step_name === 'llm_call' || row.step_name === 'image_call';
+}
+
+/** A billed call that still carries no price. These are the real holes. */
+function isLedgerHole(row: TraceRow): boolean {
+  // `=== null`, never falsy: a measured $0 is a measurement (mc2-y452l).
+  return isBilledCallRow(row) && row.cost_usd === null;
+}
 
 function usd(value: number): string {
   return `$${value.toFixed(6)}`;
@@ -67,7 +127,7 @@ async function readRows(filter: { courseId?: string; since?: string }): Promise<
     let query = supabase
       .from('generation_trace')
       .select(
-        'id, course_id, stage, phase, step_name, model_used, tokens_used, cost_usd, created_at'
+        'id, course_id, stage, phase, step_name, model_used, tokens_used, cost_usd, created_at, input_data, output_data, error_data'
       );
 
     if (filter.courseId) query = query.eq('course_id', filter.courseId);
@@ -101,13 +161,128 @@ function bucketBy(rows: TraceRow[], keyOf: (row: TraceRow) => string): Bucket[] 
     bucket.calls += 1;
     bucket.tokens += row.tokens_used ?? 0;
     bucket.cost += row.cost_usd ?? 0;
-    // A row that spent tokens but carries no price is a hole in the ledger.
-    // `cost_usd === 0` is NOT one: since mc2-y452l a measured zero is stored as
-    // 0 and is distinguishable from "never measured".
-    if (row.cost_usd === null && (row.tokens_used ?? 0) > 0) bucket.unpriced += 1;
+    if (isLedgerHole(row)) bucket.unpriced += 1;
     map.set(key, bucket);
   }
   return [...map.values()].sort((a, b) => b.cost - a.cost);
+}
+
+/**
+ * What the Career Playbook spent, which lives somewhere else entirely.
+ *
+ * Playbook costs are written to `career_playbooks.cost_breakdown`, not to
+ * `generation_trace` — a playbook is not a course, and `generation_trace`
+ * requires a `course_id` that references one. The report used to sum only the
+ * trace, so on 2026-08-20 the window showed $0.076998 and called it the total
+ * while a whole product line was outside it (mc2-rkmeg). Reconciling half a
+ * ledger against a whole invoice can only ever fail.
+ */
+interface PlaybookCost {
+  id: string;
+  updatedAt: string;
+  status: string;
+  costUsd: number;
+  unknownCostAttempts: number;
+  calls: number;
+  /** `nodeCosts[].generation_id`, so playbook spend can be verified like the rest. */
+  generationIds: string[];
+}
+
+async function readPlaybookCosts(filter: { since?: string }): Promise<PlaybookCost[]> {
+  if (!filter.since) return [];
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .select('id, status, updated_at, cost_breakdown')
+    .gte('updated_at', filter.since)
+    .order('updated_at', { ascending: true });
+
+  if (error) throw new Error(`Failed to read career_playbooks: ${error.message}`);
+
+  return (data ?? []).map(row => {
+    const raw = row as {
+      id: string;
+      status: string;
+      updated_at: string;
+      cost_breakdown: {
+        total_cost_usd?: number;
+        unknown_cost_attempts?: number;
+        nodeCosts?: unknown[];
+      } | null;
+    };
+    const nodeCosts = Array.isArray(raw.cost_breakdown?.nodeCosts)
+      ? raw.cost_breakdown.nodeCosts
+      : [];
+    return {
+      id: raw.id,
+      status: raw.status,
+      updatedAt: raw.updated_at,
+      costUsd: raw.cost_breakdown?.total_cost_usd ?? 0,
+      unknownCostAttempts: raw.cost_breakdown?.unknown_cost_attempts ?? 0,
+      calls: nodeCosts.length,
+      generationIds: nodeCosts
+        .map(node => (node as { generation_id?: unknown }).generation_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    };
+  });
+}
+
+/**
+ * Every generation id this window produced, from both ledgers.
+ *
+ * A generation id is the only thing that makes a charge OURS. The account-level
+ * counter cannot: the key is shared with production, so its delta answers a
+ * question nobody asked.
+ */
+function collectGenerationIds(rows: TraceRow[], playbookIds: string[][]): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const fromInput = (row.input_data as { generationId?: unknown } | null)?.generationId;
+    if (typeof fromInput === 'string' && fromInput.length > 0) ids.add(fromInput);
+    const fromOutput = (row.output_data as { generationId?: unknown } | null)?.generationId;
+    if (typeof fromOutput === 'string' && fromOutput.length > 0) ids.add(fromOutput);
+  }
+  for (const list of playbookIds) for (const id of list) ids.add(id);
+  return [...ids];
+}
+
+interface ProviderReconciliation {
+  asked: number;
+  answered: number;
+  totalUsd: number;
+  /** Ids the provider had no record of. Each one is a charge we cannot confirm. */
+  missing: string[];
+}
+
+/**
+ * Ask the provider what it charged for each of our calls, and add it up.
+ *
+ * Sequential on purpose: the lookup already polls for up to 30 s per id because
+ * a generation record takes ~9.6 s to become readable, and a paid run is a few
+ * dozen calls, not thousands. Never throws — a reconciliation that can fail is
+ * one nobody runs.
+ */
+async function reconcileAgainstProvider(ids: string[]): Promise<ProviderReconciliation> {
+  const result: ProviderReconciliation = {
+    asked: ids.length,
+    answered: 0,
+    totalUsd: 0,
+    missing: [],
+  };
+
+  for (const id of ids) {
+    const fact = await fetchGenerationFact(id);
+    if (!fact) {
+      result.missing.push(id);
+      continue;
+    }
+    result.answered += 1;
+    // `??`, not `||`: a genuine $0 is a measurement (mc2-y452l).
+    result.totalUsd += fact.usageUsd ?? 0;
+  }
+
+  return result;
 }
 
 function printTable(title: string, buckets: Bucket[]): void {
@@ -130,6 +305,7 @@ function printTable(title: string, buckets: Bucket[]): void {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
+  const verifyWithProvider = args.includes('--verify-with-provider');
   const sinceIndex = args.indexOf('--since');
   const since = sinceIndex === -1 ? undefined : args[sinceIndex + 1];
   const courseId = args.find(a => !a.startsWith('--') && a !== since);
@@ -140,20 +316,40 @@ async function main(): Promise<void> {
     return;
   }
 
-  const rows = await readRows({ courseId, since });
+  const [rows, playbooks] = await Promise.all([
+    readRows({ courseId, since }),
+    // Only the `--since` form: a course id selects a course, and a playbook is
+    // not one.
+    courseId ? Promise.resolve([]) : readPlaybookCosts({ since }),
+  ]);
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && playbooks.length === 0) {
     console.log('No generation_trace rows matched. Nothing was recorded for this selection.');
     return;
   }
 
-  const total = rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
+  const traceTotal = rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
+  const playbookTotal = playbooks.reduce((sum, p) => sum + p.costUsd, 0);
+  const total = traceTotal + playbookTotal;
   const tokens = rows.reduce((sum, r) => sum + (r.tokens_used ?? 0), 0);
-  const unpriced = rows.filter(r => r.cost_usd === null && (r.tokens_used ?? 0) > 0);
+  const billedCalls = rows.filter(isBilledCallRow);
+  const unpriced = rows.filter(isLedgerHole);
+  // Settled from `/api/v1/generation` rather than estimated from MODEL_CATALOG.
+  const billedByProvider = rows.filter(
+    r => (r.output_data as { billedByProvider?: boolean } | null)?.billedByProvider === true
+  );
   const measuredZero = rows.filter(r => r.cost_usd === 0);
+  const markerRows = rows.filter(r => !isBilledCallRow(r) && (r.tokens_used ?? 0) > 0);
   const noModel = rows.filter(r => r.model_used === null && (r.tokens_used ?? 0) > 0);
   const editRows = rows.filter(r => r.stage === 'stage_edit');
+  const unknownCostAttempts = playbooks.reduce((sum, p) => sum + p.unknownCostAttempts, 0);
   const times = rows.map(r => r.created_at).sort();
+
+  const generationIds = collectGenerationIds(
+    rows,
+    playbooks.map(p => p.generationIds)
+  );
+  const provider = verifyWithProvider ? await reconcileAgainstProvider(generationIds) : null;
 
   if (json) {
     console.log(
@@ -161,12 +357,36 @@ async function main(): Promise<void> {
         {
           rows: rows.length,
           totalCostUsd: Number(total.toFixed(6)),
+          traceCostUsd: Number(traceTotal.toFixed(6)),
+          playbookCostUsd: Number(playbookTotal.toFixed(6)),
           totalTokens: tokens,
+          billedCallRows: billedCalls.length,
+          billedByProviderRows: billedByProvider.length,
           unpricedRows: unpriced.length,
           measuredZeroRows: measuredZero.length,
+          progressMarkerRows: markerRows.length,
           rowsWithTokensButNoModel: noModel.length,
           editRows: editRows.length,
           editCostUsd: Number(editRows.reduce((s, r) => s + (r.cost_usd ?? 0), 0).toFixed(6)),
+          playbooks: playbooks.map(p => ({
+            id: p.id,
+            status: p.status,
+            costUsd: Number(p.costUsd.toFixed(6)),
+            calls: p.calls,
+            unknownCostAttempts: p.unknownCostAttempts,
+          })),
+          unknownCostAttempts,
+          generationIds: generationIds.length,
+          ...(provider
+            ? {
+                provider: {
+                  asked: provider.asked,
+                  answered: provider.answered,
+                  totalUsd: Number(provider.totalUsd.toFixed(6)),
+                  missing: provider.missing,
+                },
+              }
+            : {}),
           firstAt: times[0],
           lastAt: times[times.length - 1],
           byStage: bucketBy(rows, r => r.stage),
@@ -182,8 +402,15 @@ async function main(): Promise<void> {
   console.log('\n══ RECORDED COST ══');
   console.log(`selection      ${courseId ? `course ${courseId}` : `since ${since}`}`);
   console.log(`window         ${times[0]}  →  ${times[times.length - 1]}`);
-  console.log(`trace rows     ${rows.length}`);
+  console.log(`trace rows     ${rows.length}   (${billedCalls.length} of them billed calls)`);
   console.log(`tokens         ${tokens.toLocaleString('en-US')}`);
+  console.log(`generation_trace ${usd(traceTotal)}`);
+  if (playbooks.length > 0 || !courseId) {
+    console.log(
+      `career playbooks ${usd(playbookTotal)}   (${playbooks.length} in window)` +
+        (unknownCostAttempts > 0 ? `  ${unknownCostAttempts} attempts of unknown cost` : '')
+    );
+  }
   console.log(`TOTAL          ${usd(total)}`);
 
   printTable(
@@ -196,12 +423,30 @@ async function main(): Promise<void> {
   );
   printTable('BY PHASE (top 15)', bucketBy(rows, r => `${r.stage}/${r.phase}`).slice(0, 15));
 
+  if (playbooks.length > 0) {
+    console.log('\nCAREER PLAYBOOKS IN WINDOW');
+    console.log('─'.repeat(84));
+    for (const p of playbooks) {
+      console.log(
+        `  ${p.updatedAt}  ${pad(p.id, 38)} ${pad(p.status, 10)} ${padLeft(usd(p.costUsd), 13)}` +
+          `${padLeft(`${p.calls} calls`, 10)}` +
+          (p.unknownCostAttempts > 0 ? `  ${p.unknownCostAttempts} unknown` : '')
+      );
+    }
+  }
+
   console.log('\n══ LEDGER COVERAGE ══');
   console.log(
-    `rows with tokens but NO price   ${unpriced.length}   <- each one is money the ledger missed`
+    `billed calls with NO price      ${unpriced.length}   <- each one is money the ledger missed`
+  );
+  console.log(
+    `priced by the provider          ${billedByProvider.length}   <- from /api/v1/generation, not MODEL_CATALOG`
   );
   console.log(
     `rows priced at exactly $0       ${measuredZero.length}   <- measured, not missing (mc2-y452l)`
+  );
+  console.log(
+    `progress markers with tokens    ${markerRows.length}   <- not calls; their tokens are already counted (mc2-wjmrd)`
   );
   console.log(
     `rows with tokens but no model   ${noModel.length}   <- usually stage-aggregate rows`
@@ -209,12 +454,17 @@ async function main(): Promise<void> {
   console.log(
     `stage_edit rows                 ${editRows.length}   <- chat, inline edits, element CRUD`
   );
+  if (unknownCostAttempts > 0) {
+    console.log(
+      `playbook attempts of unknown cost ${unknownCostAttempts}   <- TOTAL is a lower bound by that much`
+    );
+  }
 
   if (unpriced.length > 0) {
     console.log('\nUnpriced calls, newest first:');
     for (const row of unpriced.slice(-10).reverse()) {
       console.log(
-        `  ${row.created_at}  ${pad(`${row.stage}/${row.phase}`, 34)} ${row.model_used ?? '(no model)'}`
+        `  ${row.created_at}  ${pad(`${row.stage}/${row.phase}`, 34)} ${pad(row.step_name, 20)} ${row.model_used ?? '(no model)'}`
       );
     }
   }
@@ -230,17 +480,59 @@ async function main(): Promise<void> {
       (data as { estimated_cost_usd: number | null } | null)?.estimated_cost_usd ?? null;
     console.log('\n══ CACHED TOTAL ══');
     console.log(`courses.estimated_cost_usd      ${stored === null ? 'NULL' : usd(stored)}`);
-    console.log(`sum over generation_trace       ${usd(total)}`);
-    if (stored !== null && Math.abs(stored - total) > 1e-6) {
+    console.log(`sum over generation_trace       ${usd(traceTotal)}`);
+    // Compared at the column's own precision, not at the sum's. The two are
+    // stored differently — `courses.estimated_cost_usd` is NUMERIC(_,4) while
+    // `generation_trace.cost_usd` carries 6 — so a fresh, correct total was
+    // rounded on the way in and then declared MISMATCH on the way out. Every
+    // report said MISMATCH, on every course, whatever the state of the data,
+    // which made the line worth exactly nothing (mc2-9nf9q).
+    //
+    // The tolerance is half a unit in the stored column's last place: that is
+    // the most rounding alone can account for, so anything larger is a real
+    // staleness rather than an artefact of the schema.
+    const STORED_DECIMALS = 4;
+    const ROUNDING_TOLERANCE_USD = 0.5 * 10 ** -STORED_DECIMALS;
+    if (stored !== null && Math.abs(stored - traceTotal) > ROUNDING_TOLERANCE_USD) {
       console.log('MISMATCH — the cached total is stale; a stage or edit refresh will correct it.');
     } else if (stored !== null) {
-      console.log('match');
+      console.log(`match (to the ${STORED_DECIMALS} decimals the column stores)`);
+    }
+  }
+
+  if (provider) {
+    console.log('\n══ PROVIDER RECONCILIATION ══');
+    console.log(`generation ids in this window   ${provider.asked}`);
+    console.log(`answered by /api/v1/generation  ${provider.answered}`);
+    console.log(`sum of what OpenRouter charged  ${usd(provider.totalUsd)}`);
+    console.log(`recorded TOTAL                  ${usd(total)}`);
+
+    // Half a cent per hundred calls is rounding; anything above it is a real
+    // difference and worth naming.
+    const gap = total - provider.totalUsd;
+    const tolerance = Math.max(1e-6, provider.answered * 1e-6);
+    if (provider.missing.length > 0) {
+      console.log(
+        `\n${provider.missing.length} id(s) the provider has no record of — each is a charge that cannot be confirmed:`
+      );
+      for (const id of provider.missing.slice(0, 10)) console.log(`  ${id}`);
+    }
+    if (Math.abs(gap) > tolerance) {
+      console.log(
+        `\nGAP ${usd(gap)}. A positive gap is a row priced above what was charged; a\n` +
+          'negative one is a call the provider billed and this ledger did not see.'
+      );
+    } else {
+      console.log('\nmatch — the recorded total is what OpenRouter charged for these calls.');
     }
   }
 
   console.log(
-    '\nCompare TOTAL against the OpenRouter dashboard for the same window. A gap means\n' +
-      'either an unpriced call above, or a model whose catalogue price is wrong (mc2-z0xr3).\n'
+    '\nReconcile with --verify-with-provider, which sums /api/v1/generation over the\n' +
+      'generation ids THIS window produced. Do not use the delta of /api/v1/credits:\n' +
+      'the key is shared with production, and on 2026-08-23 its delta read $1.4739\n' +
+      'against a real $0.03 over the same two hours (mc2-yson0). Remaining credit is a\n' +
+      'ceiling check, not attribution.\n'
   );
 }
 

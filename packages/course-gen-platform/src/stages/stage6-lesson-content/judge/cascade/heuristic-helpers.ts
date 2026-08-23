@@ -6,6 +6,7 @@
 import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { calculateWordCountThresholds } from '@megacampus/shared-types/judge-thresholds';
+import { countWordsScriptAware } from '@megacampus/shared-types';
 import { newStemmer } from 'snowball-stemmers';
 import { logger } from '@/shared/logger';
 import { calculateFleschKincaid } from './text-utils';
@@ -432,10 +433,16 @@ function calculateKeywordCoverage(
 }
 
 /**
- * Count words in text content (language-agnostic)
+ * Count words in text content, in any script.
  *
- * Uses whitespace splitting to count words in any language,
- * including Cyrillic, Chinese, etc.
+ * This used to split on whitespace and its comment claimed that was
+ * language-agnostic "including Cyrillic, Chinese, etc." It is not: Chinese puts
+ * no space between words, so the split counted punctuation-delimited clauses. A
+ * complete Chinese lesson came out at 356 against a minimum of 1200, failed this
+ * very pre-filter, scored 0 and was regenerated twice — three lessons at five
+ * times the cost of the same course in Spanish, none of them actually short
+ * (mc2-v6fqp). `countWordsScriptAware` converts dense-script characters and
+ * leaves Latin and Cyrillic counting exactly as it was.
  *
  * @param text - Text content to count words in
  * @returns Word count
@@ -449,8 +456,7 @@ function countWordsInText(text: string): number {
     .replace(/[#*_~`]/g, '') // Remove markdown symbols
     .trim();
 
-  // Split on whitespace and filter empty strings
-  return cleanedText.split(/\s+/).filter(word => word.length > 0).length;
+  return countWordsScriptAware(cleanedText);
 }
 
 /**

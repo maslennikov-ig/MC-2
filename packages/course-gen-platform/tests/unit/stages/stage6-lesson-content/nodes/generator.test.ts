@@ -625,6 +625,10 @@ import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 vi.mock('@/shared/llm/langchain-models', () => {
   const mockInvoke = vi.fn();
   return {
+    createCostRecordingModel: vi.fn(() => ({
+      invoke: mockInvoke,
+    })),
+    // The batch corrective retry builds an unpriced model on purpose.
     createOpenRouterModel: vi.fn(() => ({
       invoke: mockInvoke,
     })),
@@ -1545,35 +1549,37 @@ ${marker}`;
 
   describe('model configuration', () => {
     it('should use model override when provided', async () => {
-      const { createOpenRouterModel } = await import('@/shared/llm/langchain-models');
+      const { createCostRecordingModel } = await import('@/shared/llm/langchain-models');
 
       await generateLessonSingleCall(mockLessonSpec, [], 'en', 'custom-model-override', null, null);
 
-      expect(createOpenRouterModel).toHaveBeenCalledWith(
+      expect(createCostRecordingModel).toHaveBeenCalledWith(
         'custom-model-override',
         expect.any(Number),
         expect.any(Number),
+        expect.any(String),
         undefined,
         expect.objectContaining({ enabled: false })
       );
     });
 
     it('should use configured model when no override', async () => {
-      const { createOpenRouterModel } = await import('@/shared/llm/langchain-models');
+      const { createCostRecordingModel } = await import('@/shared/llm/langchain-models');
 
       await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
 
-      expect(createOpenRouterModel).toHaveBeenCalledWith(
+      expect(createCostRecordingModel).toHaveBeenCalledWith(
         'test-model-id',
         expect.any(Number),
         expect.any(Number),
+        expect.any(String),
         undefined,
         expect.objectContaining({ enabled: false })
       );
     });
 
     it('should use recommended temperature for content archetype', async () => {
-      const { createOpenRouterModel } = await import('@/shared/llm/langchain-models');
+      const { createCostRecordingModel } = await import('@/shared/llm/langchain-models');
       const { getRecommendedTemperatureV2 } = await import(
         '@megacampus/shared-types/lesson-specification-v2'
       );
@@ -1581,17 +1587,18 @@ ${marker}`;
       await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
 
       expect(getRecommendedTemperatureV2).toHaveBeenCalledWith('code_tutorial');
-      expect(createOpenRouterModel).toHaveBeenCalledWith(
+      expect(createCostRecordingModel).toHaveBeenCalledWith(
         expect.any(String),
         0.7, // Mocked return value
         expect.any(Number),
+        expect.any(String),
         undefined,
         expect.objectContaining({ enabled: false })
       );
     });
 
     it('should respect maxTokensOverride as a ceiling for rescue phases', async () => {
-      const { createOpenRouterModel } = await import('@/shared/llm/langchain-models');
+      const { createCostRecordingModel } = await import('@/shared/llm/langchain-models');
       const longLessonSpec: LessonSpecificationV2 = {
         ...mockLessonSpec,
         estimated_duration_minutes: 60,
@@ -1599,10 +1606,11 @@ ${marker}`;
 
       await generateLessonSingleCall(longLessonSpec, [], 'en', null, null, null, undefined, 12000);
 
-      expect(createOpenRouterModel).toHaveBeenCalledWith(
+      expect(createCostRecordingModel).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(Number),
         12000,
+        expect.any(String),
         undefined,
         expect.objectContaining({ enabled: false })
       );

@@ -1,0 +1,121 @@
+# Nightly model catalogue drift check (mc2-ts9i2).
+#
+# `scripts/check-model-catalog-drift.ts` existed since 2026-08-21 and ran
+# nowhere: not in CI, not as an npm script. The one manual `--all` on the day it
+# was written found five disagreeing entries, one of them on a live route.
+#
+# Deliberately NOT part of the blocking pipeline, and deliberately its own
+# workflow so it cannot gate a deploy: a price is a fact about somebody else's
+# service, and a provider changing a tariff overnight must not fail our build.
+# The stake is still real — `provider.max_price` is built from these numbers, and
+# a ceiling under every endpoint is a refused call, not a cheaper route.
+#
+# On drift it opens (or updates) one GitHub issue. The repository's tracker is
+# beads, which lives in a Dolt database this runner has no credentials for, so
+# the issue is the handoff: `bd github pull` brings it in, and beads issues here
+# already carry their GitHub number.
+
+name: Model Catalogue Drift
+
+on:
+  schedule:
+    # 03:20 UTC daily. Nothing else runs then, and OpenRouter tariff changes
+    # land during the US day.
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: model-catalog-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.34.5'
+  DRIFT_ISSUE_LABEL: 'model-catalog-drift'
+
+jobs:
+  drift:
+    name: Compare MODEL_CATALOG to the published rates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check drift across the whole catalogue
+        id: drift
+        continue-on-error: true
+        run: |
+          set +e
+          pnpm -F course-gen-platform check:model-catalog-drift:all 2>&1 | tee drift.log
+          status=${PIPESTATUS[0]}
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          # 0 clean, 1 the catalogue is wrong, 2 we could not reach the API.
+          # Those must not look alike, which is why the script separates them.
+          exit 0
+
+      - name: Report the API being unreachable, and stop
+        if: steps.drift.outputs.status == '2'
+        run: |
+          echo "::notice::OpenRouter was unreachable; the catalogue was not checked. Not a finding."
+
+      - name: Close a stale drift issue once the catalogue agrees again
+        if: steps.drift.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          number=$(gh issue list --label "$DRIFT_ISSUE_LABEL" --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body \
+              "Catalogue matches the published rates again as of run ${GITHUB_RUN_ID}. Closing."
+            gh issue close "$number"
+          fi
+
+      - name: File the drift
+        if: steps.drift.outputs.status == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "$DRIFT_ISSUE_LABEL" --color 'B60205' \
+            --description 'MODEL_CATALOG disagrees with the published OpenRouter rates' \
+            2>/dev/null || true
+
+          body=$(printf '%s\n' \
+            'The nightly check found `MODEL_CATALOG` disagreeing with the rates OpenRouter publishes.' \
+            '' \
+            'This does not block anything on purpose. It matters because `provider.max_price` is' \
+            'built from these numbers: a ceiling below every endpoint is answered with a refusal,' \
+            'not a cheaper route, so one stale entry can fail every call to a model.' \
+            '' \
+            'Fix in `packages/shared-types/src/model-catalog.ts` and the snapshot in' \
+            '`packages/course-gen-platform/tests/unit/model-catalog-coverage.test.ts`.' \
+            '' \
+            "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '' \
+            '```' ; tail -c 40000 drift.log ; printf '```\n')
+
+          number=$(gh issue list --label "$DRIFT_ISSUE_LABEL" --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            # One standing issue, not one per night: a nightly job that opens an
+            # issue a night trains people to close them unread.
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create \
+              --title 'MODEL_CATALOG drifted from the published OpenRouter rates' \
+              --label "$DRIFT_ISSUE_LABEL" \
+              --body "$body"
+          fi

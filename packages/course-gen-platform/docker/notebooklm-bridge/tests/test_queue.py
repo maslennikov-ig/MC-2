@@ -147,7 +147,17 @@ def test_global_queue_wait_timeout_raises_media_timeout_error() -> None:
     asyncio.run(run_scenario())
 
 
-def test_course_lock_serializes_same_course_generation() -> None:
+def test_course_lock_lets_audio_and_video_run_together_on_one_course() -> None:
+    """The course lock is keyed per (course, media_type), not per course.
+
+    It used to be per course, and this test asserted that: audio held the lock
+    and video waited behind it. `17d0ab003` changed the key deliberately — the
+    comment on `_get_or_create_course_generation_lock` says two media types are
+    allowed to run in parallel while two of the same type stay serialized — and
+    left the test asserting the behaviour it had just removed. Nothing caught
+    it, because no CI job runs this suite.
+    """
+
     async def run_scenario() -> None:
         release_event = asyncio.Event()
         first_start_event = asyncio.Event()
@@ -170,13 +180,48 @@ def test_course_lock_serializes_same_course_generation() -> None:
         video_task = asyncio.create_task(generator.generate_video_overview(request))
         await asyncio.sleep(0.05)
 
-        assert generator.started_media_types == ["audio"]
-        assert generator.max_parallel_generations == 1
+        # Different media type, same course: it does not wait.
+        assert generator.started_media_types == ["audio", "video"]
+        assert generator.max_parallel_generations == 2
 
         release_event.set()
         await asyncio.wait_for(asyncio.gather(audio_task, video_task), timeout=0.5)
 
-        assert generator.started_media_types == ["audio", "video"]
+    asyncio.run(run_scenario())
+
+
+def test_course_lock_still_serializes_two_of_the_same_media_type() -> None:
+    """The half of the old guarantee that survived `17d0ab003`."""
+
+    async def run_scenario() -> None:
+        release_event = asyncio.Event()
+        first_start_event = asyncio.Event()
+        generator = BlockingNotebookGenerator(
+            Settings(
+                notebooklm_bridge_token="test-token",
+                notebooklm_generation_mode="notebooklm",
+                notebooklm_allow_fallback=False,
+                notebooklm_global_generation_concurrency=2,
+                notebooklm_queue_wait_timeout_seconds=1.0,
+            ),
+            release_event=release_event,
+            first_start_event=first_start_event,
+        )
+        request = _build_course_request("course-same-type")
+
+        first = asyncio.create_task(generator.generate_audio(request))
+        await asyncio.wait_for(first_start_event.wait(), timeout=0.2)
+
+        second = asyncio.create_task(generator.generate_audio(request))
+        await asyncio.sleep(0.05)
+
+        assert generator.started_media_types == ["audio"]
+        assert generator.max_parallel_generations == 1
+
+        release_event.set()
+        await asyncio.wait_for(asyncio.gather(first, second), timeout=0.5)
+
+        assert generator.started_media_types == ["audio", "audio"]
         assert generator.max_parallel_generations == 1
 
     asyncio.run(run_scenario())

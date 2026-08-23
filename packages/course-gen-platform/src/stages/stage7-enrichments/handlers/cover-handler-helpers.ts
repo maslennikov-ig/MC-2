@@ -423,7 +423,9 @@ export async function processImagePipeline(
     height: imageResult.height,
     sizeBytes: webpResult.sizeBytes,
     modelUsed: imageResult.modelUsed,
-    imageCostUsd: imageResult.costUsd,
+    // `?? 0` only for the enrichment's own metadata field, which is a display
+    // number and not the ledger. The ledger row is in `generation_trace`.
+    imageCostUsd: imageResult.costUsd ?? 0,
   };
 }
 

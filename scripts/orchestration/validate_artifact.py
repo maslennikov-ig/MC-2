@@ -229,10 +229,6 @@ def validate_common_fields(
         errors.extend(validate_scalar(path, "risk_level", values, ALLOWED_RISK_LEVELS))
     if "verification_tier" in values:
         errors.extend(validate_scalar(path, "verification_tier", values, ALLOWED_VERIFICATION_TIERS))
-        if values.get("schema_version") == "orchestration-artifact/v3":
-            errors.append(
-                f"{path}: v3 artifacts use orchestration_level; verification_tier is legacy-only"
-            )
 
     for key in sorted(REQUIRED_LIST_KEYS):
         if key in values and not list_is_meaningful(values.get(key)):
@@ -338,10 +334,10 @@ def validate_file(path: pathlib.Path) -> list[str]:
                 profile = baseline.get("profile") if isinstance(baseline, dict) else None
             except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
                 errors.append(f"{path}: cannot read orchestration contract: {exc}")
-        if profile == "balanced-v2.19" and manifest_path.is_file():
+        if profile == "balanced-v2.20" and manifest_path.is_file():
             if schema != "orchestration-artifact/v3":
                 errors.append(
-                    f"{path}: newly reported delegated artifacts in a v2.19 stage must use orchestration-artifact/v3"
+                    f"{path}: newly reported delegated artifacts in a v2.20 stage must use orchestration-artifact/v3"
                 )
             else:
                 try:

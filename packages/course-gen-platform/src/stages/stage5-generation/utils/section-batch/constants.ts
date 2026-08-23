@@ -1,7 +1,8 @@
-/**
- * OpenRouter API base URL
- */
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+import {
+  DEFAULT_FALLBACK_MODEL_ID,
+  DEFAULT_MODEL_ID,
+  LARGE_CONTEXT_MODEL_ID,
+} from '@megacampus/shared-types';
 
 /**
  * LAST-RESORT FALLBACK MODELS (3-tier routing)
@@ -13,16 +14,29 @@ export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
  *
  * These constants are ONLY used when database is completely unavailable.
  * To change models, update llm_model_config table via admin panel.
+ *
+ * Named roles, not literal ids (mc2-p6u8k). The 2026-08-12 cut left seven live
+ * routing models and this block did not notice: it still named
+ * `kimi-k2-thinking` and `qwen3.7-plus`, so the path that runs precisely when
+ * the database is unreachable led to models the team had deliberately stopped
+ * choosing. None was delisted, so nothing broke — which is why it survived four
+ * months. Roles cannot drift that way: they follow whatever `model-defaults.ts`
+ * declares, and `model-ids-live-in-one-place.test.ts` holds that.
+ *
+ * The ids below are the ones `llm_model_config` really carries for these three
+ * phases, read from the live table on 2026-08-23. No quality claim is being
+ * re-made here: DEEPSEEK-V31-TERMINUS-QUALITY-REPORT.md judged models, and a
+ * role is about which seat, not which model fills it.
  */
 export const MODELS = {
   /** Simple tier: fast cheap model for trivial sections */
-  simple: 'deepseek/deepseek-v4-flash',
-  /** Normal tier: thinking model for most sections */
-  normal: 'moonshotai/kimi-k2-thinking',
-  /** Complex tier: premium model for hardest sections + first section */
-  complex: 'qwen/qwen3.7-plus',
+  simple: DEFAULT_MODEL_ID,
+  /** Normal tier: the careful model, as `stage_5_normal` carries in the database */
+  normal: DEFAULT_FALLBACK_MODEL_ID,
+  /** Complex tier: the careful model, for the hardest sections and the first one */
+  complex: DEFAULT_FALLBACK_MODEL_ID,
   /** Context overflow: large context model */
-  tier3_gemini: 'google/gemini-3.7-flash',
+  tier3_gemini: LARGE_CONTEXT_MODEL_ID,
 } as const;
 
 /**

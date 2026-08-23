@@ -18,11 +18,31 @@
 /**
  * Default primary model (used when DB is unavailable)
  * DeepSeek V4 Flash - default fast runtime model for course generation.
- * The leading `~` is part of the OpenRouter id: it is an alias that always
- * resolves to the newest model in the V4 Flash family.
+ *
+ * A pinned snapshot, never a `~...-latest` alias — now for two reasons rather
+ * than one.
+ *
+ * The first is what it cost. On 2026-08-17 07:03 the alias followed its family
+ * to the `-0731` snapshot with no change on our side, median latency went from
+ * 8.7s to 102s, and the courses of 12-20 August failed on timeouts nobody had
+ * configured. Pinned on 2026-08-21 to the snapshot the alias was already
+ * resolving to, so the change froze the behaviour rather than altering it
+ * (mc2-qch4w).
+ *
+ * The second was found on 2026-08-22 while briefly moving back to the alias:
+ * `GET /models/{alias}/endpoints` answers 200 with an **empty list** — 0 against
+ * 30 for this snapshot — and this codebase reads an empty list as "could not
+ * find out". So an alias silently disabled the per-attempt endpoint pin, the
+ * thing that hours earlier had moved two hung 238s calls onto a working
+ * provider. `listModelEndpoints` now follows OpenRouter's own
+ * `alias_target.slug` and that hole is closed, so an alias here would no longer
+ * be unsafe — it is simply not what the owner wants. The family already carries
+ * `deepseek-v4-flash-vision-exp`, experimental, at 5.5x this input price, and a
+ * redirect is free to land on it.
+ *
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = '~deepseek/deepseek-v4-flash-latest';
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-flash-0731';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable).
@@ -32,12 +52,55 @@ export const DEFAULT_MODEL_ID = '~deepseek/deepseek-v4-flash-latest';
  */
 export const DEFAULT_FALLBACK_MODEL_ID = 'openai/gpt-5.6-luna';
 
+/**
+ * The seat for a request too large for the model that would otherwise take it,
+ * and the emergency route when nothing else is reachable.
+ *
+ * A third vendor on purpose. This one is reached exactly when the primary and
+ * its cross-vendor fallback have both failed or been outgrown, so sharing a
+ * vendor with either would make the last hop the same bet as the one that just
+ * lost.
+ *
+ * @see llm_model_config — `emergency`, and the Stage 5 context-overflow path.
+ */
+export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
+
+// ============================================================================
+// PROSE MODEL IDS (Single Source of Truth)
+// ============================================================================
+
+/**
+ * Primary model for phases that AUTHOR text the reader opens: the lesson body,
+ * the expansion of a thin section, the rewrite of one that failed review.
+ *
+ * The two roles are deliberately the reverse of DEFAULT_*: here the careful
+ * model writes and the fast one catches an outage. That is a measurement, not a
+ * preference. The comparison run of 2026-08-22 (mc2-bneet) put one micro-course
+ * through both models on identical settings: DeepSeek produced lessons 29%
+ * shorter (11 734 characters against 16 609), taught by narration where Luna
+ * taught by a worked example with real numbers, and asserted "по статистике,
+ * более 60% людей..." with no source — a fabricated figure inside the artifact a
+ * customer reads. Judge scores barely registered it (0.88 against 0.92), which
+ * is why the repository rule is to read the artifact. The saving would have been
+ * $0.008 per micro-course.
+ *
+ * Phases that EDIT under an explicit instruction (stage_6_patcher) or that never
+ * reach the reader (arbiter, rag_planning, judges) stay on DEFAULT_MODEL_ID: a
+ * surgical patch has no room to invent a statistic.
+ *
+ * @see llm_model_config.model_id — the database still wins at runtime.
+ */
+export const PROSE_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
+
+/** Fallback for authoring phases — a different vendor, same rule as DEFAULT_*. */
+export const PROSE_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;
+
 // ============================================================================
 // CHAT MODEL IDS (Single Source of Truth)
 // ============================================================================
 
 /** Primary chat model — used for chat_node_refinement, chat_global_guidance, etc. */
-export const CHAT_PRIMARY_MODEL_ID = 'openai/gpt-5.6-luna';
+export const CHAT_PRIMARY_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
 
 /** Fallback chat model — different vendor from the primary, see DEFAULT_FALLBACK_MODEL_ID */
 export const CHAT_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;

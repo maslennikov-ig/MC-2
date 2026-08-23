@@ -147,6 +147,21 @@ export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
 /**
  * Enrichment types that are generated on-demand only (not in pipeline).
  * These are triggered manually by users from the course viewer UI.
+ *
+ * **This list gates nothing.** It is re-exported from
+ * `stage7-enrichments/index.ts` and read by no code path — checked across the
+ * platform and the web package on 2026-08-22. The list that actually decides
+ * what a user may order is `onDemandEnrichmentTypeSchema` in
+ * `@megacampus/shared-types`, enforced by `isOnDemandType` at
+ * `enrichment/procedures/generate-on-demand.ts`.
+ *
+ * It is left in place because it is accurate as documentation of intent and
+ * because deleting a re-exported constant is a wider change than the value of
+ * removing it. What it must not be is trusted: `mc2-p99f1` was opened on the
+ * reading that the four NotebookLM study aids were blocked because they are
+ * absent here. They are not blocked — the real gate lists all four, the router
+ * has handlers for all four, and the UI offers all four. Changing this array
+ * would have looked like a fix and changed nothing.
  */
 export const ON_DEMAND_ENRICHMENT_TYPES = [
   'quiz',

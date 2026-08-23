@@ -11,6 +11,8 @@ import {
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookCostBreakdown,
+  type CareerPlaybookNodeCost,
+  CareerPlaybookCostBreakdownSchema,
   type CareerPlaybookGenerateImageJobData,
   type CareerPlaybookGenerationProgress,
   type CareerPlaybookGenerateFollowupsJobData,
@@ -42,6 +44,11 @@ import {
 } from '@/stages/stage-career-playbook/nodes/mermaid-quality';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
+import {
+  buildCareerPlaybookAbortedAttemptCosts,
+  type CareerPlaybookAbortedAttempt,
+} from '@/stages/stage-career-playbook/nodes/runtime';
+import { settleCareerPlaybookNodeCosts } from '@/stages/stage-career-playbook/nodes/runtime-attempt';
 import { joinCareerPlaybookFinalBlocks } from '@/stages/stage-career-playbook/nodes/final-assembler';
 import { processCareerPlaybookSource } from '@/stages/stage-career-playbook/source-processing';
 import { generateCareerPlaybookImage } from '@/stages/stage-career-playbook/image-generation';
@@ -78,23 +85,124 @@ function normalizeRegenerationAttempts(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function buildCostBreakdown(result: CareerPlaybookGraphResult) {
+/**
+ * What the row already paid for before this job ran.
+ *
+ * A playbook spends money before its graph starts: `requestFollowups` makes an
+ * LLM call and appends its node cost to the row. The success path used to build
+ * the breakdown from the graph result alone and write it whole, so that call
+ * disappeared at the moment the graph finished — $0.00029784 on 2026-08-21, and
+ * the same amount on every playbook ever generated (mc2-ai4a8). The failure path
+ * had always merged; only this one did not.
+ *
+ * Deduplicated on `generation_id`, so a graph that ever does start from the
+ * stored costs cannot make one call count twice.
+ */
+function priorNodeCostsNotIn(
+  existing: unknown,
+  incoming: CareerPlaybookNodeCost[]
+): CareerPlaybookNodeCost[] {
+  const parsed = CareerPlaybookCostBreakdownSchema.safeParse(existing);
+  if (!parsed.success) return [];
+
+  const alreadyCounted = new Set(
+    incoming.map(nodeCost => nodeCost.generation_id).filter((id): id is string => !!id)
+  );
+  return parsed.data.nodeCosts.filter(
+    nodeCost => !nodeCost.generation_id || !alreadyCounted.has(nodeCost.generation_id)
+  );
+}
+
+async function buildCostBreakdown(result: CareerPlaybookGraphResult, existing?: unknown) {
   const regenerationAttempts = normalizeRegenerationAttempts(result.blockRegenerationAttempts);
 
-  if (result.costBreakdown) {
-    return regenerationAttempts
-      ? { ...result.costBreakdown, regeneration_attempts: regenerationAttempts }
-      : result.costBreakdown;
-  }
-  if (!Array.isArray(result.nodeCosts)) return undefined;
+  const source = result.costBreakdown?.nodeCosts ?? result.nodeCosts;
+  if (!Array.isArray(source)) return undefined;
+
+  // The last thing before the row is written: swap every catalogue estimate for
+  // the provider's own charge. Here rather than per call because a generation
+  // record takes about ten seconds to become readable, and by now they all are.
+  const nodeCosts = await settleCareerPlaybookNodeCosts([
+    ...priorNodeCostsNotIn(existing, source),
+    ...source,
+  ]);
 
   return {
-    nodeCosts: result.nodeCosts,
-    total_cost_usd: sumCareerPlaybookNodeCosts(result.nodeCosts),
+    ...(result.costBreakdown ?? {}),
+    nodeCosts,
+    total_cost_usd: sumCareerPlaybookNodeCosts(nodeCosts),
     // Non-zero means the total is a lower bound: some attempts aborted before the
     // provider reported usage, so their cost is unknown rather than zero.
-    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(result.nodeCosts),
+    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(nodeCosts),
     ...(regenerationAttempts ? { regeneration_attempts: regenerationAttempts } : {}),
+  };
+}
+
+/**
+ * The node costs a failure is carrying, if it is carrying any.
+ *
+ * A run that throws never returns a result, so `buildCostBreakdown` has nothing
+ * to read and the failure path used to write only a status. On 2026-08-20 that
+ * left playbook `c8649a86` recording one $0.00034 call from an earlier job while
+ * four specBuilder attempts of 120s each — real provider time, really billed —
+ * were nowhere, and `unknown_cost_attempts` stayed at 0 while four attempts had
+ * aborted (mc2-ajqun).
+ *
+ * The graph's own error types carry them: `CareerPlaybookSpecBuildError` its
+ * accumulated `nodeCosts`, `CareerPlaybookLLMCallError` its `abortedAttempts`.
+ * Read structurally rather than by class so an error that crossed a LangGraph
+ * boundary is still understood.
+ */
+function extractFailureNodeCosts(error: unknown): CareerPlaybookNodeCost[] {
+  if (!error || typeof error !== 'object') return [];
+
+  const candidate = error as {
+    nodeCosts?: unknown;
+    abortedAttempts?: unknown;
+    cause?: unknown;
+  };
+
+  if (Array.isArray(candidate.nodeCosts) && candidate.nodeCosts.length > 0) {
+    return candidate.nodeCosts as CareerPlaybookNodeCost[];
+  }
+
+  if (Array.isArray(candidate.abortedAttempts) && candidate.abortedAttempts.length > 0) {
+    return buildCareerPlaybookAbortedAttemptCosts(
+      'unknown',
+      candidate.abortedAttempts as CareerPlaybookAbortedAttempt[]
+    );
+  }
+
+  return candidate.cause && candidate.cause !== error
+    ? extractFailureNodeCosts(candidate.cause)
+    : [];
+}
+
+/**
+ * Add a failure's node costs to whatever the playbook had already recorded.
+ *
+ * Merging rather than replacing: generation runs as more than one job, so the
+ * row may already carry a completed phase's cost, and a failure that overwrote
+ * it would trade one hole for another.
+ */
+async function mergeFailureCostBreakdown(
+  existing: unknown,
+  failureNodeCosts: CareerPlaybookNodeCost[]
+): Promise<CareerPlaybookCostBreakdown | undefined> {
+  if (failureNodeCosts.length === 0) return undefined;
+
+  const parsed = CareerPlaybookCostBreakdownSchema.safeParse(existing);
+  const previous = parsed.success ? parsed.data : { nodeCosts: [], total_cost_usd: 0 };
+  const nodeCosts = await settleCareerPlaybookNodeCosts([
+    ...previous.nodeCosts,
+    ...failureNodeCosts,
+  ]);
+
+  return {
+    ...previous,
+    nodeCosts,
+    total_cost_usd: sumCareerPlaybookNodeCosts(nodeCosts),
+    unknown_cost_attempts: countCareerPlaybookUnknownCostAttempts(nodeCosts),
   };
 }
 
@@ -479,7 +587,10 @@ export class CareerPlaybookHandler {
     result: CareerPlaybookGraphResult
   ) {
     const safeResult = await this.remediateMermaidBeforePersist(result);
-    const costBreakdown = buildCostBreakdown(result);
+    const costBreakdown = await buildCostBreakdown(
+      result,
+      await this.readStoredCostBreakdown(jobData.playbookId)
+    );
     const storedQAData = await this.loadStoredQAData(jobData);
     const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
     const generationWarnings = normalizeGenerationWarnings(safeResult.warnings);
@@ -596,7 +707,11 @@ export class CareerPlaybookHandler {
     };
   }
 
-  private async persistFailed(jobData: CareerPlaybookGeneratePlaybookJobData, error: string) {
+  private async persistFailed(
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    error: string,
+    failureNodeCosts: CareerPlaybookNodeCost[] = []
+  ) {
     const storedQAData = await this.loadStoredQAData(jobData);
     const failedProgress = this.buildGenerationProgress(
       jobData,
@@ -604,14 +719,79 @@ export class CareerPlaybookHandler {
       storedQAData
     );
 
-    await this.updatePlaybook(jobData.playbookId, {
+    const updatePayload: Partial<CareerPlaybookRow> = {
       status: 'failed',
       q_a_data: toJson({
         ...storedQAData,
         generation_error: error,
         generation_progress: failedProgress,
       }) as CareerPlaybookRow['q_a_data'],
-    });
+    };
+
+    // What a failed run spent is still spent. Reading the current breakdown
+    // first so a failure adds to it rather than replacing it.
+    const costBreakdown = await this.buildFailureCostBreakdown(
+      jobData.playbookId,
+      failureNodeCosts
+    );
+    if (costBreakdown) {
+      updatePayload.cost_breakdown = toJson(costBreakdown) as CareerPlaybookRow['cost_breakdown'];
+    }
+
+    await this.updatePlaybook(jobData.playbookId, updatePayload);
+  }
+
+  /**
+   * The spend already on the row, or nothing if it cannot be read.
+   *
+   * Never throws: losing a pre-generation call from the total is bad, and
+   * failing the job that just succeeded over it would be worse.
+   */
+  private async readStoredCostBreakdown(playbookId: string): Promise<unknown> {
+    try {
+      const { data } = await this.getCareerPlaybookSupabase()
+        .from('career_playbooks')
+        .select('cost_breakdown')
+        .eq('id', playbookId)
+        .single();
+      return (data as { cost_breakdown: unknown } | null)?.cost_breakdown ?? null;
+    } catch (readError) {
+      logger.warn(
+        { playbookId, error: errorMessageFrom(readError) },
+        'Could not read the stored Career Playbook cost breakdown; recording this run alone'
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Never throws: a cost we could not record must not turn into a playbook that
+   * never got marked failed.
+   */
+  private async buildFailureCostBreakdown(
+    playbookId: string,
+    failureNodeCosts: CareerPlaybookNodeCost[]
+  ): Promise<CareerPlaybookCostBreakdown | undefined> {
+    if (failureNodeCosts.length === 0) return undefined;
+
+    try {
+      const { data } = await this.getCareerPlaybookSupabase()
+        .from('career_playbooks')
+        .select('cost_breakdown')
+        .eq('id', playbookId)
+        .single();
+
+      return await mergeFailureCostBreakdown(
+        (data as { cost_breakdown: unknown } | null)?.cost_breakdown,
+        failureNodeCosts
+      );
+    } catch (readError) {
+      logger.warn(
+        { playbookId, error: errorMessageFrom(readError) },
+        'Could not read the existing Career Playbook cost breakdown; recording the failure costs alone'
+      );
+      return await mergeFailureCostBreakdown(null, failureNodeCosts);
+    }
   }
 
   private async persistGenerationProgressBestEffort(
@@ -716,7 +896,7 @@ export class CareerPlaybookHandler {
     error: unknown
   ): Promise<never> {
     if (this.isFinalAttempt(job)) {
-      await this.persistFailed(jobData, message);
+      await this.persistFailed(jobData, message, extractFailureNodeCosts(error));
     }
 
     throw error instanceof Error ? error : new Error(message);

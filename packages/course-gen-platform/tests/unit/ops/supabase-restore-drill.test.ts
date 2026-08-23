@@ -15,6 +15,22 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+
+// Derived, not retyped (mc2-qd12b). The positive fixture below used to hold its
+// own copy of these sets, and because the case that uses it is
+// RUN_REAL_CONTROLLER-gated — auto-on at uid 1000, off on every CI runner — the
+// copy fell five functions and six triggers behind without a red test anywhere.
+// Importing the authority makes that particular drift impossible; whether the
+// authority itself still matches the barrier is held ungated by
+// `q12-guard-authority-drift.test.ts`.
+import {
+  GUARD_CONSTRAINTS,
+  GUARD_COLUMNS,
+  GUARD_FUNCTIONS,
+  GUARD_TABLES,
+  GUARD_TRIGGERS,
+} from '../../../../../deploy/postgres/q12-source-manifest.js';
+
 import { RUN_REAL_CONTROLLER } from './fixtures/q12-real-controller-gate.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
@@ -152,63 +168,26 @@ function sourceManifest(): Record<string, unknown> {
 }
 
 function exactGuardTransitionManifest(): Record<string, unknown> {
-  const tables = ['active_run', 'baseline', 'migration_guards', 'probe'];
+  const tables = [...GUARD_TABLES];
   // The durable, append-only guard tables — every one carries the immutable trigger pair. probe is
   // the one guard table meant to accept live writes, so it carries the row/truncate pair instead.
-  const immutableGuardTables = ['active_run', 'baseline', 'migration_guards'];
-  const columns = [
-    'active_run.singleton',
-    'active_run.run_id',
-    'active_run.capability_sha256',
-    'active_run.expected_catalog_sha256',
-    'active_run.expected_catalog',
-    'active_run.activated',
-    'baseline.singleton',
-    'baseline.baseline',
-    'baseline.baseline_sha256',
-    'migration_guards.migration',
-    'migration_guards.catalog_sha256',
-    'migration_guards.migration_file_sha256',
-    'migration_guards.stable_expected',
-    'migration_guards.relation_set',
-    'probe.probe_id',
-    'probe.touched_at',
-  ];
-  const constraints = [
-    'active_run.active_run_pkey',
-    'active_run.active_run_singleton_check',
-    'active_run.active_run_capability_sha256_check',
-    'active_run.active_run_expected_catalog_sha256_check',
-    'baseline.baseline_pkey',
-    'baseline.baseline_singleton_check',
-    'baseline.baseline_baseline_sha256_check',
-    'migration_guards.migration_guards_pkey',
-    'migration_guards.migration_guards_catalog_sha256_check',
-    'migration_guards.migration_guards_migration_file_sha256_check',
-    'probe.probe_pkey',
-  ];
-  // Must mirror GUARD_FUNCTIONS in deploy/postgres/q12-source-manifest.ts exactly — this builder
-  // is the POSITIVE case, so a short list makes it fail closed rather than vacuously pass. It had
-  // drifted five functions behind the barrier; the case is RUN_REAL_CONTROLLER-gated (auto-on for
-  // uid 1000, off on CI runners), which is why the drift stayed invisible.
-  const functions = [
-    'assert_capability',
-    'assert_controller_binding',
-    'enforce_ddl_barrier',
-    'enforce_write_barrier',
-    'extend_guard',
-    'quiesce_client_backends',
-    'verify_activated_state',
-    'verify_capability',
-    'verify_expected_guards',
-    'verify_install_resume_state',
-  ];
-  const functionIdentity = (name: string): string =>
-    name === 'extend_guard'
-      ? 'extend_guard(p_migration text, p_expected_relations jsonb, p_migration_file_sha256 text, p_expected_catalog_sha256 text)'
-      : name === 'verify_expected_guards'
-        ? 'verify_expected_guards(p_after_migration text)'
-        : `${name}()`;
+  // Read off the trigger set rather than listed, so adding a guard table cannot leave this behind.
+  const immutableGuardTables = tables.filter(table =>
+    GUARD_TRIGGERS.has(`${table}.q12_guard_immutable`)
+  );
+  const columns = [...GUARD_COLUMNS];
+  const constraints = [...GUARD_CONSTRAINTS];
+  // This builder is the POSITIVE case, so a short list makes it fail closed rather than vacuously
+  // pass — which is exactly what happened while it held its own copy of these ten names.
+  const identityByName = new Map(
+    [...GUARD_FUNCTIONS].map(identity => [identity.slice(0, identity.indexOf('(')), identity])
+  );
+  const functions = [...identityByName.keys()];
+  const functionIdentity = (name: string): string => {
+    const identity = identityByName.get(name);
+    if (!identity) throw new Error(`unknown guard function: ${name}`);
+    return identity;
+  };
   const cronJobs = Array.from({ length: 8 }, (_, index) => ({
     jobid: index + 1,
     active: true,

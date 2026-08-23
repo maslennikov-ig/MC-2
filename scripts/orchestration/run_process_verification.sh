@@ -30,12 +30,28 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.19"
-COMPATIBLE_LEGACY_PROFILES = {"balanced-v2.17", "balanced-v2.18"}
+EXPECTED_PROFILE = "balanced-v2.20"
+COMPATIBLE_LEGACY_PROFILES = {"balanced-v2.17", "balanced-v2.18", "balanced-v2.19"}
+V219_PROFILE = "balanced-v2.19"
+COHESIVE_EXPLICIT_PROFILES = {EXPECTED_PROFILE, V219_PROFILE}
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
 contract = tomllib.loads(orchestrator_path.read_text())
+baseline = contract.get("baseline")
+if not isinstance(baseline, dict):
+    raise SystemExit("Missing [baseline] section in .codex/orchestrator.toml")
+
+profile = baseline.get("profile")
+source_skill = baseline.get("source_skill")
+if not profile or not source_skill:
+    raise SystemExit("Baseline metadata must define profile and source_skill")
+
+if profile not in {EXPECTED_PROFILE, *COMPATIBLE_LEGACY_PROFILES} or source_skill != EXPECTED_SOURCE_SKILL:
+    raise SystemExit(
+        f"Expected baseline {EXPECTED_PROFILE} via {EXPECTED_SOURCE_SKILL}, got {profile} via {source_skill}"
+    )
+
 handoff_file = pathlib.Path(contract.get("handoff_file", ".codex/handoff.md"))
 project_index_file = pathlib.Path(contract.get("project_index_file", ".codex/project-index.md"))
 artifact_template = pathlib.Path(contract.get("artifact_template", ".codex/stage-artifact-template.md"))
@@ -52,7 +68,6 @@ required = [
     pathlib.Path("scripts/orchestration/run_bounded_node_tests.py"),
     pathlib.Path("scripts/orchestration/record_stage_telemetry.py"),
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
-    pathlib.Path("scripts/orchestration/test_cleanup_stage_workspace.py"),
     pathlib.Path("scripts/orchestration/report_child_completion.py"),
     pathlib.Path("scripts/orchestration/review_completion_inbox.py"),
 ]
@@ -77,16 +92,20 @@ if launcher == "none":
     }
     required = [path for path in required if path.name not in delegated_names]
 
-if launcher == "codex_subagents":
-    visibility = delegation.get("subagent_visibility")
-    if visibility != "separate_spawned_threads":
-        raise SystemExit(
-            "delegation.subagent_visibility must be 'separate_spawned_threads' for codex_subagents"
-        )
-    if delegation.get("inline_subagents_allowed") is not False:
-        raise SystemExit(
-            "delegation.inline_subagents_allowed must be false for codex_subagents"
-        )
+if profile == EXPECTED_PROFILE:
+    expected_delegation = {
+        "subagents_preauthorized_for_medium_complex": True,
+        "root_execution_scope": "simple_quick_only",
+        "medium_execution_default": "delegated_worker",
+        "complex_execution_default": "delegated_streams",
+        "simple_checks_owner": "orchestrator",
+        "delegation_gate": "medium_complex_required",
+        "delegation_unavailable_action": "block_medium_complex",
+        "independence_alone_sufficient": False,
+        "parallel_decomposition_matrix": "required_for_complex_candidates",
+        "parallel_execution_default": "spawn_eligible_streams",
+    }
+else:
     expected_delegation = {
         "subagents_preauthorized_for_complex": True,
         "medium_execution_default": "local_owner",
@@ -96,16 +115,33 @@ if launcher == "codex_subagents":
         "parallel_decomposition_matrix": "required_for_complex_candidates",
         "parallel_execution_default": "spawn_eligible_complex_streams",
     }
-    actual_delegation = {key: delegation.get(key) for key in expected_delegation}
-    if actual_delegation != expected_delegation:
-        raise SystemExit(f"delegation benefit-gate policy is stale: {actual_delegation!r}")
-    if "subagents_preauthorized_for_medium_complex" in delegation:
+actual_delegation = {key: delegation.get(key) for key in expected_delegation}
+if actual_delegation != expected_delegation:
+    raise SystemExit(
+        f"delegation execution policy is stale for {profile}: {actual_delegation!r}"
+    )
+if profile == EXPECTED_PROFILE and "subagents_preauthorized_for_complex" in delegation:
+    raise SystemExit(
+        "delegation.subagents_preauthorized_for_complex is stale; use medium/complex authorization"
+    )
+if profile != EXPECTED_PROFILE and "subagents_preauthorized_for_medium_complex" in delegation:
+    raise SystemExit(
+        "legacy delegation.subagents_preauthorized_for_medium_complex does not match its profile"
+    )
+if "requires_explicit_user_spawn_request" in delegation:
+    raise SystemExit(
+        "delegation.requires_explicit_user_spawn_request is stale; medium/complex delegation is required"
+    )
+
+if launcher == "codex_subagents":
+    visibility = delegation.get("subagent_visibility")
+    if visibility != "separate_spawned_threads":
         raise SystemExit(
-            "delegation.subagents_preauthorized_for_medium_complex is stale; use complex-only authorization"
+            "delegation.subagent_visibility must be 'separate_spawned_threads' for codex_subagents"
         )
-    if "requires_explicit_user_spawn_request" in delegation:
+    if delegation.get("inline_subagents_allowed") is not False:
         raise SystemExit(
-            "delegation.requires_explicit_user_spawn_request is stale; use the complex material-benefit gate"
+            "delegation.inline_subagents_allowed must be false for codex_subagents"
         )
     if delegation.get("sequential_requires_reason") is not True:
         raise SystemExit(
@@ -131,8 +167,28 @@ if launcher == "codex_subagents":
     required_model_policy = {
         "default_model": "inherit_orchestrator",
         "default_reasoning_effort": "inherit_orchestrator",
-        "reasoning_policy": "complexity_based",
-        "model_override_requires_current_user_authorization": True,
+        "reasoning_policy": "task_shape_proportional",
+        "mechanical_model": "gpt-5.6-luna",
+        "mechanical_reasoning_effort": "low",
+        "repetitive_model": "gpt-5.6-luna",
+        "repetitive_reasoning_effort": "medium",
+        "read_heavy_model": "gpt-5.6-terra",
+        "read_heavy_reasoning_effort": "medium",
+        "parallel_support_model": "gpt-5.6-terra",
+        "parallel_support_reasoning_effort": "medium",
+        "implementation_model": "gpt-5.6-sol",
+        "implementation_reasoning_effort": "medium",
+        "high_risk_model": "gpt-5.6-sol",
+        "high_risk_reasoning_effort": "high",
+        "fallback_model": "inherit_orchestrator",
+        "fallback_reasoning_effort": "inherit_orchestrator",
+        "model_override_requires_current_user_authorization": False,
+        "record_spawn_decision_fields": [
+            "role",
+            "model",
+            "reasoning_effort",
+            "rationale",
+        ],
         "record_model_reasoning_rationale": True,
     }
     for key, expected in required_model_policy.items():
@@ -146,20 +202,6 @@ missing = [str(path) for path in required if not path.exists()]
 if missing:
     raise SystemExit(f"Missing required orchestration files: {', '.join(missing)}")
 
-baseline = contract.get("baseline")
-if not isinstance(baseline, dict):
-    raise SystemExit("Missing [baseline] section in .codex/orchestrator.toml")
-
-profile = baseline.get("profile")
-source_skill = baseline.get("source_skill")
-if not profile or not source_skill:
-    raise SystemExit("Baseline metadata must define profile and source_skill")
-
-if profile not in {EXPECTED_PROFILE, *COMPATIBLE_LEGACY_PROFILES} or source_skill != EXPECTED_SOURCE_SKILL:
-    raise SystemExit(
-        f"Expected baseline {EXPECTED_PROFILE} via {EXPECTED_SOURCE_SKILL}, got {profile} via {source_skill}"
-    )
-
 if contract.get("role") != "orchestrator-stage":
     raise SystemExit("orchestrator role must be 'orchestrator-stage'")
 
@@ -169,7 +211,9 @@ if not isinstance(stage_limits, dict):
 if stage_limits.get("epic_scope") != "roadmap_only":
     raise SystemExit("stage_limits.epic_scope must be 'roadmap_only'")
 expected_stage_unit = (
-    "cohesive_vertical_slice" if profile == EXPECTED_PROFILE else "accepted_integration_slice"
+    "cohesive_vertical_slice"
+    if profile in COHESIVE_EXPLICIT_PROFILES
+    else "accepted_integration_slice"
 )
 if stage_limits.get("stage_unit") != expected_stage_unit:
     raise SystemExit(f"stage_limits.stage_unit must be {expected_stage_unit!r}")
@@ -189,19 +233,21 @@ if isinstance(max_correction_loops, bool) or not isinstance(max_correction_loops
 if stage_limits.get("p0_p1_block_acceptance") is not True:
     raise SystemExit("stage_limits.p0_p1_block_acceptance must be true")
 
-if profile == EXPECTED_PROFILE:
-    v219_required = [
+if profile in COHESIVE_EXPLICIT_PROFILES:
+    cohesive_required = [
         pathlib.Path(".codex/stage-manifest-template.json"),
         pathlib.Path(".codex/scope-preservation-ledger-template.json"),
         pathlib.Path(".codex/scope-criterion-snapshot-template.json"),
         pathlib.Path("scripts/orchestration/lint_stage_sizing.py"),
     ]
-    missing_v219 = [str(path) for path in v219_required if not path.exists()]
-    if missing_v219:
-        raise SystemExit(f"Missing required v2.19 sizing files: {', '.join(missing_v219)}")
+    missing_cohesive = [str(path) for path in cohesive_required if not path.exists()]
+    if missing_cohesive:
+        raise SystemExit(
+            f"Missing required {profile} sizing files: {', '.join(missing_cohesive)}"
+        )
     stage_sizing = contract.get("stage_sizing")
     if not isinstance(stage_sizing, dict):
-        raise SystemExit("v2.19 requires [stage_sizing]")
+        raise SystemExit(f"{profile} requires [stage_sizing]")
     expected_sizing = {
         "mode": "cohesive_vertical_slice",
         "manifest_schema": "orchestration-stage/v1",
@@ -251,14 +297,42 @@ if knowledge_graph.get("refresh_policy") != "accepted_relevant_integration_or_re
 verification_policy = contract.get("verification_policy")
 if not isinstance(verification_policy, dict):
     raise SystemExit("Missing [verification_policy] section")
-if profile == EXPECTED_PROFILE:
+if profile in COHESIVE_EXPLICIT_PROFILES:
     if verification_policy.get("mode") != "explicit":
-        raise SystemExit("v2.19 requires verification_policy.mode = 'explicit'")
+        raise SystemExit(f"{profile} requires verification_policy.mode = 'explicit'")
     levels = contract.get("orchestration_levels")
     if not isinstance(levels, dict) or levels.get("default") != "slice_acceptance":
-        raise SystemExit("v2.19 requires orchestration_levels.default = 'slice_acceptance'")
+        raise SystemExit(
+            f"{profile} requires orchestration_levels.default = 'slice_acceptance'"
+        )
     if verification_policy.get("default_level") != "slice_acceptance":
-        raise SystemExit("v2.19 requires verification_policy.default_level = 'slice_acceptance'")
+        raise SystemExit(
+            f"{profile} requires verification_policy.default_level = 'slice_acceptance'"
+        )
+    if profile == EXPECTED_PROFILE:
+        reuse_enabled = verification_policy.get("reuse_unchanged_evidence")
+        if not isinstance(reuse_enabled, bool):
+            raise SystemExit(
+                "verification_policy.reuse_unchanged_evidence must be true or false"
+            )
+        evidence = contract.get("evidence")
+        if not isinstance(evidence, dict):
+            raise SystemExit("Missing [evidence] section")
+        expected_evidence = {
+            "schema": "verification-evidence/v2",
+            "manifest_path": ".codex/verification-manifest.json",
+            "report_dir": "orchestration-evidence/v2",
+            "kill_switch_env": "ORCHESTRATION_EVIDENCE_REUSE_DISABLED",
+        }
+        for key, expected in expected_evidence.items():
+            if evidence.get(key) != expected:
+                raise SystemExit(f"evidence.{key} must be {expected!r}")
+        if reuse_enabled:
+            manifest = pathlib.Path(str(evidence["manifest_path"]))
+            if manifest.is_symlink() or not manifest.is_file():
+                raise SystemExit(
+                    "verification reuse requires a regular .codex/verification-manifest.json"
+                )
     removed_selectors = (
         "default_tier",
         "level_groups",
@@ -270,7 +344,8 @@ if profile == EXPECTED_PROFILE:
     present = [key for key in removed_selectors if key in verification_policy]
     if present:
         raise SystemExit(
-            "v2.19 explicit verification forbids selector fields: " + ", ".join(present)
+            f"{profile} explicit verification forbids selector fields: "
+            + ", ".join(present)
         )
 else:
     if verification_policy.get("mode") != "risk_adaptive":

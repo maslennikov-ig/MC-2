@@ -13,11 +13,23 @@ import os
 import pathlib
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import time
 import tomllib
+
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from verification_evidence import (  # noqa: E402 - installed sibling owns v2 evidence
+    EVIDENCE_SCHEMA,
+    EvidenceError,
+    load_manifest as load_verification_manifest,
+    run_verification,
+)
 
 DEBT_MARKER_PATTERN = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b", re.IGNORECASE)
 DEBT_POLICY_REFERENCE_PATTERNS = (
@@ -81,6 +93,25 @@ DEPRECATION_PATTERNS = (
 # distinct lines and stop: this is a pointer to work, not a log.
 DEPRECATION_REPORT_LIMIT = 20
 DEPRECATION_LINE_LIMIT = 300
+# A receipt that records only "passed" cannot answer how much passed, so every
+# count a stage summary would quote had to be taken on trust. These patterns
+# keep the summary lines the runners already print. Kept narrow on purpose:
+# a wrong line here becomes a wrong number in an acceptance record.
+RESULT_COUNT_PATTERNS = (
+    # unittest
+    re.compile(r"^Ran \d+ tests? in "),
+    re.compile(r"^OK(?: \(.*\))?$"),
+    re.compile(r"^FAILED \(.*\)$"),
+    # Playwright and similar runners
+    re.compile(r"^\d+ (?:passed|failed|skipped|flaky)\b"),
+    # node --test
+    re.compile(r"^\u2139 (?:tests|pass|fail|skipped|todo) \d+$"),
+    # Jest
+    re.compile(r"^Test Suites:\s+.+$"),
+    re.compile(r"^Tests:\s+.+$"),
+)
+RESULT_COUNT_REPORT_LIMIT = 12
+RESULT_COUNT_LINE_LIMIT = 200
 PLACEHOLDERS = {"", "n/a", "<short cleanup result or blocker>"}
 STRUCTURAL_CHANGE_PREFIXES = (
     "app/",
@@ -226,7 +257,6 @@ def _git_acceptance_state(
         f":(exclude).codex/stages/{stage_id}/acceptance-receipt.json",
         f":(exclude).codex/stages/{stage_id}/closeout-result.json",
         f":(exclude).codex/stages/{stage_id}/.closeout.lock",
-        f":(exclude).codex/stages/{stage_id}/evidence/**",
     ]
     diff = subprocess.run(
         ["git", "diff", "--binary", "HEAD", "--", ".", *excluded],
@@ -254,7 +284,7 @@ def _git_acceptance_state(
     hasher.update(diff.stdout)
     for encoded_path in sorted(item for item in untracked.stdout.split(b"\0") if item):
         relative = encoded_path.decode("utf-8", errors="surrogateescape")
-        if relative in ignored_names or relative.startswith(f"{ignored_prefix}evidence/"):
+        if relative in ignored_names:
             continue
         path = repo_root / relative
         if path.is_symlink() or not path.is_file():
@@ -365,22 +395,90 @@ def acceptance_fingerprint(identity: dict[str, object]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def process_check_needed(artifacts: list[dict[str, object]]) -> bool:
+def is_process_owned_path(raw: object) -> bool:
+    path = str(raw).strip().replace("\\", "/")
+    if not path or path.startswith("<") or path.startswith(".codex/stages/"):
+        return False
+    return (
+        path == "AGENTS.md"
+        or path == ".codex/orchestrator.toml"
+        or path.startswith(".codex/")
+        or path.startswith("scripts/orchestration/")
+    )
+
+
+def stage_changed_paths(repo_root: pathlib.Path, stage_id: str) -> list[str]:
+    """Paths this stage touched, from the commit that introduced its manifest.
+
+    Stage artifacts are optional metadata. A stage that records none still
+    changes files, and the process gate names files rather than artifacts, so
+    reading only the artifact list let a change to the orchestration contract
+    pass the boundary unverified.
+    """
+
+    def git(*args: str) -> tuple[int, str]:
+        done = subprocess.run(
+            ["git", *args], cwd=repo_root, text=True, capture_output=True, check=False
+        )
+        return done.returncode, done.stdout
+
+    paths: set[str] = set()
+    code, pending = git("diff", "--name-only", "HEAD")
+    if code == 0:
+        paths.update(line.strip() for line in pending.splitlines() if line.strip())
+
+    manifest = f".codex/stages/{stage_id}/stage-manifest.json"
+    code, log = git("log", "--diff-filter=A", "--format=%H", "--", manifest)
+    revisions = [line.strip() for line in log.splitlines() if line.strip()]
+    if code != 0 or not revisions:
+        # No committed manifest yet: the stage is whatever is still pending.
+        return sorted(paths)
+
+    first = revisions[-1]
+    code, committed = git("diff", "--name-only", f"{first}^", "HEAD")
+    if code != 0:
+        # The stage began at the root commit, which has no parent.
+        code, committed = git("diff", "--name-only", first, "HEAD")
+        if code == 0:
+            introduced_code, introduced = git(
+                "show", "--pretty=", "--name-only", first
+            )
+            if introduced_code == 0:
+                committed += introduced
+    if code == 0:
+        paths.update(line.strip() for line in committed.splitlines() if line.strip())
+    return sorted(paths)
+
+
+def process_check_needed(
+    artifacts: list[dict[str, object]],
+    changed_paths: list[str] | tuple[str, ...] = (),
+) -> bool:
     for artifact in artifacts:
         changed_files = artifact.get("changed_files")
         if not isinstance(changed_files, list):
             continue
-        for raw in changed_files:
-            path = str(raw).strip().replace("\\", "/")
-            if not path or path.startswith("<") or path.startswith(".codex/stages/"):
-                continue
-            if (
-                path == "AGENTS.md"
-                or path == ".codex/orchestrator.toml"
-                or path.startswith(".codex/")
-                or path.startswith("scripts/orchestration/")
-            ):
-                return True
+        if any(is_process_owned_path(raw) for raw in changed_files):
+            return True
+    return any(is_process_owned_path(path) for path in changed_paths)
+
+
+def process_verifier_is_selected(commands: list[str], entrypoint: str) -> bool:
+    """Recognize a direct shell invocation, never a mere path substring."""
+
+    expected = entrypoint.removeprefix("./")
+    for command in commands:
+        try:
+            tokens = shlex.split(command)
+        except ValueError:
+            continue
+        candidate: str | None = None
+        if tokens and tokens[0] in {"bash", "sh"} and len(tokens) > 1:
+            candidate = tokens[1]
+        elif tokens:
+            candidate = tokens[0]
+        if candidate is not None and candidate.removeprefix("./") == expected:
+            return True
     return False
 
 
@@ -467,6 +565,12 @@ def stage_closeout_lock(repo_root: pathlib.Path, stage_id: str):
 
 
 def _load_acceptance_receipt(path: pathlib.Path, key: str) -> dict[str, object] | None:
+    """Read historical receipts without treating v1 as reusable evidence.
+
+    Kept for callers that inspect old task history. Actual v2 reuse validates
+    the immutable report, its self-digest, and current identity in
+    ``verification_evidence.run_verification``.
+    """
     if not path.is_file() or path.is_symlink():
         return None
     try:
@@ -475,9 +579,57 @@ def _load_acceptance_receipt(path: pathlib.Path, key: str) -> dict[str, object] 
         return None
     if not isinstance(payload, dict):
         return None
+    if payload.get("schema_version") != "acceptance-receipt/v2":
+        return None
     if payload.get("idempotency_key") != key or payload.get("result") != "passed":
         return None
     return payload
+
+
+def configured_evidence_manifest(
+    repo_root: pathlib.Path,
+    contract: dict[str, object],
+    orchestration_level: str,
+) -> tuple[pathlib.Path, pathlib.Path] | None:
+    evidence = contract.get("evidence")
+    if not isinstance(evidence, dict) or evidence.get("schema") != EVIDENCE_SCHEMA:
+        return None
+    configured_level = normalize_orchestration_level(
+        str(evidence.get("level", "release")), legacy_default=False
+    )
+    current_level = normalize_orchestration_level(
+        orchestration_level, legacy_default=False
+    )
+    if configured_level != current_level:
+        return None
+    raw_manifest = evidence.get("manifest_path")
+    raw_report_dir = evidence.get("report_dir")
+    if not isinstance(raw_manifest, str) or not raw_manifest.strip():
+        raise SystemExit("verification-evidence/v2 requires evidence.manifest_path")
+    if not isinstance(raw_report_dir, str) or not raw_report_dir.strip():
+        raise SystemExit("verification-evidence/v2 requires evidence.report_dir")
+    manifest_relative = pathlib.PurePosixPath(raw_manifest.replace("\\", "/"))
+    report_relative = pathlib.PurePosixPath(raw_report_dir.replace("\\", "/"))
+    if manifest_relative.is_absolute() or ".." in manifest_relative.parts:
+        raise SystemExit("evidence.manifest_path must be repo-relative")
+    if report_relative.is_absolute() or ".." in report_relative.parts:
+        raise SystemExit("evidence.report_dir must be Git-common-relative")
+    manifest_path = repo_root.joinpath(*manifest_relative.parts)
+    if not manifest_path.exists():
+        return None
+    common = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if common.returncode != 0 or not common.stdout.strip():
+        raise SystemExit("verification-evidence/v2 requires a Git repository")
+    common_path = pathlib.Path(common.stdout.strip())
+    if not common_path.is_absolute():
+        common_path = repo_root / common_path
+    return manifest_path, common_path.resolve().joinpath(*report_relative.parts)
 
 
 def _save_acceptance_receipt(path: pathlib.Path, payload: dict[str, object]) -> None:
@@ -824,6 +976,22 @@ def collect_deprecations(output: str) -> list[str]:
     return found
 
 
+def collect_result_counts(output: str) -> list[str]:
+    """The count lines a reader would quote for one command, in order.
+
+    The receipt attests what passed; without these it could not say how much,
+    and every quoted total lived in prose that nothing checked.
+    """
+
+    found: list[str] = []
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or not any(pattern.search(line) for pattern in RESULT_COUNT_PATTERNS):
+            continue
+        found.append(line[:RESULT_COUNT_LINE_LIMIT])
+    return found[-RESULT_COUNT_REPORT_LIMIT:]
+
+
 def report_deprecations(results: list[dict[str, object]]) -> None:
     """Print what the toolchain said about deprecated APIs.
 
@@ -943,7 +1111,12 @@ def changed_line_debt_hits(repo_root: pathlib.Path) -> list[str]:
         if not path.is_file():
             continue
         try:
-            for line_number, line in enumerate(path.read_text(errors="ignore").splitlines(), start=1):
+            payload = path.read_bytes()
+            if b"\x00" in payload:
+                continue
+            for line_number, line in enumerate(
+                payload.decode("utf-8", errors="ignore").splitlines(), start=1
+            ):
                 if any(pattern in line for pattern in DEBT_POLICY_REFERENCE_PATTERNS):
                     continue
                 if DEBT_MARKER_PATTERN.search(line):
@@ -1205,6 +1378,22 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="run repository process verification even when orchestration-owned files did not change",
     )
+    reuse_mode = parser.add_mutually_exclusive_group()
+    reuse_mode.add_argument(
+        "--reuse",
+        action="store_true",
+        help="reuse only validated verification-evidence/v2 steps when policy permits",
+    )
+    reuse_mode.add_argument(
+        "--must-run",
+        action="store_true",
+        help="execute every required step even when reusable evidence exists (default)",
+    )
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help="execute every step and record which v2 cache entries would have hit",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv[1:])
 
@@ -1241,6 +1430,9 @@ def main(argv: list[str]) -> int:
                 "result": "dry-run" if args.dry_run else "passed",
                 "duration_seconds": round(time.monotonic() - started, 3),
             }
+            counts = collect_result_counts(output)
+            if counts:
+                entry["result_counts"] = counts
             deprecations = collect_deprecations(output)
             if deprecations:
                 entry["deprecations"] = deprecations
@@ -1260,17 +1452,14 @@ def main(argv: list[str]) -> int:
         receipt_path = (
             repo_root / ".codex" / "stages" / stage_id / "acceptance-receipt.json"
         )
-        receipt = _load_acceptance_receipt(receipt_path, fingerprint)
-        if receipt is not None:
-            print(f"acceptance receipt reused: {fingerprint}")
-            return 0
-
         baseline = contract.get("baseline")
         stage_state = contract.get("stage_state")
-        ran_process_check = args.process_check or process_check_needed(artifacts)
+        ran_process_check = args.process_check or process_check_needed(
+            artifacts, stage_changed_paths(repo_root, stage_id)
+        )
         exact_state_enabled = (
             isinstance(baseline, dict)
-            and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19"}
+            and baseline.get("profile") in {"balanced-v2.18", "balanced-v2.19", "balanced-v2.20"}
         ) or (
             isinstance(stage_state, dict)
             and stage_state.get("exact_identity_required") is True
@@ -1278,7 +1467,7 @@ def main(argv: list[str]) -> int:
         if (
             ran_process_check
             and isinstance(baseline, dict)
-            and baseline.get("profile") == "balanced-v2.19"
+            and baseline.get("profile") == "balanced-v2.20"
         ):
             sizing_linter = (
                 repo_root / "scripts" / "orchestration" / "lint_stage_sizing.py"
@@ -1311,23 +1500,102 @@ def main(argv: list[str]) -> int:
         check_documentation_review(repo_root, stage_id)
         check_documentation_decision(repo_root, stage_id, artifacts)
         check_debt_markers(repo_root, contract)
-        started_at = datetime.now(timezone.utc)
-        results = run_selected_commands()
 
-        if ran_process_check:
-            enforcement = contract.get("enforcement", {})
-            if not isinstance(enforcement, dict):
-                enforcement = {}
-            entrypoint = enforcement.get(
-                "process_verification_entrypoint",
-                "scripts/orchestration/run_process_verification.sh",
+        enforcement = contract.get("enforcement", {})
+        if not isinstance(enforcement, dict):
+            enforcement = {}
+        entrypoint = enforcement.get(
+            "process_verification_entrypoint",
+            "scripts/orchestration/run_process_verification.sh",
+        )
+        if not isinstance(entrypoint, str) or not entrypoint:
+            raise SystemExit("Missing process_verification_entrypoint")
+
+        evidence_config = configured_evidence_manifest(repo_root, contract, level)
+        if (args.reuse or args.shadow) and evidence_config is None:
+            raise SystemExit(
+                "--reuse/--shadow requires a configured verification-manifest/v2 "
+                f"for orchestration level {level}"
             )
-            if not isinstance(entrypoint, str) or not entrypoint:
-                raise SystemExit("Missing process_verification_entrypoint")
+        evidence_manifest: dict[str, object] | None = None
+        manifest_commands: list[str] = []
+        if evidence_config is not None:
+            manifest_path, report_dir = evidence_config
+            try:
+                evidence_manifest = load_verification_manifest(repo_root, manifest_path)
+            except EvidenceError as exc:
+                raise SystemExit(str(exc)) from exc
+            manifest_commands = [
+                str(step["command"]).strip() for step in evidence_manifest["steps"]
+            ]
+            if manifest_commands != commands:
+                raise SystemExit(
+                    "verification manifest required step/command set differs from selected "
+                    "acceptance commands; reconcile the manifest without changing the required set"
+                )
+
+        process_check_in_evidence = bool(
+            evidence_manifest is not None
+            and process_verifier_is_selected(manifest_commands, entrypoint)
+        )
+        if ran_process_check and not process_check_in_evidence:
             cmd = [str(repo_root / entrypoint), "--stage", stage_id]
             print("$ " + " ".join(cmd))
             if not args.dry_run:
                 subprocess.run(cmd, cwd=repo_root, check=True)
+
+        if evidence_config is not None:
+            manifest_path, report_dir = evidence_config
+            if args.dry_run:
+                run_selected_commands()
+                print("stage closeout verification dry-run OK")
+                return 0
+
+            verification_policy = contract.get("verification_policy")
+            reuse_policy_enabled = bool(
+                isinstance(verification_policy, dict)
+                and verification_policy.get("reuse_unchanged_evidence") is True
+            )
+
+            def final_state_gate() -> None:
+                check_pending_completion_events(
+                    repo_root,
+                    contract,
+                    stage_id,
+                    exact_identity=exact_state_enabled,
+                )
+                check_blocking_review_findings(repo_root, contract, stage_id)
+
+            try:
+                report = run_verification(
+                    repo_root=repo_root,
+                    manifest_path=manifest_path,
+                    receipt_path=receipt_path,
+                    report_dir=report_dir,
+                    stage_id=stage_id,
+                    orchestration_level=level,
+                    reuse_requested=args.reuse,
+                    must_run=args.must_run or (not args.reuse and not args.shadow),
+                    shadow=args.shadow,
+                    reuse_policy_enabled=reuse_policy_enabled,
+                    post_execution_gate=final_state_gate,
+                )
+            except EvidenceError as exc:
+                raise SystemExit(str(exc)) from exc
+            cached = sum(item.get("disposition") == "cached" for item in report["steps"])
+            executed = sum(item.get("disposition") == "executed" for item in report["steps"])
+            blocked = sum(item.get("disposition") == "blocked" for item in report["steps"])
+            print(
+                f"verification evidence: {report['result']} "
+                f"({executed} executed, {cached} cached, {blocked} blocked)"
+            )
+            if report["result"] != "PASS":
+                return 1
+            print("stage closeout verification OK")
+            return 0
+
+        started_at = datetime.now(timezone.utc)
+        results = run_selected_commands()
 
         check_pending_completion_events(
             repo_root,

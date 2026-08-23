@@ -6,12 +6,25 @@
  * Mirrors the Stage 5 importance-based routing pattern but uses lesson difficulty instead.
  *
  * Tier Mapping:
- * - simple: beginner difficulty → deepseek/deepseek-v4-flash
- * - normal: intermediate difficulty → moonshotai/kimi-k2-thinking
- * - complex: advanced difficulty + module 1 → qwen/qwen3.7-plus
+ * - simple: beginner difficulty → `stage_6_simple`
+ * - normal: intermediate difficulty → `stage_6_normal`
+ * - complex: advanced difficulty + module 1 → `stage_6_complex`
+ *
+ * The tier picks a PHASE NAME, never a model. Which model answers is
+ * `llm_model_config` at runtime, with `STAGE6_TIER_MODELS` only as the offline
+ * last resort. This comment named three specific models until 2026-08-23 and had
+ * been wrong since the routing shrank on 2026-08-12 (mc2-oofx5); naming them
+ * here is how it went stale, so it does not name them now.
+ *
+ * What the tiers currently differ by is REASONING, not price: all three author
+ * the lesson the reader opens, so all three take PROSE_MODEL_ID, and only
+ * `stage_6_complex` deliberates. That is the second of the two outcomes
+ * mc2-oofx5 asked for — the distinction was chosen rather than allowed to
+ * happen by itself.
  *
  * First Module Rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier
- * for best first impression quality.
+ * for best first impression quality. Stage 5 builds `lesson_id` as
+ * `${sectionIdx + 1}.${lessonIdx + 1}`, so the rule fires on the first section.
  */
 
 import {
@@ -41,10 +54,10 @@ export interface Stage6ModelTier {
 /**
  * Select model tier for Stage 6 lesson generation based on difficulty_level.
  *
- * Mapping:
- * - beginner → simple → deepseek/deepseek-v4-flash
- * - intermediate → normal → moonshotai/kimi-k2-thinking
- * - advanced → complex → qwen/qwen3.7-plus
+ * Mapping (to a phase name; the model behind it comes from the database):
+ * - beginner → simple → `stage_6_simple`
+ * - intermediate → normal → `stage_6_normal`
+ * - advanced → complex → `stage_6_complex`
  *
  * First module rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier.
  *

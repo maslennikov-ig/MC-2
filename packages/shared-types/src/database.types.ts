@@ -3552,6 +3552,9 @@ export type Database = {
         | "nlm_flashcards"
         | "nlm_mind_map"
         | "nlm_infographic"
+        | "nlm_slide_deck"
+        | "nlm_report"
+        | "nlm_data_table"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3606,6 +3609,7 @@ export type Database = {
         | "duplicate_job_detected"
         | "llm_phase_execution"
         | "json_repair_execution"
+        | "worker_started"
       metric_severity: "info" | "warn" | "error" | "fatal"
       org_role: "owner" | "admin" | "instructor" | "student" | "manager"
       role: "admin" | "superadmin" | "instructor" | "student"
@@ -3784,6 +3788,9 @@ export const Constants = {
         "nlm_flashcards",
         "nlm_mind_map",
         "nlm_infographic",
+        "nlm_slide_deck",
+        "nlm_report",
+        "nlm_data_table",
       ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],
@@ -3842,6 +3849,7 @@ export const Constants = {
         "duplicate_job_detected",
         "llm_phase_execution",
         "json_repair_execution",
+        "worker_started",
       ],
       metric_severity: ["info", "warn", "error", "fatal"],
       org_role: ["owner", "admin", "instructor", "student", "manager"],

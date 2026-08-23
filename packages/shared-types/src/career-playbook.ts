@@ -813,6 +813,15 @@ export const CareerPlaybookNodeCostSchema = z.object({
   outcome: z.enum(['succeeded', 'aborted']).optional(),
   cost_unknown: z.boolean().optional(),
   error: z.string().min(1).optional(),
+  // OpenRouter's own account of the call, when we managed to collect it. The id
+  // arrives with the response headers, so even an attempt we abandoned has one,
+  // and `GET /api/v1/generation` answers for it afterwards. `billed_by_provider`
+  // marks a `cost_usd` that is the provider's figure rather than our estimate
+  // from MODEL_CATALOG — which was measurably wrong for three models at once on
+  // 2026-08-20.
+  generation_id: z.string().min(1).optional(),
+  provider_name: z.string().min(1).optional(),
+  billed_by_provider: z.boolean().optional(),
 });
 export type CareerPlaybookNodeCost = z.infer<typeof CareerPlaybookNodeCostSchema>;
 

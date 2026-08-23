@@ -4,164 +4,38 @@
  */
 
 import type { JudgeVerdict, JudgeConfidence, CriteriaScores } from '@megacampus/shared-types';
-import type { OSCQRRubric, CriterionConfig } from '@megacampus/shared-types';
-import { getContentLabels } from '@megacampus/shared-types';
+import type { OSCQRRubric } from '@megacampus/shared-types';
 import { determineRecommendation } from '@megacampus/shared-types';
 import { LLMClient, type LLMResponse } from '@/shared/llm';
 import { logger } from '@/shared/logger';
 import { safeJSONParse } from '@/shared/workspace-utils';
 import { selectJudgeModels } from '../clev-voter';
+import { buildJudgePrompt } from '../clev-voter-helpers';
 import { DEFAULT_OSCQR_RUBRIC } from '@megacampus/shared-types';
 import type { CascadeEvaluationInput, CascadeConfig, RawJudgeResponse } from './types';
 
 /**
- * Build evaluation prompt for single judge
+ * What the single judge is told.
+ *
+ * Delegates to the panel's builder rather than keeping a second copy. They were
+ * two copies and they had drifted: the panel's prompt carries three checks the
+ * single judge's did not — that exercises and the conclusion actually belong to
+ * this lesson, that no stray CJK or Arabic script leaked into the prose, and
+ * that the lesson is not far shorter than its stated duration.
+ *
+ * The cheap gate is the one that settles 37% of lessons alone, so a gate that
+ * asks *less* than the panel behind it is the wrong way round: it lets through
+ * exactly what the panel would have caught. Measured 2026-08-22 over 1302 stored
+ * verdicts (mc2-4clyr).
+ *
+ * The two inputs are structurally identical, and one prompt is also what makes a
+ * single verdict admissible as one of the panel's votes.
  *
  * Exported so a test can read what the judge is actually told, the way the
  * conflict-detector prompts are.
  */
 export function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubric): string {
-  const { lessonContent, lessonSpec, ragChunks } = input;
-  const labels = getContentLabels(input.language || 'en');
-
-  // Format learning objectives
-  const objectives = lessonSpec.learning_objectives
-    .map((lo, i) => `- (${i + 1}) ${lo.objective} (Bloom: ${lo.bloom_level})`)
-    .join('\n');
-
-  // Format RAG context for fact verification
-  const ragContext =
-    ragChunks.length > 0
-      ? ragChunks
-          .slice(0, 5)
-          .map(chunk => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
-          .join('\n\n')
-      : 'No RAG context provided.';
-
-  // Format content for evaluation - provide full content for accurate evaluation
-  // Truncation caused low quality scores because judges couldn't assess complete content
-  //
-  // The examples block is omitted when the array is empty rather than shown as
-  // "(0 total)". Nothing fills that array: the generator writes markdown and the
-  // structured body is rebuilt from it with `examples: []` hard-coded, which is
-  // why the heuristic's own minExamples sits at 0 marked "not implemented yet".
-  // Telling a judge "Examples (0 total)" while it scores engagement_examples at
-  // 15% of the rubric asks it to mark down a lesson for a field the pipeline
-  // never fills — the examples themselves are in the sections above.
-  const examplesBlock =
-    lessonContent.examples.length > 0
-      ? `
-## ${labels.examples} (${lessonContent.examples.length} total)
-${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
-`
-      : '';
-
-  const contentSummary = `
-## ${labels.introduction}
-${lessonContent.intro}
-
-## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
-${examplesBlock}
-## ${labels.exercises} (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
-`;
-
-  // Format rubric criteria
-  const rubricCriteria = rubric.criteria
-    .map(
-      (c: CriterionConfig) =>
-        `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`
-    )
-    .join('\n');
-
-  return `You are an expert educational content evaluator. Evaluate the following lesson content against the OSCQR-based rubric.
-
-## LESSON SPECIFICATION
-
-**Title**: ${lessonSpec.title}
-**Description**: ${lessonSpec.description}
-**Difficulty**: ${lessonSpec.difficulty_level}
-**Target Audience**: ${lessonSpec.metadata.target_audience}
-**Content Archetype**: ${lessonSpec.metadata.content_archetype}
-
-### Learning Objectives
-${objectives}
-
-## LESSON CONTENT TO EVALUATE
-${contentSummary}
-
-## REFERENCE MATERIALS (for fact verification)
-${ragContext}
-
-## EVALUATION RUBRIC
-
-Evaluate against these 6 criteria (scores 0.0-1.0):
-${rubricCriteria}
-
-**Passing Threshold**: ${rubric.passingThreshold}
-
-## OUTPUT FORMAT
-
-Respond ONLY with valid JSON in this exact format:
-{
-  "overallScore": <number 0-1>,
-  "passed": <boolean>,
-  "confidence": "<high|medium|low>",
-  "criteriaScores": {
-    "learning_objective_alignment": <number 0-1>,
-    "pedagogical_structure": <number 0-1>,
-    "factual_accuracy": <number 0-1>,
-    "clarity_readability": <number 0-1>,
-    "engagement_examples": <number 0-1>,
-    "completeness": <number 0-1>
-  },
-  "issues": [
-    {
-      "criterion": "<criterion_name>",
-      "severity": "<critical|major|minor>",
-      "location": "<where in content, e.g. sec_1, sec_2, sec_introduction>",
-      "description": "<what is wrong>",
-      "quotedText": "<OPTIONAL: exact text from content that has the issue, 5-30 words>",
-      "suggestedFix": "<how to fix>",
-      "inlineReplacement": "<OPTIONAL: exact replacement for quotedText>"
-    }
-  ],
-  "strengths": ["<strength 1>", "<strength 2>"]
-}
-
-## INLINE FIX INSTRUCTIONS
-
-For LOCAL issues (typos, incorrect facts, unclear wording) that can be fixed by simple text replacement:
-
-1. Set \`quotedText\` to the EXACT text from the content (5-30 words, unique enough to locate)
-2. Set \`inlineReplacement\` to the corrected text
-
-Example:
-{
-  "criterion": "clarity_readability",
-  "severity": "minor",
-  "location": "sec_2",
-  "description": "Jargon may confuse beginners",
-  "quotedText": "синергетический эффект коллаборации",
-  "suggestedFix": "Replace jargon with simpler terms",
-  "inlineReplacement": "эффект совместной работы"
-}
-
-DO NOT provide inlineReplacement for:
-- Structural changes (moving paragraphs)
-- Adding new examples or content
-- Changes requiring creativity
-- Issues spanning multiple locations
-
-## LOCATION SPECIFICITY
-
-AVOID using "sec_global" when possible. Instead:
-- If the issue appears in specific sections, name them (e.g., "sec_1", "sec_3")
-- If engagement is lacking, identify WHERE examples should be added
-- Only use "sec_global" for truly document-wide issues (e.g., "inconsistent tone throughout")
-
-Evaluate objectively, focusing on educational quality and alignment with objectives.`;
+  return buildJudgePrompt(input, rubric);
 }
 
 interface ParsedSingleJudgeResponse {

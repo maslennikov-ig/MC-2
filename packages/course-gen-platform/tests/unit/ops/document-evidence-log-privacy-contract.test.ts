@@ -84,7 +84,10 @@ describe('document evidence ordinary-log privacy contract', () => {
       /outcome:\s*'evidence_enrichment_failed'/
     );
 
-    const traceEvidence = between(path, 'documentEvidence:', 'costUsd:');
+    // Anchored on `tokensUsed:` since 2026-08-21: the trace row's `costUsd:`
+    // was removed because a stage summary that carries a price is counted
+    // twice by `cost:report` (mc2-lymou).
+    const traceEvidence = between(path, 'documentEvidence:', 'tokensUsed:');
     expectPrivacySafe(
       traceEvidence,
       /\b(acceptedRunId|provenanceHash)\b/,

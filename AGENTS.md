@@ -23,6 +23,8 @@ Use `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` when a stag
 
 Use `scripts/orchestration/check_stranded_commits.py` before claiming that finished work is delivered. It reports commits that exist only on a side branch and never reached `develop`, matching by commit subject because cherry-pick and squash change sha, tree and patch-id. Closing a Beads issue proves intent, not delivery; on 2026-07-27 an audit found three finished, reviewed, closed changes stranded for weeks. `/push-dev` runs it as an advisory step after delivery. Knowingly undelivered branches belong in `.codex/stranded-commit-allowlist.txt` with a recorded reason.
 
+A **delivered** branch is deleted by `/push-dev` itself, locally and on `origin`, once `git merge-base --is-ancestor` confirms `develop` contains it. Left alone, delivery debris accumulates: on 2026-08-22 there were 200 remote and 69 local branches, of which 190 held nothing that was not already in `develop`. Their shas are in `.codex/deleted-branches-2026-08-22.tsv`, because deleting a branch removes a name, not commits.
+
 Typical code-change gates in this repo include:
 
 - `pnpm type-check`
@@ -58,7 +60,8 @@ Typical code-change gates in this repo include:
 
 ## Knowledge Graph
 
-- This repo uses a local Graphify graph under `graphify-out/`; read `graphify-out/GRAPH_REPORT.md` before broad search for architecture, impact, or unfamiliar code.
+- This repo uses a local Graphify graph under `graphify-out/`. Query it before broad search for architecture, impact, decisions, or unfamiliar code; it indexes documentation as well as code.
+- A missing local graph is not permission to hand-search. Use an existing suitable sibling or owner graph explicitly with `--graph <path>`, say whose graph you used, and treat it as read-only orientation. Because it may describe another branch or worktree, confirm the exact file in the current tree.
 - Use focused `graphify query`, `graphify path`, or `graphify explain`; do not paste `graphify-out/graph.json` into chat context.
 - The project-local Codex `PreToolUse` hook that runs `graphify hook-check` is allowed for Bash reminders.
 - Do not install Graphify git hooks or configure external semantic/model backends unless explicitly asked.

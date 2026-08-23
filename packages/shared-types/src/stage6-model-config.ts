@@ -1,4 +1,9 @@
-import { DEFAULT_FALLBACK_MODEL_ID, DEFAULT_MODEL_ID } from './model-defaults';
+import {
+  DEFAULT_FALLBACK_MODEL_ID,
+  DEFAULT_MODEL_ID,
+  PROSE_FALLBACK_MODEL_ID,
+  PROSE_MODEL_ID,
+} from './model-defaults';
 
 export interface Stage6CanonicalPhaseConfig {
   modelId: string;
@@ -31,13 +36,17 @@ function createStage6Config(
 }
 
 export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
+  // Every phase below that AUTHORS prose the reader opens takes PROSE_MODEL_ID;
+  // see `model-defaults.ts` for the run that decided it. The ones that edit
+  // under an explicit instruction, or that never reach the reader, keep
+  // DEFAULT_MODEL_ID.
   stage_6_content: createStage6Config({
-    modelId: 'openai/gpt-5.6-luna',
-    fallbackModelId: DEFAULT_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
   }),
   stage_6_refinement: createStage6Config({
-    modelId: DEFAULT_MODEL_ID,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
     temperature: 0.5,
   }),
   stage_6_rag_planning: createStage6Config({
@@ -47,16 +56,16 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
     maxTokens: 4096,
   }),
   stage_6_simple: createStage6Config({
-    modelId: DEFAULT_MODEL_ID,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
   }),
   stage_6_normal: createStage6Config({
-    modelId: 'openai/gpt-5.6-luna',
-    fallbackModelId: DEFAULT_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
   }),
   stage_6_complex: createStage6Config({
-    modelId: 'openai/gpt-5.6-luna',
-    fallbackModelId: DEFAULT_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
   }),
   // The two escalation phases deliberately avoid DEFAULT_MODEL_ID on BOTH the
   // primary and the fallback: by the time either runs, the default model has
@@ -84,8 +93,8 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
     maxTokens: 1000,
   }),
   stage_6_section_expander: createStage6Config({
-    modelId: DEFAULT_MODEL_ID,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: PROSE_MODEL_ID,
+    fallbackModelId: PROSE_FALLBACK_MODEL_ID,
     maxTokens: 2000,
   }),
   stage_6_delta_judge: createStage6Config({

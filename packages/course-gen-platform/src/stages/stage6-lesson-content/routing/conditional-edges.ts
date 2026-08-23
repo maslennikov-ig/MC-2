@@ -32,8 +32,15 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
     return 'generator';
   }
 
-  // Priority 2: Max retries exceeded — the judge node or executeStage6 safety-net
-  // handles setting needsHumanReview/reviewInfo. We just route to __end__.
+  // Priority 2: the judge asked for a regeneration it cannot have.
+  //
+  // Since 2026-08-23 the judge node ends this itself — it reaches the cap on its
+  // own return value and writes needsHumanReview, reviewInfo and errors through
+  // the channel, so the graph arrives here with needsRegeneration false and
+  // leaves by Priority 3. Reaching this branch therefore means a caller set
+  // needsRegeneration past the cap without going through the judge node, and
+  // nothing downstream will have been told why the lesson stopped. Kept as a
+  // net, logged at warn as one, and no longer the ordinary way out.
   if (state.needsRegeneration && state.retryCount >= maxRetries) {
     logger.warn(
       {
@@ -41,6 +48,7 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
         retryCount: state.retryCount,
         maxRetries,
         qualityScore: state.qualityScore,
+        needsHumanReview: state.needsHumanReview,
       },
       'Judge routing: Max regeneration retries exceeded - ending graph'
     );

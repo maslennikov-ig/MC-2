@@ -694,7 +694,12 @@ export class GenerationOrchestrator {
             }
           : undefined,
       },
-      costUsd: generationMetadata.cost_usd,
+      // Tokens, deliberately no price. This row summarises calls that have each
+      // already priced themselves, so carrying `generationMetadata.cost_usd`
+      // here made `cost:report` count Stage 5 twice — $0.002269 of the
+      // 2026-08-21 window, on top of the two calls it was the sum of
+      // (mc2-lymou). The rule is in `.codex/handoff.md`: a node-level summary
+      // keeps tokens and carries no price.
       tokensUsed: generationMetadata.total_tokens.total,
       durationMs: totalDuration,
     });

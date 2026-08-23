@@ -58,9 +58,93 @@ stated confidently and were wrong; each was killed by a single cheap query or a 
 suspect with evidence is worth more than a confident cause without it, and it is honest to ship the
 former labelled as such.
 
+**A `~…-latest` alias is a routing shim, not a model, and it lies twice.** OpenRouter documents it as
+a redirect that "always redirects to the latest model in the family". On 2026-08-17 the family moved,
+median call latency went 8.7 s → 102 s with no change on our side, and the courses of 12-20 August
+failed on timeouts nobody had configured (`mc2-qch4w`). The second lie is quieter and was measured on
+2026-08-22: `GET /models/{alias}/endpoints` answers **200 with an empty list** — 0 against 30 for the
+pinned snapshot — and this codebase reads an empty list as _could not find out_, so an alias silently
+switches off the per-attempt endpoint pin. `listModelEndpoints` now follows OpenRouter's own
+`alias_target.slug` and that hole is closed, but **routing stays on a pinned snapshot** by the
+owner's decision: the DeepSeek V4 Flash family already carries an experimental vision variant at 5.5×
+the input price, and a redirect is free to land on it.
+
+**A LangChain clone keeps only what the constructor was given.** `ChatOpenAI.withConfig` — which
+`withStructuredOutput` and `bindTools` both funnel through — is `new ChatOpenAI(this.fields)` by
+design (langchainjs#8586), so anything attached to a built instance is dropped, silently. That cost
+every structured call its price (`mc2-258fi`) and, separately, its mandatory-reasoning recovery
+(`mc2-148j9`). The rule that follows: build with it, never attach it. Cost recording rides in
+`callbacks`; the generation-id capture and the reasoning-floor resend ride in `configuration.fetch`,
+which also puts them below `invoke` and so covers `stream` and `batch`. Held by
+`tests/unit/shared/llm/structured-output-reaches-invoke.test.ts`.
+
+**A health check that reads a variable has checked nothing.** The NotebookLM bridge decided the
+geo-bypass proxy was fine because `HTTPS_PROXY` was set. On 2026-08-22 the tunnel had been dead long
+enough that nothing had generated since April: no listener on the forwarded port, the upstream host
+refusing SSH outright. Both containers — dev and production — reported `healthy` throughout, because
+Docker's own HEALTHCHECK only wants a 200 from `/health` and a `degraded` body still returns one. A
+dependency check must make the dependency answer. Corollary for anything behind an outbound hop:
+prove the hop, not its configuration, and remember that `docker ps` showing `(healthy)` is a claim
+about a loopback request.
+
+**An unpinned dependency lets the build date choose the version.** `notebooklm-py>=0.1.0` gave
+`:latest` (built 2026-08-10) version 0.8.0 and `:develop` (built 2026-06-04) version 0.6.0, so
+production sat two minors ahead of dev across a release that restructured error handling and removed
+dict-subscript access, and nobody had decided either. A floor is not a range. This bites hardest
+where the library automates somebody else's web interface, because there the upstream can also
+change under a version that did not move. Swept 2026-08-23 (`mc2-aqsjj`): every other requirement
+in the bridge image carries an upper bound, and `notebooklm-py` is the only exact pin — deliberately,
+because it is the only one where a minor release has already changed behaviour under us. The check
+is one line, so re-run it rather than trusting this sentence:
+`awk '!/^#/ && /">="/ && !/</' packages/course-gen-platform/docker/*/requirements.txt`.
+
+**The empty path that logs nothing is the one you will meet.** `retrieveLessonContextCore` had five
+ways to return no chunks; four logged and one did not, and the silent one is what a live run hit —
+zero RAG chunks in 143 ms with the document indexed, identified only by which log lines were
+_missing_. When a function has several early returns for the same outcome, the one without a line is
+not cheaper, it is the one that costs an afternoon. Related: a fallback that re-parses with the
+schema that just refused the value does not "use defaults", it throws (`mc2-80o1t`).
+
+**A threshold in characters is a claim about a writing system.** Stage 5 refused every Chinese
+course it was ever asked to make — `section_title` min 10 characters, `key_topics` min 5 — and
+nothing was wrong with the text: `应急基金核心概念` is eight characters and a complete idiomatic
+title that takes thirty-five in English. The minimums were calibrated on Latin script. The same
+factor of two is already written down elsewhere in this repository, in the chars-per-token table
+(2.0 for Chinese against 4.0 for English), and three call sites bypassed _that_ too by writing
+`language === 'ru' ? 'rus' : 'eng'`. When a number describes how much a character carries, weight
+it by script rather than lowering it — lowering lets genuinely truncated Latin text through.
+Related and worse: a lookup of the form `TABLE[language] || []` turns an unlisted language into
+**no checks at all**, which is how the Spanish language-consistency check passed everything.
+Configure by what a thing _is_ (which script a language uses) rather than by what it is not.
+
+**A placeholder in an id field is a filter nobody wrote.** `convertToLessonSpecV2` put
+`primary_documents: ['auto-generated']` into every automatic-mode lesson spec. Stage 6 intersects
+that list with the accepted document-evidence set, a word never matches a UUID, and so every
+automatic course with an uploaded document was written **without the document** for six months —
+zero chunks in 140 ms, `success: true`, judge scores of 0.90-0.93. Two other builders of the same
+field document the empty-array sentinel and one of them says outright "do not use 'default'
+sentinel"; this was the same mistake under a different word, which is why the guard now rejects any
+non-UUID literal rather than that one string.
+
+**Supervision is not availability, and `is-active` is a claim about the supervisor.** The dead
+SOCKS tunnel did have a systemd unit — a _user_ unit, `Linger=yes`, `Restart=always`, active since
+February. It restarted `ssh` every twelve seconds against a host refusing connections, logged
+`Connection refused` each time, and `systemctl is-active` answered `active` throughout, because the
+`autossh` parent was alive. Four months. Look for user units too (`systemctl --user`), and judge a
+tunnel by its listener and its egress, never by its unit state.
+
+**Ask the server what the constraint is.** `mc2-r7udy` was blocked from February on
+`system_metrics.event_type` refusing a new value, and the plan to unblock it stated no migration was
+needed because the table has no CHECK constraint. True, and beside the point: the constraint is a
+PostgreSQL enum, which is stricter. `pg_type.typtype = 'e'` says so in one query; the migrations
+directory does not. Sibling of "A Constraint the Repo Cannot Show You" and the same remedy.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.
+- Production workers take their environment from `/opt/megacampus/.env.<active_color>` — read
+  `active_color` first. `.env.production` is the compose default and is not what runs. A variable
+  that must survive a deploy goes into **both** `.env.green` and `.env.blue`.
 - `AGENTS.md` is rewritten by a `bd` hook, so the primary worktree is rarely clean. Stage explicit
   paths; never `git add -A`.
 - `q12-privileged-launch.sh` and `q12-writer-resume.py` are root-owned and deliberately NOT shipped

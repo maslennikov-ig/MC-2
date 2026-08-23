@@ -17,12 +17,20 @@ This is not full disaster recovery: losing both VPS providers can still lose thi
 - Scheduling: `Nice=15`, idle I/O class, CPU/IO weight 10, and a 25% one-core CPU quota.
 - Free-space floor: 10 GiB after the incoming snapshot. Its exact manifest size is reserved before
   transfer and the floor is checked again before atomic promotion.
-- Retention: no more than 14 daily generations and no generation older than 14 days.
+- Retention: no more than 7 daily generations and no generation older than 7 days.
 - Restore: monthly, exact Qdrant 1.18.2 image digest, 0.5 CPU, 1.5 GiB memory, 256 processes,
   and a loopback-only port. The temporary container is removed after the probe.
 
-The measured production snapshot on 2026-08-09 is 142,585,344 bytes. Fourteen copies consume about
-1.86 GiB, plus the pinned restore image, against 48 GiB currently free on `helixa-new`.
+The measured production snapshot on 2026-08-23 is 103,021,568 bytes. Seven copies consume about
+0.67 GiB, plus the pinned restore image, against 45 GiB currently free on `helixa-new`.
+
+Retention moved from 14 to 7 on 2026-08-23, on the owner's decision. It is one number in two
+programs: `EXPECTED_RETENTION_DAYS` in the production forced command, and `RETENTION_DAYS`/`KEEP`
+here. Changing one alone does not degrade the backup — it stops the freshness metric from being
+published at all, because the report ends in a value the restricted allow-list does not accept, and
+the stale-snapshot alert then fires 36 hours later on a copy that was pulled and verified. That
+happened between 2026-08-22 and 2026-08-23; `qdrant-offhost-backup.test.ts` now fails when the two
+disagree.
 
 ## Stored layout
 
@@ -80,7 +88,7 @@ restrict,command="/usr/local/sbin/megacampus-qdrant-offhost-source" <public-key>
 ```
 
 The wrapper validates `SSH_ORIGINAL_COMMAND` before its fixed sudo transition. The allowed commands
-are `metadata`, `export <bytes> <sha256>`, `publish-backup <epoch> <bytes> 14`, and
+are `metadata`, `export <bytes> <sha256>`, `publish-backup <epoch> <bytes> 7`, and
 `publish-restore <epoch> <points>`. It rejects all other commands. The size/digest preflight is
 bound to the export, which runs under one nonblocking lock, nice level 15, and idle I/O scheduling.
 Export reads the immutable snapshot directly from the Qdrant Docker volume and checks Qdrant's

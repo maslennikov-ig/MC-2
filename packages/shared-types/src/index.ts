@@ -17,6 +17,7 @@ export * from './analysis-job';
 export * from './analysis-schemas'; // Includes enhanced Analyze types
 export { createLLMEnumSchema } from './analysis-schemas'; // Export LLM-tolerant enum helper
 export * from './generation-result';
+export * from './text-length';
 export * from './style-prompts';
 export * from './generation-job';
 export * from './generation-metadata';

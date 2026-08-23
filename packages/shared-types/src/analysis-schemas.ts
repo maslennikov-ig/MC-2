@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { atLeastInformationChars } from './text-length';
 import { DocumentEvidenceSnapshotSchema } from './document-evidence';
 
 /**
@@ -496,19 +497,19 @@ export const Phase2InputSchema = z.object({
     }),
     contextual_language: z
       .object({
-        why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-        motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-        experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-        problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-        knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-        practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+        why_matters_context: atLeastInformationChars(50), // Removed .max(300) - allow rich context
+        motivators: atLeastInformationChars(50), // Reduced from 100 - realistic minimum for motivators text
+        experience_prompt: atLeastInformationChars(100), // Removed .max(600) - allow detailed prompts
+        problem_statement_context: atLeastInformationChars(50), // Removed .max(300) - encourage thorough problem statements
+        knowledge_bridge: atLeastInformationChars(100), // Removed .max(600) - allow comprehensive bridging
+        practical_benefit_focus: atLeastInformationChars(100), // Removed .max(600) - encourage detailed benefits
       })
       .optional(),
     topic_analysis: z.object({
       determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
       information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
       complexity: llmComplexityEnum,
-      reasoning: z.string().min(50),
+      reasoning: atLeastInformationChars(50),
       target_audience: llmTargetAudienceEnum,
       missing_elements: z.array(z.string()).nullable(),
       key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
@@ -572,19 +573,19 @@ export const Phase1OutputSchema = z.object({
   }),
   contextual_language: z
     .object({
-      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+      why_matters_context: atLeastInformationChars(50), // Removed .max(300) - allow rich context
+      motivators: atLeastInformationChars(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: atLeastInformationChars(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: atLeastInformationChars(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: atLeastInformationChars(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: atLeastInformationChars(100), // Removed .max(600) - encourage detailed benefits
     })
     .optional(),
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
     complexity: llmComplexityEnum,
-    reasoning: z.string().min(50),
+    reasoning: atLeastInformationChars(50),
     target_audience: llmTargetAudienceEnum,
     missing_elements: z.array(z.string()).nullable(),
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
@@ -628,7 +629,7 @@ export const GenerationGuidanceSchema = z.object({
 export const ResearchFlagSchema = z.object({
   topic: z.string().min(3), // Removed .max(100) - let LLM provide detailed topic names
   reason: z.string().min(3), // Removed .max(50) - encourage comprehensive reasoning
-  context: z.string().min(50), // Removed .max(200) - allow detailed context
+  context: atLeastInformationChars(50), // Removed .max(200) - allow detailed context
 });
 
 /**
@@ -637,8 +638,8 @@ export const ResearchFlagSchema = z.object({
 export const Phase3OutputSchema = z.object({
   // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    assessment_approach: z.string().min(50), // How learners demonstrate understanding
-    progression_logic: z.string().min(100), // How difficulty increases across lessons
+    assessment_approach: atLeastInformationChars(50), // How learners demonstrate understanding
+    progression_logic: atLeastInformationChars(100), // How difficulty increases across lessons
   }),
   research_flags: z.array(ResearchFlagSchema),
   phase_metadata: z.object({
@@ -716,18 +717,18 @@ export const AnalysisResultSchema = z.object({
   course_category: z.object({
     primary: llmCourseCategoryEnum,
     confidence: z.number().min(0).max(1), // Keep .max(1) - technical constraint (probability)
-    reasoning: z.string().min(50), // Removed .max(200) - encourage detailed reasoning
+    reasoning: atLeastInformationChars(50), // Removed .max(200) - encourage detailed reasoning
     secondary: llmCourseCategoryEnum.optional().nullable(),
   }),
 
   contextual_language: z
     .object({
-      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+      why_matters_context: atLeastInformationChars(50), // Removed .max(300) - allow rich context
+      motivators: atLeastInformationChars(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: atLeastInformationChars(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: atLeastInformationChars(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: atLeastInformationChars(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: atLeastInformationChars(100), // Removed .max(600) - encourage detailed benefits
     })
     .optional(),
 
@@ -735,7 +736,7 @@ export const AnalysisResultSchema = z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
     complexity: llmComplexityEnum,
-    reasoning: z.string().min(50),
+    reasoning: atLeastInformationChars(50),
     target_audience: llmTargetAudienceEnum,
     missing_elements: z.array(z.string()).nullable(),
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
@@ -744,9 +745,9 @@ export const AnalysisResultSchema = z.object({
 
   recommended_structure: z.object({
     estimated_content_hours: z.number().min(0.5), // Removed .max(200) - let LLM decide scope
-    scope_reasoning: z.string().min(100), // Removed .max(500) - encourage detailed reasoning
+    scope_reasoning: atLeastInformationChars(100), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z.number().int().min(3).max(45), // Keep .max(45) - pedagogical constraint per FR-014
-    calculation_explanation: z.string().min(20), // Removed .max(300) - allow thorough explanations
+    calculation_explanation: atLeastInformationChars(20), // Removed .max(300) - allow thorough explanations
     total_lessons: z.number().int().min(1), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
@@ -755,8 +756,8 @@ export const AnalysisResultSchema = z.object({
 
   // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    assessment_approach: z.string().min(50), // How learners demonstrate understanding
-    progression_logic: z.string().min(100), // How difficulty increases across lessons
+    assessment_approach: atLeastInformationChars(50), // How learners demonstrate understanding
+    progression_logic: atLeastInformationChars(100), // How difficulty increases across lessons
   }),
 
   research_flags: z.array(ResearchFlagSchema),

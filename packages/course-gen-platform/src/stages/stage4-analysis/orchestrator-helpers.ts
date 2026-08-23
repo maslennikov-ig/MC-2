@@ -406,7 +406,10 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
     stepName: 'finish',
     inputData: { courseId },
     outputData: analysisResult,
-    costUsd: analysisResult.metadata.total_cost_usd,
+    // Tokens, no price: the phases below this each priced their own calls. It
+    // read 0 on every measured run only because nothing accumulates
+    // `total_cost_usd` — the same shape that double-counted Stage 5 the moment
+    // its number was non-zero (mc2-lymou).
     tokensUsed: analysisResult.metadata.total_tokens.total,
     durationMs: totalDurationMs,
   });

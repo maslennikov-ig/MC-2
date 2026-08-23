@@ -176,19 +176,26 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
       };
     }
 
-    // Validate and map LLM issues
-    const validatedIssues: SelfReviewIssue[] = parsed.issues.map(issue => {
+    // Validate and map LLM issues.
+    //
+    // The fallback used to be `LLMIssueSchema.parse(issue)` — the same schema
+    // that had just refused the value — so "using defaults" threw, the outer
+    // catch reported "LLM review failed after retries", and one malformed field
+    // in one issue cost the entire review. It now drops the unusable issue and
+    // keeps the rest.
+    const validatedIssues: SelfReviewIssue[] = [];
+    for (const issue of parsed.issues) {
       const validated = LLMIssueSchema.safeParse(issue);
-      if (!validated.success) {
-        nodeLogger.warn({
-          msg: 'Invalid LLM issue format, using defaults',
-          issue,
-          errors: validated.error.errors.map(e => e.message),
-        });
-        return LLMIssueSchema.parse(issue);
+      if (validated.success) {
+        validatedIssues.push(validated.data);
+        continue;
       }
-      return validated.data;
-    });
+      nodeLogger.warn({
+        msg: 'Invalid LLM issue format, dropping this issue and keeping the review',
+        issue,
+        errors: validated.error.errors.map(e => e.message),
+      });
+    }
 
     return {
       success: true,

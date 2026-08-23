@@ -6,7 +6,7 @@ import {
   getCourseClassifications,
 } from '@/stages/stage3-classification/phases/phase-classification';
 import { cache } from '@/shared/cache/redis';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -59,7 +59,7 @@ vi.mock('@/shared/logger/index.js', () => {
 });
 
 vi.mock('@/shared/llm/langchain-models', () => ({
-  createOpenRouterModel: vi.fn(() => ({
+  createCostRecordingModel: vi.fn(() => ({
     invoke: mockModelInvoke,
     withStructuredOutput: vi.fn(() => ({
       invoke: mockStructuredModelInvoke,
@@ -90,6 +90,9 @@ vi.mock('@/shared/llm/token-estimator', () => ({
   tokenEstimator: {
     estimateTokens: vi.fn(() => 100),
   },
+  // The real one; classification asks it which script a document is in, and a
+  // stub would make these tests agree with themselves rather than with it.
+  detectScriptLanguage: vi.fn((text: string) => (/[Ѐ-ӿ]/u.test(text) ? 'rus' : 'eng')),
 }));
 
 vi.mock('@/stages/stage3-classification/utils/tournament-classification', () => ({

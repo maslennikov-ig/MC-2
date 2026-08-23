@@ -556,8 +556,15 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // adding 20260820170000_backfill_organization_storage_used.sql. It recomputes
 // `organizations.storage_used_bytes` from `file_catalog` and touches no function
 // inside the security manifest, so no new `after-*` digest is needed.
+// Re-pinned 2026-08-22 for two enum additions: 241 files, adding
+// 20260822160000_nlm_enrichment_types_slide_deck_report_data_table.sql
+// (mc2-6ye5z.4/.5/.8) and 20260822160100_metric_event_type_worker_started.sql
+// (mc2-r7udy). Both are `ALTER TYPE ... ADD VALUE` and nothing else: no table,
+// no policy, and no function inside the security manifest, so no new `after-*`
+// digest is needed. Worth noting this guard is what caught them — a narrower
+// local test selection had missed `tests/unit/scripts/` entirely, and CI did not.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '49ed5bd97f3bfb1aea9348c7bcc9f473fac2914a66952bad1f0d10df2633b211';
+  'f772ac5efaa8b191cbfc79ec12c9441d6e5636e93eba46e2b1280bff4c1d17db';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
