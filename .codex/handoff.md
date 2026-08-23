@@ -6,7 +6,41 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
-`docs/plans/brawny-mellow-quokka.md` is **complete**: every phase delivered, and phase 2
+`docs/plans/composed-dazzling-moore.md` is **complete and live**. The Docling stack moved in one
+coordinated jump to the set upstream builds and tests together — Serve 1.31.0, docling-slim 2.121.0,
+core 2.92.0, jobkit 3.4.0, parse 7.15.0, ibm-models 3.14.0, MCP 3.1.0 — and PDF heading inference is
+ON in both places it is read. Verified on the host after the deploy: those seven versions, the flag
+`true` in the MCP container and in both workers, and two real conversions with `from_cache=false`.
+
+What that upgrade is worth, measured rather than quoted: a docx content control that holds an image
+used to lose the text beside it. `content-control-image.docx` now carries that construct in the
+corpus — 194 characters of Markdown on 2.118.0 without the caption, 271 with it on 2.121.0 — so the
+fix cannot regress unnoticed. `numbered-sections.pdf` gained a second distinct heading level.
+The full corpus passed 18/18 on both stacks with no structural assertion moved; the one metric that
+fell, `recallAtK` on the scientific PDF, fell because core 2.92.0 carries content layers into chunk
+context, so more chunks contain the ground truth while atom coverage, aMRR, aDCG and the first
+relevant rank are identical.
+
+Three guards came out of this and hold beyond it:
+
+- **One image version, four files.** `docling-image-version-consistency.test.ts` makes the Dockerfile
+  LABEL the source of truth and fails on any compose tag or publish-matrix entry that disagrees. The
+  bump that prompted it had reached three files of four and would have published 3.1.0 as `3.0.0`.
+- **A flag with two readers.** `DOCLING_MCP_PDF_HEADING_HIERARCHY` is written from one repository
+  variable into both env files; half-configured is refused by a workflow gate and by a structural
+  assertion. Set on the MCP side alone, conversions WITH inferred headings are recorded under the
+  identity of ones without, and nothing downstream can tell.
+- **A deploy may go quiet for five minutes.** `docker compose up` waits on Serve's ~330s health
+  start_period; the deploy SSH had no keepalive and died with "Broken pipe" (run 32659118735,
+  production untouched). The keepalive now lives in the setup step and is asserted.
+
+Off-host Qdrant retention is **7 days** by owner decision (2026-08-23). It had been restated on both
+sides of the restricted allow-list, they drifted to 7 against 14, and the nightly report was rejected
+as an unknown command — the copy was pulled and verified, only its freshness metric went unwritten,
+and the stale-snapshot alert fired 36 hours later. The allow-list now interpolates
+`EXPECTED_RETENTION_DAYS` instead of repeating it.
+
+The previous stage remains accepted: `docs/plans/brawny-mellow-quokka.md` is **complete**: every phase delivered, and phase 2
 (`mc2-51epl`) **accepted** on the paid run of 2026-08-23 — course `6b3b183e`, dev workers on
 `afe03056f`, one of the eight lines left in the log and it is the legitimate one. The Career
 Playbook quality track stays **accepted** (`mc2-db696.110`); its two rules in
