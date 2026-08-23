@@ -43,11 +43,21 @@ every lesson past the heuristics, 1318 of 1911 by history, against 608 that reac
 held the dearest model of the pool. One pass on the measured shape (5144 in / 764 out): glm-5.2
 $0.00729, minimax $0.00246, luna $0.00195, deepseek $0.00055.
 
-**What moved to DeepSeek, and what did not.** 16 global rows where DeepSeek already served the same
-phase at the other tier now lead with it — same model, different input size, reversible. The 30 rows
-where it runs nowhere on that phase are the product's writing (lesson body, course structure, Stage 4
-expert, the playbook's authoring phases) and are deliberately untouched: that needs a comparison run,
-not an `UPDATE` (`mc2-tux1y`). The 12 `course_override` rows on two courses are also untouched.
+**Settled 2026-08-23 (`d179a18d0`): whatever AUTHORS prose the reader opens runs on Luna.** That is
+`stage_6_content`, the three tier variants, `section_expander` and `refinement`, on both tiers, in
+the database and in the offline defaults. `mc2-tux1y`/`mc2-bneet` closed on the measurement: same
+course, same settings, DeepSeek wrote 29% shorter, taught by narration rather than a worked example,
+and invented "более 60% людей" with no source, while the judge moved only 0.92 → 0.88. Saving would
+have been $0.008 per micro-course, and `stage_6_simple` is 166 of 274 lessons. What EDITS under an
+instruction (`patcher`) or never reaches the reader (`arbiter`, `rag_planning`, secondary judge,
+Stage 2/3/4 internals, `stage_5_simple`) stays on DeepSeek. The playbook's groups 1-4 and 6 are still
+DeepSeek and are a separate question, unmeasured.
+
+Model ids are declared **once**: `PROSE_MODEL_ID` / `PROSE_FALLBACK_MODEL_ID` beside `DEFAULT_*` in
+`model-defaults.ts`. `model-ids-live-in-one-place.test.ts` holds it. A row also carries the id a
+second time as `primary_display_name`; an `UPDATE` that forgets it labels the admin screen with the
+wrong model, which is what CI caught. 14 stale `course_override` rows and 2 inactive duplicates are
+filed as `mc2-f6del`.
 
 Reasoning is per-phase and the budget is load-bearing: OpenRouter bills reasoning tokens against
 `max_tokens`, so the budget is ADDED, and both the database and the seed generator refuse
@@ -252,55 +262,38 @@ naming a branch again means something really was left behind.
   `mc2-3lo22`. `mc2-db696.106`/`.107` — PDF fidelity/grounding, separate deploy accounts: not
   planned. `mc2-gmab0` — held by unit tests.
 
-## `snuggly-wiggling-sutton.md`, run 2026-08-22 — 8 paid runs, $0.298, 0 unpriced, $10.42 left
+## NotebookLM and languages — state after `snuggly-wiggling-sutton.md` (done 2026-08-22)
 
-**Phase 0 done — the hop is back (`mc2-xjykw`).** New SOCKS5 through `helixa-new` (82.26.152.8,
-Amsterdam NL), its own revocable key restricted to `from="95.81.98.230",restrict,port-forwarding`,
-unit `megacampus-socks.service`. Proved four ways because the old check lied: listener on 1080,
-`curl --socks5-hostname` egressing as NL, TCP from inside the bridge, and `notebooks.list()` now
-failing on **authentication** rather than CSRF, which is the proof. Correction: a unit _did_ exist —
-a **user** unit restarting ssh every 12 s against a refusing host since February, `is-active` green.
+That plan is finished; its narrative lives in the commits and `bd` close reasons, its lessons in
+`.codex/repository-failure-modes.md`. What still constrains work:
 
-**Phase 1 stops at the cookies (`mc2-3lo22`, P1, owner-owned).** `/health` reports `earliest cookie
-expires 2026-03-31 (-144d)` — not 28.08 as the plan said; it matches the last NLM generation,
-2026-04-15. Needs `notebooklm login`. Done meanwhile: the three enum values (migration applied,
-handlers still to write) and the CI job (`mc2-3d3ku`, green first run). `mc2-p99f1` has **no gate at
-all** — every layer already accepts the four types; `ON_DEMAND_ENRICHMENT_TYPES` is read by nobody.
+**The hop is live** (`mc2-xjykw`): SOCKS5 through `helixa-new` (82.26.152.8, NL), own revocable key,
+system unit `megacampus-socks.service`. Judge it by its listener and its egress, never by unit state.
 
-**Phase 2 done.** `mc2-kznfz` was neither hypothesis: `convertToLessonSpecV2` wrote
-`primary_documents: ['auto-generated']`, a word that never matches a UUID, so **every automatic-mode
-course with an uploaded document was written without it** since 2026-02-09. `mc2-f1tqd` fixed at the
-`configuration.fetch` seam: an empty 200 throws by name with status, body and generation id.
+**Cookies are the only NLM blocker** (`mc2-3lo22`, owner-owned): earliest expired 2026-03-31, which
+matches the last NLM generation, 2026-04-15. `mc2-p99f1` has **no gate at all** — every layer already
+accepts the four types, and `ON_DEMAND_ENRICHMENT_TYPES` is read by nobody. Three more enum values
+are applied to the database; their handlers are unwritten (`mc2-6ye5z.4/.5/.8`).
 
-**Phase 3 done.** `mc2-r7udy` unblocked — the constraint was an enum, not a CHECK, so it _did_ need
-a migration: `worker_started`, a marker from both entrypoints, and
-`pipelineAdmin.getWorkerRestartsDuringCourse`. `mc2-bnm62`: the two image rows are read now.
-`mc2-tux1y` measured in `mc2-bneet` — **do not switch**: judge 0.87-0.90 against 0.92-0.93, lessons
-29% shorter, an invented statistic in the prose, for $0.008 a micro course.
-
-**Phase 4 done, and it was the whole day.** Spanish and Chinese both complete; Chinese never could
-before. **Five defects, one class** — a threshold calibrated on Latin script applied to another,
-invisible until a non-ru/en language ran, each found once the previous was fixed: fail-open language
-check for `es`; four places halving Chinese token budgets; Stage 5 refusing every Chinese title;
-Stage 4 refusing its prose fields; the Stage 6 judge scoring **every Chinese lesson zero** for
-counting words by whitespace. Two were mine — `.refine()` deleted the constraint from the prompt
-`zodToPromptSchema` renders: here a Zod schema is not only validation, it is the prompt. Judge now
-es 0.94/0.95/0.90, zh 0.95/0.90/0.85, both read by eye; matrix and limits in `mc2-v6fqp`.
+**Spanish and Chinese both complete** (`mc2-v6fqp`), judge es 0.94/0.95/0.90, zh 0.95/0.90/0.85, both
+read by eye. Chinese never could before: five thresholds calibrated on Latin script, each invisible
+until the previous was fixed. Weight by script, never lower the number.
 
 ## Next recommended
 
 Accepted stage id: `mc2-qrdkt` · Current stage id: none
-Next stage id: **`mc2-3lo22`** — the NotebookLM cookies, which are the only thing standing between
-phase 1 of `docs/plans/snuggly-wiggling-sutton.md` and completion. Recommended action: ask the owner
-to run `notebooklm login`, deploy `storage_state.json` to both bridges, then order each of the four
-NLM types on a live lesson. Use $orchestrator-stage for an epic.
+Next stage id: **`mc2-s1vg5`** — phase 1 of `docs/plans/brawny-mellow-quokka.md`, which holds all
+remaining debt except the cookies. The owner took `mc2-3lo22` (NotebookLM cookies) for later, so it
+blocks only live NLM proof, not the handlers. Recommended action: the three absent guards —
+`generate-config-seed` reporting "complete" without reading the database, model-catalog drift running
+nowhere, `RUN_REAL_CONTROLLER` cases never reaching CI. Use $orchestrator-stage for an epic.
 
 ## Starter prompt for next orchestrator
 
-Read `docs/plans/snuggly-wiggling-sutton.md` whole first, then this file's run section above: four
-of its five phases are done and the plan does not know that. `.codex/next-goal-four-doors.md` is
-**stale**; ignore it. **Do not ask — act and report**, inside the standing authorization under
-Safety boundary.
+Read `docs/plans/brawny-mellow-quokka.md` whole first; `snuggly-wiggling-sutton.md` is **done** and
+`.codex/next-goal-four-doors.md` is **stale** — ignore both. **Do not ask — act and report**, inside
+the standing authorization under Safety boundary. Note: `codex/overnight-helixa-sync-mc2` carries six
+undelivered commits that belong to another agent — leave them alone.
 
 ## Read first
 
