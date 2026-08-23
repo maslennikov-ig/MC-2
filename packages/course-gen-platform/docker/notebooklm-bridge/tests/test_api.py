@@ -470,3 +470,183 @@ def test_video_async_lifecycle_start_status_result(async_client: TestClient) -> 
     assert payload["artifact"]["video_base64"] == base64.b64encode(b"mock-video").decode("ascii")
     assert payload["artifact"]["mime_type"] == "video/mp4"
     assert payload["artifact"]["extension"] == "mp4"
+
+
+# ── Slide deck, report and data table (mc2-6ye5z.4/.5/.8) ──────────────────
+#
+# Their `enrichment_type` enum values were applied to the database on
+# 2026-08-22 and nothing could produce one: the bridge had no endpoint. These
+# cover the half that makes them real. Live proof still waits on the NotebookLM
+# cookies (mc2-3lo22); what is provable without them is the contract.
+
+
+class ArtifactMockGenerator(MockGenerator):
+    """Answers the three new artifact types with recognisable bytes."""
+
+    async def generate_slide_deck(self, request):
+        captured_requests.append(("slide_deck", request))
+        return GenerationResult(
+            media_bytes=b"%PDF-mock-deck",
+            mime_type="application/pdf",
+            extension="pdf",
+            duration_seconds=None,
+            metadata={"slide_deck_output_format": "pdf"},
+        )
+
+    async def generate_report(self, request):
+        captured_requests.append(("report", request))
+        return GenerationResult(
+            media_bytes=b"# mock briefing",
+            mime_type="text/markdown",
+            extension="md",
+            duration_seconds=None,
+            metadata={"report_format": "briefing_doc"},
+        )
+
+    async def generate_data_table(self, request):
+        captured_requests.append(("data_table", request))
+        return GenerationResult(
+            media_bytes=b"term,definition\nmock,value\n",
+            mime_type="text/csv",
+            extension="csv",
+            duration_seconds=None,
+            metadata={},
+        )
+
+
+@pytest.fixture
+def artifact_client() -> Generator[TestClient, None, None]:
+    captured_requests.clear()
+    app = create_app(
+        settings=Settings(
+            notebooklm_bridge_token="test-token",
+            notebooklm_generation_mode="fallback",
+            notebooklm_generation_timeout_seconds=30,
+            notebooklm_poll_interval_seconds=0.01,
+            notebooklm_allow_fallback=True,
+        )
+    )
+    app.dependency_overrides[get_media_generator] = lambda: ArtifactMockGenerator()
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_slide_deck_lifecycle_returns_binary_artifact(artifact_client: TestClient) -> None:
+    start_response = artifact_client.post(
+        "/artifacts/slide-deck/start",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 3",
+            "script": "deck script",
+            "language": "ru",
+            "course_id": "course-deck",
+            "slide_deck_format": "presenter_slides",
+            "slide_deck_length": "short",
+            "slide_deck_output_format": "pdf",
+        },
+    )
+    assert start_response.status_code == 202
+    task_id = start_response.json()["task_id"]
+
+    terminal = _wait_for_terminal_status(
+        artifact_client, f"/artifacts/slide-deck/{task_id}/status"
+    )
+    assert terminal["status"] == "completed"
+    assert terminal["media_type"] == "slide_deck"
+
+    result = artifact_client.get(
+        f"/artifacts/slide-deck/{task_id}/result",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert result.status_code == 200
+    payload = result.json()
+    # Not `image_base64`: this endpoint returns PDF or PPTX, so the field is
+    # named for what it is and the mime type travels with it.
+    assert payload["artifact"]["artifact_base64"] == base64.b64encode(b"%PDF-mock-deck").decode(
+        "ascii"
+    )
+    assert payload["artifact"]["mime_type"] == "application/pdf"
+    assert payload["artifact"]["extension"] == "pdf"
+
+    media_type, request = captured_requests[-1]
+    assert media_type == "slide_deck"
+    assert request.slide_deck_format == "presenter_slides"
+    assert request.slide_deck_length == "short"
+
+
+def test_report_lifecycle_returns_markdown(artifact_client: TestClient) -> None:
+    start_response = artifact_client.post(
+        "/artifacts/report/start",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 4",
+            "script": "report script",
+            "language": "en",
+            "course_id": "course-report",
+            "report_format": "briefing_doc",
+        },
+    )
+    assert start_response.status_code == 202
+    task_id = start_response.json()["task_id"]
+
+    terminal = _wait_for_terminal_status(artifact_client, f"/artifacts/report/{task_id}/status")
+    assert terminal["status"] == "completed"
+
+    result = artifact_client.get(
+        f"/artifacts/report/{task_id}/result",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["media_type"] == "report"
+    assert payload["artifact"]["content"] == "# mock briefing"
+    assert payload["artifact"]["content_type"] == "text/markdown"
+
+
+def test_data_table_lifecycle_returns_csv(artifact_client: TestClient) -> None:
+    start_response = artifact_client.post(
+        "/artifacts/data-table/start",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 5",
+            "script": "table script",
+            "language": "en",
+            "course_id": "course-table",
+            "artifact_instructions": "one row per key term",
+        },
+    )
+    assert start_response.status_code == 202
+    task_id = start_response.json()["task_id"]
+
+    terminal = _wait_for_terminal_status(artifact_client, f"/artifacts/data-table/{task_id}/status")
+    assert terminal["status"] == "completed"
+
+    result = artifact_client.get(
+        f"/artifacts/data-table/{task_id}/result",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["media_type"] == "data_table"
+    # CSV, not markdown: a consumer that parses this must not be handed prose.
+    assert payload["artifact"]["content_type"] == "text/csv"
+    assert payload["artifact"]["content"].startswith("term,definition")
+
+    _, request = captured_requests[-1]
+    assert request.artifact_instructions == "one row per key term"
+
+
+def test_new_artifact_endpoints_require_the_bearer_token(
+    artifact_client: TestClient,
+) -> None:
+    for path in (
+        "/artifacts/slide-deck/start",
+        "/artifacts/report/start",
+        "/artifacts/data-table/start",
+    ):
+        response = artifact_client.post(
+            path,
+            json={"lesson_title": "L", "script": "s", "language": "en"},
+        )
+        assert response.status_code == 401, path

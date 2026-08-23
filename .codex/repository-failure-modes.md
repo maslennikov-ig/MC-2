@@ -92,7 +92,11 @@ about a loopback request.
 production sat two minors ahead of dev across a release that restructured error handling and removed
 dict-subscript access, and nobody had decided either. A floor is not a range. This bites hardest
 where the library automates somebody else's web interface, because there the upstream can also
-change under a version that did not move.
+change under a version that did not move. Swept 2026-08-23 (`mc2-aqsjj`): every other requirement
+in the bridge image carries an upper bound, and `notebooklm-py` is the only exact pin — deliberately,
+because it is the only one where a minor release has already changed behaviour under us. The check
+is one line, so re-run it rather than trusting this sentence:
+`awk '!/^#/ && /">="/ && !/</' packages/course-gen-platform/docker/*/requirements.txt`.
 
 **The empty path that logs nothing is the one you will meet.** `retrieveLessonContextCore` had five
 ways to return no chunks; four logged and one did not, and the silent one is what a live run hit —

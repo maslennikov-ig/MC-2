@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import type { EnrichmentType } from '@megacampus/shared-types'
 
 /**
  * Inspector view types for stack navigation
@@ -9,22 +10,15 @@ import { immer } from 'zustand/middleware/immer'
 export type InspectorView = 'root' | 'create' | 'detail' | 'batch'
 
 /**
- * Enrichment types that can be created (matches database enum, excludes card which is auto-generated)
+ * Enrichment types that can be created: everything except `card`, which is
+ * generated automatically rather than asked for.
+ *
+ * Derived rather than listed (mc2-6ye5z.4/.5/.8). This was the same idea as
+ * `CreateableEnrichmentType` in `forms/enrichment-form-config.ts`, written out
+ * twice under two names, and the two had to agree for the create flow to
+ * type-check at all — which is how the drift was found.
  */
-export type CreateEnrichmentType =
-  | 'video'
-  | 'audio'
-  | 'presentation'
-  | 'quiz'
-  | 'document'
-  | 'cover'
-  | 'banner'
-  | 'nlm_audio'
-  | 'nlm_video'
-  | 'nlm_study_guide'
-  | 'nlm_flashcards'
-  | 'nlm_mind_map'
-  | 'nlm_infographic'
+export type CreateEnrichmentType = Exclude<EnrichmentType, 'card'>
 
 /**
  * Navigation history entry for stack navigation

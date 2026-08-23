@@ -5,6 +5,8 @@ import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { getCurrentUser, verifyCourseAccess } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { enrichmentTypeSchema } from '@megacampus/shared-types'
+import type { EnrichmentType } from '@megacampus/shared-types'
 import type { Database } from '@/types/database.generated'
 
 // ============================================================================
@@ -14,22 +16,11 @@ import type { Database } from '@/types/database.generated'
 const createEnrichmentSchema = z.object({
   lessonId: z.string().regex(/^\d+\.\d+$/, 'Invalid lesson ID format (expected: "1.2")'),
   courseId: z.string().uuid('Invalid course ID'),
-  enrichmentType: z.enum([
-    'video',
-    'audio',
-    'quiz',
-    'presentation',
-    'document',
-    'cover',
-    'card',
-    'banner',
-    'nlm_audio',
-    'nlm_video',
-    'nlm_study_guide',
-    'nlm_flashcards',
-    'nlm_mind_map',
-    'nlm_infographic',
-  ]),
+  // The shared schema, not a copy of it (mc2-6ye5z.4/.5/.8). This was the
+  // sixth hand-kept list of the same values, and a list that falls behind here
+  // does not fail loudly — it rejects a type the rest of the system supports,
+  // at the one point where a user asked for it.
+  enrichmentType: enrichmentTypeSchema,
   settings: z.record(z.unknown()).optional(),
 })
 
@@ -47,21 +38,12 @@ const reorderEnrichmentsSchema = z.object({
 export interface CreateEnrichmentInput {
   lessonId: string // In format "1.2" (module.lesson label)
   courseId: string
-  enrichmentType:
-    | 'video'
-    | 'audio'
-    | 'quiz'
-    | 'presentation'
-    | 'document'
-    | 'cover'
-    | 'card'
-    | 'banner'
-    | 'nlm_audio'
-    | 'nlm_video'
-    | 'nlm_study_guide'
-    | 'nlm_flashcards'
-    | 'nlm_mind_map'
-    | 'nlm_infographic'
+  /**
+   * The shared type. It used to be a hand-written union sitting directly beside
+   * the Zod schema that validates the same field — two statements of one rule,
+   * a few lines apart, and nothing made them agree (mc2-6ye5z.4/.5/.8).
+   */
+  enrichmentType: EnrichmentType
   settings?: Record<string, unknown>
 }
 

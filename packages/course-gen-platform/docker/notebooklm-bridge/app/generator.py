@@ -21,7 +21,19 @@ from .models import MediaGenerationRequest
 
 logger = logging.getLogger("notebooklm_bridge.generator")
 
-MediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
+MediaType = Literal[
+    "audio",
+    "video",
+    "study_guide",
+    "flashcards",
+    "mind_map",
+    "infographic",
+    # mc2-6ye5z.4/.5/.8. The database enum has accepted these since 2026-08-22
+    # (migration 20260822160000); this is the half that makes them real.
+    "slide_deck",
+    "report",
+    "data_table",
+]
 
 
 class MediaGenerationError(RuntimeError):
@@ -216,6 +228,15 @@ class MediaGenerator(Protocol):
     async def generate_infographic(self, request: MediaGenerationRequest) -> GenerationResult:
         ...
 
+    async def generate_slide_deck(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
+    async def generate_report(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
+    async def generate_data_table(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
 
 class NotebookLMMediaGenerator(MediaGenerator):
     _RECOVERY_START_TIME_SKEW_SECONDS = 45.0
@@ -289,6 +310,15 @@ class NotebookLMMediaGenerator(MediaGenerator):
 
     async def generate_infographic(self, request: MediaGenerationRequest) -> GenerationResult:
         return await self._generate_text_artifact("infographic", request)
+
+    async def generate_slide_deck(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("slide_deck", request)
+
+    async def generate_report(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("report", request)
+
+    async def generate_data_table(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("data_table", request)
 
     async def _generate_text_artifact(
         self,
@@ -485,6 +515,18 @@ class NotebookLMMediaGenerator(MediaGenerator):
             )
         elif media_type == "infographic":
             return await self._generate_infographic_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "slide_deck":
+            return await self._generate_slide_deck_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "report":
+            return await self._generate_report_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "data_table":
+            return await self._generate_data_table_artifact(
                 client, notebooklm_module, notebook_id, request,
             )
         else:
@@ -830,6 +872,288 @@ class NotebookLMMediaGenerator(MediaGenerator):
             },
         )
 
+    async def _await_artifact_task(self, client: Any, notebook_id: str, status: Any) -> str | None:
+        """Wait for an artifact task to finish, and hand back its id.
+
+        Every artifact below repeats this; the id doubles as `artifact_id` for
+        the download call, which is why it is returned rather than discarded.
+        """
+        task_id = getattr(status, "task_id", None)
+        if not task_id:
+            return None
+
+        wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
+        if callable(wait_for_completion):
+            await wait_for_completion(
+                notebook_id,
+                task_id,
+                timeout=int(self._settings.notebooklm_generation_timeout_seconds),
+                poll_interval=int(self._settings.notebooklm_poll_interval_seconds),
+            )
+        return task_id
+
+    @staticmethod
+    async def _download_to_temp(
+        download: Any,
+        *,
+        notebook_id: str,
+        task_id: str | None,
+        suffix: str,
+        extra_kwargs: dict[str, Any] | None = None,
+    ) -> bytes:
+        """Run a notebooklm-py `download_*` into a temp file and read the bytes."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+        try:
+            kwargs: dict[str, Any] = {
+                "notebook_id": notebook_id,
+                "output_path": str(tmp_path),
+                **(extra_kwargs or {}),
+            }
+            if task_id:
+                kwargs["artifact_id"] = task_id
+            await download(**kwargs)
+            return tmp_path.read_bytes()
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    async def _generate_slide_deck_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate a slide deck via notebooklm-py (mc2-6ye5z.4).
+
+        A binary artifact like the infographic, not text: `download_slide_deck`
+        writes PDF or PPTX. PDF is the default because it is the one every
+        reader can open without an application.
+        """
+        generate_slide_deck = getattr(client.artifacts, "generate_slide_deck", None)
+        if not callable(generate_slide_deck):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_slide_deck; "
+                "slide_deck generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.slide_deck_format:
+            slide_format = self._resolve_enum_option(
+                notebooklm_module,
+                enum_name="SlideDeckFormat",
+                raw_value=request.slide_deck_format,
+                field_name="slide_deck_format",
+            )
+            if slide_format is not None:
+                kwargs["slide_format"] = slide_format
+        if request.slide_deck_length:
+            slide_length = self._resolve_enum_option(
+                notebooklm_module,
+                enum_name="SlideDeckLength",
+                raw_value=request.slide_deck_length,
+                field_name="slide_deck_length",
+            )
+            if slide_length is not None:
+                kwargs["slide_length"] = slide_length
+        if request.artifact_instructions:
+            kwargs["instructions"] = request.artifact_instructions
+
+        try:
+            status = await generate_slide_deck(**kwargs)
+        except TypeError:
+            status = await generate_slide_deck(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected slide_deck generation"
+            )
+
+        task_id = await self._await_artifact_task(client, notebook_id, status)
+
+        download_slide_deck = getattr(client.artifacts, "download_slide_deck", None)
+        if not callable(download_slide_deck):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.download_slide_deck"
+            )
+
+        output_format = (request.slide_deck_output_format or "pdf").strip().lower()
+        if output_format not in {"pdf", "pptx"}:
+            raise MediaGenerationError(
+                f"Unsupported slide_deck_output_format: {output_format!r}. "
+                "Allowed values: pdf, pptx"
+            )
+
+        deck_bytes = await self._download_to_temp(
+            download_slide_deck,
+            notebook_id=notebook_id,
+            task_id=task_id,
+            suffix=f".{output_format}",
+            extra_kwargs={"output_format": output_format},
+        )
+
+        if not deck_bytes:
+            raise MediaGenerationError("NotebookLM returned empty slide_deck artifact")
+
+        return GenerationResult(
+            media_bytes=deck_bytes,
+            mime_type=(
+                "application/pdf"
+                if output_format == "pdf"
+                else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            ),
+            extension=output_format,
+            duration_seconds=None,
+            metadata={
+                "slide_deck_format": request.slide_deck_format,
+                "slide_deck_length": request.slide_deck_length,
+                "slide_deck_output_format": output_format,
+            },
+        )
+
+    async def _generate_report_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate a report via notebooklm-py (mc2-6ye5z.5).
+
+        Same `artifacts.generate_report` call the study guide uses — in
+        NotebookLM every report is artifact type 2 and only the format differs.
+        The two are separate enrichment types because they are separate things
+        to a reader, so this one refuses `study_guide`: an `nlm_report` row
+        holding a study guide would make the two indistinguishable afterwards.
+        Default is `briefing_doc`, which is notebooklm-py's own default.
+        """
+        generate_report = getattr(client.artifacts, "generate_report", None)
+        if not callable(generate_report):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_report; "
+                "report generation is not available with this version"
+            )
+
+        report_format = (request.report_format or "briefing_doc").strip().lower()
+        if report_format == "study_guide":
+            raise MediaGenerationError(
+                "report_format 'study_guide' belongs to the nlm_study_guide type; "
+                "use that enrichment instead so the two stay distinguishable"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.artifact_instructions:
+            kwargs["extra_instructions"] = request.artifact_instructions
+
+        try:
+            status = await generate_report(**kwargs, report_format=report_format)
+        except TypeError:
+            # Older signatures took `format=`; older still took neither.
+            try:
+                status = await generate_report(**kwargs, format=report_format)
+            except TypeError:
+                status = await generate_report(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected report generation"
+            )
+
+        task_id = await self._await_artifact_task(client, notebook_id, status)
+
+        download_report = getattr(client.artifacts, "download_report", None)
+        if callable(download_report):
+            content_text = (
+                await self._download_to_temp(
+                    download_report,
+                    notebook_id=notebook_id,
+                    task_id=task_id,
+                    suffix=".md",
+                )
+            ).decode("utf-8")
+        else:
+            content_text = getattr(status, "content", None) or getattr(status, "text", "")
+            if not content_text:
+                raise MediaGenerationError(
+                    "notebooklm-py does not expose artifacts.download_report and "
+                    "status did not contain content"
+                )
+
+        if not content_text:
+            raise MediaGenerationError("NotebookLM returned empty report artifact")
+
+        return GenerationResult(
+            media_bytes=content_text.encode("utf-8"),
+            mime_type="text/markdown",
+            extension="md",
+            duration_seconds=None,
+            metadata={"report_format": report_format},
+        )
+
+    async def _generate_data_table_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate a data table via notebooklm-py (mc2-6ye5z.8).
+
+        `download_data_table` writes CSV, so this stays text and is stored
+        inline rather than uploaded as an asset.
+        """
+        generate_data_table = getattr(client.artifacts, "generate_data_table", None)
+        if not callable(generate_data_table):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_data_table; "
+                "data_table generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.artifact_instructions:
+            kwargs["instructions"] = request.artifact_instructions
+
+        try:
+            status = await generate_data_table(**kwargs)
+        except TypeError:
+            status = await generate_data_table(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected data_table generation"
+            )
+
+        task_id = await self._await_artifact_task(client, notebook_id, status)
+
+        download_data_table = getattr(client.artifacts, "download_data_table", None)
+        if callable(download_data_table):
+            content_text = (
+                await self._download_to_temp(
+                    download_data_table,
+                    notebook_id=notebook_id,
+                    task_id=task_id,
+                    suffix=".csv",
+                )
+            ).decode("utf-8")
+        else:
+            content_text = getattr(status, "content", None) or getattr(status, "text", "")
+            if not content_text:
+                raise MediaGenerationError(
+                    "notebooklm-py does not expose artifacts.download_data_table and "
+                    "status did not contain content"
+                )
+
+        if not content_text:
+            raise MediaGenerationError("NotebookLM returned empty data_table artifact")
+
+        return GenerationResult(
+            media_bytes=content_text.encode("utf-8"),
+            mime_type="text/csv",
+            extension="csv",
+            duration_seconds=None,
+            metadata={"artifact_instructions_used": bool(request.artifact_instructions)},
+        )
+
     def _fallback_text_result(
         self,
         media_type: MediaType,
@@ -868,8 +1192,23 @@ class NotebookLMMediaGenerator(MediaGenerator):
             media_bytes = fallback_content.encode("utf-8")
             mime_type = "application/json"
             extension = "json"
+        elif media_type == "data_table":
+            # A table's fallback is still a table: a consumer that parses CSV
+            # must not be handed markdown and told it succeeded.
+            fallback_content = f"fallback,reason\ntrue,{reason}\n"
+            media_bytes = fallback_content.encode("utf-8")
+            mime_type = "text/csv"
+            extension = "csv"
+        elif media_type == "slide_deck":
+            # No placeholder PDF: unlike a 1x1 PNG, a made-up deck is not
+            # recognisably empty to whoever opens it. The bytes are a marker and
+            # the metadata below says `placeholder`.
+            fallback_content = f"Fallback slide_deck. Generation unavailable: {reason}\n"
+            media_bytes = fallback_content.encode("utf-8")
+            mime_type = "text/plain"
+            extension = "txt"
         else:
-            # study_guide → markdown
+            # study_guide, report → markdown
             fallback_content = f"# Fallback {media_type}\n\nGeneration unavailable: {reason}\n"
             media_bytes = fallback_content.encode("utf-8")
             mime_type = "text/markdown"

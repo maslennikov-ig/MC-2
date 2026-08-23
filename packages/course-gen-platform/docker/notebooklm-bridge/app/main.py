@@ -36,6 +36,8 @@ from .models import (
     MediaGenerationTaskStatusResponse,
     TextGenerationResponse,
     TextGenerationTaskResultResponse,
+    BinaryArtifactGenerationResponse,
+    BinaryArtifactTaskResultResponse,
     VideoGenerationResponse,
     VideoGenerationTaskResultResponse,
 )
@@ -43,7 +45,18 @@ from .models import (
 logger = logging.getLogger("notebooklm_bridge.api")
 
 TaskStatus = Literal["queued", "in_progress", "completed", "failed"]
-TaskMediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
+TaskMediaType = Literal[
+    "audio",
+    "video",
+    "study_guide",
+    "flashcards",
+    "mind_map",
+    "infographic",
+    # mc2-6ye5z.4/.5/.8
+    "slide_deck",
+    "report",
+    "data_table",
+]
 
 
 def _configure_bridge_logging() -> None:
@@ -113,6 +126,20 @@ def _build_text_response(result: GenerationResult, media_type: str) -> TextGener
 def _build_infographic_response(result: GenerationResult) -> InfographicGenerationResponse:
     return InfographicGenerationResponse(
         image_base64=base64.b64encode(result.media_bytes).decode("ascii"),
+        mime_type=result.mime_type,
+        extension=result.extension,
+        metadata=result.metadata or {},
+    )
+
+
+def _build_binary_artifact_response(result: GenerationResult) -> BinaryArtifactGenerationResponse:
+    """A non-text, non-image artifact: the slide deck's PDF or PPTX bytes.
+
+    Mime type and extension come from the result rather than being defaulted,
+    because this endpoint really does return two different file types.
+    """
+    return BinaryArtifactGenerationResponse(
+        artifact_base64=base64.b64encode(result.media_bytes).decode("ascii"),
         mime_type=result.mime_type,
         extension=result.extension,
         metadata=result.metadata or {},
@@ -298,6 +325,12 @@ class _AsyncTaskStore:
                 result = await generator.generate_mind_map(request)
             elif media_type == "infographic":
                 result = await generator.generate_infographic(request)
+            elif media_type == "slide_deck":
+                result = await generator.generate_slide_deck(request)
+            elif media_type == "report":
+                result = await generator.generate_report(request)
+            elif media_type == "data_table":
+                result = await generator.generate_data_table(request)
             else:
                 raise MediaGenerationError(f"Unsupported media type: {media_type}")
         except MediaGenerationError as error:
@@ -949,6 +982,231 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return InfographicGenerationTaskResultResponse(
             task_id=task.task_id,
             media_type="infographic",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Slide deck endpoints ───────────────────────────────────────────
+    #
+    # Binary, not text: the result is PDF or PPTX bytes, so this trio uses
+    # BinaryArtifactTaskResultResponse rather than the text one (mc2-6ye5z.4).
+
+    @app.post(
+        "/artifacts/slide-deck/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_slide_deck_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="slide_deck",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="slide_deck",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/slide-deck/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_slide_deck_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="slide_deck")
+        logger.info(
+            "Bridge task status read: media=slide_deck task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "slide_deck", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="slide_deck",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/slide-deck/{task_id}/result",
+        response_model=BinaryArtifactTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_slide_deck_generation_result(task_id: str) -> BinaryArtifactTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="slide_deck")
+        artifact = _build_binary_artifact_response(task.result) if task.result else None
+        logger.info(
+            "Bridge task result read: media=slide_deck task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "slide_deck",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return BinaryArtifactTaskResultResponse(
+            task_id=task.task_id,
+            media_type="slide_deck",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Report endpoints ──────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/report/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_report_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="report",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="report",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/report/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_report_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="report")
+        logger.info(
+            "Bridge task status read: media=report task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "report", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="report",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/report/{task_id}/result",
+        response_model=TextGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_report_generation_result(task_id: str) -> TextGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="report")
+        artifact = _build_text_response(task.result, "report") if task.result else None
+        logger.info(
+            "Bridge task result read: media=report task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "report",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return TextGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="report",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Data table endpoints ──────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/data-table/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_data_table_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="data_table",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="data_table",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/data-table/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_data_table_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="data_table")
+        logger.info(
+            "Bridge task status read: media=data_table task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "data_table", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="data_table",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/data-table/{task_id}/result",
+        response_model=TextGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_data_table_generation_result(task_id: str) -> TextGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="data_table")
+        artifact = _build_text_response(task.result, "data_table") if task.result else None
+        logger.info(
+            "Bridge task result read: media=data_table task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "data_table",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return TextGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="data_table",
             status=task.status,
             artifact=artifact,
             error=task.error,

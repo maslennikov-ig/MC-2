@@ -18,7 +18,7 @@ import type {
   EnrichmentMetadata,
   Json,
 } from '@megacampus/shared-types';
-import type { EnrichmentWithContext } from '../types';
+import type { EnrichmentWithContext, NotebookLMMediaType } from '../types';
 
 /**
  * Fetch enrichment with lesson and course context
@@ -155,7 +155,7 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
 
 export interface NotebookLMAsyncMetadataState {
   taskId: string;
-  mediaType: 'audio' | 'video' | 'study_guide' | 'flashcards' | 'mind_map' | 'infographic';
+  mediaType: NotebookLMMediaType;
   status: string;
   pollAttempt: number;
   startedAt: string;

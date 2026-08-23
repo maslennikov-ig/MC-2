@@ -122,6 +122,7 @@ export function hasEmbeddedMediaPayload(payload: Record<string, unknown>): boole
       'audio_base64',
       'video_base64',
       'image_base64',
+      'artifact_base64',
       'file_base64',
       'base64',
       'base64_data',
@@ -138,6 +139,9 @@ export function parseMediaPayload(
     'audio_base64',
     'video_base64',
     'image_base64',
+    // The slide deck is neither audio, video nor an image, so it names itself
+    // plainly (mc2-6ye5z.4).
+    'artifact_base64',
     'file_base64',
     'base64',
     'base64_data',
@@ -177,7 +181,15 @@ export function parseMediaPayload(
 }
 
 export function isTextMediaType(mediaType: NotebookLMBridgeMediaType): boolean {
-  return mediaType === 'study_guide' || mediaType === 'flashcards' || mediaType === 'mind_map';
+  return (
+    mediaType === 'study_guide' ||
+    mediaType === 'flashcards' ||
+    mediaType === 'mind_map' ||
+    // Markdown and CSV respectively. `slide_deck` is deliberately absent: it
+    // returns PDF or PPTX bytes and goes through the binary path.
+    mediaType === 'report' ||
+    mediaType === 'data_table'
+  );
 }
 
 export function parseTextPayload(
@@ -255,6 +267,14 @@ export function getMediaDefaults(mediaType: NotebookLMBridgeMediaType): MediaDef
       return { mimeType: 'application/json', extension: 'json' };
     case 'infographic':
       return { mimeType: 'image/png', extension: 'png' };
+    case 'slide_deck':
+      // PDF by default; a PPTX response overrides this from its own mime type,
+      // which is why the bridge sends one rather than relying on a default.
+      return { mimeType: 'application/pdf', extension: 'pdf' };
+    case 'report':
+      return { mimeType: 'text/markdown', extension: 'md' };
+    case 'data_table':
+      return { mimeType: 'text/csv', extension: 'csv' };
   }
 }
 

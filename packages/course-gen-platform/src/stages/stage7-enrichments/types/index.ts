@@ -12,6 +12,7 @@ import type {
   EnrichmentContent,
   EnrichmentMetadata,
 } from '@megacampus/shared-types';
+import type { NotebookLMBridgeMediaType } from '../services/notebooklm-bridge-client/types';
 
 /**
  * Stage 7 enrichment type union.
@@ -19,13 +20,15 @@ import type {
  */
 export type Stage7EnrichmentType = EnrichmentType;
 
-export type NotebookLMMediaType =
-  | 'audio'
-  | 'video'
-  | 'study_guide'
-  | 'flashcards'
-  | 'mind_map'
-  | 'infographic';
+/**
+ * The media types the NotebookLM bridge can be asked for.
+ *
+ * Aliased rather than retyped (mc2-6ye5z.4/.5/.8): this was a third hand-kept
+ * copy of the same union, after the bridge client's TypeScript one and the
+ * Python `MediaType`. Adding a type meant editing all three, and the one that
+ * would silently disagree is the one whose failure only shows at runtime.
+ */
+export type NotebookLMMediaType = NotebookLMBridgeMediaType;
 
 export interface Stage7NlmAsyncState {
   taskId: string;
