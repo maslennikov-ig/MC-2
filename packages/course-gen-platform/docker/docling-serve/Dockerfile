@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1.7
-FROM ghcr.io/docling-project/docling-serve-cpu:v1.30.0@sha256:061d35c03611bc15b73d024c8e8387bcf0624279f8b57c16c1567326f214ba56
+FROM ghcr.io/docling-project/docling-serve-cpu:v1.31.0@sha256:32ba1a1dded8d8fd21f9d8da1b9837e04cfee164ef891d9513174c3d989dcee9
 
 LABEL org.opencontainers.image.title="MegaCampus Docling Serve"
-LABEL org.opencontainers.image.version="1.30.0-docling-2.118.0"
-LABEL org.opencontainers.image.base.digest="sha256:061d35c03611bc15b73d024c8e8387bcf0624279f8b57c16c1567326f214ba56"
+LABEL org.opencontainers.image.version="1.31.0-docling-2.121.0"
+LABEL org.opencontainers.image.base.digest="sha256:32ba1a1dded8d8fd21f9d8da1b9837e04cfee164ef891d9513174c3d989dcee9"
 
 USER 0
 COPY requirements.lock /tmp/requirements.lock
 RUN /opt/app-root/bin/pip install --no-cache-dir --no-deps --require-hashes \
       -r /tmp/requirements.lock \
     && /opt/app-root/bin/pip check \
-    && /opt/app-root/bin/python -c "import importlib.metadata as m; assert m.version('docling-slim') == '2.118.0'; assert m.version('docling-core') == '2.90.0'" \
+    && /opt/app-root/bin/python -c "import importlib.metadata as m; assert m.version('docling-slim') == '2.121.0'; assert m.version('docling-core') == '2.92.0'" \
     && rm /tmp/requirements.lock \
     && rm -rf /opt/app-root/src/.cache/docling/models \
     && mkdir -p /opt/app-root/src/.cache/docling/models \
@@ -29,6 +29,13 @@ RUN /opt/app-root/bin/pip install --no-cache-dir --no-deps --require-hashes \
 # to the old behaviour — the API would still accept the field and still ignore
 # it, exactly as before, and no test we own would run. Hence this assertion:
 # a base bump that loses the passthrough fails the build instead of shipping.
+#
+# It asserts BOTH halves, because the capability needs both and only one of them
+# is obvious. Assigning `heading_hierarchy_options` requests the inference;
+# `generate_parsed_pages` is what keeps the parsed cells the style signal reads,
+# and without it docling skips style silently — a passing request that infers
+# nothing. Checked against jobkit 3.4.0, where both still live in
+# `_parse_standard_pdf_opts`.
 RUN /opt/app-root/bin/python -c "\
 import inspect, re; \
 import importlib.metadata as m; \
@@ -36,7 +43,8 @@ from docling_jobkit.convert.manager import DoclingConverterManager as C; \
 v = m.version('docling-jobkit'); \
 assert tuple(int(p) for p in v.split('.')[:2]) >= (3, 3), f'docling-jobkit {v} predates the heading-hierarchy fix'; \
 src = inspect.getsource(C._parse_standard_pdf_opts); \
-assert re.search(r'heading_hierarchy_options\s*=', src), 'upstream stopped assigning heading_hierarchy_options; the wrapper would be needed again'"
+assert re.search(r'heading_hierarchy_options\s*=', src), 'upstream stopped assigning heading_hierarchy_options; the wrapper would be needed again'; \
+assert re.search(r'generate_parsed_pages\s*=\s*True', src), 'upstream stopped retaining parsed pages; style-based heading inference would be skipped silently'"
 
 USER 1001
 RUN HF_HUB_DOWNLOAD_TIMEOUT=120 HF_HUB_ETAG_TIMEOUT=120 \

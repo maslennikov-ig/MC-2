@@ -12,8 +12,13 @@ SNAPSHOTS="$ROOT/snapshots"
 RESTORE_EVIDENCE="$ROOT/restore-evidence"
 LOCK_FILE="${LOCK_FILE:-/var/lock/megacampus-qdrant-offhost-backup.lock}"
 VALIDATOR="${VALIDATOR:-/usr/local/libexec/megacampus-qdrant-offhost-validate}"
-KEEP="${KEEP:-14}"
-RETENTION_DAYS="${RETENTION_DAYS:-14}"
+# These two must equal EXPECTED_RETENTION_DAYS in the production forced command:
+# the retention is reported back and the restricted allow-list accepts only that
+# one value. A systemd drop-in that overrides them without the production side
+# moving produces a verified copy whose freshness metric is never published —
+# measured on 2026-08-23, and the reason the numbers now live in one test.
+KEEP="${KEEP:-7}"
+RETENTION_DAYS="${RETENTION_DAYS:-7}"
 MIN_FREE_MB="${MIN_FREE_MB:-10240}"
 MAX_SOURCE_AGE_SECONDS="${MAX_SOURCE_AGE_SECONDS:-28800}"
 RESTORE_MAX_SOURCE_AGE_SECONDS="${RESTORE_MAX_SOURCE_AGE_SECONDS:-129600}"

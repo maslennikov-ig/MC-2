@@ -288,9 +288,9 @@ doclang==0.7.3 \
     --hash=sha256:9440c4ca9f7e061a7b8d33bdf15b1029be69a4c13cd8952dd6ce541884e4c685 \
     --hash=sha256:ca50615357e46ebf9597bb9065b9112367103ec24bd539f8ae12649224cf50b0
     # via docling-core
-docling-core==2.90.0 \
-    --hash=sha256:55eda84a4a1822cca4c9259e0b7682477b56bd7db02763e4bccb9fafffe4e10b \
-    --hash=sha256:e8d739c51db4ea29d25217de1b1c3854dba9dd2483cd2f95aaafb09e4e52d3c5
+docling-core==2.92.0 \
+    --hash=sha256:33fd25e38c199336447a21925374400aca13a6b9316a032f111972c2dc0f085c \
+    --hash=sha256:726d89c23197e53be2f7192bb4c00108ff545830cf9ab7b981fb014fa92b5c02
     # via
     #   -r requirements.in
     #   docling-mcp
@@ -299,9 +299,9 @@ docling-mcp==3.1.0 \
     --hash=sha256:7e421bc210a6490680afa5fee2611b54ba48d3e597d3cddae036d71ed744e4f9 \
     --hash=sha256:86c708dcc9b6e487baa0d4efc50065a50d1ba27bea55424e2b2abbba1f6c2483
     # via -r requirements.in
-docling-slim==2.118.0 \
-    --hash=sha256:228593a908984dcfbd9c41cc175540c9dbc5da38f7c50e9cdc15e54a429c57d1 \
-    --hash=sha256:30d248aa0b25158e66050a7c48a353728e2af01577813afb74ace1ca911e94d2
+docling-slim==2.121.0 \
+    --hash=sha256:c97fc9cd889b61a66b9cf5d2d87c6b6935f29fe7aacfd8fd39802be7425e4996 \
+    --hash=sha256:f3069ded34f62f4e6a4d2ffda78cba0baad2ced4944a4b2d70cb646670ef327b
     # via
     #   -r requirements.in
     #   docling-mcp

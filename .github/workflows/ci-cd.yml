@@ -944,6 +944,15 @@ jobs:
           # fallback here stays `legacy_markdown`: an unset variable must never
           # silently change how documents are cut.
           DOCLING_CHUNK_STRATEGY=${{ vars.DOCLING_CHUNK_STRATEGY || 'legacy_markdown' }}
+          # ONE line, read TWICE, and it has to be one line or neither.
+          # The MCP container gets it by compose interpolation out of this file
+          # (docker-compose.infra.yml / .production.yml), which is what asks Serve
+          # for heading inference. The worker gets it as an ordinary variable out
+          # of the same file (env_file), where `resolveConversionProfile` puts it
+          # into the chunk identity and the cache key. Set on the MCP side alone
+          # and conversions WITH inferred headings get recorded as `baseline`,
+          # indistinguishable from the ones without.
+          DOCLING_MCP_PDF_HEADING_HIERARCHY=${{ vars.DOCLING_MCP_PDF_HEADING_HIERARCHY || 'false' }}
           NOTEBOOKLM_BRIDGE_TOKEN=${{ secrets.NOTEBOOKLM_BRIDGE_TOKEN }}
           NOTEBOOKLM_STORAGE_STATE_DIR=./secrets/notebooklm
           NOTEBOOKLM_STORAGE_PATH=/app/secrets/notebooklm/storage_state.json
@@ -980,6 +989,25 @@ jobs:
               ;;
           esac
           echo "Docling chunking strategy: $DOCLING_CHUNK_STRATEGY"
+
+      # The same class of silence, one flag over. `runtime.py` raises on a
+      # non-boolean, but the WORKER does not: `resolveConversionProfile` compares
+      # with `=== 'true'`, so `True`, `1` or `yes` gives a worker that records
+      # `baseline` while the MCP container refuses to start at all. Both readers
+      # are strict about different things, so the value is checked before either
+      # of them sees it.
+      - name: Validate the Docling PDF heading-hierarchy flag
+        env:
+          DOCLING_MCP_PDF_HEADING_HIERARCHY: ${{ vars.DOCLING_MCP_PDF_HEADING_HIERARCHY || 'false' }}
+        run: |
+          case "$DOCLING_MCP_PDF_HEADING_HIERARCHY" in
+            true|false) ;;
+            *)
+              echo "::error::DOCLING_MCP_PDF_HEADING_HIERARCHY is '$DOCLING_MCP_PDF_HEADING_HIERARCHY'; expected exactly true or false. The MCP container would refuse to start, or the worker would record inferred headings as a baseline conversion."
+              exit 1
+              ;;
+          esac
+          echo "Docling PDF heading hierarchy: $DOCLING_MCP_PDF_HEADING_HIERARCHY"
 
       - name: Resolve host-derived environment values
         run: |
@@ -1256,6 +1284,13 @@ jobs:
           DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
           DOCLING_MCP_TIMEOUT=1200000
           DOCLING_MCP_MAX_RETRIES=1
+          # The dev worker's half of the flag. Its other half is not here on
+          # purpose: dev and production share ONE Docling stack, and the MCP
+          # container is always started from `.env.production` — including by
+          # `deploy_dev.sh`. So this value must equal the production one, which
+          # is what the workflow gate checks; the same repository variable feeds
+          # both.
+          DOCLING_MCP_PDF_HEADING_HIERARCHY=${{ vars.DOCLING_MCP_PDF_HEADING_HIERARCHY || 'false' }}
           NOTEBOOKLM_BRIDGE_TOKEN=${{ secrets.NOTEBOOKLM_BRIDGE_TOKEN }}
           NOTEBOOKLM_STORAGE_STATE_DIR=./secrets/notebooklm
           NOTEBOOKLM_STORAGE_PATH=/app/secrets/notebooklm/storage_state.json
@@ -1267,6 +1302,24 @@ jobs:
           NODE_OPTIONS=--max-old-space-size=1024
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev"
+
+      # Dev shares production's Docling stack, so a dev deploy writes only the
+      # worker's half of this flag; the MCP container it talks to was configured
+      # by the production deploy from the same repository variable. A value the
+      # worker reads as false against a container converting with inference is
+      # the half-configured state this gate exists to refuse.
+      - name: Validate the Docling PDF heading-hierarchy flag
+        env:
+          DOCLING_MCP_PDF_HEADING_HIERARCHY: ${{ vars.DOCLING_MCP_PDF_HEADING_HIERARCHY || 'false' }}
+        run: |
+          case "$DOCLING_MCP_PDF_HEADING_HIERARCHY" in
+            true|false) ;;
+            *)
+              echo "::error::DOCLING_MCP_PDF_HEADING_HIERARCHY is '$DOCLING_MCP_PDF_HEADING_HIERARCHY'; expected exactly true or false. The dev worker would record inferred headings as a baseline conversion."
+              exit 1
+              ;;
+          esac
+          echo "Docling PDF heading hierarchy: $DOCLING_MCP_PDF_HEADING_HIERARCHY"
 
       - name: Deploy
         run: |

@@ -9,7 +9,18 @@ readonly METRICS_DIR=/var/lib/megacampus/qdrant-metrics
 readonly EXPORT_LOCK=/run/lock/megacampus-qdrant-offhost-export.lock
 readonly CONTAINER=megacampus-qdrant
 readonly EXPECTED_VERSION=1.18.2
-readonly EXPECTED_RETENTION_DAYS=14
+# Retention is part of the accepted report, so this host and the backup host have
+# to agree on the number. On 2026-08-22 they stopped agreeing: a drop-in on
+# helixa-new set RETENTION_DAYS=7, the next night's report ended in `7`, and the
+# allow-list below — which then repeated `14` as a second literal — rejected it
+# as an unknown command. The copy was pulled and verified; only the freshness
+# metric went unwritten, and 36 hours later the stale-snapshot alert fired on a
+# backup that was never missing. The owner settled the question at 7 on
+# 2026-08-23.
+#
+# So the number appears ONCE. The allow-list interpolates this constant instead
+# of restating it.
+readonly EXPECTED_RETENTION_DAYS=7
 
 die() {
   printf 'qdrant-offhost-source: %s\n' "$*" >&2
@@ -21,7 +32,7 @@ die() {
 enter_privileged() {
   local command=${SSH_ORIGINAL_COMMAND:-}
   case "$command" in
-    metadata | export\ [0-9]*\ [a-f0-9]* | publish-backup\ [0-9]*\ [0-9]*\ 14 | publish-restore\ [0-9]*\ [0-9]*) ;;
+    metadata | export\ [0-9]*\ [a-f0-9]* | publish-backup\ [0-9]*\ [0-9]*\ "$EXPECTED_RETENTION_DAYS" | publish-restore\ [0-9]*\ [0-9]*) ;;
     *) die 'command is not allowed' ;;
   esac
   exec /usr/bin/sudo -n /usr/bin/env -i \
