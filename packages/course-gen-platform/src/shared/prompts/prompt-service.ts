@@ -21,6 +21,7 @@ import {
   type HardcodedPrompt,
 } from './prompt-registry';
 import { filterWhitelistedTemplates } from '../validation/template-whitelist';
+import { checkOverrideContract } from './prompt-override-contract';
 import type { PromptKey, PromptVariableMap } from './prompt-contracts';
 
 // ============================================================================
@@ -110,7 +111,7 @@ class PromptServiceImpl {
     // Try database lookup
     try {
       const dbPrompt = await this.fetchPromptFromDb(promptKey);
-      if (dbPrompt) {
+      if (dbPrompt && this.isUsableOverride(dbPrompt)) {
         logger.info({ promptKey, source: 'database' }, 'Using database prompt');
         this.promptCache.set(cacheKey, dbPrompt);
         return dbPrompt;
@@ -231,6 +232,42 @@ class PromptServiceImpl {
   clearCache(): void {
     this.promptCache.clear();
     logger.info('Prompt cache cleared');
+  }
+
+  // ==========================================================================
+  // PRIVATE METHODS - OVERRIDE CONTRACT
+  // ==========================================================================
+
+  /**
+   * Whether a database row may replace the registry entry for its key.
+   *
+   * A row that outlived its caller is worse than no row: the caller still fills
+   * the variables it always filled, the row ignores them, and the generation is
+   * paid for either way. See `prompt-override-contract.ts` for the two rules and
+   * for the two live rows that made this necessary.
+   *
+   * A key with no registry entry is left alone — the database is its only
+   * source, so there is nothing to compare it against.
+   */
+  private isUsableOverride(dbPrompt: PromptResult): boolean {
+    const registryPrompt = PROMPT_REGISTRY.get(dbPrompt.promptKey);
+    if (!registryPrompt) return true;
+
+    const violation = checkOverrideContract(dbPrompt.promptTemplate, registryPrompt);
+    if (!violation) return true;
+
+    logger.error(
+      {
+        promptKey: dbPrompt.promptKey,
+        version: dbPrompt.version,
+        unknownPlaceholders: violation.unknownPlaceholders,
+        droppedRequiredVariables: violation.droppedRequiredVariables,
+        databaseTemplateLength: dbPrompt.promptTemplate.length,
+        registryTemplateLength: registryPrompt.promptTemplate.length,
+      },
+      'Database prompt no longer matches its caller; using the registry template instead'
+    );
+    return false;
   }
 
   // ==========================================================================

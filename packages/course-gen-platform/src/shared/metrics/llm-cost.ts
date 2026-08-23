@@ -91,7 +91,11 @@ export function settleTraceCostFromProvider(
   const timer = setTimeout(() => {
     void (async () => {
       try {
-        const fact = await fetchGenerationFact(generationId);
+        // Nobody awaits this one, so its waits stay unreferenced: the row keeps
+        // its catalogue estimate if the process leaves first, which is the trade
+        // the `unref` below already accepted. Every other caller does await, and
+        // the default is to hold the loop (mc2-avjau).
+        const fact = await fetchGenerationFact(generationId, { keepProcessAlive: false });
         // `=== null` and not falsy: a genuine $0 is a measurement, and filing it
         // as "not measured" is the bug that once corrupted the very metric used
         // to find unpriced calls (mc2-y452l).

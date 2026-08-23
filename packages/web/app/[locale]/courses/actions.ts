@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { generateSlug } from '@/lib/utils/slug'
-import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { cleanupCourseResourcesBeforeDelete } from '@/lib/helpers/course-cleanup'
 
 // Type definitions
 type StatisticsQueryResponse = {
@@ -338,30 +338,6 @@ export async function getCourses({
 }
 
 /**
- * Clean up external course resources via tRPC backend
- * Cleans: Qdrant vectors, Redis keys, RAG context cache, physical files
- *
- * @param courseId - Course UUID to clean up
- * @returns Cleanup result or null if cleanup failed
- */
-async function cleanupCourseResources(courseId: string): Promise<{
-  success: boolean
-  errors: string[]
-} | null> {
-  try {
-    const client = await getServerTrpcClient()
-    const result = await client.generation.cleanupCourse.mutate({ courseId })
-    return (result as { success: boolean; errors: string[] }) ?? null
-  } catch (error) {
-    logger.error('Failed to cleanup course resources', {
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return null
-  }
-}
-
-/**
  * Delete course with RLS enforcement
  *
  * Cleanup order:
@@ -395,22 +371,7 @@ export async function deleteCourse(courseSlug: string) {
 
     // Step 1: Clean external resources BEFORE database deletion
     // This ensures Qdrant vectors, Redis keys, RAG cache, and physical files are removed
-    const cleanupResult = await cleanupCourseResources(courseId)
-
-    if (cleanupResult) {
-      if (cleanupResult.success) {
-        logger.info('Course external resources cleaned up successfully', { courseId })
-      } else {
-        // Log warning but continue with deletion - cleanup is best-effort
-        logger.warn('Some course resources failed to clean up', {
-          courseId,
-          errors: cleanupResult.errors,
-        })
-      }
-    } else {
-      // Cleanup request failed entirely - log and continue
-      logger.warn('Could not cleanup course resources, proceeding with deletion', { courseId })
-    }
+    await cleanupCourseResourcesBeforeDelete(courseId, user.id)
 
     // Step 2: Delete database records
     // For cascade deletes, we need admin client

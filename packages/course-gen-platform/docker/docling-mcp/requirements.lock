@@ -295,9 +295,9 @@ docling-core==2.90.0 \
     #   -r requirements.in
     #   docling-mcp
     #   docling-slim
-docling-mcp==3.0.0 \
-    --hash=sha256:595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23 \
-    --hash=sha256:b72247f92500eaf8802a87e1dcc239990eb5fc8769e491beff70cc858a89dad8
+docling-mcp==3.1.0 \
+    --hash=sha256:7e421bc210a6490680afa5fee2611b54ba48d3e597d3cddae036d71ed744e4f9 \
+    --hash=sha256:86c708dcc9b6e487baa0d4efc50065a50d1ba27bea55424e2b2abbba1f6c2483
     # via -r requirements.in
 docling-slim==2.118.0 \
     --hash=sha256:228593a908984dcfbd9c41cc175540c9dbc5da38f7c50e9cdc15e54a429c57d1 \

@@ -58,10 +58,32 @@ export interface OpenRouterGenerationFact {
   providerName: string | null;
 }
 
-function sleep(ms: number): Promise<void> {
+/**
+ * A wait that keeps the process alive while something is waiting on it.
+ *
+ * This timer used to be `unref`'d, and that is a promise Node is allowed to
+ * abandon: if nothing else holds the event loop, the loop is considered empty,
+ * `beforeExit` fires and the process leaves with code 0 while this `await` is
+ * still pending. Every caller here is inside `await`, so an abandoned timer is
+ * an abandoned caller.
+ *
+ * That is not theoretical (mc2-avjau). A Career Playbook attempt on
+ * `group_6_wrap` timed out at its configured 238 s; the failure handler asked
+ * for the generation record; this slept 2 s before the first read; the aborted
+ * request had already closed the only socket, so at that instant nothing was
+ * left. Measured 2026-08-23: `beforeExit code=0` at 243.0 s with two stdio pipes
+ * as the only live resources. No result, no error, no timeout message — exit 0,
+ * which a caller reads as success. Four runs, four times.
+ *
+ * It only ever showed in a one-shot script: a worker holds queue sockets and
+ * interval timers, so the loop is never empty there and the same lookup
+ * completes. The bound is `GENERATION_LOOKUP_MAX_WAIT_MS`, which caps the whole
+ * lookup at 30 s — a real bound, unlike a timer nothing is obliged to run.
+ */
+function sleep(ms: number, keepProcessAlive: boolean): Promise<void> {
   return new Promise(resolve => {
     const timer = setTimeout(resolve, ms);
-    timer.unref?.();
+    if (!keepProcessAlive) timer.unref?.();
   });
 }
 
@@ -116,6 +138,18 @@ export interface GenerationLookupOptions {
   initialDelayMs?: number;
   /** Total time to keep asking before giving up and letting the estimate stand. */
   maxWaitMs?: number;
+  /**
+   * Whether the wait between reads holds the event loop open. Default true,
+   * because the default caller is `await`ing the answer and an abandoned wait
+   * abandons them with it — see {@link sleep}.
+   *
+   * `false` belongs to exactly one shape: a caller that scheduled this in the
+   * background and will not read the result, where "a receipt still to be
+   * collected is not a reason to keep a process alive" still holds. There the
+   * cost of losing it is a trace row that keeps its catalogue estimate; here it
+   * was a run that reported success without producing anything.
+   */
+  keepProcessAlive?: boolean;
 }
 
 /**
@@ -134,13 +168,14 @@ export async function fetchGenerationFact(
     if (!apiKey) return null;
 
     const deadline = Date.now() + (options.maxWaitMs ?? GENERATION_LOOKUP_MAX_WAIT_MS);
-    await sleep(options.initialDelayMs ?? GENERATION_LOOKUP_DELAY_MS);
+    const keepProcessAlive = options.keepProcessAlive ?? true;
+    await sleep(options.initialDelayMs ?? GENERATION_LOOKUP_DELAY_MS, keepProcessAlive);
 
     for (;;) {
       const fact = await requestGeneration(generationId, apiKey);
       if (fact) return fact;
       if (Date.now() >= deadline) return null;
-      await sleep(GENERATION_LOOKUP_INTERVAL_MS);
+      await sleep(GENERATION_LOOKUP_INTERVAL_MS, keepProcessAlive);
     }
   } catch (error) {
     logger.debug(

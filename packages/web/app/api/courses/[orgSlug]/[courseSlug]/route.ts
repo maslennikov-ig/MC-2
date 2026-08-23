@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { withOptionalAuth, withDevBypass, AuthUser } from '@/lib/auth'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
+import { cleanupCourseResourcesBeforeDelete } from '@/lib/helpers/course-cleanup'
 import { PostgrestError } from '@supabase/supabase-js'
 
 interface Lesson {
@@ -211,7 +212,13 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
   const id = courseData.id
   logger.devLog('DELETE request for course:', courseSlug, 'id:', id, 'by owner:', user.email)
 
-  // Atomic database deletion via RPC
+  // Step 1: external resources, before the rows that name them are gone.
+  // Until 2026-08-23 this door skipped straight to the RPC below, so Qdrant
+  // vectors, Redis keys, the RAG cache and the uploaded files survived every
+  // delete made through it, with nothing in any log to say so (mc2-ipc80).
+  await cleanupCourseResourcesBeforeDelete(id, user?.id)
+
+  // Step 2: atomic database deletion via RPC
   // All deletions happen in a single transaction — if any step fails, everything rolls back.
   // The RPC function handles: lesson_progress cleanup (NO ACTION FK), then course deletion
   // with ON DELETE CASCADE handling all other child tables automatically.
