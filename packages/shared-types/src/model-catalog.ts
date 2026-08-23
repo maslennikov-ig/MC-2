@@ -239,8 +239,12 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * downstream treats this number as the charge (mc2-qch4w).
    */
   '~deepseek/deepseek-v4-flash-latest': {
-    inputPricePerMillion: 0.065,
-    outputPricePerMillion: 0.18,
+    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05/
+    // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
+    // a cheaper snapshot, which is the same mechanism that made it unsafe to
+    // route on.
+    inputPricePerMillion: 0.05,
+    outputPricePerMillion: 0.13,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -282,16 +286,24 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'deepseek/deepseek-v4-flash': {
-    inputPricePerMillion: 0.0798,
-    outputPricePerMillion: 0.1596,
+    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05306/
+    // $0.10612, against $0.0798/$0.1596 here — 1.50x over on both legs. Third
+    // correction to this one entry in three days, which is the argument for the
+    // check running nightly instead of when somebody remembers.
+    inputPricePerMillion: 0.05306,
+    outputPricePerMillion: 0.10612,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
     supportsReasoning: true,
   },
   'deepseek/deepseek-v4-pro': {
-    inputPricePerMillion: 1.6,
-    outputPricePerMillion: 3.2,
+    // Re-read 2026-08-23: $0.396894/$0.793788, against $1.60/$3.20 here — 4.03x
+    // over, the largest gap the catalogue has held. Not on a live route, so it
+    // cost nothing; had it been, `provider.max_price` would have been built four
+    // times too high and bought nothing.
+    inputPricePerMillion: 0.396894,
+    outputPricePerMillion: 0.793788,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,

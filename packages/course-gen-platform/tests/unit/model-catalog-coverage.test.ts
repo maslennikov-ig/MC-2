@@ -127,14 +127,18 @@ describe('model catalogue coverage', () => {
   it('prices listed retired models at the OpenRouter rates verified on 2026-08-21', () => {
     const verifiedRates: Record<string, [input: number, output: number]> = {
       'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
-      // It matters more than a retired entry usually would, because
-      // `normalizeModelId` prices every undated V4 Flash snapshot from here
-      // (mc2-hc91g). The 2026-08-21 re-read found it 1.04x dear — small, and
-      // still the direction that over-reports rather than the one that builds a
-      // `max_price` under every endpoint and refuses the call.
-      'deepseek/deepseek-v4-flash': [0.0798, 0.1596],
-      '~deepseek/deepseek-v4-flash-latest': [0.065, 0.18],
-      'deepseek/deepseek-v4-pro': [1.6, 3.2],
+      // The three DeepSeek rows below were re-read 2026-08-23 by the first run
+      // of the nightly drift check (mc2-ts9i2), which is what that check is for:
+      // this snapshot is only as current as the last person who remembered to
+      // re-read it, and nobody had for two days.
+      //
+      // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
+      // would, because `normalizeModelId` prices every undated V4 Flash snapshot
+      // from here (mc2-hc91g). It was 1.50x dear; `deepseek-v4-pro` was 4.03x,
+      // the largest gap this catalogue has held.
+      'deepseek/deepseek-v4-flash': [0.05306, 0.10612],
+      '~deepseek/deepseek-v4-flash-latest': [0.05, 0.13],
+      'deepseek/deepseek-v4-pro': [0.396894, 0.793788],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],

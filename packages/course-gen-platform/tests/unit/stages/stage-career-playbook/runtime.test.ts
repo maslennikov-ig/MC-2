@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
+import { MODEL_CATALOG } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 
 describe('Career Playbook runtime', () => {
@@ -478,10 +479,14 @@ describe('Career Playbook runtime', () => {
 
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(500);
-    // deepseek/deepseek-v4-flash: $0.0798/1M input + $0.1596/1M output,
-    // re-read 2026-08-21; the catalogue had carried $0.14/$0.28 (mc2-hc91g).
-    // 1000 * 0.0798/1e6 + 500 * 0.1596/1e6 = 0.0000798 + 0.0000798 = 0.0001596
-    expect(result.costUsd).toBeCloseTo(0.0001596, 10);
+    // Priced from the catalogue rather than a retyped rate: what this case holds
+    // is that reported usage reaches the price, not what DeepSeek charges today
+    // (mc2-ts9i2).
+    const rates = MODEL_CATALOG['deepseek/deepseek-v4-flash'];
+    expect(result.costUsd).toBeCloseTo(
+      (1000 * rates.inputPricePerMillion) / 1e6 + (500 * rates.outputPricePerMillion) / 1e6,
+      10
+    );
   });
 
   it('falls back to token estimates and still prices when usage is absent', async () => {
