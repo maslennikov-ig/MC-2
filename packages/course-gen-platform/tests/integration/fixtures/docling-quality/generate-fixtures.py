@@ -1,5 +1,6 @@
 """Generate deterministic quality fixtures for the Docling A/B benchmark."""
 
+from io import BytesIO
 from pathlib import Path
 
 from docx import Document
@@ -162,6 +163,69 @@ def make_hierarchy_docx() -> None:
     document.add_paragraph("Максимальная задержка обработки составляет 30 минут.")
 
     document.save(ROOT / "hierarchy-multilevel.docx")
+
+
+def make_content_control_docx() -> None:
+    """A content control that holds a caption AND an image.
+
+    Word wraps template regions in `w:sdt` (a content control), and until
+    Docling 2.121.0 the docx backend did not descend into one whose content
+    included a drawing: the image placeholder survived and every run of text
+    beside it was dropped. MEASURED on 2026-08-23 by converting THIS file on
+    both stacks — 2.118.0 produced 194 characters of Markdown with no
+    "Внутриконтрольная подпись" line at all, 2.121.0 produced 271 with it.
+
+    That is silent content loss in the format that is more than half of what
+    production uploads, so the corpus carries the construct from now on rather
+    than trusting a changelog. The caption is worded so a retrieval question
+    can only be answered from inside the control.
+    """
+    document = Document()
+    document.add_heading("Договор с шаблонными блоками", level=1)
+    document.add_paragraph(
+        "Вводный абзац вне контрола описывает предмет и ссылается на приложение."
+    )
+
+    caption = document.add_paragraph(
+        "Внутриконтрольная подпись: контрольная сумма приложения равна 512 единицам."
+    )
+    picture_paragraph = document.add_paragraph()
+    picture_paragraph.add_run().add_picture(_content_control_image(), width=DocxCm(3))
+
+    # python-docx has no content-control API, so the two paragraphs are moved
+    # under a `w:sdt` built by hand. `w:picture` in the properties is what Word
+    # writes for a picture control, and is the shape the backend used to skip.
+    body = document.element.body
+    sdt = OxmlElement("w:sdt")
+    properties = OxmlElement("w:sdtPr")
+    _append_value(properties, "w:alias", "Блок приложения")
+    _append_value(properties, "w:tag", "attachment-block")
+    _append_value(properties, "w:id", "101")
+    properties.append(OxmlElement("w:picture"))
+    sdt.append(properties)
+    content = OxmlElement("w:sdtContent")
+    body.insert(list(body).index(caption._p), sdt)
+    for paragraph in (caption, picture_paragraph):
+        body.remove(paragraph._p)
+        content.append(paragraph._p)
+    sdt.append(content)
+
+    document.add_paragraph(
+        "Заключительный абзац вне контрола фиксирует ответственных за приложение."
+    )
+    document.save(ROOT / "content-control-image.docx")
+
+
+def _content_control_image() -> BytesIO:
+    """A tiny deterministic PNG: the construct matters, the pixels do not.
+
+    Returned in memory so the generator leaves no stray file beside the
+    fixtures it is supposed to produce.
+    """
+    buffer = BytesIO()
+    Image.new("RGB", (64, 64), (204, 51, 51)).save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
 
 
 # Markers carry the hierarchy: Docling's numbering inference recognises `1.` as
@@ -858,6 +922,7 @@ GENERATORS = {
     "enrichment-pdf": make_enrichment_pdf,
     "structured-docx": make_docx,
     "hierarchy-docx": make_hierarchy_docx,
+    "content-control-docx": make_content_control_docx,
     "numbered-sections-pdf": make_numbered_sections_pdf,
     "reading-order-pptx": make_pptx,
     "raster-ocr-pdf": make_raster_ocr_pdf,
