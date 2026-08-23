@@ -6,16 +6,20 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
-`docs/plans/brawny-mellow-quokka.md` ran on 2026-08-23: every phase is delivered in code, and
-**phase 2 (`mc2-51epl`) owes only its acceptance** — one paid run whose log carries none of the
-eight lines. The Career Playbook quality track stays **accepted** (`mc2-db696.110`); its two rules
-in `06-quality-acceptance.md` hold: read the artifact before calling a run accepted, and clean up
+`docs/plans/brawny-mellow-quokka.md` is **complete**: every phase delivered, and phase 2
+(`mc2-51epl`) **accepted** on the paid run of 2026-08-23 — course `6b3b183e`, dev workers on
+`afe03056f`, one of the eight lines left in the log and it is the legitimate one. The Career
+Playbook quality track stays **accepted** (`mc2-db696.110`); its two rules in
+`06-quality-acceptance.md` hold: read the artifact before calling a run accepted, and clean up
 **after** the editorial pass.
 
-## The eight warnings (2026-08-23, `mc2-51epl`) — causes fixed, acceptance owed
+## The eight warnings (2026-08-23, `mc2-51epl`) — accepted
 
-All eight are diagnosed and their causes are on `develop`; the run that proves it is not done. What
-constrains work from here:
+The run: 0 errors, 9 warn lines, and of the eight only **"Section duplication detected"** (3x),
+which fires exactly when the filter fails and here reported a real one. The self-reviewer trio
+stayed silent too, so `cd9b60138` is not only repaired but running. Ledger: 0 billed calls unpriced,
+23 of 23 generation ids answered, provider $0.037857 against a recorded $0.037859. What constrains
+work from here:
 
 - **`prompt_templates` overrides `PROMPT_REGISTRY` at runtime, and a row can outlive its caller.**
   7 of 21 active rows had. `checkOverrideContract` now refuses a row that references a placeholder
@@ -30,11 +34,11 @@ constrains work from here:
 - **A pure routing function cannot end a lesson.** The judge now writes its own terminal
   review_required when the regeneration cap is reached, naming the cap and the score, so
   `executeStage6`'s safety net is a net again — it had been the only path, 76 of the 154
-  `review_required` rows. "Section duplication detected" stays: it fires when the filter fails.
+  `review_required` rows.
 - **Layer-3 Stage 4 recovery is real but narrow.** `initialize_fsm_with_outbox` accepts only
   NULL/`pending`/`completed`/`failed`/`cancelled` and raises 23505 from anything else. Every
-  `stage_4_*` status now counts as initialised, and a status the RPC cannot accept is reported
-  rather than attempted. 37 of the 182 FSM initialisations in this database came from this path.
+  `stage_4_*` status now counts as initialised, and one the RPC cannot accept is reported rather
+  than attempted. 37 of the 182 FSM initialisations in this database came from this path.
 
 ## RAG retrieval, chunking and parent expansion (2026-08-12/13)
 
@@ -60,8 +64,7 @@ because by the time they run it has already failed.
 
 **Judges, reshuffled 2026-08-22 by price** (`mc2-d1d09`): primary `gpt-5.6-luna`, secondary
 **`deepseek-v4-flash-0731`**, tiebreaker **`glm-5.2`** (fallback `minimax-m3`). `executeSingleJudge`
-takes `judgeModels.secondary`, the **most frequent judge call in the pipeline** — 1318 of 1911
-lessons against 608 that reach a panel.
+takes `judgeModels.secondary`, the **most frequent judge call** — 1318 of 1911 lessons.
 
 **Settled 2026-08-23 (`d179a18d0`, `2e01e0b02`): whatever AUTHORS prose the reader opens runs on
 Luna** — `stage_6_content` and its three tier variants, `section_expander`, `refinement`, both
@@ -136,9 +139,9 @@ decimal on two runs of 2026-08-22. What still constrains work:
   was wrong three times for this.
 - **Editing is inside the course total** (`mc2-b7olk.5`, verified live 2026-08-23):
   `generation_trace.stage` accepts `stage_edit`, `stageOfPhase` knows `chat_*`/`inline_*`, and
-  `get_audit_summary` returns `stage_edit` as its own row, which is the split the owner asked for.
-  **`provider.max_price` below every endpoint is a refusal**, not a cheaper route: one wrong
-  catalogue price would fail every call for that model, so the ceiling yields and the call lives.
+  `get_audit_summary` returns `stage_edit` as its own row, the split the owner asked for.
+  **`provider.max_price` below every endpoint is a refusal**, not a cheaper route: the ceiling
+  yields so the call lives.
 
 **Each attempt pins its own endpoint, because a hung one never names itself.** `provider.order` with
 one `tag` from `/models/{model}/endpoints` and `allow_fallbacks: false`; the next attempt takes the
@@ -146,10 +149,9 @@ next cheapest by live price, nothing outliving the call, no pin when the list ca
 `GET /api/v1/generation` cannot help — unreadable while the call still runs, which is exactly what a
 timeout is — and `X-Provider-Name` is advertised but never sent. The 1.5x ceiling holds over the
 pin. Closed (`mc2-6crnj`) and proven again 2026-08-23: a `group_6_wrap` attempt hung 238 s on
-`open-inference/fp4` and `relace/fp4` answered the identical request in 124 s.
+`open-inference/fp4` and `relace/fp4` answered the identical request in 124 s. A pinned endpoint
+can also answer with nothing at all — five attempts, no record (`mc2-f1tqd`, open).
 
-**A pinned endpoint can also answer with nothing** (`mc2-f1tqd`, open): five attempts died on
-`Cannot read properties of undefined` with no generation record at all.
 **`requiresReasoning` is a net, not only a list** (`mc2-148j9`). A 400 whose body says reasoning is
 mandatory is re-sent once with `reasoning: {effort:'low'}` and a budget grown by
 `MANDATORY_REASONING_RESERVE_TOKENS`, capped by the model's output ceiling. It lives in
@@ -170,10 +172,9 @@ change — confirm that job's own conclusion, not the run's.
 ## Stage 6 Batch API, and backlog order
 
 `FEATURE_STAGE6_BATCH_GENERATION` (off) sends a course's initial lesson generation as one
-asynchronous OpenRouter batch (`/api/beta/batches`, plain model slug, 24h window); a coordinator
-polls and each lesson is also enqueued with a `STAGE6_BATCH_MAX_WAIT_MS` delay so it generates
-synchronously if the batch never lands. Eligibility is per call against the **live** catalogue. Not
-a config switch: a `:batch` id on the synchronous endpoint breaks the caller, and its tariff is
+asynchronous OpenRouter batch; a coordinator polls, and each lesson is also enqueued with a
+`STAGE6_BATCH_MAX_WAIT_MS` delay so it generates synchronously if the batch never lands. Not a
+config switch: a `:batch` id on the synchronous endpoint breaks the caller, and its tariff is
 **not** reliably half the base one.
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order; do not re-open the 27
@@ -196,7 +197,7 @@ through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y0.13.6` (T3), `mc2-iioip` (
   `.env.<active_color>` (`cat /opt/megacampus/active_color`), **not** `.env.production`.
 - The default backend Vitest command is fail-closed and needs Qdrant 1.18.2; use
   `vitest.config.unit.ts` for focused unit tests. `MC2_Q12_REAL_CONTROLLER` runs on uid 1000 only.
-  `graph-reviewed: blocked` — Graphify 0.9.14 has no `build` subcommand; the graph is read only.
+  Graphify 0.9.14 has no `build` subcommand, so the graph is read, never refreshed.
 
 ## Owner decisions
 
@@ -254,8 +255,8 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 
 ## Explicit defers
 
-`mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23, only live proof waits on `mc2-3lo22`; `mc2-rmbwo`
-and `mc2-p99f1` wait on it too. `mc2-db696.106`/`.107` (PDF fidelity/grounding, separate deploy
+`mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23, only live proof waits on `mc2-3lo22`, as do
+`mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding, separate deploy
 accounts) not planned; `mc2-gmab0` held by unit tests.
 
 ## NotebookLM and languages
@@ -276,21 +277,21 @@ script, never lower the number.
 
 ## Next recommended
 
-Accepted stage id: `mc2-qrdkt` · Current stage id: `mc2-51epl` · Next stage id: **`mc2-51epl`**
-All eight warnings are diagnosed and their causes are on `develop`; the run whose log proves it is
-the only thing owed. Recommended action: drive it from `docs/runbooks/cost-ledger-paid-run.md`,
-reconcile with `--verify-with-provider`, and accept only if no line from the plan's list appears
-without an explanation of why it is legitimate. `stage_5_escalation` still owes a run in which Stage
-5 really escalated and Stage 6 owes one where the judge's new terminal path fires — both can ride
-that run if a generation is made to fail. Use $orchestrator-stage if it grows into an epic.
+Accepted stage id: `mc2-51epl` · Current stage id: none · Next stage id: **owner's call**
+`brawny-mellow-quokka.md` is finished and nothing in it is owed. Recommended action: pick the next
+track — `mc2-db696` (Career Playbook) and `mc2-uv7n7` (UI redesign, 22 Stitch screens) are the two
+standing directions, and `specs/026-post-triage-priorities/spec.md` holds the backlog order.
+Two small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
+never actually escalated and the judge's new terminal path has never fired, both needing a
+generation forced to fail. Use $orchestrator-stage when the next track becomes an epic.
 
-`mc2-ibzcc` is **closed**: docling-mcp is on 3.1.0, most of the cache wrapper is gone, and the image
-builds green locally — but it is **neither published nor deployed**, which runs through the manual
-`build-docling-images.yml` workflow and a recorded `image@sha256` and is a production mutation of
-its own. `mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`.
-`mc2-8m90f` moved without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none
-on the six affected courses. New: `mc2-pdcb7` (covers drawn without their visual style — fixed;
-whether to pay to redraw is the owner's) and `mc2-jraut` (five orphan prompt rows).
+`mc2-ibzcc` is **closed**: docling-mcp is on 3.1.0 and most of the cache wrapper is gone, but the
+image is **neither published nor deployed** — that runs through the manual
+`build-docling-images.yml` workflow and a recorded `image@sha256`, a production mutation of its own.
+`mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`. `mc2-8m90f` moved
+without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none on the six
+affected courses. New: `mc2-pdcb7` (covers drawn without their visual style — fixed; whether to pay
+to redraw is the owner's) and `mc2-jraut` (five orphan prompt rows).
 
 ## Starter prompt for next orchestrator
 
@@ -304,5 +305,4 @@ than running `pnpm install`. The 47 failing `.tsx` files under `packages/web` ar
 JSX parse failure in the local rolldown transform, reproduce on `origin/develop`, and are in no CI
 job — `pnpm test:unit` covers `course-gen-platform` and `shared-types` only.
 
-Read first: `AGENTS.md`, `.codex/orchestrator.toml`, this file,
-`.codex/repository-failure-modes.md`, `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.
+Read first: `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`, `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.
