@@ -382,9 +382,19 @@ export default function CareerPlaybookLibraryPageClient({
     const publicLinkMessage = publicLinkMessages[item.id]
     const builderHref = `/${locale}/career-playbook/new?resume=${encodeURIComponent(item.id)}`
 
+    const viewHref = `/${locale}/career-playbook/${item.id}`
+
     return (
-      <article className="career-playbook-panel flex h-full flex-col p-4">
+      // `relative` is load-bearing: the title link below stretches itself over
+      // this card with `after:absolute after:inset-0`, which needs a positioned
+      // ancestor to stretch to (mc2-1786710715542).
+      <article className="career-playbook-panel relative flex h-full flex-col p-4">
         <CareerPlaybookCardImage item={item} />
+        {/*
+          No z-10 on this row: it is mostly empty space and badges, and lifting
+          the whole row above the card link turned that space into a dead zone.
+          Only the one control inside it is raised, below.
+        */}
         <div className="flex items-start justify-between gap-3">
           {canManageVisibility ? (
             <DropdownMenu>
@@ -393,7 +403,9 @@ export default function CareerPlaybookLibraryPageClient({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className={`h-8 gap-1.5 rounded-md border px-2.5 text-xs ${currentVisibility.color}`}
+                  // relative z-10: above the card-wide link, so the dropdown
+                  // still opens instead of navigating.
+                  className={`relative z-10 h-8 gap-1.5 rounded-md border px-2.5 text-xs ${currentVisibility.color}`}
                   disabled={isUpdatingVisibility}
                   aria-label={`${tc('visibility.label')}: ${tc(`visibility.${visibility}`)}`}
                 >
@@ -438,7 +450,23 @@ export default function CareerPlaybookLibraryPageClient({
           )}
           <Badge className={getStatusTone(item.status)}>{t(`statusLabels.${item.status}`)}</Badge>
         </div>
-        <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
+        {/*
+          The whole card opens the playbook, via a real link on the title rather
+          than an `onClick` on the <article>: an onClick handler has no href, so
+          middle-click, Ctrl+click, "copy link address" and keyboard focus all
+          stop working, and a screen reader is told nothing is interactive here.
+          The stretched pseudo-element gives the card-sized hit area without a
+          second overlay element competing for the accessible name — that name
+          is the title, which is what a reader would say out loud.
+        */}
+        <h2 className="mt-4 text-lg font-semibold">
+          <Link
+            href={viewHref}
+            className="after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:outline-none"
+          >
+            {item.title}
+          </Link>
+        </h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
           {formatDate(item.createdAt, locale)}
         </p>
@@ -446,7 +474,7 @@ export default function CareerPlaybookLibraryPageClient({
           {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
           {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
         </div>
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <div className="relative z-10 mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
           <div className="flex items-center gap-1">
             {shareHref ? (
               <>
