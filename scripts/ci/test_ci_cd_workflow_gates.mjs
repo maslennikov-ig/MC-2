@@ -485,4 +485,44 @@ assert(
   'ci-success must reject a failed or skipped security audit before delivery'
 );
 
+// The PDF heading-hierarchy flag is read in two places that cannot see each
+// other: the MCP container asks Serve for the inference, and the worker folds the
+// answer into `resolveConversionProfile`, which is part of chunk identity and the
+// cache key. Configure one and not the other and conversions WITH inferred
+// headings get stored under the identity of ones without — a corruption no test
+// downstream can detect, because both halves look internally consistent.
+//
+// Two files, one repository variable. Asserted structurally, because the failure
+// is silent and has no runtime symptom to alert on.
+const headingFlagExpression =
+  "DOCLING_MCP_PDF_HEADING_HIERARCHY=${{ vars.DOCLING_MCP_PDF_HEADING_HIERARCHY || 'false' }}";
+for (const [job, step] of [
+  ['deploy', 'Create .env.production'],
+  ['deploy-dev', 'Create .env.dev'],
+]) {
+  const run = (jobs[job]?.steps ?? []).find(candidate => candidate?.name === step)?.run ?? '';
+  assert(
+    run.includes(headingFlagExpression),
+    `${job} must write the heading-hierarchy flag from the shared repository variable into ${step}`
+  );
+}
+for (const job of ['deploy', 'deploy-dev']) {
+  assert(
+    (jobs[job]?.steps ?? []).some(
+      step => step?.name === 'Validate the Docling PDF heading-hierarchy flag'
+    ),
+    `${job} must refuse a heading-hierarchy value that is not exactly true or false`
+  );
+}
+const infraCompose = readFileSync(resolve(rootDir, 'docker-compose.infra.yml'), 'utf8');
+for (const [name, text] of [
+  ['docker-compose.production.yml', productionCompose],
+  ['docker-compose.infra.yml', infraCompose],
+]) {
+  assert(
+    text.includes('DOCLING_MCP_PDF_HEADING_HIERARCHY=${DOCLING_MCP_PDF_HEADING_HIERARCHY:-false}'),
+    `${name} must pass the heading-hierarchy flag to the MCP container, defaulting to off`
+  );
+}
+
 console.log('CI/CD workflow deploy gate test passed');
