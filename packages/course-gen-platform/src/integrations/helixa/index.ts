@@ -8,4 +8,5 @@ export * from './snapshot-loader';
 export * from './storage-reader';
 export * from './runtime-repository';
 export * from './service';
+export * from './scheduler';
 export * from './errors';
