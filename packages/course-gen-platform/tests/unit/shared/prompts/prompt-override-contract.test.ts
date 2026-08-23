@@ -98,6 +98,20 @@ describe('checkOverrideContract', () => {
     );
   });
 
+  it('accepts a row carrying the Mustache sections the registry itself carries', () => {
+    // `stage6_planner` has a real `{{#userRefinementPrompt}}` / `{{/...}}` pair.
+    // Judged against the variable list alone those read as two placeholders no
+    // caller fills, and the guard rejected a row that WAS the registry text —
+    // caught by re-running the sync script against a row it had just written.
+    // Sections are not the only case: Helm and Jinja fragments arrive inside RAG
+    // context, and the fix is to judge against the maintained template rather
+    // than to keep a list of every templating language.
+    const registry = registryEntry('stage6_planner');
+    expect(registry.promptTemplate).toContain('{{#userRefinementPrompt}}');
+
+    expect(checkOverrideContract(registry.promptTemplate, registry)).toBeNull();
+  });
+
   it('ignores a required variable the registry itself does not render', () => {
     const registry: HardcodedPrompt = {
       ...registryEntry('stage4_phase3_expert'),

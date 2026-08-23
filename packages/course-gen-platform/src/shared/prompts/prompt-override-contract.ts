@@ -6,7 +6,7 @@
  * `prompt_templates` wins over `PROMPT_REGISTRY` at runtime, which is the point:
  * a prompt can be changed without a deploy. Nothing checked that the row still
  * fits the caller, though, and the callers moved on. Measured on the live
- * database 2026-08-23, 8 of 21 active rows no longer fit; two of them are on a
+ * database 2026-08-23, 7 of 21 active rows no longer fit; two of them are on a
  * live path:
  *
  * - `stage4_phase3_expert` — a 2025-12-04 row, 1440 characters against 2585 in
@@ -63,7 +63,17 @@ export function checkOverrideContract(
   const registryPlaceholders = extractPlaceholders(registryPrompt.promptTemplate);
   const declared = new Set(registryPrompt.variables.map(variable => variable.name));
 
-  const unknownPlaceholders = [...rowPlaceholders].filter(name => !declared.has(name));
+  // Measured against the declared variables AND the registry's own text, not
+  // against the variable list alone. A template legitimately contains braces
+  // that are not variables — Mustache sections (`{{#name}}`, `{{/name}}`), and
+  // the Helm and Jinja fragments that arrive inside RAG context — and
+  // `stage6_planner` carries a real `{{#userRefinementPrompt}}` pair. Judging
+  // those by a list of allowed prefixes means keeping a second list of every
+  // templating language a source document might use; judging them by what the
+  // maintained template itself contains needs no list at all.
+  const unknownPlaceholders = [...rowPlaceholders].filter(
+    name => !declared.has(name) && !registryPlaceholders.has(name)
+  );
   const droppedRequiredVariables = registryPrompt.variables
     .filter(variable => variable.required)
     .map(variable => variable.name)
