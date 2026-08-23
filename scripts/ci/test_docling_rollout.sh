@@ -4,15 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT_DIR/scripts/lib/docling-rollout.sh"
 
+# A synthetic tag on purpose: this case asserts that the repository name is
+# lowercased, not what the stack is pinned to today. A real version here reads
+# like a version claim and would go stale beside the four files that do carry
+# one (see the docling-image-version-consistency unit test).
+NORMALIZATION_FIXTURE_TAG='0.0.0-image-ref-normalization-fixture'
 IMAGE_REF_OUTPUT="$(
     "$ROOT_DIR/scripts/ci/resolve_docling_image_ref.sh" \
         'maslennikov-ig/MC-2' \
         'docling-mcp-v3' \
-        '3.0.0-docling-2.118.0'
+        "$NORMALIZATION_FIXTURE_TAG"
 )"
-EXPECTED_IMAGE_REF_OUTPUT="$(cat <<'EOF'
+EXPECTED_IMAGE_REF_OUTPUT="$(cat <<EOF
 repository=ghcr.io/maslennikov-ig/mc-2/docling-mcp-v3
-tag=ghcr.io/maslennikov-ig/mc-2/docling-mcp-v3:3.0.0-docling-2.118.0
+tag=ghcr.io/maslennikov-ig/mc-2/docling-mcp-v3:$NORMALIZATION_FIXTURE_TAG
 EOF
 )"
 [ "$IMAGE_REF_OUTPUT" = "$EXPECTED_IMAGE_REF_OUTPUT" ] || {

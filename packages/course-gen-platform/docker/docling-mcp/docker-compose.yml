@@ -39,7 +39,7 @@ services:
     build:
       context: ../docling-serve-advanced
       dockerfile: Dockerfile
-    image: mc2/docling-serve-advanced:1.30.0-docling-2.118.0
+    image: mc2/docling-serve-advanced:1.30.0-docling-2.118.0-advanced
     environment:
       UVICORN_HOST: 0.0.0.0
       UVICORN_PORT: '5001'
