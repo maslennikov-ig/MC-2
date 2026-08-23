@@ -30,6 +30,8 @@ function repository(): HelixaCourseCreationRepository {
       payloadHash: string;
       courseId: string;
       status: 'pending' | 'completed' | 'action_required';
+      leaseToken: string;
+      claimGeneration: number;
       receipt?: { commandId: string; courseId: string; status: 'completed' };
     }
   >();
@@ -37,18 +39,42 @@ function repository(): HelixaCourseCreationRepository {
     reserve: vi.fn(async input => {
       const prior = rows.get(input.command.commandId);
       if (prior && prior.payloadHash !== input.payloadHash) return { kind: 'conflict' as const };
-      if (prior) return { kind: 'reserved' as const, mutationOwner: false, ...prior };
+      if (prior)
+        return {
+          kind: 'reserved' as const,
+          payloadHash: prior.payloadHash,
+          courseId: prior.courseId,
+          status: prior.status,
+          mutationOwner: false,
+          leaseToken: null,
+          claimGeneration: prior.claimGeneration,
+          ...(prior.receipt ? { receipt: prior.receipt } : {}),
+        };
       const row = {
         payloadHash: input.payloadHash,
         courseId: 'course-reserved-1',
         status: 'pending' as const,
+        leaseToken: 'lease-1',
+        claimGeneration: 1,
       };
       rows.set(input.command.commandId, row);
-      return { kind: 'reserved' as const, mutationOwner: true, ...row };
+      return {
+        kind: 'reserved' as const,
+        mutationOwner: true,
+        ...row,
+      };
     }),
+    renew: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(async input => {
       const row = rows.get(input.commandId);
-      if (!row || row.courseId !== input.courseId || row.status !== 'pending') return null;
+      if (
+        !row ||
+        row.courseId !== input.courseId ||
+        row.status !== 'pending' ||
+        row.leaseToken !== input.leaseToken ||
+        row.claimGeneration !== input.claimGeneration
+      )
+        return null;
       const receipt = {
         commandId: input.commandId,
         courseId: input.courseId,
@@ -57,7 +83,7 @@ function repository(): HelixaCourseCreationRepository {
       rows.set(input.commandId, { ...row, status: 'completed', receipt });
       return receipt;
     }),
-    actionRequired: vi.fn(),
+    actionRequired: vi.fn(() => Promise.resolve(true)),
   };
 }
 
@@ -89,10 +115,10 @@ describe('Helixa fake course creation command', () => {
     expect(sql).toContain(
       'FROM helixa_course_creation_commands AS command\n  WHERE command.binding_id = p_binding_id AND command.command_id = p_command_id;'
     );
-    expect(sql.match(/UPDATE helixa_course_creation_commands AS command/g)).toHaveLength(2);
+    expect(sql.match(/UPDATE helixa_course_creation_commands AS command/g)).toHaveLength(4);
     expect(
       sql.match(/WHERE command\.binding_id = p_binding_id AND command\.command_id = p_command_id/g)
-    ).toHaveLength(3);
+    ).toHaveLength(6);
   });
   it('keeps the PostgreSQL command contract at the Helixa sender bounds', async () => {
     const sql = await readFile(
@@ -110,6 +136,22 @@ describe('Helixa fake course creation command', () => {
       'approved_revision BIGINT NOT NULL CHECK (approved_revision BETWEEN 1 AND 9007199254740991)'
     );
     expect(sql).toContain('p_approved_revision BIGINT, p_payload_hash TEXT');
+  });
+  it('fences course mutation ownership with a renewable execution lease', async () => {
+    const sql = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260823060000_helixa_course_creation_commands.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(sql).toContain('lease_token UUID');
+    expect(sql).toContain('claim_generation INTEGER NOT NULL DEFAULT 1');
+    expect(sql).toContain('lease_expires_at TIMESTAMPTZ');
+    expect(sql).toContain('claim_generation = command.claim_generation + 1');
+    expect(sql).toContain('command.lease_token = p_lease_token');
+    expect(sql).toContain('command.claim_generation = p_claim_generation');
+    expect(sql).toContain('renew_helixa_course_creation_command');
   });
   it('allows only the exact fake runtime mode', () => {
     expect(readHelixaCourseCreationMode({})).toBe('disabled');
@@ -133,6 +175,8 @@ describe('Helixa fake course creation command', () => {
             status: 'completed',
             conflict: false,
             mutation_owner: false,
+            lease_token: null,
+            claim_generation: 1,
           },
         ],
         error: null,
@@ -146,6 +190,8 @@ describe('Helixa fake course creation command', () => {
             status: 'pending',
             conflict: true,
             mutation_owner: false,
+            lease_token: null,
+            claim_generation: 1,
           },
         ],
         error: null,
@@ -162,6 +208,7 @@ describe('Helixa fake course creation command', () => {
       payloadHash: 'a'.repeat(64),
       bindingId: 'ignored',
       organizationId: 'ignored',
+      environment: 'ignored',
       destinationBindingId: 'ignored',
     });
     const conflict = await durable.reserve({
@@ -169,6 +216,7 @@ describe('Helixa fake course creation command', () => {
       payloadHash: 'b'.repeat(64),
       bindingId: 'ignored',
       organizationId: 'ignored',
+      environment: 'ignored',
       destinationBindingId: 'ignored',
     });
     expect(rpc.mock.calls[0]?.[1]).toMatchObject({
@@ -180,7 +228,12 @@ describe('Helixa fake course creation command', () => {
     expect(replay).toMatchObject({ status: 'completed', receipt: { courseId: 'course-1' } });
     expect(conflict).toEqual({ kind: 'conflict' });
     await expect(
-      durable.complete({ commandId: canonicalCommandId, courseId: 'other-course' })
+      durable.complete({
+        commandId: canonicalCommandId,
+        courseId: 'other-course',
+        leaseToken: 'lease-1',
+        claimGeneration: 1,
+      })
     ).resolves.toBeNull();
   });
   it('rejects unknown fields and raw source material', () => {

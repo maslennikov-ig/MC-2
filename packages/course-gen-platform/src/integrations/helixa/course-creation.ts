@@ -66,8 +66,9 @@ export interface HelixaCourseCreationRepository {
     command: HelixaCourseCreationCommand;
     payloadHash: string;
     bindingId: string;
-    externalOrganizationId: string;
-    externalProjectId: string;
+    organizationId: string;
+    environment: string;
+    destinationBindingId: string;
   }): Promise<
     | { kind: 'conflict' }
     | {
@@ -76,17 +77,39 @@ export interface HelixaCourseCreationRepository {
         courseId: string;
         status: 'pending' | 'completed' | 'action_required';
         mutationOwner: boolean;
+        leaseToken: string | null;
+        claimGeneration: number;
         receipt?: HelixaCourseCreationReceipt;
       }
   >;
+  renew(input: {
+    commandId: string;
+    courseId: string;
+    leaseToken: string;
+    claimGeneration: number;
+  }): Promise<boolean>;
   complete(input: {
     commandId: string;
     courseId: string;
+    leaseToken: string;
+    claimGeneration: number;
   }): Promise<HelixaCourseCreationReceipt | null>;
-  actionRequired(input: { commandId: string; courseId: string; safeError: string }): Promise<void>;
+  actionRequired(input: {
+    commandId: string;
+    courseId: string;
+    safeError: string;
+    leaseToken: string;
+    claimGeneration: number;
+  }): Promise<boolean>;
 }
 
 export interface FakeHelixaCourseCreationPort {
+  reconcile?(input: {
+    courseId: string;
+    command: HelixaCourseCreationCommand;
+    binding: HelixaCourseCreationBinding;
+  }): Promise<'missing' | 'completed' | 'uncertain'>;
+  /** Must be idempotent for the deterministic reserved courseId. */
   create(input: {
     courseId: string;
     command: HelixaCourseCreationCommand;
@@ -104,6 +127,12 @@ export function createInMemoryFakeHelixaCourseCreationPort(options: {
 }): FakeHelixaCourseCreationPort {
   const completions = new Map<string, Promise<void>>();
   return {
+    async reconcile(input) {
+      const completion = completions.get(input.courseId);
+      if (!completion) return 'missing';
+      await completion;
+      return 'completed';
+    },
     async create(input) {
       let completion = completions.get(input.courseId);
       if (!completion) {
@@ -128,6 +157,8 @@ export interface HelixaCourseCreationComposition {
   binding: HelixaCourseCreationBinding;
 }
 
+const COURSE_CREATION_LEASE_HEARTBEAT_MS = 30_000;
+
 export function readHelixaCourseCreationMode(
   environment: NodeJS.ProcessEnv = process.env
 ): 'disabled' | 'fake' {
@@ -151,6 +182,8 @@ type CourseCommandRow = {
   status: 'pending' | 'completed' | 'action_required';
   conflict: boolean;
   mutation_owner: boolean;
+  lease_token: string | null;
+  claim_generation: number;
 };
 
 export function createPostgresHelixaCourseCreationRepository(
@@ -176,12 +209,16 @@ export function createPostgresHelixaCourseCreationRepository(
         throw new Error('Failed to reserve Helixa course creation command');
       const row = result.data[0];
       if (row.conflict) return { kind: 'conflict' };
+      if (row.mutation_owner && row.lease_token == null)
+        throw new Error('Helixa course creation reservation omitted its execution lease');
       return {
         kind: 'reserved',
         payloadHash: row.payload_hash,
         courseId: row.course_id,
         status: row.status,
         mutationOwner: row.mutation_owner,
+        leaseToken: row.mutation_owner ? row.lease_token : null,
+        claimGeneration: row.claim_generation,
         ...(row.status === 'completed'
           ? {
               receipt: {
@@ -193,11 +230,24 @@ export function createPostgresHelixaCourseCreationRepository(
           : {}),
       };
     },
+    async renew(input) {
+      const result = await client.rpc<boolean>('renew_helixa_course_creation_command', {
+        p_binding_id: binding.bindingId,
+        p_command_id: input.commandId,
+        p_course_id: input.courseId,
+        p_lease_token: input.leaseToken,
+        p_claim_generation: input.claimGeneration,
+      });
+      if (result.error) throw new Error('Failed to renew Helixa course creation lease');
+      return result.data === true;
+    },
     async complete(input) {
       const result = await client.rpc<boolean>('complete_helixa_course_creation_command', {
         p_binding_id: binding.bindingId,
         p_command_id: input.commandId,
         p_course_id: input.courseId,
+        p_lease_token: input.leaseToken,
+        p_claim_generation: input.claimGeneration,
       });
       if (result.error || result.data !== true) return null;
       return { commandId: input.commandId, courseId: input.courseId, status: 'completed' };
@@ -208,9 +258,11 @@ export function createPostgresHelixaCourseCreationRepository(
         p_command_id: input.commandId,
         p_course_id: input.courseId,
         p_safe_error: input.safeError,
+        p_lease_token: input.leaseToken,
+        p_claim_generation: input.claimGeneration,
       });
-      if (result.error || result.data !== true)
-        throw new Error('Failed to record Helixa course creation failure');
+      if (result.error) throw new Error('Failed to record Helixa course creation failure');
+      return result.data === true;
     },
   };
 }
@@ -259,7 +311,7 @@ export async function executeHelixaCourseCreationCommand(input: {
 
   if (!reservation.mutationOwner) {
     const deadline = Date.now() + 30_000;
-    do {
+    while (!reservation.mutationOwner && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 25));
       reservation = await input.repository.reserve(reservationInput);
       if (reservation.kind === 'conflict')
@@ -267,30 +319,92 @@ export async function executeHelixaCourseCreationCommand(input: {
       if (reservation.status === 'completed' && reservation.receipt) return reservation.receipt;
       if (reservation.status === 'action_required')
         throw new Error('Helixa course creation requires operator action');
-    } while (Date.now() < deadline);
-    throw new Error('Helixa course creation is still pending');
+    }
+    if (!reservation.mutationOwner) throw new Error('Helixa course creation is still pending');
   }
 
+  if (reservation.leaseToken == null)
+    throw new Error('Helixa course creation reservation omitted its execution lease');
+  const lease = {
+    commandId: command.commandId,
+    courseId: reservation.courseId,
+    leaseToken: reservation.leaseToken,
+    claimGeneration: reservation.claimGeneration,
+  };
+  let terminalized = false;
+
   try {
-    const created = await input.fakePort.create({
-      courseId: reservation.courseId,
-      command,
-      binding: input.composition.binding,
-    });
+    if (reservation.claimGeneration > 1) {
+      const reconciliation =
+        (await input.fakePort.reconcile?.({
+          courseId: reservation.courseId,
+          command,
+          binding: input.composition.binding,
+        })) ?? 'uncertain';
+      if (reconciliation === 'completed') {
+        const receipt = await input.repository.complete(lease);
+        if (receipt == null)
+          throw new Error('Course creation lease was lost during reconciliation');
+        return receipt;
+      }
+      if (reconciliation === 'uncertain') {
+        terminalized = await input.repository.actionRequired({
+          ...lease,
+          safeError: 'Fake course creation state is uncertain after lease takeover',
+        });
+        if (!terminalized) throw new Error('Course creation lease was lost during reconciliation');
+        throw new Error('Helixa course creation requires operator action');
+      }
+    }
+
+    if (!(await input.repository.renew(lease)))
+      throw new Error('Course creation lease was lost before mutation');
+    const heartbeatState: { renewing: Promise<void> | null; healthy: boolean } = {
+      renewing: null,
+      healthy: true,
+    };
+    const heartbeat = setInterval(() => {
+      if (heartbeatState.renewing !== null) return;
+      heartbeatState.renewing = input.repository
+        .renew(lease)
+        .then(renewed => {
+          if (!renewed) heartbeatState.healthy = false;
+        })
+        .catch(() => {
+          heartbeatState.healthy = false;
+        })
+        .finally(() => {
+          heartbeatState.renewing = null;
+        });
+    }, COURSE_CREATION_LEASE_HEARTBEAT_MS);
+    heartbeat.unref();
+
+    let created: { courseId: string };
+    try {
+      created = await input.fakePort.create({
+        courseId: reservation.courseId,
+        command,
+        binding: input.composition.binding,
+      });
+    } finally {
+      clearInterval(heartbeat);
+      const pendingRenewal = heartbeatState.renewing;
+      if (pendingRenewal !== null) await pendingRenewal;
+    }
+    if (!heartbeatState.healthy) throw new Error('Course creation lease was lost during mutation');
     if (created.courseId !== reservation.courseId)
       throw new Error('Fake creation returned a different course ID');
-    const receipt = await input.repository.complete({
-      commandId: command.commandId,
-      courseId: reservation.courseId,
-    });
+    const receipt = await input.repository.complete(lease);
     if (receipt == null) throw new Error('Course creation completion lost its reservation');
     return receipt;
   } catch (error) {
-    await input.repository.actionRequired({
-      commandId: command.commandId,
-      courseId: reservation.courseId,
-      safeError: 'Fake course creation failed',
-    });
+    if (!terminalized) {
+      const recorded = await input.repository.actionRequired({
+        ...lease,
+        safeError: 'Fake course creation failed',
+      });
+      if (!recorded) throw new Error('Course creation lease was lost before failure recording');
+    }
     throw error;
   }
 }

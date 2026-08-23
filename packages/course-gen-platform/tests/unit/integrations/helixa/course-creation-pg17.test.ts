@@ -7,6 +7,8 @@ import { Pool } from 'pg';
 import {
   createPostgresHelixaCourseCreationRepository,
   executeHelixaCourseCreationCommand,
+  helixaCourseCreationPayloadHash,
+  parseHelixaCourseCreationCommand,
 } from '@/integrations/helixa/course-creation';
 
 const REAL_PG17 = process.env.MC2_HELIXA_REAL_PG17 === '1';
@@ -64,15 +66,41 @@ function rpcClient(pool: Pool) {
         }
         if (name === 'complete_helixa_course_creation_command') {
           const result = await pool.query(
-            `SELECT complete_helixa_course_creation_command($1, $2, $3) AS value`,
-            [args.p_binding_id, args.p_command_id, args.p_course_id]
+            `SELECT complete_helixa_course_creation_command($1, $2, $3, $4, $5) AS value`,
+            [
+              args.p_binding_id,
+              args.p_command_id,
+              args.p_course_id,
+              args.p_lease_token,
+              args.p_claim_generation,
+            ]
+          );
+          return { data: result.rows[0]?.value as T, error: null };
+        }
+        if (name === 'renew_helixa_course_creation_command') {
+          const result = await pool.query(
+            `SELECT renew_helixa_course_creation_command($1, $2, $3, $4, $5) AS value`,
+            [
+              args.p_binding_id,
+              args.p_command_id,
+              args.p_course_id,
+              args.p_lease_token,
+              args.p_claim_generation,
+            ]
           );
           return { data: result.rows[0]?.value as T, error: null };
         }
         if (name === 'action_required_helixa_course_creation_command') {
           const result = await pool.query(
-            `SELECT action_required_helixa_course_creation_command($1, $2, $3, $4) AS value`,
-            [args.p_binding_id, args.p_command_id, args.p_course_id, args.p_safe_error]
+            `SELECT action_required_helixa_course_creation_command($1, $2, $3, $4, $5, $6) AS value`,
+            [
+              args.p_binding_id,
+              args.p_command_id,
+              args.p_course_id,
+              args.p_safe_error,
+              args.p_lease_token,
+              args.p_claim_generation,
+            ]
           );
           return { data: result.rows[0]?.value as T, error: null };
         }
@@ -118,6 +146,15 @@ describe.runIf(REAL_PG17)('Helixa course command PostgreSQL concurrency', () => 
       password: POSTGRES_PASSWORD,
       max: 4,
     });
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      try {
+        await pool.query('SELECT 1');
+        break;
+      } catch (error) {
+        if (attempt === 99) throw error;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
     const migration = await readFile(
       new URL(
         '../../../../supabase/migrations/20260823060000_helixa_course_creation_commands.sql',
@@ -216,5 +253,145 @@ describe.runIf(REAL_PG17)('Helixa course command PostgreSQL concurrency', () => 
 
     expect(conflict).toEqual({ commandId: command.commandId, status: 'conflict' });
     expect(mutation).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers a missing deterministic course after the execution lease expires', async () => {
+    const crashedRepository = createPostgresHelixaCourseCreationRepository(
+      rpcClient(pool),
+      BINDING
+    );
+    const parsedCommand = parseHelixaCourseCreationCommand(command);
+    const reservation = await crashedRepository.reserve({
+      command: parsedCommand,
+      payloadHash: helixaCourseCreationPayloadHash(parsedCommand),
+      ...BINDING,
+    });
+    expect(reservation).toMatchObject({
+      kind: 'reserved',
+      mutationOwner: true,
+      claimGeneration: 1,
+      leaseToken: expect.any(String),
+    });
+    if (reservation.kind === 'conflict') throw new Error('unexpected conflict');
+    const priorLease = {
+      leaseToken: reservation.leaseToken,
+      claimGeneration: reservation.claimGeneration,
+    };
+    await pool.query(
+      `UPDATE helixa_course_creation_commands SET lease_expires_at = NOW() - INTERVAL '1 second'
+       WHERE command_id = $1`,
+      [command.commandId]
+    );
+
+    const calls: string[] = [];
+    const reconciliationStarted = Promise.withResolvers<void>();
+    const continueReconciliation = Promise.withResolvers<void>();
+    const recovery = executeHelixaCourseCreationCommand({
+      command,
+      composition: { mode: 'fake', binding: BINDING },
+      repository: createPostgresHelixaCourseCreationRepository(rpcClient(pool), BINDING),
+      fakePort: {
+        reconcile: async () => {
+          calls.push('reconcile');
+          reconciliationStarted.resolve();
+          await continueReconciliation.promise;
+          return 'missing' as const;
+        },
+        create: ({ courseId }) => {
+          calls.push('create');
+          return Promise.resolve({ courseId });
+        },
+      },
+    });
+
+    await reconciliationStarted.promise;
+    await expect(
+      crashedRepository.complete({
+        commandId: command.commandId,
+        courseId: reservation.courseId,
+        ...priorLease,
+      })
+    ).resolves.toBeNull();
+    continueReconciliation.resolve();
+    const recovered = await recovery;
+
+    expect(calls).toEqual(['reconcile', 'create']);
+    expect(recovered).toMatchObject({ commandId: command.commandId, status: 'completed' });
+    const ledger = await pool.query(
+      `SELECT status, claim_generation FROM helixa_course_creation_commands WHERE command_id = $1`,
+      [command.commandId]
+    );
+    expect(ledger.rows[0]).toEqual({ status: 'completed', claim_generation: 2 });
+  });
+
+  it('reconciles a completed deterministic course before stale takeover can mutate again', async () => {
+    const crashedRepository = createPostgresHelixaCourseCreationRepository(
+      rpcClient(pool),
+      BINDING
+    );
+    const parsedCommand = parseHelixaCourseCreationCommand(command);
+    const reservation = await crashedRepository.reserve({
+      command: parsedCommand,
+      payloadHash: helixaCourseCreationPayloadHash(parsedCommand),
+      ...BINDING,
+    });
+    if (reservation.kind === 'conflict') throw new Error('unexpected conflict');
+    await pool.query(
+      `UPDATE helixa_course_creation_commands SET lease_expires_at = NOW() - INTERVAL '1 second'
+       WHERE command_id = $1`,
+      [command.commandId]
+    );
+    const create = vi.fn(() => Promise.reject(new Error('duplicate mutation')));
+
+    const recovered = await executeHelixaCourseCreationCommand({
+      command,
+      composition: { mode: 'fake', binding: BINDING },
+      repository: createPostgresHelixaCourseCreationRepository(rpcClient(pool), BINDING),
+      fakePort: {
+        reconcile: () => Promise.resolve('completed' as const),
+        create,
+      },
+    });
+
+    expect(recovered).toMatchObject({
+      commandId: command.commandId,
+      courseId: reservation.courseId,
+      status: 'completed',
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('grants one new owner when two receivers race for a stale lease', async () => {
+    const parsedCommand = parseHelixaCourseCreationCommand(command);
+    const payloadHash = helixaCourseCreationPayloadHash(parsedCommand);
+    const repository = createPostgresHelixaCourseCreationRepository(rpcClient(pool), BINDING);
+    const initial = await repository.reserve({ command: parsedCommand, payloadHash, ...BINDING });
+    if (initial.kind === 'conflict') throw new Error('unexpected conflict');
+    await pool.query(
+      `UPDATE helixa_course_creation_commands SET lease_expires_at = NOW() - INTERVAL '1 second'
+       WHERE command_id = $1`,
+      [command.commandId]
+    );
+
+    const [first, second] = await Promise.all([
+      createPostgresHelixaCourseCreationRepository(rpcClient(pool), BINDING).reserve({
+        command: parsedCommand,
+        payloadHash,
+        ...BINDING,
+      }),
+      createPostgresHelixaCourseCreationRepository(rpcClient(pool), BINDING).reserve({
+        command: parsedCommand,
+        payloadHash,
+        ...BINDING,
+      }),
+    ]);
+    if (first.kind === 'conflict' || second.kind === 'conflict')
+      throw new Error('unexpected conflict');
+
+    expect([first.mutationOwner, second.mutationOwner].filter(Boolean)).toHaveLength(1);
+    expect(first.courseId).toBe(initial.courseId);
+    expect(second.courseId).toBe(initial.courseId);
+    expect(first.claimGeneration).toBe(2);
+    expect(second.claimGeneration).toBe(2);
   });
 });
