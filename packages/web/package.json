@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "type-check": "pnpm --filter @megacampus/course-gen-platform build:types && tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude 'tests/integration/**'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run tests/integration",

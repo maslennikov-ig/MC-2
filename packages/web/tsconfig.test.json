@@ -5,6 +5,16 @@
     "noEmit": true,
     "types": ["vitest/globals"]
   },
-  "include": ["app/**/*", "components/**/*", "lib/**/*", "tests/**/*", "vitest.setup.ts"],
+  // `vitest.config.ts` alongside `vitest.setup.ts`: tsconfig.json excludes both, so without
+  // an entry here no project covers the config file and typed linting refuses it outright
+  // ("none of those TSConfigs include this file") the first time it is staged.
+  "include": [
+    "app/**/*",
+    "components/**/*",
+    "lib/**/*",
+    "tests/**/*",
+    "vitest.setup.ts",
+    "vitest.config.ts"
+  ],
   "exclude": ["node_modules", ".next", "playwright-report", "test-results"]
 }

@@ -7,6 +7,16 @@ export default mergeConfig(
   sharedConfig,
   defineConfig({
     plugins: [react()],
+    // tsconfig.json says `"jsx": "preserve"` because Next.js compiles JSX itself.
+    // Vite 8 transforms with oxc instead of esbuild, and oxc honours that tsconfig
+    // field, so every .tsx reached rolldown's SSR re-parse with its JSX intact and
+    // died on `Unexpected JSX expression` — 47 of 93 test files, none of them a
+    // failing assertion. @vitejs/plugin-react does set `esbuild.jsx: 'automatic'`,
+    // but vite 8 ignores esbuild options entirely and only says so in a startup
+    // warning. Compile JSX here, for tests alone; the Next build is untouched.
+    oxc: {
+      jsx: 'react-jsx',
+    },
     test: {
       environment: 'jsdom',
       setupFiles: ['./vitest.setup.ts'],
