@@ -110,12 +110,162 @@ function getDefaultCardPrompt(
  * This is a single-stage automatic generation flow.
  * Uses GPT-5 Image Mini for cost-effective 1024x1024 square images.
  */
+/**
+ * Where the course's look came from, in one place.
+ *
+ * This was written out three times with two different answers: the two log lines distinguished
+ * `visual_style` / `settings` / `default`, while the metadata field recorded only
+ * `visual_style` / `default` — so a course styled through `settings.visual_style` was LOGGED as
+ * settings-styled and STORED as unstyled. The stored value is the one a later question is
+ * answered from, and it was the wrong one.
+ */
+function describeVisualStyleSource(course: {
+  visual_style?: unknown;
+  settings?: { visual_style?: unknown } | null;
+}): 'visual_style' | 'settings' | 'default' {
+  if (course.visual_style) return 'visual_style';
+  if (course.settings?.visual_style) return 'settings';
+  return 'default';
+}
+
+/**
+ * Render a card prompt from the database, falling back to the inline default.
+ *
+ * The database copy is the one an editor can change without a deploy; the inline one exists so
+ * that a missing or malformed row costs a plainer card rather than the whole enrichment. Both
+ * card kinds did this identically and are now one call.
+ */
+async function renderCardPrompt(input: {
+  templateKey: 'stage7_card_course' | 'stage7_card_lesson';
+  variables: Record<string, string>;
+  fallback: () => string;
+  enrichmentId: string;
+  kind: 'course' | 'lesson';
+}): Promise<string> {
+  const { templateKey, variables, fallback, enrichmentId, kind } = input;
+  try {
+    return await createPromptService().renderPrompt(templateKey, variables);
+  } catch (err) {
+    logger.warn(
+      { enrichmentId, error: err },
+      `Card handler: failed to render ${kind} card prompt from DB, using inline fallback`
+    );
+    return fallback();
+  }
+}
+
+/**
+ * The user's own instructions, spliced in where they still apply.
+ *
+ * Before the no-text clause, not after it: the models honour the last instruction most, and a
+ * custom prompt appended after "absolutely no text" reliably brought the text back.
+ */
+function applyCustomPrompt(imagePrompt: string, customPrompt: string): string {
+  const noTextSuffix =
+    ', absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image';
+
+  return imagePrompt.includes(noTextSuffix)
+    ? imagePrompt.replace(noTextSuffix, `. ${customPrompt}${noTextSuffix}`)
+    : `${imagePrompt} ${customPrompt}`;
+}
+
+/** The full image prompt for one card: database template, inline fallback, user additions. */
+async function buildCardPrompt(
+  input: EnrichmentHandlerInput,
+  context: { isCourseCard: boolean; lessonContent: string | null }
+): Promise<string> {
+  const { enrichment, lesson, course } = input.enrichmentContext;
+  const { isCourseCard } = context;
+
+  const visualStyle = getVisualStyle(course, DEFAULT_CARD_VISUAL_STYLE);
+  const language = course.language ?? 'en';
+  const languageContext =
+    language === 'ru'
+      ? 'Russian educational content'
+      : language === 'en'
+        ? 'English educational content'
+        : `${language} educational content`;
+
+  const styleVariables = {
+    languageContext,
+    colorScheme: visualStyle.colorScheme,
+    aesthetic: visualStyle.aesthetic,
+    visualElements: visualStyle.visualElements,
+    mood: visualStyle.mood,
+  };
+  const courseTitle = course.title || 'Educational Course';
+  const courseTopic = course.course_description || course.title || 'Education';
+
+  let imagePrompt: string;
+  if (isCourseCard) {
+    imagePrompt = await renderCardPrompt({
+      templateKey: 'stage7_card_course',
+      variables: { courseTitle, courseTopic, ...styleVariables },
+      fallback: () =>
+        getDefaultCardPrompt(
+          course.title ?? 'Educational Course',
+          course.course_description ?? 'Education',
+          'course'
+        ),
+      enrichmentId: enrichment.id,
+      kind: 'course',
+    });
+  } else {
+    const lessonObjectives = extractLessonObjectives(context.lessonContent);
+    const objectivesSummary = lessonObjectives.slice(0, 3).join('; ') || 'Key lesson concepts';
+
+    imagePrompt = await renderCardPrompt({
+      templateKey: 'stage7_card_lesson',
+      variables: {
+        lessonTitle: lesson.title,
+        objectivesSummary,
+        courseTitle,
+        courseTopic,
+        ...styleVariables,
+      },
+      fallback: () =>
+        getDefaultCardPrompt(
+          lesson.title,
+          `${course.title ?? 'Educational Course'} (${course.course_description ?? 'Education'})`,
+          'lesson'
+        ),
+      enrichmentId: enrichment.id,
+      kind: 'lesson',
+    });
+  }
+
+  const customPrompt =
+    typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt.trim() : '';
+
+  if (customPrompt) {
+    imagePrompt = applyCustomPrompt(imagePrompt, customPrompt);
+    logger.debug(
+      { enrichmentId: enrichment.id, customPromptLength: customPrompt.length },
+      'Card handler: adding custom prompt to generation'
+    );
+  }
+
+  logger.info(
+    {
+      enrichmentId: enrichment.id,
+      courseId: course.id,
+      lessonId: lesson.id,
+      promptLength: imagePrompt.length,
+      isCourseCard,
+      visualStyleSource: describeVisualStyleSource(course),
+      hasCustomPrompt: Boolean(customPrompt),
+    },
+    'Card handler: prompt built'
+  );
+
+  return imagePrompt;
+}
+
 async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
   const { enrichmentContext } = input;
   const { enrichment, lesson, course } = enrichmentContext;
 
   const startTime = Date.now();
-  let imageCostUsd = 0;
 
   // Determine if this is a course card or lesson card
   // Use explicit markers as source of truth, remove overly broad conditions
@@ -123,10 +273,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     enrichment.title === 'course-card' || enrichment.settings?.isCourseCard === true;
 
   // Fetch lesson content from lesson_contents table (for lesson cards)
-  let lessonContent: string | null = null;
-  if (!isCourseCard) {
-    lessonContent = await getLessonContent(lesson.id, enrichmentContext.course.id);
-  }
+  const lessonContent = isCourseCard
+    ? null
+    : await getLessonContent(lesson.id, enrichmentContext.course.id);
 
   // Log debug if using fallback detection (not a warning - this is normal behavior)
   if (!isCourseCard && (!lessonContent || lesson.id === 'course-level')) {
@@ -148,111 +297,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   try {
-    // Get visual style from course
-    const visualStyle = getVisualStyle(course, DEFAULT_CARD_VISUAL_STYLE);
-
-    // Get prompt service (DB with fallback to PROMPT_REGISTRY)
-    const promptService = createPromptService();
-
-    // Build appropriate prompt using database templates
-    let imagePrompt: string;
-    const language = course.language ?? 'en';
-    const languageContext =
-      language === 'ru'
-        ? 'Russian educational content'
-        : language === 'en'
-          ? 'English educational content'
-          : `${language} educational content`;
-
-    if (isCourseCard) {
-      // Course card prompt from database
-      try {
-        imagePrompt = await promptService.renderPrompt('stage7_card_course', {
-          courseTitle: course.title || 'Educational Course',
-          courseTopic: course.course_description || course.title || 'Education',
-          languageContext,
-          colorScheme: visualStyle.colorScheme,
-          aesthetic: visualStyle.aesthetic,
-          visualElements: visualStyle.visualElements,
-          mood: visualStyle.mood,
-        });
-      } catch (err) {
-        logger.warn(
-          { enrichmentId: enrichment.id, error: err },
-          'Card handler: failed to render course card prompt from DB, using inline fallback'
-        );
-        imagePrompt = getDefaultCardPrompt(
-          course.title ?? 'Educational Course',
-          course.course_description ?? 'Education',
-          'course'
-        );
-      }
-    } else {
-      // Lesson card prompt from database
-      const lessonObjectives = extractLessonObjectives(lessonContent);
-      const objectivesSummary = lessonObjectives.slice(0, 3).join('; ') || 'Key lesson concepts';
-
-      try {
-        imagePrompt = await promptService.renderPrompt('stage7_card_lesson', {
-          lessonTitle: lesson.title,
-          objectivesSummary,
-          courseTitle: course.title || 'Educational Course',
-          courseTopic: course.course_description || course.title || 'Education',
-          colorScheme: visualStyle.colorScheme,
-          aesthetic: visualStyle.aesthetic,
-          visualElements: visualStyle.visualElements,
-          mood: visualStyle.mood,
-        });
-      } catch (err) {
-        logger.warn(
-          { enrichmentId: enrichment.id, error: err },
-          'Card handler: failed to render lesson card prompt from DB, using inline fallback'
-        );
-        imagePrompt = getDefaultCardPrompt(
-          lesson.title,
-          `${course.title ?? 'Educational Course'} (${course.course_description ?? 'Education'})`,
-          'lesson'
-        );
-      }
-    }
-
-    // Append custom prompt from user settings if provided
-    const customPrompt =
-      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
-
-    if (customPrompt?.trim()) {
-      // Add custom instructions before the no-text requirement
-      const noTextSuffix =
-        ', absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image';
-      if (imagePrompt.includes(noTextSuffix)) {
-        // Insert custom prompt before no-text suffix
-        imagePrompt = imagePrompt.replace(noTextSuffix, `. ${customPrompt.trim()}${noTextSuffix}`);
-      } else {
-        // Just append
-        imagePrompt += ` ${customPrompt.trim()}`;
-      }
-      logger.debug(
-        { enrichmentId: enrichment.id, customPromptLength: customPrompt.length },
-        'Card handler: adding custom prompt to generation'
-      );
-    }
-
-    logger.info(
-      {
-        enrichmentId: enrichment.id,
-        courseId: course.id,
-        lessonId: lesson.id,
-        promptLength: imagePrompt.length,
-        isCourseCard,
-        visualStyleSource: course.visual_style
-          ? 'visual_style'
-          : course.settings?.visual_style
-            ? 'settings'
-            : 'default',
-        hasCustomPrompt: !!customPrompt?.trim(),
-      },
-      'Card handler: prompt built'
-    );
+    const imagePrompt = await buildCardPrompt(input, { isCourseCard, lessonContent });
 
     // Generate image using GPT-5 Image Mini (1024x1024)
     const imageResult = await generateCardImage(imagePrompt, {
@@ -265,7 +310,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     // number and not the ledger. The ledger row is in `generation_trace`, where
     // an unestimated call is left genuinely unpriced and then settled against
     // the provider's charge.
-    imageCostUsd = imageResult.costUsd ?? 0;
+    const imageCostUsd = imageResult.costUsd ?? 0;
 
     logger.info(
       {
@@ -321,8 +366,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       'Card handler: image uploaded'
     );
 
-    // Build result
     const durationMs = Date.now() - startTime;
+    const visualStyleSource = describeVisualStyleSource(course);
 
     const content: CardEnrichmentContent = {
       type: 'card',
@@ -353,7 +398,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       retry_attempts: enrichment.generation_attempt,
       additional_info: {
         card_type: isCourseCard ? 'course' : 'lesson',
-        visual_style_source: course.visual_style ? 'visual_style' : 'default',
+        visual_style_source: visualStyleSource,
       },
     };
 
@@ -365,11 +410,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         durationMs,
         costUsd: imageCostUsd,
         cardType: isCourseCard ? 'course' : 'lesson',
-        visualStyleSource: course.visual_style
-          ? 'visual_style'
-          : course.settings?.visual_style
-            ? 'settings'
-            : 'default',
+        visualStyleSource,
       },
       'Card handler: card generation complete'
     );
