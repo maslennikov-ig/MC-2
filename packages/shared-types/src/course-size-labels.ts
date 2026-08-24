@@ -1,0 +1,557 @@
+/**
+ * Course size labels, for all 19 platform languages.
+ * @module course-size-labels
+ *
+ * Split out of `course-size.ts`, which was 603 lines of code against a limit of
+ * 500 — and 490 of those lines were these two translation tables. The sizes and
+ * presets are a decision; the tables are copy. Separating them means editing a
+ * Polish subtitle no longer touches the module that defines what a course size
+ * IS, and the size definitions are readable in one screen again.
+ *
+ * Re-exported by `course-size.ts`, so every existing import is unaffected.
+ */
+
+import type { Language } from './common-enums';
+import type { CourseSize } from './course-size';
+
+export interface CourseSizeLabel {
+  /** Display title (e.g., "Express", "Compact") */
+  title: string;
+  /** Subtitle with lesson count (e.g., "~10 lessons") */
+  subtitle: string;
+  /** Short description (e.g., "Quick overview course") */
+  description: string;
+}
+
+/**
+ * Localized labels for course size presets
+ * Supports all 19 platform languages
+ */
+export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeLabel>> = {
+  ru: {
+    auto: {
+      title: 'Оптимальный',
+      subtitle: 'ИИ-анализ',
+      description: 'Размер на основе анализа темы',
+    },
+    micro: { title: 'Микро', subtitle: '1-5 уроков', description: 'Минимальный быстрый курс' },
+    mini: { title: 'Экспресс', subtitle: '8-16 уроков', description: 'Быстрый обзорный курс' },
+    compact: {
+      title: 'Компактный',
+      subtitle: '15-30 уроков',
+      description: 'Небольшой фокусированный курс',
+    },
+    standard: {
+      title: 'Стандартный',
+      subtitle: '30-50 уроков',
+      description: 'Типичный полноценный курс',
+    },
+    comprehensive: {
+      title: 'Полный',
+      subtitle: '60-100 уроков',
+      description: 'Большой подробный курс',
+    },
+  },
+  en: {
+    auto: {
+      title: 'Optimal',
+      subtitle: 'AI Analysis',
+      description: 'Size based on topic analysis',
+    },
+    micro: { title: 'Micro', subtitle: '1-5 lessons', description: 'Minimal quick course' },
+    mini: { title: 'Express', subtitle: '8-16 lessons', description: 'Quick overview course' },
+    compact: { title: 'Compact', subtitle: '15-30 lessons', description: 'Small focused course' },
+    standard: {
+      title: 'Standard',
+      subtitle: '30-50 lessons',
+      description: 'Typical comprehensive course',
+    },
+    comprehensive: {
+      title: 'Comprehensive',
+      subtitle: '60-100 lessons',
+      description: 'Large detailed course',
+    },
+  },
+  zh: {
+    auto: { title: '最优', subtitle: 'AI分析', description: '基于主题分析的大小' },
+    micro: { title: '微型', subtitle: '1-5课', description: '最小快速课程' },
+    mini: { title: '速成', subtitle: '8-16课', description: '快速概览课程' },
+    compact: { title: '精简', subtitle: '15-30课', description: '小型专注课程' },
+    standard: { title: '标准', subtitle: '30-50课', description: '典型完整课程' },
+    comprehensive: { title: '全面', subtitle: '60-100课', description: '大型详细课程' },
+  },
+  es: {
+    auto: {
+      title: 'Óptimo',
+      subtitle: 'Análisis IA',
+      description: 'Tamaño basado en análisis del tema',
+    },
+    micro: { title: 'Micro', subtitle: '1-5 lecciones', description: 'Curso mínimo rápido' },
+    mini: { title: 'Exprés', subtitle: '8-16 lecciones', description: 'Curso de vista rápida' },
+    compact: {
+      title: 'Compacto',
+      subtitle: '15-30 lecciones',
+      description: 'Curso pequeño enfocado',
+    },
+    standard: {
+      title: 'Estándar',
+      subtitle: '30-50 lecciones',
+      description: 'Curso completo típico',
+    },
+    comprehensive: {
+      title: 'Completo',
+      subtitle: '60-100 lecciones',
+      description: 'Curso grande detallado',
+    },
+  },
+  fr: {
+    auto: {
+      title: 'Optimal',
+      subtitle: 'Analyse IA',
+      description: "Taille basée sur l'analyse du sujet",
+    },
+    micro: { title: 'Micro', subtitle: '1-5 leçons', description: 'Cours minimal rapide' },
+    mini: { title: 'Express', subtitle: '8-16 leçons', description: 'Cours aperçu rapide' },
+    compact: { title: 'Compact', subtitle: '15-30 leçons', description: 'Petit cours ciblé' },
+    standard: { title: 'Standard', subtitle: '30-50 leçons', description: 'Cours complet typique' },
+    comprehensive: {
+      title: 'Complet',
+      subtitle: '60-100 leçons',
+      description: 'Grand cours détaillé',
+    },
+  },
+  de: {
+    auto: {
+      title: 'Optimal',
+      subtitle: 'KI-Analyse',
+      description: 'Größe basierend auf Themenanalyse',
+    },
+    micro: { title: 'Mikro', subtitle: '1-5 Lektionen', description: 'Minimaler Schnellkurs' },
+    mini: { title: 'Express', subtitle: '8-16 Lektionen', description: 'Schneller Überblickskurs' },
+    compact: {
+      title: 'Kompakt',
+      subtitle: '15-30 Lektionen',
+      description: 'Kleiner fokussierter Kurs',
+    },
+    standard: {
+      title: 'Standard',
+      subtitle: '30-50 Lektionen',
+      description: 'Typischer umfassender Kurs',
+    },
+    comprehensive: {
+      title: 'Umfassend',
+      subtitle: '60-100 Lektionen',
+      description: 'Großer detaillierter Kurs',
+    },
+  },
+  ja: {
+    auto: { title: '最適', subtitle: 'AI分析', description: 'トピック分析に基づくサイズ' },
+    micro: { title: 'マイクロ', subtitle: '1-5レッスン', description: '最小クイックコース' },
+    mini: { title: 'エクスプレス', subtitle: '8-16レッスン', description: 'クイック概要コース' },
+    compact: { title: 'コンパクト', subtitle: '15-30レッスン', description: '小規模集中コース' },
+    standard: {
+      title: 'スタンダード',
+      subtitle: '30-50レッスン',
+      description: '標準的な総合コース',
+    },
+    comprehensive: { title: '総合', subtitle: '60-100レッスン', description: '大規模詳細コース' },
+  },
+  ko: {
+    auto: { title: '최적', subtitle: 'AI 분석', description: '주제 분석 기반 크기' },
+    micro: { title: '마이크로', subtitle: '1-5강', description: '최소 빠른 코스' },
+    mini: { title: '익스프레스', subtitle: '8-16강', description: '빠른 개요 코스' },
+    compact: { title: '컴팩트', subtitle: '15-30강', description: '소규모 집중 코스' },
+    standard: { title: '스탠다드', subtitle: '30-50강', description: '일반 종합 코스' },
+    comprehensive: { title: '종합', subtitle: '60-100강', description: '대규모 상세 코스' },
+  },
+  ar: {
+    auto: { title: 'الأمثل', subtitle: 'تحليل AI', description: 'الحجم بناءً على تحليل الموضوع' },
+    micro: { title: 'مصغر', subtitle: '1-5 دروس', description: 'دورة سريعة بالحد الأدنى' },
+    mini: { title: 'سريع', subtitle: '8-16 درس', description: 'دورة نظرة عامة سريعة' },
+    compact: { title: 'مختصر', subtitle: '15-30 درس', description: 'دورة صغيرة مركزة' },
+    standard: { title: 'قياسي', subtitle: '30-50 درس', description: 'دورة شاملة نموذجية' },
+    comprehensive: { title: 'شامل', subtitle: '60-100 درس', description: 'دورة كبيرة مفصلة' },
+  },
+  pt: {
+    auto: {
+      title: 'Ótimo',
+      subtitle: 'Análise IA',
+      description: 'Tamanho baseado em análise do tema',
+    },
+    micro: { title: 'Micro', subtitle: '1-5 aulas', description: 'Curso mínimo rápido' },
+    mini: { title: 'Expresso', subtitle: '8-16 aulas', description: 'Curso de visão geral rápida' },
+    compact: { title: 'Compacto', subtitle: '15-30 aulas', description: 'Curso pequeno focado' },
+    standard: { title: 'Padrão', subtitle: '30-50 aulas', description: 'Curso completo típico' },
+    comprehensive: {
+      title: 'Abrangente',
+      subtitle: '60-100 aulas',
+      description: 'Curso grande detalhado',
+    },
+  },
+  it: {
+    auto: {
+      title: 'Ottimale',
+      subtitle: 'Analisi IA',
+      description: 'Dimensione basata su analisi del tema',
+    },
+    micro: { title: 'Micro', subtitle: '1-5 lezioni', description: 'Corso minimo rapido' },
+    mini: { title: 'Express', subtitle: '8-16 lezioni', description: 'Corso panoramica rapida' },
+    compact: {
+      title: 'Compatto',
+      subtitle: '15-30 lezioni',
+      description: 'Piccolo corso focalizzato',
+    },
+    standard: {
+      title: 'Standard',
+      subtitle: '30-50 lezioni',
+      description: 'Corso completo tipico',
+    },
+    comprehensive: {
+      title: 'Completo',
+      subtitle: '60-100 lezioni',
+      description: 'Grande corso dettagliato',
+    },
+  },
+  tr: {
+    auto: { title: 'Optimal', subtitle: 'AI Analizi', description: 'Konu analizine dayalı boyut' },
+    micro: { title: 'Mikro', subtitle: '1-5 ders', description: 'Minimum hızlı kurs' },
+    mini: { title: 'Ekspres', subtitle: '8-16 ders', description: 'Hızlı genel bakış kursu' },
+    compact: { title: 'Kompakt', subtitle: '15-30 ders', description: 'Küçük odaklı kurs' },
+    standard: { title: 'Standart', subtitle: '30-50 ders', description: 'Tipik kapsamlı kurs' },
+    comprehensive: {
+      title: 'Kapsamlı',
+      subtitle: '60-100 ders',
+      description: 'Büyük detaylı kurs',
+    },
+  },
+  vi: {
+    auto: {
+      title: 'Tối ưu',
+      subtitle: 'Phân tích AI',
+      description: 'Kích thước dựa trên phân tích chủ đề',
+    },
+    micro: { title: 'Siêu nhỏ', subtitle: '1-5 bài', description: 'Khóa học tối thiểu nhanh' },
+    mini: { title: 'Tốc hành', subtitle: '8-16 bài', description: 'Khóa học tổng quan nhanh' },
+    compact: { title: 'Gọn', subtitle: '15-30 bài', description: 'Khóa học nhỏ tập trung' },
+    standard: {
+      title: 'Tiêu chuẩn',
+      subtitle: '30-50 bài',
+      description: 'Khóa học toàn diện điển hình',
+    },
+    comprehensive: {
+      title: 'Toàn diện',
+      subtitle: '60-100 bài',
+      description: 'Khóa học lớn chi tiết',
+    },
+  },
+  th: {
+    auto: {
+      title: 'เหมาะสมที่สุด',
+      subtitle: 'AI วิเคราะห์',
+      description: 'ขนาดจากการวิเคราะห์หัวข้อ',
+    },
+    micro: { title: 'ไมโคร', subtitle: '1-5 บทเรียน', description: 'หลักสูตรขั้นต่ำเร็ว' },
+    mini: { title: 'ด่วน', subtitle: '8-16 บทเรียน', description: 'หลักสูตรภาพรวมด่วน' },
+    compact: {
+      title: 'กะทัดรัด',
+      subtitle: '15-30 บทเรียน',
+      description: 'หลักสูตรขนาดเล็กเน้นเฉพาะ',
+    },
+    standard: { title: 'มาตรฐาน', subtitle: '30-50 บทเรียน', description: 'หลักสูตรครบถ้วนทั่วไป' },
+    comprehensive: {
+      title: 'ครอบคลุม',
+      subtitle: '60-100 บทเรียน',
+      description: 'หลักสูตรใหญ่ละเอียด',
+    },
+  },
+  id: {
+    auto: {
+      title: 'Optimal',
+      subtitle: 'Analisis AI',
+      description: 'Ukuran berdasarkan analisis topik',
+    },
+    micro: { title: 'Mikro', subtitle: '1-5 pelajaran', description: 'Kursus cepat minimal' },
+    mini: { title: 'Kilat', subtitle: '8-16 pelajaran', description: 'Kursus tinjauan cepat' },
+    compact: {
+      title: 'Ringkas',
+      subtitle: '15-30 pelajaran',
+      description: 'Kursus kecil terfokus',
+    },
+    standard: {
+      title: 'Standar',
+      subtitle: '30-50 pelajaran',
+      description: 'Kursus lengkap tipikal',
+    },
+    comprehensive: {
+      title: 'Lengkap',
+      subtitle: '60-100 pelajaran',
+      description: 'Kursus besar terperinci',
+    },
+  },
+  ms: {
+    auto: {
+      title: 'Optimum',
+      subtitle: 'Analisis AI',
+      description: 'Saiz berdasarkan analisis topik',
+    },
+    micro: { title: 'Mikro', subtitle: '1-5 pelajaran', description: 'Kursus pantas minimum' },
+    mini: {
+      title: 'Ekspres',
+      subtitle: '8-16 pelajaran',
+      description: 'Kursus gambaran keseluruhan pantas',
+    },
+    compact: { title: 'Padat', subtitle: '15-30 pelajaran', description: 'Kursus kecil berfokus' },
+    standard: {
+      title: 'Standard',
+      subtitle: '30-50 pelajaran',
+      description: 'Kursus lengkap tipikal',
+    },
+    comprehensive: {
+      title: 'Menyeluruh',
+      subtitle: '60-100 pelajaran',
+      description: 'Kursus besar terperinci',
+    },
+  },
+  hi: {
+    auto: { title: 'इष्टतम', subtitle: 'AI विश्लेषण', description: 'विषय विश्लेषण पर आधारित आकार' },
+    micro: { title: 'माइक्रो', subtitle: '1-5 पाठ', description: 'न्यूनतम त्वरित पाठ्यक्रम' },
+    mini: { title: 'एक्सप्रेस', subtitle: '8-16 पाठ', description: 'त्वरित अवलोकन पाठ्यक्रम' },
+    compact: { title: 'संक्षिप्त', subtitle: '15-30 पाठ', description: 'छोटा केंद्रित पाठ्यक्रम' },
+    standard: { title: 'मानक', subtitle: '30-50 पाठ', description: 'विशिष्ट व्यापक पाठ्यक्रम' },
+    comprehensive: {
+      title: 'व्यापक',
+      subtitle: '60-100 पाठ',
+      description: 'बड़ा विस्तृत पाठ्यक्रम',
+    },
+  },
+  bn: {
+    auto: {
+      title: 'সর্বোত্তম',
+      subtitle: 'AI বিশ্লেষণ',
+      description: 'বিষয় বিশ্লেষণের উপর ভিত্তি করে আকার',
+    },
+    micro: { title: 'মাইক্রো', subtitle: '১-৫ পাঠ', description: 'ন্যূনতম দ্রুত কোর্স' },
+    mini: { title: 'এক্সপ্রেস', subtitle: '৮-১৬ পাঠ', description: 'দ্রুত ওভারভিউ কোর্স' },
+    compact: { title: 'সংক্ষিপ্ত', subtitle: '১৫-৩০ পাঠ', description: 'ছোট ফোকাসড কোর্স' },
+    standard: {
+      title: 'স্ট্যান্ডার্ড',
+      subtitle: '৩০-৫০ পাঠ',
+      description: 'সাধারণ সম্পূর্ণ কোর্স',
+    },
+    comprehensive: {
+      title: 'বিস্তারিত',
+      subtitle: '৬০-১০০ পাঠ',
+      description: 'বড় বিস্তারিত কোর্স',
+    },
+  },
+  pl: {
+    auto: {
+      title: 'Optymalny',
+      subtitle: 'Analiza AI',
+      description: 'Rozmiar oparty na analizie tematu',
+    },
+    micro: { title: 'Mikro', subtitle: '1-5 lekcji', description: 'Minimalny szybki kurs' },
+    mini: { title: 'Ekspres', subtitle: '8-16 lekcji', description: 'Szybki kurs przeglądowy' },
+    compact: {
+      title: 'Kompaktowy',
+      subtitle: '15-30 lekcji',
+      description: 'Mały skoncentrowany kurs',
+    },
+    standard: { title: 'Standardowy', subtitle: '30-50 lekcji', description: 'Typowy pełny kurs' },
+    comprehensive: {
+      title: 'Kompleksowy',
+      subtitle: '60-100 lekcji',
+      description: 'Duży szczegółowy kurs',
+    },
+  },
+};
+
+/**
+ * Get localized labels for a course size
+ * Falls back to English for unknown language codes
+ *
+ * @param language - ISO 639-1 language code
+ * @param size - Course size identifier
+ */
+export function getCourseSizeLabels(language: string, size: CourseSize): CourseSizeLabel {
+  const langLabels = COURSE_SIZE_LABELS[language as Language];
+  if (langLabels) {
+    return langLabels[size];
+  }
+  // Fallback to English
+  return COURSE_SIZE_LABELS.en[size];
+}
+
+/**
+ * Get all course size labels for a language
+ * Falls back to English for unknown language codes
+ *
+ * @param language - ISO 639-1 language code
+ */
+export function getAllCourseSizeLabels(language: string): Record<CourseSize, CourseSizeLabel> {
+  const langLabels = COURSE_SIZE_LABELS[language as Language];
+  return langLabels || COURSE_SIZE_LABELS.en;
+}
+
+// ============================================================================
+// UI LABELS FOR COURSE SIZE SELECTOR (i18n)
+// ============================================================================
+
+export interface CourseSizeUILabels {
+  /** Section title */
+  sectionTitle: string;
+  /** Legend for screen readers */
+  legendText: string;
+  /** Advisory note at bottom */
+  advisoryNote: string;
+  /** Helper text when auto is selected */
+  autoHelperText: string;
+}
+
+/**
+ * Localized UI labels for CourseSizeSelector component
+ * Supports all 19 platform languages
+ */
+export const COURSE_SIZE_UI_LABELS: Record<Language, CourseSizeUILabels> = {
+  ru: {
+    sectionTitle: 'Размер курса',
+    legendText: 'Выберите размер курса',
+    advisoryNote: 'Это рекомендация - фактический размер может отличаться',
+    autoHelperText:
+      'ИИ автоматически определит оптимальный размер курса на основе анализа темы и загруженных материалов.',
+  },
+  en: {
+    sectionTitle: 'Course Size',
+    legendText: 'Select course size',
+    advisoryNote: 'This is a recommendation - actual size may vary',
+    autoHelperText:
+      'AI will automatically determine optimal course size based on topic analysis and uploaded materials.',
+  },
+  zh: {
+    sectionTitle: '课程规模',
+    legendText: '选择课程规模',
+    advisoryNote: '这是建议 - 实际规模可能有所不同',
+    autoHelperText: 'AI将根据主题分析和上传的材料自动确定最佳课程规模。',
+  },
+  es: {
+    sectionTitle: 'Tamaño del curso',
+    legendText: 'Seleccionar tamaño del curso',
+    advisoryNote: 'Esta es una recomendación - el tamaño real puede variar',
+    autoHelperText:
+      'La IA determinará automáticamente el tamaño óptimo del curso según el análisis del tema y los materiales cargados.',
+  },
+  fr: {
+    sectionTitle: 'Taille du cours',
+    legendText: 'Sélectionner la taille du cours',
+    advisoryNote: 'Ceci est une recommandation - la taille réelle peut varier',
+    autoHelperText:
+      "L'IA déterminera automatiquement la taille optimale du cours en fonction de l'analyse du sujet et des documents téléchargés.",
+  },
+  de: {
+    sectionTitle: 'Kursgröße',
+    legendText: 'Kursgröße auswählen',
+    advisoryNote: 'Dies ist eine Empfehlung - die tatsächliche Größe kann variieren',
+    autoHelperText:
+      'KI wird die optimale Kursgröße basierend auf der Themenanalyse und hochgeladenen Materialien automatisch bestimmen.',
+  },
+  ja: {
+    sectionTitle: 'コースサイズ',
+    legendText: 'コースサイズを選択',
+    advisoryNote: 'これは推奨です - 実際のサイズは異なる場合があります',
+    autoHelperText:
+      'AIがトピック分析とアップロードされた資料に基づいて最適なコースサイズを自動的に決定します。',
+  },
+  ko: {
+    sectionTitle: '코스 크기',
+    legendText: '코스 크기 선택',
+    advisoryNote: '이것은 권장 사항입니다 - 실제 크기는 다를 수 있습니다',
+    autoHelperText:
+      'AI가 주제 분석과 업로드된 자료를 바탕으로 최적의 코스 크기를 자동으로 결정합니다.',
+  },
+  ar: {
+    sectionTitle: 'حجم الدورة',
+    legendText: 'اختر حجم الدورة',
+    advisoryNote: 'هذه توصية - قد يختلف الحجم الفعلي',
+    autoHelperText:
+      'سيحدد الذكاء الاصطناعي تلقائيًا الحجم الأمثل للدورة بناءً على تحليل الموضوع والمواد المرفوعة.',
+  },
+  pt: {
+    sectionTitle: 'Tamanho do curso',
+    legendText: 'Selecionar tamanho do curso',
+    advisoryNote: 'Esta é uma recomendação - o tamanho real pode variar',
+    autoHelperText:
+      'A IA determinará automaticamente o tamanho ideal do curso com base na análise do tema e nos materiais carregados.',
+  },
+  it: {
+    sectionTitle: 'Dimensione del corso',
+    legendText: 'Seleziona dimensione del corso',
+    advisoryNote: 'Questa è una raccomandazione - la dimensione effettiva può variare',
+    autoHelperText:
+      "L'IA determinerà automaticamente la dimensione ottimale del corso in base all'analisi dell'argomento e ai materiali caricati.",
+  },
+  tr: {
+    sectionTitle: 'Kurs boyutu',
+    legendText: 'Kurs boyutunu seçin',
+    advisoryNote: 'Bu bir öneridir - gerçek boyut farklı olabilir',
+    autoHelperText:
+      'AI, konu analizi ve yüklenen materyallere göre en uygun kurs boyutunu otomatik olarak belirleyecektir.',
+  },
+  vi: {
+    sectionTitle: 'Quy mô khóa học',
+    legendText: 'Chọn quy mô khóa học',
+    advisoryNote: 'Đây là khuyến nghị - quy mô thực tế có thể khác',
+    autoHelperText:
+      'AI sẽ tự động xác định quy mô khóa học tối ưu dựa trên phân tích chủ đề và tài liệu đã tải lên.',
+  },
+  th: {
+    sectionTitle: 'ขนาดหลักสูตร',
+    legendText: 'เลือกขนาดหลักสูตร',
+    advisoryNote: 'นี่เป็นคำแนะนำ - ขนาดจริงอาจแตกต่างกัน',
+    autoHelperText:
+      'AI จะกำหนดขนาดหลักสูตรที่เหมาะสมโดยอัตโนมัติตามการวิเคราะห์หัวข้อและเอกสารที่อัปโหลด',
+  },
+  id: {
+    sectionTitle: 'Ukuran kursus',
+    legendText: 'Pilih ukuran kursus',
+    advisoryNote: 'Ini adalah rekomendasi - ukuran sebenarnya dapat bervariasi',
+    autoHelperText:
+      'AI akan secara otomatis menentukan ukuran kursus yang optimal berdasarkan analisis topik dan materi yang diunggah.',
+  },
+  ms: {
+    sectionTitle: 'Saiz kursus',
+    legendText: 'Pilih saiz kursus',
+    advisoryNote: 'Ini adalah cadangan - saiz sebenar mungkin berbeza',
+    autoHelperText:
+      'AI akan menentukan saiz kursus optimum secara automatik berdasarkan analisis topik dan bahan yang dimuat naik.',
+  },
+  hi: {
+    sectionTitle: 'कोर्स का आकार',
+    legendText: 'कोर्स का आकार चुनें',
+    advisoryNote: 'यह एक सिफारिश है - वास्तविक आकार भिन्न हो सकता है',
+    autoHelperText:
+      'AI विषय विश्लेषण और अपलोड की गई सामग्री के आधार पर स्वचालित रूप से इष्टतम कोर्स आकार निर्धारित करेगा।',
+  },
+  bn: {
+    sectionTitle: 'কোর্সের আকার',
+    legendText: 'কোর্সের আকার নির্বাচন করুন',
+    advisoryNote: 'এটি একটি সুপারিশ - প্রকৃত আকার ভিন্ন হতে পারে',
+    autoHelperText:
+      'AI বিষয় বিশ্লেষণ এবং আপলোড করা উপকরণের উপর ভিত্তি করে স্বয়ংক্রিয়ভাবে সর্বোত্তম কোর্সের আকার নির্ধারণ করবে।',
+  },
+  pl: {
+    sectionTitle: 'Rozmiar kursu',
+    legendText: 'Wybierz rozmiar kursu',
+    advisoryNote: 'To jest zalecenie - rzeczywisty rozmiar może się różnić',
+    autoHelperText:
+      'AI automatycznie określi optymalny rozmiar kursu na podstawie analizy tematu i przesłanych materiałów.',
+  },
+};
+
+/**
+ * Get localized UI labels for CourseSizeSelector
+ * Falls back to English for unknown language codes
+ */
+export function getCourseSizeUILabels(language: string): CourseSizeUILabels {
+  const labels = COURSE_SIZE_UI_LABELS[language as Language];
+  return labels || COURSE_SIZE_UI_LABELS.en;
+}
