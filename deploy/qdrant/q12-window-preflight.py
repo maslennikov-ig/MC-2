@@ -81,6 +81,19 @@ def canonical(payload: object) -> bytes:
     )
 
 
+def tracked(payload: object) -> bytes:
+    """The serialisation for a file that lives in Git, as opposed to a published report.
+
+    Same key order as `canonical`, but indented, because prettier owns every tracked `.json`
+    here and would rewrite a single-line file at commit time anyway. When the two disagreed,
+    re-pinning the asset manifest showed up as `1 insertion(+), 216 deletions(-)` and read as
+    if the manifest had been emptied — it had not, 26 assets before and after with one entry
+    changed, and the correct result was reverted on the strength of that diff. Byte-identical
+    output makes `git diff` describe what actually moved.
+    """
+    return (json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
 def immutable_publish(path: pathlib.Path, data: bytes, mode: int) -> None:
     """O_EXCL temp + fsync + rename-noreplace + directory fsync, the same discipline every other
     run-root artifact is published under. A report is never overwritten: a second run in the same
@@ -451,6 +464,25 @@ def asset_manifest_sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def asset_manifest_summary(previous: dict, current: dict) -> str:
+    """One line naming what a re-pin did, in the terms an operator can check: how many assets
+    the manifest holds and how many of them moved. `git diff --stat` cannot say this, because
+    a whole-file rewrite hides a one-entry change behind the line count."""
+    before = {entry["path"]: entry.get("sha256") for entry in previous.get("assets", [])}
+    after = {entry["path"]: entry.get("sha256") for entry in current.get("assets", [])}
+    added = sorted(set(after) - set(before))
+    removed = sorted(set(before) - set(after))
+    changed = sorted(path for path in set(after) & set(before) if before[path] != after[path])
+    parts = [f"{len(after)} assets"]
+    for label, names in (("changed", changed), ("added", added), ("removed", removed)):
+        if names:
+            shown = ", ".join(names[:3]) + (", …" if len(names) > 3 else "")
+            parts.append(f"{len(names)} {label} ({shown})")
+    if len(parts) == 1:
+        parts.append("nothing changed")
+    return "q12 asset manifest: " + "; ".join(parts)
+
+
 # --- the gate q12-live-cutover.sh calls -----------------------------------------------------------
 
 DEFAULT_MAX_AGE_MINUTES = 30
@@ -656,7 +688,11 @@ def main(argv: "list[str]") -> int:
         repo_root = pathlib.Path(arguments.repo_root) if arguments.repo_root else HERE.parents[1]
         manifest = build_asset_manifest(repo_root)
         target = asset_manifest_path(repo_root)
-        target.write_bytes(canonical(manifest))
+        previous = load_asset_manifest(target) if target.is_file() else {"assets": []}
+        target.write_bytes(tracked(manifest))
+        # The file is rewritten in place and only its path goes to stdout, so redirecting the
+        # output yields one line that looks like nothing happened. Say on stderr what changed.
+        sys.stderr.write(asset_manifest_summary(previous, manifest) + "\n")
         sys.stdout.write(f"{target}\n")
         return 0
 
