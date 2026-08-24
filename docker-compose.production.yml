@@ -244,7 +244,14 @@ services:
       - HTTPS_PROXY=socks5h://172.19.0.1:1080
       - HTTP_PROXY=socks5h://172.19.0.1:1080
     volumes:
-      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
+      # Writable on purpose. notebooklm-py re-mints the rotating half of the
+      # session (__Secure-1PSIDTS, __Secure-3PSIDTS, SIDCC) while it works and
+      # writes it back. Mounted :ro it could not, and logged only
+      # "Failed to write updated cookies ... Read-only file system" at WARNING —
+      # so the file froze at whatever moment it was captured and aged out
+      # unattended. The long-lived cookies last ~400 days; the rotating ones do
+      # not, and they are what the requests actually carry.
+      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:rw
     healthcheck:
       test:
         [

@@ -190,8 +190,23 @@ async def _check_proxy_reachable(proxy_url: str) -> HealthCheckDetail:
     return HealthCheckDetail(name="proxy", passed=True, message=f"{redacted} reachable")
 
 
+#: The cookies that actually carry a Google session. If these are alive the
+#: bridge can work; if any is gone it cannot, whatever else the file holds.
+#:
+#: The check used to take ``min()`` over *every* cookie, and Google ships
+#: short-lived helpers alongside the session ones. A login captured 2026-08-24
+#: carried ``CONSISTENCY`` expiring the same day and ``OTZ`` expiring in 29,
+#: while ``SID`` and its siblings were good for 399 — so a freshly minted file
+#: reported "earliest cookie expires today" and would have flipped to failed
+#: within hours. A monitor that cries wolf from day one is worse than none: the
+#: cookies died on 2026-03-31 and were noticed in August.
+SESSION_COOKIE_NAMES = frozenset(
+    {"SID", "HSID", "SAPISID", "__Secure-1PSID", "__Secure-3PSID"}
+)
+
+
 def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
-    """Report the earliest cookie expiry. Never reports a cookie name or value."""
+    """Report the earliest SESSION cookie expiry. Never reports a value."""
     path = settings.notebooklm_storage_path
     if settings.notebooklm_auth_json or not path:
         return HealthCheckDetail(
@@ -203,16 +218,23 @@ def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
         expiries = [
             float(cookie["expires"])
             for cookie in state.get("cookies", [])
-            if isinstance(cookie, dict) and (cookie.get("expires") or 0) > 0
+            if isinstance(cookie, dict)
+            and cookie.get("name") in SESSION_COOKIE_NAMES
+            and (cookie.get("expires") or 0) > 0
         ]
     except (OSError, ValueError, TypeError) as error:
         return HealthCheckDetail(
             name="auth_expiry", passed=False, message=f"Unreadable: {type(error).__name__}",
         )
 
+    # No session cookie at all is a dead file, not an unexpiring one. The old
+    # code answered "No expiring cookies stored" and passed, so a storage_state
+    # holding only helper cookies read as healthy.
     if not expiries:
         return HealthCheckDetail(
-            name="auth_expiry", passed=True, message="No expiring cookies stored",
+            name="auth_expiry",
+            passed=False,
+            message="No Google session cookie stored — the file cannot authenticate",
         )
 
     earliest = datetime.fromtimestamp(min(expiries), UTC)
@@ -221,7 +243,7 @@ def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
         name="auth_expiry",
         passed=days_left > 0,
         message=(
-            f"earliest cookie expires {earliest.date().isoformat()} "
+            f"earliest session cookie expires {earliest.date().isoformat()} "
             f"({days_left:.0f}d)"
             + (" — renew soon" if 0 < days_left <= AUTH_EXPIRY_WARN_DAYS else "")
         ),
