@@ -74,24 +74,39 @@ appbound encryption!`. From an elevated PowerShell 7.6.5 that check passes and d
    as NotebookLM loads; the older instruction to confirm in the terminal is wrong. Wait until the
    terminal prints that auth was saved, then close the browser if it is still open.
 
-## The passwordless route that is still open, if anyone wants it
+## Route 3 — attach to the running Chrome over CDP. ALSO CLOSED, and closed by design
 
 `run_cdp_capture` in `_auth/browser_capture.py` attaches to a Chrome the operator is already running
-(`playwright.chromium.connect_over_cdp`, loopback endpoints only), reuses its existing context —
-explicitly never `new_context`, which would be logged out — opens a temporary page it owns,
-captures `storage_state()` and closes only that page. No decryption is involved because Chrome
-serves the cookies itself, so App-Bound Encryption is irrelevant.
+(`connect_over_cdp`, loopback only), reuses its existing context, captures `storage_state()` and
+closes only the page it opened. No decryption is involved, so App-Bound Encryption should be
+irrelevant. It was tried end to end on 2026-08-24 and it cannot work on Chrome 151. **Do not
+rebuild it.**
 
-Two things stop this being a one-liner today, both worth knowing before starting:
+The two halves are the same gate seen from two sides, and you get one or the other, never both:
 
-- **`login --cdp-url` alone does nothing.** The flag is read only inside the
-  `master_token or master_token_refresh` branch of `session_cmd.py`. Plain cookie capture over CDP
-  means either `--master-token` (needs the `[headless]` extra, and gives a durable token that
-  re-mints cookies with no browser at all — the real cure for cookies dying unnoticed for four
-  months) or a few lines calling `run_cdp_capture` directly.
-- **Chrome must be started with `--remote-debugging-port`,** and recent Chrome refuses that against
-  the default profile directory. Unverified here; check that `http://127.0.0.1:9222/json/version`
-  answers before assuming it worked.
+- Launched **without** `--user-data-dir`, Chrome refuses the debugging port outright — nothing ever
+  answers on 9222. That is the Chrome 136+ rule against remote debugging on the default profile.
+- Launched **with** `--user-data-dir`, even when the path given is exactly the default one, the port
+  opens (`Chrome/151.0.7922.170` answered) — and Chrome then treats the profile as non-default and
+  never unlocks the App-Bound-Encrypted cookie store. The attached context reports **0 cookies of
+  any kind**, and a tab pointed at NotebookLM lands on
+  `accounts.google.com/v3/signin/identifier`.
+
+The profile is not the problem, and neither is geo. Read directly with `sqlite3`, the cookie DB
+holds 2498 rows, 104 of them for `google.com`, including `SID`, `SAPISID`, `HSID`,
+`__Secure-1PSID` and `__Secure-3PSID` — a complete live session. Windows egress is Amsterdam
+(185.200.177.180, NL), the same as WSL. Chrome is simply declining to hand over a session to a
+process that asked for a debugging port, which is exactly what App-Bound Encryption was built to do.
+
+Copying the profile to another directory does not help either, and fails one step earlier: the
+copied `Local State` key does not decrypt from a new path, so that Chrome comes up signed out and
+lands on the same sign-in page.
+
+What is still worth building is `--master-token`: one sign-in, then cookies are re-minted with no
+browser at all. That is the actual cure for an expiry nobody noticed for four months, and it needs
+the `[headless]` extra. Note that `login --cdp-url` is read **only** inside the
+`master_token or master_token_refresh` branch of `session_cmd.py`, so its oauth capture would hit
+the same wall as above; the sign-in half has to happen some other way.
 
 ## Deployment (either route)
 
