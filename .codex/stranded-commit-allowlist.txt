@@ -17,6 +17,9 @@ codex/checkpoint-2026-04-12	April checkpoint snapshot kept beside the `backup/` 
 
 feature/video-presentation-pipeline	DEFERRED, owner-gated: mc2-hqfc3. The February rendering pipeline (Azure TTS, satori slides, FFmpeg composition, two players) is absent from `develop` by decision; video runs through NotebookLM instead. The owner will say when to return, and the code needs a full refresh first.
 
+codex/overnight-helixa-*	Strict ancestor of `codex/helixa-two-entity-workspace-mc2`; a second name for commits the entry below already covers. Its own name does not start with `helixa`, so the glob below does not reach it.
+codex/helixa-*	IN PROGRESS, not lost: the Helixa AIOS bridge (15 commits, 6149 lines). Two blockers are recorded in mc2-gxese — the branch does not type-check (`delivery.ts:30`, Buffer is not a BodyInit) and its five migrations break the pinned migration frontier. It lived only on one laptop until 2026-08-24; `codex/helixa-two-entity-workspace-mc2` was pushed to origin that day as a safety copy, which is why three refs report the same commits. `codex/overnight-helixa-sync-mc2` is a strict ancestor and carries nothing extra. Remove this entry when the work lands or is abandoned.
+
 codex/career-playbook-numeric-provenance	Numeric provenance was deliberately removed from the product on 2026-07-27 (mc2-jc275); this branch is the feature it removed.
 codex/career-playbook-numeric-review	Preservation commit for the abandoned numeric-review worktree, kept only so the 2026-06 exploration is not lost.
 
