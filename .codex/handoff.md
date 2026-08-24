@@ -6,18 +6,45 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
-`docs/plans/composed-dazzling-moore.md` is **complete and live**. The Docling stack moved in one
-coordinated jump to the set upstream builds and tests together — Serve 1.31.0, docling-slim 2.121.0,
-core 2.92.0, jobkit 3.4.0, parse 7.15.0, ibm-models 3.14.0, MCP 3.1.0 — and PDF heading inference is
-ON in both places it is read. Verified on the host after the deploy: those seven versions, the flag
-`true` in the MCP container and in both workers, and two real conversions with `from_cache=false`.
+The 2026-08-24 technical-debt epic `mc2-cuk7j` is **four of six done and delivered** — 26 commits
+on `develop`, pushed and green (run 32758709267, Deploy to Dev succeeded).
 
-Measured, not quoted: a docx content control holding an image used to lose the text beside it (194
-Markdown characters on 2.118.0, 271 on 2.121.0, now in the corpus as `content-control-image.docx`),
-and `numbered-sections.pdf` gained a second heading level. 18/18 on both stacks with no structural
-assertion moved; the one metric that fell, `recallAtK` on the scientific PDF, fell because core
-2.92.0 carries content layers into chunk context — atom coverage, aMRR, aDCG and first relevant rank
-are identical. Its three guards outlive this stage and moved to `.codex/repository-failure-modes.md`.
+`mc2-cuk7j.1` closed: `packages/web` had 93 test files of which 47 could not PARSE. tsconfig says
+`"jsx": "preserve"` for Next.js, vite 8 transforms with oxc, and oxc honours that field — so JSX
+reached rolldown's SSR re-parse intact. Three lines of `oxc: { jsx: 'react-jsx' }` in the test
+config; 647 tests became 1279, and `pnpm test:unit` now covers all three packages.
+
+`mc2-cuk7j.5` closed at **zero**, not at a ratchet: 102 warnings → 0, every package pinned to
+`--max-warnings=0`. Thresholds were re-derived from this repository (median 143, p99 805) rather
+than taken on taste — `max-lines` 500→800, `complexity` 30→40 — and the remaining 92 were
+refactored away with no suppressions. More than half was duplication, not complexity.
+
+`mc2-cuk7j.3` closed as **WRONG**: the pipeline has built the bridge image since 2026-07-12. The
+missing build was a red run nobody re-ran. `:latest` no longer depends on `{{is_default_branch}}`.
+
+`mc2-cuk7j.6` closed: the Q12 manifest generator no longer prints like a deletion, and the dead
+185 MB `.venv-nlm` is gone.
+
+**Two remain, both gated on the owner.**
+
+`mc2-cuk7j.2` — production still runs the pre-fix bridge image and a `:ro` secrets mount. It needs
+an ordinary `develop → master` release; patching the host is what caused the original problem.
+
+`mc2-cuk7j.4` — preparation is DONE and live on dev: the image was missing `gpsoauth` entirely
+(the `[headless]` extra) and missing PySocks, without which `requests` cannot use the
+`socks5h://` geo-bypass hop and the exchange fails with `InvalidSchema`. Both are in the image
+now and verified INSIDE the running dev container, not read off a status line. A backup of the
+working session sits at
+`/opt/megacampus/secrets/notebooklm/storage_state.json.bak-pre-master-token-2026-08-24`
+(sha `d44bfe84439ae4b2`, identical to live). What is left is one interactive Google sign-in by the
+owner at `accounts.google.com/EmbeddedSetup` as `djbkk68@gmail.com`, to yield the single-use
+`oauth_token` cookie. It cannot be derived from the cookies already on the host — different flow,
+different artifact — and there is no unattended headless Google login by design.
+
+`docs/plans/composed-dazzling-moore.md` is **complete and live** — the coordinated Docling stack
+jump (Serve 1.31.0, docling-slim 2.121.0, core 2.92.0, MCP 3.1.0) with PDF heading inference on in
+both places it is read, verified on the host after the deploy. Its three durable guards moved to
+`.codex/repository-failure-modes.md`; the measurements are in the plan and in the commits.
 
 Off-host Qdrant retention is **7 days** by owner decision (2026-08-23); the allow-list interpolates
 `EXPECTED_RETENTION_DAYS` rather than repeating it, after the two copies drifted to 7 against 14.
