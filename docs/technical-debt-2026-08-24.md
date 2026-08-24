@@ -1,0 +1,147 @@
+# Technical debt, measured 2026-08-24
+
+Companion to epic `mc2-cuk7j`. Everything here was measured on the live system —
+a command was run, a container was inspected, a database was read. Nothing is
+inferred from reading code, because most of these items look correct in the
+source and only fail in the world.
+
+## The shape they share
+
+None of these is bad code. Every one of them is **silence**:
+
+| item                   | what was silent                                      |
+| ---------------------- | ---------------------------------------------------- |
+| `packages/web` tests   | a suite that exists and never runs                   |
+| bridge image           | a build the pipeline never performs                  |
+| `:ro` secrets mount    | a failed write, logged at WARNING and read by nobody |
+| `auth_expiry`          | an alarm measuring a quantity nobody meant           |
+| Q12 manifest generator | a success that prints like a deletion                |
+
+Each looked healthy until something asked it a direct question. That is the
+lesson worth carrying: **judge a thing by its dependency, not by its status
+line.** The NotebookLM bridge reported `Up` for four months with dead auth.
+
+## The items
+
+### `mc2-cuk7j.1` — `packages/web` tests run nowhere (P1)
+
+Two independent failures stacked:
+
+```
+root package.json:
+  "test:unit": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/shared-types test:unit"
+CI runs exactly:  pnpm test:unit
+packages/web has no `test:unit` script at all.
+```
+
+So the filter cannot reach `web` even in principle. And locally:
+
+```
+$ cd packages/web && npx vitest run
+ Test Files  47 failed | 46 passed (93)
+      Tests  647 passed (647)
+```
+
+All 47 failures are `RolldownError: Parse failure` on JSX — the transform
+refusing `.tsx`, not an assertion failing. The 46 files that do parse hold 647
+passing tests, so these were written and do work.
+
+**Fix the parse first.** Wiring `web` into CI while 47 files cannot load would
+just paint the pipeline red.
+
+### `mc2-cuk7j.2` — production bridge still on `:ro` and the old image (P1)
+
+Verified on dev after the fix, by dependency rather than status:
+
+```
+mount_rw = true
+auth_expiry: "earliest session cookie expires 2027-09-28 (400d)"
+storage_state.json mtime moved 13:52 → 14:30 after a read-only notebooks.list()
+```
+
+Production has neither. It needs `:latest` in GHCR **and**
+`docker-compose.infra.yml` with `:rw`, and the second is delivered only by
+`Deploy to Production`, which runs from `master`.
+
+**Do not patch the file on the host.** The next master deploy overwrites it with
+the old version and silently restores `:ro` — the same quiet revert that caused
+the original problem. Production gets this through a normal
+`develop → master` release.
+
+### `mc2-cuk7j.3` — the bridge image has no build in the pipeline (P2)
+
+CI runs the bridge's tests and never builds its image. Both tags are moved by
+hand, whenever somebody remembers. A change to `app/main.py` therefore passes
+tests, passes CI, lands in `develop`, and reaches nothing.
+
+`.github/workflows/build-docling-images.yml` is the working pattern. One caveat
+that must not be missed: **`:latest` is production.** An automatic build must
+not move it on a `develop` commit — `develop → :develop`, `master → :latest`.
+
+### `mc2-cuk7j.4` — make cookie refresh browserless (P2)
+
+The cure for the recurrence, not another manual round. `notebooklm-py` 0.8.0 can
+bootstrap a durable master token from one browser sign-in and then re-mint web
+cookies with no browser (`--master-token-refresh`, "for recovery / cron").
+
+Only meaningful together with `mc2-cuk7j.2`: re-minted cookies need somewhere to
+be written. Note the refresh must egress through the same SOCKS hop the bridge
+uses, or Google will not serve it.
+
+### `mc2-cuk7j.5` — 106 lint warnings (P3)
+
+`pnpm -r lint`: 0 errors, 106 warnings, concentrated in Stage 6 and Stage 7 —
+the 90% of spend and the most-edited code. Worst single point:
+`processStage6Job`, complexity 97 against a limit of 30, 657 lines in one
+function.
+
+The useful move is not a rewrite. It is a ratchet: freeze 106 as the ceiling and
+fail on 107, so new code must be simpler and old code is fixed when touched
+anyway.
+
+### `mc2-cuk7j.6` — two small traps (P4)
+
+`q12-window-preflight.py --emit-asset-manifest` writes canonical single-line
+JSON while the committed file is pretty-printed, so `git diff --stat` reads
+`1 insertion, 216 deletions` and looks like the manifest was emptied. It was
+not — 26 assets before and after, one entry changed. It also prints only the
+path to stdout while rewriting the file in place, so redirecting the output
+looks like a failed generation.
+
+`/home/me/code/mc2/.venv-nlm` is 185 MB, gitignored, and dead: its interpreter
+points at a `python3.12` the system removed. Invisible to `git status`,
+so it lives forever.
+
+## Deliberately not in this epic
+
+These are tracked with their own reopen conditions and are not work we owe:
+
+- `mc2-vlskb` — upstream-gated. docling-mcp 3.1.0 still drops
+  `service_timeout`/`service_max_retries`; reopen on a release above 3.1.0.
+- `mc2-8m90f` — precondition-gated. 7 accepted `document_evidence_runs` exist
+  now, but none on the six affected courses; reopen on a Stage 4 run for one of
+  them.
+- `mc2-hqfc3`, `mc2-x72bq` — owner-gated by decision.
+- `mc2-gxese` — another agent owns the Helixa branch. Its three blockers are
+  fixed on `fix/helixa-blockers` and handed over, not merged. What remains is a
+  design call for that owner: six database triggers on `courses`,
+  `career_playbooks` and `file_catalog`, inert while
+  `helixa_knowledge_sync_bindings` is empty but installed at the database level,
+  where the env flag does not reach — and dev and staging share one database.
+
+## How to verify anything here
+
+```bash
+pnpm type-check                      # 0 errors expected
+pnpm test:unit                       # course-gen-platform + shared-types only
+pnpm -r lint                         # 0 errors, 106 warnings
+cd packages/web && npx vitest run    # 47 failed | 46 passed — the debt itself
+bash scripts/orchestration/run_process_verification.sh
+python3 scripts/orchestration/check_stranded_commits.py
+
+ssh megacampus-prod "curl -s --max-time 30 http://127.0.0.1:8010/health"   # dev bridge
+```
+
+Read `.codex/repository-failure-modes.md` before diagnosing anything on the
+host: it holds the traps that cost a session each, including why a green
+pipeline can still skip the deploy and why supervision is not availability.
