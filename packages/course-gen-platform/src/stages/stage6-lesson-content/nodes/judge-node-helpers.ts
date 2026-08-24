@@ -77,6 +77,8 @@ import {
 } from './judge-remediation-helpers';
 import type { TableFixPipelineMetrics } from '../utils/table-fix-pipeline';
 import { QualityRemediationAction, buildQaSignals } from '../quality/remediation';
+// The trace row's shape lives next door; it is presentation, not a decision.
+import { buildJudgeTraceOutput } from './judge-trace';
 
 /**
  * Phase 1: Setup judge context and validate inputs
@@ -842,61 +844,19 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       inputTokens: totalInputTokens || undefined,
       outputTokens: totalOutputTokens || undefined,
     },
-    outputData: {
+    outputData: buildJudgeTraceOutput({
       finalRecommendation,
       finalScore,
       decisionAction: decision?.action,
       needsRegeneration,
       judgeModelsUsed,
       enrichedOutput,
-      qualitySummary: cascadeResult?.heuristicResults?.qualitySummary ?? null,
-      factualDiagnostics: cascadeResult?.factualVerificationResult
-        ? {
-            overallAccuracyScore: cascadeResult.factualVerificationResult.overallAccuracyScore,
-            contradictedClaims: cascadeResult.factualVerificationResult.contradictedClaims,
-            unverifiedClaims: cascadeResult.factualVerificationResult.unverifiedClaims,
-            noEvidenceClaims: cascadeResult.factualVerificationResult.noEvidenceClaims,
-            claims: cascadeResult.factualVerificationResult.claims.slice(0, 5).map(claim => ({
-              text: claim.text,
-              status: claim.verificationStatus,
-              confidence: claim.confidence,
-              evidenceChunkIds: claim.ragEvidence.map(chunk => chunk.chunk_id),
-              mismatchReason: claim.diagnostics?.mismatchReason,
-            })),
-          }
-        : null,
+      cascadeResult,
       factualWarnings,
-      sourceGroundingRemediation: sourceGroundingRemediation
-        ? {
-            changed: sourceGroundingRemediation.changed,
-            tasks: sourceGroundingRemediation.tasks,
-          }
-        : null,
-      factualIssueVeto: cascadeResult?.factualIssueVetoApplied
-        ? {
-            applied: true,
-            issue: cascadeResult.blockingFactualIssue,
-          }
-        : null,
-      mermaidRenderGate: mermaidRenderValidation
-        ? {
-            passed: mermaidRenderValidation.passed,
-            totalBlocks: mermaidRenderValidation.totalBlocks,
-            failedBlocks: mermaidRenderValidation.failedBlocks,
-            fallbackComments: mermaidRenderValidation.fallbackComments,
-            failedDiagnostics: mermaidRenderValidation.diagnostics
-              .filter(d => !d.parseValid)
-              .slice(0, 3)
-              .map(d => ({
-                blockIndex: d.blockIndex,
-                errors: d.errors,
-                codeSnippet: d.codeSnippet,
-              })),
-            remediation: mermaidRenderValidation.remediation ?? null,
-          }
-        : null,
-      tableRemediation: tableFixMetrics,
-    },
+      sourceGroundingRemediation,
+      mermaidRenderValidation,
+      tableFixMetrics,
+    }),
     modelUsed,
     tokensUsed: totalTokensUsed,
     durationMs,
@@ -941,6 +901,26 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
   // move for the other node that can exhaust the same budget.
   const capReached = needsRegeneration && nextRetryCount >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
 
+  // Everything both endings report the same way. Written once so that a field added to the
+  // ordinary return cannot be forgotten in the budget-exhausted one — which is how the two
+  // drifted apart the last time.
+  const commonUpdate = {
+    currentNode: 'judge' as const,
+    qualityScore: finalScore,
+    judgeRecommendation: finalRecommendation,
+    factualWarnings: factualWarnings ?? undefined,
+    retryCount: nextRetryCount,
+    tokensUsed: totalTokensUsed,
+    durationMs,
+    progressSummary: completionProgress,
+    qaSignals: qaSignals ?? undefined,
+    ...(usedTargetedRefinement && {
+      arbiterOutput,
+      targetedRefinementStatus: finalContent ? ('accepted' as const) : ('escalated' as const),
+      targetedRefinementTokensUsed: refinementTokensUsed,
+    }),
+  };
+
   if (capReached) {
     const scoreText =
       finalScore === null || finalScore === undefined
@@ -962,52 +942,26 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     );
 
     return {
-      currentNode: 'judge',
+      ...commonUpdate,
       lessonContent: null,
-      qualityScore: finalScore,
-      judgeRecommendation: finalRecommendation,
       needsRegeneration: false,
       needsHumanReview: true,
       reviewInfo: { needsReview: true, reasons: [reason] },
       errors: [reason],
-      factualWarnings: factualWarnings ?? undefined,
       regenerationMode: null,
       regenerateCount: (state.regenerateCount ?? 0) + 1,
-      retryCount: nextRetryCount,
-      tokensUsed: totalTokensUsed,
-      durationMs,
-      progressSummary: completionProgress,
-      qaSignals: qaSignals ?? undefined,
-      ...(usedTargetedRefinement && {
-        arbiterOutput,
-        targetedRefinementStatus: finalContent ? ('accepted' as const) : ('escalated' as const),
-        targetedRefinementTokensUsed: refinementTokensUsed,
-      }),
     };
   }
 
   return {
-    currentNode: 'judge',
+    ...commonUpdate,
     lessonContent: finalLessonContent,
-    qualityScore: finalScore,
-    judgeRecommendation: finalRecommendation,
     needsRegeneration,
     needsHumanReview,
     reviewInfo: reviewInfo ?? undefined,
-    factualWarnings: factualWarnings ?? undefined,
     regenerationMode: needsRegeneration ? 'full_regenerate' : null,
     regenerateCount: needsRegeneration
       ? (state.regenerateCount ?? 0) + 1
       : (state.regenerateCount ?? 0),
-    retryCount: nextRetryCount,
-    tokensUsed: totalTokensUsed,
-    durationMs,
-    progressSummary: completionProgress,
-    qaSignals: qaSignals ?? undefined,
-    ...(usedTargetedRefinement && {
-      arbiterOutput,
-      targetedRefinementStatus: finalContent ? ('accepted' as const) : ('escalated' as const),
-      targetedRefinementTokensUsed: refinementTokensUsed,
-    }),
   };
 }

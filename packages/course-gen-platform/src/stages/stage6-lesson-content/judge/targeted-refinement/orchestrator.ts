@@ -19,6 +19,7 @@ import { initializeQualityLocksFromArbiter } from './state-manager';
 import { calculateHeuristicScore, detectScoreOscillation } from './scoring';
 import { collectAllIssues, applyPatchToContent, convertToIterationHistory } from './content-utils';
 import { executePatcherTask, executeExpanderTask } from './task-executor';
+import type { SectionRefinementTask } from '@megacampus/shared-types/judge-types';
 
 /**
  * Check if token budget is exhausted and handle the stop condition.
@@ -49,6 +50,98 @@ function checkBudgetExhausted(
   });
 
   return { exhausted: true, skipped: remainingTaskCount, stopReason: 'stop_token_budget' };
+}
+
+/**
+ * The mutable half of one refinement pass.
+ *
+ * `budgetStopReason` is how the task groups tell the iteration to stop: they cannot return it,
+ * because they run inside a labelled loop and the caller needs the reason after the break.
+ */
+interface IterationRun {
+  currentContent: LessonContent;
+  startedTaskCount: number;
+  sectionsEdited: string[];
+  skippedDueToBudget: number;
+  budgetStopReason: StopReason | null;
+}
+
+/**
+ * Run one kind of refinement task — surgical patches, or whole-section regenerations.
+ *
+ * These were two loops written twice, differing in the executor, the field the new text arrives
+ * under (`patchedContent` against `regeneratedContent`) and one word in a log line. Everything
+ * that governs SAFETY was identical and now exists once:
+ *
+ *   * the budget is re-checked before every task, not once per batch, because a single
+ *     regeneration can exhaust what was left;
+ *   * the edit count is incremented whether the task succeeded or FAILED, which is what stops a
+ *     section that keeps failing from being retried forever — a lock after
+ *     `sectionLockAfterEdits` attempts, not after that many successes;
+ *   * tokens are counted on failure too, because a refused generation was still paid for.
+ *
+ * Returns `false` when the budget ran out, which the caller reads as "leave the batch loop".
+ */
+async function runTaskGroup(input: {
+  tasks: SectionRefinementTask[];
+  label: 'Patcher' | 'Expander';
+  execute: (task: SectionRefinementTask) => Promise<{
+    sectionId: string;
+    success: boolean;
+    tokensUsed: number;
+    newContent: string;
+  }>;
+  state: RefinementState;
+  run: IterationRun;
+  selectedTaskCount: number;
+  onStreamEvent: TargetedRefinementInput['onStreamEvent'];
+}): Promise<boolean> {
+  const { tasks, label, execute, state, run, selectedTaskCount, onStreamEvent } = input;
+
+  for (const task of tasks) {
+    const budgetCheck = checkBudgetExhausted(
+      state,
+      selectedTaskCount - run.startedTaskCount,
+      onStreamEvent
+    );
+    if (budgetCheck.exhausted) {
+      run.skippedDueToBudget += budgetCheck.skipped;
+      run.budgetStopReason = budgetCheck.stopReason;
+      return false;
+    }
+
+    run.startedTaskCount++;
+    run.sectionsEdited.push(task.sectionId);
+
+    const result = await execute(task);
+
+    // Always increment edit count to prevent infinite loops on repeated failures.
+    // Section will lock after sectionLockAfterEdits attempts (success or failure).
+    state.sectionEditCount[result.sectionId] = (state.sectionEditCount[result.sectionId] || 0) + 1;
+
+    // Count tokens whichever way it went: a refused generation was still paid for.
+    state.tokensUsed += result.tokensUsed;
+
+    if (result.success) {
+      run.currentContent = applyPatchToContent(
+        run.currentContent,
+        result.sectionId,
+        result.newContent
+      );
+    } else {
+      // Log failed attempt for debugging (hallucination rejection, truncation, etc.)
+      logger.warn(
+        {
+          sectionId: result.sectionId,
+          editCount: state.sectionEditCount[result.sectionId],
+          maxEdits: REFINEMENT_CONFIG.quality.sectionLockAfterEdits,
+        },
+        `${label} failed - edit attempt counted toward section lock`
+      );
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -100,8 +193,15 @@ export async function executeTargetedRefinement(
     startTime,
   };
 
-  let currentContent = { ...content };
-  let skippedTasksDueToBudget = 0;
+  // The mutable half of one refinement pass. Held in an object rather than as locals because
+  // `runTaskGroup` advances all four, and passing four `let`s into a helper is how they drift.
+  const run: IterationRun = {
+    currentContent: { ...content },
+    startedTaskCount: 0,
+    sectionsEdited: [],
+    skippedDueToBudget: 0,
+    budgetStopReason: null,
+  };
 
   // Calculate initial score
   const initialScore = calculateHeuristicScore(arbiterOutput, 0, 0, 0);
@@ -109,7 +209,7 @@ export async function executeTargetedRefinement(
   state.contentHistory.push({
     iteration: 0,
     score: initialScore,
-    content: currentContent,
+    content: run.currentContent,
     remainingIssues: collectAllIssues(arbiterOutput.plan.tasks),
   });
 
@@ -155,7 +255,7 @@ export async function executeTargetedRefinement(
     }
 
     if (state.tokensUsed >= REFINEMENT_CONFIG.limits.maxTokens) {
-      skippedTasksDueToBudget += availableTasks.length;
+      run.skippedDueToBudget += availableTasks.length;
       logger.warn(
         {
           tokensUsed: state.tokensUsed,
@@ -197,9 +297,9 @@ export async function executeTargetedRefinement(
     }
 
     const batches = createExecutionBatches(selectedTasks);
-    const sectionsEditedThisIteration: string[] = [];
-    let startedTaskCount = 0;
-    let stopAfterCurrentIteration = false;
+    run.startedTaskCount = 0;
+    run.sectionsEdited = [];
+    run.budgetStopReason = null;
 
     // Execute batches
     batchLoop: for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -225,30 +325,18 @@ export async function executeTargetedRefinement(
       const patcherTasks = batch.filter(t => t.actionType === 'SURGICAL_EDIT');
       const expanderTasks = batch.filter(t => t.actionType === 'REGENERATE_SECTION');
 
-      // Execute Patcher tasks
       if (patcherTasks.length > 0) {
         const sectionIds = new Set(patcherTasks.map(t => t.sectionId));
         if (sectionIds.size !== patcherTasks.length) {
           throw new Error('Invalid batch: duplicate sectionIds detected');
         }
+      }
 
-        for (const task of patcherTasks) {
-          const budgetCheck = checkBudgetExhausted(
-            state,
-            selectedTasks.length - startedTaskCount,
-            onStreamEvent
-          );
-          if (budgetCheck.exhausted) {
-            skippedTasksDueToBudget += budgetCheck.skipped;
-            stopReason = budgetCheck.stopReason;
-            stopAfterCurrentIteration = true;
-            break batchLoop;
-          }
-
-          startedTaskCount++;
-          sectionsEditedThisIteration.push(task.sectionId);
-
-          const result = await executePatcherTask(task, currentContent, llmCall, onStreamEvent, {
+      const patcherRan = await runTaskGroup({
+        tasks: patcherTasks,
+        label: 'Patcher',
+        execute: task =>
+          executePatcherTask(task, run.currentContent, llmCall, onStreamEvent, {
             score: state.scoreHistory[state.scoreHistory.length - 1] || 0.7,
             iteration: state.iteration,
             issues: collectAllIssues(arbiterOutput.plan.tasks),
@@ -258,89 +346,33 @@ export async function executeTargetedRefinement(
               arbiterOutput.acceptedIssues.length === 0 ? ['Content meets quality standards'] : [],
             language, // Pass language for token budget calculation
             courseId,
-          });
+          }).then(result => ({ ...result, newContent: result.patchedContent })),
+        state,
+        run,
+        selectedTaskCount: selectedTasks.length,
+        onStreamEvent,
+      });
+      if (!patcherRan) break batchLoop;
 
-          // Always increment edit count to prevent infinite loops on repeated failures
-          // Section will lock after sectionLockAfterEdits attempts (success or failure)
-          state.sectionEditCount[result.sectionId] =
-            (state.sectionEditCount[result.sectionId] || 0) + 1;
-
-          if (result.success) {
-            currentContent = applyPatchToContent(
-              currentContent,
-              result.sectionId,
-              result.patchedContent
-            );
-            state.tokensUsed += result.tokensUsed;
-          } else {
-            // Log failed attempt for debugging (hallucination rejection, truncation, etc.)
-            logger.warn(
-              {
-                sectionId: result.sectionId,
-                editCount: state.sectionEditCount[result.sectionId],
-                maxEdits: REFINEMENT_CONFIG.quality.sectionLockAfterEdits,
-              },
-              'Patcher failed - edit attempt counted toward section lock'
-            );
-            // Still count tokens used even on failure (for budget tracking)
-            state.tokensUsed += result.tokensUsed;
-          }
-        }
-      }
-
-      // Execute Expander tasks
-      if (expanderTasks.length > 0) {
-        for (const task of expanderTasks) {
-          const budgetCheck = checkBudgetExhausted(
-            state,
-            selectedTasks.length - startedTaskCount,
-            onStreamEvent
-          );
-          if (budgetCheck.exhausted) {
-            skippedTasksDueToBudget += budgetCheck.skipped;
-            stopReason = budgetCheck.stopReason;
-            stopAfterCurrentIteration = true;
-            break batchLoop;
-          }
-
-          startedTaskCount++;
-          sectionsEditedThisIteration.push(task.sectionId);
-
-          const result = await executeExpanderTask(
+      const expanderRan = await runTaskGroup({
+        tasks: expanderTasks,
+        label: 'Expander',
+        execute: task =>
+          executeExpanderTask(
             task,
-            currentContent,
+            run.currentContent,
             onStreamEvent,
             ragChunks || [],
             lessonSpec?.learning_objectives?.map(lo => lo.objective) || [],
             language,
             courseId
-          );
-
-          // Always increment edit count to prevent infinite loops on repeated failures
-          state.sectionEditCount[result.sectionId] =
-            (state.sectionEditCount[result.sectionId] || 0) + 1;
-
-          if (result.success) {
-            currentContent = applyPatchToContent(
-              currentContent,
-              result.sectionId,
-              result.regeneratedContent
-            );
-            state.tokensUsed += result.tokensUsed;
-          } else {
-            // Log failed attempt for debugging
-            logger.warn(
-              {
-                sectionId: result.sectionId,
-                editCount: state.sectionEditCount[result.sectionId],
-                maxEdits: REFINEMENT_CONFIG.quality.sectionLockAfterEdits,
-              },
-              'Expander failed - edit attempt counted toward section lock'
-            );
-            state.tokensUsed += result.tokensUsed;
-          }
-        }
-      }
+          ).then(result => ({ ...result, newContent: result.regeneratedContent })),
+        state,
+        run,
+        selectedTaskCount: selectedTasks.length,
+        onStreamEvent,
+      });
+      if (!expanderRan) break batchLoop;
 
       emitEvent(onStreamEvent, {
         type: 'batch_complete',
@@ -367,7 +399,7 @@ export async function executeTargetedRefinement(
     state.lockedSections = [...new Set([...state.lockedSections, ...newlyLockedSections])];
 
     // Re-evaluate score
-    const tasksCompletedThisIteration = sectionsEditedThisIteration.length;
+    const tasksCompletedThisIteration = run.sectionsEdited.length;
     const newScore = calculateHeuristicScore(
       arbiterOutput,
       state.iteration,
@@ -381,10 +413,10 @@ export async function executeTargetedRefinement(
     const sectionsToLockForOscillation: string[] = [];
 
     if (oscillationDetected.detected) {
-      sectionsToLockForOscillation.push(...sectionsEditedThisIteration);
+      sectionsToLockForOscillation.push(...run.sectionsEdited);
       logger.warn(
         {
-          sections: sectionsEditedThisIteration,
+          sections: run.sectionsEdited,
           previousScore: oscillationDetected.previousScore,
           improvedScore: oscillationDetected.improvedScore,
           currentScore: newScore,
@@ -412,7 +444,7 @@ export async function executeTargetedRefinement(
     state.contentHistory.push({
       iteration: state.iteration,
       score: newScore,
-      content: { ...currentContent },
+      content: { ...run.currentContent },
       remainingIssues,
     });
 
@@ -432,7 +464,8 @@ export async function executeTargetedRefinement(
       'Iteration complete'
     );
 
-    if (stopAfterCurrentIteration) {
+    if (run.budgetStopReason) {
+      stopReason = run.budgetStopReason;
       shouldContinue = false;
     } else {
       // Check if we should continue
@@ -461,7 +494,7 @@ export async function executeTargetedRefinement(
           reason: stopReason,
           finalScore: newScore,
           iterations: state.iteration,
-          skippedTasksDueToBudget,
+          skippedTasksDueToBudget: run.skippedDueToBudget,
         },
         'Stopping refinement loop'
       );
@@ -491,7 +524,7 @@ export async function executeTargetedRefinement(
 
     bestEffortResult = selectorResult.bestResult;
     finalStatus = selectorResult.finalStatus;
-    currentContent = bestEffortResult.content as LessonContent; // Safe cast
+    run.currentContent = bestEffortResult.content as LessonContent; // Safe cast
 
     logger.info(
       {
@@ -532,7 +565,7 @@ export async function executeTargetedRefinement(
       finalScore,
       iterations: state.iteration,
       stopReason,
-      skippedTasksDueToBudget,
+      skippedTasksDueToBudget: run.skippedDueToBudget,
       tokensUsed: state.tokensUsed,
       durationMs,
     },
@@ -540,7 +573,7 @@ export async function executeTargetedRefinement(
   );
 
   return {
-    content: currentContent,
+    content: run.currentContent,
     status: finalStatus,
     finalScore,
     iterations: state.iteration,
