@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stageOfPhase } from '@/shared/llm/model-cost-callbacks';
@@ -31,13 +31,29 @@ function read(relativePath: string): string {
   return readFileSync(join(SRC, relativePath), 'utf8');
 }
 
+/**
+ * Every `.ts` in a directory, concatenated.
+ *
+ * The evidence extraction calls used to all sit in `card-generator.ts`, and this guard counted
+ * them there. When that file was split, two of the three moved to `evidence-extraction-port.ts`
+ * and the count dropped to one — the calls were still priced, but the guard could no longer see
+ * them. A guard a file split can blind is not a guard, so it reads the whole module group.
+ */
+function readDirectory(relativePath: string): string {
+  const directory = join(SRC, relativePath);
+  return readdirSync(directory)
+    .filter(entry => entry.endsWith('.ts'))
+    .map(entry => readFileSync(join(directory, entry), 'utf8'))
+    .join('\n');
+}
+
 describe('document evidence writes to the course ledger', () => {
-  const cardGenerator = read('stages/stage4-analysis/evidence/card-generator.ts');
+  const evidenceModules = readDirectory('stages/stage4-analysis/evidence');
   const conflictDetector = read('stages/stage4-analysis/evidence/conflict-detector.ts');
   const wiring = read('stages/stage4-analysis/orchestrator-phase-helpers.ts');
 
   it('prices each of its three extraction calls', () => {
-    const phases = cardGenerator.match(/phase: 'stage_4_evidence_\w+'/g) ?? [];
+    const phases = evidenceModules.match(/phase: 'stage_4_evidence_\w+'/g) ?? [];
     expect(phases).toHaveLength(3);
   });
 
