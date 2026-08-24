@@ -563,8 +563,19 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // no policy, and no function inside the security manifest, so no new `after-*`
 // digest is needed. Worth noting this guard is what caught them — a narrower
 // local test selection had missed `tests/unit/scripts/` entirely, and CI did not.
+// Re-pinned 2026-08-24 for the Helixa AIOS bridge (mc2-gxese): 246 files, adding
+// 20260822235900_helixa_knowledge_sync_outbox.sql,
+// 20260823060000_helixa_course_creation_commands.sql,
+// 20260823120000_helixa_generation_commands.sql,
+// 20260823130000_helixa_generation_native_transactions.sql and
+// 20260823140000_helixa_generation_course_source.sql. They add their own tables and
+// `helixa_*`-prefixed functions and touch no function inside the security manifest, which
+// covers only the 2026-07-11 document-evidence chain, so no new `after-*` digest is needed.
+// What they DO add is six triggers on three live tables — `courses` (2), `career_playbooks`
+// (3) and `file_catalog` (1). Those are outside this guard's reach and are data-gated on
+// `helixa_knowledge_sync_bindings` being non-empty; re-pinning here is not a review of them.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'f772ac5efaa8b191cbfc79ec12c9441d6e5636e93eba46e2b1280bff4c1d17db';
+  '1aa86cce2767f064258771e8772b846d7a69de4617ced15f095614ef4ba35b16';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
