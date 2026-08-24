@@ -909,6 +909,46 @@ function validatedCardExtraction(
   };
 }
 
+/**
+ * The smallest output budget in which a structured extraction can physically
+ * fit, and the reason it is a floor rather than a fraction of the input.
+ *
+ * The extraction answers with a JSON object, and most of that object is not
+ * prose: every claim carries a confidence and a list of `source_refs`, and each
+ * ref is a sha256 chunk id and a uuid — well over a hundred tokens for a single
+ * claim before a word of Russian is written. Measured on the live run of
+ * 2026-08-22, the two calls that succeeded emitted 1184 and 1277 completion
+ * tokens for a 339-token source. The output is a function of the shape asked
+ * for, not of how long the document was.
+ */
+const EVIDENCE_EXTRACTION_MIN_OUTPUT_TOKENS = 2_048;
+
+/**
+ * What the standalone extraction is allowed to emit.
+ *
+ * This was `Math.max(256, Math.min(allocatedTokens, 4096))` — the source
+ * document's own length — while its sibling calls in the map/reduce path used
+ * `maxBatchTokens / 2`, and the line directly above it already reads
+ * `maxBatchTokens` for the input side. Sizing an answer by the length of the
+ * question makes the budget tightest exactly where the JSON overhead dominates,
+ * so the smaller the document the more certain the failure.
+ *
+ * Live proof, course 09286fc6 on 2026-08-22 14:13:54: a 339-token source gave
+ * the fallback 339 output tokens, the call came back `finish_reason: "length"`
+ * with `nativeTokensCompletion: 339`, and the truncated JSON could not parse.
+ * This is the last resort — the hierarchical path had already failed — so the
+ * card was written `failed`, and Stage 4 continued with no evidence at all for
+ * that document. Three paid calls, one usable card, and the run that eventually
+ * worked was a fresh retry rather than this fallback.
+ *
+ * A ceiling is not spend: a model is billed for what it emits, so raising an
+ * unreachable cap costs nothing and only stops truncation.
+ */
+function standaloneExtractionOutputBudget(input: GenerateEvidenceCardInput): number {
+  const halfBatch = Math.floor((input.maxBatchTokens ?? 0) / 2);
+  return Math.min(4_096, Math.max(EVIDENCE_EXTRACTION_MIN_OUTPUT_TOKENS, halfBatch));
+}
+
 async function standaloneExtraction(
   input: GenerateEvidenceCardInput,
   summary: string
@@ -928,7 +968,7 @@ async function standaloneExtraction(
         documentName: input.source.documentName,
         sourceVersionHash: input.source.sourceVersionHash,
         maxInputTokens: input.maxBatchTokens ?? Math.max(input.allocatedTokens, 1),
-        maxOutputTokens: Math.max(256, Math.min(input.allocatedTokens, 4_096)),
+        maxOutputTokens: standaloneExtractionOutputBudget(input),
       }),
     input.maxRetries ?? 2,
     extractor.retryOwner
