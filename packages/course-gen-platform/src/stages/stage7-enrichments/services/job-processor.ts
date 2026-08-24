@@ -8,6 +8,7 @@
 
 import { Job, Queue } from 'bullmq';
 import { logger } from '@/shared/logger';
+import type { EnrichmentMetadata } from '@megacampus/shared-types';
 import { getRedisClient } from '@/shared/cache/redis';
 import type { EnrichmentStatus } from '@megacampus/shared-types';
 import type {
@@ -386,6 +387,154 @@ async function resolveConfiguredFallbackModel(
   }
 }
 
+/**
+ * A NotebookLM task that has not finished: record where it got to and book the next poll.
+ *
+ * This existed twice, verbatim apart from three things — whether the draft rides along in the
+ * async state, the log line, and which metrics the caller reports. Everything that matters is
+ * identical: the timeout against `getNlmMaxWaitMs()`, the attempt counter, the metadata write,
+ * the backoff, the enqueue and the progress update. Two copies of a poll scheduler is two places
+ * for a poll to be lost.
+ *
+ * The timeout THROWS rather than returning a failure, so it lands in the caller's retry
+ * decision like any other error.
+ */
+async function scheduleDeferredNlmPoll(
+  job: Job<Stage7JobInput, Stage7JobResult>,
+  input: {
+    enrichmentId: string;
+    enrichmentMetadata: EnrichmentMetadata | null;
+    deferredTask: NonNullable<GenerateResult['deferredTask']>;
+    nlmAsyncState: Stage7NlmAsyncState | undefined;
+    isNlmPollJob: boolean;
+    draft?: Stage7NlmAsyncState['draft'];
+    logMessage: string;
+    /** `logger.child(...)`, whose pino generic differs from the root logger's. */
+    jobLogger: typeof logger;
+  }
+): Promise<void> {
+  const {
+    enrichmentId,
+    enrichmentMetadata,
+    deferredTask,
+    nlmAsyncState,
+    isNlmPollJob,
+    draft,
+    logMessage,
+    jobLogger,
+  } = input;
+
+  const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
+  const elapsedMs = Date.now() - new Date(startedAt).getTime();
+  const maxWaitMs = getNlmMaxWaitMs();
+  if (elapsedMs > maxWaitMs) {
+    throw new Error(
+      `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${deferredTask.taskId})`
+    );
+  }
+
+  const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
+  const nextAsyncState: Stage7NlmAsyncState = {
+    taskId: deferredTask.taskId,
+    mediaType: deferredTask.mediaType,
+    pollAttempt: nextPollAttempt,
+    startedAt,
+    ...(draft ? { draft } : {}),
+  };
+
+  await saveNotebookLMAsyncMetadataState(enrichmentId, enrichmentMetadata, {
+    taskId: nextAsyncState.taskId,
+    mediaType: nextAsyncState.mediaType,
+    status: deferredTask.status,
+    pollAttempt: nextAsyncState.pollAttempt,
+    startedAt: nextAsyncState.startedAt,
+    lastPolledAt: new Date().toISOString(),
+    responseMetadata: deferredTask.responseMetadata,
+  });
+
+  const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
+  const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
+
+  await updateJobProgress(job, {
+    phase: isNlmPollJob ? 'polling_async' : 'pending_async',
+    progress: 55,
+    message: `NotebookLM task ${deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
+  });
+
+  jobLogger.info(
+    {
+      taskId: nextAsyncState.taskId,
+      mediaType: nextAsyncState.mediaType,
+      pollAttempt: nextAsyncState.pollAttempt,
+      pollDelayMs,
+      nextJobId,
+      taskStatus: deferredTask.status,
+    },
+    logMessage
+  );
+}
+
+/**
+ * The job threw. Retry it, or write the failure where a user can see it.
+ *
+ * Retry re-throws so BullMQ owns the attempt counter — `job.attemptsMade` is the truth, not
+ * anything carried in job data, because a retried job carries the ORIGINAL data.
+ */
+async function handleStage7Failure(
+  job: Job<Stage7JobInput, Stage7JobResult>,
+  error: unknown,
+  input: {
+    enrichmentId: string;
+    enrichmentType: Stage7JobInput['enrichmentType'];
+    startTime: number;
+    /** `logger.child(...)`, whose pino generic differs from the root logger's. */
+    jobLogger: typeof logger;
+  }
+): Promise<Stage7JobResult> {
+  const { enrichmentId, enrichmentType, startTime, jobLogger } = input;
+  const errorObj = error instanceof Error ? error : new Error(String(error));
+  const durationMs = Date.now() - startTime;
+
+  jobLogger.error({ error: formatErrorForLogging(errorObj), durationMs }, 'Stage 7 job failed');
+
+  // Check if we should retry (use BullMQ's actual attempt counter, not static job data)
+  const retryContext = { enrichmentType, attempt: job.attemptsMade + 1, error: errorObj };
+
+  if (shouldRetry(retryContext)) {
+    const delay = getRetryDelay(retryContext);
+    jobLogger.info(
+      {
+        delay,
+        currentAttempt: retryContext.attempt,
+        nextAttempt: retryContext.attempt + 1,
+        maxRetries: 3,
+      },
+      'Will retry after delay'
+    );
+
+    // Sleep before retry (BullMQ will handle the actual retry)
+    await sleep(delay);
+
+    // Re-throw to trigger BullMQ retry
+    throw error;
+  }
+
+  // Mark as failed in database
+  await updateEnrichmentStatus(enrichmentId, 'failed', errorObj.message, {
+    stack: errorObj.stack,
+    attempt: job.attemptsMade + 1,
+    jobId: job.id,
+  });
+
+  await updateJobProgress(job, {
+    phase: 'error',
+    progress: 0,
+    message: `Generation failed: ${errorObj.message}`,
+  });
+
+  return createFailedResult(enrichmentId, errorObj.message, startTime);
+}
+
 export async function processStage7Job(
   job: Job<Stage7JobInput, Stage7JobResult>
 ): Promise<Stage7JobResult> {
@@ -437,25 +586,24 @@ export async function processStage7Job(
       return createCancelledResult(enrichmentId, startTime);
     }
 
+    const isNlmPollJob = Boolean(nlmAsyncState && isNotebookLMType(enrichmentType));
+
+    // A poll job for an enrichment that already finished is a straggler: the task completed
+    // through another path and this one must not reopen it.
     if (
-      nlmAsyncState &&
-      isNotebookLMType(enrichmentType) &&
+      isNlmPollJob &&
       (enrichmentContext.enrichment.status === 'completed' ||
         enrichmentContext.enrichment.status === 'failed')
     ) {
       jobLogger.info(
-        {
-          currentStatus: enrichmentContext.enrichment.status,
-        },
+        { currentStatus: enrichmentContext.enrichment.status },
         'Skipping stale NotebookLM poll job because enrichment is already terminal'
       );
       return {
         enrichmentId,
         success: enrichmentContext.enrichment.status === 'completed',
         status: enrichmentContext.enrichment.status,
-        metrics: {
-          durationMs: Date.now() - startTime,
-        },
+        metrics: { durationMs: Date.now() - startTime },
       };
     }
 
@@ -464,8 +612,6 @@ export async function processStage7Job(
       jobLogger.info('Job cancelled, aborting');
       return createFailedResult(enrichmentId, 'Job cancelled', startTime);
     }
-
-    const isNlmPollJob = Boolean(nlmAsyncState && isNotebookLMType(enrichmentType));
 
     // Increment generation attempt only for non-poll jobs.
     const attemptNumber = isNlmPollJob
@@ -515,14 +661,12 @@ export async function processStage7Job(
       },
     };
 
-    // Execute generation based on flow type
+    // Two-stage, phase 1: produce a draft for a human to approve.
     if (isTwoStage && isDraftPhase && handler.generateDraft) {
-      // Two-stage: Generate draft (Phase 1)
       jobLogger.info('Generating draft for two-stage enrichment');
 
       const draftResult = await handler.generateDraft(handlerInput);
 
-      // Save draft and update status
       await saveDraftContent(enrichmentId, draftResult.draftContent, {
         generated_at: new Date().toISOString(),
         generation_duration_ms: draftResult.metadata.durationMs,
@@ -537,12 +681,7 @@ export async function processStage7Job(
         message: 'Draft ready for review',
       });
 
-      jobLogger.info(
-        {
-          durationMs: draftResult.metadata.durationMs,
-        },
-        'Draft generation completed'
-      );
+      jobLogger.info({ durationMs: draftResult.metadata.durationMs }, 'Draft generation completed');
 
       return {
         enrichmentId,
@@ -556,32 +695,29 @@ export async function processStage7Job(
       };
     }
 
-    // Two-stage: Final generation (Phase 2) - use generateFinal with approved draft
+    // Two-stage, phase 2: final content from the approved draft.
     if (isTwoStage && !isDraftPhase && handler.generateFinal) {
       jobLogger.info('Generating final content from approved draft');
 
-      // Get draft content from enrichment (it has selected_variant set by approval)
+      // The approved draft is the enrichment's own content, with selected_variant set.
       const draftContent = enrichmentContext.enrichment.content;
-
       if (!draftContent) {
         throw new Error('Draft content missing for final generation. Please regenerate the draft.');
       }
 
-      // Build draft result structure expected by generateFinal
-      const draftResult = {
+      const storedMetadata = enrichmentContext.enrichment.metadata as Record<
+        string,
+        unknown
+      > | null;
+      const result = await handler.generateFinal(handlerInput, {
         draftContent,
         metadata: {
           durationMs: 0, // Already counted in draft phase
-          tokensUsed:
-            ((enrichmentContext.enrichment.metadata as Record<string, unknown>)
-              ?.total_tokens as number) ?? 0,
-          modelUsed:
-            ((enrichmentContext.enrichment.metadata as Record<string, unknown>)
-              ?.model_used as string) ?? 'unknown',
+          tokensUsed: (storedMetadata?.total_tokens as number) ?? 0,
+          modelUsed: (storedMetadata?.model_used as string) ?? 'unknown',
         },
-      };
+      });
 
-      const result = await handler.generateFinal(handlerInput, draftResult);
       return finalizeSuccessfulResult(job, {
         enrichmentId,
         enrichmentType,
@@ -594,64 +730,23 @@ export async function processStage7Job(
       });
     }
 
-    // Single-stage generation
+    // NotebookLM single-stage: a draft feeds straight into the final call, and the result may
+    // be a detached task rather than content.
     if (isNotebookLMType(enrichmentType) && handler.generateDraft && handler.generateFinal) {
       const activeDraft = nlmAsyncState?.draft ?? (await handler.generateDraft(handlerInput));
       const nlmResult = await handler.generateFinal(handlerInput, activeDraft);
 
       if (nlmResult.deferredTask) {
-        const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
-        const elapsedMs = Date.now() - new Date(startedAt).getTime();
-        const maxWaitMs = getNlmMaxWaitMs();
-        if (elapsedMs > maxWaitMs) {
-          throw new Error(
-            `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${nlmResult.deferredTask.taskId})`
-          );
-        }
-
-        const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
-        const nextAsyncState: Stage7NlmAsyncState = {
-          taskId: nlmResult.deferredTask.taskId,
-          mediaType: nlmResult.deferredTask.mediaType,
-          pollAttempt: nextPollAttempt,
-          startedAt,
-          draft: activeDraft,
-        };
-
-        await saveNotebookLMAsyncMetadataState(
+        await scheduleDeferredNlmPoll(job, {
           enrichmentId,
-          enrichmentContext.enrichment.metadata,
-          {
-            taskId: nextAsyncState.taskId,
-            mediaType: nextAsyncState.mediaType,
-            status: nlmResult.deferredTask.status,
-            pollAttempt: nextAsyncState.pollAttempt,
-            startedAt: nextAsyncState.startedAt,
-            lastPolledAt: new Date().toISOString(),
-            responseMetadata: nlmResult.deferredTask.responseMetadata,
-          }
-        );
-
-        const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
-        const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
-
-        await updateJobProgress(job, {
-          phase: isNlmPollJob ? 'polling_async' : 'pending_async',
-          progress: 55,
-          message: `NotebookLM task ${nlmResult.deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
+          enrichmentMetadata: enrichmentContext.enrichment.metadata,
+          deferredTask: nlmResult.deferredTask,
+          nlmAsyncState,
+          isNlmPollJob,
+          draft: activeDraft,
+          logMessage: 'NotebookLM detached task pending, scheduled poll job',
+          jobLogger,
         });
-
-        jobLogger.info(
-          {
-            taskId: nextAsyncState.taskId,
-            mediaType: nextAsyncState.mediaType,
-            pollAttempt: nextAsyncState.pollAttempt,
-            pollDelayMs,
-            nextJobId,
-            taskStatus: nlmResult.deferredTask.status,
-          },
-          'NotebookLM detached task pending, scheduled poll job'
-        );
 
         return {
           enrichmentId,
@@ -683,61 +778,21 @@ export async function processStage7Job(
 
     // Handle deferred async task from single-stage handlers (e.g. NLM text/image artifacts)
     if (result.deferredTask) {
-      const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
-      const elapsedMs = Date.now() - new Date(startedAt).getTime();
-      const maxWaitMs = getNlmMaxWaitMs();
-      if (elapsedMs > maxWaitMs) {
-        throw new Error(
-          `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${result.deferredTask.taskId})`
-        );
-      }
-
-      const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
-      const nextAsyncState: Stage7NlmAsyncState = {
-        taskId: result.deferredTask.taskId,
-        mediaType: result.deferredTask.mediaType,
-        pollAttempt: nextPollAttempt,
-        startedAt,
-      };
-
-      await saveNotebookLMAsyncMetadataState(enrichmentId, enrichmentContext.enrichment.metadata, {
-        taskId: nextAsyncState.taskId,
-        mediaType: nextAsyncState.mediaType,
-        status: result.deferredTask.status,
-        pollAttempt: nextAsyncState.pollAttempt,
-        startedAt: nextAsyncState.startedAt,
-        lastPolledAt: new Date().toISOString(),
-        responseMetadata: result.deferredTask.responseMetadata,
+      await scheduleDeferredNlmPoll(job, {
+        enrichmentId,
+        enrichmentMetadata: enrichmentContext.enrichment.metadata,
+        deferredTask: result.deferredTask,
+        nlmAsyncState,
+        isNlmPollJob,
+        logMessage: 'Single-stage handler returned deferred task, scheduled poll job',
+        jobLogger,
       });
-
-      const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
-      const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
-
-      await updateJobProgress(job, {
-        phase: isNlmPollJob ? 'polling_async' : 'pending_async',
-        progress: 55,
-        message: `NotebookLM task ${result.deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
-      });
-
-      jobLogger.info(
-        {
-          taskId: nextAsyncState.taskId,
-          mediaType: nextAsyncState.mediaType,
-          pollAttempt: nextAsyncState.pollAttempt,
-          pollDelayMs,
-          nextJobId,
-          taskStatus: result.deferredTask.status,
-        },
-        'Single-stage handler returned deferred task, scheduled poll job'
-      );
 
       return {
         enrichmentId,
         success: true,
         status: 'generating',
-        metrics: {
-          durationMs: Date.now() - startTime,
-        },
+        metrics: { durationMs: Date.now() - startTime },
       };
     }
 
@@ -752,57 +807,12 @@ export async function processStage7Job(
       jobLogger,
     });
   } catch (error) {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    const durationMs = Date.now() - startTime;
-
-    jobLogger.error(
-      {
-        error: formatErrorForLogging(errorObj),
-        durationMs,
-      },
-      'Stage 7 job failed'
-    );
-
-    // Check if we should retry (use BullMQ's actual attempt counter, not static job data)
-    const retryContext = {
+    return handleStage7Failure(job, error, {
+      enrichmentId,
       enrichmentType,
-      attempt: job.attemptsMade + 1,
-      error: errorObj,
-    };
-
-    if (shouldRetry(retryContext)) {
-      const delay = getRetryDelay(retryContext);
-      jobLogger.info(
-        {
-          delay,
-          currentAttempt: retryContext.attempt,
-          nextAttempt: retryContext.attempt + 1,
-          maxRetries: 3,
-        },
-        'Will retry after delay'
-      );
-
-      // Sleep before retry (BullMQ will handle the actual retry)
-      await sleep(delay);
-
-      // Re-throw to trigger BullMQ retry
-      throw error;
-    }
-
-    // Mark as failed in database
-    await updateEnrichmentStatus(enrichmentId, 'failed', errorObj.message, {
-      stack: errorObj.stack,
-      attempt: job.attemptsMade + 1,
-      jobId: job.id,
+      startTime,
+      jobLogger,
     });
-
-    await updateJobProgress(job, {
-      phase: 'error',
-      progress: 0,
-      message: `Generation failed: ${errorObj.message}`,
-    });
-
-    return createFailedResult(enrichmentId, errorObj.message, startTime);
   }
 }
 

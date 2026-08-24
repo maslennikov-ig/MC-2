@@ -258,6 +258,97 @@ export interface ImageGenerationResult {
  * @param options - Generation options
  * @returns Generated image data
  */
+/**
+ * Two endpoints, two shapes.
+ *
+ * `/images` answers with `data[0].b64_json`; chat completions puts base64 data URLs in
+ * `message.images`. Both are funnelled into one array so the format handling below stays in one
+ * place, and the log line reports the same fields whichever endpoint was used.
+ */
+interface OpenRouterMessage {
+  images?: unknown[];
+  content?: string | null;
+}
+
+function resolveResponseImages(
+  response: unknown,
+  viaImagesApi: boolean
+): { images: unknown[] | undefined; messageWithImages: OpenRouterMessage | undefined } {
+  if (viaImagesApi) {
+    return { images: (response as OpenRouterImageResponse).data, messageWithImages: undefined };
+  }
+
+  const message = (response as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message;
+  const messageWithImages = message as OpenRouterMessage | undefined;
+  return { images: messageWithImages?.images, messageWithImages };
+}
+
+/**
+ * Get a `data:` URL out of whatever OpenRouter returned for one image.
+ *
+ * Four shapes have been observed in production and all four are handled:
+ *
+ *   1. `{ type: "image_url", image_url: { url: "data:..." } }` — chat completion format
+ *   2. `{ url: string }` — a direct URL, which is only usable when it is itself a data URL
+ *   3. `{ b64_json: string }` — base64 with no data-URL prefix
+ *   4. `{ data: string }` — already a data URL
+ *
+ * A plain string is taken as the URL. Anything else throws WITH the payload in the message,
+ * because a fifth shape appearing is exactly the thing the next person needs to see.
+ */
+function extractImageDataUrl(imageData: unknown): string {
+  if (typeof imageData === 'string') return imageData;
+
+  if (!imageData || typeof imageData !== 'object') {
+    throw new Error(`Unexpected image data type: ${typeof imageData}`);
+  }
+
+  const imgObj = imageData as {
+    type?: string;
+    image_url?: { url?: string };
+    url?: string;
+    b64_json?: string;
+    data?: string;
+  };
+
+  if (imgObj.type === 'image_url' && imgObj.image_url?.url) return imgObj.image_url.url;
+  if (imgObj.url?.startsWith('data:')) return imgObj.url;
+  if (imgObj.url) throw new Error(`External image URL not supported yet: ${imgObj.url}`);
+  if (imgObj.b64_json) return `data:image/png;base64,${imgObj.b64_json}`;
+  if (imgObj.data) return imgObj.data;
+
+  throw new Error(`Unknown image object format: ${JSON.stringify(imgObj).substring(0, 200)}`);
+}
+
+/** Split `data:image/png;base64,...` into its two halves, or say it was not one. */
+function parseImageDataUrl(imageDataUrl: string): { mimeType: string; base64Data: string } {
+  const dataUrlMatch = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  if (!dataUrlMatch) {
+    throw new Error('Invalid image data URL format');
+  }
+  return { mimeType: dataUrlMatch[1], base64Data: dataUrlMatch[2] };
+}
+
+/** `image_config` is a Gemini-only extension; sending it to other models is an OpenRouter error. */
+function buildChatImageRequest(
+  model: string,
+  fullPrompt: string,
+  aspectRatio: string,
+  imageSize: string
+): Record<string, unknown> {
+  const requestOptions: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: fullPrompt }],
+    modalities: ['text', 'image'],
+  };
+
+  if (supportsImageConfig(model)) {
+    requestOptions.image_config = { aspect_ratio: aspectRatio, image_size: imageSize };
+  }
+
+  return requestOptions;
+}
+
 export async function generateImage(
   prompt: string,
   options: ImageGenerationOptions = {}
@@ -321,32 +412,13 @@ export async function generateImage(
         return { response: image, generationId: slot.generationId };
       }
 
-      // Build request options - only include image_config for models that support it
-      const requestOptions: Record<string, unknown> = {
-        model,
-        messages: [
-          {
-            role: 'user',
-            content: fullPrompt,
-          },
-        ],
-        modalities: ['text', 'image'],
-      };
-
-      // Only add image_config for Gemini models (OpenRouter limitation)
-      if (supportsImageConfig(model)) {
-        requestOptions.image_config = {
-          aspect_ratio: aspectRatio,
-          image_size: imageSize,
-        };
-      }
-
       // The shared factory, not a local `new OpenAI`: it is what wraps the
       // transport so `x-generation-id` reaches `withGenerationIdCapture`.
       // Without it this call could never learn what it cost, and its price
       // stayed an invented constant for as long as the service existed
       // (mc2-l17v5).
       const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
+      const requestOptions = buildChatImageRequest(model, fullPrompt, aspectRatio, imageSize);
       // cost-exempt: an image is billed per image token, not per text token, so
       // this call prices itself with `recordImageCallCost` below rather than
       // through either LLM wrapper — and then replaces that estimate with the
@@ -361,28 +433,7 @@ export async function generateImage(
     clearTimeout(timeoutId);
 
     const durationMs = Date.now() - startTime;
-
-    // Extract image from response.
-    //
-    // Two endpoints, two shapes. `/images` answers with `data[0].b64_json`;
-    // chat completions puts base64 data URLs in `message.images`. Both are
-    // funnelled into the one `images` array below so the format handling that
-    // follows — hard-won, four variants deep — stays in one place.
-    interface OpenRouterMessage {
-      images?: unknown[];
-      content?: string | null;
-    }
-    let images: unknown[] | undefined;
-    let messageWithImages: OpenRouterMessage | undefined;
-
-    if (viaImagesApi) {
-      images = (response as OpenRouterImageResponse).data;
-    } else {
-      const message = (response as { choices?: Array<{ message?: unknown }> }).choices?.[0]
-        ?.message;
-      messageWithImages = message as OpenRouterMessage | undefined;
-      images = messageWithImages?.images;
-    }
+    const { images, messageWithImages } = resolveResponseImages(response, viaImagesApi);
 
     // Log the actual response structure for debugging
     logger.info(
@@ -405,56 +456,7 @@ export async function generateImage(
       throw new Error('No image generated in response');
     }
 
-    const imageData = images[0];
-
-    // Handle different response formats
-    let imageDataUrl: string;
-
-    if (typeof imageData === 'string') {
-      imageDataUrl = imageData;
-    } else if (imageData && typeof imageData === 'object') {
-      // OpenRouter can return various formats:
-      // 1. { type: "image_url", image_url: { url: "data:..." } } - chat completion format
-      // 2. { url: string } - direct URL
-      // 3. { b64_json: string } - base64 without data URL prefix
-      // 4. { data: string } - data URL
-      const imgObj = imageData as {
-        type?: string;
-        image_url?: { url?: string };
-        url?: string;
-        b64_json?: string;
-        data?: string;
-      };
-
-      if (imgObj.type === 'image_url' && imgObj.image_url?.url) {
-        // Chat completion format: { type: "image_url", image_url: { url: "data:..." } }
-        imageDataUrl = imgObj.image_url.url;
-      } else if (imgObj.url?.startsWith('data:')) {
-        // Direct data URL
-        imageDataUrl = imgObj.url;
-      } else if (imgObj.url) {
-        // External URL - not supported yet
-        throw new Error(`External image URL not supported yet: ${imgObj.url}`);
-      } else if (imgObj.b64_json) {
-        imageDataUrl = `data:image/png;base64,${imgObj.b64_json}`;
-      } else if (imgObj.data) {
-        imageDataUrl = imgObj.data;
-      } else {
-        throw new Error(`Unknown image object format: ${JSON.stringify(imgObj).substring(0, 200)}`);
-      }
-    } else {
-      throw new Error(`Unexpected image data type: ${typeof imageData}`);
-    }
-
-    // Parse data URL: data:image/png;base64,{base64_data}
-    const dataUrlMatch = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-
-    if (!dataUrlMatch) {
-      throw new Error('Invalid image data URL format');
-    }
-
-    const mimeType = dataUrlMatch[1];
-    const base64Data = dataUrlMatch[2];
+    const { mimeType, base64Data } = parseImageDataUrl(extractImageDataUrl(images[0]));
 
     // Get actual dimensions based on model and settings
     const actualDimensions = getImageDimensions(model, imageSize, aspectRatio);
