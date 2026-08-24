@@ -257,6 +257,22 @@ nothing — this "saving" bought three paid calls where one would do. And the te
 `generation_trace.output_data` carries `finishReason` and `nativeTokensCompletion`, and truncation
 reads as `"length"` with the completion count exactly equal to the allocated tokens.
 
+**A guard that names a file cannot survive that file being split.** Several of the strongest checks
+here read SOURCE TEXT rather than behaviour — `no-anonymous-spend` scans for raw
+`.completions.create(`, `every-spend-has-one-ledger` counts `phase: 'stage_4_evidence_*'`, the
+document-evidence privacy contract reads the payload just before a named log message. Each of them
+named one path. On 2026-08-24 a lint-debt sweep split four of those files, and three guards went
+red without a single behavioural change: the calls were still priced, the log lines still written,
+the phases still named. What had changed was which file they were in.
+
+Two lessons, both cheap. When a guard is about a MODULE'S behaviour, read the module's directory,
+not a path — `readdirSync` over the sibling `.ts` files costs nothing and cannot be blinded by a
+rename. And when a guard is about a CALL SITE — "the cost context must be visible at the call", "the
+`cost-exempt:` note must be within 400 characters" — do not widen it: those windows are the point,
+and hoisting a shared options object or a request builder out of the call is exactly what they
+exist to notice. One of the three failures in that sweep was real by that rule: an options literal
+had been collapsed into a spread, and the attribution was no longer where a reader checks it.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.

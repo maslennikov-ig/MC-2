@@ -49,8 +49,11 @@ function readDirectory(relativePath: string): string {
 
 describe('document evidence writes to the course ledger', () => {
   const evidenceModules = readDirectory('stages/stage4-analysis/evidence');
-  const conflictDetector = read('stages/stage4-analysis/evidence/conflict-detector.ts');
-  const wiring = read('stages/stage4-analysis/orchestrator-phase-helpers.ts');
+  // Both of these read a module GROUP rather than a named file, for the reason recorded on
+  // `readDirectory`: conflict detection and the phase that wires it have each since been split
+  // across siblings, and a guard a file split can blind is not a guard.
+  const conflictDetector = evidenceModules;
+  const wiring = readDirectory('stages/stage4-analysis');
 
   it('prices each of its three extraction calls', () => {
     const phases = evidenceModules.match(/phase: 'stage_4_evidence_\w+'/g) ?? [];

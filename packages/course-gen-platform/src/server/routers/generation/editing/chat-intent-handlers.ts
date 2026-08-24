@@ -581,18 +581,26 @@ export async function handleStructuralIntentRoute(
     { role: 'system' as const, content: systemPrompt },
     { role: 'user' as const, content: userMessage },
   ];
-  const callOptions = { temperature, maxTokens: 2048, enableCaching: true, costContext };
-
+  // `costContext` is written out at BOTH call sites rather than hoisted into a shared options
+  // object. `no-anonymous-spend` reads the options literal at the call, so a spread hides the
+  // attribution from the guard even though the runtime value is identical — and the guard is
+  // right to want it there: this is where a reader checks who a paid call is charged to.
   try {
     llmResponse = await llmClient.generateChatCompletion(messages, {
       model: modelId,
-      ...callOptions,
+      temperature,
+      maxTokens: 2048,
+      enableCaching: true,
+      costContext,
     });
   } catch {
     modelUsed = fallbackModelId;
     llmResponse = await llmClient.generateChatCompletion(messages, {
       model: fallbackModelId,
-      ...callOptions,
+      temperature,
+      maxTokens: 2048,
+      enableCaching: true,
+      costContext,
     });
   }
 
