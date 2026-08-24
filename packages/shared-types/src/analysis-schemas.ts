@@ -105,10 +105,17 @@ export function llmOptional<T extends z.ZodTypeAny>(
   z.output<T> | undefined,
   z.input<T> | null | undefined
 > {
-  return schema
-    .optional()
-    .nullable()
-    .transform(value => value ?? undefined);
+  return (
+    schema
+      .optional()
+      .nullable()
+      // `z.ZodTypeAny` is `ZodType<any, any, any>`, so `z.output<T>` IS `any` for an
+      // unconstrained `T` and no annotation can narrow it — the declared return type
+      // above is where the real contract lives, and every caller instantiates `T`
+      // concretely and gets a concrete type back. Not suppressible by fixing the code.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- generic Zod helper; see above
+      .transform(value => value ?? undefined)
+  );
 }
 
 /**

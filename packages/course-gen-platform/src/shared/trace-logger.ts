@@ -29,12 +29,14 @@ interface TraceLogParams {
     | 'stage_edit';
   phase: string;
   stepName: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects (Date, enums, etc.) that Supabase serializes
-  inputData?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects
-  outputData?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects
-  errorData?: any;
+  // Arbitrary runtime values — Dates, enums, class instances — that supabase-js
+  // serialises on the way to a JSONB column. `unknown` rather than `any`: the
+  // caller side is unchanged (every argument is assignable to `unknown`), but
+  // the assertion now happens once, at the column boundary in `asJsonColumn`,
+  // instead of leaking through every expression that touched these three fields.
+  inputData?: unknown;
+  outputData?: unknown;
+  errorData?: unknown;
   modelUsed?: string | null;
   promptText?: string | null;
   completionText?: string | null;
@@ -45,6 +47,21 @@ interface TraceLogParams {
   retryAttempt?: number;
   wasCached?: boolean;
   qualityScore?: number | null;
+}
+
+type JsonColumn = Database['public']['Tables']['generation_trace']['Insert']['input_data'];
+
+/**
+ * The single point where trace data crosses into a JSONB column.
+ *
+ * `Json` describes what arrives at the database after supabase-js has run the
+ * value through `JSON.stringify`, not what the caller is holding, so an
+ * assertion here is unavoidable. Making it one named, commented assertion is
+ * the difference between a boundary and a hole: typing the parameters `any`
+ * put the same assertion on every line that read them.
+ */
+function asJsonColumn(value: unknown): JsonColumn {
+  return value as JsonColumn;
 }
 
 /**
@@ -115,13 +132,13 @@ export async function logTrace(params: TraceLogParams): Promise<string | null> {
     }
 
     // Ensure inputs are objects (safe for JSONB)
-    const safeInput = {
-      ...(params.inputData || {}),
+    const safeInput = asJsonColumn({
+      ...((params.inputData || {}) as Record<string, unknown>),
       // Include lessonLabel in input_data for searchability
       ...(lessonLabel ? { lessonLabel } : {}),
-    };
-    const safeOutput = params.outputData || undefined; // undefined to skip if null
-    const safeError = params.errorData || undefined;
+    });
+    const safeOutput = params.outputData ? asJsonColumn(params.outputData) : undefined; // skip if null
+    const safeError = params.errorData ? asJsonColumn(params.errorData) : undefined;
 
     // Write prompt_text/completion_text to local file (default) instead of Supabase
     void writePromptsToFile(

@@ -156,7 +156,10 @@ function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === 'string' && value.trim().length > 0) return value.trim();
     if (Array.isArray(value)) {
-      const nested = firstString(...value);
+      // `Array.isArray` narrows `unknown` to `any[]`, so spreading it fed `any`
+      // back into a parameter list typed `unknown[]`. The array's elements are
+      // unknown by construction — this recursion is what decides what they are.
+      const nested = firstString(...(value as unknown[]));
       if (nested) return nested;
     }
   }

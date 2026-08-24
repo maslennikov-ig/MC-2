@@ -38,7 +38,7 @@
   },
   "scripts": {
     "build": "tsc --build && node scripts/fix-esm-imports.mjs",
-    "lint": "eslint src",
+    "lint": "eslint src --max-warnings=5",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
