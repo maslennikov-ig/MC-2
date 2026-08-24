@@ -29,7 +29,28 @@ Two things this procedure depends on, both verified 2026-08-24:
   writes a `<storage>.browser_profile` directory beside the file. Use a directory the invoking user
   owns; this runbook uses `~/.nlm-auth`.
 
-## Steps
+## Which route
+
+`--browser chrome` does **not** reuse your logged-in Chrome. Playwright runs
+`launch_persistent_context` against a profile directory the tool creates next to `--storage`, so
+that flag only swaps the binary (bundled Chromium → system Chrome) and still starts signed out.
+The only flag that reuses an existing session is `--browser-cookies`, and it reads a browser on the
+**same OS as the CLI**.
+
+That splits into two real routes, and the choice is about where you are already signed in:
+
+- **Route 1 — sign in fresh (WSL).** No admin, nothing to install. Costs one password entry, and
+  `--fresh` empties the account picker so the right account is chosen explicitly rather than
+  inherited. This is also the cleaner credential: a server session that is not a copy of a personal
+  desktop session does not die when that person changes their password.
+- **Route 2 — reuse the Windows Chrome login (Windows, elevated).** No password, no browser window.
+  Requires an **Administrator** PowerShell: from Chrome v130 cookies use App-Bound Encryption, and
+  `rookiepy` refuses outright otherwise — `Chrome cookies from version v130 can be decrypted only
+when running as admin due to appbound encryption!`. Verified on Chrome 151 with
+  `app_bound_encrypted_key` present in `Local State`. WSL cannot do this at all: the cookies are
+  bound to the Windows user, so no Linux-side reader reaches them.
+
+## Route 1 — sign in fresh, from WSL
 
 1. **Owner runs in the WSL terminal** (this is the only step that needs a human):
 
@@ -49,6 +70,31 @@ Two things this procedure depends on, both verified 2026-08-24:
    **Do not press Enter.** From 0.8.0 the CLI detects the login itself and writes the file as soon
    as NotebookLM loads; the older instruction to confirm in the terminal is wrong. Wait until the
    terminal prints that auth was saved, then close the browser if it is still open.
+
+## Route 2 — reuse the Windows Chrome login
+
+Prepared 2026-08-24: Windows has Python 3.12.0 (`py -V`) and a venv at
+`%USERPROFILE%\nlm-probe-venv` already carrying `notebooklm-py[cookies]==0.8.0`. Delete that
+directory to undo it.
+
+Owner opens **PowerShell as Administrator** (right-click → Run as administrator) and runs:
+
+```powershell
+& $env:USERPROFILE\nlm-probe-venv\Scripts\notebooklm.exe login `
+  --browser-cookies chrome `
+  --account SERVER_ACCOUNT@example.com `
+  --storage $env:USERPROFILE\nlm-auth\server_storage_state.json
+```
+
+`--account` is what picks one of several signed-in accounts, so the wrong one cannot be captured by
+accident. If the address is not known, `--all-accounts` extracts every signed-in account into its own
+profile named after its email, which also reveals what they are. No browser window opens either way.
+
+The file then lands at `C:\Users\<user>\nlm-auth\server_storage_state.json`, which WSL reads directly
+as `/mnt/c/Users/<user>/nlm-auth/server_storage_state.json` — no manual copying. The `/tmp` chmod trap
+does not apply here: the tool skips chmod entirely on Windows.
+
+## Deployment (either route)
 
 2. **Agent copies it to the host** (`claude-deploy` has NOPASSWD sudo):
 
