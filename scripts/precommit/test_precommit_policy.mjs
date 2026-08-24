@@ -44,13 +44,64 @@ test('format-only staged source skips ESLint while semantic changes remain linta
     execFileSync(prettierBin, ['--write', source], { cwd, stdio: 'ignore' });
     git(cwd, 'add', 'packages/web/example.ts');
     const formatCommands = await policy.buildTypeScriptCommands([source], { cwd });
-    assert.equal(formatCommands.some(command => command.startsWith('eslint --fix ')), false);
+    assert.equal(formatCommands.some(command => command.includes('exec eslint --fix ')), false);
     assert.equal(formatCommands.some(command => command.startsWith('prettier --write ')), true);
 
     await writeFile(source, "export const value = { label: 'changed' };\n", 'utf8');
     git(cwd, 'add', 'packages/web/example.ts');
     const semanticCommands = await policy.buildTypeScriptCommands([source], { cwd });
-    assert.equal(semanticCommands.some(command => command.startsWith('eslint --fix ')), true);
+    assert.equal(semanticCommands.some(command => command.includes('exec eslint --fix ')), true);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('each package is linted from its own directory, not from the repository root', async () => {
+  // A root-level `eslint` has never heard of `eslint-config-next`, so it reports every
+  // `eslint-disable-next-line @next/next/...` in packages/web as "Definition for rule was not
+  // found" — an ERROR, which failed the hook on files nobody had semantically changed.
+  const policy = await import(policyUrl);
+  const cwd = await makeRepository();
+  try {
+    const paths = {
+      web: 'packages/web/component.ts',
+      platform: 'packages/course-gen-platform/src/service.ts',
+      types: 'packages/shared-types/src/contract.ts',
+      untracked: 'packages/shared-utils/src/helper.ts',
+    };
+    for (const relative of Object.values(paths)) {
+      const absolute = path.join(cwd, relative);
+      await mkdir(path.dirname(absolute), { recursive: true });
+      await writeFile(absolute, "export const value = { label: 'changed' };\n", 'utf8');
+      git(cwd, 'add', relative);
+    }
+
+    const commands = await policy.buildTypeScriptCommands(
+      Object.values(paths).map(relative => path.join(cwd, relative)),
+      { cwd }
+    );
+    const lint = commands.filter(command => command.includes('exec eslint --fix '));
+
+    assert.equal(lint.length, 3, 'one command per linted package, none for shared-utils');
+    for (const dir of ['packages/web', 'packages/course-gen-platform', 'packages/shared-types']) {
+      assert.equal(
+        lint.some(command => command.startsWith(`pnpm --dir=${dir} exec eslint --fix `)),
+        true,
+        `expected a lint command rooted at ${dir}`
+      );
+    }
+    assert.equal(
+      lint.some(command => command.includes('shared-utils')),
+      false,
+      'shared-utils has no lint script and must not be linted'
+    );
+    // Every staged file is still formatted, linted package or not.
+    assert.equal(
+      commands.at(-1).startsWith('prettier --write '),
+      true,
+      'prettier runs last, over all staged files'
+    );
+    assert.equal(commands.at(-1).includes('shared-utils'), true);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
