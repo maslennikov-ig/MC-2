@@ -53,6 +53,25 @@ def test_master_token_auth_can_actually_import_gpsoauth() -> None:
     assert master_token._require_gpsoauth() is gpsoauth
 
 
+def test_requests_can_reach_a_socks_proxy() -> None:
+    """gpsoauth uses `requests`, and requests needs PySocks to parse `socks5h://` at all.
+
+    The container is handed `HTTPS_PROXY=socks5h://172.19.0.1:1080`. `httpx` does its own SOCKS
+    through `socksio`, but gpsoauth does not use httpx — so without PySocks the exchange does not
+    quietly go direct, it raises `InvalidSchema: Missing dependencies for SOCKS support` and the
+    bootstrap fails outright.
+
+    `proxy_manager_for` is the exact call requests makes when it meets a `socks5h://` proxy, and
+    it is where the missing dependency surfaces — so this needs no network and no live proxy,
+    only the address shape.
+    """
+    pytest.importorskip("requests", reason="requests arrives with gpsoauth")
+
+    from requests.adapters import HTTPAdapter  # noqa: PLC0415
+
+    assert HTTPAdapter().proxy_manager_for("socks5h://172.19.0.1:1080") is not None
+
+
 def test_every_requirement_has_an_upper_bound() -> None:
     """A floor is not a range.
 
