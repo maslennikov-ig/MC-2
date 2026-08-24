@@ -20,15 +20,27 @@ Two things this procedure depends on, both verified 2026-08-24:
 - **The venv is Python 3.12 built by `uv`.** The system python is 3.14 and `python3.14-venv` is not
   installed, so `python3 -m venv` fails on `ensurepip` — recreating it that way is the failure this
   document was written after. Rebuild with `uv venv --python 3.12 .venv`, never `python3 -m venv`.
+  The stray `/home/me/code/mc2/.venv-nlm` is dead for the same reason and is not used by anything;
+  activating it does nothing but shadow `PATH`.
+- **`--storage` must not point into `/tmp`.** `prepare_login_paths` unconditionally runs
+  `storage_path.parent.chmod(0o700)`, and `/tmp` is `drwxrwxrwt root root`, so a normal user gets
+  `PermissionError: [Errno 1] Operation not permitted: '/tmp'` and the CLI reports only
+  `Unexpected error: 1` — no mention of the path, the permission or the directory. The tool also
+  writes a `<storage>.browser_profile` directory beside the file. Use a directory the invoking user
+  owns; this runbook uses `~/.nlm-auth`.
 
 ## Steps
 
 1. **Owner runs in the WSL terminal** (this is the only step that needs a human):
 
    ```bash
+   mkdir -p ~/.nlm-auth && chmod 700 ~/.nlm-auth
    cd /home/me/code/mc2/packages/course-gen-platform/docker/notebooklm-bridge
-   .venv/bin/notebooklm login --storage /tmp/server_storage_state.json --fresh
+   .venv/bin/notebooklm login --storage ~/.nlm-auth/server_storage_state.json --fresh
    ```
+
+   If it exits immediately with `Unexpected error: 1`, re-run it with `-vv` before the subcommand
+   (`.venv/bin/notebooklm -vv login …`) — the bare message names nothing, and the traceback does.
 
    A Chromium window opens through WSLg. Sign in with the **server** Google account — `--fresh`
    clears any cached profile, so the account picker starts empty and a previously used personal
@@ -41,12 +53,12 @@ Two things this procedure depends on, both verified 2026-08-24:
 2. **Agent copies it to the host** (`claude-deploy` has NOPASSWD sudo):
 
    ```bash
-   scp /tmp/server_storage_state.json megacampus-prod:/tmp/storage_state.json
+   scp ~/.nlm-auth/server_storage_state.json megacampus-prod:/tmp/storage_state.json
    ssh megacampus-prod "sudo cp /opt/megacampus/secrets/notebooklm/storage_state.json /opt/megacampus/secrets/notebooklm/storage_state.json.bak-\$(date +%F) \
      && sudo cp /tmp/storage_state.json /opt/megacampus/secrets/notebooklm/storage_state.json \
      && sudo chmod 600 /opt/megacampus/secrets/notebooklm/storage_state.json \
      && rm /tmp/storage_state.json"
-   rm /tmp/server_storage_state.json
+   rm -rf ~/.nlm-auth/server_storage_state.json ~/.nlm-auth/server_storage_state.json.browser_profile
    ```
 
    The backup line is not decoration: the file is the only copy of that session, and a login that
