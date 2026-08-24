@@ -68,15 +68,27 @@ the old version and silently restores `:ro` — the same quiet revert that cause
 the original problem. Production gets this through a normal
 `develop → master` release.
 
-### `mc2-cuk7j.3` — the bridge image has no build in the pipeline (P2)
+### `mc2-cuk7j.3` — the bridge image has no build in the pipeline (P2) — WRONG, closed
 
-CI runs the bridge's tests and never builds its image. Both tags are moved by
-hand, whenever somebody remembers. A change to `app/main.py` therefore passes
-tests, passes CI, lands in `develop`, and reaches nothing.
+**This item's premise was false, and the correction is the useful part.** The
+pipeline has built the bridge image since at least 2026-07-12:
+`detect_deploy_changes.sh` emits a `notebooklm-bridge` matrix entry gated on
+`bridge_changed`, and `build-docker` builds and pushes it. Every published
+version in GHCR carries the tag shapes `docker/metadata-action` produces —
+`master-acc516b`, `develop-dbe094e`, the full commit sha — which nobody types.
 
-`.github/workflows/build-docling-images.yml` is the working pattern. One caveat
-that must not be missed: **`:latest` is production.** An automatic build must
-not move it on a `develop` commit — `develop → :develop`, `master → :latest`.
+What actually happened is a failure already in
+`.codex/repository-failure-modes.md` wearing a new coat. Run 32724467242, for
+the cookie fix `e2c55c19c`, had Unit Tests fail, so `ci-success` failed and
+`build-docker` was SKIPPED. The next commit touched only `deploy/qdrant/**`, so
+`bridge_changed` was false and no build followed. The image was then built by
+hand — and the hand-built one is identifiable, because it is the only version
+tagged `develop` with no `develop-<sha>` companion.
+
+One real hardening came out of it. `:latest` was gated on
+`enable={{is_default_branch}}`, which is correct only for as long as the default
+branch happens to be master — a repository setting, changed from a web page,
+with no diff and no review. The branch is named explicitly now.
 
 ### `mc2-cuk7j.4` — make cookie refresh browserless (P2)
 
@@ -88,18 +100,44 @@ Only meaningful together with `mc2-cuk7j.2`: re-minted cookies need somewhere to
 be written. Note the refresh must egress through the same SOCKS hop the bridge
 uses, or Google will not serve it.
 
-### `mc2-cuk7j.5` — 106 lint warnings (P3)
+### `mc2-cuk7j.5` — 106 lint warnings (P3) — closed at ZERO, not at a ratchet
 
-`pnpm -r lint`: 0 errors, 106 warnings, concentrated in Stage 6 and Stage 7 —
-the 90% of spend and the most-edited code. Worst single point:
-`processStage6Job`, complexity 97 against a limit of 30, 657 lines in one
-function.
+The measured figure was 102, not 106. This section proposed freezing it as a
+ceiling; the owner chose to fix rather than to freeze, and every package now
+carries `--max-warnings=0`.
 
-The useful move is not a rewrite. It is a ratchet: freeze 106 as the ceiling and
-fail on 107, so new code must be simpler and old code is fixed when touched
-anyway.
+Three passes, and the middle one is the part worth remembering.
 
-### `mc2-cuk7j.6` — two small traps (P4)
+Ten warnings were real defects in miniature — `any` in `trace-logger` switched
+off checking for a whole JSONB insert, a React effect closed over `session.user`
+while declaring only `user.id`, so a changed display name never reached the
+widget.
+
+Then the thresholds were re-derived from this repository instead of taken on
+taste. Over the 845 files these rules govern: median 143, p90 436, p95 512,
+p99 805. `max-lines` 500 → 800 (44 files → 11), because length is a PROXY and
+it was demanding harm where no honest seam exists — splitting
+`analysis-schemas.ts` at its only available seam turned 2 warnings into 67,
+since Zod's inference does not survive a module boundary. `complexity` 30 → 40,
+at the gap in the distribution: twenty-one functions sit in the arguable band
+31–40, and the rest form a tail (41 … 97) that is not arguable. Two blanket
+opt-outs already in the tree said the same from the other side.
+
+The remaining 92 were refactored away, with no suppressions. More than half the
+length turned out to be DUPLICATION: two identical query loops for RAG Tier 1
+and Tier 2, two NotebookLM poll schedulers, a twenty-field zero-result written
+twice beside an existing function of that exact shape, two patcher/expander task
+loops, a twelve-field generation input written twice. Where coverage was
+missing, 35 characterization tests were written against the OLD implementation
+first and pass unchanged against the new one.
+
+Two defects were found by the refactor rather than by the linter: the pre-commit
+hook judged `packages/web` files with the ROOT eslint config, which made the
+repository's own `eslint-disable @next/next/...` an error and any edit to those
+files uncommittable without `--no-verify`; and `visual_style_source` was STORED
+as `default` where the logs said `settings`.
+
+### `mc2-cuk7j.6` — two small traps (P4) — closed
 
 `q12-window-preflight.py --emit-asset-manifest` writes canonical single-line
 JSON while the committed file is pretty-printed, so `git diff --stat` reads
@@ -133,9 +171,9 @@ These are tracked with their own reopen conditions and are not work we owe:
 
 ```bash
 pnpm type-check                      # 0 errors expected
-pnpm test:unit                       # course-gen-platform + shared-types only
-pnpm -r lint                         # 0 errors, 106 warnings
-cd packages/web && npx vitest run    # 47 failed | 46 passed — the debt itself
+pnpm test:unit                       # all three packages since mc2-cuk7j.1
+pnpm -r lint                         # 0 errors, 0 warnings; ceilings are 0
+cd packages/web && npx vitest run    # 93 passed — was 47 failed | 46 passed
 bash scripts/orchestration/run_process_verification.sh
 python3 scripts/orchestration/check_stranded_commits.py
 
