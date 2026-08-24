@@ -43,12 +43,15 @@ That splits into two real routes, and the choice is about where you are already 
   `--fresh` empties the account picker so the right account is chosen explicitly rather than
   inherited. This is also the cleaner credential: a server session that is not a copy of a personal
   desktop session does not die when that person changes their password.
-- **Route 2 — reuse the Windows Chrome login (Windows, elevated).** No password, no browser window.
-  Requires an **Administrator** PowerShell: from Chrome v130 cookies use App-Bound Encryption, and
-  `rookiepy` refuses outright otherwise — `Chrome cookies from version v130 can be decrypted only
-when running as admin due to appbound encryption!`. Verified on Chrome 151 with
-  `app_bound_encrypted_key` present in `Local State`. WSL cannot do this at all: the cookies are
-  bound to the Windows user, so no Linux-side reader reaches them.
+- **Route 2 — reuse the Windows Chrome login. TRIED 2026-08-24, DOES NOT WORK. Do not spend time
+  here again.** Admin turned out to be necessary but not sufficient. Unelevated, `rookiepy` refuses
+  up front: `Chrome cookies from version v130 can be decrypted only when running as admin due to
+appbound encryption!`. From an elevated PowerShell 7.6.5 that check passes and decryption still
+  fails: `Could not decrypt chrome cookies.` — followed by advice about a macOS Keychain, which is
+  its own error text taking the wrong branch and is not a hint about this machine. Chrome 151 with
+  `app_bound_encrypted_key` in `Local State`; `rookiepy` 0.5.6 handles the older DPAPI key, while
+  App-Bound Encryption requires impersonating Chrome's own elevation service. WSL cannot do it
+  either — the cookies are bound to the Windows user.
 
 ## Route 1 — sign in fresh, from WSL
 
@@ -71,28 +74,24 @@ when running as admin due to appbound encryption!`. Verified on Chrome 151 with
    as NotebookLM loads; the older instruction to confirm in the terminal is wrong. Wait until the
    terminal prints that auth was saved, then close the browser if it is still open.
 
-## Route 2 — reuse the Windows Chrome login
+## The passwordless route that is still open, if anyone wants it
 
-Prepared 2026-08-24: Windows has Python 3.12.0 (`py -V`) and a venv at
-`%USERPROFILE%\nlm-probe-venv` already carrying `notebooklm-py[cookies]==0.8.0`. Delete that
-directory to undo it.
+`run_cdp_capture` in `_auth/browser_capture.py` attaches to a Chrome the operator is already running
+(`playwright.chromium.connect_over_cdp`, loopback endpoints only), reuses its existing context —
+explicitly never `new_context`, which would be logged out — opens a temporary page it owns,
+captures `storage_state()` and closes only that page. No decryption is involved because Chrome
+serves the cookies itself, so App-Bound Encryption is irrelevant.
 
-Owner opens **PowerShell as Administrator** (right-click → Run as administrator) and runs:
+Two things stop this being a one-liner today, both worth knowing before starting:
 
-```powershell
-& $env:USERPROFILE\nlm-probe-venv\Scripts\notebooklm.exe login `
-  --browser-cookies chrome `
-  --account djbkk68@gmail.com `
-  --storage $env:USERPROFILE\nlm-auth\server_storage_state.json
-```
-
-`--account` is what picks one of several signed-in accounts, so the wrong one cannot be captured by
-accident. If the address is not known, `--all-accounts` extracts every signed-in account into its own
-profile named after its email, which also reveals what they are. No browser window opens either way.
-
-The file then lands at `C:\Users\<user>\nlm-auth\server_storage_state.json`, which WSL reads directly
-as `/mnt/c/Users/<user>/nlm-auth/server_storage_state.json` — no manual copying. The `/tmp` chmod trap
-does not apply here: the tool skips chmod entirely on Windows.
+- **`login --cdp-url` alone does nothing.** The flag is read only inside the
+  `master_token or master_token_refresh` branch of `session_cmd.py`. Plain cookie capture over CDP
+  means either `--master-token` (needs the `[headless]` extra, and gives a durable token that
+  re-mints cookies with no browser at all — the real cure for cookies dying unnoticed for four
+  months) or a few lines calling `run_cdp_capture` directly.
+- **Chrome must be started with `--remote-debugging-port`,** and recent Chrome refuses that against
+  the default profile directory. Unverified here; check that `http://127.0.0.1:9222/json/version`
+  answers before assuming it worked.
 
 ## Deployment (either route)
 
