@@ -82,7 +82,7 @@ Owner opens **PowerShell as Administrator** (right-click → Run as administrato
 ```powershell
 & $env:USERPROFILE\nlm-probe-venv\Scripts\notebooklm.exe login `
   --browser-cookies chrome `
-  --account SERVER_ACCOUNT@example.com `
+  --account djbkk68@gmail.com `
   --storage $env:USERPROFILE\nlm-auth\server_storage_state.json
 ```
 
@@ -137,7 +137,8 @@ does not apply here: the tool skips chmod entirely on Windows.
   not exist.
 - Server path: `/opt/megacampus/secrets/notebooklm/storage_state.json`. SSH host `megacampus-prod`
   (user `claude-deploy`, key `~/.ssh/megacampus/claude-deploy`).
-- **Which Google account is not recorded anywhere** — not in the docs, not in `bd`, not in the
-  runbook. It has to be asked each time. Write it down here once it is known.
+- **The server account is `djbkk68@gmail.com`** (owner, 2026-08-24). It had been recorded nowhere —
+  not in the docs, not in `bd`, not here — so every refresh started by asking. Both routes take it:
+  `--account` for the cookie route, and it is what to type into the sign-in form for the fresh one.
 - Local diagnostics: `.venv/bin/notebooklm auth check` and `auth check --test` (adds a network call).
 - Never print the contents of `storage_state.json` into a terminal, a ticket or a commit.
