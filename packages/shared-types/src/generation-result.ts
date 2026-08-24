@@ -745,4 +745,4 @@ export type CourseMetadataWithoutInjectedFields = z.infer<
 // `RetryCount`, `Stage5DocumentEvidenceEnrichment`, `GenerationMetadata` and
 // `GenerationResult` live next door; re-exported here so that every existing
 // import path keeps working.
-export * from './generation-metadata';
+export * from './generation-run-metrics';
