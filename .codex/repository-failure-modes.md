@@ -139,6 +139,124 @@ needed because the table has no CHECK constraint. True, and beside the point: th
 PostgreSQL enum, which is stricter. `pg_type.typtype = 'e'` says so in one query; the migrations
 directory does not. Sibling of "A Constraint the Repo Cannot Show You" and the same remedy.
 
+**`:batch` is an endpoint, not a discount flag.** A `:batch` model id sent to the synchronous
+OpenRouter endpoint breaks the caller — it belongs to an asynchronous API with a 24-hour window —
+and its tariff is not reliably half the base one. Read the same way as the provider price spread:
+a suffix or a catalogue entry is never the price.
+
+**A similarity threshold is only meaningful against a measured score distribution.** The retrieval
+cut-off was `0.7` against embeddings that top out near `0.58`, so the vector half never returned
+anything and "hybrid" search was BM25-only, silently. Thresholds now have one source,
+`src/shared/qdrant/retrieval-thresholds.ts`, and a test rejects any literal above it. Measure the
+ceiling before choosing a number.
+
+**Remaining credit is a ceiling check, never attribution.** Reconcile with
+`pnpm cost:report --since <T0> --verify-with-provider`, which sums `/api/v1/generation` over the
+generation ids a window produced — from `generation_trace` and `career_playbooks.cost_breakdown`
+alike — and names any id the provider has no record of. **Never the delta of `/api/v1/credits`**:
+the key is shared with production and that traffic never stops. Two idle samples with no call of
+mine spent $0.084 in 45 s and $0.072 in 150 s, and over two hours the delta read $1.4739 against an
+actual $0.03 (`mc2-yson0`).
+
+**An `await` on an `unref`'d timer is a promise Node may abandon.** The waits in
+`fetchGenerationFact` were unreferenced, so a failed Career Playbook attempt slept in the generation
+lookup and the process exited with **code 0 and no output** — which a caller reads as success. Only
+visible in a one-shot script; a worker's own sockets keep the loop alive. The wait now holds the
+loop, bounded at 30 s, and the background settle in `llm-cost.ts` opts out explicitly (`mc2-avjau`).
+
+**A model id is declared once, and a row still carries it twice.** `PROSE_MODEL_ID` /
+`PROSE_FALLBACK_MODEL_ID` sit beside `DEFAULT_*` in `model-defaults.ts`, held by
+`model-ids-live-in-one-place.test.ts`. But an `llm_model_config` row also carries the id a second
+time as `primary_display_name`, so an `UPDATE` that forgets it labels the admin screen with the
+wrong model — which is what CI caught. **Changing any model id** means `DEFAULT_MODEL_ID`, every
+occurrence in `config-seed.json` and the active rows of `llm_model_config` moving together, and
+because the database wins over the seed at runtime the order is fixed: edit the database first, then
+`pnpm generate:config-seed`, which reads it and rewrites the seed. That order is the only correct
+one.
+
+**A reasoning budget is added to `max_tokens`, not carved out of it.** OpenRouter bills reasoning
+tokens against `max_tokens`, so both the database and the seed generator refuse `reasoning_enabled`
+without a budget. Companion to the output-cap trap below: both are cases where a token limit means
+something other than what it looks like.
+
+**A database row that overrides code can outlive its caller, silently.** `prompt_templates` beats
+`PROMPT_REGISTRY` at runtime, which is the feature — a prompt changes without a deploy — and nothing
+checked the row still fitted the caller. 7 of 21 active rows did not. `checkOverrideContract` now
+refuses a row that references a placeholder the registry lacks or drops a required variable the
+registry renders, and falls back to the registry; a placeholder counts as unknown only when the
+registry's own template lacks it too, so Mustache sections and RAG-borne Helm/Jinja need no second
+list. The loud row cost Stage 4 Phase 3 its schema for nine months. **The silent one cost more**:
+`stage7_cover_user` ignored four variables the caller had started passing, so every lesson cover was
+drawn without its art direction and nothing warned, because an unused variable leaves no unresolved
+placeholder (`mc2-pdcb7`).
+
+**A guard is blind to what it has nothing to compare against.** A `prompt_templates` row whose key
+has no registry entry cannot be checked by the rule above, and five such rows sat unexamined until
+2026-08-24 — all dead, all editable from the pipeline-admin screen, where changing one would have
+looked like changing the pipeline and changed nothing (`mc2-jraut`). Two traps found retiring them.
+First, `clarifying_questions` **looked** used because its key collides with a table name; its phase
+uses a constant in code and never asks the prompt service. Second, retiring orphans in bulk is
+unsafe: the same admin screen can create a prompt under a key the registry has never heard of, so
+the keys are named explicitly and `decideDeactivation` refuses any the registry still declares — the
+live and dead halves of the Stage 4 `_system`/`_user` split differ by one suffix. Report by name,
+never by count: `5 with no registry entry` cost an hour to turn back into five keys.
+
+**Each attempt must pin its own endpoint, because a hung one never names itself.** `provider.order`
+with one `tag` from `/models/{model}/endpoints` and `allow_fallbacks: false`; the next attempt takes
+the next cheapest by live price, nothing outliving the call, and no pin at all when the list cannot
+be fetched. `GET /api/v1/generation` cannot help here — it is unreadable while the call still runs,
+which is exactly what a timeout is — and `X-Provider-Name` is advertised but never sent. Proven
+2026-08-23: a `group_6_wrap` attempt hung 238 s on `open-inference/fp4` while `relace/fp4` answered
+the identical request in 124 s. A pinned endpoint can also answer with nothing at all
+(`mc2-f1tqd`).
+
+**A LangChain option must ride a constructor field or it is lost to the clone.** `requiresReasoning`
+retries a 400 whose body says reasoning is mandatory, once, with `reasoning: {effort:'low'}` and a
+budget grown by `MANDATORY_REASONING_RESERVE_TOKENS`. It lives in `configuration.fetch`, a
+constructor field, so it survives `new ChatOpenAI(fields)` — the same reason cost recording rides in
+`callbacks` — and sitting below `invoke` it also covers `stream` and `batch`. An earlier version
+wrapped `invoke`, and the four structured call sites all missed it (`mc2-148j9`).
+
+**A log line must say which deployment it came from.** The pino base uses `detectEnvironment()`, not
+`NODE_ENV`, because every dev container sets `NODE_ENV=production`; the image carries `APP_VERSION`.
+
+**Timeouts come from measurement, and a small budget re-bills the call.** `DEFAULT_LLM_TIMEOUT_MS` is
+300000, and all eleven `stage_career_playbook_*` phases carry 238000 in both `config-seed.json` and
+`llm_model_config`, because measured calls have taken the full 238 s (`mc2-wg60c`).
+
+**A deploy can be skipped on a fully green pipeline.** `Detect Deploy-Relevant Changes` skips
+`Deploy to Dev` for a test-only change, so confirm that job's own conclusion rather than the run's.
+Companion to "A deploy can ship an image that does not contain the commit" above.
+
+**One version, four files.** A Docling image bump reached three files of four and would have
+published 3.1.0 under the tag `3.0.0`. `docling-image-version-consistency.test.ts` now makes the
+Dockerfile LABEL the source of truth and fails on any compose tag or publish-matrix entry that
+disagrees. Same shape as a number restated across a trust boundary: interpolate, never retype.
+
+**A flag with two readers is not configured until both have it.**
+`DOCLING_MCP_PDF_HEADING_HIERARCHY` is written from one repository variable into both env files, and
+half-configured is refused by a workflow gate and by a structural assertion. Set on the MCP side
+alone, conversions WITH inferred headings are recorded under the identity of ones without, and
+nothing downstream can tell the two apart.
+
+**A deploy may go quiet for five minutes and that is not a hang.** `docker compose up` waits on
+Docling Serve's ~330s health `start_period`; the deploy SSH had no keepalive and died with "Broken
+pipe" (run 32659118735, production untouched). The keepalive lives in the setup step and is
+asserted. Before killing a silent deploy, find out what it is waiting on.
+
+**An output cap taken from the input length fails backwards, and a ceiling is not spend.** Stage 4's
+evidence fallback set `maxOutputTokens` to the source document's own token count (`mc2-o5ktb`). A
+structured answer is mostly not prose — every claim carries a confidence and `source_refs` whose
+entries are a sha256 chunk id and a uuid, over a hundred tokens per claim before a word of content —
+so the budget is tightest exactly where the JSON overhead dominates, and **the smaller the input the
+more certain the truncation**. A realistic fixture passes; a 339-token source cannot. Replayed
+against the provider: 339 gave `finish_reason: "length"` and unparseable JSON, while the same call
+at 2048 answered in 941 tokens with `"stop"`. Size an output budget by the shape being asked for.
+Two corollaries. The provider bills what the model **emits**, so raising an unreachable cap costs
+nothing — this "saving" bought three paid calls where one would do. And the tell needs no logs:
+`generation_trace.output_data` carries `finishReason` and `nativeTokensCompletion`, and truncation
+reads as `"length"` with the completion count exactly equal to the allocated tokens.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.

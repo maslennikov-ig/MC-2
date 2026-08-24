@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-23. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-24. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -12,40 +12,21 @@ core 2.92.0, jobkit 3.4.0, parse 7.15.0, ibm-models 3.14.0, MCP 3.1.0 — and PD
 ON in both places it is read. Verified on the host after the deploy: those seven versions, the flag
 `true` in the MCP container and in both workers, and two real conversions with `from_cache=false`.
 
-What that upgrade is worth, measured rather than quoted: a docx content control that holds an image
-used to lose the text beside it. `content-control-image.docx` now carries that construct in the
-corpus — 194 characters of Markdown on 2.118.0 without the caption, 271 with it on 2.121.0 — so the
-fix cannot regress unnoticed. `numbered-sections.pdf` gained a second distinct heading level.
-The full corpus passed 18/18 on both stacks with no structural assertion moved; the one metric that
-fell, `recallAtK` on the scientific PDF, fell because core 2.92.0 carries content layers into chunk
-context, so more chunks contain the ground truth while atom coverage, aMRR, aDCG and the first
-relevant rank are identical.
+Measured, not quoted: a docx content control holding an image used to lose the text beside it (194
+Markdown characters on 2.118.0, 271 on 2.121.0, now in the corpus as `content-control-image.docx`),
+and `numbered-sections.pdf` gained a second heading level. 18/18 on both stacks with no structural
+assertion moved; the one metric that fell, `recallAtK` on the scientific PDF, fell because core
+2.92.0 carries content layers into chunk context — atom coverage, aMRR, aDCG and first relevant rank
+are identical. Its three guards outlive this stage and moved to `.codex/repository-failure-modes.md`.
 
-Three guards came out of this and hold beyond it:
+Off-host Qdrant retention is **7 days** by owner decision (2026-08-23); the allow-list interpolates
+`EXPECTED_RETENTION_DAYS` rather than repeating it, after the two copies drifted to 7 against 14.
 
-- **One image version, four files.** `docling-image-version-consistency.test.ts` makes the Dockerfile
-  LABEL the source of truth and fails on any compose tag or publish-matrix entry that disagrees. The
-  bump that prompted it had reached three files of four and would have published 3.1.0 as `3.0.0`.
-- **A flag with two readers.** `DOCLING_MCP_PDF_HEADING_HIERARCHY` is written from one repository
-  variable into both env files; half-configured is refused by a workflow gate and by a structural
-  assertion. Set on the MCP side alone, conversions WITH inferred headings are recorded under the
-  identity of ones without, and nothing downstream can tell.
-- **A deploy may go quiet for five minutes.** `docker compose up` waits on Serve's ~330s health
-  start_period; the deploy SSH had no keepalive and died with "Broken pipe" (run 32659118735,
-  production untouched). The keepalive now lives in the setup step and is asserted.
-
-Off-host Qdrant retention is **7 days** by owner decision (2026-08-23). It had been restated on both
-sides of the restricted allow-list, they drifted to 7 against 14, and the nightly report was rejected
-as an unknown command — the copy was pulled and verified, only its freshness metric went unwritten,
-and the stale-snapshot alert fired 36 hours later. The allow-list now interpolates
-`EXPECTED_RETENTION_DAYS` instead of repeating it.
-
-The previous stage remains accepted: `docs/plans/brawny-mellow-quokka.md` is **complete**: every phase delivered, and phase 2
-(`mc2-51epl`) **accepted** on the paid run of 2026-08-23 — course `6b3b183e`, dev workers on
-`afe03056f`, one of the eight lines left in the log and it is the legitimate one. The Career
-Playbook quality track stays **accepted** (`mc2-db696.110`); its two rules in
-`06-quality-acceptance.md` hold: read the artifact before calling a run accepted, and clean up
-**after** the editorial pass.
+The previous stage remains accepted: `docs/plans/brawny-mellow-quokka.md` is **complete**, every
+phase delivered, phase 2 (`mc2-51epl`) **accepted** on the paid run of 2026-08-23 — course
+`6b3b183e`, dev workers on `afe03056f`. The Career Playbook quality track stays **accepted**
+(`mc2-db696.110`); its two rules in `06-quality-acceptance.md` hold: read the artifact before calling
+a run accepted, and clean up **after** the editorial pass.
 
 ## The eight warnings (2026-08-23, `mc2-51epl`) — accepted
 
@@ -55,16 +36,11 @@ stayed silent too, so `cd9b60138` is not only repaired but running. Ledger: 0 bi
 23 of 23 generation ids answered, provider $0.037857 against a recorded $0.037859. What constrains
 work from here:
 
-- **`prompt_templates` overrides `PROMPT_REGISTRY` at runtime, and a row can outlive its caller.**
-  7 of 21 active rows had. `checkOverrideContract` now refuses a row that references a placeholder
-  the registry lacks or drops a required variable the registry renders, and uses the registry
-  instead; a placeholder counts as unknown only when the registry's own template lacks it too, so
-  Mustache sections and RAG-borne Helm/Jinja need no second list.
-  `scripts/sync-prompt-templates-to-registry.ts` reports by default and rewrites under `--apply`; it
-  read `0 that no longer fit` after the sync, and five rows with no registry entry are left alone
-  (`mc2-jraut`). The loud row cost Stage 4 Phase 3 its schema for nine months; the silent one cost
-  every lesson cover its art direction (`mc2-pdcb7`), because an ignored variable leaves no
-  unresolved placeholder to warn about.
+- **`prompt_templates` is now fully guarded.** `scripts/sync-prompt-templates-to-registry.ts`
+  reads `0 that no longer fit` and **0 with no registry entry**: the five orphans were retired
+  2026-08-24 (`mc2-jraut` closed), so 21 active rows became **16, every one inside
+  `checkOverrideContract`**. Retire another with `--deactivate=key_a,key_b`. Why the guard exists,
+  and the two traps in retiring a row, are in `.codex/repository-failure-modes.md`.
 - **A pure routing function cannot end a lesson.** The judge now writes its own terminal
   review_required when the regeneration cap is reached, naming the cap and the score, so
   `executeStage6`'s safety net is a net again — it had been the only path, 76 of the 154
@@ -80,12 +56,12 @@ Closed: `mc2-pdmgu`, `mc2-7frdr`, `mc2-5fpaf`, `mc2-18ujf`, `mc2-o3s4r`; `mc2-lr
 "no backfill". What still constrains work:
 
 Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6
-ceiling), and a test rejects any literal above it — the old `0.7` was unreachable against embeddings
-topping out near 0.58, which made hybrid search BM25-only. Degenerate parents no longer reach the
-index (`selectIndexableChunks`). Only children are indexed, plus any childless parent; the passage
-is rebuilt at retrieval time from siblings, **after reranking** in the two paths that rerank. On for
-Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off for evidence retrieval, where a
-citation must point at the fragment that matched. Average expansion 5.5x; **quality** unmeasured.
+ceiling); why, and the rule it produced, are in `.codex/repository-failure-modes.md`. Degenerate
+parents no longer reach the index (`selectIndexableChunks`). Only children are indexed, plus any
+childless parent; the passage is rebuilt at retrieval time from siblings, **after reranking** in the
+two paths that rerank. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off for
+evidence retrieval, where a citation must point at the fragment that matched. Average expansion
+5.5x; **quality** unmeasured.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -114,25 +90,16 @@ reaches the reader (`arbiter`, `rag_planning`, secondary judge, Stage 2/3/4 inte
 stored configuration — a global `UPDATE` moves other people's runs on the shared database, and
 `llm_model_config.course_id` cannot reference a playbook at all.
 
-Model ids are declared **once**: `PROSE_MODEL_ID` / `PROSE_FALLBACK_MODEL_ID` beside `DEFAULT_*` in
-`model-defaults.ts`, held by `model-ids-live-in-one-place.test.ts`. A row also carries the id a
-second time as `primary_display_name`; an `UPDATE` that forgets it labels the admin screen with the
-wrong model, which is what CI caught. Two inactive duplicate rows remain (`mc2-f6del`).
-
-Reasoning is per-phase and the budget is load-bearing: OpenRouter bills reasoning tokens against
-`max_tokens`, so the budget is ADDED, and both the database and the seed generator refuse
-`reasoning_enabled` without one. On for `stage_6_complex`, `stage_5_escalation`,
-`stage_6_auto_last_chance` only. Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation,
-30.0% judging, 20.2% section generation; Stage 5 ~5.5%, Stage 4 ~1.9% (epic `mc2-4clyr`).
+Reasoning is on for `stage_6_complex`, `stage_5_escalation` and `stage_6_auto_last_chance` only.
+Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
+generation; Stage 5 ~5.5%, Stage 4 ~1.9% (epic `mc2-4clyr`). Two inactive duplicate rows remain
+(`mc2-f6del`).
 
 **The `~`-alias question is settled: routing stays on the pinned snapshot** (owner, 2026-08-22).
 Both reasons — the 2026-08-17 latency incident and the empty endpoint list that silently disables
-the attempt pin — are in `.codex/repository-failure-modes.md`.
-
-**How to change any model id:** `DEFAULT_MODEL_ID`, every occurrence in `config-seed.json` and the
-active rows of `llm_model_config` move **together**, and the database wins over the seed at runtime —
-so edit the database first, then `pnpm generate:config-seed`, which reads it and rewrites the seed.
-That order is the only correct one.
+the attempt pin — are in `.codex/repository-failure-modes.md`, together with how a model id must be
+changed (database first, then `pnpm generate:config-seed`) and why a reasoning budget is added to
+`max_tokens` rather than taken out of it.
 
 **Phase configs** (2026-08-13, `7ad421986`): Stage 5, metadata generation and `getModelForPhase` all
 go through `buildProviderParams`, held by `tests/unit/phase-config-provider-contract.test.ts`;
@@ -177,39 +144,21 @@ decimal on two runs of 2026-08-22. What still constrains work:
   **`provider.max_price` below every endpoint is a refusal**, not a cheaper route: the ceiling
   yields so the call lives.
 
-**Each attempt pins its own endpoint, because a hung one never names itself.** `provider.order` with
-one `tag` from `/models/{model}/endpoints` and `allow_fallbacks: false`; the next attempt takes the
-next cheapest by live price, nothing outliving the call, no pin when the list cannot be fetched.
-`GET /api/v1/generation` cannot help — unreadable while the call still runs, which is exactly what a
-timeout is — and `X-Provider-Name` is advertised but never sent. The 1.5x ceiling holds over the
-pin. Closed (`mc2-6crnj`) and proven again 2026-08-23: a `group_6_wrap` attempt hung 238 s on
-`open-inference/fp4` and `relace/fp4` answered the identical request in 124 s. A pinned endpoint
-can also answer with nothing at all — five attempts, no record (`mc2-f1tqd`, open).
+**Attempt 1 stays on the primary**: `FALLBACK_FROM_ATTEMPT = 2` (`mc2-rqukn`). The 1.5x ceiling
+holds over the per-attempt endpoint pin (`mc2-6crnj`, closed); `mc2-f1tqd` stays **open** — a pinned
+endpoint that answered with nothing at all, five attempts, no record.
 
-**`requiresReasoning` is a net, not only a list** (`mc2-148j9`). A 400 whose body says reasoning is
-mandatory is re-sent once with `reasoning: {effort:'low'}` and a budget grown by
-`MANDATORY_REASONING_RESERVE_TOKENS`, capped by the model's output ceiling. It lives in
-`configuration.fetch`, a **constructor** field, so it survives the `new ChatOpenAI(fields)` clone —
-the same reason cost recording rides in `callbacks` — and below `invoke` it covers `stream` and
-`batch`. An earlier version wrapped `invoke` and the four structured call sites missed it.
-
-**A log line says which deployment it came from**: the pino base uses `detectEnvironment()`, not
-`NODE_ENV` (every dev container sets it to `production`), and the image carries `APP_VERSION`.
-**Timeouts come from measurement**: `DEFAULT_LLM_TIMEOUT_MS` is **300000** and all eleven
-`stage_career_playbook_*` phases carry 238000 in `config-seed.json` and `llm_model_config`, because
-measured calls have taken the full 238 s and a smaller budget re-bills them (`mc2-wg60c`).
-
-**Attempt 1 stays on the primary**: `FALLBACK_FROM_ATTEMPT = 2` (`mc2-rqukn`). **A deploy can be
-skipped on a green pipeline**: `Detect Deploy-Relevant Changes` skips `Deploy to Dev` for a test-only
-change — confirm that job's own conclusion, not the run's.
+Five rules that came out of this epic outlive it and moved to
+`.codex/repository-failure-modes.md`: each attempt pins its own endpoint, a LangChain option must
+ride a constructor field, a log line must name its deployment, timeouts come from measurement, and a
+green pipeline can still skip the deploy.
 
 ## Stage 6 Batch API, and backlog order
 
 `FEATURE_STAGE6_BATCH_GENERATION` (off) sends a course's initial lesson generation as one
 asynchronous OpenRouter batch; a coordinator polls, and each lesson is also enqueued with a
-`STAGE6_BATCH_MAX_WAIT_MS` delay so it generates synchronously if the batch never lands. Not a
-config switch: a `:batch` id on the synchronous endpoint breaks the caller, and its tariff is
-**not** reliably half the base one.
+`STAGE6_BATCH_MAX_WAIT_MS` delay so it generates synchronously if the batch never lands. Turning it
+on is not a config switch — see `:batch` in `.codex/repository-failure-modes.md`.
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order; do not re-open the 27
 already closed with a commit or a measurement, and do not re-rank by tracker priority. Complete
@@ -263,18 +212,10 @@ ceiling, commits, `git push` to `develop`, dev deploys on a green pipeline, edit
 `llm_model_config` and `config-seed.json`, branch/worktree cleanup, the migrations named in the
 active plan when necessary, and `RAG_SHADOW_RETRIEVAL_RATE` in production.
 
-**Reconcile with `pnpm cost:report --since <T0> --verify-with-provider`** (`mc2-yson0`, closed): it
-sums `/api/v1/generation` over the generation ids that window produced, from `generation_trace` and
-`career_playbooks.cost_breakdown` alike, and names any id the provider has no record of. **Never the
-delta of `/api/v1/credits`** — the key is shared with production and that traffic never stops: two
-idle samples with no call of mine spent $0.084 in 45 s and $0.072 in 150 s, and over two hours the
-delta read $1.4739 against my $0.03. Remaining credit is a ceiling check, not attribution.
-
-**An `await` on an `unref`'d timer is a promise Node may abandon** (`mc2-avjau`, closed): the waits
-in `fetchGenerationFact` were unreferenced, so a failed Career Playbook attempt slept in the
-generation lookup and the process left with **code 0 and no output**, which a caller reads as
-success. Visible only in a one-shot script; a worker's own sockets keep the loop alive. The wait now
-holds the loop, bounded at 30 s; the background settle in `llm-cost.ts` opts out explicitly.
+After a paid run, reconcile with `pnpm cost:report --since <T0> --verify-with-provider` (`mc2-yson0`,
+closed). Why the credits endpoint cannot be used for this, and why an `await` on an `unref`'d timer
+let a process exit 0 with no output (`mc2-avjau`, closed), are both in
+`.codex/repository-failure-modes.md`.
 
 Outside it, needing a fresh decision each time: reindex, force-push, secrets or access changes, any
 other production mutation, and any migration the plan does not name.
@@ -290,8 +231,7 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 ## Explicit defers
 
 `mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23, only live proof waits on `mc2-3lo22`, as do
-`mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding, separate deploy
-accounts) not planned; `mc2-gmab0` held by unit tests.
+`mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding, separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
 ## NotebookLM and languages
 
@@ -324,16 +264,42 @@ image is **neither published nor deployed** — that runs through the manual
 `build-docling-images.yml` workflow and a recorded `image@sha256`, a production mutation of its own.
 `mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`. `mc2-8m90f` moved
 without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none on the six
-affected courses. New: `mc2-pdcb7` (covers drawn without their visual style — fixed; whether to pay
-to redraw is the owner's) and `mc2-jraut` (five orphan prompt rows).
+affected courses — re-measured 2026-08-24, still none, so its reopen gate narrows from "any
+post-window Stage 4 run" to "a run on one of those six courses". New: `mc2-pdcb7` (covers drawn
+without their visual style — fixed; whether to pay to redraw is the owner's).
+
+**Those same 7 runs carried a live defect nobody had opened** — 4 of the 7 coverage cards `failed`,
+meaning both evidence paths failed and Stage 4 continued with no evidence for that document at all.
+Fixed 2026-08-24 (`mc2-o5ktb`, `7dbbdfc5d`) and **verified by paid replay of the exact live call**:
+old budget `finish_reason: "length"` at 339 tokens with the production path throwing, new budget
+`"stop"` at 941–956 tokens and 12 claims, $0.000530 for four calls. Deployed — CI run 32710233749
+green including `Deploy to Dev`, though the container itself was not checked, this laptop having no
+SSH to the deploy host. The general rule it produced is in `.codex/repository-failure-modes.md`.
+
+Two tickets were fixed long ago and left open, and both are now closed with the evidence:
+`mc2-b7olk.8` on `eb939d21f` (three causes, not one — a measured 120s budget with one transport
+retry shared by quiz and presentation, `maxPrimaryAttempts: 1` against a stalled route, and
+`MODEL_CONFIG.primary` reaching the handler as `settings.model` and so outranking `llm_model_config`
+with its `fallback_model_id`), and the inbox triage epic `mc2-p2908`, whose 22 Aug conclusions
+needed correcting three times — two tasks called "title only, no description" carry the owner's
+detailed 29 July requirements (now under `mc2-db696`), and the catalog screen it said did not
+exist did.
 
 ## Starter prompt for next orchestrator
 
 Read `docs/plans/brawny-mellow-quokka.md` whole first, then the section above for what it still owes;
 `snuggly-wiggling-sutton.md` is **done** and `.codex/next-goal-four-doors.md` is **stale** — ignore
 both. **Do not ask — act and report**, inside the standing authorization under Safety boundary.
-`codex/overnight-helixa-sync-mc2` carries eleven undelivered commits belonging to another agent —
-leave them alone; that agent also broke the root `node_modules` once, so if a pre-commit hook cannot
+The Helixa AIOS bridge belongs to another agent — leave it alone. **16 unique commits, 6149 lines**,
+reported by three refs; its three blockers are fixed on `fix/helixa-blockers` and handed over, not
+merged (`mc2-gxese`) — the branch did not type-check, its five migrations broke the pinned migration
+frontier, and eslint refused 13 more, three gates that had never run there because the worktree had
+no `node_modules`. Still the branch owner's call, and **not** covered by re-pinning the manifest:
+six database triggers the migrations install on `courses`, `career_playbooks` and `file_catalog`,
+inert while `helixa_knowledge_sync_bindings` is empty but installed at the database level, where the
+env flag does not reach — and dev and staging share one database. Both branches are in
+`.codex/stranded-commit-allowlist.txt`; remove the two entries together. That agent also broke the
+root `node_modules` once, so if a pre-commit hook cannot
 find `prettier-plugin-tailwindcss`, relink the symlink into `node_modules/.pnpm/...` by hand rather
 than running `pnpm install`. The 47 failing `.tsx` files under `packages/web` are a pre-existing
 JSX parse failure in the local rolldown transform, reproduce on `origin/develop`, and are in no CI
