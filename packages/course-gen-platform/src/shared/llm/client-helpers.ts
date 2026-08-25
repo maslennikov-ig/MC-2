@@ -468,6 +468,12 @@ export function parseCompletionResponse(
   // needs in order to route around it.
   const servedBy = (completion as unknown as Record<string, unknown>).provider;
 
+  // Alongside it, in the same body, the tariff the call was served at:
+  // `default`, `flex`, `priority`, or absent when the provider offers none.
+  // A fact rather than an inference — flex can refuse for capacity, so asking
+  // for it and getting it are different things (mc2-a9w19).
+  const servedTier = (completion as unknown as Record<string, unknown>).service_tier;
+
   return {
     content: choice.message.content,
     inputTokens,
@@ -477,6 +483,7 @@ export function parseCompletionResponse(
     finishReason: choice.finish_reason || 'unknown',
     requestId: (completion as unknown as Record<string, unknown>)._request_id as string | undefined,
     ...(typeof servedBy === 'string' && servedBy.length > 0 ? { providerName: servedBy } : {}),
+    ...(typeof servedTier === 'string' && servedTier.length > 0 ? { serviceTier: servedTier } : {}),
   };
 }
 

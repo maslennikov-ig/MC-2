@@ -66,7 +66,29 @@ export interface LlmCallUsage {
   generationId?: string;
   /** Display name of the endpoint that served the call, when it is known. */
   providerName?: string;
+  /**
+   * The tariff the provider says it served this call at: `default`, `flex` or
+   * `priority`. Read from the response body, not from what was requested.
+   */
+  serviceTier?: string;
 }
+
+/**
+ * What the flex tier charges, as a fraction of the catalogued rate.
+ *
+ * Half, on every model that offers it. Read from the live catalogue on
+ * 2026-08-25: luna $0.10/$0.60 against $0.20/$1.20, gemini-3.7-flash
+ * $0.1875/$0.9375 against $0.375/$1.875, gemini-2.5-flash-image $0.15/$1.25
+ * against $0.30/$2.50. It is a published tier multiplier rather than a
+ * per-model price, which is why one constant is honest here where a second
+ * price table would not be.
+ *
+ * Applied only when the *answer* said flex. A request that asked for flex and
+ * was served at the default rate — a model with no flex endpoint, or one that
+ * refused for capacity — must not be estimated at half, because an
+ * underestimate hides money where an overestimate merely reserves it.
+ */
+const FLEX_TARIFF_MULTIPLIER = 0.5;
 
 /**
  * Replace an estimated price with what OpenRouter actually charged.
@@ -115,6 +137,11 @@ export function settleTraceCostFromProvider(
               finishReason: fact.finishReason,
               nativeTokensPrompt: fact.nativeTokensPrompt,
               nativeTokensCompletion: fact.nativeTokensCompletion,
+              nativeTokensReasoning: fact.nativeTokensReasoning,
+              // Which tariff this call was actually served at. The routing
+              // decision is an intention; flex can refuse for capacity, and
+              // this is the only record of which one happened (mc2-a9w19).
+              serviceTier: fact.serviceTier,
             },
           })
           .eq('id', traceId);
@@ -156,13 +183,21 @@ export function settleTraceCostFromProvider(
  *
  * An uncatalogued model is a routing bug, not a rounding problem, so it is
  * reported rather than silently priced at zero.
+ *
+ * The catalogue holds the default tariff. A call the provider says it served at
+ * the flex tier cost half of it, and while `settleTraceCostFromProvider`
+ * replaces this figure with the real charge about ten seconds later, a call that
+ * was aborted or that failed never gets that receipt — its estimate is the only
+ * number the row will ever carry.
  */
 export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
   const capabilities = getModelCapabilities(usage.model);
   if (!capabilities) return undefined;
+  const tariff = usage.serviceTier === 'flex' ? FLEX_TARIFF_MULTIPLIER : 1;
   return (
-    (usage.inputTokens * capabilities.inputPricePerMillion) / 1_000_000 +
-    (usage.outputTokens * capabilities.outputPricePerMillion) / 1_000_000
+    ((usage.inputTokens * capabilities.inputPricePerMillion) / 1_000_000 +
+      (usage.outputTokens * capabilities.outputPricePerMillion) / 1_000_000) *
+    tariff
   );
 }
 
@@ -347,6 +382,7 @@ export async function recordLlmCallCost(
         ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
         ...(usage.generationId ? { generationId: usage.generationId } : {}),
         ...(usage.providerName ? { providerName: usage.providerName } : {}),
+        ...(usage.serviceTier ? { serviceTier: usage.serviceTier } : {}),
       },
     });
 

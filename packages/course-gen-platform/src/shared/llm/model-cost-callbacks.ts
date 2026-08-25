@@ -87,6 +87,12 @@ export function costRecordingCallbacks(
         };
         if (usage.promptTokens === undefined && usage.completionTokens === undefined) return;
         const generationId = generationIdOf(output);
+        // No `serviceTier` here on purpose. LangChain hands back `tokenUsage`
+        // and little else, so the tier this call was served at is not knowable
+        // from `llmOutput` — and guessing it from the phase would halve the
+        // estimate for a model that has no flex endpoint. The estimate stays at
+        // the default tariff and `settleTraceCostFromProvider` replaces it with
+        // the real charge, and the real tier, about ten seconds later.
         await recordLlmCallCost(
           {
             model: modelId,

@@ -3,6 +3,7 @@ import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shar
 import { buildProviderPriceCeiling } from '@/shared/llm/client-helpers';
 import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
+import { resolveServiceTier } from '@/shared/llm/service-tier';
 import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
   selectAttemptModel,
@@ -319,7 +320,10 @@ export function createCareerPlaybookRuntime(
         const endpoint = pickCheapestUntriedEndpoint(
           await listModelEndpoints(modelId),
           triedEndpointTags,
-          priceCeiling
+          priceCeiling,
+          // The wizard's two phases answer a person; the six group phases and
+          // the spec run after they have submitted (see service-tier.ts).
+          resolveServiceTier(options.phaseName)
         );
         if (endpoint) triedEndpointTags.add(endpoint.tag);
 

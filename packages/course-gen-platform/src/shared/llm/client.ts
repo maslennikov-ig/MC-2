@@ -38,6 +38,7 @@ import {
 import { buildOpenRouterClient } from './openrouter-client';
 import { fetchGenerationFact, resolveProviderSlug } from './openrouter-generation';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from './openrouter-endpoints';
+import { resolveServiceTier, type ServiceTier } from './service-tier';
 import {
   isMandatoryReasoningRejection,
   rememberMandatoryReasoning,
@@ -183,6 +184,16 @@ export interface LLMClientOptions {
    * six such waits — 32 minutes — before giving up (mc2-b7olk.8).
    */
   maxRetries?: number;
+  /**
+   * The cheapest service tier this call may be served by.
+   *
+   * Omit it and the tier follows `costContext.phase` — background work gets
+   * flex at half price, anything a person is waiting on stays on the default
+   * tier. Set it only where the caller knows something the phase name does not.
+   *
+   * @see shared/llm/service-tier
+   */
+  serviceTier?: ServiceTier;
 }
 
 export interface LLMClientConstructionOptions {
@@ -224,6 +235,15 @@ export interface LLMResponse {
    * cannot be derived from one another (see `resolveProviderSlug`).
    */
   providerName?: string;
+  /**
+   * The tariff this call was actually served at, as the provider reported it:
+   * `default`, `flex` or `priority`.
+   *
+   * What was asked for is in the request; this is what happened. Flex is half
+   * price and may refuse for capacity, so the estimate has to follow the answer
+   * rather than the intention.
+   */
+  serviceTier?: string;
 }
 
 /**
@@ -356,6 +376,7 @@ export class LLMClient {
       reasoning,
       costContext,
       maxRetries,
+      serviceTier = resolveServiceTier(costContext?.phase),
     } = options;
 
     logger.info(
@@ -390,7 +411,7 @@ export class LLMClient {
         model,
         inputContentLength,
         'LLM',
-        maxRetries
+        { maxRetries, serviceTier }
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -423,6 +444,7 @@ export class LLMClient {
       reasoning,
       costContext,
       maxRetries,
+      serviceTier = resolveServiceTier(costContext?.phase),
     } = options;
 
     logger.info(
@@ -451,7 +473,7 @@ export class LLMClient {
         model,
         inputContentLength,
         'Chat completion',
-        maxRetries
+        { maxRetries, serviceTier }
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -542,6 +564,7 @@ export class LLMClient {
         outputTokens: response.outputTokens,
         ...(response.generationId ? { generationId: response.generationId } : {}),
         ...(response.providerName ? { providerName: response.providerName } : {}),
+        ...(response.serviceTier ? { serviceTier: response.serviceTier } : {}),
       },
       costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
@@ -652,6 +675,7 @@ export class LLMClient {
    * @param model - Model identifier for logging and for the price ceiling
    * @param inputContentLength - Input content length for token estimation
    * @param label - Label for log messages (e.g., 'LLM' or 'Chat completion')
+   * @param call - This call's retry budget and the tier it may be served by
    * @returns The LLMResponse from the first attempt that succeeds
    */
   private async executeWithRetry(
@@ -660,9 +684,9 @@ export class LLMClient {
     model: string,
     inputContentLength: number,
     label: string,
-    callMaxRetries?: number
+    call: { maxRetries?: number; serviceTier: ServiceTier }
   ): Promise<LLMResponse> {
-    const maxRetries = callMaxRetries ?? this.maxRetries;
+    const maxRetries = call.maxRetries ?? this.maxRetries;
 
     // Local to this call by construction. No cache, no module state, nothing
     // that outlives the return.
@@ -690,7 +714,8 @@ export class LLMClient {
       const endpoint = pickCheapestUntriedEndpoint(
         await listModelEndpoints(model),
         triedEndpointTags,
-        requestOptions.extra_body?.provider?.max_price
+        requestOptions.extra_body?.provider?.max_price,
+        call.serviceTier
       );
       if (endpoint) triedEndpointTags.add(endpoint.tag);
 

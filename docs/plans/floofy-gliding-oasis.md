@@ -1,0 +1,321 @@
+# Варианты Luna: тариф, режим рассуждений и асинхронный путь
+
+## Контекст
+
+Вопрос владельца от 2026-08-25: у боевой модели `openai/gpt-5.6-luna` появились
+варианты `-pro`, `:batch` и `-pro:batch`; нужно решить, что где ставить.
+
+Живой каталог OpenRouter, прочитанный 2026-08-25, отвечает не то, что
+подсказывает интуиция. Вариантов не четыре, а шесть, потому что тариф задаётся
+не только идентификатором модели, но и эндпоинтом, на который уходит вызов
+($/1M вход/выход):
+
+| id                          | endpoint tag      | in             | out      | режим                               |
+| --------------------------- | ----------------- | -------------- | -------- | ----------------------------------- |
+| `openai/gpt-5.6-luna`       | `openai`          | 0.20           | 1.20     | синхронный — **платим это сегодня** |
+| `openai/gpt-5.6-luna`       | `openai/flex`     | **0.10**       | **0.60** | синхронный                          |
+| `openai/gpt-5.6-luna`       | `openai/priority` | 0.40           | 2.40     | синхронный                          |
+| `openai/gpt-5.6-luna-pro`   | те же три         | **те же цены** |          | синхронный                          |
+| `openai/gpt-5.6-luna:batch` | `openai`          | 0.10           | 0.60     | async, окно 24 ч                    |
+| `openai/gpt-5.6-luna:batch` | `openai/flex`     | 0.05           | 0.30     | async, окно 24 ч                    |
+
+Из этого следуют три факта, каждый из которых проверен, а не выведен:
+
+1. **`-pro` не дороже за токен.** `reasoning.mode: pro` меняет только то,
+   сколько reasoning-токенов модель потратит, а они биллятся как output. Это
+   вопрос качества и латентности, а не тарифа. При этом `reasoning_enabled =
+false` стоит у 41 из 51 luna-фазы в `config-seed.json`, то есть сегодня
+   `-pro` там нечем себя проявить.
+
+2. **`:batch` даёт меньше, чем кажется.** Batch по default-тарифу стоит ровно
+   столько же, сколько синхронный flex. `openrouter-batch-client.ts` не
+   отправляет `provider` вовсе, поэтому включённый сегодня batch дал бы ноль
+   экономии против flex и добавил бы часы ожидания.
+
+3. **Мы платим полный тариф.** По 158 luna-вызовам за 10 дней, где
+   `output_data->>'billedByProvider' = true` (то есть цена — это счёт
+   провайдера, а не наша оценка): фактически $0.317049 против $0.322506 по
+   ставке $0.2/$1.2. Отношение 0.983 — default-тариф, разница объясняется
+   скидкой на чтение кэша.
+
+Есть и срочная часть. `pickCheapestUntriedEndpoint`
+(`packages/course-gen-platform/src/shared/llm/openrouter-endpoints.ts:257`)
+сортирует эндпоинты по цене и пинит самый дешёвый. Tier-эндпоинты приходят в том
+же списке `/endpoints`, и flex теперь самый дешёвый — у Luna, у
+`google/gemini-3.7-flash` ($0.1875/$0.9375) и у `google/gemini-2.5-flash-image`
+($0.15/$1.25). **Следующий боевой прогон уедет на flex сам и молча.** Flex, в
+отличие от priority, не откатывается на default при нехватке мощности — он
+возвращает ошибку. Это должно стать решением, а не сюрпризом.
+
+Решения владельца (2026-08-25): flex — везде, кроме интерактива; `-pro` —
+сначала замерить; batch — расширять за пределы Stage 6.
+
+Документация: OpenRouter — HTTP API, а не пакет из lockfile, поэтому Docs L1
+(`@neuledge/context`) неприменим; использованы first-party docs
+(`openrouter.ai/docs/guides/features/service-tiers`,
+`openrouter.ai/docs/features/provider-routing`) плюс живые ответы `/api/v1/models`
+и `/api/v1/models/{id}/endpoints`.
+
+---
+
+## Этап 1. Service tier становится явным решением — СДЕЛАНО (mc2-a9w19)
+
+Цель: убрать молчаливый уезд на flex и одновременно забрать −50% там, где
+задержка никому не стоит денег.
+
+### Что подтвердилось живым замером
+
+`scripts/probe-service-tier.ts` (новый, платный, два вызова по 19 токенов),
+2026-08-25 — оба механизма приняты API:
+
+| режим                            | service_tier в ответе | total_cost   | латентность |
+| -------------------------------- | --------------------- | ------------ | ----------- |
+| `provider.only: ['openai/flex']` | `flex`                | $0.000004356 | 789 мс      |
+| `service_tier: 'flex'` в теле    | `flex`                | $0.000004356 | 742 мс      |
+| без указания                     | `default`             | $0.000008712 | 439 мс      |
+
+Ровно половина на идентичных 14+5 токенах. Латентность на микропромпте выше
+в 1.7 раза — на реальных промптах это ещё предстоит измерить прогоном.
+
+### Чего план не предвидел
+
+Самая дорогая фаза — генерация урока Stage 6 — идёт **не** через `LLMClient`,
+а через LangChain (`createCostRecordingModel` → `generator-single-call.ts:140`).
+Пина эндпоинтов там нет вовсе, поэтому фильтр `pickCheapestUntriedEndpoint` её
+бы не коснулся. Тир на этом пути называется параметром `service_tier` в теле —
+у пути нет списка эндпоинтов, чтобы выбрать тег.
+
+За это пришлось заплатить деградацией: flex не откатывается сам, а на этом пути
+нет цепочки попыток, которая взяла бы следующий эндпоинт. Отсюда
+`withFlexCapacityFallbackFetch` — транспортная обёртка ровно той же формы, что
+уже существующая `withMandatoryReasoningRecoveryFetch`, и по той же причине
+(`ChatOpenAI.withConfig` пересобирает инстанс из конструкторных полей, поэтому
+всё, что навешено после, теряется клоном `withStructuredOutput`).
+
+### Новый модуль: реестр тиров и интерактивных фаз
+
+`packages/course-gen-platform/src/shared/llm/service-tier.ts`
+
+- `export type ServiceTier = 'default' | 'flex'` — `priority` не поддерживаем,
+  он дороже вдвое и нам не нужен.
+- `LATENCY_SENSITIVE_PHASES: ReadonlySet<PhaseName>` — список интерактива, а не
+  фона, потому что интерактива мало и он перечислим:
+  `chat_intent_classification`, `chat_node_refinement`, `chat_global_guidance`,
+  `chat_full_regeneration`, `chat_stage_5_refinement`, `chat_stage_6_refinement`,
+  `inline_block_regeneration`, `inline_element_crud`, `stage_4_clarifying`,
+  `stage_career_playbook_department_classifier`, `stage_career_playbook_followup`.
+  Тип `PhaseName` уже существует в `@megacampus/shared-types/model-config` и
+  используется в `phase-fallback-config.ts` — берём его, новый перечень фаз не
+  заводим.
+- `resolveServiceTier(phase: string | undefined): ServiceTier` — `flex` для
+  фоновых фаз, `default` для интерактивных **и для неизвестной фазы**.
+  Консервативный дефолт намеренный: `costContext` необязателен по проекту (см.
+  `LLMClientOptions.costContext` в `client.ts:170`), и вызов без фазы не должен
+  молча менять тариф.
+
+### Эндпоинт знает свой тир
+
+`openrouter-endpoints.ts`
+
+- `ModelEndpoint` получает поле `tier: ServiceTier | 'priority'`.
+- Разбор тега — по явному списку последних сегментов `flex` и `priority`, а не
+  «всё после последнего слэша». В теге живут и не-тиры: `sail-research/fp4`,
+  `open-inference/fp4`, `azure/eu`, `azure/us`, `google-vertex/global/flex`.
+  Всё, что не `flex` и не `priority`, — `default`.
+- `pickCheapestUntriedEndpoint` получает аргумент `allowedTier: ServiceTier`.
+  `priority` исключается всегда. `flex` проходит только при `allowedTier ===
+'flex'`. Это одновременно чинит текущую дыру и открывает экономию.
+
+### Тир доезжает до вызова
+
+- `LLMClientOptions` (`client.ts:152`) получает `serviceTier?: ServiceTier`.
+  Если не задан — выводится из `costContext.phase` через `resolveServiceTier`.
+- `executeWithRetry` (`client.ts:657`) передаёт тир в
+  `pickCheapestUntriedEndpoint`. Деградация уже написана и менять её не надо:
+  пин + `allow_fallbacks: false`, а при отказе flex по мощности следующая
+  попытка берёт следующий по цене эндпоинт, то есть default.
+- Второй пин живёт в
+  `src/stages/stage-career-playbook/nodes/runtime.ts:319` — правится тем же
+  способом, иначе плейбук останется на старом поведении.
+
+### Доказательство, где мы были
+
+- `OpenRouterGenerationFact` (`openrouter-generation.ts`) получает `serviceTier`
+  и `nativeTokensReasoning` — OpenRouter отдаёт `service_tier` верхним полем
+  (`default | flex | priority | null`). Первое нужно, чтобы экономию можно было
+  доказать строкой из БД, второе понадобится Этапу 2.
+- Поле кладётся в `output_data` трассы рядом с существующими `providerName` и
+  `billedByProvider` (`shared/metrics/llm-cost.ts`). Отдельную колонку не
+  заводим.
+
+### Оценка стоимости до прихода счёта
+
+`calculateLlmCostUsd` считает по `MODEL_CATALOG`, то есть по default-тарифу. На
+flex оценка вдвое завышена — обычно на ~10 секунд, пока не придёт запись
+`/api/v1/generation` (см. `reference_generation_record_lands_late`). Но у
+отменённого или упавшего вызова счёта не будет никогда, и завышенная оценка
+останется навсегда. Поэтому оценка получает множитель 0.5, когда попытка была
+пинена на flex-эндпоинт. Каталог при этом не трогаем: он описывает модель, а не
+эндпоинт, и `check-model-catalog-drift.ts` продолжает сверяться с базовым
+`/models`.
+
+### Чего этот этап не делает
+
+Не меняет ни одной строки `llm_model_config` и `config-seed.json`. Модель
+остаётся та же, меняется только эндпоинт, который её обслуживает.
+
+### Итог этапа
+
+Изменённые файлы: `service-tier.ts` (новый), `openrouter-endpoints.ts`,
+`client.ts`, `client-helpers.ts`, `langchain-models.ts`, `llm-cost.ts`,
+`openrouter-generation.ts`, `model-cost-callbacks.ts`, playbook `runtime.ts`.
+Плюс `scripts/probe-service-tier.ts` и 18 новых тестов в
+`service-tier-is-chosen-not-inherited.test.ts`.
+
+Пройдено: `pnpm type-check`, `pnpm build`, `pnpm -F course-gen-platform test`
+(7640 тестов, 0 падений), eslint по изменённым файлам.
+
+Не сделано и требует прогона: боевая проверка на dev — раздел «Проверка», п. 4-5.
+Это платный прогон, поэтому он ждёт явного решения владельца.
+
+---
+
+## Этап 2. Замер luna-pro (ничего не ставим в прод)
+
+Вопрос, на который нет ответа из каталога: что `-pro` даёт на наших промптах и
+во что обходится в reasoning-токенах.
+
+Переиспользуем готовый инструмент, а не пишем новый:
+`packages/course-gen-platform/scripts/career-playbook-model-ab.ts`. Он уже умеет
+ровно то, что нужно, и по причинам, записанным в его шапке: оборачивает
+`modelConfigService` на время процесса вместо записи в общую БД (dev и staging
+делят один проект Supabase) и переигрывает одну стадию, а не пайплайн.
+
+Что дописать:
+
+- Пару `openai/gpt-5.6-luna` против `openai/gpt-5.6-luna-pro` в дополнение к
+  существующей паре моделей.
+- Прогон фазы `stage_career_playbook_spec` (16k выхода, скелет всего плейбука —
+  фаза, где ошибка дороже всего) рядом с одной prose-группой.
+- Сбор `native_tokens_reasoning` и `total_cost` из `/api/v1/generation` по
+  каждому вызову, чтобы «дороже» было числом, а не ощущением.
+
+Технический вопрос, который замер обязан закрыть до любого решения: принимает ли
+`-pro` наш `reasoning: {enabled: false}` (так уходит 41 luna-фаза), или отвечает
+`400 Reasoning is mandatory`. Во втором случае сработает
+`mandatory-reasoning-recovery.ts` и опустит запрос до `effort: 'low'` — то есть
+`-pro` в этих фазах превратится в обычную Luna с лишним кругом. Это решает,
+нужен ли `-pro` вообще без включения reasoning на фазе.
+
+Решение о проде принимается по прочитанным артефактам, а не по оценке судьи —
+правило репозитория, оплаченное `mc2-bneet`, где разница включала выдуманную
+статистику, а судья сдвинулся лишь с 0.92 на 0.88.
+
+Если после замера `-pro` куда-то ставится, к нему обязателен пакет:
+
+- запись в `MODEL_CATALOG` (`packages/shared-types/src/model-catalog.ts`).
+  `normalizeModelId` не снимает суффикс `-pro`, поэтому без своей записи модель
+  получит `UNKNOWN_MODEL_PRICING` $1/$3 и останется без ценового потолка;
+- `LIVE_ROUTING_MODEL_IDS` — иначе `check-model-catalog-drift.ts` не будет
+  сверять её цену;
+- миграция `llm_model_config` + пересборка `config-seed.json` (тест
+  `config-seed-drift.test.ts` ловит расхождение);
+- `reasoning_enabled` для затронутых фаз, если замер покажет, что без него
+  смысла нет.
+
+---
+
+## Этап 3. Batch за пределами Stage 6
+
+Порядок здесь важен: batch без flex — не экономия. Batch@default ($0.10/$0.60)
+равен sync@flex, и только batch@flex ($0.05/$0.30) даёт вторые −50%.
+
+### 3.1. Batch-запросы должны нести тариф
+
+- `openrouter-batch-client.ts`: `OpenRouterChatBatchRequest.body` получает
+  `provider`, и `submitChatBatch` проставляет `only: ['openai/flex']` (или
+  эквивалентный тег для другой модели) для фоновых заданий.
+- `openrouter-batch-eligibility.ts`: сегодня `selectDiscountedBatchVariant`
+  сравнивает базовые цены из `/models`. С flex в игре это сравнение неверно — оно
+  одобрит batch, который не дешевле того, что мы уже платим. Сравнение должно
+  идти между batch@flex и sync@flex, то есть по `/endpoints`, а не по `/models`.
+  Тест `openrouter-batch-eligibility.test.ts` уже описывает нужную дисциплину
+  («не угадывать по суффиксу»), в него добавляются случаи с тирами.
+
+### 3.2. Координатор переезжает из Stage 6 в общее место
+
+Из `src/stages/stage6-lesson-content/batch/` в `src/shared/llm/batch/`:
+координатор, который принимает список независимых заданий, группирует по модели,
+сабмитит, поллит, раздаёт результаты и откатывается на синхронный путь по
+таймауту. Логика уже написана и обкатана в `batch-processor.ts` — это вынос, а
+не переписывание. Stage 6 остаётся его первым потребителем, чтобы вынос был
+проверяем существующими тестами.
+
+### 3.3. Новые потребители, в порядке безопасности
+
+1. **Stage 7 enrichments** — `quiz`, `presentation`, `video`, `audio`
+   (`src/stages/stage7-enrichments/handlers/`). Идеальный случай: вызовы
+   независимы друг от друга, идут после того, как курс уже читаем, и никто их не
+   ждёт на экране.
+2. **Stage 2 summarization** — много документов, полный фон, независимые вызовы.
+
+**Не батчим и записываем это явно:** судьи Stage 6 и `stage_6_patcher` (внутри
+петли качества — задержка останавливает конвейер), чат и inline-правки,
+`stage_4_clarifying`, группы Career Playbook (пользователь ждёт результат).
+
+### 3.4. Честная оценка выигрыша
+
+На нынешнем объёме ($0.87 за 10 дней) flex экономит ~$0.18, а batch поверх него
+— ещё ~$0.09. Это центы. Расширение batch — вложение в масштаб и в дисциплину
+раздельного учёта, а не в текущий счёт; при десятикратном росте генераций разница
+между 0.25x и 1.0x тарифа перестаёт быть теоретической. Этап 3 стоит делать
+после того, как Этап 1 отработает на боевом прогоне и покажет реальную
+латентность flex.
+
+---
+
+## Проверка
+
+**Этап 1** — сначала измерение на живом API, потом код:
+
+1. Один дешёвый вызов Luna с `provider: {only: ['openai/flex'], allow_fallbacks:
+false}` и один без, на одинаковом коротком промпте. Через ~10 с прочитать
+   `GET /api/v1/generation?id=…` по обоим и сравнить `total_cost` и
+   `service_tier`. Это проверяет главное допущение плана — что тег-слаг вообще
+   принимается в `provider.only`/`order`. Ключ живёт в БД
+   (`api-key-service`), в чат его не выводим.
+2. `pnpm -F course-gen-platform test` — юнит-тесты, включая новые случаи в
+   `attempt-is-pinned-to-an-endpoint.test.ts` и
+   `provider-routing.test.ts` на то, что интерактивная фаза не получает flex, а
+   `priority` не выбирается никогда.
+3. `pnpm type-check` и `pnpm build`.
+4. Боевой прогон одного микрокурса на dev. Приёмка — SQL, а не ощущение:
+
+```sql
+select output_data->>'serviceTier' tier, count(*), round(sum(cost_usd),6) cost,
+       round(avg(duration_ms)) avg_ms
+from generation_trace
+where model_used = 'openai/gpt-5.6-luna' and created_at > now() - interval '1 day'
+group by 1;
+```
+
+Ожидаем `flex` на фоновых фазах, `default` на чате и `stage_4_clarifying`, и
+отношение факта к ставке $0.2/$1.2 около 0.5 вместо нынешних 0.983.
+
+5. Отдельно смотрим `avg_ms` и долю ретраев: если flex систематически медленнее
+   на фазе с таймаутом 120 с, эта фаза возвращается на default — это настройка
+   списка, а не откат этапа.
+
+**Этап 2** — `tsx scripts/career-playbook-model-ab.ts --playbook <uuid>` с новой
+парой моделей; читаем сгенерированные markdown-файлы глазами, сверяем
+`native_tokens_reasoning` и стоимость.
+
+**Этап 3** — существующие тесты Stage 6 batch должны пройти после выноса без
+изменений по смыслу; затем прогон Stage 7 на одном курсе с
+`FEATURE_STAGE6_BATCH_GENERATION` и новым флагом Stage 7.
+
+## Учёт работы
+
+Завести в Beads: Этап 1 (одна задача), Этап 2 (замер), Этап 3 (эпик из 3.1–3.3).
+Этап 1 несёт исправление текущего дефекта — молчаливого выбора flex — и должен
+идти первым независимо от судьбы остальных.

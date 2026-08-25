@@ -36,6 +36,7 @@
 
 import { getApiKeySync } from '../services/api-key-service';
 import { OPENROUTER_BASE_URL } from './openrouter-client';
+import type { ServiceTier } from './service-tier';
 import logger from '../logger';
 
 /**
@@ -47,6 +48,30 @@ import logger from '../logger';
  * stale entry costs at most one wasted attempt, which the chain already handles.
  */
 export const ENDPOINT_CACHE_TTL_MS = 5 * 60_000;
+
+/**
+ * The service tier an endpoint belongs to, read from its tag.
+ *
+ * `priority` is not a {@link ServiceTier} we route to, but it has to be
+ * nameable: it is the double-price endpoint, and the only way to keep the price
+ * sort from ever choosing it is to recognise it.
+ */
+export type EndpointTier = ServiceTier | 'priority';
+
+/**
+ * The tag suffixes that mean a service tier, exhaustively.
+ *
+ * Matched against a fixed list rather than "whatever follows the last slash",
+ * because most of what follows a slash is not a tier: the live catalogue carries
+ * `sail-research/fp4` and `open-inference/fp4` (quantisation), `azure/eu` and
+ * `azure/us` (region), and `google-vertex/global/flex` (both, then a tier).
+ * Treating any suffix as a tier would classify an fp4 endpoint as one and
+ * quietly refuse it.
+ */
+const TIER_SUFFIXES: ReadonlyMap<string, EndpointTier> = new Map<string, EndpointTier>([
+  ['flex', 'flex'],
+  ['priority', 'priority'],
+]);
 
 /** One provider endpoint for one model, as `/endpoints` reports it. */
 export interface ModelEndpoint {
@@ -60,6 +85,14 @@ export interface ModelEndpoint {
   completionPricePerMillion: number;
   /** OpenRouter's own health figure; below zero is degraded or disabled. */
   status: number;
+  /** Which service tier this endpoint is, from its tag. */
+  tier: EndpointTier;
+}
+
+/** The service tier an endpoint tag names, or `default` when it names none. */
+export function readEndpointTier(tag: string): EndpointTier {
+  const suffix = tag.slice(tag.lastIndexOf('/') + 1);
+  return TIER_SUFFIXES.get(suffix) ?? 'default';
 }
 
 interface CacheEntry {
@@ -116,6 +149,7 @@ function parseEndpoint(raw: unknown): ModelEndpoint | null {
     promptPricePerMillion: prompt * 1_000_000,
     completionPricePerMillion: completion * 1_000_000,
     status: readNumber(record, 'status') ?? 0,
+    tier: readEndpointTier(tag),
   };
 }
 
@@ -242,13 +276,24 @@ export async function listModelEndpoints(
 }
 
 /**
- * The cheapest endpoint this chain has not tried yet.
+ * The cheapest endpoint this chain has not tried yet, within the tier it may use.
  *
  * Skips what OpenRouter's own routing skips — a negative `status` is degraded or
  * disabled — so the first attempt lands where the default route would have sent
  * it. On 2026-08-20 the same model's two cheapest endpoints were priced
  * identically and OpenRouter passed over the one at status `-2`; picking it
  * ourselves would have been a change of behaviour dressed as a fix.
+ *
+ * `allowedTier` is the one thing the price sort must not decide for itself. A
+ * flex endpoint is half the price and therefore always first, so without this
+ * every call in the pipeline — including the chat box — would move to a tier
+ * that refuses rather than falls back the moment OpenRouter published the tags.
+ * `priority` is excluded whatever is asked for: it is double the price, and
+ * nothing here is worth that to answer sooner.
+ *
+ * Degradation needs no special case. A flex endpoint that refuses for capacity
+ * fails its attempt like any other, and the next attempt takes the next cheapest
+ * untried endpoint, which is the default-tier one.
  *
  * The ceiling is applied here, against the live price, rather than left to
  * `provider.max_price` alone: a pinned endpoint the ceiling then refuses costs a
@@ -257,11 +302,14 @@ export async function listModelEndpoints(
 export function pickCheapestUntriedEndpoint(
   endpoints: ModelEndpoint[],
   triedTags: ReadonlySet<string>,
-  ceiling?: { prompt?: number; completion?: number }
+  ceiling?: { prompt?: number; completion?: number },
+  allowedTier: ServiceTier = 'default'
 ): ModelEndpoint | undefined {
   return endpoints.find(endpoint => {
     if (triedTags.has(endpoint.tag)) return false;
     if (endpoint.status < 0) return false;
+    if (endpoint.tier === 'priority') return false;
+    if (endpoint.tier === 'flex' && allowedTier !== 'flex') return false;
     if (ceiling?.prompt !== undefined && endpoint.promptPricePerMillion > ceiling.prompt) {
       return false;
     }
