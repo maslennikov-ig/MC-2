@@ -276,6 +276,24 @@ export async function listModelEndpoints(
 }
 
 /**
+ * What a model actually costs at one tier, or `undefined` if it has no healthy
+ * endpoint there.
+ *
+ * "No endpoint there" is a real answer and not a lookup failure, and the
+ * difference matters: `openai/gpt-5.6-luna:batch` publishes a flex endpoint at
+ * $0.05/$0.30 and `z-ai/glm-5.2` publishes none at all. Anything deciding
+ * whether a cheaper route exists has to be able to tell those apart rather than
+ * assume a tier multiplier applies everywhere.
+ */
+export function cheapestEndpointAtTier(
+  endpoints: readonly ModelEndpoint[],
+  tier: ServiceTier
+): ModelEndpoint | undefined {
+  // The list arrives sorted by prompt price, so the first match is the cheapest.
+  return endpoints.find(endpoint => endpoint.tier === tier && endpoint.status >= 0);
+}
+
+/**
  * The cheapest endpoint this chain has not tried yet, within the tier it may use.
  *
  * Skips what OpenRouter's own routing skips — a negative `status` is degraded or

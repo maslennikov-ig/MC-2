@@ -19,6 +19,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  cheapestEndpointAtTier,
   pickCheapestUntriedEndpoint,
   readEndpointTier,
   type ModelEndpoint,
@@ -100,6 +101,29 @@ describe('pickCheapestUntriedEndpoint', () => {
     expect(
       pickCheapestUntriedEndpoint(onlyPriority, new Set(), undefined, 'default')
     ).toBeUndefined();
+  });
+});
+
+describe('cheapestEndpointAtTier', () => {
+  it('prices a route at the tier it would really be served at', () => {
+    expect(cheapestEndpointAtTier(LUNA_ENDPOINTS, 'flex')?.promptPricePerMillion).toBe(0.1);
+    expect(cheapestEndpointAtTier(LUNA_ENDPOINTS, 'default')?.promptPricePerMillion).toBe(0.2);
+  });
+
+  it('answers "no endpoint here", which is not the same as "could not look it up"', () => {
+    // `z-ai/glm-5.2` is the live example: the most expensive line of a course
+    // and no flex endpoint at all. Assuming a tier multiplier applies to every
+    // model would invent a discount it does not offer.
+    const noFlex = [endpoint('z-ai', 0.63, 1.98)];
+    expect(cheapestEndpointAtTier(noFlex, 'flex')).toBeUndefined();
+  });
+
+  it('passes over a degraded endpoint, as the attempt chain does', () => {
+    const degraded: ModelEndpoint[] = [
+      { ...endpoint('openai/flex', 0.1, 0.6), status: -2 },
+      endpoint('google-vertex/global/flex', 0.12, 0.7),
+    ];
+    expect(cheapestEndpointAtTier(degraded, 'flex')?.tag).toBe('google-vertex/global/flex');
   });
 });
 

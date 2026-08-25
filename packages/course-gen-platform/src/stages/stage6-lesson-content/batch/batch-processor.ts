@@ -18,6 +18,7 @@ import type {
   PositionedBatchResult,
 } from '@/shared/llm/openrouter-batch-client';
 import { mapCompletedBatchResultsByPosition } from '@/shared/llm/openrouter-batch-client';
+import { resolveServiceTier } from '@/shared/llm/service-tier';
 
 export interface Stage6BatchLessonJob {
   position: number;
@@ -278,6 +279,9 @@ export function createStage6BatchProcessor(dependencies: Stage6BatchProcessorDep
           requiredContextTokens: estimateTokensFromText(item.prompt, job.data.language),
           requiredOutputTokens: outputTokens,
           requiredParameters: requiredParameters(item),
+          // The price the batch discount has to beat is the one this phase
+          // would really have been billed synchronously, not the catalogue's.
+          serviceTier: resolveServiceTier('stage_6_content'),
         });
 
         const batchItem: Stage6BatchGroupItem = {

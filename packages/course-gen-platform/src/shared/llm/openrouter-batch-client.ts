@@ -67,6 +67,22 @@ export interface OpenRouterBatch {
   error: OpenRouterBatchError | null;
 }
 
+/**
+ * One request inside a batch.
+ *
+ * There is deliberately no tier field. `/endpoints` advertises
+ * `openai/gpt-5.6-luna:batch` at `openai/flex` for $0.05/$0.30, and the Batch
+ * API does not serve it. Two paid probes on 2026-08-25, same 13+5 tokens, both
+ * billed $0.0000043 — the default batch rate to the cent — once with
+ * `service_tier: 'flex'` in the body and once with
+ * `provider: {only: ['openai/flex'], allow_fallbacks: false}`. Neither
+ * generation record reported a `service_tier` at all.
+ *
+ * A field the provider measurably ignores is worse than an absent one: it reads
+ * as a working control, which is exactly how `extra_body` hid for months
+ * (mc2-5pt54). If OpenRouter starts honouring one, add it back with a probe
+ * result next to it.
+ */
 export interface OpenRouterChatBatchRequest {
   customId: string;
   body: {
@@ -132,7 +148,15 @@ export class OpenRouterBatchClient {
   }
 
   async getBatch(batchId: string): Promise<OpenRouterBatch> {
-    if (!/^batch_[A-Za-z0-9_-]+$/u.test(batchId)) {
+    // The guard exists to keep anything that is not an id out of a URL path, so
+    // it stays strict about the character set and permissive about the prefix.
+    // It required `batch_` until 2026-08-25 and OpenRouter issues `batch-`:
+    // `batch-1787647619-as0NWfE8y270wkfYc6aq`, read off a live submission. So
+    // every batch we ever submitted could be created and never polled — the
+    // coordinator would have waited out its whole window and fallen back to
+    // synchronous generation, which looks like a slow provider rather than a
+    // typo (mc2-g4fdf).
+    if (!/^batch[-_][A-Za-z0-9_-]+$/u.test(batchId)) {
       throw new Error('Invalid OpenRouter batch identifier');
     }
 
