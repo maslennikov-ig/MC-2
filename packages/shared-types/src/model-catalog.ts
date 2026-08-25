@@ -180,8 +180,9 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * this figure is what a price ceiling and a budget estimate are built from.
    */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 0.966,
-    outputPricePerMillion: 3.036,
+    // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
+    inputPricePerMillion: 1.19,
+    outputPricePerMillion: 3.74,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -218,8 +219,10 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * tail. A ceiling under every endpoint is a refusal, not a saving (mc2-qch4w).
    */
   'deepseek/deepseek-v4-flash-0731': {
-    inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.18,
+    // Re-read live 2026-08-25: 0.08/0.18 had drifted to 0.14/0.28 (0.57x/0.64x),
+    // the widest gap in the catalogue and on the highest-volume model.
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.28,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,

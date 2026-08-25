@@ -66,7 +66,7 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedBatchRates);
   });
 
-  it('prices every live routing model at the OpenRouter base rates verified on 2026-08-21', () => {
+  it('prices every live routing model at the OpenRouter base rates verified on 2026-08-25', () => {
     // The models a course actually runs on. Three of these were wrong at once on
     // 2026-08-20 and the errors pointed in opposite directions, which is why the
     // invoice gap looked smaller than its causes: openai/gpt-5.6-luna was
@@ -74,9 +74,9 @@ describe('model catalogue coverage', () => {
     // z-ai/glm-5.2 was 1.23x and ~deepseek/...-latest up to 1.8x too dear
     // (mc2-v1pn2, mc2-156kg).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v4-flash-0731': [0.08, 0.18],
+      'deepseek/deepseek-v4-flash-0731': [0.14, 0.28],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [0.966, 3.036],
+      'z-ai/glm-5.2': [1.19, 3.74],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.375, 1.875],
       'openai/gpt-5-image-mini': [2.5, 2],

@@ -38,10 +38,25 @@
  * synchronously at flex. Pricing the batch leg from that catalogue row would
  * approve a 24h window in exchange for nothing.
  *
- * Batch still earns its keep where the model has **no** flex endpoint — for
- * `z-ai/glm-5.2` (sync $0.63/$1.98, the most expensive line of a course) batch
- * is a real halving, because there flex is not an alternative route to the same
- * discount, it is absent.
+ * It is tempting to conclude that batch still earns its keep on a model with no
+ * flex endpoint. Checked against all seven models in `config-seed.json` on
+ * 2026-08-25, cheapest healthy synchronous endpoint against the `:batch` entry,
+ * $/1M in/out — **it does not pay anywhere**:
+ *
+ * | model                         | cheapest sync                    | `:batch`    |
+ * | ----------------------------- | -------------------------------- | ----------- |
+ * | `deepseek-v4-flash-0731`      | 0.035/0.100 open-inference/fp4   | none        |
+ * | `gemini-2.5-flash-image`      | 0.150/1.250 google-ai-studio/flex| none        |
+ * | `gemini-3.7-flash`            | 0.188/0.938 google-vertex/…/flex | 0.188/0.938 |
+ * | `minimax-m3`                  | 0.230/0.960 coreweave/fp4        | 0.300/1.200 |
+ * | `gpt-5-image-mini`            | 2.500/2.000 openai               | none        |
+ * | `gpt-5.6-luna`                | 0.100/0.600 openai/flex          | 0.100/0.600 |
+ * | `glm-5.2`                     | 0.500/3.150 sail-research/fp8    | 1.400/4.400 |
+ *
+ * The reason is the same one that makes the flex row a mirage: a batch rate is a
+ * discount off the model's **base** price, and we do not pay the base price — we
+ * pay the cheapest endpoint, which is often far below it. `glm-5.2` has no flex
+ * endpoint and batch is still 2.8x its cheapest provider.
  *
  * @module shared/llm/openrouter-batch-eligibility
  */

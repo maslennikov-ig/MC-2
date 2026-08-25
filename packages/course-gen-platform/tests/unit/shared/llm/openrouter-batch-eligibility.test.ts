@@ -84,9 +84,12 @@ describe('selectDiscountedBatchVariant', () => {
   });
 
   it('rejects a more expensive variant even if it has the batch suffix', () => {
+    // Live rates, 2026-08-25. glm-5.2 has no flex endpoint, which makes it the
+    // obvious candidate for batching — and its `:batch` entry is dearer than its
+    // base price, let alone than the $0.50/$3.15 provider we actually route to.
     const models = [
-      model('z-ai/glm-5.2', '0.00000063', '0.00000198', 1_048_576),
-      model('z-ai/glm-5.2:batch', '0.0000007', '0.0000022', 512_000),
+      model('z-ai/glm-5.2', '0.00000119', '0.00000374', 1_048_576),
+      model('z-ai/glm-5.2:batch', '0.0000014', '0.0000044', 512_000),
     ];
 
     expect(
@@ -163,10 +166,10 @@ describe('the price the batch discount has to beat', () => {
   });
 
   it('approves a route that is genuinely cheaper than what we pay', () => {
-    // The shape that still pays off: a model with no flex endpoint, so the
-    // synchronous call runs at the default tariff and batch@default halves it.
-    // `z-ai/glm-5.2` is the live example — and the most expensive line of a
-    // course.
+    // The shape that would pay off: a synchronous call at the default tariff
+    // against a batch entry that halves it. No model in config-seed.json is
+    // actually shaped like this today (checked 2026-08-25, all seven), so this
+    // is the contract rather than a live case.
     expect(
       selectDiscountedBatchVariant(
         'openai/gpt-5.6-luna',
@@ -183,8 +186,9 @@ describe('the price the batch discount has to beat', () => {
   });
 
   it('refuses a batch model that does not publish our tier at all', () => {
-    // Not the same as "we could not look it up": glm-5.2 has no flex endpoint,
-    // and assuming the multiplier applies everywhere would invent a discount.
+    // Not the same as "we could not look it up": glm-5.2 publishes 36 endpoints
+    // and not one of them is flex, and assuming the multiplier applies
+    // everywhere would invent a discount.
     expect(
       selectDiscountedBatchVariant(
         'openai/gpt-5.6-luna',
