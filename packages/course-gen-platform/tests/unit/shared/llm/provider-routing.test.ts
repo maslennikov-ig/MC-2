@@ -20,7 +20,7 @@
  *    `extra_body` until 2026-08-25 — a python-openai convention that the Node
  *    SDK does not unwrap — so OpenRouter received a field it does not read and
  *    discarded every control above. Nothing failed; the call was simply routed
- *    as if none of this existed, for as long as it had existed (mc2-3nnjs).
+ *    as if none of this existed, for as long as it had existed (mc2-5pt54).
  */
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
