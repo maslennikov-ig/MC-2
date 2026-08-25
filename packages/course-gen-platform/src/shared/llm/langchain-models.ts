@@ -114,6 +114,12 @@ export function buildProviderParams(
   maxTokens: number;
   modelKwargs: Record<string, unknown>;
 } {
+  // `usage: {include: true}` is kept, and it is worth saying that it buys
+  // nothing today: measured on the live API 2026-08-25, OpenRouter returns
+  // `usage.cost` with or without it. It stays because it is the documented way
+  // to ask for the accounting block we now read the charge out of, it costs
+  // nothing, and the alternative is depending on undocumented default behaviour
+  // for a number the ledger is built on.
   const modelKwargs: Record<string, unknown> = { usage: { include: true } };
   let effectiveMaxTokens = maxTokens;
 

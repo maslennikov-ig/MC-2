@@ -23,7 +23,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
+import { calculateLlmCostUsd, estimateLlmCostUsd } from '@/shared/metrics/llm-cost';
 
 const LUNA = 'openai/gpt-5.6-luna';
 
@@ -62,6 +62,21 @@ describe('a call the provider priced', () => {
     expect(
       calculateLlmCostUsd({ model: LUNA, inputTokens: 13, outputTokens: 5, actualCostUsd: 0 })
     ).toBe(0);
+  });
+
+  it('can still be asked what it was predicted to cost', () => {
+    // The row keeps both numbers. The prediction is the only thing that can show
+    // a catalogue entry has drifted, and it cannot do that from a field that was
+    // overwritten with the charge it was meant to be compared against.
+    const usage = {
+      model: LUNA,
+      inputTokens: 1_000_000,
+      outputTokens: 0,
+      actualCostUsd: 0.000004257,
+    };
+
+    expect(calculateLlmCostUsd(usage)).toBe(0.000004257);
+    expect(estimateLlmCostUsd(usage)).toBeCloseTo(0.2, 10);
   });
 
   it('still estimates when no body arrived to state a charge', () => {

@@ -227,6 +227,19 @@ export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
   // Nothing to estimate when the provider already stated the charge.
   if (usage.actualCostUsd !== undefined) return usage.actualCostUsd;
 
+  return estimateLlmCostUsd(usage);
+}
+
+/**
+ * What this call was predicted to cost, ignoring anything the provider said.
+ *
+ * Kept separate so a settled row can carry both numbers. The estimate is the
+ * only thing that can show a catalogue entry has drifted, and it cannot do that
+ * from a field that was overwritten with the answer it was supposed to be
+ * compared against — three entries were wrong at once on 2026-08-20, and only
+ * the gap between prediction and charge would have said so.
+ */
+export function estimateLlmCostUsd(usage: LlmCallUsage): number | undefined {
   // The price of the endpoint we pinned beats the catalogue on every count: it
   // is live, it is the endpoint that actually served the call, and it already
   // carries the tier, so no multiplier is guessed on top. The catalogue holds
@@ -385,6 +398,8 @@ export async function recordLlmCallCost(
   }
 
   const costUsd = calculateLlmCostUsd(usage);
+  // The prediction, kept even when it was not used: see `estimateLlmCostUsd`.
+  const estimatedCostUsd = estimateLlmCostUsd(usage);
   if (costUsd === undefined) {
     logger.warn(
       { model: usage.model, courseId: context.courseId, stage: context.stage },
@@ -444,8 +459,11 @@ export async function recordLlmCallCost(
         ...(usage.actualCostUsd === undefined ? {} : { billedInResponse: true }),
         // The catalogue figure is kept alongside the provider's so a wrong
         // catalogue entry stays visible after the row is settled, instead of
-        // being quietly overwritten by the truth it should have matched.
-        ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
+        // being quietly overwritten by the truth it should have matched. It has
+        // to be the *estimate* and not `costUsd`, which on a settled row is the
+        // charge — writing that here made the field agree with itself and say
+        // nothing.
+        ...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
         ...(usage.generationId ? { generationId: usage.generationId } : {}),
         ...(usage.providerName ? { providerName: usage.providerName } : {}),
         ...(usage.serviceTier ? { serviceTier: usage.serviceTier } : {}),

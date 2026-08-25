@@ -5,6 +5,11 @@
  * calling node reports one total, so pricing has to happen at the call. This is
  * the LangChain half of that; the OpenAI-SDK half is in `client.ts` (mc2-o7740).
  *
+ * The price itself is OpenRouter's own figure rather than an estimate of it, for
+ * every call that returned a body. `@langchain/openai` drops `usage.cost` while
+ * assembling `llmOutput`, so the transport keeps it and this reads it back by
+ * generation id — the key this file was already computing (mc2-2sv4a).
+ *
  * @module shared/llm/model-cost-callbacks
  */
 
@@ -12,6 +17,7 @@ import type { Callbacks } from '@langchain/core/callbacks/manager';
 import type { LLMResult } from '@langchain/core/outputs';
 
 import { recordLlmCallCost, type LlmCostContext } from '../metrics/llm-cost';
+import { takeStatedCharge } from './stated-charge-capture';
 
 /**
  * The stage a phase belongs to, read off the phase name.
@@ -87,18 +93,32 @@ export function costRecordingCallbacks(
         };
         if (usage.promptTokens === undefined && usage.completionTokens === undefined) return;
         const generationId = generationIdOf(output);
-        // No `serviceTier` here on purpose. LangChain hands back `tokenUsage`
-        // and little else, so the tier this call was served at is not knowable
-        // from `llmOutput` — and guessing it from the phase would halve the
-        // estimate for a model that has no flex endpoint. The estimate stays at
-        // the default tariff and `settleTraceCostFromProvider` replaces it with
-        // the real charge, and the real tier, about ten seconds later.
+        // What OpenRouter said this call cost, left here by the transport under
+        // the same id (see `stated-charge-capture`). Taking it clears it, and
+        // `undefined` — an aborted call, a body the guard handed through
+        // unparsed — is not an error: `recordLlmCallCost` then behaves exactly
+        // as it did before, estimating from the catalogue and letting the
+        // deferred receipt correct it.
+        //
+        // `=== undefined` and not truthiness, because a stated $0 is a
+        // measurement (mc2-y452l).
+        const statedCostUsd = takeStatedCharge(generationId);
+        // No `serviceTier` here, still on purpose, and now it matters less.
+        // LangChain hands back `tokenUsage` and little else, so the tier this
+        // call was served at is not knowable from `llmOutput` — and guessing it
+        // from the phase would halve the estimate for a model that has no flex
+        // endpoint. For a call that returned a body the point is moot: the
+        // charge above is the charge, tier and all. For one that did not, the
+        // estimate stays at the default tariff and `settleTraceCostFromProvider`
+        // replaces it with the real charge, and the real tier, about ten seconds
+        // later.
         await recordLlmCallCost(
           {
             model: modelId,
             inputTokens: usage.promptTokens ?? 0,
             outputTokens: usage.completionTokens ?? 0,
             ...(generationId ? { generationId } : {}),
+            ...(statedCostUsd === undefined ? {} : { actualCostUsd: statedCostUsd }),
           },
           { courseId, stage, phase }
         );
