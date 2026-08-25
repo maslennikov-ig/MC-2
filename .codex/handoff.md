@@ -207,10 +207,9 @@ current, one at a time. `mc2-hqfc3` video stays parked.
 
 **Answered 2026-08-23, all delivered:** `stage_5_escalation` joins the Stage 5 chain (`mc2-9yrgb`);
 course edits count inside the course total (`mc2-b7olk.5`); the playbook model is decided by
-measurement (`mc2-gg65o`); the 14 `course_override` rows are **deleted**, contents in `mc2-sjwm0`.
-
-**Answered 2026-08-23:** `mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own
-`generation_id`s, not by a second key; the job-description rework (plan 4.5) **stays parked**.
+measurement (`mc2-gg65o`); the 14 `course_override` rows are **deleted**, contents in `mc2-sjwm0`;
+`mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own `generation_id`s, not by
+a second key; the job-description rework (plan 4.5) **stays parked**.
 **Answered 2026-08-25:** the `develop → master` release for `mc2-cuk7j.2` was authorized and run.
 
 **Still open:** `mc2-v6fqp` — which third language. "ru and en" stays the test language.
@@ -268,22 +267,23 @@ Accepted stage id: `mc2-51epl` · Current stage id: none · Next stage id: **own
 `brawny-mellow-quokka.md` is finished and nothing in it is owed. Recommended action: pick the next
 track — `mc2-db696` (Career Playbook) and `mc2-uv7n7` (UI redesign, 22 Stitch screens) are the two
 standing directions, and `specs/026-post-triage-priorities/spec.md` holds the backlog order.
-Two small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
-never actually escalated and the judge's new terminal path has never fired, both needing a
-generation forced to fail. Use $orchestrator-stage when the next track becomes an epic.
+Three small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
+never actually escalated, the judge's new terminal path has never fired — both needing a generation
+forced to fail — and **no real NLM generation has run since the cookies were restored**, which now
+needs only a run. Use $orchestrator-stage when the next track becomes an epic.
 
-`mc2-ibzcc` is **closed**: docling-mcp is on 3.1.0 and most of the cache wrapper is gone, but the
-image is **neither published nor deployed** — that runs through the manual
-`build-docling-images.yml` workflow and a recorded `image@sha256`, a production mutation of its own.
-`mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`. `mc2-8m90f` moved
-without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none on the six
-affected courses — re-measured 2026-08-24, still none, so its reopen gate narrows from "any
-post-window Stage 4 run" to "a run on one of those six courses". New: `mc2-pdcb7` (covers drawn
-without their visual style — fixed; whether to pay to redraw is the owner's).
+New and open: `mc2-h6nlv` — the bridge healthcheck in both compose files opens a TCP socket and never
+asks `/health`, so it stays green with dead auth, a dead hop or no master token. Removing the
+override is NOT the fix: the container has `HTTP_PROXY=socks5h://…`, urllib takes the proxy branch
+even for loopback, and the Dockerfile's own check dies on `unknown url type: socks5h`.
 
-`mc2-o5ktb` (Stage 4 evidence output budget), `mc2-b7olk.8` and the inbox triage epic `mc2-p2908`
-are **closed with their evidence in the tickets**; the rule the first produced is in
-`.codex/repository-failure-modes.md`.
+`mc2-ibzcc` is **closed**, but its docling-mcp 3.1.0 image is **neither published nor deployed** —
+that is the manual `build-docling-images.yml` workflow and a recorded `image@sha256`, a production
+mutation of its own. `mc2-vlskb` stays open: 3.1.0 still drops
+`service_timeout`/`service_max_retries`. `mc2-8m90f`'s reopen gate narrowed to "a run on one of the
+six affected courses" — re-measured 2026-08-24, still none. `mc2-pdcb7`: covers drawn without their
+visual style, fixed; whether to pay to redraw is the owner's. `mc2-o5ktb`, `mc2-b7olk.8` and
+`mc2-p2908` are closed with their evidence in the tickets.
 
 ## Starter prompt for next orchestrator
 
