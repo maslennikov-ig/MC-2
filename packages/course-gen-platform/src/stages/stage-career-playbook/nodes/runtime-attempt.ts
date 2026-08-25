@@ -8,6 +8,7 @@
 
 import { estimateCost, estimateTokenCount } from '@/shared/llm/cost-calculator';
 import { fetchGenerationFact, resolveProviderSlug } from '@/shared/llm/openrouter-generation';
+import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
 import { logger } from '@/shared/logger';
 import type { CareerPlaybookNodeCost } from '@megacampus/shared-types';
 
@@ -78,6 +79,11 @@ export function settleSuccessfulAttempt(params: {
   attemptStartedAt: number;
   callStartedAt: number;
   abortedAttempts: CareerPlaybookAbortedAttempt[];
+  /**
+   * What the endpoint this attempt was pinned to charges, per million. Known
+   * only when one endpoint was named with `allow_fallbacks: false`.
+   */
+  endpointRate?: { prompt: number; completion: number };
 }): CareerPlaybookLLMResult {
   const { invocation, options, modelId, attempt, generationId } = params;
 
@@ -91,7 +97,21 @@ export function settleSuccessfulAttempt(params: {
   // readable; waiting for one per node would add minutes to a run for a number
   // nobody reads until it is persisted. `settleCareerPlaybookNodeCosts` collects
   // them all at once, when the run is over and every record is long since ready.
-  const costUsd = estimateCost(modelId, inputTokens + outputTokens, inputTokens);
+  //
+  // Priced from the endpoint the attempt was pinned to when there was one. The
+  // catalogue holds what the mainstream providers charge and the pin routes to
+  // the cheapest — for `deepseek-v4-flash-0731` on 2026-08-25 that is $0.035
+  // against a published $0.14 — so pricing a pinned call from the catalogue
+  // overstates it fourfold until a receipt arrives, and for an attempt that
+  // aborts no receipt ever does. `estimateCost` remains the last resort for a
+  // model neither source prices.
+  const costUsd =
+    calculateLlmCostUsd({
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      ...(params.endpointRate ? { endpointRate: params.endpointRate } : {}),
+    }) ?? estimateCost(modelId, inputTokens + outputTokens, inputTokens);
   const totalDurationMs = Date.now() - params.callStartedAt;
 
   logger.info(

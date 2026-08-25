@@ -389,6 +389,14 @@ export function createCareerPlaybookRuntime(
             attemptStartedAt,
             callStartedAt,
             abortedAttempts,
+            ...(endpoint
+              ? {
+                  endpointRate: {
+                    prompt: endpoint.promptPricePerMillion,
+                    completion: endpoint.completionPricePerMillion,
+                  },
+                }
+              : {}),
           });
         } catch (error) {
           lastError = error;

@@ -7,9 +7,25 @@
  * only way to answer "what did this course cost" was the provider's own key
  * counter, which knows nothing about courses, stages or models (mc2-o7740).
  *
- * Prices come from `MODEL_CATALOG` and nowhere else: a second price table in
- * this repository would drift from the routing configuration that picks the
- * models.
+ * A price is taken from the most specific source that knows it, in this order:
+ *
+ * 1. The provider's own receipt, `GET /api/v1/generation`, which arrives about
+ *    ten seconds later and overwrites everything below.
+ * 2. The endpoint this attempt was pinned to, whose live rate is exactly what
+ *    this call will be billed.
+ * 3. `MODEL_CATALOG`, the frozen mainstream rate, times the flex multiplier when
+ *    the answer said flex.
+ *
+ * The third is a fallback and not a base: it holds the price the mainstream
+ * providers charge, while the per-attempt pin routes to the cheapest, so it
+ * overstates. Measured 2026-08-25 for `deepseek-v4-flash-0731`: catalogue $0.14
+ * against a served $0.035, four times over. That correction used to arrive with
+ * the receipt — but 92 of 509 rows over the previous fortnight never got one,
+ * because an aborted or failed call has no receipt to collect, and those rows
+ * carried 17% of the ledger on the overstated number.
+ *
+ * No second price table is introduced by any of this. Every figure above is
+ * OpenRouter's own, read at a different moment.
  */
 
 import {
@@ -71,6 +87,13 @@ export interface LlmCallUsage {
    * `priority`. Read from the response body, not from what was requested.
    */
   serviceTier?: string;
+  /**
+   * What the endpoint this attempt was pinned to charges, in dollars per
+   * million. Present only when the attempt named one endpoint with
+   * `allow_fallbacks: false`, which is the only case where we know who served
+   * it before the receipt arrives.
+   */
+  endpointRate?: { prompt: number; completion: number };
 }
 
 /**
@@ -179,18 +202,32 @@ export function settleTraceCostFromProvider(
 }
 
 /**
- * Price of one call in USD, or `undefined` when the model is not catalogued.
+ * Price of one call in USD, or `undefined` when nothing prices the model.
  *
- * An uncatalogued model is a routing bug, not a rounding problem, so it is
- * reported rather than silently priced at zero.
+ * An uncatalogued model with no pinned endpoint is a routing bug, not a rounding
+ * problem, so it is reported rather than silently priced at zero.
  *
- * The catalogue holds the default tariff. A call the provider says it served at
- * the flex tier cost half of it, and while `settleTraceCostFromProvider`
- * replaces this figure with the real charge about ten seconds later, a call that
- * was aborted or that failed never gets that receipt — its estimate is the only
- * number the row will ever carry.
+ * `settleTraceCostFromProvider` replaces this figure with the real charge about
+ * ten seconds later — but only for a call that produced a receipt. An aborted or
+ * failed call never does, and for those this estimate is the only number the row
+ * will ever carry, which is why it is worth taking from the pinned endpoint
+ * rather than from the catalogue.
  */
 export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
+  // The price of the endpoint we pinned beats the catalogue on every count: it
+  // is live, it is the endpoint that actually served the call, and it already
+  // carries the tier, so no multiplier is guessed on top. The catalogue holds
+  // the mainstream providers' rate and the pin routes to the cheapest — for
+  // `deepseek-v4-flash-0731` on 2026-08-25 that was $0.035 against a published
+  // $0.14, so the catalogue estimate overstated by four times. It also prices a
+  // `~` alias, which the catalogue declines to price exactly at all.
+  if (usage.endpointRate) {
+    return (
+      (usage.inputTokens * usage.endpointRate.prompt) / 1_000_000 +
+      (usage.outputTokens * usage.endpointRate.completion) / 1_000_000
+    );
+  }
+
   const capabilities = getModelCapabilities(usage.model);
   if (!capabilities) return undefined;
   const tariff = usage.serviceTier === 'flex' ? FLEX_TARIFF_MULTIPLIER : 1;

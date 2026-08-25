@@ -236,6 +236,13 @@ export interface LLMResponse {
    */
   providerName?: string;
   /**
+   * What the pinned endpoint charges, in dollars per million.
+   *
+   * Set only when the attempt named one endpoint with `allow_fallbacks: false`,
+   * because that is the only case where the price is known before the receipt.
+   */
+  endpointRate?: { prompt: number; completion: number };
+  /**
    * The tariff this call was actually served at, as the provider reported it:
    * `default`, `flex` or `priority`.
    *
@@ -565,6 +572,7 @@ export class LLMClient {
         ...(response.generationId ? { generationId: response.generationId } : {}),
         ...(response.providerName ? { providerName: response.providerName } : {}),
         ...(response.serviceTier ? { serviceTier: response.serviceTier } : {}),
+        ...(response.endpointRate ? { endpointRate: response.endpointRate } : {}),
       },
       costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
@@ -736,7 +744,24 @@ export class LLMClient {
         ...(endpoint ? { allow_fallbacks: false } : {}),
       });
       try {
-        return await this.executeSingleRequest(requestOptions, timeout, model, inputContentLength);
+        const response = await this.executeSingleRequest(
+          requestOptions,
+          timeout,
+          model,
+          inputContentLength
+        );
+        // The pin is what makes this knowable: one endpoint, no fallbacks, so
+        // the price it publishes is the price of this call. Without a pin the
+        // estimate stays on the catalogue and waits for the receipt.
+        return endpoint
+          ? {
+              ...response,
+              endpointRate: {
+                prompt: endpoint.promptPricePerMillion,
+                completion: endpoint.completionPricePerMillion,
+              },
+            }
+          : response;
       } catch (error) {
         // A ceiling nothing can meet is a refusal, not a cheaper route:
         // OpenRouter answers "No endpoints found that satisfy the max price for

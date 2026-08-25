@@ -2,11 +2,19 @@
  * Contract: a completion made with a course context records what it cost.
  *
  * Every LLM call used to leave tokens in the trace and no price, because the
- * cost path had no production caller. This asserts the call itself now prices
- * the served model from MODEL_CATALOG (mc2-o7740).
+ * cost path had no production caller (mc2-o7740). What it is priced *from*
+ * matters as much: the catalogue holds the mainstream providers' rate while the
+ * per-attempt pin routes to the cheapest, so when an endpoint is pinned its own
+ * live rate is the one that will be billed.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const listModelEndpoints = vi.fn(async () => [] as unknown[]);
+vi.mock('@/shared/llm/openrouter-endpoints', async importOriginal => {
+  const original = await importOriginal<typeof import('@/shared/llm/openrouter-endpoints')>();
+  return { ...original, listModelEndpoints };
+});
 
 vi.mock('@/shared/services/api-key-service', () => ({
   getOpenRouterApiKey: vi.fn(async () => 'test-key'),
@@ -73,6 +81,32 @@ describe('LLMClient cost recording', () => {
     // cheap by today. A published rate is a moving number, which is what
     // scripts/check-model-catalog-drift.ts exists to notice.
     expect(entry.costUsd).toBeCloseTo(0.612, 10);
+  });
+
+  it('prices a pinned attempt from the endpoint that will serve it', async () => {
+    // glm-5.2 is catalogued at 1.19/3.74 and its cheapest live endpoint is
+    // sail-research/fp8 at 0.50/3.15. 200k in + 100k out is $0.612 by the
+    // catalogue and $0.415 by the endpoint — and the endpoint is the one that
+    // sends the invoice.
+    listModelEndpoints.mockResolvedValueOnce([
+      {
+        tag: 'sail-research/fp8',
+        providerName: 'Sail Research',
+        promptPricePerMillion: 0.5,
+        completionPricePerMillion: 3.15,
+        status: 0,
+        tier: 'default',
+      },
+    ]);
+
+    const { LLMClient } = await import('@/shared/llm/client');
+    await new LLMClient().generateCompletion('\u0432\u043e\u043f\u0440\u043e\u0441', {
+      model: 'z-ai/glm-5.2',
+      costContext: { courseId: COURSE_ID, stage: 'stage_6', phase: 'stage_6_judge' },
+    });
+
+    const [entry] = logTrace.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(entry.costUsd).toBeCloseTo(0.415, 10);
   });
 
   it('makes no trace row for a call with no course to charge', async () => {
