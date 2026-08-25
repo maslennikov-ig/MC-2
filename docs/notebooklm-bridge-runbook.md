@@ -26,7 +26,15 @@ API/worker call it through the existing TypeScript client using:
   - Empty value is treated as disabled (bridge falls back to file mode).
 - `NOTEBOOKLM_STORAGE_STATE_DIR`
   - Local file fallback: host directory that contains `storage_state.json` for `notebooklm-py`.
-  - Mounted read-only into bridge container as `/app/secrets/notebooklm`.
+  - Mounted **read-write** into the bridge container as `/app/secrets/notebooklm`. It was `:ro`
+    until 2026-08-25, and that is not a hardening detail: `notebooklm-py` re-issues the rotating
+    half of the session (`__Secure-1PSIDTS`, `__Secure-3PSIDTS`, `SIDCC`) while it works and writes
+    it back. Mounted `:ro` it could not, and said so only at WARNING —
+    `Failed to write updated cookies … Read-only file system`.
+- `NOTEBOOKLM_MASTER_TOKEN_REFRESH_ENABLED` (default `true`)
+  - The browserless cookie re-mint. See "Cookie refresh" below.
+- `NOTEBOOKLM_MASTER_TOKEN_REFRESH_INTERVAL_SECONDS` (default `604800`, one week)
+- `NOTEBOOKLM_MASTER_TOKEN_REFRESH_CHECK_INTERVAL_SECONDS` (default `3600`)
 - `NOTEBOOKLM_STORAGE_PATH`
   - Optional file fallback path in-container.
   - If set, bridge client initialization will prefer this path.
@@ -46,8 +54,42 @@ export NOTEBOOKLM_AUTH_JSON="$(cat ./secrets/notebooklm/storage_state.json)"
 ```
 
 Local file fallback is also supported using `NOTEBOOKLM_STORAGE_STATE_DIR` +
-`NOTEBOOKLM_STORAGE_PATH`. If file auth expires, run the login command again to
-refresh it.
+`NOTEBOOKLM_STORAGE_PATH`.
+
+## Cookie refresh (no browser)
+
+Cookies expired on 2026-03-31 and were noticed on 2026-08-22. The cause was not the expiry, it was
+that every refresh needed a person with a browser and a password, so a refresh only ever happened
+after something had already broken.
+
+Since 2026-08-25 the bridge holds a durable `aas_et/` **master token** and re-mints the web session
+from it with no browser at all. The loop lives in `app/master_token_refresh.py`, runs inside the
+service, and therefore arrives wherever the image does — deliberately not a `deploy/systemd` timer,
+because CI does not install those and `is-active` is green whether or not the file ever moves.
+
+- Bootstrap (one browser sign-in, ever): `notebooklm login --master-token --account EMAIL
+--oauth-token …`, run inside the container. The `oauth_token` is a single-use cookie from
+  `accounts.google.com/EmbeddedSetup`. See `notebooklm-server-auth-refresh.md`.
+- The durable token lands at `$NOTEBOOKLM_HOME/profiles/default/master_token.json`, mode 0600 —
+  **not** beside `storage_state.json`, whatever the upstream docstring says. `get_storage_path`
+  falls back to the home root; `get_master_token_path` does not.
+- Judge it by the file, never by a status line: `stat -c %y` on `storage_state.json` must move.
+  `/health` carries a `master_token` check that fails out loud when no token is present.
+
+### Running the CLI in this container
+
+Always put `--storage` **before** the subcommand:
+
+```bash
+notebooklm --storage /app/secrets/notebooklm/storage_state.json login --master-token-refresh
+```
+
+There are two flags spelled `--storage` — one on the group, one on `login` — and only the group's
+one skips the CLI's startup migration, which MOVES the home-root `storage_state.json` into
+`profiles/default/`. Both bridges read the home-root path, so `notebooklm login
+--master-token-refresh` (no group flag) deletes the file the service depends on; measured on
+2026-08-25, `/health` went to `auth_file: Not found` on both. The refresh loop reconciles that
+within a tick and logs it at WARNING, but the position of the flag is what avoids it.
 
 ## Local Run (Dev Compose)
 

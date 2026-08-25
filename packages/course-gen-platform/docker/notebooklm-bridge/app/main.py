@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import pathlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -15,6 +17,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
 
+from . import master_token_refresh
 from .auth import require_bearer_token
 from .config import Settings, get_settings
 from .generator import (
@@ -446,10 +449,39 @@ class _AsyncTaskStore:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        """Own the browserless cookie refresh for exactly as long as the service runs.
+
+        A `deploy/systemd` timer would have been the other option and is the worse one here: CI
+        deliberately does not install those units, so a timer proves nothing about any particular
+        host, and `is-active` stays green whether or not the file ever moves. Held by the app, the
+        refresh arrives with the image.
+        """
+        try:
+            resolved = settings if settings is not None else get_settings()
+        except Exception as error:  # noqa: BLE001 — misconfiguration must not block startup
+            logger.warning(
+                "Master-token cookie refresh not started, settings unavailable: %s: %s",
+                type(error).__name__,
+                error,
+            )
+            yield
+            return
+
+        task = asyncio.create_task(master_token_refresh.refresh_loop(resolved))
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
     app = FastAPI(
         title="NotebookLM Bridge",
         description="Bridge service for NotebookLM audio/video artifact generation",
         version="1.0.0",
+        lifespan=lifespan,
     )
     task_store = _AsyncTaskStore()
 
@@ -515,6 +547,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # Cookies expire, and the failure reads as "the page structure changed".
         checks.append(_check_auth_freshness(resolved_settings))
+
+        # `auth_expiry` says the cookies are alive. This one says whether this service can
+        # replace them without a person holding a browser — the gap that went unobserved from
+        # 2026-03-31 to 2026-08-22.
+        checks.append(master_token_refresh.describe(resolved_settings))
 
         # Count active tasks via public API
         active = await task_store.count_active_tasks()

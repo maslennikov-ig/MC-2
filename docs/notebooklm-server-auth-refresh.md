@@ -102,11 +102,45 @@ Copying the profile to another directory does not help either, and fails one ste
 copied `Local State` key does not decrypt from a new path, so that Chrome comes up signed out and
 lands on the same sign-in page.
 
-What is still worth building is `--master-token`: one sign-in, then cookies are re-minted with no
-browser at all. That is the actual cure for an expiry nobody noticed for four months, and it needs
-the `[headless]` extra. Note that `login --cdp-url` is read **only** inside the
-`master_token or master_token_refresh` branch of `session_cmd.py`, so its oauth capture would hit
-the same wall as above; the sign-in half has to happen some other way.
+## Route 4 — master token. BUILT AND LIVE since 2026-08-25. Prefer this.
+
+One browser sign-in, ever; after that the web cookies are re-minted with no browser at all. This is
+the cure for an expiry nobody noticed for four months, and the routes above are now only for the
+day the master token itself is revoked.
+
+The single sign-in yields a **single-use `oauth_token` cookie**, and it cannot be derived from the
+cookies already on the host — different flow, different artifact. There is no unattended headless
+Google login, by design.
+
+1. **Owner**, in a browser on a machine Google serves (VPN on): go to
+   `https://accounts.google.com/EmbeddedSetup` and sign in as `djbkk68@gmail.com`.
+
+   **The page will appear to hang after "I agree". That is the success state, not a failure.**
+   `EmbeddedSetup` is the web half of Android device setup: after consent it tries to hand the
+   session to a device that does not exist in a desktop browser, so it simply sits there. The
+   library's own capture never waits for that navigation either — `capture_oauth_token` polls the
+   cookie jar while the page stays open. At that stalled moment, DevTools → Application → Cookies →
+   `https://accounts.google.com` → copy the value of `oauth_token`.
+
+   Incognito is optional. It only empties the account picker so the server account is chosen
+   explicitly rather than inherited from a personal session.
+
+2. **Agent** runs the exchange **inside the dev bridge container**, feeding the token on stdin so it
+   never reaches argv, the host process list or a shell history. Inside the container the SOCKS
+   proxy, the read-write mount and `NOTEBOOKLM_HOME` are all already correct; the host has none of
+   python3-venv, uv or a usable pip module.
+
+   The token is short-lived as well as single-use — capture it and spend it in the same few minutes,
+   or it comes back `exchange_token rejected the oauth_token`.
+
+3. After that, nothing needs a person. The bridge re-mints on its own schedule
+   (`app/master_token_refresh.py`), and a hand-run recovery is
+   `notebooklm --storage /app/secrets/notebooklm/storage_state.json login --master-token-refresh`
+   — with `--storage` **before** the subcommand. See the runbook for why the position matters.
+
+Note that `login --cdp-url` is read **only** inside the `master_token or master_token_refresh`
+branch of `session_cmd.py`, so its oauth capture would hit the same App-Bound-Encryption wall as
+route 3; the sign-in half has to happen in a real browser regardless.
 
 ## Deployment (either route)
 

@@ -273,6 +273,32 @@ and hoisting a shared options object or a request builder out of the call is exa
 exist to notice. One of the three failures in that sweep was real by that rule: an options literal
 had been collapsed into a spread, and the attribution was no longer where a reader checks it.
 
+**A tool may reorganise the directory you told it to write to, and the flag that stops it is
+positional.** `notebooklm-py`'s CLI runs a legacy-layout migration in its group callback: it MOVES a
+home-root `storage_state.json` into `profiles/default/` — copy, then delete the original. This
+deployment is deliberately on the flat layout, because `generator._configure_notebooklm_home`
+derives `NOTEBOOKLM_HOME` from the storage file's PARENT, so a profile-shaped path would resolve
+the master token one directory too deep. On 2026-08-25 a single `notebooklm login
+--master-token-refresh` therefore did not reorganise that directory, it emptied it: production and
+dev bind-mount the same host path, and both went to `auth_file: Not found` the moment the command
+returned. Three things generalise. First, the gate is `if not storage and not has_env_auth_json()`
+reading the GROUP callback's parameter, and `login` has a `--storage` of its own — two flags with
+one name, where `notebooklm --storage PATH login …` is safe and `notebooklm login … --storage PATH`
+is not. Second, the library path never migrates; only the CLI does, so calling
+`notebooklm.auth.mint_cookies` / `persist_minted_jar` directly is both smaller and safer than
+shelling out. Third, a runbook line saying "always pass the flag first" is obeyed until the one
+night it is not: the durable answer was to make the service reconcile the layout on its own tick
+and fail the `master_token` health check out loud while the fork exists.
+
+**A recurring job that must not be absent belongs in the image, not in `deploy/systemd`.** Units in
+`deploy/systemd` are deliberately NOT installed by CI — root ownership of that tree is the security
+property, which is exactly why `scripts/ci/check_monitoring_drift.py` had to be written. So a unit
+in the repository proves nothing about any particular host, and `is-active` reads green whether or
+not the work ever happens; that is the same shape as the geo-bypass tunnel that was supervised,
+restarting and dead for four months. The browserless cookie re-mint was put in the bridge's own
+FastAPI lifespan instead: it arrives wherever the image arrives, it needs no root install, and its
+evidence is the mtime of the file it rewrites.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.

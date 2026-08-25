@@ -83,6 +83,25 @@ class Settings(BaseSettings):
         default=None,
         alias="NOTEBOOKLM_STORAGE_PATH",
     )
+    notebooklm_master_token_refresh_enabled: bool = Field(
+        default=True,
+        alias="NOTEBOOKLM_MASTER_TOKEN_REFRESH_ENABLED",
+    )
+    # Seven days against a ~400-day session is not about the long-lived cookies — those outlive any
+    # schedule. It is about the ROTATING half (__Secure-1PSIDTS, __Secure-3PSIDTS, SIDCC), which the
+    # client re-issues only while it is working. An idle bridge stops rotating them, which is how a
+    # file that looked alive on 31 March was dead by April with nobody touching it.
+    notebooklm_master_token_refresh_interval_seconds: float = Field(
+        default=604800.0,
+        gt=0,
+        alias="NOTEBOOKLM_MASTER_TOKEN_REFRESH_INTERVAL_SECONDS",
+    )
+    # How often to look, not how often to re-mint. Cheap: a stat() on one file.
+    notebooklm_master_token_refresh_check_interval_seconds: float = Field(
+        default=3600.0,
+        gt=0,
+        alias="NOTEBOOKLM_MASTER_TOKEN_REFRESH_CHECK_INTERVAL_SECONDS",
+    )
 
 
 @lru_cache(maxsize=1)
