@@ -70,18 +70,18 @@ export interface OpenRouterBatch {
 /**
  * One request inside a batch.
  *
- * There is deliberately no tier field. `/endpoints` advertises
- * `openai/gpt-5.6-luna:batch` at `openai/flex` for $0.05/$0.30, and the Batch
- * API does not serve it. Two paid probes on 2026-08-25, same 13+5 tokens, both
- * billed $0.0000043 — the default batch rate to the cent — once with
- * `service_tier: 'flex'` in the body and once with
- * `provider: {only: ['openai/flex'], allow_fallbacks: false}`. Neither
- * generation record reported a `service_tier` at all.
+ * There is deliberately no tier field, and the reason is upstream of OpenRouter.
+ * OpenAI defines flex as *"Tokens are priced at Batch API rates"* — flex and
+ * batch are one discount reached two ways, so asking a batch for flex asks for a
+ * price that does not exist. Three paid probes on 2026-08-25, same 13+5 tokens,
+ * all billed $0.0000043 (the batch rate to the cent) and none reported a
+ * `service_tier`: `service_tier: 'flex'` under the plain slug, `provider:
+ * {only: ['openai/flex'], allow_fallbacks: false}` under the plain slug, and
+ * `service_tier: 'flex'` under the `:batch` slug.
  *
  * A field the provider measurably ignores is worse than an absent one: it reads
  * as a working control, which is exactly how `extra_body` hid for months
- * (mc2-5pt54). If OpenRouter starts honouring one, add it back with a probe
- * result next to it.
+ * (mc2-5pt54).
  */
 export interface OpenRouterChatBatchRequest {
   customId: string;

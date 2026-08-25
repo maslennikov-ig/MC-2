@@ -10,7 +10,7 @@
  * | sync default   | 0.20 | 1.20 |
  * | sync flex      | 0.10 | 0.60 |  ← every background phase, since mc2-a9w19
  * | batch default  | 0.10 | 0.60 |  ← what a batch is billed, whatever it asks
- * | batch flex     | 0.05 | 0.30 |  ← advertised by `/endpoints`, not reachable
+ * | batch flex     | 0.05 | 0.30 |  ← a catalogue artefact; see below
  *
  * `/models` reports the default tariff for both ids, so comparing those two
  * numbers says "half price" and means it about a synchronous call we stopped
@@ -18,17 +18,30 @@
  *
  * The batch leg is priced at the **default** tariff on purpose, even though
  * `/endpoints` advertises `openai/gpt-5.6-luna:batch` at `openai/flex` for
- * $0.05/$0.30. That endpoint is not reachable through the Batch API. Two paid
- * probes on 2026-08-25, same 13+5 tokens, both billed $0.0000043 — which is
- * 13×0.10 + 5×0.60 per million, the default rate exactly:
+ * $0.05/$0.30. That row does not exist at the origin, and cannot: OpenAI's own
+ * documentation defines flex as *"Tokens are priced at Batch API rates, with
+ * additional discounts from prompt caching."* Its price table lists luna at
+ * Standard $0.20/$1.20, Flex $0.10/$0.60, Batch $0.10/$0.60 — flex and batch are
+ * one discount reached two ways, not two multipliers. There is nothing to stack.
  *
- * - `service_tier: 'flex'` in the request body: ignored.
- * - `provider: {only: ['openai/flex'], allow_fallbacks: false}`: ignored.
+ * OpenRouter derives tier endpoints by applying its 0.5x multiplier to a model
+ * entry, so applying it to an already-batch-priced `:batch` entry produces a
+ * $0.05/$0.30 row that nothing can bill. Three paid probes on 2026-08-25, same
+ * 13+5 tokens, all billed $0.0000043 = 13×0.10 + 5×0.60 per million:
  *
- * In both the generation record reported no `service_tier` at all. So a batched
- * call costs what batch@default costs, and for luna that is precisely what we
- * already pay synchronously at flex. Pricing the batch leg optimistically would
+ * - `luna` + `service_tier: 'flex'`
+ * - `luna` + `provider: {only: ['openai/flex'], allow_fallbacks: false}`
+ * - `luna:batch` + `service_tier: 'flex'`
+ *
+ * None reported a `service_tier` in the generation record. So a batched call
+ * costs what batch costs, and for luna that is precisely what we already pay
+ * synchronously at flex. Pricing the batch leg from that catalogue row would
  * approve a 24h window in exchange for nothing.
+ *
+ * Batch still earns its keep where the model has **no** flex endpoint — for
+ * `z-ai/glm-5.2` (sync $0.63/$1.98, the most expensive line of a course) batch
+ * is a real halving, because there flex is not an alternative route to the same
+ * discount, it is absent.
  *
  * @module shared/llm/openrouter-batch-eligibility
  */
