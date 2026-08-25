@@ -27,7 +27,6 @@ import {
   handleUnknownError,
   applyMandatoryReasoningFloor,
   applyProviderRouting,
-  buildProviderPriceCeiling,
 } from './client-helpers';
 import type { ReasoningRequest, OpenRouterRequestOptions } from './client-helpers';
 import {
@@ -39,6 +38,7 @@ import { buildOpenRouterClient } from './openrouter-client';
 import { fetchGenerationFact, resolveProviderSlug } from './openrouter-generation';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from './openrouter-endpoints';
 import { resolveServiceTier, type ServiceTier } from './service-tier';
+import { resolveProviderPriceCeiling } from './openrouter-catalogue';
 import {
   isMandatoryReasoningRejection,
   rememberMandatoryReasoning,
@@ -692,7 +692,15 @@ export class LLMClient {
     // that outlives the return.
     const ignoredProviderSlugs = new Set<string>();
 
-    const priceCeiling = buildProviderPriceCeiling(model, PROVIDER_PRICE_CEILING_MULTIPLIER);
+    // Read live, not remembered. The frozen catalogue rate drifts, and a ceiling
+    // built from a stale low number narrows the provider pool silently and, low
+    // enough, refuses every endpoint (see openrouter-catalogue.ts). The lookup
+    // is cached and costs nothing extra here: the attempt below already awaits
+    // `listModelEndpoints` for the same model.
+    const priceCeiling = await resolveProviderPriceCeiling(
+      model,
+      PROVIDER_PRICE_CEILING_MULTIPLIER
+    );
     if (priceCeiling) {
       applyProviderRouting(requestOptions, { max_price: priceCeiling });
     } else {

@@ -62,20 +62,10 @@
  */
 
 import { cheapestEndpointAtTier, listModelEndpoints } from './openrouter-endpoints';
+import { OpenRouterCatalogue, type OpenRouterCatalogModel } from './openrouter-catalogue';
 import type { ServiceTier } from './service-tier';
 
-export interface OpenRouterCatalogModel {
-  id: string;
-  context_length: number | null;
-  pricing: {
-    prompt: string;
-    completion: string;
-  };
-  supported_parameters?: string[];
-  top_provider?: {
-    max_completion_tokens?: number | null;
-  };
-}
+export type { OpenRouterCatalogModel };
 
 export interface BatchCompatibilityRequirements {
   /** Estimated prompt tokens, excluding the requested completion budget. */
@@ -240,10 +230,6 @@ export function selectDiscountedBatchVariant(
   };
 }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
-const DEFAULT_CATALOG_TTL_MS = 5 * 60 * 1000;
-const DEFAULT_CATALOG_TIMEOUT_MS = 5_000;
-
 export interface OpenRouterBatchEligibilityResolverOptions {
   fetch?: typeof fetch;
   cacheTtlMs?: number;
@@ -282,18 +268,6 @@ async function readTieredRatesFromEndpoints(
   };
 }
 
-function isCatalogModel(value: unknown): value is OpenRouterCatalogModel {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<OpenRouterCatalogModel>;
-  return (
-    typeof candidate.id === 'string' &&
-    (typeof candidate.context_length === 'number' || candidate.context_length === null) &&
-    !!candidate.pricing &&
-    typeof candidate.pricing.prompt === 'string' &&
-    typeof candidate.pricing.completion === 'string'
-  );
-}
-
 /**
  * Runtime source of truth for automatic Batch API selection.
  *
@@ -302,20 +276,13 @@ function isCatalogModel(value: unknown): value is OpenRouterCatalogModel {
  * continue through the synchronous path.
  */
 export class OpenRouterBatchEligibilityResolver {
-  private readonly fetchImpl: typeof fetch;
-  private readonly cacheTtlMs: number;
-  private readonly timeoutMs: number;
-  private readonly now: () => number;
+  private readonly catalogue: OpenRouterCatalogue;
   private readonly resolveTieredRates: NonNullable<
     OpenRouterBatchEligibilityResolverOptions['resolveTieredRates']
   >;
-  private cached: { models: OpenRouterCatalogModel[]; expiresAt: number } | null = null;
 
   constructor(options: OpenRouterBatchEligibilityResolverOptions = {}) {
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
-    this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CATALOG_TTL_MS;
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_CATALOG_TIMEOUT_MS;
-    this.now = options.now ?? Date.now;
+    this.catalogue = new OpenRouterCatalogue(options);
     this.resolveTieredRates = options.resolveTieredRates ?? readTieredRatesFromEndpoints;
   }
 
@@ -324,7 +291,7 @@ export class OpenRouterBatchEligibilityResolver {
     requirements: BatchCompatibilityRequirements
   ): Promise<BatchEligibilityDecision> {
     try {
-      const models = await this.getModels();
+      const models = await this.catalogue.list();
       const batchModelId = `${baseModelId}:batch`;
       const tieredRates = await this.resolveTieredRates(
         baseModelId,
@@ -338,29 +305,6 @@ export class OpenRouterBatchEligibilityResolver {
   }
 
   clearCache(): void {
-    this.cached = null;
-  }
-
-  private async getModels(): Promise<OpenRouterCatalogModel[]> {
-    if (this.cached && this.cached.expiresAt > this.now()) return this.cached.models;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const response = await this.fetchImpl(OPENROUTER_MODELS_URL, {
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`OpenRouter model catalogue returned ${response.status}`);
-
-      const payload = (await response.json()) as { data?: unknown };
-      if (!Array.isArray(payload.data)) throw new Error('OpenRouter model catalogue is malformed');
-      const models = payload.data.filter(isCatalogModel);
-      if (models.length === 0) throw new Error('OpenRouter model catalogue is empty');
-
-      this.cached = { models, expiresAt: this.now() + this.cacheTtlMs };
-      return models;
-    } finally {
-      clearTimeout(timeout);
-    }
+    this.catalogue.clearCache();
   }
 }

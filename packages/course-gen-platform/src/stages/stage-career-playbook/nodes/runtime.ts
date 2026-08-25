@@ -1,6 +1,6 @@
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shared/llm/client';
-import { buildProviderPriceCeiling } from '@/shared/llm/client-helpers';
+import { resolveProviderPriceCeiling } from '@/shared/llm/openrouter-catalogue';
 import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
 import { resolveServiceTier } from '@/shared/llm/service-tier';
@@ -308,9 +308,11 @@ export function createCareerPlaybookRuntime(
         const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
         const attemptStartedAt = Date.now();
 
+        // Live, not remembered — see openrouter-catalogue.ts. The lookup is
+        // cached and adds no round trip the pin below was not already making.
         const priceCeiling = priceCeilingRefused
           ? undefined
-          : buildProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
+          : await resolveProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
 
         // Pin this attempt to one endpoint, so that whatever happens to it is
         // attributable without asking anyone afterwards. Routing around a
