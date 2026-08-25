@@ -17,7 +17,7 @@
 | `openai/gpt-5.6-luna`       | `openai/priority` | 0.40           | 2.40     | синхронный                          |
 | `openai/gpt-5.6-luna-pro`   | те же три         | **те же цены** |          | синхронный                          |
 | `openai/gpt-5.6-luna:batch` | `openai`          | 0.10           | 0.60     | async, окно 24 ч                    |
-| `openai/gpt-5.6-luna:batch` | `openai/flex`     | 0.05           | 0.30     | async, окно 24 ч                    |
+| `openai/gpt-5.6-luna:batch` | `openai/flex`     | 0.05           | 0.30     | async — **недостижим, см. Этап 3**  |
 
 Из этого следуют три факта, каждый из которых проверен, а не выведен:
 
