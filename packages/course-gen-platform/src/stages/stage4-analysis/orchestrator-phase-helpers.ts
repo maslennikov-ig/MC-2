@@ -39,6 +39,7 @@ import type {
   Phase4Output,
 } from '@megacampus/shared-types/analysis-result';
 import type pino from 'pino';
+import { ZodError } from 'zod';
 import { ClarifyingQuestionsInterrupt } from '@/shared/errors';
 import { logTrace } from '../../shared/trace-logger';
 import type { AnalysisContext } from './orchestrator-helpers';
@@ -701,6 +702,18 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
  * Aligned with Stage 5/6 non-retryable bail-out pattern.
  */
 function isNonRetryablePhaseError(error: Error): boolean {
+  // Ask the error what it is before reading what it says. A ZodError's message
+  // is a JSON array of issues — it contains none of the words below, so this
+  // guard missed the one error class it was written for: on 2026-08-25
+  // phase2_scope rejected its own input, spent two more attempts and 3s of
+  // backoff reproducing the identical failure, and reported "failed after 3
+  // attempts", which reads as a flaky model rather than a fixed input
+  // (mc2-4m29k). `name` is checked too, because a ZodError that crossed a
+  // module boundary can fail `instanceof`.
+  if (error instanceof ZodError || error.name === 'ZodError') {
+    return true;
+  }
+
   const msg = error.message.toLowerCase();
   return (
     msg.includes('validation failed') ||

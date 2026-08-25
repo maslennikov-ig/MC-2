@@ -181,9 +181,22 @@ const llmCourseCategoryEnum = createLLMEnumSchema(
     research: 'academic',
   },
   'course_category'
+).describe(
+  // The synonym map is Latin-only, so a course generated in Chinese answered
+  // `专业` — the correct category, in the language the rest of the prompt asked
+  // for, and unmappable (mc2-4m29k).
+  'use one of these English words verbatim, even when the rest of the output is in another language'
 );
 
 // complexity enum (used in Phase1, Phase2Input, AnalysisResult)
+//
+// The name and the values disagree: `complexity` reads as difficulty, the values
+// measure breadth. A model asked for "complexity" answers `beginner` — which is
+// a perfectly good answer to the question the field name asks, and an invalid
+// value for the question the enum asks. The description is what closes that gap,
+// and it only reaches the model because zodToPromptSchema now renders pipelines
+// (mc2-4m29k). Renaming the field would be cleaner and is not free: it is stored
+// in analysis_result, read by the web panels and by Phase 0.5, 2 and 3.
 const llmComplexityEnum = createLLMEnumSchema(
   ['narrow', 'medium', 'broad'] as const,
   {
@@ -201,7 +214,7 @@ const llmComplexityEnum = createLLMEnumSchema(
     comprehensive: 'broad',
   },
   'complexity'
-);
+).describe('how much ground the topic covers, NOT how hard it is for the learner');
 
 // target_audience enum (used in Phase1, Phase2Input, AnalysisResult)
 const llmTargetAudienceEnum = createLLMEnumSchema(
@@ -223,6 +236,8 @@ const llmTargetAudienceEnum = createLLMEnumSchema(
     universal: 'mixed',
   },
   'target_audience'
+).describe(
+  'the learner proficiency level, one of these words only — not a description of who the learners are'
 );
 
 // difficulty_progression enum (used in SectionBreakdown)
@@ -488,86 +503,6 @@ export const Phase2OutputSchema = z.object({
 });
 
 /**
- * Phase 2 input schema: Course classification from Phase 1 + user input
- */
-export const Phase2InputSchema = z.object({
-  course_id: z.string().uuid('Invalid course ID'),
-  language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
-  topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
-  document_summaries: z.array(z.string()).nullable().optional(),
-  phase1_output: z.object({
-    course_category: z.object({
-      primary: llmCourseCategoryEnum,
-      confidence: z.number().min(0).max(1),
-      reasoning: z.string().min(1),
-      secondary: llmCourseCategoryEnum.nullable().optional(),
-    }),
-    contextual_language: z
-      .object({
-        why_matters_context: atLeastInformationChars(50), // Removed .max(300) - allow rich context
-        motivators: atLeastInformationChars(50), // Reduced from 100 - realistic minimum for motivators text
-        experience_prompt: atLeastInformationChars(100), // Removed .max(600) - allow detailed prompts
-        problem_statement_context: atLeastInformationChars(50), // Removed .max(300) - encourage thorough problem statements
-        knowledge_bridge: atLeastInformationChars(100), // Removed .max(600) - allow comprehensive bridging
-        practical_benefit_focus: atLeastInformationChars(100), // Removed .max(600) - encourage detailed benefits
-      })
-      .optional(),
-    topic_analysis: z.object({
-      determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
-      information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
-      complexity: llmComplexityEnum,
-      reasoning: atLeastInformationChars(50),
-      target_audience: llmTargetAudienceEnum,
-      missing_elements: z.array(z.string()).nullable(),
-      key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
-      domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
-    }),
-    phase_metadata: z.object({
-      duration_ms: z.number().int().nonnegative(),
-      model_used: z.string().min(1),
-      tokens: z.object({
-        input: z.number().int().nonnegative(),
-        output: z.number().int().nonnegative(),
-        total: z.number().int().nonnegative(),
-      }),
-      quality_score: z.number().min(0).max(1),
-      retry_count: z.number().int().nonnegative(),
-    }),
-  }),
-  // Course size fields (advisory - LLM may deviate if needed)
-  course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
-  structure_profile: z.enum(['general_auto', 'role_playbook_bridge', 'explicit_size']).optional(),
-  target_lessons: z.number().int().positive().optional(),
-  target_sections: z.number().int().positive().optional(),
-  size_guidance: z.string().min(1).optional(),
-  /** Minimum lessons count (hard constraint from size preset) */
-  min_lessons: z.number().int().positive().optional(),
-  /** Maximum lessons count (soft constraint from size preset) */
-  max_lessons: z.number().int().positive().optional(),
-
-  /** Course description (user-provided context) */
-  course_description: z.string().optional(),
-
-  /** Learning outcomes (user-specified goals) */
-  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
-
-  /** Overlap detection feedback from previous attempt (for retry) */
-  overlap_feedback: z.string().optional(),
-
-  /** Clarifying answers from Phase 0.5 */
-  clarifying_answers: z
-    .array(
-      z.object({
-        question: z.string(),
-        answer: z.string(),
-        priority: z.string(),
-        category: z.string().nullable(),
-      })
-    )
-    .optional(),
-});
-
-/**
  * Phase 1 output schema: Course classification and contextual language
  * Used to validate Phase 1 output before returning (enables retry-with-escalation)
  */
@@ -609,6 +544,52 @@ export const Phase1OutputSchema = z.object({
     quality_score: z.number().min(0).max(1),
     retry_count: z.number().int().nonnegative(),
   }),
+});
+
+/**
+ * Phase 2 input schema: Course classification from Phase 1 + user input
+ */
+export const Phase2InputSchema = z.object({
+  course_id: z.string().uuid('Invalid course ID'),
+  language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
+  topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
+  document_summaries: z.array(z.string()).nullable().optional(),
+  // The same schema Phase 1 validates against, not a copy of it. It was a
+  // field-for-field duplicate until 2026-08-25: two hand-maintained statements
+  // of one contract, either of which could drift into rejecting what the other
+  // accepts, on the boundary where a rejection kills the course (mc2-4m29k).
+  phase1_output: Phase1OutputSchema,
+  // Course size fields (advisory - LLM may deviate if needed)
+  course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
+  structure_profile: z.enum(['general_auto', 'role_playbook_bridge', 'explicit_size']).optional(),
+  target_lessons: z.number().int().positive().optional(),
+  target_sections: z.number().int().positive().optional(),
+  size_guidance: z.string().min(1).optional(),
+  /** Minimum lessons count (hard constraint from size preset) */
+  min_lessons: z.number().int().positive().optional(),
+  /** Maximum lessons count (soft constraint from size preset) */
+  max_lessons: z.number().int().positive().optional(),
+
+  /** Course description (user-provided context) */
+  course_description: z.string().optional(),
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
+
+  /** Overlap detection feedback from previous attempt (for retry) */
+  overlap_feedback: z.string().optional(),
+
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+        priority: z.string(),
+        category: z.string().nullable(),
+      })
+    )
+    .optional(),
 });
 
 /**

@@ -33,6 +33,73 @@ interface ZodDefWithValue {
   value: unknown;
 }
 
+interface DescribableType {
+  schema: z.ZodType;
+  isOptional: boolean;
+  isNullable: boolean;
+  /** The nearest `.describe()` found while unwrapping, if any. */
+  description: string;
+}
+
+/**
+ * Strip the wrappers that carry no shape of their own, keeping what they said.
+ *
+ * Two wrappers matter here and both have already cost a course:
+ *
+ * - **ZodPipeline** (`.transform().pipe()`) is how every LLM-tolerant enum in
+ *   this repo is built. The input side is how we forgive the model; the OUTPUT
+ *   side is what we are asking it to produce, so that is what gets described.
+ *   Without this branch each one fell through to the `unknown` fallback, and on
+ *   2026-08-25 the Stage 4 Phase 1 prompt literally read `"complexity": unknown,
+ *   "target_audience": unknown`. The model answered the field *names* instead of
+ *   the enums it was never shown — a difficulty for a breadth enum, a prose
+ *   paragraph for a four-word level, and `专业` for a Latin-only category list —
+ *   and Phase 2 then rejected its own upstream input (mc2-4m29k).
+ * - **ZodEffects** (`.refine()`, `.transform()`, INV-2025-11-19-001) keeps its own `.describe()`,
+ *   because unwrapping otherwise throws away the only statement of what the
+ *   refinement requires. On 2026-08-22 replacing `.min(100)` with a script-aware
+ *   `.refine()` silently deleted "min 100" from what the model was told, so it
+ *   wrote short and the phase failed three times (mc2-v6fqp).
+ *
+ * A constraint the model cannot see is a constraint it cannot satisfy.
+ */
+function unwrapToDescribableType(schema: z.ZodType): DescribableType {
+  let current = schema;
+  let isOptional = false;
+  let isNullable = false;
+  let description = '';
+
+  const remember = (candidate: string | undefined): void => {
+    if (!description && candidate) description = candidate;
+  };
+
+  while (current instanceof z.ZodOptional || current instanceof z.ZodNullable) {
+    if (current instanceof z.ZodOptional) {
+      isOptional = true;
+      current = current._def.innerType as z.ZodType;
+    }
+    if (current instanceof z.ZodNullable) {
+      isNullable = true;
+      current = current._def.innerType as z.ZodType;
+    }
+  }
+
+  if (current instanceof z.ZodPipeline) {
+    remember(current.description);
+    current = (current as z.ZodPipeline<z.ZodTypeAny, z.ZodTypeAny>)._def.out as z.ZodType;
+    remember(current.description);
+  }
+
+  if (current instanceof z.ZodEffects) {
+    remember(current.description);
+    current = current._def.schema as z.ZodType;
+    // `.describe()` on the inner schema still counts when the wrapper is silent.
+    remember(current.description);
+  }
+
+  return { schema: current, isOptional, isNullable, description };
+}
+
 /**
  * Converts Zod schema to human-readable prompt description for LLMs
  *
@@ -64,42 +131,14 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   const indent = '  '.repeat(depth);
   const nextIndent = '  '.repeat(depth + 1);
 
-  // Unwrap optional and nullable
-  let currentSchema = schema;
-  let isOptional = false;
-  let isNullable = false;
+  const {
+    schema: currentSchema,
+    isOptional,
+    isNullable,
+    description,
+  } = unwrapToDescribableType(schema);
 
-  while (currentSchema instanceof z.ZodOptional || currentSchema instanceof z.ZodNullable) {
-    if (currentSchema instanceof z.ZodOptional) {
-      isOptional = true;
-      currentSchema = currentSchema._def.innerType as z.ZodType;
-    }
-    if (currentSchema instanceof z.ZodNullable) {
-      isNullable = true;
-      currentSchema = currentSchema._def.innerType as z.ZodType;
-    }
-  }
-
-  // Unwrap ZodEffects (created by .refine(), .transform(), etc.)
-  // ZodEffects wraps the actual schema, we need to access the underlying type
-  // See: INV-2025-11-19-001 - zodToPromptSchema missing ZodEffects handler
-  //
-  // A refinement's own `.describe()` is kept, because unwrapping otherwise
-  // throws away the only statement of what the refinement requires. That is not
-  // cosmetic: this description IS the prompt, and on 2026-08-22 replacing
-  // `.min(100)` with a script-aware `.refine()` silently deleted "min 100" from
-  // what the model was told, so it started writing short and the phase failed
-  // three times (mc2-v6fqp). A constraint the model cannot see is a constraint
-  // it cannot satisfy.
-  let refinementDescription = '';
-  if (currentSchema instanceof z.ZodEffects) {
-    refinementDescription = currentSchema.description ?? '';
-    currentSchema = currentSchema._def.schema as z.ZodType;
-    // `.describe()` on the inner schema still counts when the wrapper is silent.
-    if (!refinementDescription) refinementDescription = currentSchema.description ?? '';
-  }
-  const refinementSuffix = refinementDescription ? ` (${refinementDescription})` : '';
-
+  const refinementSuffix = description ? ` (${description})` : '';
   const optionalSuffix = isOptional ? ' (optional)' : '';
   const nullableSuffix = isNullable ? ' (nullable)' : '';
 
@@ -188,7 +227,11 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   // Handle ZodEnum
   if (currentSchema instanceof z.ZodEnum) {
     const values = (currentSchema as unknown as { _def: ZodDefWithValues })._def.values;
-    return `enum: ${values.join(' | ')}${optionalSuffix}${nullableSuffix}`;
+    // The description carries what the field name does not. `complexity` with
+    // values narrow|medium|broad asks about breadth while its name asks about
+    // difficulty; a model shown only the values still has to guess which
+    // question it is answering.
+    return `enum: ${values.join(' | ')}${refinementSuffix}${optionalSuffix}${nullableSuffix}`;
   }
 
   // Handle ZodBoolean
@@ -210,7 +253,17 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
     return `${optionDescriptions.join(' | ')}${optionalSuffix}${nullableSuffix}`;
   }
 
-  // Fallback for unknown types
+  // Fallback for unknown types.
+  //
+  // Say so out loud. A wrapper this function does not recognise degrades the
+  // prompt to the word "unknown", which the model reads as "put anything here" —
+  // and nothing anywhere else in the system reports that a field was described
+  // to the model as nothing at all. That silence is what let the LLM-tolerant
+  // enums stay invisible for as long as they existed (mc2-4m29k).
+  logger.warn(
+    { zodType: currentSchema.constructor.name, depth },
+    '[zodToPromptSchema] No handler for this Zod type; the model will be told this field is "unknown"'
+  );
   return `unknown${optionalSuffix}${nullableSuffix}`;
 }
 
