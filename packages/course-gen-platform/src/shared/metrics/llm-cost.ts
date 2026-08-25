@@ -94,6 +94,16 @@ export interface LlmCallUsage {
    * it before the receipt arrives.
    */
   endpointRate?: { prompt: number; completion: number };
+  /**
+   * What OpenRouter says it charged, from `usage.cost` in the completion body.
+   *
+   * The charge itself, not an estimate of it, and it costs nothing to have:
+   * measured 2026-08-25, it is on every completion with or without
+   * `usage: {include: true}` and equals `GET /api/v1/generation` to the cent.
+   * Absent only when no body arrived — an aborted or timed-out call — which is
+   * exactly the case the deferred lookup and the estimates below exist for.
+   */
+  actualCostUsd?: number;
 }
 
 /**
@@ -214,6 +224,9 @@ export function settleTraceCostFromProvider(
  * rather than from the catalogue.
  */
 export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
+  // Nothing to estimate when the provider already stated the charge.
+  if (usage.actualCostUsd !== undefined) return usage.actualCostUsd;
+
   // The price of the endpoint we pinned beats the catalogue on every count: it
   // is live, it is the endpoint that actually served the call, and it already
   // carries the tier, so no multiplier is guessed on top. The catalogue holds
@@ -403,6 +416,21 @@ export async function recordLlmCallCost(
       ...(costUsd === undefined ? {} : { costUsd }),
       durationMs: context.durationMs ?? 0,
       ...(context.retryAttempt === undefined ? {} : { retryAttempt: context.retryAttempt }),
+      // A row whose price came from the response body is settled the moment it
+      // is written. Saying so here rather than waiting for the deferred lookup
+      // matters: 83 of 509 rows over the fortnight to 2026-08-25 never got an
+      // `output_data` at all, so every reconciliation read them as unpriced
+      // guesses when their number was already right.
+      ...(usage.actualCostUsd === undefined
+        ? {}
+        : {
+            outputData: {
+              billedByProvider: true,
+              ...(usage.generationId ? { generationId: usage.generationId } : {}),
+              ...(usage.providerName ? { providerName: usage.providerName } : {}),
+              ...(usage.serviceTier ? { serviceTier: usage.serviceTier } : {}),
+            },
+          }),
       inputData: {
         // Says "a provider charged for this", so a reconciliation can tell a
         // call from a stage progress marker. Token counts cannot: `judge_complete`
@@ -413,6 +441,7 @@ export async function recordLlmCallCost(
         billedCall: true,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
+        ...(usage.actualCostUsd === undefined ? {} : { billedInResponse: true }),
         // The catalogue figure is kept alongside the provider's so a wrong
         // catalogue entry stays visible after the row is settled, instead of
         // being quietly overwritten by the truth it should have matched.

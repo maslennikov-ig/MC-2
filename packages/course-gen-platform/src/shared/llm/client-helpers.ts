@@ -483,12 +483,21 @@ export function parseCompletionResponse(
   // for it and getting it are different things (mc2-a9w19).
   const servedTier = (completion as unknown as Record<string, unknown>).service_tier;
 
+  // And the charge itself, in the same body. OpenRouter puts `usage.cost` on
+  // every completion — measured 2026-08-25, present with and without
+  // `usage: {include: true}`, and equal to the cent to what
+  // `GET /api/v1/generation` reports eleven seconds later: $0.000004257 both
+  // times. Every estimate below this line exists for the calls that never
+  // return a body at all.
+  const billed = (usage as unknown as Record<string, unknown> | undefined)?.cost;
+
   return {
     content: choice.message.content,
     inputTokens,
     outputTokens,
     totalTokens,
     model: completion.model || model,
+    ...(typeof billed === 'number' && Number.isFinite(billed) ? { actualCostUsd: billed } : {}),
     finishReason: choice.finish_reason || 'unknown',
     requestId: (completion as unknown as Record<string, unknown>)._request_id as string | undefined,
     ...(typeof servedBy === 'string' && servedBy.length > 0 ? { providerName: servedBy } : {}),

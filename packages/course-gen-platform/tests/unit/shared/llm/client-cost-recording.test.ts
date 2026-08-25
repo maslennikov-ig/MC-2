@@ -10,14 +10,15 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const listModelEndpoints = vi.fn(async () => [] as unknown[]);
+const statedCost = vi.hoisted(() => ({ value: undefined as number | undefined }));
+const listModelEndpoints = vi.fn(() => Promise.resolve([] as unknown[]));
 vi.mock('@/shared/llm/openrouter-endpoints', async importOriginal => {
   const original = await importOriginal<typeof import('@/shared/llm/openrouter-endpoints')>();
   return { ...original, listModelEndpoints };
 });
 
 vi.mock('@/shared/services/api-key-service', () => ({
-  getOpenRouterApiKey: vi.fn(async () => 'test-key'),
+  getOpenRouterApiKey: vi.fn(() => Promise.resolve('test-key')),
   getApiKeySync: vi.fn(() => 'test-key'),
 }));
 
@@ -33,13 +34,20 @@ vi.mock('openai', () => {
   const MockOpenAI = vi.fn(function (this: Record<string, unknown>) {
     this.chat = {
       completions: {
-        create: vi.fn().mockResolvedValue({
+        create: vi.fn().mockImplementation(() => ({
           choices: [{ message: { content: 'ответ' }, finish_reason: 'stop' }],
-          usage: { prompt_tokens: 200_000, completion_tokens: 100_000, total_tokens: 300_000 },
+          usage: {
+            prompt_tokens: 200_000,
+            completion_tokens: 100_000,
+            total_tokens: 300_000,
+            // Every real completion carries this. Left off by default so the
+            // estimate paths above stay exercised.
+            ...(statedCost.value === undefined ? {} : { cost: statedCost.value }),
+          },
           // The provider reports what it actually served, which is what the
           // price must follow once a fallback fires.
           model: 'z-ai/glm-5.2',
-        }),
+        })),
       },
     };
   });
@@ -47,7 +55,7 @@ vi.mock('openai', () => {
   return { default: MockOpenAI };
 });
 
-const logTrace = vi.fn(async () => undefined);
+const logTrace = vi.fn(() => Promise.resolve(undefined));
 vi.mock('@/shared/trace-logger', () => ({ logTrace }));
 
 const COURSE_ID = '20000000-0000-4000-8000-000000000001';
@@ -55,6 +63,7 @@ const COURSE_ID = '20000000-0000-4000-8000-000000000001';
 describe('LLMClient cost recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    statedCost.value = undefined;
   });
 
   it('traces the served model, both token counts and the catalogue price', async () => {
@@ -107,6 +116,34 @@ describe('LLMClient cost recording', () => {
 
     const [entry] = logTrace.mock.calls[0] as unknown as [Record<string, unknown>];
     expect(entry.costUsd).toBeCloseTo(0.415, 10);
+  });
+
+  it('records the charge OpenRouter stated in the body, over any estimate', async () => {
+    // The catalogue would say $0.612 and the pinned endpoint $0.415. The
+    // provider says $0.37, and the provider is the one sending the invoice.
+    listModelEndpoints.mockResolvedValueOnce([
+      {
+        tag: 'sail-research/fp8',
+        providerName: 'Sail Research',
+        promptPricePerMillion: 0.5,
+        completionPricePerMillion: 3.15,
+        status: 0,
+        tier: 'default',
+      },
+    ]);
+    statedCost.value = 0.37;
+
+    const { LLMClient } = await import('@/shared/llm/client');
+    await new LLMClient().generateCompletion('вопрос', {
+      model: 'z-ai/glm-5.2',
+      costContext: { courseId: COURSE_ID, stage: 'stage_6', phase: 'stage_6_judge' },
+    });
+
+    const [entry] = logTrace.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(entry.costUsd).toBe(0.37);
+    // Settled the moment it is written: no deferred lookup, and no reconciliation
+    // reading it as an unpriced guess.
+    expect(entry.outputData).toMatchObject({ billedByProvider: true });
   });
 
   it('makes no trace row for a call with no course to charge', async () => {

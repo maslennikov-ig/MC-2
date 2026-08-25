@@ -243,6 +243,14 @@ export interface LLMResponse {
    */
   endpointRate?: { prompt: number; completion: number };
   /**
+   * What OpenRouter charged for this call, from `usage.cost` in the response.
+   *
+   * Not an estimate and not a second lookup: the provider states it in the same
+   * body, and it matches `GET /api/v1/generation` exactly. Absent only for a
+   * call whose body never arrived.
+   */
+  actualCostUsd?: number;
+  /**
    * The tariff this call was actually served at, as the provider reported it:
    * `default`, `flex` or `priority`.
    *
@@ -573,6 +581,7 @@ export class LLMClient {
         ...(response.providerName ? { providerName: response.providerName } : {}),
         ...(response.serviceTier ? { serviceTier: response.serviceTier } : {}),
         ...(response.endpointRate ? { endpointRate: response.endpointRate } : {}),
+        ...(response.actualCostUsd === undefined ? {} : { actualCostUsd: response.actualCostUsd }),
       },
       costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
