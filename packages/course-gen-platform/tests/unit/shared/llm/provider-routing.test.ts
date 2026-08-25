@@ -16,6 +16,11 @@
  * 3. The skip list dies with the call. The owner's decision of 2026-08-20 is
  *    that there is no standing blocklist: a provider that is degraded now may be
  *    the cheapest working one next time.
+ * 4. Routing goes at the **top level** of the request. It rode inside
+ *    `extra_body` until 2026-08-25 — a python-openai convention that the Node
+ *    SDK does not unwrap — so OpenRouter received a field it does not read and
+ *    discarded every control above. Nothing failed; the call was simply routed
+ *    as if none of this existed, for as long as it had existed (mc2-3nnjs).
  */
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
@@ -43,7 +48,7 @@ describe('provider routing on the request', () => {
     applyProviderRouting(request, { max_price: { prompt: 0.3, completion: 1.8 } });
     applyProviderRouting(request, { ignore: ['open-inference'] });
 
-    expect(request.extra_body?.provider).toEqual({
+    expect(request.provider).toEqual({
       max_price: { prompt: 0.3, completion: 1.8 },
       ignore: ['open-inference'],
     });
@@ -55,7 +60,7 @@ describe('provider routing on the request', () => {
     applyProviderRouting(request, { cache_control: true });
     applyProviderRouting(request, { ignore: ['deepinfra'] });
 
-    expect(request.extra_body?.provider).toMatchObject({
+    expect(request.provider).toMatchObject({
       cache_control: true,
       ignore: ['deepinfra'],
     });
@@ -67,7 +72,30 @@ describe('provider routing on the request', () => {
     applyProviderRouting(request, { ignore: ['open-inference'] });
     applyProviderRouting(request, { ignore: [] });
 
-    expect(request.extra_body?.provider?.ignore).toBeUndefined();
+    expect(request.provider?.ignore).toBeUndefined();
+  });
+
+  it('puts routing where OpenRouter reads it, and nowhere else', () => {
+    // The whole defect in one assertion. `extra_body` is what python-openai
+    // unwraps before sending; the Node SDK forwards unknown fields verbatim, so
+    // an envelope reaches OpenRouter as an unread field and the pin, the
+    // ceiling and the skip list all evaporate. Verified against the live API on
+    // 2026-08-25: the same order under `extra_body` was served `default`, at the
+    // top level `flex`.
+    const request = emptyRequest();
+
+    applyProviderRouting(request, {
+      order: ['openai/flex'],
+      allow_fallbacks: false,
+      max_price: { prompt: 0.3, completion: 1.8 },
+    });
+
+    expect(request.provider).toEqual({
+      order: ['openai/flex'],
+      allow_fallbacks: false,
+      max_price: { prompt: 0.3, completion: 1.8 },
+    });
+    expect(request).not.toHaveProperty('extra_body');
   });
 });
 

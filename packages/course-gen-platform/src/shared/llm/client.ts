@@ -714,7 +714,7 @@ export class LLMClient {
       const endpoint = pickCheapestUntriedEndpoint(
         await listModelEndpoints(model),
         triedEndpointTags,
-        requestOptions.extra_body?.provider?.max_price,
+        requestOptions.provider?.max_price,
         call.serviceTier
       );
       if (endpoint) triedEndpointTags.add(endpoint.tag);
@@ -741,7 +741,7 @@ export class LLMClient {
             { model, priceCeiling },
             '[Routing] No provider is within the price ceiling; retrying without it and leaving the catalogue price to be corrected'
           );
-          delete requestOptions.extra_body?.provider?.max_price;
+          delete requestOptions.provider?.max_price;
           throw error;
         }
         // Only worth asking when nothing was pinned. With a pin we already know
