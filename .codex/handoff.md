@@ -1,45 +1,30 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-24. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-25. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
 ## Current stage
 
-The 2026-08-24 technical-debt epic `mc2-cuk7j` is **four of six done and delivered** — 26 commits
-on `develop`, pushed and green (run 32758709267, Deploy to Dev succeeded).
+The technical-debt epic `mc2-cuk7j` is **complete, six of six**. Four closed 2026-08-24 (`.1` web
+tests that could not parse, `.5` lint warnings to zero, `.3` closed as WRONG — the pipeline had
+built the bridge image since 2026-07-12 — and `.6` the Q12 manifest generator plus the dead
+`.venv-nlm`). The two owner-gated items closed 2026-08-25 and are the only ones that still
+constrain work:
 
-`mc2-cuk7j.1` closed: `packages/web` had 93 test files of which 47 could not PARSE. tsconfig says
-`"jsx": "preserve"` for Next.js, vite 8 transforms with oxc, and oxc honours that field — so JSX
-reached rolldown's SSR re-parse intact. Three lines of `oxc: { jsx: 'react-jsx' }` in the test
-config; 647 tests became 1279, and `pnpm test:unit` now covers all three packages.
+`mc2-cuk7j.4` — **the bridge re-mints its own cookies now.** One browser sign-in yielded a durable
+master token; `app/master_token_refresh.py` mints the web session from it on a weekly interval with
+no browser at all. It lives in the FastAPI lifespan rather than in `deploy/systemd`, because CI
+deliberately does not install those units and `is-active` is green whether or not the file moves.
+`/health` gained a `master_token` check that FAILS while no token is present. Building it exposed a
+live trap that took production and dev down together for a minute: the CLI's group callback MOVES
+the home-root `storage_state.json` into `profiles/default/`, and only the **group-level**
+`--storage` (before the subcommand) skips it. The loop reconciles that fork on its own tick; the
+full account is in `.codex/repository-failure-modes.md`.
 
-`mc2-cuk7j.5` closed at **zero**, not at a ratchet: 102 warnings → 0, every package pinned to
-`--max-warnings=0`. Thresholds were re-derived from this repository (median 143, p99 805) rather
-than taken on taste — `max-lines` 500→800, `complexity` 30→40 — and the remaining 92 were
-refactored away with no suppressions. More than half was duplication, not complexity.
-
-`mc2-cuk7j.3` closed as **WRONG**: the pipeline has built the bridge image since 2026-07-12. The
-missing build was a red run nobody re-ran. `:latest` no longer depends on `{{is_default_branch}}`.
-
-`mc2-cuk7j.6` closed: the Q12 manifest generator no longer prints like a deletion, and the dead
-185 MB `.venv-nlm` is gone.
-
-**Two remain, both gated on the owner.**
-
-`mc2-cuk7j.2` — production still runs the pre-fix bridge image and a `:ro` secrets mount. It needs
-an ordinary `develop → master` release; patching the host is what caused the original problem.
-
-`mc2-cuk7j.4` — preparation is DONE and live on dev: the image was missing `gpsoauth` entirely
-(the `[headless]` extra) and missing PySocks, without which `requests` cannot use the
-`socks5h://` geo-bypass hop and the exchange fails with `InvalidSchema`. Both are in the image
-now and verified INSIDE the running dev container, not read off a status line. A backup of the
-working session sits at
-`/opt/megacampus/secrets/notebooklm/storage_state.json.bak-pre-master-token-2026-08-24`
-(sha `d44bfe84439ae4b2`, identical to live). What is left is one interactive Google sign-in by the
-owner at `accounts.google.com/EmbeddedSetup` as `djbkk68@gmail.com`, to yield the single-use
-`oauth_token` cookie. It cannot be derived from the cookies already on the host — different flow,
-different artifact — and there is no unattended headless Google login by design.
+`mc2-cuk7j.2` — production carries the fixed image and the `:rw` secrets mount, delivered by an
+ordinary `develop → master` release. Patching the host is what caused the original problem: the
+next master deploy restores whatever the file says.
 
 `docs/plans/composed-dazzling-moore.md` is **complete and live** — the coordinated Docling stack
 jump (Serve 1.31.0, docling-slim 2.121.0, core 2.92.0, MCP 3.1.0) with PDF heading inference on in
@@ -224,11 +209,9 @@ current, one at a time. `mc2-hqfc3` video stays parked.
 course edits count inside the course total (`mc2-b7olk.5`); the playbook model is decided by
 measurement (`mc2-gg65o`); the 14 `course_override` rows are **deleted**, contents in `mc2-sjwm0`.
 
-**Answered 2026-08-23, shaping the next session:** cookies are **not** updated, so no live NLM proof
-is in scope; `mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own
-`generation_id`s, not by a second key; the job-description rework (plan 4.5) **stays parked**; the
-docling-mcp pin is **bumped and the redundant wrapper deleted**, and the seven drifted
-`prompt_templates` rows **rewritten to the registry text** — both delivered the same day.
+**Answered 2026-08-23:** `mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own
+`generation_id`s, not by a second key; the job-description rework (plan 4.5) **stays parked**.
+**Answered 2026-08-25:** the `develop → master` release for `mc2-cuk7j.2` was authorized and run.
 
 **Still open:** `mc2-v6fqp` — which third language. "ru and en" stays the test language.
 
@@ -257,15 +240,18 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 
 ## Explicit defers
 
-`mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23, only live proof waits on `mc2-3lo22`, as do
-`mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding, separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
+`mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23; live proof was blocked by `mc2-3lo22` and is now
+merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
+separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
 ## NotebookLM and languages
 
 **The hop is live** (`mc2-xjykw`): SOCKS5 through `helixa-new` (82.26.152.8, NL), own revocable key,
 system unit `megacampus-socks.service`. Judge it by its listener and its egress, never by unit state.
-**Cookies are the only NLM blocker** (`mc2-3lo22`, owner-owned): earliest expired 2026-03-31, which
-matches the last NLM generation. `mc2-p99f1` has **no gate at all** — every layer already accepts the
+**Cookies are no longer a blocker** (`mc2-3lo22`, `mc2-cuk7j.4`): the session is minted from a master
+token, `/health` reads `2028-08-24 (730d)` and `notebooks.list()` answers. **Nothing has yet run a
+real NLM generation through it** — that is the one proof still owed, and it now needs only a run.
+`mc2-p99f1` has **no gate at all** — every layer already accepts the
 four types, and `ON_DEMAND_ENRICHMENT_TYPES` is read by nobody. Three more enum values are applied to
 the database and **their handlers now exist** (`dbe094e21`), held by
 `stage7-new-nlm-types-are-real.test.ts`. `nlm_report` is `artifacts.generate_report` with a format
@@ -295,41 +281,28 @@ affected courses — re-measured 2026-08-24, still none, so its reopen gate narr
 post-window Stage 4 run" to "a run on one of those six courses". New: `mc2-pdcb7` (covers drawn
 without their visual style — fixed; whether to pay to redraw is the owner's).
 
-**Those same 7 runs carried a live defect nobody had opened** — 4 of the 7 coverage cards `failed`,
-meaning both evidence paths failed and Stage 4 continued with no evidence for that document at all.
-Fixed 2026-08-24 (`mc2-o5ktb`, `7dbbdfc5d`) and **verified by paid replay of the exact live call**:
-old budget `finish_reason: "length"` at 339 tokens with the production path throwing, new budget
-`"stop"` at 941–956 tokens and 12 claims, $0.000530 for four calls. Deployed — CI run 32710233749
-green including `Deploy to Dev`, though the container itself was not checked, this laptop having no
-SSH to the deploy host. The general rule it produced is in `.codex/repository-failure-modes.md`.
-
-Two tickets were fixed long ago and left open, and both are now closed with the evidence:
-`mc2-b7olk.8` on `eb939d21f` (three causes, not one — a measured 120s budget with one transport
-retry shared by quiz and presentation, `maxPrimaryAttempts: 1` against a stalled route, and
-`MODEL_CONFIG.primary` reaching the handler as `settings.model` and so outranking `llm_model_config`
-with its `fallback_model_id`), and the inbox triage epic `mc2-p2908`, whose 22 Aug conclusions
-needed correcting three times — two tasks called "title only, no description" carry the owner's
-detailed 29 July requirements (now under `mc2-db696`), and the catalog screen it said did not
-exist did.
+`mc2-o5ktb` (Stage 4 evidence output budget), `mc2-b7olk.8` and the inbox triage epic `mc2-p2908`
+are **closed with their evidence in the tickets**; the rule the first produced is in
+`.codex/repository-failure-modes.md`.
 
 ## Starter prompt for next orchestrator
 
 Read `docs/plans/brawny-mellow-quokka.md` whole first, then the section above for what it still owes;
 `snuggly-wiggling-sutton.md` is **done** and `.codex/next-goal-four-doors.md` is **stale** — ignore
 both. **Do not ask — act and report**, inside the standing authorization under Safety boundary.
+
 The Helixa AIOS bridge belongs to another agent — leave it alone. **16 unique commits, 6149 lines**,
 reported by three refs; its three blockers are fixed on `fix/helixa-blockers` and handed over, not
-merged (`mc2-gxese`) — the branch did not type-check, its five migrations broke the pinned migration
-frontier, and eslint refused 13 more, three gates that had never run there because the worktree had
-no `node_modules`. Still the branch owner's call, and **not** covered by re-pinning the manifest:
-six database triggers the migrations install on `courses`, `career_playbooks` and `file_catalog`,
-inert while `helixa_knowledge_sync_bindings` is empty but installed at the database level, where the
-env flag does not reach — and dev and staging share one database. Both branches are in
+merged (`mc2-gxese`). Still the branch owner's call, and **not** covered by re-pinning the manifest:
+its migrations install six triggers on `courses`, `career_playbooks` and `file_catalog`, inert while
+`helixa_knowledge_sync_bindings` is empty but present at the database level, where the env flag does
+not reach — and dev and staging share one database. Both branches are in
 `.codex/stranded-commit-allowlist.txt`; remove the two entries together. That agent also broke the
-root `node_modules` once, so if a pre-commit hook cannot
-find `prettier-plugin-tailwindcss`, relink the symlink into `node_modules/.pnpm/...` by hand rather
-than running `pnpm install`. The 47 failing `.tsx` files under `packages/web` are a pre-existing
-JSX parse failure in the local rolldown transform, reproduce on `origin/develop`, and are in no CI
-job — `pnpm test:unit` covers `course-gen-platform` and `shared-types` only.
+root `node_modules` once, so if a pre-commit hook cannot find `prettier-plugin-tailwindcss`, relink
+the symlink into `node_modules/.pnpm/...` by hand rather than running `pnpm install`.
+
+`pnpm test:unit` covers **all three** packages since `mc2-cuk7j.1`; earlier notes here said it
+covered two and that 47 `packages/web` `.tsx` files were an unfixable local parse failure. Both were
+wrong — the cause was `"jsx": "preserve"` reaching oxc.
 
 Read first: `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`, `.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.
