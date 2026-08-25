@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 /**
  * Judge Types and Schemas for Stage 6 Lesson Content Validation
  * @module @megacampus/shared-types/judge-types

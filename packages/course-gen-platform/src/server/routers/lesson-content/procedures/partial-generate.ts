@@ -34,6 +34,166 @@ import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { buildPartialGenerateJobData } from '../helpers/build-partial-generate-job-data';
 
 /**
+ * Create the `sections` and `lessons` rows a course structure describes, if it has none.
+ *
+ * Stage 5 writes `course_structure` as JSON; the rows are what everything downstream joins
+ * against. A course can reach this point with a structure and no rows — a partial generation
+ * started before materialization, or rows deleted since — so this runs on every request and
+ * exits immediately when even one section already exists.
+ *
+ * A failed LESSON insert is logged and survived rather than thrown: one missing lesson is worth
+ * less than the other twenty the request was for. A failed SECTION insert does throw, because
+ * its lessons have nowhere to go.
+ */
+async function materializeSectionsAndLessons(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  courseId: string,
+  courseStructure: { sections: SectionFromStructure[] },
+  requestId: string
+): Promise<void> {
+  const { data: existingSections } = await supabase
+    .from('sections')
+    .select('id')
+    .eq('course_id', courseId)
+    .limit(1);
+
+  if (existingSections && existingSections.length > 0) return;
+
+  logger.info({ requestId, courseId }, 'Materializing sections and lessons from course_structure');
+
+  for (const [sectionIndex, section] of courseStructure.sections.entries()) {
+    const sectionNumber = resolveSectionNumber(section, sectionIndex);
+    const { data: newSection, error: sectionError } = await supabase
+      .from('sections')
+      .insert({
+        course_id: courseId,
+        title: section.section_title,
+        order_index: sectionNumber,
+      })
+      .select('id')
+      .single();
+
+    throwOnSupabaseError(sectionError, 'Section', { requestId, courseId, sectionNumber });
+    if (!newSection) continue;
+
+    for (const [lessonIndex, lesson] of section.lessons.entries()) {
+      const { error: lessonError } = await supabase.from('lessons').insert({
+        section_id: newSection.id,
+        title: lesson.lesson_title,
+        order_index: lessonIndex + 1,
+        lesson_type: 'text',
+        duration_minutes: lesson.estimated_duration_minutes || 15,
+        objectives: lesson.lesson_objectives || [],
+      });
+
+      if (lessonError) {
+        logger.error(
+          {
+            requestId,
+            courseId,
+            lessonId: buildLessonId(sectionNumber, lessonIndex + 1),
+            error: lessonError,
+          },
+          'Failed to create lesson'
+        );
+      }
+    }
+  }
+
+  logger.info(
+    { requestId, courseId, sectionsCount: courseStructure.sections.length },
+    'Sections and lessons materialized successfully'
+  );
+}
+
+/**
+ * Which lessons this request is for: the ones named, or every lesson of the sections named.
+ *
+ * Explicit lesson ids win over section ids when both are given. A section id that matches
+ * nothing contributes nothing rather than failing — the caller finds out from the empty result,
+ * which is checked once by the caller instead of per section here.
+ */
+function resolveLessonIdsToGenerate(
+  courseStructure: { sections: SectionFromStructure[] },
+  lessonIds: string[] | undefined,
+  sectionIds: number[] | undefined
+): string[] {
+  if (lessonIds && lessonIds.length > 0) return [...lessonIds];
+  if (!sectionIds || sectionIds.length === 0) return [];
+
+  const lessonIdsToGenerate: string[] = [];
+  for (const sectionId of sectionIds) {
+    const section = courseStructure.sections.find(
+      (candidate, index) => resolveSectionNumber(candidate, index) === sectionId
+    );
+    if (!section) continue;
+
+    for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
+      lessonIdsToGenerate.push(buildLessonId(sectionId, lessonIndex + 1));
+    }
+  }
+  return lessonIdsToGenerate;
+}
+
+/**
+ * Turn lesson ids into the specifications Stage 6 runs from.
+ *
+ * Each of the three ways an id can fail to resolve — unparseable, no such section, no such
+ * lesson — logs its own line with the values it had, because the caller only sees "0 specs" and
+ * these three are the reasons why. Skipping rather than throwing keeps a single bad id from
+ * cancelling the rest of the request.
+ */
+function buildLessonSpecs(
+  lessonIdsToGenerate: string[],
+  courseStructure: { sections: SectionFromStructure[] },
+  rawAnalysisResult: unknown,
+  requestId: string
+): LessonSpecificationV2[] {
+  const analysisResult = parseAnalysisResult(rawAnalysisResult);
+  const lessonSpecs: LessonSpecificationV2[] = [];
+
+  for (const lessonId of lessonIdsToGenerate) {
+    const parsedLessonId = parseLessonId(lessonId);
+    if (!parsedLessonId) {
+      logger.warn({ requestId, lessonId }, 'Invalid lesson ID format');
+      continue;
+    }
+
+    const { sectionNum, lessonOrder } = parsedLessonId;
+
+    const section = courseStructure.sections.find(
+      (candidate, sectionIndex) => resolveSectionNumber(candidate, sectionIndex) === sectionNum
+    );
+    if (!section) {
+      logger.warn({ requestId, lessonId, sectionNum }, 'Section not found in course_structure');
+      continue;
+    }
+
+    const lesson = findLessonByOrder(section, lessonOrder);
+    if (!lesson) {
+      logger.warn(
+        { requestId, lessonId, sectionNum, lessonOrder },
+        'Lesson not found in course_structure'
+      );
+      continue;
+    }
+
+    lessonSpecs.push(
+      buildMinimalLessonSpec(
+        lessonId,
+        lesson,
+        sectionNum,
+        requestId,
+        analysisResult,
+        courseStructure
+      )
+    );
+  }
+
+  return lessonSpecs;
+}
+
+/**
  * Partial Stage 6 generation for selected lessons
  *
  * Purpose: Regenerate specific lessons or sections without requiring frontend
@@ -155,96 +315,14 @@ export const partialGenerate = protectedProcedure
 
       // Step 3.6: Materialize sections and lessons from course_structure if not exists
       // This runs regardless of status - ensures DB has actual section/lesson records
-      const { data: existingSections } = await supabase
-        .from('sections')
-        .select('id')
-        .eq('course_id', courseId)
-        .limit(1);
-
-      if (!existingSections || existingSections.length === 0) {
-        logger.info(
-          {
-            requestId,
-            courseId,
-          },
-          'Materializing sections and lessons from course_structure'
-        );
-
-        // Create sections
-        for (let sectionIndex = 0; sectionIndex < courseStructure.sections.length; sectionIndex++) {
-          const section = courseStructure.sections[sectionIndex];
-          const sectionNumber = resolveSectionNumber(section, sectionIndex);
-          const { data: newSection, error: sectionError } = await supabase
-            .from('sections')
-            .insert({
-              course_id: courseId,
-              title: section.section_title,
-              order_index: sectionNumber,
-            })
-            .select('id')
-            .single();
-
-          throwOnSupabaseError(sectionError, 'Section', { requestId, courseId, sectionNumber });
-          if (!newSection) {
-            continue;
-          }
-
-          // Create lessons for this section
-          for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
-            const lesson = section.lessons[lessonIndex];
-            const { error: lessonError } = await supabase.from('lessons').insert({
-              section_id: newSection.id,
-              title: lesson.lesson_title,
-              order_index: lessonIndex + 1,
-              lesson_type: 'text',
-              duration_minutes: lesson.estimated_duration_minutes || 15,
-              objectives: lesson.lesson_objectives || [],
-            });
-
-            if (lessonError) {
-              logger.error(
-                {
-                  requestId,
-                  courseId,
-                  lessonId: buildLessonId(sectionNumber, lessonIndex + 1),
-                  error: lessonError,
-                },
-                'Failed to create lesson'
-              );
-            }
-          }
-        }
-
-        logger.info(
-          {
-            requestId,
-            courseId,
-            sectionsCount: courseStructure.sections.length,
-          },
-          'Sections and lessons materialized successfully'
-        );
-      }
+      await materializeSectionsAndLessons(supabase, courseId, courseStructure, requestId);
 
       // Step 4: Build list of lesson IDs to generate
-      const lessonIdsToGenerate: string[] = [];
-
-      if (lessonIds && lessonIds.length > 0) {
-        // Use provided lesson IDs
-        lessonIdsToGenerate.push(...lessonIds);
-      } else if (sectionIds && sectionIds.length > 0) {
-        // Build lesson IDs from section IDs
-        for (const sectionId of sectionIds) {
-          const sectionIndex = courseStructure.sections.findIndex(
-            (s, idx) => resolveSectionNumber(s, idx) === sectionId
-          );
-          if (sectionIndex !== -1) {
-            const section = courseStructure.sections[sectionIndex];
-            for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
-              lessonIdsToGenerate.push(buildLessonId(sectionId, lessonIndex + 1));
-            }
-          }
-        }
-      }
+      const lessonIdsToGenerate = resolveLessonIdsToGenerate(
+        courseStructure,
+        lessonIds,
+        sectionIds
+      );
 
       if (lessonIdsToGenerate.length === 0) {
         logger.warn(
@@ -264,58 +342,12 @@ export const partialGenerate = protectedProcedure
       }
 
       // Step 5: Build lesson specifications from course_structure
-      const lessonSpecs: LessonSpecificationV2[] = [];
-
-      for (const lessonId of lessonIdsToGenerate) {
-        const parsedLessonId = parseLessonId(lessonId);
-        if (!parsedLessonId) {
-          logger.warn({ requestId, lessonId }, 'Invalid lesson ID format');
-          continue;
-        }
-
-        const { sectionNum, lessonOrder } = parsedLessonId;
-
-        const section = courseStructure.sections.find(
-          (s, sectionIndex) => resolveSectionNumber(s, sectionIndex) === sectionNum
-        );
-        if (!section) {
-          logger.warn(
-            {
-              requestId,
-              lessonId,
-              sectionNum,
-            },
-            'Section not found in course_structure'
-          );
-          continue;
-        }
-
-        const lesson = findLessonByOrder(section, lessonOrder);
-        if (!lesson) {
-          logger.warn(
-            {
-              requestId,
-              lessonId,
-              sectionNum,
-              lessonOrder,
-            },
-            'Lesson not found in course_structure'
-          );
-          continue;
-        }
-
-        // Safely parse analysis_result using runtime type guard
-        const analysisResult = parseAnalysisResult(course.analysis_result);
-        const spec = buildMinimalLessonSpec(
-          lessonId,
-          lesson,
-          sectionNum,
-          requestId,
-          analysisResult,
-          courseStructure
-        );
-        lessonSpecs.push(spec);
-      }
+      const lessonSpecs = buildLessonSpecs(
+        lessonIdsToGenerate,
+        courseStructure,
+        course.analysis_result,
+        requestId
+      );
 
       if (lessonSpecs.length === 0) {
         logger.warn(

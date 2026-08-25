@@ -189,6 +189,9 @@ jobs:
           bash scripts/ci/test_docling_rollout.sh
           bash scripts/ci/test_course_gen_types_rebuild.sh
           python3 -m unittest scripts/orchestration/test_cleanup_stage_workspace.py
+          # The pre-commit policy decides which config judges a staged file. Its suite existed
+          # and ran nowhere, which is the same defect this list was built to prevent.
+          node --test scripts/precommit/test_precommit_policy.mjs
 
   type-check:
     name: Type Check
@@ -703,11 +706,19 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          # `:latest` is what docker-compose.production.yml pulls, so this line
+          # decides which commits can reach production. It used to say
+          # `enable={{is_default_branch}}`, which is correct only for as long as
+          # the default branch happens to be master — a repository setting, changed
+          # from a web page, with no diff and no review. Naming the branch makes the
+          # rule the pipeline's rather than GitHub's: develop moves `:develop` (from
+          # `type=ref,event=branch`), master moves `:latest`, and no single build
+          # moves both.
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=${{ github.sha }}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
       - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v7

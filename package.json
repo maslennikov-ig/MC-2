@@ -9,7 +9,7 @@
     "nlm:stage7-preflight": "bash ./scripts/nlm-stage7-preflight.sh",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "test:unit": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/shared-types test:unit",
+    "test:unit": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/shared-types --filter @megacampus/web test:unit",
     "test:contract": "pnpm --filter @megacampus/course-gen-platform test:contract",
     "test:integration": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/web test:integration",
     "test:integration:ci": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/web test:integration:ci",

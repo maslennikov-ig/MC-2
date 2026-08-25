@@ -280,198 +280,92 @@ function calculateMatchConfidence(title: string, identifier: string): number {
  * // ]
  * ```
  */
-export function resolveTargetPathWithMatches(
-  identifier: string | undefined | null,
-  explicitPath: string | undefined | null,
-  courseStructure: CourseStructure,
-  nodeContextPath?: string | null
-): TargetMatch[] {
-  // 1. If explicit path provided, return single match with max confidence
-  if (explicitPath) {
-    const element = getElementAtPath(courseStructure, explicitPath);
-    if (element) {
-      const isLesson = isLessonPath(explicitPath);
-      const title = isLesson
-        ? (element as Lesson).lesson_title
-        : (element as Section).section_title;
-      const indices = parsePathIndices(explicitPath);
-      const displayLabel = isLesson
-        ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
-        : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
+/**
+ * Build the display label a user sees for a path: "Урок 2.3" or "Секция 2".
+ *
+ * One-based, because the paths are zero-based and the labels are for people. A path whose
+ * indices cannot be parsed shows `?` rather than a wrong number.
+ */
+function displayLabelForPath(path: string): string {
+  const indices = parsePathIndices(path);
+  const section = indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?';
+  if (!isLessonPath(path)) return `Секция ${section}`;
+  const lesson = indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?';
+  return `Урок ${section}.${lesson}`;
+}
 
-      return [
-        {
-          path: explicitPath,
-          title,
-          elementType: isLesson ? 'lesson' : 'section',
-          confidence: CONFIDENCE_SCORES.EXACT,
-          displayLabel,
-        },
-      ];
-    }
-    return [];
-  }
+/**
+ * The single, maximum-confidence match for a path the caller already knows.
+ *
+ * This block existed three times verbatim — for an explicit path, for a node-context path, and
+ * for a resolved positional reference — which is most of where this resolver's cyclomatic
+ * complexity of 51 came from. Returns `null` when the path names nothing, which the three
+ * callers read differently: two of them stop, and the positional one falls through to the
+ * pattern matching below.
+ */
+function exactMatchAtPath(courseStructure: CourseStructure, path: string): TargetMatch | null {
+  const element = getElementAtPath(courseStructure, path);
+  if (!element) return null;
 
-  // 2. If nodeContext path provided, return single match with max confidence
-  if (nodeContextPath) {
-    const element = getElementAtPath(courseStructure, nodeContextPath);
-    if (element) {
-      const isLesson = isLessonPath(nodeContextPath);
-      const title = isLesson
-        ? (element as Lesson).lesson_title
-        : (element as Section).section_title;
-      const indices = parsePathIndices(nodeContextPath);
-      const displayLabel = isLesson
-        ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
-        : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
+  const isLesson = isLessonPath(path);
+  return {
+    path,
+    title: isLesson ? (element as Lesson).lesson_title : (element as Section).section_title,
+    elementType: isLesson ? 'lesson' : 'section',
+    confidence: CONFIDENCE_SCORES.EXACT,
+    displayLabel: displayLabelForPath(path),
+  };
+}
 
-      return [
-        {
-          path: nodeContextPath,
-          title,
-          elementType: isLesson ? 'lesson' : 'section',
-          confidence: CONFIDENCE_SCORES.EXACT,
-          displayLabel,
-        },
-      ];
-    }
-    return [];
-  }
-
-  // 3. No identifier - return empty
-  if (!identifier) {
-    return [];
-  }
-
-  // 4. Limit identifier length (same as resolveTargetPath)
-  const MAX_IDENTIFIER_LENGTH = 200;
-  if (identifier.length > MAX_IDENTIFIER_LENGTH) {
-    return [];
-  }
-
-  const matches: TargetMatch[] = [];
-
-  // 5a. Check for positional references ("последнюю секцию", "first lesson")
-  const positionalRef = detectPositionalReference(identifier);
-  if (positionalRef) {
-    const posPath = resolvePositionalPath(positionalRef, courseStructure);
-    if (posPath) {
-      const element = getElementAtPath(courseStructure, posPath);
-      if (element) {
-        const isLesson = isLessonPath(posPath);
-        const title = isLesson
-          ? (element as Lesson).lesson_title
-          : (element as Section).section_title;
-        const indices = parsePathIndices(posPath);
-        const displayLabel = isLesson
-          ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
-          : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
-
-        return [
-          {
-            path: posPath,
-            title,
-            elementType: isLesson ? 'lesson' : 'section',
-            confidence: CONFIDENCE_SCORES.EXACT,
-            displayLabel,
-          },
-        ];
-      }
-    }
-  }
-
-  // 5b. Check for explicit numeric patterns (exact match, confidence 1.0)
-  // Match patterns like "урок 2.3", "lesson 2.3"
+/**
+ * Explicit numbering: "урок 2.3" / "lesson 2.3", and "секция 2" / "section 2" / "раздел 3".
+ *
+ * `null` rather than `[]` when the identifier carries no such pattern OR names an element that
+ * does not exist — both mean "keep looking", which is what the original fall-through did.
+ */
+function matchByNumber(identifier: string, courseStructure: CourseStructure): TargetMatch | null {
   const lessonMatch = identifier.match(/(?:урок|lesson)\s*(\d+)\.(\d+)/i);
   if (lessonMatch) {
     const [, sectionNum, lessonNum] = lessonMatch;
     const sectionIndex = parseInt(sectionNum, 10) - 1;
     const lessonIndex = parseInt(lessonNum, 10) - 1;
-
-    if (
-      courseStructure.sections[sectionIndex] &&
-      courseStructure.sections[sectionIndex].lessons[lessonIndex]
-    ) {
-      const lesson = courseStructure.sections[sectionIndex].lessons[lessonIndex];
-      return [
-        {
-          path: `sections[${sectionIndex}].lessons[${lessonIndex}]`,
-          title: lesson.lesson_title,
-          elementType: 'lesson',
-          confidence: CONFIDENCE_SCORES.EXACT,
-          displayLabel: `Урок ${sectionIndex + 1}.${lessonIndex + 1}`,
-        },
-      ];
+    const lesson = courseStructure.sections[sectionIndex]?.lessons[lessonIndex];
+    if (lesson) {
+      return {
+        path: `sections[${sectionIndex}].lessons[${lessonIndex}]`,
+        title: lesson.lesson_title,
+        elementType: 'lesson',
+        confidence: CONFIDENCE_SCORES.EXACT,
+        displayLabel: `Урок ${sectionIndex + 1}.${lessonIndex + 1}`,
+      };
     }
   }
 
-  // Match patterns like "секция 2", "section 2", "раздел 3"
   const sectionNumMatch = identifier.match(/(?:секция|section|раздел)\s*(\d+)/i);
   if (sectionNumMatch) {
     const sectionIndex = parseInt(sectionNumMatch[1], 10) - 1;
-    if (courseStructure.sections[sectionIndex]) {
-      const section = courseStructure.sections[sectionIndex];
-      return [
-        {
-          path: `sections[${sectionIndex}]`,
-          title: section.section_title,
-          elementType: 'section',
-          confidence: CONFIDENCE_SCORES.EXACT,
-          displayLabel: `Секция ${sectionIndex + 1}`,
-        },
-      ];
+    const section = courseStructure.sections[sectionIndex];
+    if (section) {
+      return {
+        path: `sections[${sectionIndex}]`,
+        title: section.section_title,
+        elementType: 'section',
+        confidence: CONFIDENCE_SCORES.EXACT,
+        displayLabel: `Секция ${sectionIndex + 1}`,
+      };
     }
   }
 
-  // Match by section title pattern "секция <title>"
-  const sectionTitleMatch = identifier.match(/(?:секция|section|раздел)\s+["']?(.+?)["']?$/i);
-  if (sectionTitleMatch) {
-    const title = sectionTitleMatch[1].toLowerCase();
-    for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
-      const section = courseStructure.sections[sIdx];
-      const sectionTitleLower = section.section_title.toLowerCase();
-      const confidence = calculateMatchConfidence(sectionTitleLower, title);
-      if (confidence > 0) {
-        matches.push({
-          path: `sections[${sIdx}]`,
-          title: section.section_title,
-          elementType: 'section',
-          confidence,
-          displayLabel: `Секция ${sIdx + 1}`,
-        });
-      }
-    }
-    // If we found explicit section title matches, return them sorted
-    if (matches.length > 0) {
-      return matches.sort((a, b) => b.confidence - a.confidence);
-    }
-  }
+  return null;
+}
 
-  // 6. Fuzzy match on all lessons
-  const lowerIdentifier = identifier.toLowerCase();
-  for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
-    const section = courseStructure.sections[sIdx];
-    for (let lIdx = 0; lIdx < section.lessons.length; lIdx++) {
-      const lesson = section.lessons[lIdx];
-      const lessonTitleLower = lesson.lesson_title.toLowerCase();
-      const confidence = calculateMatchConfidence(lessonTitleLower, lowerIdentifier);
-      if (confidence > 0) {
-        matches.push({
-          path: `sections[${sIdx}].lessons[${lIdx}]`,
-          title: lesson.lesson_title,
-          elementType: 'lesson',
-          confidence,
-          displayLabel: `Урок ${sIdx + 1}.${lIdx + 1}`,
-        });
-      }
-    }
-  }
+/** Every section whose title resembles `title`, best first. */
+function matchSectionsByTitle(title: string, courseStructure: CourseStructure): TargetMatch[] {
+  const wanted = title.toLowerCase();
+  const matches: TargetMatch[] = [];
 
-  // 7. Fuzzy match on all sections (only if no lesson matches or for additional results)
-  for (let sIdx = 0; sIdx < courseStructure.sections.length; sIdx++) {
-    const section = courseStructure.sections[sIdx];
-    const sectionTitleLower = section.section_title.toLowerCase();
-    const confidence = calculateMatchConfidence(sectionTitleLower, lowerIdentifier);
+  courseStructure.sections.forEach((section, sIdx) => {
+    const confidence = calculateMatchConfidence(section.section_title.toLowerCase(), wanted);
     if (confidence > 0) {
       matches.push({
         path: `sections[${sIdx}]`,
@@ -481,15 +375,98 @@ export function resolveTargetPathWithMatches(
         displayLabel: `Секция ${sIdx + 1}`,
       });
     }
+  });
+
+  return matches.sort((a, b) => b.confidence - a.confidence);
+}
+
+/** Every lesson, then every section, whose title resembles the identifier. Unsorted. */
+function fuzzyMatches(lowerIdentifier: string, courseStructure: CourseStructure): TargetMatch[] {
+  const matches: TargetMatch[] = [];
+
+  courseStructure.sections.forEach((section, sIdx) => {
+    section.lessons.forEach((lesson, lIdx) => {
+      const confidence = calculateMatchConfidence(
+        lesson.lesson_title.toLowerCase(),
+        lowerIdentifier
+      );
+      if (confidence > 0) {
+        matches.push({
+          path: `sections[${sIdx}].lessons[${lIdx}]`,
+          title: lesson.lesson_title,
+          elementType: 'lesson',
+          confidence,
+          displayLabel: `Урок ${sIdx + 1}.${lIdx + 1}`,
+        });
+      }
+    });
+  });
+
+  courseStructure.sections.forEach((section, sIdx) => {
+    const confidence = calculateMatchConfidence(
+      section.section_title.toLowerCase(),
+      lowerIdentifier
+    );
+    if (confidence > 0) {
+      matches.push({
+        path: `sections[${sIdx}]`,
+        title: section.section_title,
+        elementType: 'section',
+        confidence,
+        displayLabel: `Секция ${sIdx + 1}`,
+      });
+    }
+  });
+
+  return matches;
+}
+
+/** Same as `resolveTargetPath`, and applied before any matching is attempted. */
+const MAX_IDENTIFIER_LENGTH = 200;
+
+export function resolveTargetPathWithMatches(
+  identifier: string | undefined | null,
+  explicitPath: string | undefined | null,
+  courseStructure: CourseStructure,
+  nodeContextPath?: string | null
+): TargetMatch[] {
+  // 1-2. A path the caller already knows wins outright, and a path that names nothing is an
+  // answer too: the caller asked about THAT element, so falling back to a fuzzy search over the
+  // identifier would answer a different question.
+  const knownPath = explicitPath || nodeContextPath;
+  if (knownPath) {
+    const match = exactMatchAtPath(courseStructure, knownPath);
+    return match ? [match] : [];
   }
 
-  // 8. Sort by confidence DESC, then by path (for stable ordering)
-  return matches.sort((a, b) => {
-    if (b.confidence !== a.confidence) {
-      return b.confidence - a.confidence;
-    }
-    return a.path.localeCompare(b.path);
-  });
+  // 3-4. Nothing to match on, or an identifier long enough to be an attack rather than a title.
+  if (!identifier || identifier.length > MAX_IDENTIFIER_LENGTH) {
+    return [];
+  }
+
+  // 5a. Positional reference: "последнюю секцию", "first lesson".
+  const positionalRef = detectPositionalReference(identifier);
+  const positionalPath = positionalRef
+    ? resolvePositionalPath(positionalRef, courseStructure)
+    : null;
+  const positionalMatch = positionalPath ? exactMatchAtPath(courseStructure, positionalPath) : null;
+  if (positionalMatch) return [positionalMatch];
+
+  // 5b. Explicit numbering: "урок 2.3", "секция 2".
+  const numbered = matchByNumber(identifier, courseStructure);
+  if (numbered) return [numbered];
+
+  // 5c. "секция <title>" names a section by name rather than by number.
+  const sectionTitleMatch = identifier.match(/(?:секция|section|раздел)\s+["']?(.+?)["']?$/i);
+  if (sectionTitleMatch) {
+    const byTitle = matchSectionsByTitle(sectionTitleMatch[1], courseStructure);
+    if (byTitle.length > 0) return byTitle;
+  }
+
+  // 6-8. Fuzzy over every title, best first, then by path so that equal scores order stably.
+  return fuzzyMatches(identifier.toLowerCase(), courseStructure).sort((a, b) =>
+    b.confidence !== a.confidence ? b.confidence - a.confidence : a.path.localeCompare(b.path)
+  );
 }
 
 // ============================================================================

@@ -339,4 +339,134 @@ describe('executeStage6 terminal state detection', () => {
       expect(result.reviewInfo?.reasons[0]).toContain('Generation retries exhausted');
     });
   });
+  // ==========================================================================
+  // Characterization for the parts of executeStage6 that had no coverage: the
+  // modelOverride guard, the best-effort content synthesis on the review path,
+  // the success rule, and what a thrown graph produces. Pinned before the
+  // function's forty-odd `??` defaults were moved into builders.
+  // ==========================================================================
+  describe('modelOverride validation', () => {
+    it('passes a well-formed "provider/model" straight through to graph state', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: [],
+        tokensUsed: 1,
+        currentNode: 'judge',
+      });
+
+      await executeStage6({ ...baseInput, modelOverride: 'openai/gpt-5' });
+
+      expect(mockInvoke.mock.calls[0][0].modelOverride).toBe('openai/gpt-5');
+    });
+
+    it('drops an override with no slash so the database config wins', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: [],
+        tokensUsed: 1,
+        currentNode: 'judge',
+      });
+
+      await executeStage6({ ...baseInput, modelOverride: 'gpt-5' });
+
+      expect(mockInvoke.mock.calls[0][0].modelOverride).toBeNull();
+    });
+
+    it('passes null when the caller supplied no override at all', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: [],
+        tokensUsed: 1,
+        currentNode: 'judge',
+      });
+
+      await executeStage6(baseInput);
+
+      expect(mockInvoke.mock.calls[0][0].modelOverride).toBeNull();
+    });
+  });
+
+  describe('success and metrics', () => {
+    it('is a success only with content and no errors', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: ['something went wrong'],
+        tokensUsed: 10,
+        currentNode: 'judge',
+      });
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toEqual(['something went wrong']);
+    });
+
+    it('defaults every absent metric rather than emitting undefined', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: [],
+        tokensUsed: 42,
+        currentNode: 'judge',
+      });
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.success).toBe(true);
+      expect(result.metrics).toMatchObject({
+        tokensUsed: 42,
+        modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
+        qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
+        regenerationMode: null,
+      });
+      expect(result.metrics.durationMs).toBeGreaterThanOrEqual(0);
+      expect(result.reviewInfo).toBeUndefined();
+      expect(result.lessonDigest).toBeUndefined();
+    });
+
+    it('reports an empty lessonDigest as absent rather than empty', async () => {
+      mockInvoke.mockResolvedValue({
+        lessonContent: { content: 'ok' },
+        errors: [],
+        tokensUsed: 1,
+        currentNode: 'judge',
+        lessonDigest: '',
+      });
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.lessonDigest).toBeUndefined();
+    });
+  });
+
+  describe('a graph that throws', () => {
+    it('answers with a failed result carrying the message, not an exception', async () => {
+      mockInvoke.mockRejectedValue(new Error('graph exploded'));
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.success).toBe(false);
+      expect(result.lessonContent).toBeNull();
+      expect(result.errors).toEqual(['graph exploded']);
+      expect(result.metrics.tokensUsed).toBe(0);
+      expect(result.metrics.qualityScore).toBe(0);
+      expect(result.metrics.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('stringifies a non-Error rejection', async () => {
+      mockInvoke.mockRejectedValue('just a string');
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.errors).toEqual(['just a string']);
+    });
+  });
 });

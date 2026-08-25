@@ -657,69 +657,55 @@ ${schemaDescription}
    * @param input - Original job input
    * @returns Quality metrics (0-1 scale)
    */
-  private validateMetadataQuality(
-    metadata: Partial<CourseStructure>,
-    input: GenerationJobInput,
-    language: string = 'en'
-  ): QualityMetrics {
-    // Completeness: Check required fields are present and have sufficient length
+  /**
+   * How much of the required metadata is actually there.
+   *
+   * Partial credit for a short string rather than none, because a ten-character description is
+   * thin but not missing, and treating the two the same hides which one a course has.
+   */
+  private scoreCompleteness(metadata: Partial<CourseStructure>): number {
+    // 'course_overview' REMOVED - redundant with course_description
+    // 'target_audience' REMOVED - optional, derive from difficulty_level
+    // 'assessment_strategy' REMOVED — not consumed by Stage 6 or downstream
     const requiredFields = [
       'course_title',
       'course_description',
-      // 'course_overview' REMOVED - redundant with course_description
-      // 'target_audience' REMOVED - optional, derive from difficulty_level
       'estimated_duration_hours',
       'difficulty_level',
       'learning_outcomes',
-      // 'assessment_strategy' REMOVED — not consumed by Stage 6 or downstream
       'course_tags',
     ];
 
     let completenessScore = 0;
-    let fieldsChecked = 0;
 
     for (const field of requiredFields) {
-      fieldsChecked++;
       const value = metadata[field as keyof CourseStructure];
 
-      if (value === null || value === undefined) {
-        continue;
-      }
+      if (value === null || value === undefined) continue;
 
-      // Check string length for text fields
       if (typeof value === 'string') {
-        if (value.length >= 10) {
-          completenessScore += 1;
-        } else {
-          completenessScore += 0.5; // Partial credit for short content
-        }
-      }
-      // Check array length
-      else if (Array.isArray(value)) {
-        if (value.length >= 1) {
-          completenessScore += 1;
-        }
-      }
-      // Check object presence
-      else if (typeof value === 'object') {
-        completenessScore += 1;
-      }
-      // Check number validity
-      else if (typeof value === 'number') {
-        if (value > 0) {
-          completenessScore += 1;
-        }
-      }
-      // Other types get full credit if present
-      else {
+        completenessScore += value.length >= 10 ? 1 : 0.5; // Partial credit for short content
+      } else if (Array.isArray(value)) {
+        if (value.length >= 1) completenessScore += 1;
+      } else if (typeof value === 'number') {
+        if (value > 0) completenessScore += 1;
+      } else {
+        // Objects, and anything else, count as present.
         completenessScore += 1;
       }
     }
 
-    const completeness = fieldsChecked > 0 ? completenessScore / fieldsChecked : 0;
+    return requiredFields.length > 0 ? completenessScore / requiredFields.length : 0;
+  }
 
-    // Coherence: Check consistency (simplified - checks if difficulty aligns with prerequisites)
-    let coherenceScore = 1.0; // Start optimistic
+  /**
+   * Whether the metadata contradicts itself.
+   *
+   * Starts optimistic and deducts, and logs every deduction with its reason — a coherence score
+   * that arrives without its penalties cannot be argued with.
+   */
+  private scoreCoherence(metadata: Partial<CourseStructure>): number {
+    let coherenceScore = 1.0;
     const coherencePenalties: string[] = [];
 
     if (metadata.difficulty_level && metadata.prerequisites) {
@@ -755,7 +741,6 @@ ${schemaDescription}
       }
     }
 
-    // Log coherence calculation details for diagnostics
     if (coherencePenalties.length > 0) {
       logger.warn({
         msg: 'Coherence penalties applied',
@@ -768,14 +753,23 @@ ${schemaDescription}
       });
     }
 
-    const coherence = Math.max(0, coherenceScore);
+    return Math.max(0, coherenceScore);
+  }
 
-    // Alignment: Check match with input requirements
-    let alignmentScore = 1.0; // Start optimistic
+  /**
+   * Whether the metadata answers what was asked for.
+   *
+   * The title check is skipped across languages. When the input is Cyrillic and the target is
+   * English — "Как стать счастливым" with `language: 'en'` — the model is SUPPOSED to translate,
+   * and comparing the two as strings penalises it for doing its job.
+   */
+  private scoreAlignment(
+    metadata: Partial<CourseStructure>,
+    input: GenerationJobInput,
+    language: string
+  ): number {
+    let alignmentScore = 1.0;
 
-    // Check title matches - skip when input language differs from target language
-    // For cross-language scenarios, the LLM legitimately translates the title
-    // (e.g., input "Как стать счастливым" with language="en" → "How to Become Happy")
     const inputTitle = input.frontend_parameters.course_title || '';
     const inputHasCyrillic = /[\u0400-\u04FF]/.test(inputTitle);
     const inputHasLatin = /[a-zA-Z]/.test(inputTitle);
@@ -809,12 +803,18 @@ ${schemaDescription}
     // Note: Course-level learning_outcomes are simple strings (no language field)
     // Language consistency is validated at section-level LearningOutcome objects
 
-    const alignment = Math.max(0, alignmentScore);
+    return Math.max(0, alignmentScore);
+  }
 
+  private validateMetadataQuality(
+    metadata: Partial<CourseStructure>,
+    input: GenerationJobInput,
+    language: string = 'en'
+  ): QualityMetrics {
     return {
-      completeness,
-      coherence,
-      alignment,
+      completeness: this.scoreCompleteness(metadata),
+      coherence: this.scoreCoherence(metadata),
+      alignment: this.scoreAlignment(metadata, input, language),
     };
   }
 

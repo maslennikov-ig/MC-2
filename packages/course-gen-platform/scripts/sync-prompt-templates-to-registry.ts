@@ -22,9 +22,19 @@
  * Read-only unless `--apply` is passed. Only touches rows the contract check
  * rejects; a row that fits is somebody's deliberate override and is left alone.
  *
+ * A row with no registry entry is a third case, and neither `--apply` nor the
+ * runtime guard can do anything with it: there is nothing to compare it to, and
+ * overwriting it would delete the only copy. Such a row is still reported by
+ * name, because a count alone (`5 with no registry entry`) cost an hour of
+ * grepping to turn back into five keys (mc2-jraut). Retiring one is
+ * `--deactivate`, and it takes the keys explicitly — the pipeline-admin screen
+ * can create a prompt whose key the registry has never heard of, so "deactivate
+ * every orphan" would silently retire somebody's new prompt.
+ *
  * Usage:
  *   tsx scripts/sync-prompt-templates-to-registry.ts            # report only
  *   tsx scripts/sync-prompt-templates-to-registry.ts --apply
+ *   tsx scripts/sync-prompt-templates-to-registry.ts --deactivate=key_a,key_b
  */
 
 import 'dotenv/config';
@@ -32,6 +42,7 @@ import 'dotenv/config';
 import { getSupabaseAdmin } from '../src/shared/supabase/admin.js';
 import { PROMPT_REGISTRY } from '../src/shared/prompts/prompt-registry.js';
 import { checkOverrideContract } from '../src/shared/prompts/prompt-override-contract.js';
+import { decideDeactivation } from '../src/shared/prompts/prompt-deactivation.js';
 
 interface Row {
   prompt_key: string;
@@ -40,8 +51,63 @@ interface Row {
   version: number | null;
 }
 
+/** Keys named on the command line as `--deactivate=a,b`; empty when absent. */
+function requestedDeactivations(argv: string[]): string[] {
+  const flag = argv.find(argument => argument.startsWith('--deactivate='));
+  if (!flag) return [];
+  return flag
+    .slice('--deactivate='.length)
+    .split(',')
+    .map(key => key.trim())
+    .filter(key => key.length > 0);
+}
+
+/**
+ * Retire the named keys by clearing `is_active`. The template text stays, so
+ * the move is one `is_active = true` from reversible. `decideDeactivation`
+ * holds the rules and the reasons; this only carries them out.
+ */
+async function deactivate(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  keys: string[],
+  rows: Row[]
+): Promise<void> {
+  const active = new Set(rows.map(row => row.prompt_key));
+
+  for (const key of keys) {
+    const decision = decideDeactivation({
+      key,
+      declaredInRegistry: PROMPT_REGISTRY.has(key),
+      activeInDatabase: active.has(key),
+    });
+
+    if (decision.action === 'refuse') {
+      console.error(`REFUSED ${key}: ${decision.reason}`);
+      process.exitCode = 1;
+      continue;
+    }
+    if (decision.action === 'skip') {
+      console.log(`skipped ${key}: ${decision.reason}`);
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from('prompt_templates')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('prompt_key', key);
+
+    if (updateError) {
+      console.error(`FAILED ${key}: ${updateError.message}`);
+      process.exitCode = 1;
+      continue;
+    }
+    console.log(`deactivated ${key} (template kept; reverse with is_active = true)`);
+  }
+}
+
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
+  const toDeactivate = requestedDeactivations(process.argv);
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
@@ -54,14 +120,14 @@ async function main(): Promise<void> {
 
   const rows = (data ?? []) as Row[];
   const broken: Array<{ row: Row; unknown: string[]; dropped: string[] }> = [];
-  let orphans = 0;
+  const orphans: Row[] = [];
 
   for (const row of rows) {
     const registryPrompt = PROMPT_REGISTRY.get(row.prompt_key);
     if (!registryPrompt) {
       // The database is this key's only source. Nothing to compare against, and
       // overwriting it would delete the only copy.
-      orphans += 1;
+      orphans.push(row);
       continue;
     }
 
@@ -76,8 +142,20 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `${rows.length} active rows; ${orphans} with no registry entry (left alone); ${broken.length} that no longer fit their caller.\n`
+    `${rows.length} active rows; ${orphans.length} with no registry entry (left alone); ${broken.length} that no longer fit their caller.\n`
   );
+
+  if (orphans.length > 0) {
+    console.log('no registry entry — nothing reads these unless a caller names the key directly:');
+    for (const row of orphans)
+      console.log(`  ${row.prompt_key}  db=${row.prompt_template.length} chars`);
+    console.log('');
+  }
+
+  if (toDeactivate.length > 0) {
+    await deactivate(supabase, toDeactivate, rows);
+    return;
+  }
 
   for (const { row, unknown, dropped } of broken) {
     const registryPrompt = PROMPT_REGISTRY.get(row.prompt_key)!;

@@ -200,6 +200,71 @@ def test_health_reports_cookie_expiry_without_naming_a_cookie(
     assert "SID" not in expiry["message"]
 
 
+def _health_with_cookies(
+    cookies: list[dict[str, object]],
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    state = tmp_path / "storage_state.json"
+    state.write_text(json.dumps({"cookies": cookies}), encoding="utf-8")
+    app = create_app(
+        settings=Settings(
+            notebooklm_bridge_token="test-token",
+            notebooklm_generation_mode="fallback",
+            notebooklm_allow_fallback=True,
+            notebooklm_storage_path=str(state),
+        )
+    )
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    with TestClient(app) as probe:
+        payload = probe.get("/health").json()
+    return next(c for c in payload["checks"] if c["name"] == "auth_expiry")
+
+
+def test_short_lived_helper_cookie_does_not_condemn_a_live_session(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fresh login must not read as expired.
+
+    Google ships helpers next to the session. The login captured 2026-08-24
+    carried CONSISTENCY expiring the same day while SID and its siblings were
+    good for 399 — and the old min()-over-everything check called that file
+    expired hours after it was minted. An alarm that fires on day one is how a
+    real expiry goes unnoticed for four months.
+    """
+    expiry = _health_with_cookies(
+        [
+            {"name": "CONSISTENCY", "value": "x", "expires": time.time() + 60},
+            {"name": "SID", "value": "x", "expires": time.time() + 399 * 86_400},
+            {"name": "__Secure-1PSID", "value": "x", "expires": time.time() + 399 * 86_400},
+        ],
+        tmp_path,
+        monkeypatch,
+    )
+
+    assert expiry["passed"] is True
+    assert "renew soon" not in expiry["message"]
+
+
+def test_a_file_without_a_session_cookie_is_not_healthy(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No session cookie is a dead file, not an unexpiring one.
+
+    The old branch answered "No expiring cookies stored" and passed, so a
+    storage_state holding nothing that can authenticate reported healthy.
+    """
+    expiry = _health_with_cookies(
+        [{"name": "NID", "value": "x", "expires": time.time() + 180 * 86_400}],
+        tmp_path,
+        monkeypatch,
+    )
+
+    assert expiry["passed"] is False
+    assert "session cookie" in expiry["message"]
+
+
 def test_auth_required_for_audio_generation(client: TestClient) -> None:
     response = client.post(
         "/artifacts/generate-audio",

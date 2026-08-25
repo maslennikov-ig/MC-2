@@ -123,6 +123,175 @@ function resolveStorageOwner(input: Stage1StorageInput): StorageOwner {
 }
 
 /**
+ * Where this upload will live on disk, refusing anything that could escape the storage root.
+ *
+ * The extension is rebuilt rather than trusted: everything outside `[a-z0-9.]` is dropped and
+ * the result capped at ten characters, so a filename cannot smuggle a path separator through
+ * `path.extname`. The normalised result is then checked against the root anyway, because
+ * stripping characters is a guess and the containment check is not.
+ */
+function resolveStoragePath(
+  input: Stage1StorageInput,
+  owner: ReturnType<typeof resolveStorageOwner>,
+  rollback: RollbackContext
+): { fileId: string; fileExtension: string; uploadDir: string; storagePath: string } {
+  const fileId = crypto.randomUUID();
+
+  // H6: Sanitize file extension to prevent path traversal
+  const rawExtension = path.extname(input.filename).toLowerCase();
+  // Allow only alphanumeric and dots, max 10 chars
+  const fileExtension = rawExtension.replace(/[^a-z0-9.]/gi, '').substring(0, 10) || '.bin';
+
+  const uploadDir = path.join(
+    getUploadStorageRootPath(),
+    input.organizationId,
+    ...owner.uploadPathSegments
+  );
+  const storagePath = path.join(uploadDir, `${fileId}${fileExtension}`);
+
+  // Validate path to prevent directory traversal attacks
+  if (!isPathInsideUploadStorageRoot(path.normalize(storagePath))) {
+    throw createStorageError('BAD_REQUEST', 'Invalid file path', rollback);
+  }
+
+  return { fileId, fileExtension, uploadDir, storagePath };
+}
+
+/**
+ * Decode the upload and settle the quota against what actually arrived.
+ *
+ * The quota was reserved from the DECLARED size before the bytes were seen, because reserving
+ * afterwards is a race two concurrent uploads can win together. The declared size therefore has
+ * to be reconciled here: too small and more is reserved, too large and the excess is released,
+ * and `rollback.quotaAmount` is corrected either way so a later failure releases the right
+ * number. A difference beyond `SIZE_TOLERANCE_BYTES` is not reconciled — it is refused.
+ */
+async function decodeAndReconcileQuota(
+  input: Stage1StorageInput,
+  rollback: RollbackContext
+): Promise<{ fileBuffer: Buffer; actualSize: number }> {
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = Buffer.from(input.fileContent, 'base64');
+  } catch {
+    throw createStorageError('BAD_REQUEST', 'Invalid base64 content', rollback);
+  }
+
+  const actualSize = fileBuffer.length;
+  if (Math.abs(actualSize - input.fileSize) > SIZE_TOLERANCE_BYTES) {
+    throw createStorageError(
+      'BAD_REQUEST',
+      `File size mismatch: declared ${input.fileSize} bytes, actual ${actualSize} bytes (tolerance: ${SIZE_TOLERANCE_BYTES} bytes)`,
+      rollback
+    );
+  }
+
+  // H5: Adjust quota if actual size differs from declared size
+  if (actualSize !== input.fileSize) {
+    const quotaDelta = actualSize - input.fileSize;
+    if (quotaDelta > 0) {
+      // Need more quota
+      await incrementQuota(input.organizationId, quotaDelta);
+      logger.debug(
+        { declared: input.fileSize, actual: actualSize, delta: quotaDelta },
+        '[Phase 2] Reserved additional quota'
+      );
+    } else {
+      // Release excess quota
+      await decrementQuota(input.organizationId, -quotaDelta);
+      logger.debug(
+        { declared: input.fileSize, actual: actualSize, delta: quotaDelta },
+        '[Phase 2] Released excess quota'
+      );
+    }
+  }
+
+  // Update rollback context with actual size
+  rollback.quotaAmount = actualSize;
+  return { fileBuffer, actualSize };
+}
+
+/**
+ * Create the directory and write the file, recording the path for rollback once it exists.
+ *
+ * `rollback.filePath` is set after the write and not before: a path recorded before a failed
+ * write would have rollback deleting a file it never created.
+ */
+async function writeUploadToDisk(
+  uploadDir: string,
+  storagePath: string,
+  fileBuffer: Buffer,
+  rollback: RollbackContext
+): Promise<void> {
+  try {
+    await fs.mkdir(uploadDir, { recursive: true });
+  } catch (error) {
+    throw createStorageError(
+      'INTERNAL_SERVER_ERROR',
+      `Failed to create upload directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      rollback
+    );
+  }
+
+  try {
+    await fs.writeFile(storagePath, fileBuffer);
+    rollback.filePath = storagePath;
+  } catch (error) {
+    throw createStorageError(
+      'INTERNAL_SERVER_ERROR',
+      `Failed to save file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      rollback
+    );
+  }
+}
+
+/**
+ * Has this exact content been uploaded before, by anyone?
+ *
+ * A failed lookup is not automatically fatal, and the distinction is deliberate. A timeout or a
+ * dropped connection means the answer is UNKNOWN, so it throws and the upload is retried; any
+ * other error means deduplication is unavailable, which costs disk rather than the upload, so it
+ * warns and returns `null`. Returning `null` for both is why this is a function: the caller
+ * cannot then mistake "could not check" for "no duplicate", which is the same value.
+ */
+async function findDuplicateFile(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  fileHash: string,
+  hashPrefix: string,
+  rollback: RollbackContext
+): Promise<DuplicateFileResult | null> {
+  const duplicateResult = await supabase.rpc('find_duplicate_file', { p_hash: fileHash });
+
+  // M2: Add transient error detection for duplicate search failures
+  if (duplicateResult.error) {
+    const errorMsg = duplicateResult.error.message.toLowerCase();
+    const isTransient =
+      errorMsg.includes('timeout') ||
+      errorMsg.includes('connection') ||
+      errorMsg.includes('network');
+
+    if (isTransient) {
+      throw createStorageError(
+        'INTERNAL_SERVER_ERROR',
+        `Deduplication check failed (transient): ${duplicateResult.error.message}`,
+        rollback
+      );
+    }
+
+    // Non-transient: log and continue with normal upload
+    logger.warn(
+      { err: duplicateResult.error.message, hashPrefix },
+      '[Phase 2] Deduplication check failed (non-transient), continuing with normal upload'
+    );
+    return null;
+  }
+
+  // M3: Simplified array handling (RPC always returns array)
+  const duplicateFile = (duplicateResult.data?.[0] ?? null) as DuplicateFileResult | null;
+  return duplicateFile?.file_id ? duplicateFile : null;
+}
+
+/**
  * Phase 2: Store uploaded file
  *
  * Performs atomic file storage with comprehensive rollback:
@@ -195,91 +364,16 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
       '[Phase 2] Quota reserved'
     );
 
-    // Step 2: Generate file ID and determine storage path
-    const fileId = crypto.randomUUID();
-
-    // H6: Sanitize file extension to prevent path traversal
-    const rawExtension = path.extname(input.filename).toLowerCase();
-    // Allow only alphanumeric and dots, max 10 chars
-    const fileExtension = rawExtension.replace(/[^a-z0-9.]/gi, '').substring(0, 10) || '.bin';
-
-    const uploadDir = path.join(
-      getUploadStorageRootPath(),
-      input.organizationId,
-      ...owner.uploadPathSegments
+    // Steps 2-4: where it goes, what it actually is, and what that costs against the quota.
+    const { fileId, fileExtension, uploadDir, storagePath } = resolveStoragePath(
+      input,
+      owner,
+      rollback
     );
-    const storagePath = path.join(uploadDir, `${fileId}${fileExtension}`);
+    const { fileBuffer, actualSize } = await decodeAndReconcileQuota(input, rollback);
 
-    // Validate path to prevent directory traversal attacks
-    const normalizedPath = path.normalize(storagePath);
-    if (!isPathInsideUploadStorageRoot(normalizedPath)) {
-      throw createStorageError('BAD_REQUEST', 'Invalid file path', rollback);
-    }
-
-    // Step 3: Decode base64 content
-    let fileBuffer: Buffer;
-    try {
-      fileBuffer = Buffer.from(input.fileContent, 'base64');
-    } catch {
-      throw createStorageError('BAD_REQUEST', 'Invalid base64 content', rollback);
-    }
-
-    // Step 4: Verify decoded file size matches declared size
-    const actualSize = fileBuffer.length;
-    const sizeDifference = Math.abs(actualSize - input.fileSize);
-    if (sizeDifference > SIZE_TOLERANCE_BYTES) {
-      throw createStorageError(
-        'BAD_REQUEST',
-        `File size mismatch: declared ${input.fileSize} bytes, actual ${actualSize} bytes (tolerance: ${SIZE_TOLERANCE_BYTES} bytes)`,
-        rollback
-      );
-    }
-
-    // H5: Adjust quota if actual size differs from declared size
-    if (actualSize !== input.fileSize) {
-      const quotaDelta = actualSize - input.fileSize;
-      if (quotaDelta > 0) {
-        // Need more quota
-        await incrementQuota(input.organizationId, quotaDelta);
-        logger.debug(
-          { declared: input.fileSize, actual: actualSize, delta: quotaDelta },
-          '[Phase 2] Reserved additional quota'
-        );
-      } else {
-        // Release excess quota
-        await decrementQuota(input.organizationId, -quotaDelta);
-        logger.debug(
-          { declared: input.fileSize, actual: actualSize, delta: quotaDelta },
-          '[Phase 2] Released excess quota'
-        );
-      }
-    }
-
-    // Update rollback context with actual size
-    rollback.quotaAmount = actualSize;
-
-    // Step 5: Create directory structure
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-    } catch (error) {
-      throw createStorageError(
-        'INTERNAL_SERVER_ERROR',
-        `Failed to create upload directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        rollback
-      );
-    }
-
-    // Step 6: Write file to disk
-    try {
-      await fs.writeFile(storagePath, fileBuffer);
-      rollback.filePath = storagePath;
-    } catch (error) {
-      throw createStorageError(
-        'INTERNAL_SERVER_ERROR',
-        `Failed to save file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        rollback
-      );
-    }
+    // Steps 5-6: create the directory and write the bytes.
+    await writeUploadToDisk(uploadDir, storagePath, fileBuffer, rollback);
 
     logger.debug({ fileId, storagePath }, '[Phase 2] File written to disk');
 
@@ -290,40 +384,9 @@ export async function runPhase2Storage(input: Stage1StorageInput): Promise<Phase
     logger.debug({ fileId, hashPrefix }, '[Phase 2] File hash calculated, checking for duplicates');
 
     // Step 7.5: Check for duplicate file (cross-organization deduplication)
-    const duplicateResult = await supabase.rpc('find_duplicate_file', {
-      p_hash: fileHash,
-    });
+    const duplicateFile = await findDuplicateFile(supabase, fileHash, hashPrefix, rollback);
 
-    // M2: Add transient error detection for duplicate search failures
-    if (duplicateResult.error) {
-      const errorMsg = duplicateResult.error.message.toLowerCase();
-      const isTransient =
-        errorMsg.includes('timeout') ||
-        errorMsg.includes('connection') ||
-        errorMsg.includes('network');
-
-      if (isTransient) {
-        throw createStorageError(
-          'INTERNAL_SERVER_ERROR',
-          `Deduplication check failed (transient): ${duplicateResult.error.message}`,
-          rollback
-        );
-      }
-
-      // Non-transient: log and continue with normal upload
-      logger.warn(
-        {
-          err: duplicateResult.error.message,
-          hashPrefix,
-        },
-        '[Phase 2] Deduplication check failed (non-transient), continuing with normal upload'
-      );
-    }
-
-    // M3: Simplified array handling (RPC always returns array)
-    const duplicateFile = (duplicateResult.data?.[0] ?? null) as DuplicateFileResult | null;
-
-    if (duplicateFile && duplicateFile.file_id && !duplicateResult.error) {
+    if (duplicateFile) {
       // ============================================
       // DEDUPLICATION PATH: File already exists
       // ============================================

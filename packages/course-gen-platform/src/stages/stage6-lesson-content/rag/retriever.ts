@@ -10,12 +10,8 @@ import { RequiredRagUnavailableError } from '@/shared/rag/document-availability'
 import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
-import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
+import type { LessonRAGParams, LessonRAGResult } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
-import { rerankChunks } from './reranking';
-import { estimateTokens } from './formatters';
-import { expandToSiblingContext } from '@/shared/qdrant/context-expansion';
-import { calculateLessonCoverage } from './coverage';
 import { resolveTier1ShadowSelection } from './shadow-retrieval';
 import {
   getStage6EvidenceProvenance,
@@ -201,6 +197,414 @@ async function runTier1ShadowRetrieval(input: Tier1ShadowRetrievalInput): Promis
  * @param params - Lesson retrieval parameters
  * @returns LessonRAGResult with chunks and metrics
  */
+import type { RetrievalCollector } from './retrieval-collector';
+
+interface QueryPassInput {
+  queries: string[];
+  scoreThreshold: number;
+  tier: 1 | 2;
+  courseId: string;
+  lessonId: string;
+  organizationId: string;
+  baseSearchOptions: Omit<SearchOptions, 'score_threshold'>;
+  evidenceContext?: Stage6AcceptedEvidenceContext;
+  collector: RetrievalCollector;
+  /** Tier 2 stops early once it has enough candidates; the gate never does. */
+  stopWhenEnough?: () => boolean;
+}
+
+/**
+ * Run a list of queries and collect whatever new chunks they return.
+ *
+ * Tier 1 and Tier 2 ran two copies of this loop that differed only in the score threshold, the
+ * number in the log line, and Tier 2's early break — so a fix to one of them silently did not
+ * apply to the other.
+ *
+ * A failed query is counted and survived, because partial retrieval beats none. The one error
+ * that is NOT survivable is `Stage6EvidenceScopeError`: it means a result came back from outside
+ * the accepted evidence scope, and continuing would write a lesson from a document the run was
+ * not allowed to read.
+ */
+async function runQueryPass(input: QueryPassInput): Promise<void> {
+  const {
+    queries,
+    scoreThreshold,
+    tier,
+    courseId,
+    lessonId,
+    organizationId,
+    baseSearchOptions,
+    evidenceContext,
+    collector,
+    stopWhenEnough,
+  } = input;
+
+  for (const query of queries) {
+    try {
+      const response = await searchChunks(query, {
+        ...baseSearchOptions,
+        score_threshold: scoreThreshold,
+      });
+
+      for (const result of response.results) {
+        if (evidenceContext) {
+          assertEvidenceSearchResult({ result, courseId, organizationId, evidenceContext });
+        }
+        if (collector.seenChunkIds.has(result.chunk_id)) continue;
+
+        collector.seenChunkIds.add(result.chunk_id);
+        collector.allChunks.push({
+          chunk_id: result.chunk_id,
+          document_id: result.document_id,
+          document_name: result.document_name,
+          content: result.content,
+          heading_path: result.heading_path,
+          similarity_score: result.score,
+          matched_query: query,
+          sibling_chunk_ids: result.sibling_chunk_ids,
+          parent_chunk_id: result.parent_chunk_id,
+          token_count: result.token_count,
+        });
+        collector.queriesUsed.push(query);
+      }
+
+      logger.debug(
+        {
+          lessonId,
+          resultsCount: response.results.length,
+          totalUnique: collector.allChunks.length,
+          tier,
+        },
+        `[Lesson RAG] Tier ${tier} query executed`
+      );
+    } catch (error) {
+      if (error instanceof Stage6EvidenceScopeError) throw error;
+      collector.queryFailureCount += 1;
+      logger.warn(
+        { err: error instanceof Error ? error.message : String(error), lessonId, tier },
+        tier === 1
+          ? '[Lesson RAG] Tier 1 query failed - continuing'
+          : '[Lesson RAG] Tier 2 query failed - continuing with remaining queries'
+      );
+    }
+
+    if (stopWhenEnough?.()) break;
+  }
+}
+
+/**
+ * Reuse a lesson's cached RAG context without touching live Qdrant.
+ *
+ * The cache is keyed by evidence identity as well as by lesson, but a cache written before the
+ * accepted evidence set narrowed can still hold a document that is now out of scope — hence the
+ * re-check on read. Returns `null` when there is nothing usable, which is not an error.
+ */
+async function tryCachedContext(
+  params: LessonRAGParams,
+  startTime: number
+): Promise<LessonRAGResult | null> {
+  const { courseId, lessonSpec, useCache = true, evidenceContext } = params;
+  if (!useCache || !lessonSpec.rag_context) return null;
+
+  const ragContextId = generateCacheKey(
+    courseId,
+    lessonSpec.lesson_id,
+    evidenceContext?.cacheIdentity
+  );
+  const cached = await ragContextCache.get(ragContextId);
+  if (!cached) return null;
+
+  if (
+    evidenceContext &&
+    cached.chunks.some(
+      chunk => !isStage6EvidenceChunkAllowed(evidenceContext, chunk.documentId, chunk.chunkId)
+    )
+  ) {
+    throw new Stage6EvidenceScopeError(
+      'Stage 6 cache contains a document outside the current accepted evidence scope'
+    );
+  }
+
+  logger.debug(
+    { lessonId: lessonSpec.lesson_id, cachedChunks: cached.chunks.length },
+    '[Lesson RAG] Using cached context'
+  );
+
+  try {
+    await logTrace({
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      stage: 'stage_6',
+      phase: 'rag_retrieval',
+      stepName: 'lesson_cache_hit',
+      inputData: { lessonId: lessonSpec.lesson_id },
+      outputData: { chunksFound: cached.chunks.length, cached: true },
+      durationMs: Date.now() - startTime,
+    });
+  } catch {
+    // Don't fail on trace error
+  }
+
+  const convertedChunks: RAGChunk[] = cached.chunks.map((chunk: SectionRAGChunk) => ({
+    chunk_id: chunk.chunkId,
+    document_id: chunk.documentId,
+    document_name: chunk.documentName,
+    content: chunk.content,
+    page_or_section: chunk.headingPath,
+    relevance_score: chunk.score,
+    metadata: {
+      matched_query: chunk.matchedQuery,
+      ...(evidenceContext && {
+        evidence_provenance: getStage6EvidenceProvenance(
+          evidenceContext,
+          chunk.documentId,
+          chunk.chunkId
+        ),
+      }),
+    },
+  }));
+
+  return {
+    lessonId: lessonSpec.lesson_id,
+    chunks: convertedChunks,
+    totalRetrieved: cached.chunks.length,
+    queriesUsed: cached.searchQueriesUsed,
+    coverageScore: cached.coverageScore,
+    retrievalDurationMs: Date.now() - startTime,
+    cached: true,
+  };
+}
+
+/**
+ * Which documents this lesson is allowed to search, given the accepted evidence set.
+ *
+ * Returns `null` when the lesson names documents and the accepted evidence names documents and
+ * the two do not intersect — meaning the lesson would be written without the user's sources.
+ *
+ * That case is why this is a separate function rather than an inline branch. It was the one
+ * empty-result path that used to say nothing at all: it returned in ~140 ms leaving no line, no
+ * trace row and nothing to tell it apart from a course that simply has no documents. On
+ * 2026-08-22 a dev run hit it with two chunks sitting indexed in Qdrant, and the branch had to
+ * be identified by eliminating the four that DO log (mc2-kznfz). It also sits ABOVE the Tier 1
+ * gate, so the shadow cohort that exists to measure silent RAG loss (mc2-wxun) cannot see it.
+ */
+async function resolveDocumentScope(
+  params: LessonRAGParams,
+  startTime: number
+): Promise<{ primaryDocIds: string[] | undefined } | null> {
+  const { courseId, lessonSpec, evidenceContext } = params;
+  const specifiedPrimaryDocIds = lessonSpec.rag_context?.primary_documents;
+
+  if (!evidenceContext) return { primaryDocIds: specifiedPrimaryDocIds };
+
+  const primaryDocIds =
+    specifiedPrimaryDocIds && specifiedPrimaryDocIds.length > 0
+      ? specifiedPrimaryDocIds.filter(documentId =>
+          evidenceContext.allowedDocumentIds.includes(documentId)
+        )
+      : evidenceContext.allowedDocumentIds;
+
+  if (!specifiedPrimaryDocIds || specifiedPrimaryDocIds.length === 0 || primaryDocIds.length > 0) {
+    return { primaryDocIds };
+  }
+
+  logger.warn(
+    {
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
+      allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
+      outcome: 'empty',
+    },
+    '[Lesson RAG] Lesson documents and accepted evidence do not intersect - writing without sources'
+  );
+  try {
+    await logTrace({
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      stage: 'stage_6',
+      phase: 'rag_retrieval',
+      stepName: 'evidence_scope_empty',
+      inputData: {
+        lessonId: lessonSpec.lesson_id,
+        specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
+        allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
+      },
+      outputData: { chunksFound: 0, reason: 'lesson_documents_outside_accepted_evidence' },
+      durationMs: Date.now() - startTime,
+    });
+  } catch {
+    // Don't fail on trace error
+  }
+  return null;
+}
+
+interface Tier1GateInput {
+  courseId: string;
+  lessonId: string;
+  organizationId: string;
+  queries: string[];
+  tier1Queries: string[];
+  tier2Queries: string[];
+  baseSearchOptions: Omit<SearchOptions, 'score_threshold'>;
+  evidenceContext?: Stage6AcceptedEvidenceContext;
+  collector: RetrievalCollector;
+  ragRequired: boolean;
+}
+
+/**
+ * Tier 1 (Light Gate): run the first N queries at a permissive threshold, and if ALL of them
+ * come back empty, stop here.
+ *
+ * Saves ~65% of Qdrant queries and ~75% of Jina Reranker calls on lessons the documents do not
+ * cover. @see docs/plans/dapper-jumping-plum.md
+ *
+ * Returns `true` when the caller should exit. A sampled share of exits fires a shadow retrieval
+ * in the background, which is how silent RAG loss gets measured rather than assumed — and it is
+ * deliberately not awaited, because it exists to observe this run, not to delay it.
+ */
+async function runTier1Gate(input: Tier1GateInput): Promise<boolean> {
+  const {
+    courseId,
+    lessonId,
+    organizationId,
+    queries,
+    tier1Queries,
+    tier2Queries,
+    baseSearchOptions,
+    evidenceContext,
+    collector,
+    ragRequired,
+  } = input;
+
+  const tier1StartTime = Date.now();
+  await runQueryPass({
+    queries: tier1Queries,
+    scoreThreshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+    tier: 1,
+    courseId,
+    lessonId,
+    organizationId,
+    baseSearchOptions,
+    evidenceContext,
+    collector,
+  });
+  const tier1DurationMs = Date.now() - tier1StartTime;
+
+  // Strike-Two: if ALL Tier 1 queries returned 0 chunks → early exit
+  if (collector.allChunks.length > 0) {
+    const tier1MaxScore = Math.max(...collector.allChunks.map(chunk => chunk.similarity_score));
+
+    logger.info(
+      {
+        lessonId,
+        tier1ChunksFound: collector.allChunks.length,
+        tier1MaxScore: tier1MaxScore.toFixed(3),
+        tier1DurationMs,
+      },
+      '[Lesson RAG] Tier 1 passed - proceeding to Tier 2'
+    );
+
+    // Log trace for Tier 1 pass (helps measure false negative rate)
+    try {
+      await logTrace({
+        courseId,
+        lessonId,
+        stage: 'stage_6',
+        phase: 'rag_retrieval',
+        stepName: 'tier1_pass',
+        inputData: {
+          lessonId,
+          tier1Queries: tier1Queries.length,
+          totalQueries: queries.length,
+          tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+        },
+        outputData: {
+          tier1ChunksFound: collector.allChunks.length,
+          tier1MaxScore,
+          tier1Exit: false,
+        },
+        durationMs: tier1DurationMs,
+      });
+    } catch {
+      // Don't fail on trace error
+    }
+    return false;
+  }
+
+  // Nothing found. If evidence was REQUIRED and queries failed, this is an outage, not an answer.
+  if (ragRequired && collector.queryFailureCount > 0) {
+    throw new RequiredRagUnavailableError(
+      courseId,
+      'qdrant_service_unavailable',
+      'All Stage 6 retrieval queries failed after required-RAG preflight'
+    );
+  }
+
+  logger.info(
+    {
+      lessonId,
+      courseId,
+      tier1Queries: tier1Queries.length,
+      tier1DurationMs,
+      tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+    },
+    '[Lesson RAG] Tier 1 exit - no results from gate queries (Strike-Two)'
+  );
+
+  const shadowSelection = resolveTier1ShadowSelection(courseId, lessonId);
+  try {
+    await logTrace({
+      courseId,
+      lessonId,
+      stage: 'stage_6',
+      phase: 'rag_retrieval',
+      stepName: 'tier1_exit',
+      inputData: {
+        lessonId,
+        tier1Queries: tier1Queries.length,
+        totalQueries: queries.length,
+        tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+      },
+      outputData: {
+        tier1ChunksFound: 0,
+        tier1Exit: true,
+        queriesSaved: tier2Queries.length,
+        rerankerSkipped: true,
+        shadowSampled: shadowSelection.sampled,
+        shadowRate: shadowSelection.rate,
+      },
+      durationMs: tier1DurationMs,
+    });
+  } catch {
+    // Don't fail on trace error
+  }
+
+  if (shadowSelection.sampled) {
+    void runTier1ShadowRetrieval({
+      courseId,
+      lessonId,
+      organizationId,
+      tier1Queries,
+      tier2Queries,
+      baseSearchOptions,
+      evidenceContext,
+      shadowRate: shadowSelection.rate,
+    }).catch(error =>
+      logger.warn(
+        { err: error instanceof Error ? error.message : String(error), courseId, lessonId },
+        '[Lesson RAG] Tier 1 shadow retrieval failed'
+      )
+    );
+  }
+
+  return true;
+}
+
+// The ranking and assembly half lives next door; it is the part of retrieval that no longer
+// talks to Qdrant, only to the reranker, the cache and the trace log.
+import { rankAndAssemble } from './retrieval-assembly';
+
 async function retrieveLessonContextCore(
   params: LessonRAGParams
 ): Promise<LessonRAGResult & { fallbackUsed?: boolean }> {
@@ -210,214 +614,69 @@ async function retrieveLessonContextCore(
     organizationId,
     lessonSpec,
     targetChunks = LESSON_RAG_CONFIG.TARGET_CHUNKS,
-    useCache = true,
     enablePriorityBoost = true, // Default: boost CORE/IMPORTANT documents
     evidenceContext,
   } = params;
+  const lessonId = lessonSpec.lesson_id;
+  const empty = () => createEmptyResult(lessonId, Date.now() - startTime);
 
   logger.debug(
     {
       courseId,
-      lessonId: lessonSpec.lesson_id,
+      lessonId,
       targetChunks,
-      useCache,
+      useCache: params.useCache ?? true,
       enablePriorityBoost,
     },
     '[Lesson RAG] Starting retrieval'
   );
 
-  // Preserve existing resilience: if a lesson already has cached RAG context,
-  // reuse it without touching live Qdrant.
-  if (useCache && lessonSpec.rag_context) {
-    const ragContextId = generateCacheKey(
-      courseId,
-      lessonSpec.lesson_id,
-      evidenceContext?.cacheIdentity
-    );
-    const cached = await ragContextCache.get(ragContextId);
+  const cached = await tryCachedContext(params, startTime);
+  if (cached) return cached;
 
-    if (cached) {
-      if (
-        evidenceContext &&
-        cached.chunks.some(
-          chunk => !isStage6EvidenceChunkAllowed(evidenceContext, chunk.documentId, chunk.chunkId)
-        )
-      ) {
-        throw new Stage6EvidenceScopeError(
-          'Stage 6 cache contains a document outside the current accepted evidence scope'
-        );
-      }
-      logger.debug(
-        {
-          lessonId: lessonSpec.lesson_id,
-          cachedChunks: cached.chunks.length,
-        },
-        '[Lesson RAG] Using cached context'
-      );
-
-      try {
-        await logTrace({
-          courseId,
-          lessonId: lessonSpec.lesson_id,
-          stage: 'stage_6',
-          phase: 'rag_retrieval',
-          stepName: 'cache_hit',
-          inputData: {
-            lessonId: lessonSpec.lesson_id,
-            ragContextId,
-          },
-          outputData: {
-            cachedChunks: cached.chunks.length,
-            coverageScore: cached.coverageScore,
-            cached: true,
-          },
-          durationMs: Date.now() - startTime,
-        });
-      } catch {
-        // Don't fail on trace error
-      }
-
-      const convertedChunks: RAGChunk[] = cached.chunks.map((chunk: SectionRAGChunk) => ({
-        chunk_id: chunk.chunkId,
-        document_id: chunk.documentId,
-        document_name: chunk.documentName,
-        content: chunk.content,
-        page_or_section: chunk.headingPath,
-        relevance_score: chunk.score,
-        metadata: {
-          matched_query: chunk.matchedQuery,
-          ...(evidenceContext && {
-            evidence_provenance: getStage6EvidenceProvenance(
-              evidenceContext,
-              chunk.documentId,
-              chunk.chunkId
-            ),
-          }),
-        },
-      }));
-
-      return {
-        lessonId: lessonSpec.lesson_id,
-        chunks: convertedChunks,
-        totalRetrieved: cached.chunks.length,
-        queriesUsed: cached.searchQueriesUsed,
-        coverageScore: cached.coverageScore,
-        retrievalDurationMs: Date.now() - startTime,
-        cached: true,
-      };
-    }
-  }
-
-  // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
-  // This prevents ~100s of wasted time when course has no uploaded documents
+  // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries.
+  // This prevents ~100s of wasted time when the course has no uploaded documents.
   const ragAvailability = await assertCourseRagReadyWithRetry(courseId);
   if (ragAvailability.availability === 'optional_no_documents') {
     logger.info(
-      {
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-      },
+      { courseId, lessonId },
       '[Lesson RAG] Course has no indexed documents, skipping RAG retrieval'
     );
-
-    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+    return empty();
   }
 
   const tenantOrganizationId = requireTenantScope(organizationId);
   if (evidenceContext && evidenceContext.allowedDocumentIds.length === 0) {
     logger.info(
-      {
-        outcome: 'empty',
-        allowedDocumentCount: 0,
-      },
+      { outcome: 'empty', allowedDocumentCount: 0 },
       '[Lesson RAG] Accepted evidence decisions exclude all document refs'
     );
-    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+    return empty();
   }
 
-  // Build search queries from lesson specification
   const queries = buildLessonQueries(lessonSpec);
-
   if (queries.length === 0) {
-    logger.warn(
-      {
-        lessonId: lessonSpec.lesson_id,
-      },
-      '[Lesson RAG] No search queries generated'
-    );
-
-    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+    logger.warn({ lessonId }, '[Lesson RAG] No search queries generated');
+    return empty();
   }
 
-  // Execute searches and collect chunks
-  // When reranking is enabled, fetch more candidates (4x) for reranking
+  const scope = await resolveDocumentScope(params, startTime);
+  if (!scope) return empty();
+  const { primaryDocIds } = scope;
+
+  // When reranking is enabled, fetch more candidates (4x) for reranking.
   const candidateCount = RERANKER_CONFIG.enabled
     ? targetChunks * RERANKER_CONFIG.candidateMultiplier
     : targetChunks;
 
-  const allChunks: LessonRAGChunk[] = [];
-  const seenChunkIds = new Set<string>();
-  const queriesUsed: string[] = [];
-  let queryFailureCount = 0;
+  const collector: RetrievalCollector = {
+    allChunks: [],
+    seenChunkIds: new Set<string>(),
+    queriesUsed: [],
+    queryFailureCount: 0,
+  };
 
-  // Shared filter config for all queries
-  const specifiedPrimaryDocIds = lessonSpec.rag_context?.primary_documents;
-  const primaryDocIds = evidenceContext
-    ? specifiedPrimaryDocIds && specifiedPrimaryDocIds.length > 0
-      ? specifiedPrimaryDocIds.filter(documentId =>
-          evidenceContext.allowedDocumentIds.includes(documentId)
-        )
-      : evidenceContext.allowedDocumentIds
-    : specifiedPrimaryDocIds;
-  if (
-    evidenceContext &&
-    specifiedPrimaryDocIds &&
-    specifiedPrimaryDocIds.length > 0 &&
-    primaryDocIds?.length === 0
-  ) {
-    // The one empty-result path that used to say nothing at all.
-    //
-    // The lesson names documents, the accepted evidence set names documents,
-    // and they do not overlap — so the lesson is written without the user's
-    // sources. Every other early return here logs; this one returned in ~140 ms
-    // leaving no line, no trace row and nothing to tell it apart from a course
-    // that simply has no documents. On 2026-08-22 a dev run hit it with two
-    // chunks sitting indexed in Qdrant, and the branch had to be identified by
-    // eliminating the four that do log (mc2-kznfz).
-    //
-    // It also sits ABOVE the Tier 1 gate, so the shadow cohort that exists to
-    // measure silent RAG loss (mc2-wxun) cannot see this one at all.
-    logger.warn(
-      {
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-        specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
-        allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
-        outcome: 'empty',
-      },
-      '[Lesson RAG] Lesson documents and accepted evidence do not intersect - writing without sources'
-    );
-    try {
-      await logTrace({
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-        stage: 'stage_6',
-        phase: 'rag_retrieval',
-        stepName: 'evidence_scope_empty',
-        inputData: {
-          lessonId: lessonSpec.lesson_id,
-          specifiedPrimaryDocumentCount: specifiedPrimaryDocIds.length,
-          allowedDocumentCount: evidenceContext.allowedDocumentIds.length,
-        },
-        outputData: { chunksFound: 0, reason: 'lesson_documents_outside_accepted_evidence' },
-        durationMs: Date.now() - startTime,
-      });
-    } catch {
-      // Don't fail on trace error
-    }
-    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
-  }
-  const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
+  const filteringByDocs = Boolean(primaryDocIds && primaryDocIds.length > 0);
   const baseSearchOptions: Omit<SearchOptions, 'score_threshold'> = {
     limit: Math.ceil(candidateCount / queries.length) + 2,
     enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
@@ -434,277 +693,56 @@ async function retrieveLessonContextCore(
 
   logger.debug(
     {
-      lessonId: lessonSpec.lesson_id,
+      lessonId,
       filteringByDocs,
       documentCount: primaryDocIds?.length ?? 0,
       twoTierEnabled: TWO_TIER_CONFIG.enabled,
     },
     filteringByDocs
-      ? `RAG filtering by ${primaryDocIds.length} documents`
+      ? `RAG filtering by ${primaryDocIds?.length ?? 0} documents`
       : 'RAG searching all course documents'
   );
 
-  // ============================================================================
-  // TWO-TIER RETRIEVAL: Tier 1 (Light Gate)
-  // Execute first N queries with permissive threshold. If ALL return 0 → early exit.
-  // This saves ~65% Qdrant queries and ~75% Jina Reranker calls for irrelevant lessons.
-  // @see docs/plans/dapper-jumping-plum.md
-  // ============================================================================
   const tier1QueryCount = TWO_TIER_CONFIG.enabled
     ? Math.min(TWO_TIER_CONFIG.TIER1_QUERY_COUNT, queries.length)
     : 0;
   const tier1Queries = queries.slice(0, tier1QueryCount);
   const tier2Queries = TWO_TIER_CONFIG.enabled ? queries.slice(tier1QueryCount) : queries;
+
   if (TWO_TIER_CONFIG.enabled && tier1Queries.length > 0) {
-    const tier1StartTime = Date.now();
-
-    for (const query of tier1Queries) {
-      try {
-        const searchOptions: SearchOptions = {
-          ...baseSearchOptions,
-          score_threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
-        };
-
-        const response = await searchChunks(query, searchOptions);
-
-        for (const result of response.results) {
-          if (evidenceContext) {
-            assertEvidenceSearchResult({
-              result,
-              courseId,
-              organizationId: tenantOrganizationId,
-              evidenceContext,
-            });
-          }
-          if (!seenChunkIds.has(result.chunk_id)) {
-            seenChunkIds.add(result.chunk_id);
-            allChunks.push({
-              chunk_id: result.chunk_id,
-              document_id: result.document_id,
-              document_name: result.document_name,
-              content: result.content,
-              heading_path: result.heading_path,
-              similarity_score: result.score,
-              matched_query: query,
-              sibling_chunk_ids: result.sibling_chunk_ids,
-              parent_chunk_id: result.parent_chunk_id,
-              token_count: result.token_count,
-            });
-            queriesUsed.push(query);
-          }
-        }
-
-        logger.debug(
-          {
-            lessonId: lessonSpec.lesson_id,
-            resultsCount: response.results.length,
-            totalUnique: allChunks.length,
-            tier: 1,
-          },
-          '[Lesson RAG] Tier 1 query executed'
-        );
-      } catch (error) {
-        if (error instanceof Stage6EvidenceScopeError) throw error;
-        queryFailureCount += 1;
-        logger.warn(
-          {
-            err: error instanceof Error ? error.message : String(error),
-            lessonId: lessonSpec.lesson_id,
-            tier: 1,
-          },
-          '[Lesson RAG] Tier 1 query failed - continuing'
-        );
-      }
-    }
-
-    const tier1DurationMs = Date.now() - tier1StartTime;
-
-    // Strike-Two: if ALL Tier 1 queries returned 0 chunks → early exit
-    if (allChunks.length === 0) {
-      if (ragAvailability.ragRequired && queryFailureCount > 0) {
-        throw new RequiredRagUnavailableError(
-          courseId,
-          'qdrant_service_unavailable',
-          'All Stage 6 retrieval queries failed after required-RAG preflight'
-        );
-      }
-      logger.info(
-        {
-          lessonId: lessonSpec.lesson_id,
-          courseId,
-          tier1Queries: tier1Queries.length,
-          tier1DurationMs,
-          tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
-        },
-        '[Lesson RAG] Tier 1 exit - no results from gate queries (Strike-Two)'
-      );
-
-      const shadowSelection = resolveTier1ShadowSelection(courseId, lessonSpec.lesson_id);
-      // Log trace for observability
-      try {
-        await logTrace({
-          courseId,
-          lessonId: lessonSpec.lesson_id,
-          stage: 'stage_6',
-          phase: 'rag_retrieval',
-          stepName: 'tier1_exit',
-          inputData: {
-            lessonId: lessonSpec.lesson_id,
-            tier1Queries: tier1Queries.length,
-            totalQueries: queries.length,
-            tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
-          },
-          outputData: {
-            tier1ChunksFound: 0,
-            tier1Exit: true,
-            queriesSaved: tier2Queries.length,
-            rerankerSkipped: true,
-            shadowSampled: shadowSelection.sampled,
-            shadowRate: shadowSelection.rate,
-          },
-          durationMs: tier1DurationMs,
-        });
-      } catch {
-        // Don't fail on trace error
-      }
-
-      if (shadowSelection.sampled) {
-        void runTier1ShadowRetrieval({
-          courseId,
-          lessonId: lessonSpec.lesson_id,
-          organizationId: tenantOrganizationId,
-          tier1Queries,
-          tier2Queries,
-          baseSearchOptions,
-          evidenceContext,
-          shadowRate: shadowSelection.rate,
-        }).catch(error =>
-          logger.warn(
-            {
-              err: error instanceof Error ? error.message : String(error),
-              courseId,
-              lessonId: lessonSpec.lesson_id,
-            },
-            '[Lesson RAG] Tier 1 shadow retrieval failed'
-          )
-        );
-      }
-
-      return {
-        ...createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime),
-        fallbackUsed: queryFailureCount > 0,
-      };
-    }
-
-    // Compute Tier 1 max score for threshold tuning data
-    const tier1MaxScore =
-      allChunks.length > 0 ? Math.max(...allChunks.map(c => c.similarity_score)) : 0;
-
-    logger.info(
-      {
-        lessonId: lessonSpec.lesson_id,
-        tier1ChunksFound: allChunks.length,
-        tier1MaxScore: tier1MaxScore.toFixed(3),
-        tier1DurationMs,
-      },
-      '[Lesson RAG] Tier 1 passed - proceeding to Tier 2'
-    );
-
-    // Log trace for Tier 1 pass (helps measure false negative rate)
-    try {
-      await logTrace({
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-        stage: 'stage_6',
-        phase: 'rag_retrieval',
-        stepName: 'tier1_pass',
-        inputData: {
-          lessonId: lessonSpec.lesson_id,
-          tier1Queries: tier1Queries.length,
-          totalQueries: queries.length,
-          tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
-        },
-        outputData: {
-          tier1ChunksFound: allChunks.length,
-          tier1MaxScore,
-          tier1Exit: false,
-        },
-        durationMs: tier1DurationMs,
-      });
-    } catch {
-      // Don't fail on trace error
+    const shouldExit = await runTier1Gate({
+      courseId,
+      lessonId,
+      organizationId: tenantOrganizationId,
+      queries,
+      tier1Queries,
+      tier2Queries,
+      baseSearchOptions,
+      evidenceContext,
+      collector,
+      ragRequired: ragAvailability.ragRequired,
+    });
+    if (shouldExit) {
+      return { ...empty(), fallbackUsed: collector.queryFailureCount > 0 };
     }
   }
 
-  // ============================================================================
-  // TIER 2: Full Retrieval (remaining queries + reranking)
-  // Only reached if Tier 1 found at least one chunk, or if Two-Tier is disabled.
-  // ============================================================================
-  const tier2QueryList = TWO_TIER_CONFIG.enabled ? tier2Queries : queries;
+  // TIER 2: full retrieval. Only reached if Tier 1 found at least one chunk, or Two-Tier is off.
+  const enoughCandidates = Math.min(candidateCount * 1.5, LESSON_RAG_CONFIG.MAX_CHUNKS * 4);
+  await runQueryPass({
+    queries: TWO_TIER_CONFIG.enabled ? tier2Queries : queries,
+    scoreThreshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
+    tier: 2,
+    courseId,
+    lessonId,
+    organizationId: tenantOrganizationId,
+    baseSearchOptions,
+    evidenceContext,
+    collector,
+    stopWhenEnough: () => collector.allChunks.length >= enoughCandidates,
+  });
 
-  for (const query of tier2QueryList) {
-    try {
-      const searchOptions: SearchOptions = {
-        ...baseSearchOptions,
-        score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
-      };
-
-      const response = await searchChunks(query, searchOptions);
-
-      for (const result of response.results) {
-        if (evidenceContext) {
-          assertEvidenceSearchResult({
-            result,
-            courseId,
-            organizationId: tenantOrganizationId,
-            evidenceContext,
-          });
-        }
-        if (!seenChunkIds.has(result.chunk_id)) {
-          seenChunkIds.add(result.chunk_id);
-          allChunks.push({
-            chunk_id: result.chunk_id,
-            document_id: result.document_id,
-            document_name: result.document_name,
-            content: result.content,
-            heading_path: result.heading_path,
-            similarity_score: result.score,
-            matched_query: query,
-            sibling_chunk_ids: result.sibling_chunk_ids,
-            parent_chunk_id: result.parent_chunk_id,
-            token_count: result.token_count,
-          });
-          queriesUsed.push(query);
-        }
-      }
-
-      logger.debug(
-        {
-          lessonId: lessonSpec.lesson_id,
-          resultsCount: response.results.length,
-          totalUnique: allChunks.length,
-          tier: 2,
-        },
-        '[Lesson RAG] Tier 2 query executed'
-      );
-    } catch (error) {
-      if (error instanceof Stage6EvidenceScopeError) throw error;
-      queryFailureCount += 1;
-      logger.warn(
-        {
-          err: error instanceof Error ? error.message : String(error),
-          lessonId: lessonSpec.lesson_id,
-          tier: 2,
-        },
-        '[Lesson RAG] Tier 2 query failed - continuing with remaining queries'
-      );
-    }
-
-    // Stop if we have enough candidates
-    if (allChunks.length >= Math.min(candidateCount * 1.5, LESSON_RAG_CONFIG.MAX_CHUNKS * 4)) break;
-  }
-
-  if (ragAvailability.ragRequired && queryFailureCount > 0) {
+  if (ragAvailability.ragRequired && collector.queryFailureCount > 0) {
     throw new RequiredRagUnavailableError(
       courseId,
       'qdrant_service_unavailable',
@@ -712,164 +750,15 @@ async function retrieveLessonContextCore(
     );
   }
 
-  // Track candidates before reranking for metrics
-  const chunksBeforeRerank = allChunks.length;
-  let rerankDurationMs = 0;
-
-  // Apply reranking if enabled and we have chunks
-  let sortedChunks: LessonRAGChunk[];
-  if (RERANKER_CONFIG.enabled && allChunks.length > 0) {
-    const rerankStartTime = Date.now();
-    sortedChunks = await rerankChunks(allChunks, queries, lessonSpec.lesson_id, targetChunks);
-    rerankDurationMs = Date.now() - rerankStartTime;
-  } else {
-    // Fallback to Qdrant score sorting
-    sortedChunks = allChunks
-      .sort((a, b) => b.similarity_score - a.similarity_score)
-      .slice(0, targetChunks);
-  }
-
-  // Expand only what survived: reranking is a cross-encoder over the retrieved
-  // text and discards four candidates in five, so widening before it would pay
-  // to fetch context that is about to be thrown away and would hand the model
-  // that judges relevance a passage where a focused chunk was meant to be.
-  sortedChunks = await expandToSiblingContext(
-    sortedChunks.map(chunk => ({
-      ...chunk,
-      score: chunk.similarity_score,
-      token_count: chunk.token_count ?? estimateTokens(chunk.content),
-    })),
-    { maxTokens: LESSON_RAG_CONFIG.MAX_TOKENS }
-  );
-
-  // Convert to RAGChunk format
-  const ragChunks: RAGChunk[] = sortedChunks.map(chunk => ({
-    chunk_id: chunk.chunk_id,
-    document_id: chunk.document_id,
-    document_name: chunk.document_name,
-    content: chunk.content,
-    page_or_section: chunk.heading_path,
-    relevance_score: chunk.similarity_score,
-    metadata: {
-      matched_query: chunk.matched_query,
-      ...(evidenceContext && {
-        evidence_provenance: getStage6EvidenceProvenance(
-          evidenceContext,
-          chunk.document_id,
-          chunk.chunk_id
-        ),
-      }),
-    },
-  }));
-
-  // Calculate coverage score based on learning objectives
-  const coverageScore = calculateLessonCoverage(ragChunks, lessonSpec);
-
-  const retrievalDurationMs = Date.now() - startTime;
-
-  // Log trace for observability in TraceViewer
-  try {
-    const scores = ragChunks.map(c => c.relevance_score);
-    await logTrace({
-      courseId,
-      lessonId: lessonSpec.lesson_id,
-      stage: 'stage_6',
-      phase: 'rag_retrieval',
-      stepName: 'lesson_rerank',
-      inputData: {
-        lessonId: lessonSpec.lesson_id,
-        queriesCount: queries.length,
-        targetChunks,
-        twoTierEnabled: TWO_TIER_CONFIG.enabled,
-        tier1QueryCount: TWO_TIER_CONFIG.enabled ? tier1Queries.length : 0,
-      },
-      outputData: {
-        rerankerEnabled: RERANKER_CONFIG.enabled,
-        candidatesCount: chunksBeforeRerank,
-        rerankedCount: ragChunks.length,
-        rerankerLatencyMs: rerankDurationMs,
-        scoreDistribution:
-          ragChunks.length > 0
-            ? {
-                min: Math.min(...scores),
-                max: Math.max(...scores),
-                avg: scores.reduce((s, c) => s + c, 0) / scores.length,
-              }
-            : { min: 0, max: 0, avg: 0 },
-        coverageScore,
-        cached: false,
-      },
-      durationMs: retrievalDurationMs,
-    });
-  } catch (traceError) {
-    // Don't fail retrieval if trace logging fails
-    logger.warn(
-      {
-        err: traceError instanceof Error ? traceError.message : String(traceError),
-        lessonId: lessonSpec.lesson_id,
-      },
-      '[Lesson RAG] Failed to log trace'
-    );
-  }
-
-  // Cache the result if enabled
-  if (useCache) {
-    try {
-      const cacheIdentity = generateCacheKey(
-        courseId,
-        lessonSpec.lesson_id,
-        evidenceContext?.cacheIdentity
-      );
-      await ragContextCache.getOrRetrieve(courseId, lessonSpec.lesson_id, cacheIdentity, () =>
-        Promise.resolve({
-          sectionId: lessonSpec.lesson_id,
-          chunks: sortedChunks.map(c => ({
-            chunkId: c.chunk_id,
-            documentId: c.document_id,
-            documentName: c.document_name,
-            content: c.content,
-            headingPath: c.heading_path,
-            score: c.similarity_score,
-            matchedQuery: c.matched_query,
-          })),
-          totalRetrieved: ragChunks.length,
-          searchQueriesUsed: [...new Set(queriesUsed)],
-          coverageScore,
-          retrievalDurationMs,
-        })
-      );
-    } catch (cacheError) {
-      logger.warn(
-        {
-          err: cacheError instanceof Error ? cacheError.message : String(cacheError),
-          lessonId: lessonSpec.lesson_id,
-        },
-        '[Lesson RAG] Failed to cache result'
-      );
-    }
-  }
-
-  logger.info(
-    {
-      lessonId: lessonSpec.lesson_id,
-      chunksRetrieved: ragChunks.length,
-      queriesExecuted: queries.length,
-      coverageScore: coverageScore.toFixed(2),
-      durationMs: retrievalDurationMs,
-    },
-    '[Lesson RAG] Retrieval complete'
-  );
-
-  return {
-    lessonId: lessonSpec.lesson_id,
-    chunks: ragChunks,
-    totalRetrieved: ragChunks.length,
-    queriesUsed: [...new Set(queriesUsed)],
-    coverageScore,
-    retrievalDurationMs,
-    cached: false,
-    fallbackUsed: queryFailureCount > 0,
-  };
+  return rankAndAssemble({
+    params,
+    organizationId: tenantOrganizationId,
+    queries,
+    tier1Queries,
+    targetChunks,
+    collector,
+    startTime,
+  });
 }
 
 export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {

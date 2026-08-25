@@ -421,9 +421,13 @@ export function MarkdownRendererFull({
       )
     },
 
-    // Image with lazy loading (next/image not usable in react-markdown custom components)
+    // Image with lazy loading. `next/image` is not an option here: markdown is
+    // generated content and may name any host, and next/image THROWS at render
+    // time for a host outside `remotePatterns` — that turns a broken image into
+    // a broken page. Same call as InfographicViewer, for the same reason.
     img: ({ src, alt, title }) => {
       return (
+        // eslint-disable-next-line @next/next/no-img-element -- user content with unknown dimensions
         <img
           src={src}
           alt={alt || ''}

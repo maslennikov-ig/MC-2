@@ -21,11 +21,18 @@ export function UserbackProvider() {
   const locale = useLocale()
   const ubRef = useRef<UserbackWidget | null>(null)
 
+  // The three primitives the widget actually displays, read outside the effect.
+  // The effect used to close over the whole `session.user` object while listing
+  // only `user.id` as a dependency, so a changed display name or email never
+  // reached the widget — and adding `session.user` to the list instead would
+  // destroy and rebuild the widget on every token refresh, because Supabase
+  // hands back a new object each time. Depending on the values fixes both.
+  const userId = session?.user?.id
+  const userEmail = session?.user?.email
+  const userName = (session?.user?.user_metadata?.full_name as string) || undefined
+
   useEffect(() => {
     if (!USERBACK_ENABLED || !USERBACK_TOKEN) return
-
-    const user = session?.user
-    const userName = (user?.user_metadata?.full_name as string) || undefined
 
     Userback(USERBACK_TOKEN, {
       widget_settings: {
@@ -44,10 +51,10 @@ export function UserbackProvider() {
 
         // identify() — рекомендованный способ для SPA (docs.userback.io/docs/react)
         // Одновременно идентифицирует пользователя И заполняет поля формы
-        if (user) {
-          instance.identify(user.id, {
+        if (userId) {
+          instance.identify(userId, {
             name: userName || '',
-            email: user.email || '',
+            email: userEmail || '',
           })
         }
       })
@@ -59,7 +66,7 @@ export function UserbackProvider() {
       ubRef.current?.destroy()
       ubRef.current = null
     }
-  }, [session?.user?.id, locale])
+  }, [userId, userEmail, userName, locale])
 
   useEffect(() => {
     if (!ubRef.current) return

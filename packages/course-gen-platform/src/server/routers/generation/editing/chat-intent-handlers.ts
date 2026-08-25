@@ -375,6 +375,162 @@ export function isStructuralIntent(intent: string): boolean {
  * Handle structural intents (ADD_LESSON, ADD_SECTION) via LLM with ID remapping.
  * Returns a structural_operation proposal with CourseOperation[] batch.
  */
+/**
+ * The system prompt for an add-lesson or add-section request.
+ *
+ * The structure is handed to the model with SIMPLIFIED ids (`sec_1`, `lsn_1`) rather than the
+ * real UUIDs, and the operations come back in the same terms — a model asked to copy a UUID
+ * back gets one character wrong often enough to matter, and the remap is exact.
+ */
+function buildStructuralPrompt(
+  simplifiedStructure: CourseStructure,
+  structureSummary: string,
+  isAddLesson: boolean,
+  courseLanguage: string | null
+): string {
+  const operationType = isAddLesson ? 'add_lesson' : 'add_section';
+  const operationFormat = isAddLesson
+    ? `Operation format:
+{
+  "type": "add_lesson",
+  "reasoning": "why this lesson",
+  "tempId": "__new_1__",
+  "parentSectionId": "sec_N",
+  "afterLessonId": "lsn_N" or null,
+  "title": "lesson title",
+  "objectives": ["objective 1", "objective 2"],
+  "keyTopics": ["topic 1", "topic 2"]
+}`
+    : `Operation format:
+{
+  "type": "add_section",
+  "reasoning": "why this section",
+  "tempId": "__new_1__",
+  "afterSectionId": "sec_N" or null,
+  "title": "section title",
+  "description": "section description"
+}`;
+
+  return `You are a course structure editor. The user wants to ${isAddLesson ? 'add a lesson' : 'add a section'} to their course.
+
+Course: "${simplifiedStructure.course_title}"
+Structure:
+${structureSummary}
+
+Respond with a JSON object containing:
+- "operations": array with one ${operationType} operation
+- "summary": human-readable summary in ${courseLanguage === 'en' ? 'English' : 'Russian'}
+
+${operationFormat}
+
+Use the simplified IDs (sec_1, lsn_1, etc.) from the structure above.
+Respond ONLY with valid JSON, no markdown fences.`;
+}
+
+/**
+ * Which model answers a chat edit, from the admin-configured phase.
+ *
+ * Fails with 503 rather than falling back to a constant: an edit that quietly runs on a model
+ * nobody chose is an edit whose cost and quality nobody agreed to.
+ */
+async function resolveChatPhaseModel(
+  phaseKey: string,
+  courseId: string,
+  courseLanguage: string | null,
+  fallbackConfig: ChatFallbackConfig,
+  requestId: string
+): Promise<{ modelId: string; fallbackModelId: string; temperature: number }> {
+  // The pre-config defaults, kept so the shape is complete before the lookup. The successful
+  // path replaces all three and the failing path throws, so neither is ever the answer.
+  let temperature = fallbackConfig.temperature;
+
+  try {
+    const config = await createModelConfigService().getModelForPhase(
+      phaseKey,
+      courseId,
+      undefined,
+      (courseLanguage as 'ru' | 'en') || 'ru'
+    );
+    temperature = config.temperature;
+    return {
+      modelId: config.modelId || CHAT_PRIMARY_MODEL_ID,
+      fallbackModelId: config.fallbackModelId || CHAT_FALLBACK_MODEL_ID,
+      temperature,
+    };
+  } catch (configError) {
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
+      { requestId, courseId, phaseKey, error: configError },
+      'Chat phase model config unavailable — returning 503 per plan requirement'
+    );
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
+    });
+  }
+}
+
+/**
+ * Has Stage 6 actually produced content, or does the status only say so?
+ *
+ * The status alone is not enough to offer "generate content for the new lessons": a course can
+ * carry `stage_6_complete` with nothing written. This counts the LATEST row per lesson and asks
+ * for a majority, and a failure to check leaves the offer OFF — an absent button is a smaller
+ * mistake than one that promises work the pipeline will not do.
+ */
+async function isStage6ContentGenerated(
+  supabaseAdmin: SupabaseClient<Database>,
+  courseId: string,
+  requestId: string
+): Promise<boolean> {
+  try {
+    const { data: lessons, error: lessonsError } = await supabaseAdmin
+      .from('lessons')
+      .select('id, sections!inner(course_id)')
+      .eq('sections.course_id', courseId);
+
+    if (lessonsError) throw lessonsError;
+
+    const lessonIds = (lessons || []).map(lesson => lesson.id);
+    if (lessonIds.length === 0) return false;
+
+    const { data: contents, error: contentsError } = await supabaseAdmin
+      .from('lesson_contents')
+      .select('lesson_id, status, created_at')
+      .eq('course_id', courseId)
+      .in('lesson_id', lessonIds)
+      .order('created_at', { ascending: false });
+
+    if (contentsError) throw contentsError;
+
+    const latestStatusByLesson = new Map<string, string>();
+    for (const row of contents || []) {
+      if (!latestStatusByLesson.has(row.lesson_id)) {
+        latestStatusByLesson.set(row.lesson_id, row.status);
+      }
+    }
+
+    const completedLessons = lessonIds.filter(lessonId => {
+      const latestStatus = latestStatusByLesson.get(lessonId);
+      return latestStatus === 'completed' || latestStatus === 'review_required';
+    }).length;
+
+    return completedLessons / lessonIds.length > 0.5;
+  } catch (consistencyError) {
+    // Non-fatal: keep CTA disabled when consistency check cannot be verified.
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        error:
+          consistencyError instanceof Error ? consistencyError.message : String(consistencyError),
+      },
+      'Chat: Stage 6 consistency check failed, CTA disabled'
+    );
+    return false;
+  }
+}
+
 export async function handleStructuralIntentRoute(
   classifiedIntent: Awaited<ReturnType<typeof classifyIntent>>,
   userMessage: string,
@@ -395,76 +551,25 @@ export async function handleStructuralIntentRoute(
   const structureSummary = buildCourseSkeleton(simplifiedStructure);
 
   const isAddLesson = classifiedIntent.intent === 'ADD_LESSON';
-  const operationType = isAddLesson ? 'add_lesson' : 'add_section';
-
-  const systemPrompt = `You are a course structure editor. The user wants to ${isAddLesson ? 'add a lesson' : 'add a section'} to their course.
-
-Course: "${simplifiedStructure.course_title}"
-Structure:
-${structureSummary}
-
-Respond with a JSON object containing:
-- "operations": array with one ${operationType} operation
-- "summary": human-readable summary in ${courseLanguage === 'en' ? 'English' : 'Russian'}
-
-${
-  isAddLesson
-    ? `Operation format:
-{
-  "type": "add_lesson",
-  "reasoning": "why this lesson",
-  "tempId": "__new_1__",
-  "parentSectionId": "sec_N",
-  "afterLessonId": "lsn_N" or null,
-  "title": "lesson title",
-  "objectives": ["objective 1", "objective 2"],
-  "keyTopics": ["topic 1", "topic 2"]
-}`
-    : `Operation format:
-{
-  "type": "add_section",
-  "reasoning": "why this section",
-  "tempId": "__new_1__",
-  "afterSectionId": "sec_N" or null,
-  "title": "section title",
-  "description": "section description"
-}`
-}
-
-Use the simplified IDs (sec_1, lsn_1, etc.) from the structure above.
-Respond ONLY with valid JSON, no markdown fences.`;
+  const systemPrompt = buildStructuralPrompt(
+    simplifiedStructure,
+    structureSummary,
+    isAddLesson,
+    courseLanguage
+  );
 
   // Stage-aware model selection
   const phaseKey =
     params.nodeContext?.stageId === 'stage_6'
       ? 'chat_stage_6_refinement'
       : 'chat_stage_5_refinement';
-  const modelConfigService = createModelConfigService();
-  let modelId = CHAT_PRIMARY_MODEL_ID;
-  let fallbackModelId = CHAT_FALLBACK_MODEL_ID;
-  let temperature = fallbackConfig.temperature;
-
-  try {
-    const config = await modelConfigService.getModelForPhase(
-      phaseKey,
-      courseId,
-      undefined,
-      (courseLanguage as 'ru' | 'en') || 'ru'
-    );
-    modelId = config.modelId || modelId;
-    fallbackModelId = config.fallbackModelId || fallbackModelId;
-    temperature = config.temperature;
-  } catch (configError) {
-    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
-    logger.error(
-      { requestId, courseId, phaseKey, error: configError },
-      'Chat phase model config unavailable — returning 503 per plan requirement'
-    );
-    throw new TRPCError({
-      code: 'SERVICE_UNAVAILABLE',
-      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
-    });
-  }
+  const { modelId, fallbackModelId, temperature } = await resolveChatPhaseModel(
+    phaseKey,
+    courseId,
+    courseLanguage,
+    fallbackConfig,
+    requestId
+  );
 
   // Call LLM with primary/fallback
   let modelUsed = modelId;
@@ -472,24 +577,31 @@ Respond ONLY with valid JSON, no markdown fences.`;
 
   // See the note in the intent flow above: an edit is spend on the course.
   const costContext = { courseId, stage: 'stage_edit' as const, phase: phaseKey };
-
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    { role: 'user' as const, content: userMessage },
+  ];
+  // `costContext` is written out at BOTH call sites rather than hoisted into a shared options
+  // object. `no-anonymous-spend` reads the options literal at the call, so a spread hides the
+  // attribution from the guard even though the runtime value is identical — and the guard is
+  // right to want it there: this is where a reader checks who a paid call is charged to.
   try {
-    llmResponse = await llmClient.generateChatCompletion(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      { model: modelId, temperature, maxTokens: 2048, enableCaching: true, costContext }
-    );
+    llmResponse = await llmClient.generateChatCompletion(messages, {
+      model: modelId,
+      temperature,
+      maxTokens: 2048,
+      enableCaching: true,
+      costContext,
+    });
   } catch {
     modelUsed = fallbackModelId;
-    llmResponse = await llmClient.generateChatCompletion(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      { model: fallbackModelId, temperature, maxTokens: 2048, enableCaching: true, costContext }
-    );
+    llmResponse = await llmClient.generateChatCompletion(messages, {
+      model: fallbackModelId,
+      temperature,
+      maxTokens: 2048,
+      enableCaching: true,
+      costContext,
+    });
   }
 
   // Parse LLM response into operations
@@ -535,69 +647,8 @@ Respond ONLY with valid JSON, no markdown fences.`;
       STAGE6_COMPLETE_STATUSES.includes(generationStatus) &&
       realOperations.some(op => op.type === 'add_lesson');
 
-    if (statusMatch) {
-      // Consistency check (plan:318): verify ratio of lesson_contents with
-      // completed/review_required LATEST status per lesson UUID.
-      // A majority (>50%) indicates Stage 6 content has actually been generated,
-      // not just status set.
-      try {
-        const { data: lessons, error: lessonsError } = await supabaseAdmin
-          .from('lessons')
-          .select('id, sections!inner(course_id)')
-          .eq('sections.course_id', courseId);
-
-        if (lessonsError) {
-          throw lessonsError;
-        }
-
-        const lessonIds = (lessons || []).map(lesson => lesson.id);
-        if (lessonIds.length === 0) {
-          stage6ContentReady = false;
-        } else {
-          const { data: contents, error: contentsError } = await supabaseAdmin
-            .from('lesson_contents')
-            .select('lesson_id, status, created_at')
-            .eq('course_id', courseId)
-            .in('lesson_id', lessonIds)
-            .order('created_at', { ascending: false });
-
-          if (contentsError) {
-            throw contentsError;
-          }
-
-          const latestStatusByLesson = new Map<string, string>();
-          for (const row of contents || []) {
-            if (!latestStatusByLesson.has(row.lesson_id)) {
-              latestStatusByLesson.set(row.lesson_id, row.status);
-            }
-          }
-
-          let completedLessons = 0;
-          for (const lessonId of lessonIds) {
-            const latestStatus = latestStatusByLesson.get(lessonId);
-            if (latestStatus === 'completed' || latestStatus === 'review_required') {
-              completedLessons++;
-            }
-          }
-
-          stage6ContentReady = completedLessons / lessonIds.length > 0.5;
-        }
-      } catch (consistencyError) {
-        // Non-fatal: keep CTA disabled when consistency check cannot be verified.
-        logger.warn(
-          {
-            requestId,
-            courseId,
-            error:
-              consistencyError instanceof Error
-                ? consistencyError.message
-                : String(consistencyError),
-          },
-          'Chat: Stage 6 consistency check failed, CTA disabled'
-        );
-        stage6ContentReady = false;
-      }
-    }
+    stage6ContentReady =
+      statusMatch && (await isStage6ContentGenerated(supabaseAdmin, courseId, requestId));
 
     if (stage6ContentReady) {
       assistantMessage +=

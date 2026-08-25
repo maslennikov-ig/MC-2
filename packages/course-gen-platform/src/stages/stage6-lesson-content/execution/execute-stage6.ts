@@ -6,6 +6,152 @@ import type { LessonGraphStateType } from '../state';
 import { buildLessonContent, extractContentBody } from '../judge/judge-helpers';
 
 /**
+ * The metrics block, with every absent field spelled as an explicit default.
+ *
+ * Written twice before — once for the success path and once for the catch — which is both a
+ * duplicate and a hazard: a field added to one copy and not the other reads as "not measured"
+ * rather than as a bug. `??` throughout, never `||`, because zero is a real measurement here:
+ * a lesson can genuinely cost zero rejected tokens or score zero.
+ */
+function buildMetrics(
+  result: LessonGraphStateType | null,
+  durationMs: number
+): Stage6Output['metrics'] {
+  return {
+    tokensUsed: result?.tokensUsed ?? 0,
+    durationMs,
+    modelUsed: result?.modelUsed ?? null,
+    selectedModel: result?.selectedModel ?? null,
+    fallbackModel: result?.fallbackModel ?? null,
+    selectedModelTier: result?.selectedModelTier ?? null,
+    selectedModelTierReason: result?.selectedModelTierReason ?? null,
+    selectedModelPhase: result?.selectedModelPhase ?? null,
+    selectedModelSource: result?.selectedModelSource ?? null,
+    qualityScore: result?.qualityScore ?? 0,
+    regenerateCount: result?.regenerateCount ?? 0,
+    truncationCount: result?.truncationCount ?? 0,
+    rejectedTokens: result?.rejectedTokens ?? 0,
+    regenerationMode: result?.regenerationMode ?? null,
+  };
+}
+
+/**
+ * A model override must look like `provider/model-name`.
+ *
+ * Anything else is dropped rather than passed on, so the database configuration decides. A
+ * malformed override that reached the provider would fail the call rather than fall back.
+ */
+function validateModelOverride(input: Stage6Input): string | null {
+  const override = input.modelOverride ?? null;
+  if (!override || override.includes('/')) return override;
+
+  logger.warn(
+    { lessonId: input.lessonSpec.lesson_id, modelOverride: override },
+    'ModelOverride format invalid (expected "provider/model-name"), falling back to database config'
+  );
+  return null;
+}
+
+/** The graph's starting channels, all of them, with the caller's optional fields defaulted. */
+function buildInitialState(
+  input: Stage6Input,
+  modelOverride: string | null
+): Partial<LessonGraphStateType> {
+  return {
+    lessonSpec: input.lessonSpec,
+    courseId: input.courseId,
+    language: input.language,
+    lessonUuid: input.lessonUuid ?? null,
+    ragChunks: input.ragChunks ?? [],
+    ragContextId: input.ragContextId ?? null,
+    userRefinementPrompt: input.userRefinementPrompt ?? null,
+    modelOverride,
+    style: input.style ?? null,
+    analysisResult: input.analysisResult ?? null,
+    selectedModel: input.selectedModel ?? null,
+    fallbackModel: input.fallbackModel ?? null,
+    selectedModelTier: input.selectedModelTier ?? null,
+    selectedModelTierReason: input.selectedModelTierReason ?? null,
+    selectedModelPhase: input.selectedModelPhase ?? null,
+    selectedModelSource: input.selectedModelSource ?? null,
+    prefetchedGeneratorResponse: input.prefetchedGeneratorResponse ?? null,
+    prefetchedGeneratorResponseConsumed: false,
+    currentNode: 'generator',
+    errors: [],
+    retryCount: 0,
+    regenerateCount: 0,
+    truncationCount: 0,
+    rejectedTokens: 0,
+    lastGenerationTokens: 0,
+    regenerationMode: null,
+  };
+}
+
+/**
+ * Fail-open: review-required outcomes should not trigger outer fallback loops.
+ *
+ * SAFETY NET (defensive): both nodes that can exhaust a budget now set
+ * needsHumanReview and reviewInfo through channel-safe state updates — the
+ * self-reviewer since the channel-safety chain (67725d56 → 020bed88), the
+ * judge since 2026-08-23 (mc2-51epl). This is a last-resort recovery for edge
+ * cases where neither node path fires — e.g. future refactors that add new
+ * terminal conditions without routing them through a node.
+ *
+ * "Rarely" was not true before the judge was fixed: the judge reached its cap
+ * on every exhausted lesson and set nothing, so this net was the primary path
+ * and its warning fired on ordinary runs. If the line below appears now, a node
+ * really did leave without saying why.
+ *
+ * It does NOT mutate `result`. The recovered reviewInfo is used only when
+ * `result.reviewInfo` is absent, which preserves any node-authored reason
+ * verbatim.
+ */
+function recoverTerminalState(
+  result: LessonGraphStateType,
+  input: Stage6Input
+): { needsReview: boolean; recoveredReviewInfo: LessonGraphStateType['reviewInfo'] } {
+  const needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+  if (needsReview || result.lessonContent) {
+    return { needsReview, recoveredReviewInfo: null };
+  }
+
+  // Cap operator conventions (see docs/specs/stage6-truncation-policy.md):
+  //   - retryCount uses >= (count == MAX means cap reached)
+  //   - truncationCount uses > (MAX allowed attempts, MAX+1 = exceeded)
+  //   - sectionsToRegenerate uses > (MAX allowed sections, MAX+1 = exceeded)
+  const retryCapHit = (result.retryCount ?? 0) >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+  const truncCapHit =
+    (result.truncationCount ?? 0) > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
+  const sectionCapHit =
+    (result.selfReviewResult?.sectionsToRegenerate?.length ?? 0) >
+    HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+
+  if (!retryCapHit && !truncCapHit && !sectionCapHit) {
+    return { needsReview: false, recoveredReviewInfo: null };
+  }
+
+  const reasons =
+    result.errors.length > 0
+      ? [...result.errors]
+      : ['Generation retries exhausted without producing acceptable content'];
+
+  logger.warn(
+    {
+      lessonId: input.lessonSpec.lesson_id,
+      retryCount: result.retryCount,
+      truncationCount: result.truncationCount,
+      regenerateCount: result.regenerateCount,
+      sectionCount: result.selfReviewResult?.sectionsToRegenerate?.length,
+      errorCount: result.errors.length,
+      capTrigger: retryCapHit ? 'retry' : truncCapHit ? 'truncation' : 'section',
+    },
+    'Safety-net recovered review_required state — node path did not set channel flags (should be rare post channel-safety chain)'
+  );
+
+  return { needsReview: true, recoveredReviewInfo: { needsReview: true, reasons } };
+}
+
+/**
  * Execute Stage 6 lesson generation
  *
  * Orchestrates the LangGraph pipeline for a single lesson.
@@ -28,119 +174,18 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
 
   try {
     const graph = getGraph();
+    const initialState = buildInitialState(input, validateModelOverride(input));
 
-    // Validate modelOverride format (should be "provider/model-name")
-    let validatedModelOverride = input.modelOverride ?? null;
-    if (validatedModelOverride && !validatedModelOverride.includes('/')) {
-      logger.warn(
-        {
-          lessonId: input.lessonSpec.lesson_id,
-          modelOverride: validatedModelOverride,
-        },
-        'ModelOverride format invalid (expected "provider/model-name"), falling back to database config'
-      );
-      validatedModelOverride = null;
-    }
-
-    // Build initial state
-    const initialState: Partial<LessonGraphStateType> = {
-      lessonSpec: input.lessonSpec,
-      courseId: input.courseId,
-      language: input.language,
-      lessonUuid: input.lessonUuid ?? null,
-      ragChunks: input.ragChunks ?? [],
-      ragContextId: input.ragContextId ?? null,
-      userRefinementPrompt: input.userRefinementPrompt ?? null,
-      modelOverride: validatedModelOverride,
-      style: input.style ?? null,
-      analysisResult: input.analysisResult ?? null,
-      selectedModel: input.selectedModel ?? null,
-      fallbackModel: input.fallbackModel ?? null,
-      selectedModelTier: input.selectedModelTier ?? null,
-      selectedModelTierReason: input.selectedModelTierReason ?? null,
-      selectedModelPhase: input.selectedModelPhase ?? null,
-      selectedModelSource: input.selectedModelSource ?? null,
-      prefetchedGeneratorResponse: input.prefetchedGeneratorResponse ?? null,
-      prefetchedGeneratorResponseConsumed: false,
-      currentNode: 'generator',
-      errors: [],
-      retryCount: 0,
-      regenerateCount: 0,
-      truncationCount: 0,
-      rejectedTokens: 0,
-      lastGenerationTokens: 0,
-      regenerationMode: null,
-    };
-
-    // Execute graph
     const result = await graph.invoke(initialState);
-
     const durationMs = Date.now() - startTime;
 
-    // Fail-open: review-required outcomes should not trigger outer fallback loops.
-    //
-    // SAFETY NET (defensive): both nodes that can exhaust a budget now set
-    // needsHumanReview and reviewInfo through channel-safe state updates — the
-    // self-reviewer since the channel-safety chain (67725d56 → 020bed88), the
-    // judge since 2026-08-23 (mc2-51epl). This block is a last-resort recovery
-    // for edge cases where neither node path fires — e.g. future refactors that
-    // add new terminal conditions without routing them through a node.
-    //
-    // "Rarely" was not true before the judge was fixed: the judge reached its
-    // cap on every exhausted lesson and set nothing, so this net was the primary
-    // path and its warning fired on ordinary runs. If the line below appears
-    // now, a node really did leave without saying why.
-    //
-    // IMPORTANT: this block does NOT mutate `result`. Instead it computes a local
-    // recoveredReviewInfo that's used only if `result.reviewInfo` is absent.
-    // This preserves any node-authored reason verbatim.
-    let needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
-    let recoveredReviewInfo: typeof result.reviewInfo = null;
+    const { needsReview, recoveredReviewInfo } = recoverTerminalState(result, input);
 
-    if (!needsReview && !result.lessonContent) {
-      // Cap operator conventions (see docs/specs/stage6-truncation-policy.md):
-      //   - retryCount uses >= (count == MAX means cap reached)
-      //   - truncationCount uses > (MAX allowed attempts, MAX+1 = exceeded)
-      //   - sectionsToRegenerate uses > (MAX allowed sections, MAX+1 = exceeded)
-      const retryCapHit = (result.retryCount ?? 0) >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
-      const truncCapHit =
-        (result.truncationCount ?? 0) > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
-      const sectionCapHit =
-        (result.selfReviewResult?.sectionsToRegenerate?.length ?? 0) >
-        HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
-
-      if (retryCapHit || truncCapHit || sectionCapHit) {
-        needsReview = true;
-
-        const reasons =
-          result.errors.length > 0
-            ? [...result.errors]
-            : ['Generation retries exhausted without producing acceptable content'];
-
-        recoveredReviewInfo = {
-          needsReview: true,
-          reasons,
-        };
-
-        logger.warn(
-          {
-            lessonId: input.lessonSpec.lesson_id,
-            retryCount: result.retryCount,
-            truncationCount: result.truncationCount,
-            regenerateCount: result.regenerateCount,
-            sectionCount: result.selfReviewResult?.sectionsToRegenerate?.length,
-            errorCount: result.errors.length,
-            capTrigger: retryCapHit ? 'retry' : truncCapHit ? 'truncation' : 'section',
-          },
-          'Safety-net recovered review_required state — node path did not set channel flags (should be rare post channel-safety chain)'
-        );
-      }
-    }
+    // If the graph ended in review mode without structured content, synthesize best-effort
+    // content from generated markdown so it can be persisted as review_required.
     let lessonContent = result.lessonContent ?? null;
     let synthesizedReviewContent = false;
 
-    // If the graph ended in review mode without structured content, synthesize best-effort content
-    // from generated markdown so it can be persisted as review_required.
     if (needsReview && !lessonContent) {
       const contentBody = extractContentBody(result);
       if (contentBody) {
@@ -174,22 +219,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       lessonContent,
       success,
       errors: result.errors,
-      metrics: {
-        tokensUsed: result.tokensUsed,
-        durationMs,
-        modelUsed: result.modelUsed ?? null,
-        selectedModel: result.selectedModel ?? null,
-        fallbackModel: result.fallbackModel ?? null,
-        selectedModelTier: result.selectedModelTier ?? null,
-        selectedModelTierReason: result.selectedModelTierReason ?? null,
-        selectedModelPhase: result.selectedModelPhase ?? null,
-        selectedModelSource: result.selectedModelSource ?? null,
-        qualityScore: result.qualityScore ?? 0,
-        regenerateCount: result.regenerateCount ?? 0,
-        truncationCount: result.truncationCount ?? 0,
-        rejectedTokens: result.rejectedTokens ?? 0,
-        regenerationMode: result.regenerationMode ?? null,
-      },
+      metrics: buildMetrics(result, durationMs),
       // Include review info for UI warnings (undefined if not set).
       // Priority: node-authored reviewInfo > safety-net recovered reviewInfo.
       // This preserves the specific terminal reason set by applyChannelSafeEscalation
@@ -204,11 +234,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     logger.error(
-      {
-        lessonId: input.lessonSpec.lesson_id,
-        error: errorMessage,
-        durationMs,
-      },
+      { lessonId: input.lessonSpec.lesson_id, error: errorMessage, durationMs },
       'Stage 6 generation failed with exception'
     );
 
@@ -216,22 +242,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       lessonContent: null,
       success: false,
       errors: [errorMessage],
-      metrics: {
-        tokensUsed: 0,
-        durationMs,
-        modelUsed: null,
-        selectedModel: null,
-        fallbackModel: null,
-        selectedModelTier: null,
-        selectedModelTierReason: null,
-        selectedModelPhase: null,
-        selectedModelSource: null,
-        qualityScore: 0,
-        regenerateCount: 0,
-        truncationCount: 0,
-        rejectedTokens: 0,
-        regenerationMode: null,
-      },
+      metrics: buildMetrics(null, durationMs),
     };
   }
 }

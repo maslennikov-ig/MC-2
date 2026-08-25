@@ -9,7 +9,38 @@ pydantic-settings>=2.5.0,<3.0.0
 # access removed — so crossing it must be a decision with a run behind it.
 # 0.8.0 is what production already carries. The move to 0.8.1 is mc2-rmbwo and
 # needs a real generation to verify, which needs the geo-bypass hop back up.
-notebooklm-py==0.8.0
+notebooklm-py[headless]==0.8.0
+# The `[headless]` extra above is what makes master-token auth possible: without
+# it `notebooklm._auth.master_token` refuses at import with "Master-token auth
+# needs gpsoauth", so neither the one-time exchange nor the recurring re-mint can
+# run inside this image. Verified missing on 2026-08-24 in the running dev
+# container and in a local venv alike — `import gpsoauth` raised
+# ModuleNotFoundError in both.
+#
+# Bounded explicitly because the extra itself declares only `gpsoauth>=1.1.0`,
+# and a floor is not a range: a rebuild today would silently take 2.0.0, which is
+# exactly how this image ended up two minors apart from production before.
+# 2.x is the deliberate choice rather than the 1.x the floor was written against.
+# `exchange_token` and `perform_oauth` — the only two functions notebooklm-py
+# calls — have byte-identical signatures in 1.1.1 and 2.0.0, so the major bump is
+# not about them: 1.x caps `urllib3<2.0` and 2.x does not. This image has no
+# urllib3 at all today, so pinning 1.x would import that cap for nothing.
+gpsoauth>=2.0.0,<3.0.0
+# What routes gpsoauth through the geo-bypass hop.
+#
+# The container is given `HTTPS_PROXY=socks5h://172.19.0.1:1080`, and everything
+# else here honours it: httpx does the SOCKS itself through `socksio` above. But
+# gpsoauth talks to `https://android.clients.google.com/auth` with `requests`,
+# and requests needs PySocks before it can parse a `socks5h://` proxy at all.
+# Without it the exchange does not quietly go direct — it raises
+# `InvalidSchema: Missing dependencies for SOCKS support` and the whole
+# master-token bootstrap fails. Measured both ways on 2026-08-24; with PySocks
+# installed the same call becomes a `SOCKSHTTPSConnectionPool`.
+#
+# This matters beyond the one bootstrap call: a master token minted from one
+# country and used from another is the kind of thing Google revokes, so the
+# exchange has to leave by the same door the bridge already uses.
+PySocks>=1.7.1,<2.0.0
 pytest>=8.0.0,<9.0.0
 httpx>=0.27.0,<1.0.0
 socksio>=1.0.0,<2.0.0

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -6,8 +6,28 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const source = (path: string) => readFileSync(resolve(REPO_ROOT, path), 'utf8');
 
+/**
+ * The file that holds `message`, looking in `path` and then in its siblings.
+ *
+ * A log line is written in one file, but which file is an implementation detail that changes
+ * whenever a module is split — and this contract is about what the line CONTAINS, not where it
+ * lives. Pinning it to a named path made an unrelated file split look like a deleted log.
+ */
+function sourceContaining(path: string, message: string): string {
+  const named = source(path);
+  if (named.includes(message)) return named;
+
+  const directory = resolve(REPO_ROOT, path, '..');
+  for (const entry of readdirSync(directory)) {
+    if (!entry.endsWith('.ts')) continue;
+    const text = readFileSync(resolve(directory, entry), 'utf8');
+    if (text.includes(message)) return text;
+  }
+  return named;
+}
+
 function payloadBefore(path: string, message: string, callMarker: string): string {
-  const text = source(path);
+  const text = sourceContaining(path, message);
   const messageIndex = text.indexOf(message);
   expect(messageIndex, `missing log message: ${message}`).toBeGreaterThan(-1);
   const callIndex = text.lastIndexOf(callMarker, messageIndex);
@@ -16,7 +36,7 @@ function payloadBefore(path: string, message: string, callMarker: string): strin
 }
 
 function between(path: string, start: string, end: string): string {
-  const text = source(path);
+  const text = sourceContaining(path, start);
   const startIndex = text.indexOf(start);
   expect(startIndex, `missing start marker: ${start}`).toBeGreaterThan(-1);
   const endIndex = text.indexOf(end, startIndex);

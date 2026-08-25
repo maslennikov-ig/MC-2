@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import pathlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -15,6 +17,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
 
+from . import master_token_refresh
 from .auth import require_bearer_token
 from .config import Settings, get_settings
 from .generator import (
@@ -190,8 +193,23 @@ async def _check_proxy_reachable(proxy_url: str) -> HealthCheckDetail:
     return HealthCheckDetail(name="proxy", passed=True, message=f"{redacted} reachable")
 
 
+#: The cookies that actually carry a Google session. If these are alive the
+#: bridge can work; if any is gone it cannot, whatever else the file holds.
+#:
+#: The check used to take ``min()`` over *every* cookie, and Google ships
+#: short-lived helpers alongside the session ones. A login captured 2026-08-24
+#: carried ``CONSISTENCY`` expiring the same day and ``OTZ`` expiring in 29,
+#: while ``SID`` and its siblings were good for 399 — so a freshly minted file
+#: reported "earliest cookie expires today" and would have flipped to failed
+#: within hours. A monitor that cries wolf from day one is worse than none: the
+#: cookies died on 2026-03-31 and were noticed in August.
+SESSION_COOKIE_NAMES = frozenset(
+    {"SID", "HSID", "SAPISID", "__Secure-1PSID", "__Secure-3PSID"}
+)
+
+
 def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
-    """Report the earliest cookie expiry. Never reports a cookie name or value."""
+    """Report the earliest SESSION cookie expiry. Never reports a value."""
     path = settings.notebooklm_storage_path
     if settings.notebooklm_auth_json or not path:
         return HealthCheckDetail(
@@ -203,16 +221,23 @@ def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
         expiries = [
             float(cookie["expires"])
             for cookie in state.get("cookies", [])
-            if isinstance(cookie, dict) and (cookie.get("expires") or 0) > 0
+            if isinstance(cookie, dict)
+            and cookie.get("name") in SESSION_COOKIE_NAMES
+            and (cookie.get("expires") or 0) > 0
         ]
     except (OSError, ValueError, TypeError) as error:
         return HealthCheckDetail(
             name="auth_expiry", passed=False, message=f"Unreadable: {type(error).__name__}",
         )
 
+    # No session cookie at all is a dead file, not an unexpiring one. The old
+    # code answered "No expiring cookies stored" and passed, so a storage_state
+    # holding only helper cookies read as healthy.
     if not expiries:
         return HealthCheckDetail(
-            name="auth_expiry", passed=True, message="No expiring cookies stored",
+            name="auth_expiry",
+            passed=False,
+            message="No Google session cookie stored — the file cannot authenticate",
         )
 
     earliest = datetime.fromtimestamp(min(expiries), UTC)
@@ -221,7 +246,7 @@ def _check_auth_freshness(settings: Settings) -> HealthCheckDetail:
         name="auth_expiry",
         passed=days_left > 0,
         message=(
-            f"earliest cookie expires {earliest.date().isoformat()} "
+            f"earliest session cookie expires {earliest.date().isoformat()} "
             f"({days_left:.0f}d)"
             + (" — renew soon" if 0 < days_left <= AUTH_EXPIRY_WARN_DAYS else "")
         ),
@@ -424,10 +449,39 @@ class _AsyncTaskStore:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        """Own the browserless cookie refresh for exactly as long as the service runs.
+
+        A `deploy/systemd` timer would have been the other option and is the worse one here: CI
+        deliberately does not install those units, so a timer proves nothing about any particular
+        host, and `is-active` stays green whether or not the file ever moves. Held by the app, the
+        refresh arrives with the image.
+        """
+        try:
+            resolved = settings if settings is not None else get_settings()
+        except Exception as error:  # noqa: BLE001 — misconfiguration must not block startup
+            logger.warning(
+                "Master-token cookie refresh not started, settings unavailable: %s: %s",
+                type(error).__name__,
+                error,
+            )
+            yield
+            return
+
+        task = asyncio.create_task(master_token_refresh.refresh_loop(resolved))
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
     app = FastAPI(
         title="NotebookLM Bridge",
         description="Bridge service for NotebookLM audio/video artifact generation",
         version="1.0.0",
+        lifespan=lifespan,
     )
     task_store = _AsyncTaskStore()
 
@@ -493,6 +547,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # Cookies expire, and the failure reads as "the page structure changed".
         checks.append(_check_auth_freshness(resolved_settings))
+
+        # `auth_expiry` says the cookies are alive. This one says whether this service can
+        # replace them without a person holding a browser — the gap that went unobserved from
+        # 2026-03-31 to 2026-08-22.
+        checks.append(master_token_refresh.describe(resolved_settings))
 
         # Count active tasks via public API
         active = await task_store.count_active_tasks()
