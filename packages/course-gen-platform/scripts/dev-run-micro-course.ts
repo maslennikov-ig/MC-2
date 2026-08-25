@@ -147,7 +147,7 @@ async function main(): Promise<void> {
 
     const { data: row } = await admin
       .from('courses')
-      .select('generation_status, current_stage')
+      .select('generation_status, failed_at_stage')
       .eq('id', course.id)
       .single();
 
@@ -165,9 +165,11 @@ async function main(): Promise<void> {
       tiers.set(tier, (tiers.get(tier) ?? 0) + 1);
     }
 
-    const report = `${row?.generation_status} stage=${row?.current_stage} calls=${
-      traces?.length ?? 0
-    } spent=$${spent.toFixed(6)} tiers=${JSON.stringify(Object.fromEntries(tiers))}`;
+    const report = `${row?.generation_status}${
+      row?.failed_at_stage ? ` failed_at=${row.failed_at_stage}` : ''
+    } calls=${traces?.length ?? 0} spent=$${spent.toFixed(6)} tiers=${JSON.stringify(
+      Object.fromEntries(tiers)
+    )}`;
     if (report !== lastReport) {
       console.log(`  ${new Date().toISOString().slice(11, 19)}  ${report}`);
       lastReport = report;
