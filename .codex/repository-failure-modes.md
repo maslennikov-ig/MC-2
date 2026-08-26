@@ -81,11 +81,22 @@ which also puts them below `invoke` and so covers `stream` and `batch`. Held by
 **A health check that reads a variable has checked nothing.** The NotebookLM bridge decided the
 geo-bypass proxy was fine because `HTTPS_PROXY` was set. On 2026-08-22 the tunnel had been dead long
 enough that nothing had generated since April: no listener on the forwarded port, the upstream host
-refusing SSH outright. Both containers — dev and production — reported `healthy` throughout, because
-Docker's own HEALTHCHECK only wants a 200 from `/health` and a `degraded` body still returns one. A
+refusing SSH outright. Both containers — dev and production — reported `healthy` throughout. A
 dependency check must make the dependency answer. Corollary for anything behind an outbound hop:
-prove the hop, not its configuration, and remember that `docker ps` showing `(healthy)` is a claim
-about a loopback request.
+prove the hop, not its configuration.
+
+This entry first said the containers stayed green because a `degraded` body still returns 200. That
+was generous. On 2026-08-25 the healthcheck turned out not to reach `/health` at all: all three
+compose files replaced the image's HEALTHCHECK with a bare TCP connect, which proves only that
+uvicorn bound the port. Nor could the image's own line have run — it used `urllib.request`, and this
+container is given `HTTP_PROXY=socks5h://...`, so urllib routes even a loopback request through the
+SOCKS proxy and fails (`URLError: unknown url type: socks5h`, measured against a server answering 200
+on the same port). Fixed in mc2-h6nlv by asking `/health` through `http.client`, which never consults
+the environment, held equal across all four files by
+`tests/unit/ops/notebooklm-bridge-healthcheck.test.ts`. The 200 stays liveness-only on purpose —
+restarting cannot renew a cookie or revive a tunnel — so `scripts/nlm-preflight.sh` is what now
+refuses to start a paid generation against a `degraded` bridge. `docker ps` showing `(healthy)` is a
+claim about whatever that container was told to ask, which is worth reading before trusting.
 
 **An unpinned dependency lets the build date choose the version.** `notebooklm-py>=0.1.0` gave
 `:latest` (built 2026-08-10) version 0.8.0 and `:develop` (built 2026-06-04) version 0.6.0, so

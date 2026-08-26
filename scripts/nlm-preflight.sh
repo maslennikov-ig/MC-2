@@ -18,6 +18,7 @@ Options:
   --language <lang>             Request language (default: en)
   --save-dir <path>             Directory for generated smoke files
   --skip-generate               Run preflight checks only, no media generation
+  --allow-degraded              Continue when /health reports degraded (default: refuse)
   -h, --help                    Show help
 USAGE
 }
@@ -54,6 +55,7 @@ CLI_TOKEN=""
 CLI_LANGUAGE=""
 CLI_SAVE_DIR=""
 SKIP_GENERATE=0
+ALLOW_DEGRADED=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -83,6 +85,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-generate)
       SKIP_GENERATE=1
+      shift
+      ;;
+    --allow-degraded)
+      ALLOW_DEGRADED=1
       shift
       ;;
     --)
@@ -167,8 +173,41 @@ if [[ "$health_code" != "200" ]]; then
   cat "$health_body" >&2
   exit 1
 fi
-log "Bridge health OK"
 cat "$health_body"
+printf '\n'
+
+# A 200 says the app is serving; it does not say the bridge can reach
+# NotebookLM. The container HEALTHCHECK stops at the 200 on purpose — restarting
+# cannot renew a cookie or revive the geo-bypass tunnel — so this is where a
+# degraded bridge has to be noticed, before a generation that takes hours and
+# costs money starts against it. Until 2026-08-25 this script read the same 200
+# and printed the failing checks as if they were news of nothing (mc2-h6nlv).
+health_status="$(node - "$health_body" <<'NODE'
+const fs = require('node:fs');
+let health;
+try {
+  health = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+} catch (error) {
+  console.error(`unreadable /health body: ${error instanceof Error ? error.message : error}`);
+  process.exit(2);
+}
+const failed = (Array.isArray(health.checks) ? health.checks : []).filter(check => !check.passed);
+for (const check of failed) console.error(`  ${check.name}: ${check.message}`);
+process.stdout.write(typeof health.status === 'string' ? health.status : 'unknown');
+NODE
+)"
+
+if [[ "$health_status" != "ok" ]]; then
+  if [[ "$ALLOW_DEGRADED" -eq 1 ]]; then
+    log "Bridge health ${health_status}, continuing because --allow-degraded was given"
+  else
+    echo "[error] Bridge health is '${health_status}'; the checks above failed." >&2
+    echo "[error] Fix them, or pass --allow-degraded to proceed anyway." >&2
+    exit 1
+  fi
+else
+  log "Bridge health OK"
+fi
 
 if [[ "$SKIP_GENERATE" -eq 1 ]]; then
   log "skip-generate enabled, finishing after preflight checks"
