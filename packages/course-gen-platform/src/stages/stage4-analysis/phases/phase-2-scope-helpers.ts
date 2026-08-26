@@ -446,7 +446,15 @@ export function postProcessSections(sections: unknown[]): Record<string, unknown
           ? sec.pedagogical_approach
           : 'Hands-on practice with incremental complexity and real-world examples',
       section_id: sec.section_id || '1',
-      estimated_duration_hours: Math.max((sec.estimated_duration_hours as number) || 0.5, 0.5),
+      // Only has to be a positive number to clear the first parse:
+      // `normalizeRecommendedStructure` recomputes it for every section from
+      // the lesson count that survives. The old `Math.max(..., 0.5)` was
+      // raising the model's figure to meet a schema floor that no longer
+      // exists, and raising a figure nothing reads (mc2-ythy6).
+      estimated_duration_hours:
+        typeof sec.estimated_duration_hours === 'number' && sec.estimated_duration_hours > 0
+          ? sec.estimated_duration_hours
+          : 0.5,
       difficulty: (VALID_DIFFICULTY as readonly string[]).includes(sec.difficulty as string)
         ? sec.difficulty
         : 'intermediate',

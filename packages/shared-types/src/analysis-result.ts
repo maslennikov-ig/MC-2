@@ -54,7 +54,7 @@ export interface AnalysisResult {
 
   // Scope and structure recommendations (Phase 2)
   recommended_structure: {
-    estimated_content_hours: number; // 0.5-200h
+    estimated_content_hours: number; // derived as total_lessons x lesson_duration_minutes / 60; positive, unbounded above
     scope_reasoning: string; // 100-500 chars
     lesson_duration_minutes: number; // 3-45 minutes
     calculation_explanation: string; // 50-300 chars
@@ -156,7 +156,7 @@ export interface SectionBreakdown {
 
   // NEW: Enhanced fields for Generation (Analyze Enhancement)
   section_id?: string; // e.g., "1", "2", "3" - unique identifier
-  estimated_duration_hours?: number; // 0.5-20h - time to complete section
+  estimated_duration_hours?: number; // time to complete section; derived as lessons x lesson_duration_minutes / 60, positive and otherwise unbounded (mc2-ythy6)
   difficulty?: 'beginner' | 'intermediate' | 'advanced'; // Difficulty level
   /**
    * @deprecated Kept for backward compatibility with stored analysis data. No longer generated in new courses.

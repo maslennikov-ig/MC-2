@@ -13,6 +13,9 @@ import {
 const calculationExplanationSchema =
   Phase2OutputSchema.shape.recommended_structure.shape.calculation_explanation;
 
+/** And the one it runs the whole normalized structure through, twice. */
+const recommendedStructureSchema = Phase2OutputSchema.shape.recommended_structure;
+
 const baseStructure = {
   estimated_content_hours: 12.5,
   scope_reasoning:
@@ -35,6 +38,50 @@ const baseStructure = {
     difficulty: 'intermediate' as const,
   })),
 };
+
+/**
+ * Every profile Stage 4 can resolve, every lesson duration the schema allows.
+ *
+ * The explicit-size ones are resolved from the real presets the way
+ * `phase-2-scope-helpers` resolves them. They are where the edges live: their
+ * label is a bare word and therefore the shortest, and `micro` allows a single
+ * lesson, which is the smallest structure the normalizer can be asked to
+ * describe.
+ */
+const PROFILES = [
+  resolveCourseStructureProfile({ courseSize: 'auto', settings: {} }),
+  resolveCourseStructureProfile({
+    courseSize: 'auto',
+    settings: { source: 'career_playbook', bridgeVersion: 1 },
+  }),
+  ...PRESET_COURSE_SIZES.map(courseSize => {
+    const preset = COURSE_SIZE_PRESETS[courseSize];
+    return resolveCourseStructureProfile({
+      courseSize,
+      minLessons: preset.minLessons,
+      maxLessons: preset.maxLessons,
+      targetLessons: preset.targetLessons,
+      targetSections: preset.targetSections,
+    });
+  }),
+];
+const DURATIONS = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45];
+
+/** A structure of `sectionCount` sections carrying `lessons` lessons each. */
+function proposing(sectionCount: number, lessonsPerSection: number, duration: number) {
+  return {
+    ...baseStructure,
+    lesson_duration_minutes: duration,
+    total_lessons: sectionCount * lessonsPerSection,
+    total_sections: sectionCount,
+    sections_breakdown: Array.from({ length: sectionCount }, (_, index) => ({
+      ...baseStructure.sections_breakdown[0],
+      area: `Section ${index + 1}`,
+      estimated_lessons: lessonsPerSection,
+      section_id: `${index + 1}`,
+    })),
+  };
+}
 
 describe('course structure policy', () => {
   it('resolves auto courses to the general auto profile', () => {
@@ -102,46 +149,6 @@ describe('course structure policy', () => {
  * is why this walks the grid.
  */
 describe('the explanation of the scope arithmetic', () => {
-  const PROFILES = [
-    resolveCourseStructureProfile({ courseSize: 'auto', settings: {} }),
-    resolveCourseStructureProfile({
-      courseSize: 'auto',
-      settings: { source: 'career_playbook', bridgeVersion: 1 },
-    }),
-    // The explicit-size profiles, resolved from the real presets the way
-    // `phase-2-scope-helpers` resolves them. Their label is a bare word and
-    // therefore the shortest, and every failing combination was one of these —
-    // `micro` above all, whose preset asks the model for at most one hour, and
-    // a whole number of hours is what costs the two characters.
-    ...PRESET_COURSE_SIZES.map(courseSize => {
-      const preset = COURSE_SIZE_PRESETS[courseSize];
-      return resolveCourseStructureProfile({
-        courseSize,
-        minLessons: preset.minLessons,
-        maxLessons: preset.maxLessons,
-        targetLessons: preset.targetLessons,
-        targetSections: preset.targetSections,
-      });
-    }),
-  ];
-  const DURATIONS = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45];
-
-  /** A structure of `sectionCount` sections carrying `lessons` lessons each. */
-  function proposing(sectionCount: number, lessonsPerSection: number, duration: number) {
-    return {
-      ...baseStructure,
-      lesson_duration_minutes: duration,
-      total_lessons: sectionCount * lessonsPerSection,
-      total_sections: sectionCount,
-      sections_breakdown: Array.from({ length: sectionCount }, (_, index) => ({
-        ...baseStructure.sections_breakdown[0],
-        area: `Section ${index + 1}`,
-        estimated_lessons: lessonsPerSection,
-        section_id: `${index + 1}`,
-      })),
-    };
-  }
-
   it('satisfies the schema for every profile, duration and course size', () => {
     const rejected: string[] = [];
 
@@ -210,5 +217,108 @@ describe('the explanation of the scope arithmetic', () => {
       true
     );
     expect(normalized.calculation_explanation).toContain('三节课');
+  });
+});
+
+/**
+ * The same grid, asking the whole question.
+ *
+ * `mc2-zwp7f` walked every profile, duration and lesson count and then checked
+ * one field of the result. Everything else the normalizer writes went
+ * unexamined, and two more of its outputs are bounded by the schema that
+ * validates them: `estimated_duration_hours` per section carried
+ * `.min(0.5).max(20)`, and `estimated_content_hours` carried `.min(0.5)`.
+ *
+ * Both are arithmetic on inputs the schema has already validated — lessons x
+ * `lesson_duration_minutes` / 60 — so both bounds are a second opinion that can
+ * veto the first. A micro course of one 3-minute lesson computes 0.05 hours, ten
+ * times under the floor; one section of 40 lessons at 45 minutes computes 30
+ * hours, half again over the ceiling. Neither is a wrong number. Rejecting it
+ * kills a paid course at the second parse in `postProcessAndValidate`, which is
+ * exactly how `mc2-zwp7f` was found (mc2-ythy6).
+ *
+ * Clamping instead of rejecting would be worse than either: Stage 5 derives
+ * lesson lengths back out of this field (`lesson-helpers.ts`), so a section
+ * rounded up from 0.05 to 0.5 hands the learner 30-minute lessons the user never
+ * asked for.
+ */
+describe('the structure the normalizer derives', () => {
+  it('satisfies the schema whole, for every profile, duration and course size', () => {
+    const rejected: string[] = [];
+
+    for (const profile of PROFILES) {
+      for (const duration of DURATIONS) {
+        for (let sections = 1; sections <= 8; sections++) {
+          for (const lessonsPerSection of [1, 2, 5]) {
+            const normalized = normalizeRecommendedStructure(
+              proposing(sections, lessonsPerSection, duration),
+              profile
+            );
+            const parsed = recommendedStructureSchema.safeParse(normalized);
+            if (!parsed.success)
+              rejected.push(
+                `${profile.id}/${profile.label} ${sections}x${lessonsPerSection} @${duration}min: ` +
+                  parsed.error.issues
+                    .map(issue => `${issue.path.join('.')} ${issue.message}`)
+                    .join('; ')
+              );
+          }
+        }
+      }
+    }
+
+    // Before the fix this listed 451 of the 1440 combinations, in every profile
+    // the repo has: 119 micro, 70 mini, 52 compact, 41 standard, 32
+    // comprehensive, 70 general auto, 67 role bridge. 68 of them also broke the
+    // course-level `estimated_content_hours` floor and 8 broke the section
+    // ceiling from above, so both directions were live at once.
+    expect(rejected).toEqual([]);
+  });
+
+  it('reports the hours it actually computed for the smallest course', () => {
+    const preset = COURSE_SIZE_PRESETS.micro;
+    const profile = resolveCourseStructureProfile({
+      courseSize: 'micro',
+      minLessons: preset.minLessons,
+      maxLessons: preset.maxLessons,
+      targetLessons: preset.targetLessons,
+      targetSections: preset.targetSections,
+    });
+    const normalized = normalizeRecommendedStructure(proposing(1, 1, 3), profile);
+
+    // One 3-minute lesson is three minutes, not thirty.
+    expect(normalized.sections_breakdown[0].estimated_duration_hours).toBe(0.05);
+    expect(normalized.estimated_content_hours).toBe(0.05);
+  });
+
+  it('reports the hours it actually computed for the longest section', () => {
+    const profile = resolveCourseStructureProfile({
+      courseSize: 'custom',
+      minLessons: 40,
+      maxLessons: 40,
+      targetLessons: 40,
+      targetSections: 1,
+    });
+    const normalized = normalizeRecommendedStructure(proposing(1, 40, 45), profile);
+
+    expect(normalized.sections_breakdown).toHaveLength(1);
+    expect(normalized.sections_breakdown[0].estimated_duration_hours).toBe(30);
+    expect(recommendedStructureSchema.safeParse(normalized).success).toBe(true);
+  });
+
+  it('keeps the section hours summing to the course hours', () => {
+    // The identity the two bounds would have broken the moment either clamped:
+    // a section rounded up to the floor no longer belongs to the total beside it.
+    for (const profile of PROFILES) {
+      for (const duration of [3, 15, 45]) {
+        const normalized = normalizeRecommendedStructure(proposing(3, 2, duration), profile);
+        const summed = normalized.sections_breakdown.reduce(
+          (sum, section) => sum + (section.estimated_duration_hours ?? 0),
+          0
+        );
+
+        expect(summed).toBeCloseTo(normalized.estimated_content_hours, 2);
+      }
+    }
   });
 });

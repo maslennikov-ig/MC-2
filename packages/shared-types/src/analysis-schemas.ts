@@ -364,7 +364,27 @@ export const SectionBreakdownSchema = z.object({
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
   section_id: z.string().optional(), // Unique identifier (e.g., "1", "2", "3")
-  estimated_duration_hours: z.number().min(0.5).max(20).optional(), // Time to complete section
+  /**
+   * Time to complete the section, bounded away from zero and nowhere else.
+   *
+   * The model proposes a value and `normalizeRecommendedStructure` then
+   * overwrites every section with `estimated_lessons x lesson_duration_minutes
+   * / 60` — arithmetic on two fields this same schema has already validated. A
+   * `.min(0.5).max(20)` here was therefore a second opinion able to veto the
+   * first: one 3-minute lesson computes 0.05 hours, one section of 40 lessons
+   * at 45 minutes computes 30, and neither is a wrong number. Both were
+   * rejected on the second parse in `postProcessAndValidate`, which kills a
+   * course after it has been paid for — the way mc2-zwp7f was found. Walking
+   * the grid rather than an example, 451 of 1440 combinations of profile,
+   * lesson duration and shape were refused, across every profile and not only
+   * the small ones (mc2-ythy6).
+   *
+   * Clamping instead of rejecting would be worse than either. Stage 5 derives
+   * lesson lengths back out of this field in `lesson-helpers.ts`, so a section
+   * rounded up from 0.05 to the floor hands the learner 30-minute lessons the
+   * user never asked for.
+   */
+  estimated_duration_hours: z.number().positive().optional(),
   difficulty: llmDifficultyEnum.optional(), // Difficulty level
   // Deprecated: kept optional for backward compat with stored analysis data
   prerequisites: z.array(z.string()).optional(), // section_ids that must be completed first
@@ -471,7 +491,11 @@ export const CALCULATION_EXPLANATION_MIN_LENGTH = 50;
  */
 export const Phase2OutputSchema = z.object({
   recommended_structure: z.object({
-    estimated_content_hours: z.number().min(0.5, 'Minimum content hours: 0.5'), // Removed .max(200) - let LLM decide scope
+    // Derived, like the per-section hours above: the normalizer recomputes it
+    // from `total_lessons x lesson_duration_minutes / 60`. A 0.5 floor refused
+    // 68 of the 1440 grid combinations, every one of them a course the user had
+    // explicitly asked to be that short (mc2-ythy6).
+    estimated_content_hours: z.number().positive('Content hours must be positive'),
     scope_reasoning: z.string().min(100, 'Scope reasoning must be at least 100 characters'), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z
       .number()
@@ -743,7 +767,7 @@ export const AnalysisResultSchema = z.object({
   }),
 
   recommended_structure: z.object({
-    estimated_content_hours: z.number().min(0.5), // Removed .max(200) - let LLM decide scope
+    estimated_content_hours: z.number().positive(), // Derived; see Phase2OutputSchema (mc2-ythy6)
     scope_reasoning: atLeastInformationChars(100), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z.number().int().min(3).max(45), // Keep .max(45) - pedagogical constraint per FR-014
     calculation_explanation: atLeastInformationChars(20), // Removed .max(300) - allow thorough explanations
