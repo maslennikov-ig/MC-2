@@ -195,7 +195,7 @@ function callsFor(model: string, pin: string | null): Call[] {
         // Room for a model that thinks before it answers. At 200 the first run
         // of this probe spent 198 tokens reasoning, hit `finish_reason: length`
         // and returned nothing — which would have read as "cannot do structured
-        // output" when it only meant the budget was too small (mc2-9r0nq).
+        // output" when it only meant the budget was too small (mc2-r8shw).
         max_tokens: 2_000,
       },
     },
