@@ -1,3 +1,5 @@
+import { CALCULATION_EXPLANATION_MIN_LENGTH, informationLength } from '@megacampus/shared-types';
+
 export type CourseStructureProfileId = 'general_auto' | 'role_playbook_bridge' | 'explicit_size';
 
 export interface CourseStructureProfile {
@@ -243,6 +245,7 @@ export function normalizeRecommendedStructure<T extends RecommendedStructureLike
   }));
 
   const totalLessons = sections.reduce((sum, section) => sum + section.estimated_lessons, 0);
+  const contentHours = Number(((totalLessons * lessonDuration) / 60).toFixed(2));
   const changed = originalLessons !== totalLessons || originalSections !== sections.length;
   const warning = changed
     ? `Normalized by ${profile.id}: ${originalLessons} lessons/${originalSections} sections -> ${totalLessons} lessons/${sections.length} sections.`
@@ -253,12 +256,68 @@ export function normalizeRecommendedStructure<T extends RecommendedStructureLike
     sections_breakdown: sections,
     total_lessons: totalLessons,
     total_sections: sections.length,
-    estimated_content_hours: Number(((totalLessons * lessonDuration) / 60).toFixed(2)),
-    calculation_explanation: `${totalLessons} lessons x ${lessonDuration} minutes = ${Number(
-      ((totalLessons * lessonDuration) / 60).toFixed(2)
-    )} hours (${profile.label} profile)`,
+    estimated_content_hours: contentHours,
+    calculation_explanation: buildCalculationExplanation(structure.calculation_explanation, {
+      totalLessons,
+      lessonDuration,
+      contentHours,
+      profile,
+    }),
     scope_warning: changed
       ? [structure.scope_warning, warning].filter(Boolean).join(' ')
       : structure.scope_warning,
   };
+}
+
+/**
+ * Compose the explanation of the scope arithmetic, keeping what the model wrote.
+ *
+ * Two things have to be true of the result at once, and until 2026-08-25 the
+ * first quietly cost the second.
+ *
+ * It has to describe the structure that survived normalization, not the one the
+ * model proposed — those differ whenever a profile bound moves the lesson count,
+ * and a stale sum is worse than none. So the arithmetic is recomputed here.
+ *
+ * And it has to satisfy `Phase2OutputSchema`, which requires
+ * `CALCULATION_EXPLANATION_MIN_LENGTH` characters. The old code met the first by
+ * overwriting the field with the arithmetic alone, and then met the second by
+ * luck: `"6 lessons x 10 minutes = 1 hours (micro profile)"` is 48 characters.
+ * Whole-number hours cost two characters, a single-digit duration one more, and
+ * a short profile label several — 176 combinations of (profile x duration x
+ * lesson count) land under the floor, all of them on explicit-size profiles
+ * whose label is a bare word like `micro`. Every course in the database sits at
+ * 50 or 51 characters, one character from the edge.
+ *
+ * When a course fell over it, Zod rejected the second parse in
+ * `postProcessAndValidate`, Stage 4 bailed out, BullMQ retried three times and
+ * the course died having already been paid for — $0.004728 across six calls on
+ * course 7b1837c7, four of them the same scope call (mc2-zwp7f).
+ *
+ * So: keep the model's sentence, append the recomputed arithmetic, and if the
+ * two together are still short, state the profile's own bounds. Every clause is
+ * a fact about this course; none is padding. The floor is now met by
+ * construction, and `course-structure-policy.test.ts` walks the whole grid to
+ * prove it rather than trusting one example.
+ */
+function buildCalculationExplanation(
+  modelExplanation: string | undefined,
+  scope: {
+    totalLessons: number;
+    lessonDuration: number;
+    contentHours: number;
+    profile: CourseStructureProfile;
+  }
+): string {
+  const { totalLessons, lessonDuration, contentHours, profile } = scope;
+
+  const arithmetic = `Normalized structure: ${totalLessons} lessons x ${lessonDuration} minutes = ${contentHours} hours (${profile.label} profile).`;
+  const composed = [modelExplanation?.trim(), arithmetic].filter(Boolean).join(' ');
+
+  // The schema's own predicate, not a restatement of it: `informationLength`
+  // weights a Han, Kana or Hangul character as two, so a Chinese explanation is
+  // measured the way it will be validated.
+  if (informationLength(composed) >= CALCULATION_EXPLANATION_MIN_LENGTH) return composed;
+
+  return `${composed} Profile ${profile.id} allows ${profile.minLessons}-${profile.hardMaxLessons} lessons in ${profile.minSections}-${profile.maxSections} sections.`;
 }

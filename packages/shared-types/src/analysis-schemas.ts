@@ -454,6 +454,19 @@ export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine
 export { SectionBreakdownSchemaWithAlignment as SectionBreakdownSchemaAligned };
 
 /**
+ * How much text `calculation_explanation` has to carry.
+ *
+ * Exported because the field is not written by the model alone: Stage 4
+ * normalizes the structure afterwards and recomputes this sentence from the
+ * lesson count that survived, so the code composing it has to satisfy the same
+ * floor this schema enforces. It was a bare `50` in one place and an assumption
+ * in the other, and the assumption was wrong for 176 combinations of lesson
+ * count, lesson duration and profile label — which killed a course that had
+ * already been paid for (mc2-zwp7f). One constant, read by both.
+ */
+export const CALCULATION_EXPLANATION_MIN_LENGTH = 50;
+
+/**
  * Phase 2 output schema: Scope and structure recommendations
  */
 export const Phase2OutputSchema = z.object({
@@ -465,9 +478,7 @@ export const Phase2OutputSchema = z.object({
       .int()
       .min(3, 'Minimum lesson duration: 3 minutes')
       .max(45, 'Maximum lesson duration: 45 minutes'), // Keep .max(45) - pedagogical constraint per FR-014
-    calculation_explanation: z
-      .string()
-      .min(50, 'Calculation explanation must be at least 50 characters'), // Removed .max(300) - allow thorough explanations
+    calculation_explanation: atLeastInformationChars(CALCULATION_EXPLANATION_MIN_LENGTH), // Removed .max(300) - allow thorough explanations
     total_lessons: z.number().int().min(1, 'Minimum 1 lesson required'), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1, 'Minimum 1 section'), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
