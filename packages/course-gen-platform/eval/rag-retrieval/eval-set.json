@@ -1,0 +1,807 @@
+{
+  "version": 1,
+  "built_at": "2026-08-26T18:17:22.211Z",
+  "collection": "course_embeddings",
+  "corpus_points": 6856,
+  "question_model": "deepseek/deepseek-v4-flash-0731",
+  "queries": [
+    {
+      "id": "ka-0b3af59d-child_30_821580036",
+      "source": "known-answer",
+      "query": "Какие сведения о договоре заказчик обязан включить в документ, размещаемый в единой информационной системе?",
+      "course_id": "0b3af59d-eeb7-4be6-89fb-5d2abac302bd",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_30_821580036",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["электронном и (или) в графическом виде, предусмотренные положением"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0b3af59d-child_29_261309202",
+      "source": "known-answer",
+      "query": "Как правильно внести и опубликовать изменения в протокол закупки и когда он считается размещенным?",
+      "course_id": "0b3af59d-eeb7-4be6-89fb-5d2abac302bd",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_29_261309202",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Измененный протокол, составленный в ходе закупки, считается размещенным"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0b3af59d-child_4_688042699",
+      "source": "known-answer",
+      "query": "Какие формы торгов предусмотрены законом и в каких случаях торги признаются несостоявшимися?",
+      "course_id": "0b3af59d-eeb7-4be6-89fb-5d2abac302bd",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_4_688042699",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["если иное не предусмотрено законом. 5. Аукцион и"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0b3af59d-child_3_218615252",
+      "source": "known-answer",
+      "query": "Каким образом и через кого может заключаться договор при проведении торгов, и какие существуют формы их проведения?",
+      "course_id": "0b3af59d-eeb7-4be6-89fb-5d2abac302bd",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_3_218615252",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["на основании договора с указанными лицами и выступающее"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0b3af59d-child_24_426943386",
+      "source": "known-answer",
+      "query": "Как присваивается порядковый номер информации и документам в реестровой записи?",
+      "course_id": "0b3af59d-eeb7-4be6-89fb-5d2abac302bd",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_24_426943386",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Российской Федерации. 16. При представлении заказчиком информации, указанной"]
+        }
+      ]
+    },
+    {
+      "id": "ka-8baaa75e-child_30_821580036",
+      "source": "known-answer",
+      "query": "Какие сведения о договоре заказчик обязан включить в документ, размещаемый в единой информационной системе?",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_30_821580036",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["электронном и (или) в графическом виде, предусмотренные положением"]
+        }
+      ]
+    },
+    {
+      "id": "ka-8baaa75e-child_29_261309202",
+      "source": "known-answer",
+      "query": "Как правильно внести и опубликовать изменения в протокол закупки и когда он считается размещенным?",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_29_261309202",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Измененный протокол, составленный в ходе закупки, считается размещенным"]
+        }
+      ]
+    },
+    {
+      "id": "ka-8baaa75e-child_4_688042699",
+      "source": "known-answer",
+      "query": "Какие формы торгов предусмотрены законом и в каких случаях торги признаются несостоявшимися?",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_4_688042699",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["если иное не предусмотрено законом. 5. Аукцион и"]
+        }
+      ]
+    },
+    {
+      "id": "ka-8baaa75e-child_3_218615252",
+      "source": "known-answer",
+      "query": "Каким образом и через кого может заключаться договор при проведении торгов, и какие существуют формы их проведения?",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_3_218615252",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["на основании договора с указанными лицами и выступающее"]
+        }
+      ]
+    },
+    {
+      "id": "ka-8baaa75e-child_24_426943386",
+      "source": "known-answer",
+      "query": "Как присваивается порядковый номер информации и документам в реестровой записи?",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_24_426943386",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Российской Федерации. 16. При представлении заказчиком информации, указанной"]
+        }
+      ]
+    },
+    {
+      "id": "ka-bc34283a-child_36_1587631379",
+      "source": "known-answer",
+      "query": "Каким образом подтверждается российское происхождение товара или программного обеспечения в рамках Постановления № 1875?",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_36_1587631379",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["149-ФЗ \"Об информации, информационных технологиях и о защите"]
+        }
+      ]
+    },
+    {
+      "id": "ka-bc34283a-child_35_997666865",
+      "source": "known-answer",
+      "query": "Где можно найти критерии, по которым продукцию признают российской, и куда заносят сведения о такой продукции?",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_35_997666865",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": [
+            "производства российской промышленной продукции, установленным постановлением Правительства Российской"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ka-bc34283a-child_27_298889991",
+      "source": "known-answer",
+      "query": "Почему заказчик нарушил правила, допустив к аукциону участников с товарами второго уровня локализации, если была заявка с товарами первого уровня?",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_27_298889991",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["заявителя с предложением продукции первого уровня, противоречат требованиям"]
+        }
+      ]
+    },
+    {
+      "id": "ka-bc34283a-child_26_2044226343",
+      "source": "known-answer",
+      "query": "Какова правовая оценка действий заказчика, отклонившего заявку участника, предложившего товар с иным уровнем локализации производства?",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_26_2044226343",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["ст. 7.30.4 КОАП РФ. Также идем дальше. Решение"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0de49227-child_0_325882054",
+      "source": "known-answer",
+      "query": "Какие документы нужны для поступления и что делать, если вы ИП или учредитель ООО?",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_0_325882054",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["за 1 месяц до зачисления - Копия трудовой"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0de49227-child_3_880573113",
+      "source": "known-answer",
+      "query": "Какие темы и выездные модули включены в программу обучения?",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_3_880573113",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["проектами 13) Системы операционного и корпоративного управления 14)"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0de49227-child_40_122064080",
+      "source": "known-answer",
+      "query": "Какие темы и навыки охватывает программа модуля по корпоративным финансам и инвестиционным стратегиям?",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_40_122064080",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["и управления ликвидностью. Влияние этих факторов на долгосрочную"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0de49227-child_4_1546871447",
+      "source": "known-answer",
+      "query": "Какие модули входят в программу обучения и в какие сроки они проводятся?",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_4_1546871447",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Бизнес-миссия: часть 1. Китай 6 дней (48 часов)"]
+        }
+      ]
+    },
+    {
+      "id": "ka-0de49227-child_23_1056763380",
+      "source": "known-answer",
+      "query": "Какие темы рассматриваются в бонусном модуле?",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_23_1056763380",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": [
+            "партнерства Конституция в партнерстве: содержание и предназначение Психологические"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ka-577d7687-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-577d7687-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "ka-e2aae4cc-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-e2aae4cc-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "ka-fd155785-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-fd155785-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "ka-a00a6010-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-a00a6010-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "ka-78730bf8-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-78730bf8-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "ka-eeb784f8-child_48_256396460",
+      "source": "known-answer",
+      "query": "Какой фактор сильнее всего отличает самых счастливых людей от остальных?",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_48_256396460",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["Статистика брака: Опрос 35 000 американцев показал, что"]
+        }
+      ]
+    },
+    {
+      "id": "ka-eeb784f8-child_47_2053364551",
+      "source": "known-answer",
+      "query": "Как позитивные эмоции влияют на когнитивные способности и социальные связи?",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "target_chunk_id": "child_47_2053364551",
+      "evidence": [
+        {
+          "id": "answer",
+          "tokens": ["задачу прикрепить свечу к стене. Тем, у кого"]
+        }
+      ]
+    },
+    {
+      "id": "obj-eeb784f8-0",
+      "source": "lesson-objective",
+      "query": "Administer Subjective Happiness Scale and interpret personal results.",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-eeb784f8-1",
+      "source": "lesson-objective",
+      "query": "Align daily habits with desired self-concept",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-eeb784f8-2",
+      "source": "lesson-objective",
+      "query": "Analyze how different activities contribute to varying happiness levels.",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-eeb784f8-3",
+      "source": "lesson-objective",
+      "query": "Apply savoring techniques including temporal awareness, sensory amplification, and memory building to extend positive experiences",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-eeb784f8-4",
+      "source": "lesson-objective",
+      "query": "Apply the atomic habits framework specifically to well-being practices using cue-routine-reward loops",
+      "course_id": "eeb784f8-5550-4b5a-9747-b49bcc5f7a55",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-0de49227-0",
+      "source": "lesson-objective",
+      "query": "Автоматизировать процесс подготовки к встречам с учетом профиля клиента и истории взаимодействия",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-0de49227-1",
+      "source": "lesson-objective",
+      "query": "Адаптировать акценты на преимущества под профиль клиента",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-0de49227-2",
+      "source": "lesson-objective",
+      "query": "Адаптировать тон и глубину диалога под уровень C-level vs. рекомендателя",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-577d7687-0",
+      "source": "lesson-objective",
+      "query": "Адаптировать чужой успешный опыт под текущие ресурсы и контекст.",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-0de49227-3",
+      "source": "lesson-objective",
+      "query": "Анализировать запросы на масштабирование бизнеса",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-0de49227-4",
+      "source": "lesson-objective",
+      "query": "Анализировать запросы на повышение квалификации",
+      "course_id": "0de49227-3f75-4d97-8aaa-078447d1c2be",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-8baaa75e-0",
+      "source": "lesson-objective",
+      "query": "Анализировать последствия включения в заявку товара из запрещенного перечня",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-fd155785-0",
+      "source": "lesson-objective",
+      "query": "Анализировать результаты Habit Scorecard из Секции 2 и выявлять ключевые точки влияния на поведение",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-8baaa75e-1",
+      "source": "lesson-objective",
+      "query": "Анализировать риски ошибочного отнесения закупки к Перечню или исключения из него",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-8baaa75e-2",
+      "source": "lesson-objective",
+      "query": "Анализировать риски признания обоснования необоснованным со стороны ФАС",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-8baaa75e-3",
+      "source": "lesson-objective",
+      "query": "Анализировать смешанные закупки (товар + услуга + работа)",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-bc34283a-0",
+      "source": "lesson-objective",
+      "query": "Анализировать, как критерии влияют на выбор поставщика в тендере",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-fd155785-1",
+      "source": "lesson-objective",
+      "query": "Аргументировать, почему системный подход превосходит целеориентированный в контексте устойчивого благополучия",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-8baaa75e-4",
+      "source": "lesson-objective",
+      "query": "Верифицировать логическую связность между разделами извещения, документации и проекта договора",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-78730bf8-0",
+      "source": "lesson-objective",
+      "query": "Внедрить 3-5 колоколов в ежедневную рутину с четким протоколом реакции",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-a00a6010-0",
+      "source": "lesson-objective",
+      "query": "Внедрить микропотоковые занятия для быстрой перезагрузки мозга",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-577d7687-1",
+      "source": "lesson-objective",
+      "query": "Внедрить немедленное вознаграждение для новой привычки",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-fd155785-2",
+      "source": "lesson-objective",
+      "query": "Внедрить систему триггеров и барьеров для минимизации затрат воли",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-577d7687-2",
+      "source": "lesson-objective",
+      "query": "Внедрить структуру блокировок времени для задач высокой когнитивной нагрузки",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-e2aae4cc-0",
+      "source": "lesson-objective",
+      "query": "Внедрить физический или ментальный сигнал («колокол») для прерывания рутины.",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-e2aae4cc-1",
+      "source": "lesson-objective",
+      "query": "Выбрать 3 практики активного создания счастья для недели",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-78730bf8-1",
+      "source": "lesson-objective",
+      "query": "Выбрать стратегию баланса между удовольствием и смыслом",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-78730bf8-2",
+      "source": "lesson-objective",
+      "query": "Выделить долю преднамеренных действий в формуле",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-fd155785-3",
+      "source": "lesson-objective",
+      "query": "Выделить конкретные области жизни, находящиеся под полным контролем сотрудника",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-577d7687-3",
+      "source": "lesson-objective",
+      "query": "Выделить универсальные принципы, применимые в любой компании.",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-fd155785-4",
+      "source": "lesson-objective",
+      "query": "Выявить 2-3 критических блокирующих фактора, препятствующих входу в поток",
+      "course_id": "fd155785-d819-48d7-9217-ea776006b449",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-577d7687-4",
+      "source": "lesson-objective",
+      "query": "Выявить дефицитные зоны в личной формуле счастья",
+      "course_id": "577d7687-abb8-4daf-9b9b-8e391816515a",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-e2aae4cc-2",
+      "source": "lesson-objective",
+      "query": "Выявить стратегии, которые вызывают сопротивление или кажутся сложными.",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-e2aae4cc-3",
+      "source": "lesson-objective",
+      "query": "Выявить три главных триггера, которые отнимают контроль",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-e2aae4cc-4",
+      "source": "lesson-objective",
+      "query": "Выявить три систематические ошибки воображения, которые заставляют переоценивать эмоциональное влияние будущих событий на работе",
+      "course_id": "e2aae4cc-8980-4e13-bfbb-66df0f73100b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-78730bf8-3",
+      "source": "lesson-objective",
+      "query": "Геймифицировать скучные процессы без внешних наград",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-78730bf8-4",
+      "source": "lesson-objective",
+      "query": "Декодировать структурные требования финального проекта и матрицу оценки согласно корпоративным стандартам",
+      "course_id": "78730bf8-1967-43c9-b88d-f3d8c662c1f6",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-a00a6010-1",
+      "source": "lesson-objective",
+      "query": "Зафиксировать базовую точку для отслеживания прогресса и корректировки траектории",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-a00a6010-2",
+      "source": "lesson-objective",
+      "query": "Идентифицировать 4 ранних сигнала выгорания специфичных для IT-специалистов",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-bc34283a-1",
+      "source": "lesson-objective",
+      "query": "Идентифицировать ключевые изменения в Постановлении №1875 и других актах для 2025 года",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-bc34283a-2",
+      "source": "lesson-objective",
+      "query": "Идентифицировать критические точки зависимости от импортных поставок",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-a00a6010-3",
+      "source": "lesson-objective",
+      "query": "Изучить модель баланса навыков и вызова для оптимальной работы",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-a00a6010-4",
+      "source": "lesson-objective",
+      "query": "Интегрировать все инструменты курса в систему долгосрочного благополучия и устойчивой продуктивности",
+      "course_id": "a00a6010-854e-43c4-8368-0617e788375b",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-bc34283a-3",
+      "source": "lesson-objective",
+      "query": "Исследовать ключевые изменения в тендерных процедурах согласно новому регулированию",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    },
+    {
+      "id": "obj-bc34283a-4",
+      "source": "lesson-objective",
+      "query": "Исследовать типичные риски, возникающие при замене импортных компонентов отечественными аналогами.",
+      "course_id": "bc34283a-0a61-45cb-8e5c-773a3b67a86c",
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "evidence": []
+    }
+  ]
+}

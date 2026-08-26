@@ -1,6 +1,203 @@
 {
   "runId": "50000000-0000-4000-8000-000000000005",
-  "now": "2026-07-10T12:00:00.000Z",
+  "now": "2026-08-26T12:00:00.000Z",
+  "recoveryBinding": {
+    "manifest": {
+      "schema_version": "megacampus.qdrant.source-recovery/v1",
+      "run_id": "51000000-0000-4000-8000-000000000005",
+      "release_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "generated_at": "2026-07-12T12:00:00.000Z",
+      "operator_image_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_audit_version": "unit-reviewed-v1",
+      "development_root": "/srv/megacampus/uploads-dev",
+      "production_root": "/srv/megacampus/uploads",
+      "pre_counts": {
+        "total": 7,
+        "eligible": 7,
+        "recoverable": 1,
+        "missing": 4,
+        "invalid": 2,
+        "unsupported": 0
+      },
+      "expected_post_counts": {
+        "total": 7,
+        "eligible": 7,
+        "recoverable": 1,
+        "missing": 4,
+        "invalid": 2,
+        "unsupported": 0
+      },
+      "copies": [],
+      "dispositions": [
+        {
+          "entry_id": "eligible-0",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000000",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-0.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        },
+        {
+          "entry_id": "eligible-1",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000001",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-1.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        },
+        {
+          "entry_id": "eligible-2",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000002",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-2.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        },
+        {
+          "entry_id": "eligible-3",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000003",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-3.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        },
+        {
+          "entry_id": "eligible-4",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000004",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-4.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        },
+        {
+          "entry_id": "eligible-5",
+          "kind": "eligible_unrecoverable",
+          "file_catalog_id": "e0000000-0000-4000-8000-000000000005",
+          "organization_id": "10000000-0000-4000-8000-000000000001",
+          "course_id": "20000000-0000-4000-8000-000000000002",
+          "expected_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_storage_path": "uploads/org/course/audited-5.pdf",
+          "expected_vector_status": "pending",
+          "expected_file_error_message": null,
+          "reason": "source_file_unrecoverable"
+        }
+      ]
+    },
+    "manifestSha256": "750527a0635619a69d3d21f29b00c037f087d0d0aa9e93f34742b919419295b3",
+    "journal": {
+      "schema_version": "megacampus.qdrant.source-recovery-progress/v1",
+      "run_id": "51000000-0000-4000-8000-000000000005",
+      "manifest_sha256": "750527a0635619a69d3d21f29b00c037f087d0d0aa9e93f34742b919419295b3",
+      "revision": 12,
+      "phase": "verified",
+      "copy_states": {},
+      "disposition_kinds": {
+        "eligible-0": "eligible_unrecoverable",
+        "eligible-1": "eligible_unrecoverable",
+        "eligible-2": "eligible_unrecoverable",
+        "eligible-3": "eligible_unrecoverable",
+        "eligible-4": "eligible_unrecoverable",
+        "eligible-5": "eligible_unrecoverable"
+      },
+      "disposition_states": {
+        "eligible-0": "disposition_verified",
+        "eligible-1": "disposition_verified",
+        "eligible-2": "disposition_verified",
+        "eligible-3": "disposition_verified",
+        "eligible-4": "disposition_verified",
+        "eligible-5": "disposition_verified"
+      }
+    },
+    "acceptedFailedCoverage": {
+      "status": "accepted",
+      "source": "file_catalog",
+      "recoveryRunId": "51000000-0000-4000-8000-000000000005",
+      "recoveryManifestSha256": "750527a0635619a69d3d21f29b00c037f087d0d0aa9e93f34742b919419295b3",
+      "fingerprint": "d406b14b48551936da732fc1bfd3b4e6c4f35b1306427712733c457f2da0245b",
+      "scopes": [
+        {
+          "organizationId": "10000000-0000-4000-8000-000000000001",
+          "courseId": "20000000-0000-4000-8000-000000000002",
+          "entries": [
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000000",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-0.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            },
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000001",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-1.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            },
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000002",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-2.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            },
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000003",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-3.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            },
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000004",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-4.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            },
+            {
+              "fileCatalogId": "e0000000-0000-4000-8000-000000000005",
+              "organizationId": "10000000-0000-4000-8000-000000000001",
+              "courseId": "20000000-0000-4000-8000-000000000002",
+              "storagePath": "uploads/org/course/audited-5.pdf",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "vectorStatus": "failed",
+              "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005"
+            }
+          ]
+        }
+      ]
+    }
+  },
   "sources": [
     {
       "id": "60000000-0000-4000-8000-000000000006",
@@ -8,74 +205,125 @@
       "courseId": "20000000-0000-4000-8000-000000000002",
       "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
       "userId": "30000000-0000-4000-8000-000000000003",
-      "storagePath": "uploads/org/course/russian-source.pdf",
+      "storagePath": "uploads/org/course/60000000-0000-4000-8000-000000000006.pdf",
       "mimeType": "application/pdf",
       "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "vectorStatus": "indexed",
-      "chunkCount": 4,
-      "locale": "ru",
-      "alreadyEnqueued": false,
-      "sourceAvailable": true
-    },
-    {
-      "id": "70000000-0000-4000-8000-000000000007",
-      "organizationId": "10000000-0000-4000-8000-000000000001",
-      "courseId": "21000000-0000-4000-8000-000000000012",
-      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
-      "userId": "30000000-0000-4000-8000-000000000003",
-      "storagePath": "uploads/org/course/english-source.md",
-      "mimeType": "text/markdown",
-      "priority": "IMPORTANT",
-      "vectorStatus": "indexed",
+      "errorMessage": null,
       "chunkCount": 3,
-      "locale": "en",
-      "alreadyEnqueued": false,
-      "sourceAvailable": true
-    },
-    {
-      "id": "80000000-0000-4000-8000-000000000008",
-      "organizationId": "10000000-0000-4000-8000-000000000001",
-      "courseId": "20000000-0000-4000-8000-000000000002",
-      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
-      "userId": "30000000-0000-4000-8000-000000000003",
-      "storagePath": "uploads/org/course/missing-source.pdf",
-      "mimeType": "application/pdf",
-      "priority": "SUPPLEMENTARY",
-      "vectorStatus": "indexed",
-      "chunkCount": 2,
       "locale": "ru",
       "alreadyEnqueued": false,
-      "sourceAvailable": false
+      "sourceAvailable": true,
+      "invalidSourcePath": false
     },
     {
-      "id": "90000000-0000-4000-8000-000000000009",
+      "id": "e0000000-0000-4000-8000-000000000000",
       "organizationId": "10000000-0000-4000-8000-000000000001",
       "courseId": "20000000-0000-4000-8000-000000000002",
       "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
       "userId": "30000000-0000-4000-8000-000000000003",
-      "storagePath": "uploads/org/course/unsupported.zip",
-      "mimeType": "application/zip",
-      "priority": null,
-      "vectorStatus": "pending",
-      "chunkCount": null,
-      "locale": "ru",
-      "alreadyEnqueued": false,
-      "sourceAvailable": true
-    },
-    {
-      "id": "a0000000-0000-4000-8000-00000000000a",
-      "organizationId": "10000000-0000-4000-8000-000000000001",
-      "courseId": "20000000-0000-4000-8000-000000000002",
-      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
-      "userId": "30000000-0000-4000-8000-000000000003",
-      "storagePath": "uploads/org/course/already-enqueued.pdf",
+      "storagePath": "uploads/org/course/audited-0.pdf",
       "mimeType": "application/pdf",
       "priority": "CORE",
-      "vectorStatus": "indexing",
-      "chunkCount": 5,
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
       "locale": "ru",
-      "alreadyEnqueued": true,
-      "sourceAvailable": true
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": false
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/audited-1.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": false
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/audited-2.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": false
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000003",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/audited-3.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": false
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000004",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/audited-4.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": true
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000005",
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "courseId": "20000000-0000-4000-8000-000000000002",
+      "courseOrganizationId": "10000000-0000-4000-8000-000000000001",
+      "userId": "30000000-0000-4000-8000-000000000003",
+      "storagePath": "uploads/org/course/audited-5.pdf",
+      "mimeType": "application/pdf",
+      "priority": "CORE",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "vectorStatus": "failed",
+      "errorMessage": "source_file_unrecoverable; recovery_run=51000000-0000-4000-8000-000000000005",
+      "chunkCount": 3,
+      "locale": "ru",
+      "alreadyEnqueued": false,
+      "sourceAvailable": false,
+      "invalidSourcePath": true
     }
   ],
   "schemaVerification": {
@@ -87,23 +335,19 @@
       "documentId": "60000000-0000-4000-8000-000000000006",
       "courseId": "20000000-0000-4000-8000-000000000002",
       "organizationId": "10000000-0000-4000-8000-000000000001",
-      "pointCount": 4
-    },
-    {
-      "documentId": "70000000-0000-4000-8000-000000000007",
-      "courseId": "21000000-0000-4000-8000-000000000012",
-      "organizationId": "10000000-0000-4000-8000-000000000001",
       "pointCount": 3
-    },
-    {
-      "documentId": "a0000000-0000-4000-8000-00000000000a",
-      "courseId": "20000000-0000-4000-8000-000000000002",
-      "organizationId": "10000000-0000-4000-8000-000000000001",
-      "pointCount": 5
     }
   ],
   "relevanceChecks": [
-    { "language": "ru", "passed": true, "nativeHybrid": true },
-    { "language": "en", "passed": true, "nativeHybrid": true }
+    {
+      "language": "ru",
+      "passed": true,
+      "nativeHybrid": true
+    },
+    {
+      "language": "en",
+      "passed": true,
+      "nativeHybrid": true
+    }
   ]
 }

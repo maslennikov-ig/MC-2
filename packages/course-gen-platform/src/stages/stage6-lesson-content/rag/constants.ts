@@ -15,7 +15,16 @@ import {
  * constant so that tuning applies everywhere instead of only to Stage 6.
  */
 export const LESSON_RAG_CONFIG = {
-  /** Target number of chunks (middle of 5-10 range) */
+  /**
+   * Target number of chunks (middle of 5-10 range).
+   *
+   * Measured and left unchanged, 2026-08-26, because the measurement says the
+   * target is not what is limiting Stage 6. With `group_by_document` on, a
+   * single query returns **6.25 chunks on average** — below this target and far
+   * below the 30 candidates the request asks for — so raising the target would
+   * ask for more of something the grouping step is already refusing to give.
+   * See `docs/rag/2026-08-26-retrieval-quality-measurement.md`.
+   */
   TARGET_CHUNKS: 7,
   /** Minimum acceptable chunks */
   MIN_CHUNKS: 5,
@@ -40,7 +49,16 @@ export const LESSON_RAG_CONFIG = {
 export const RERANKER_CONFIG = {
   /** Enable reranking (set to false to disable) */
   enabled: true,
-  /** Fetch N times more candidates for reranking */
+  /**
+   * Fetch N times more candidates for reranking.
+   *
+   * Measured and left unchanged, 2026-08-26 — but it is currently buying much
+   * less than it claims. 4 x `TARGET_CHUNKS` asks Qdrant for 30 candidates per
+   * query; grouping hands back 6.25, so the cross-encoder usually has fewer
+   * candidates than the seven chunks it is meant to select from them. Raising
+   * the multiplier does not fix that, because the ceiling is the grouping, and
+   * lowering it would only make the shortfall permanent.
+   */
   candidateMultiplier: 4,
   /** Use Qdrant scores if reranker fails */
   fallbackOnError: true,

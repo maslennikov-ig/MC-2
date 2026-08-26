@@ -62,18 +62,46 @@ work from here:
   `stage_4_*` status now counts as initialised, and one the RPC cannot accept is reported rather
   than attempted. 37 of the 182 FSM initialisations in this database came from this path.
 
-## RAG retrieval, chunking and parent expansion (2026-08-12/13)
+## RAG retrieval, chunking and parent expansion (2026-08-12/13, measured 2026-08-26)
 
 Closed: `mc2-pdmgu`, `mc2-7frdr`, `mc2-5fpaf`, `mc2-18ujf`, `mc2-o3s4r`; `mc2-lrav0` on the owner's
 "no backfill". What still constrains work:
 
-Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6
+Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.65
 ceiling); why, and the rule it produced, are in `.codex/repository-failure-modes.md`. Degenerate
 parents no longer reach the index (`selectIndexableChunks`). Only children are indexed, plus any
 childless parent; the passage is rebuilt at retrieval time from siblings, **after reranking** in the
 two paths that rerank. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off for
-evidence retrieval, where a citation must point at the fragment that matched. Average expansion
-5.5x; **quality** unmeasured.
+evidence retrieval, where a citation must point at the fragment that matched.
+
+**Expansion runs at 1.00x on the live corpus, not 5.5x** (`mc2-xg6g8`). `sibling_chunk_ids` is empty
+on all 6856 points — every one was indexed in July 2026 with `total_chunks: 1`, before degenerate
+parents were kept out — so there is nothing to stitch and 0 of 7785 measured results widened. The
+5.5x is what expansion **will** cost once a document is indexed with the current chunker; it is not
+what production pays today. The token ceilings (20K Stage 6, 40K Stage 5) are never approached.
+
+**Retrieval quality is a number now:** recall@5 **0.9677** Stage 5, **0.7419** Stage 6, **0.4839**
+`search_documents` (the only path that does not ask for hybrid). Re-run with
+`pnpm --filter @megacampus/course-gen-platform benchmark:rag run` against the live collection
+read-only; the 76-query set and its vectors are in `packages/course-gen-platform/eval/rag-retrieval/`.
+Full results and method: `docs/rag/2026-08-26-retrieval-quality-measurement.md`; the read-only
+platform pass is `docs/rag/2026-08-26-qdrant-operations-recheck.md`.
+
+Three things that measurement changed or exposed:
+
+- **Stage 5 was never hybrid for a section plan of three or fewer queries.** `max_query_limit` is 100
+  and applies to a prefetch limit; Stage 5 asked for 300/150/102 and got `Bad Request` → dense-only,
+  on every such query. `getPrefetchLimit` now clamps to the collection's own ceiling. Stage 5
+  recall@5 0.7742 → 0.9677, MRR 0.6290 → 0.9097, fallbacks 76/76 → 0/76.
+- **The dense threshold costs nothing between 0.15 and 0.30** on any entry point, and above 0.30 only
+  the dense-only path loses answers. 0.25 stays, now measured rather than inherited.
+- **A fused RRF score is NOT on a different scale from a dense cosine one.** The old comment said 0.7
+  was unreachable for RRF by construction; measured, fused scores reach 1.0000 against dense bests of
+  0.45–0.65. The advice stands, the stated reason was wrong in the dangerous direction.
+
+Open and owner-gated: `mc2-zewto` — Stage 6's `group_by_document` costs **22.6 points of recall@5**
+(0.7419 against 0.9677 with it off) and holds the reranker to 6.25 candidates where it asks for 30.
+That is diversity against relevance, it reverses `mc2-jz6y0.16`, and nothing was changed for it.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -242,6 +270,22 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 `mc2-6ye5z.4/.5/.8` — handlers written 2026-08-23; live proof was blocked by `mc2-3lo22` and is now
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
+
+**`mc2-78ya6` — `develop` is red and it is telling the truth.**
+`tests/unit/ops/q12-window-preflight.test.ts` fails three tests because
+`docker-compose.infra.yml` in the tree (`e447c928…`) differs from
+`q12-deployed-asset-manifest.json` (`dce8e074…`) — and the **host matches the manifest**. The
+divergence is commit `27790d81d`, the bridge healthcheck fix, which was committed and never
+deployed, so `megacampus-notebooklm-bridge` still carries the bare TCP-connect healthcheck that hid a
+dead tunnel for four months. **Do not repair this by rewriting the manifest**: the manifest is right
+about the host and rewriting it would erase a correct signal. It is fixed by delivering the compose
+file, which is a production mutation and needs a fresh decision. Predates `mc2-xg6g8` and was found
+by it.
+
+`mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
+writer is configured on staging, which is idle, and not on dev, where the runs happen.
+
+`mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
 
 ## NotebookLM and languages
 
