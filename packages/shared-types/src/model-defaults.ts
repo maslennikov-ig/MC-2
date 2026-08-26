@@ -88,9 +88,33 @@ export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
  * reach the reader (arbiter, rag_planning, judges) stay on DEFAULT_MODEL_ID: a
  * surgical patch has no room to invent a statistic.
  *
+ * **Changed 2026-08-26 to `z-ai/glm-5.3-flash`, by the same method** (mc2-r8shw).
+ * Luna held this seat because DeepSeek narrated where Luna worked an example,
+ * and invented a statistic doing it. glm-5.3-flash was measured against Luna the
+ * same way, twice, with the artifacts read:
+ *
+ * - Career Playbook, five prose groups of one real RU playbook: 6670 words for
+ *   $0.006234 against Luna's 8818 for $0.013592. 54% cheaper per playbook, 39%
+ *   per 1000 words. Zero quality issues on either side, and no unsourced figure
+ *   on either — the one number glm added carries the product's own
+ *   "(пример — заменить)" marker.
+ * - Stage 6, one real lesson with introduction and two Mermaid sections: 11454
+ *   tokens in 85.7s against Luna's 14817 in 105.6s, and the only heuristic
+ *   warning in the run — a duplicated section — was Luna's.
+ *
+ * It writes ~24% less than Luna and leaves more blanks for the customer to fill.
+ * That is the trade being accepted, and it is visible in the artifacts, not
+ * inferred from a score.
+ *
+ * Two things this model cannot do, both measured on both of its endpoints, and
+ * neither of which touches an authoring phase: it refuses
+ * `reasoning: {enabled: false}` with a 400 — handled by `requiresReasoning` in
+ * MODEL_CATALOG — and it ignores a strict `json_schema`, answering with a shape
+ * of its own invention. Anything that parses the answer stays where it was.
+ *
  * @see llm_model_config.model_id — the database still wins at runtime.
  */
-export const PROSE_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
+export const PROSE_MODEL_ID = 'z-ai/glm-5.3-flash';
 
 /** Fallback for authoring phases — a different vendor, same rule as DEFAULT_*. */
 export const PROSE_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;

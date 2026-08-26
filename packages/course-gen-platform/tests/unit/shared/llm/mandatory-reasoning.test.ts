@@ -136,6 +136,11 @@ describe('models that mandate reasoning', () => {
       'minimax/minimax-m2.1',
       'moonshotai/kimi-k2-thinking',
       'openai/gpt-oss-20b',
+      // Measured 2026-08-26 on both of its endpoints — `z-ai` and `novita` —
+      // because the refusal is a property of the model, not of one provider:
+      // `400 Reasoning is mandatory for this endpoint and cannot be disabled`
+      // (mc2-r8shw).
+      'z-ai/glm-5.3-flash',
     ]);
   });
 });

@@ -189,6 +189,35 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   /**
+   * Read live 2026-08-26, the day the model was published (mc2-r8shw).
+   *
+   * Two endpoints only — `z-ai` at exactly this rate and `novita` at twice it —
+   * so unlike `glm-5.2` above there is no wide provider spread to hedge
+   * against, and equally little to reroute to if z-ai goes down. No `:batch`
+   * sibling exists.
+   *
+   * `requiresReasoning` here is not inherited from the family, it is measured:
+   * both endpoints answer `400 Reasoning is mandatory for this endpoint and
+   * cannot be disabled`. That costs real tokens — 791 of them on a prompt whose
+   * answer was three sentences — and the rate still comes out ahead of luna's
+   * $0.20/$1.20 per call.
+   *
+   * Not recorded here because the catalogue has no field for it: this model
+   * ignores a strict `json_schema` and answers with a shape of its own, so the
+   * three call sites that ask for one stay on luna. `supported_parameters` omits
+   * `structured_outputs`, which turned out to be the truth rather than an
+   * oversight.
+   */
+  'z-ai/glm-5.3-flash': {
+    inputPricePerMillion: 0.075,
+    outputPricePerMillion: 0.25,
+    contextLength: 1048576,
+    maxOutputTokens: 131072,
+    supportsTemperature: true,
+    supportsReasoning: true,
+    requiresReasoning: true,
+  },
+  /**
    * Re-read 2026-08-21: $1.40/$4.40. The entry had carried $0.70/$2.20 on the
    * belief that the Batch tariff is half the base rate — true for luna, false
    * here. This id is *dearer* than the synchronous `z-ai/glm-5.2` above, not
@@ -535,6 +564,7 @@ export const LIVE_ROUTING_MODEL_IDS = [
   'deepseek/deepseek-v4-flash-0731',
   'openai/gpt-5.6-luna',
   'z-ai/glm-5.2',
+  'z-ai/glm-5.3-flash',
   'minimax/minimax-m3',
   'google/gemini-3.7-flash',
   'openai/gpt-5-image-mini',

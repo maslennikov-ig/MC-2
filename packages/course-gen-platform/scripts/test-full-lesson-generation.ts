@@ -218,8 +218,15 @@ async function generateFullLesson(
           [], // Empty RAG chunks for testing
           previousContext,
           language,
-          model, // Model override
-          'professional'
+          // `courseId` was inserted ahead of `modelOverride` after this script
+          // was written, and positional arguments do not complain: the model id
+          // went to the database as a course uuid and the style string went to
+          // OpenRouter as a model. Both models under test "failed" identically
+          // with `400 professional is not a valid model ID`, which reads as a
+          // model problem and is a call-site problem (mc2-r8shw).
+          null, // courseId — no course-scoped override in a bench run
+          model, // modelOverride
+          'professional' // style
         );
 
         const sectionDuration = Date.now() - sectionStart;
