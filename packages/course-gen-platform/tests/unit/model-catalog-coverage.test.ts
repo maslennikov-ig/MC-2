@@ -68,7 +68,7 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedBatchRates);
   });
 
-  it('prices every live routing model at the OpenRouter base rates verified on 2026-08-25', () => {
+  it('prices every live routing model at the OpenRouter base rates last verified for each', () => {
     // The models a course actually runs on. Three of these were wrong at once on
     // 2026-08-20 and the errors pointed in opposite directions, which is why the
     // invoice gap looked smaller than its causes: openai/gpt-5.6-luna was
@@ -76,7 +76,9 @@ describe('model catalogue coverage', () => {
     // z-ai/glm-5.2 was 1.23x and ~deepseek/...-latest up to 1.8x too dear
     // (mc2-v1pn2, mc2-156kg).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v4-flash-0731': [0.14, 0.28],
+      // Re-read 2026-08-26; it read $0.14/$0.28 the day before and $0.08/$0.18
+      // the day before that, and moved 2.33x within two hours on 2026-08-25.
+      'deepseek/deepseek-v4-flash-0731': [0.06, 0.12],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [1.19, 3.74],
       'minimax/minimax-m3': [0.3, 1.2],
@@ -126,25 +128,27 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedImageRates);
   });
 
-  it('prices listed retired models at the OpenRouter rates verified on 2026-08-21', () => {
+  it('prices listed retired models at the OpenRouter rates last verified for each', () => {
+    // Dated per row rather than per test: these are re-read when something
+    // sends somebody to look, not on one day together, and a single date in the
+    // title claims a freshness the rows do not share.
     const verifiedRates: Record<string, [input: number, output: number]> = {
       'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
-      // The three DeepSeek rows below were re-read 2026-08-23 by the first run
-      // of the nightly drift check (mc2-ts9i2), which is what that check is for:
-      // this snapshot is only as current as the last person who remembered to
-      // re-read it, and nobody had for two days.
-      //
       // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
       // would, because `normalizeModelId` prices every undated V4 Flash snapshot
-      // from here (mc2-hc91g). It was 1.50x dear; `deepseek-v4-pro` was 4.03x,
-      // the largest gap this catalogue has held.
-      'deepseek/deepseek-v4-flash': [0.05306, 0.10612],
+      // from here (mc2-hc91g). Re-read 2026-08-26 at $0.088606/$0.177212: the
+      // snapshot held $0.05306, 40% UNDER, which is the direction that refuses
+      // calls rather than merely misreporting them. It has now been corrected
+      // four times in four days, each time by somebody re-reading it, which is
+      // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
+      'deepseek/deepseek-v4-flash': [0.088606, 0.177212],
       '~deepseek/deepseek-v4-flash-latest': [0.05, 0.13],
       'deepseek/deepseek-v4-pro': [0.396894, 0.793788],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],
       'qwen/qwen3-235b-a22b-2507': [0.09, 0.55],
+      'qwen/qwen-plus-2025-07-28': [0.26, 0.78],
       'qwen/qwen3-max': [0.78, 3.9],
       'qwen/qwen3.7-plus': [0.32, 1.28],
       'z-ai/glm-4.6': [0.5, 2],
@@ -208,10 +212,7 @@ describe('model catalogue coverage', () => {
      * barrel that re-exports it. The point of listing them is that a *new* one
      * fails here instead of joining them.
      */
-    const UNCATALOGUED_TODAY = [
-      'moonshotai/kimi-linear-48b-a3b-instruct',
-      'qwen/qwen-plus-2025-07-28',
-    ];
+    const UNCATALOGUED_TODAY = ['moonshotai/kimi-linear-48b-a3b-instruct'];
 
     it('prices every model the code can route to, apart from the two already known', () => {
       const unpriced = routable.filter(modelId => !getModelCapabilities(modelId));

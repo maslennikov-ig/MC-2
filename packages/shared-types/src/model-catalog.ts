@@ -219,10 +219,14 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * tail. A ceiling under every endpoint is a refusal, not a saving (mc2-qch4w).
    */
   'deepseek/deepseek-v4-flash-0731': {
-    // Re-read live 2026-08-25: 0.08/0.18 had drifted to 0.14/0.28 (0.57x/0.64x),
-    // the widest gap in the catalogue and on the highest-volume model.
-    inputPricePerMillion: 0.14,
-    outputPricePerMillion: 0.28,
+    // Re-read 2026-08-26: $0.06/$0.12. It read $0.14/$0.28 the day before, and
+    // $0.08/$0.18 the day before that — this one moved 2.33x within two hours on
+    // 2026-08-25. Chasing it by hand is not the plan: the ceiling reads the
+    // published list live, and this figure is what it falls back on when it
+    // cannot. Being high there costs an overstated estimate; being low refuses
+    // the call.
+    inputPricePerMillion: 0.06,
+    outputPricePerMillion: 0.12,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -289,12 +293,15 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'deepseek/deepseek-v4-flash': {
-    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05306/
-    // $0.10612, against $0.0798/$0.1596 here — 1.50x over on both legs. Third
-    // correction to this one entry in three days, which is the argument for the
-    // check running nightly instead of when somebody remembers.
-    inputPricePerMillion: 0.05306,
-    outputPricePerMillion: 0.10612,
+    // Re-read 2026-08-26: $0.088606/$0.177212. The entry held $0.05306/$0.10612
+    // — 40% UNDER, which is the dangerous direction. `provider.max_price` is
+    // built from this number, and a ceiling below every endpoint is answered
+    // with a refusal rather than a cheaper route (mc2-a6qxc). Fourth correction
+    // to this one entry; the value moves faster than anybody re-reads it, which
+    // is why the frozen figure is only a fallback for when the live list cannot
+    // be read, and why too high is the safe way to be wrong.
+    inputPricePerMillion: 0.088606,
+    outputPricePerMillion: 0.177212,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -409,6 +416,22 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     outputPricePerMillion: 0.55,
     contextLength: 262144,
     maxOutputTokens: 16384,
+    supportsTemperature: true,
+    supportsReasoning: false,
+  },
+  /**
+   * Reachable from the `MODELS` escalation registry in `model-selector.ts` and
+   * absent from every pricing table in the repo until 2026-08-26, so it priced
+   * at the pessimistic default and its ceiling was a guess (mc2-a6qxc).
+   *
+   * Read from the published list that day: $0.26/$0.78, 1M context, 32768
+   * output, `supported_parameters` carries `temperature` and no `reasoning`.
+   */
+  'qwen/qwen-plus-2025-07-28': {
+    inputPricePerMillion: 0.26,
+    outputPricePerMillion: 0.78,
+    contextLength: 1000000,
+    maxOutputTokens: 32768,
     supportsTemperature: true,
     supportsReasoning: false,
   },

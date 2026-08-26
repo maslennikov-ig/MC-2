@@ -194,9 +194,18 @@ async function main(): Promise<void> {
   }
 
   if (drift.length === 0) {
+    // Says what was compared, not what was asked for. `absent` never reached the
+    // published list and `uncatalogued` has no number to compare, so counting
+    // either as a match would report full coverage of a check that skipped them.
+    const compared = modelIds.length - absent.length - uncatalogued.length;
+    const skipped = [
+      ...(absent.length > 0 ? [`${absent.length} not in the published list`] : []),
+      ...(uncatalogued.length > 0 ? [`${uncatalogued.length} not in MODEL_CATALOG`] : []),
+    ];
     console.log(
-      `model catalogue drift check OK: ${modelIds.length - absent.length} of ${modelIds.length} ` +
-        `${checkAll ? 'catalogued' : 'routable'} models match the published rates`
+      `model catalogue drift check OK: ${compared} of ${modelIds.length} ` +
+        `${checkAll ? 'catalogued' : 'routable'} models match the published rates` +
+        (skipped.length > 0 ? ` (${skipped.join(', ')})` : '')
     );
     return;
   }
