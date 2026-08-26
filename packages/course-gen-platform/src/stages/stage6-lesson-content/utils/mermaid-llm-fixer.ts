@@ -68,6 +68,15 @@ const LLM_MODELS = {
   ultimate: 'z-ai/glm-5', // T3: top model, expensive, last resort
 } as const;
 
+/**
+ * The same three, for the catalogue drift gate to read.
+ *
+ * A repair tier is a paid call like any other, and its price is a ceiling
+ * (`provider.max_price`) before it is a report. Exported rather than restated
+ * so the gate cannot fall behind a change made here (mc2-a6qxc).
+ */
+export const MERMAID_REPAIR_MODEL_IDS: readonly string[] = Object.values(LLM_MODELS);
+
 export type MermaidModelTier = keyof typeof LLM_MODELS;
 
 /**

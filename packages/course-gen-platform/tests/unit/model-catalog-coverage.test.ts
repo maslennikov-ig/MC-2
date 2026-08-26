@@ -13,6 +13,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
+
 import {
   MODEL_CATALOG,
   LIVE_ROUTING_MODEL_IDS,
@@ -177,6 +179,64 @@ describe('model catalogue coverage', () => {
     const unpriced = LIVE_ROUTING_MODEL_IDS.filter(modelId => !getModelCapabilities(modelId));
 
     expect(unpriced).toEqual([]);
+  });
+
+  /**
+   * Everything the code can route to, derived rather than restated.
+   *
+   * `LIVE_ROUTING_MODEL_IDS` is seven ids typed by hand. Sixty days of
+   * `generation_trace` to 2026-08-25 held eleven, and the six that were missing
+   * were not scripts: `stage_6_refinement` ran on `qwen/qwen3.7-plus`,
+   * `z-ai/glm-5` and `minimax/minimax-m2.1`, and `moonshotai/kimi-k2-thinking`
+   * served `stage_4_clarifying`. They reached the wire through registries the
+   * hand-written list knew nothing about — a per-phase fallback table, an
+   * escalation registry, a provider rename map, the Stage 6 repair tiers
+   * (mc2-a6qxc).
+   */
+  describe('models the code can route to', () => {
+    const routable = collectRoutableModelIds();
+
+    /**
+     * Routable ids with no catalogue entry, as found on 2026-08-26.
+     *
+     * Grandfathered rather than fixed here, because adding a price is a claim
+     * about what a provider charges and belongs with a reading of the published
+     * list, not with a test. Both are entries in `MODELS` — the escalation
+     * registry in `model-selector.ts` — and nothing selects them today: the only
+     * paths that could return them are `getModelByKey` and
+     * `getModelsWithCapability`, and neither is called anywhere outside the
+     * barrel that re-exports it. The point of listing them is that a *new* one
+     * fails here instead of joining them.
+     */
+    const UNCATALOGUED_TODAY = [
+      'moonshotai/kimi-linear-48b-a3b-instruct',
+      'qwen/qwen-plus-2025-07-28',
+    ];
+
+    it('prices every model the code can route to, apart from the two already known', () => {
+      const unpriced = routable.filter(modelId => !getModelCapabilities(modelId));
+
+      expect(unpriced.sort()).toEqual([...UNCATALOGUED_TODAY].sort());
+    });
+
+    it('covers everything the hand-written live list claims', () => {
+      // The list stays for its `shared-types` consumers, but stops being the
+      // authority: if it names something no registry routes to, one of the two
+      // is wrong and this says so rather than letting them drift apart.
+      const missing = LIVE_ROUTING_MODEL_IDS.filter(modelId => !routable.includes(modelId));
+
+      expect(missing).toEqual([]);
+    });
+
+    it('finds more than the hand-written list did, and says who routes to each', () => {
+      // Guards the derivation itself: if `collectRoutableModelSources` silently
+      // stopped reading a registry, this is what notices.
+      expect(routable.length).toBeGreaterThan(LIVE_ROUTING_MODEL_IDS.length);
+
+      for (const modelId of routable) {
+        expect(describeRoutableModel(modelId).length).toBeGreaterThan(0);
+      }
+    });
   });
 
   it('never carries a zero or negative price', () => {
