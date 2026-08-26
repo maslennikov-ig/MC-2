@@ -38,7 +38,9 @@ export type ModelCapability =
   | 'structured_output';
 
 /**
- * Complete model configuration with pricing and capabilities
+ * Complete model configuration: context window and capabilities.
+ *
+ * Prices live in `MODEL_CATALOG`, never here (mc2-zcfh1).
  *
  * @example
  * ```typescript
@@ -46,8 +48,6 @@ export type ModelCapability =
  *   modelId: 'qwen/qwen3-235b-a22b-2507',
  *   displayName: 'Qwen3 235B',
  *   maxContextTokens: 128_000,
- *   costPer1kInput: 0.00011,
- *   costPer1kOutput: 0.0006,
  *   capabilities: ['generation', 'multilingual', 'structured_output'],
  * };
  * ```
@@ -61,12 +61,6 @@ export interface ModelConfig {
 
   /** Maximum context window in tokens */
   maxContextTokens: number;
-
-  /** Cost per 1K input tokens in USD */
-  costPer1kInput: number;
-
-  /** Cost per 1K output tokens in USD */
-  costPer1kOutput: number;
 
   /** Model capabilities for filtering */
   capabilities: ModelCapability[];
@@ -146,8 +140,15 @@ export const MODEL_TIERS = {
 /**
  * Complete model registry with configurations
  *
- * Pricing sourced from OpenRouter API documentation (2025-11-22)
- * @see https://openrouter.ai/docs#pricing
+ * Carries no prices. It used to hold `costPer1kInput`/`costPer1kOutput` beside
+ * `MODEL_CATALOG`, the `llm_model_config` table and the rates cost accounting
+ * reads — a fourth pricing surface, and a dead one: the only thing that ever
+ * read those fields was `estimateModelCost`, which nothing called. Rates that
+ * nothing verifies go stale silently, and this table sits next to a registry
+ * routing genuinely uses, so it read as a source of truth (mc2-zcfh1).
+ *
+ * A price belongs to `MODEL_CATALOG` in `@megacampus/shared-types`, where
+ * `model-catalog-coverage.test.ts` checks it against the published rates.
  */
 export const MODELS: Record<string, ModelConfig> = {
   // Analysis Models
@@ -155,8 +156,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'deepseek/deepseek-v4-flash',
     displayName: 'DeepSeek V4 Flash',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.0001,
-    costPer1kOutput: 0.0002,
     capabilities: ['analysis', 'structured_output'],
   },
 
@@ -164,8 +163,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'google/gemini-3.7-flash',
     displayName: 'Gemini 3 Flash',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.0005,
-    costPer1kOutput: 0.003,
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 
@@ -174,8 +171,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'qwen/qwen3-235b-a22b-2507',
     displayName: 'Qwen3 235B',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.00011,
-    costPer1kOutput: 0.0006,
     capabilities: ['generation', 'multilingual', 'structured_output', 'code'],
   },
 
@@ -183,8 +178,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'deepseek/deepseek-v3.1-terminus',
     displayName: 'DeepSeek V3.1 Terminus',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.00027,
-    costPer1kOutput: 0.0011,
     capabilities: ['generation', 'code', 'structured_output'],
   },
 
@@ -193,8 +186,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'moonshotai/kimi-k2-thinking',
     displayName: 'Kimi K2',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.00055,
-    costPer1kOutput: 0.00225,
     capabilities: ['generation', 'multilingual', 'structured_output', 'code'],
   },
 
@@ -203,8 +194,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'deepseek/deepseek-v4-flash',
     displayName: 'DeepSeek V4 Flash',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.0001,
-    costPer1kOutput: 0.0002,
     capabilities: ['analysis', 'generation', 'multilingual', 'structured_output'],
   },
 
@@ -213,8 +202,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'openai/gpt-oss-20b',
     displayName: 'GPT OSS 20B',
     maxContextTokens: 128_000,
-    costPer1kInput: 0.00008,
-    costPer1kOutput: 0.00008,
     capabilities: ['analysis'],
   },
 
@@ -223,8 +210,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'google/gemini-3.7-flash',
     displayName: 'Gemini 3 Flash Preview',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.000075,
-    costPer1kOutput: 0.0003,
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 
@@ -232,8 +217,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'deepseek/deepseek-v4-flash',
     displayName: 'DeepSeek V4 Flash',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.0001,
-    costPer1kOutput: 0.0002,
     capabilities: ['analysis', 'large_context', 'generation'],
   },
 
@@ -241,8 +224,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'moonshotai/kimi-linear-48b-a3b-instruct',
     displayName: 'Kimi Linear 48B',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.0004,
-    costPer1kOutput: 0.0016,
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 
@@ -250,8 +231,6 @@ export const MODELS: Record<string, ModelConfig> = {
     modelId: 'qwen/qwen-plus-2025-07-28',
     displayName: 'Qwen Plus 2025',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.0002,
-    costPer1kOutput: 0.0008,
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 } as const;
@@ -603,31 +582,6 @@ export function selectModelForLargeContext(): ModelConfig {
  */
 export function getModelsWithCapability(capability: ModelCapability): ModelConfig[] {
   return Object.values(MODELS).filter(model => model.capabilities.includes(capability));
-}
-
-/**
- * Estimate cost for a model based on token counts.
- *
- * @param model - Model configuration
- * @param inputTokens - Number of input tokens
- * @param outputTokens - Number of output tokens
- * @returns Estimated cost in USD
- *
- * @example
- * ```typescript
- * const model = MODELS['qwen3-max'];
- * const cost = estimateModelCost(model, 10_000, 2_000);
- * // cost === 0.0011 + 0.0012 = 0.0023 USD
- * ```
- */
-export function estimateModelCost(
-  model: ModelConfig,
-  inputTokens: number,
-  outputTokens: number
-): number {
-  const inputCost = (inputTokens / 1000) * model.costPer1kInput;
-  const outputCost = (outputTokens / 1000) * model.costPer1kOutput;
-  return inputCost + outputCost;
 }
 
 /**

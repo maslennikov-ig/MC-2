@@ -36,7 +36,6 @@ export {
   getModelByKey,
   getModelById,
   getModelsWithCapability,
-  estimateModelCost,
   fitsInContext,
 } from './model-selector';
 
