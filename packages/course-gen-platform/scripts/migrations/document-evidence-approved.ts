@@ -563,8 +563,14 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // no policy, and no function inside the security manifest, so no new `after-*`
 // digest is needed. Worth noting this guard is what caught them — a narrower
 // local test selection had missed `tests/unit/scripts/` entirely, and CI did not.
+// Re-pinned 2026-08-26 for the prose routing move (mc2-r8shw): 242 files, adding
+// 20260826200000_prose_phases_move_to_glm_5_3_flash.sql. It is a single UPDATE of
+// `llm_model_config.model_id` for eight Career Playbook phases — no table, no
+// policy, no function inside the security manifest — so no new `after-*` digest
+// is needed. And the note above repeated itself exactly: a narrow local run
+// missed `tests/unit/scripts/` again, and the full suite caught it.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'f772ac5efaa8b191cbfc79ec12c9441d6e5636e93eba46e2b1280bff4c1d17db';
+  'e498c3daa3e5c9b493bf3d90dc122c7dfa5291776f9bf9771fdcbc17ecfadc8f';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
