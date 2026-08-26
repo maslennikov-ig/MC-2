@@ -569,8 +569,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // policy, no function inside the security manifest — so no new `after-*` digest
 // is needed. And the note above repeated itself exactly: a narrow local run
 // missed `tests/unit/scripts/` again, and the full suite caught it.
+// Re-pinned again the same night: 243 files, adding
+// 20260827000000_stage6_prose_moves_to_glm_5_3_flash.sql. Same shape as the one
+// above — a single UPDATE of `llm_model_config` — so again no new `after-*`
+// digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'e498c3daa3e5c9b493bf3d90dc122c7dfa5291776f9bf9771fdcbc17ecfadc8f';
+  'd806371e598045fea6f7d4b02b97154629f58501c4ae6cb3c6b459584175214f';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

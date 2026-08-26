@@ -88,31 +88,42 @@ export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
  * reach the reader (arbiter, rag_planning, judges) stay on DEFAULT_MODEL_ID: a
  * surgical patch has no room to invent a statistic.
  *
- * **`z-ai/glm-5.3-flash` was tried here on 2026-08-26 and did not take the
- * seat** (mc2-r8shw). Two offline comparisons said it should: five Career
- * Playbook prose groups at 54% of Luna's cost with zero quality issues, and one
- * Stage 6 lesson at 11454 tokens against Luna's 14817, faster, with the run's
- * only heuristic warning being Luna's. A live micro course on dev said
- * otherwise, and only the live run could: all 23 `stage_6_content` calls came
- * back `finishReason: length` having spent 4819 of 4848 completion tokens on
- * reasoning, so the lessons were written by the escalation model instead.
+ * **Changed 2026-08-26 to `z-ai/glm-5.3-flash`, on the second live run**
+ * (mc2-r8shw). Two offline comparisons said it should: five Career Playbook
+ * prose groups at 54% of Luna's cost with zero quality issues, and one Stage 6
+ * lesson at 11454 tokens against Luna's 14817, faster, the run's only heuristic
+ * warning being Luna's.
  *
- * The cause is arithmetic, not taste. `calculateMaxTokensForSection` sizes a
- * section from the lesson's duration — a few hundred tokens for a micro lesson —
- * and a mandatory-reasoning model gets a flat
- * `MANDATORY_REASONING_RESERVE_TOKENS` (4096) added to it. This model's
- * deliberation alone exceeds that reserve, so nothing is left to answer with.
- * The offline Stage 6 comparison passed because it asked for a flat 4000 tokens
- * and never met the pipeline's own budget.
+ * The first live micro course contradicted them — all 23 `stage_6_content`
+ * calls `finishReason: length`, 4819 of 4848 completion tokens spent on
+ * reasoning, every lesson written by the escalation model, $0.0949 against a
+ * usual $0.03-0.06 — and the contradiction was the container, not the model.
+ * `requiresReasoning` shipped in the same commit as the routing, so dev was
+ * still asking a mandatory thinker to stop thinking. Three paid probes on one
+ * prompt: no reasoning field costs 1831 reasoning tokens, `effort: 'low'` costs
+ * **0** and answers in full, `enabled: false` is a 400.
  *
- * Career Playbook prose, whose phases ask for 14000 tokens, is on it in the
- * database and stays there. Stage 6 needs the reserve to become per-model, or
- * the deliberation itself capped with `reasoning: {max_tokens}`, before this
- * constant can move.
+ * The second run, after deploying: eight calls, every one `finish: stop`,
+ * average 41 reasoning tokens, no escalation. Like for like on the same topic —
+ * luna $0.037859 total and $0.024493 in Stage 6, glm $0.019854 and $0.005267.
+ * Total 48% lower; Stage 6, which is about 90% of generation spend, 78% lower.
+ * The lesson was read: a worked analogy, a valid diagram, and its one
+ * statistical claim hedged rather than fabricated — the exact failure that put
+ * Luna in this seat.
+ *
+ * It writes about 24% less than Luna. That is the trade, and it is visible in
+ * the artifacts rather than inferred from a score.
+ *
+ * Two things this model cannot do, measured on both of its endpoints: it refuses
+ * `reasoning: {enabled: false}` — which is why the catalogue entry above must
+ * keep `requiresReasoning`, and why moving this constant without deploying the
+ * catalogue is how the first run went wrong — and it ignores a strict
+ * `json_schema`, answering with a shape of its own. Anything that parses the
+ * answer stays where it was.
  *
  * @see llm_model_config.model_id — the database still wins at runtime.
  */
-export const PROSE_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
+export const PROSE_MODEL_ID = 'z-ai/glm-5.3-flash';
 
 /** Fallback for authoring phases — a different vendor, same rule as DEFAULT_*. */
 export const PROSE_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;
