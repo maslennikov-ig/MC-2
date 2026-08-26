@@ -198,7 +198,7 @@
       "mode": null,
       "owner": null,
       "path": "docker-compose.infra.yml",
-      "sha256": "dce8e0748e3b1b9dca03c732e13cad8ced3ca99a03d81f0ce4ba82e0718410a6"
+      "sha256": "e447c92874c1a053ec1584a6267ef11e95155a30ff67826d688dea64b06696bd"
     },
     {
       "group": null,
@@ -211,6 +211,6 @@
   ],
   "deploy_root": "/opt/megacampus",
   "derivation": "every /opt/megacampus path named in deploy/qdrant/q12-command-manifest.json argv that exists in the tree, plus the controller chain those commands execute, plus the pre-flight's own two files; identity from the consuming script's own refusal where one exists (mc2-lzft4), else mode 0555 where git marks the file executable, else 0444",
-  "generated_from_tree_sha": "02c5ebce6c9b22a0e01a83a3c78e20a2e8863c8e",
+  "generated_from_tree_sha": "ca56f7458989b64982f1dabec004c7fffa680814",
   "schema_version": "megacampus.q12.deployed-asset-manifest/v1"
 }
