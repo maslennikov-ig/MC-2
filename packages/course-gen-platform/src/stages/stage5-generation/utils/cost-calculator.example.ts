@@ -95,21 +95,27 @@ function example2_preGenerationEstimate() {
   const estimatedSectionsTokens = 50000;
   const estimatedValidationTokens = 3000;
 
+  // `estimateCost` answers `undefined` for a model no rate covers. Shown as
+  // "not measured" rather than folded into the total as $0, which is what an
+  // estimate of a course would otherwise be quietly missing.
+  const notMeasured = 'not measured';
   const metadataCost = estimateCost('qwen/qwen3-max', estimatedMetadataTokens, 0);
   const sectionsCost = estimateCost('deepseek/deepseek-v4-flash', estimatedSectionsTokens, 0);
   const validationCost = estimateCost('google/gemini-3.7-flash', estimatedValidationTokens, 0);
+  const show = (cost: number | undefined): string =>
+    cost === undefined ? notMeasured : formatCost(cost);
 
-  const totalEstimatedCost = metadataCost + sectionsCost + validationCost;
+  const totalEstimatedCost = (metadataCost ?? 0) + (sectionsCost ?? 0) + (validationCost ?? 0);
 
   console.log('Pre-Generation Cost Estimate:');
   console.log(
-    `  Metadata:   ${formatCost(metadataCost)} (${estimatedMetadataTokens.toLocaleString()} tokens)`
+    `  Metadata:   ${show(metadataCost)} (${estimatedMetadataTokens.toLocaleString()} tokens)`
   );
   console.log(
-    `  Sections:   ${formatCost(sectionsCost)} (${estimatedSectionsTokens.toLocaleString()} tokens)`
+    `  Sections:   ${show(sectionsCost)} (${estimatedSectionsTokens.toLocaleString()} tokens)`
   );
   console.log(
-    `  Validation: ${formatCost(validationCost)} (${estimatedValidationTokens.toLocaleString()} tokens)`
+    `  Validation: ${show(validationCost)} (${estimatedValidationTokens.toLocaleString()} tokens)`
   );
   console.log(`  Total:      ${formatCost(totalEstimatedCost)}`);
 
@@ -155,7 +161,9 @@ function example3_modelComparison() {
       const priceInfo = pricing.combinedPricePerMillion
         ? `$${pricing.combinedPricePerMillion}/1M (unified)`
         : `$${pricing.inputPricePerMillion}/$${pricing.outputPricePerMillion}/1M (split)`;
-      console.log(`  ${model.padEnd(30)} ${formatCost(cost).padEnd(10)} (${priceInfo})`);
+      console.log(
+        `  ${model.padEnd(30)} ${(cost === undefined ? 'not measured' : formatCost(cost)).padEnd(10)} (${priceInfo})`
+      );
     }
   });
 

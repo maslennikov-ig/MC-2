@@ -105,13 +105,19 @@ export function settleSuccessfulAttempt(params: {
   // overstates it fourfold until a receipt arrives, and for an attempt that
   // aborts no receipt ever does. `estimateCost` remains the last resort for a
   // model neither source prices.
-  const costUsd =
+  //
+  // When neither prices it the cost is unknown, not zero. The row still has to
+  // carry a number, so it carries `0` — marked, so the total reads as the lower
+  // bound it is. `cost_unknown` is the field the schema already keeps for an
+  // aborted attempt, and an unpriced model is the same claim.
+  const estimatedCostUsd =
     calculateLlmCostUsd({
       model: modelId,
       inputTokens,
       outputTokens,
       ...(params.endpointRate ? { endpointRate: params.endpointRate } : {}),
     }) ?? estimateCost(modelId, inputTokens + outputTokens, inputTokens);
+  const costUsd = estimatedCostUsd ?? 0;
   const totalDurationMs = Date.now() - params.callStartedAt;
 
   logger.info(
@@ -125,7 +131,8 @@ export function settleSuccessfulAttempt(params: {
       totalDurationMs,
       inputTokens,
       outputTokens,
-      estimatedCostUsd: costUsd,
+      estimatedCostUsd,
+      costUnknown: estimatedCostUsd === undefined,
       generationId,
     },
     'Career Playbook LLM call succeeded'
@@ -137,6 +144,7 @@ export function settleSuccessfulAttempt(params: {
     inputTokens,
     outputTokens,
     costUsd,
+    ...(estimatedCostUsd === undefined ? { costUnknown: true } : {}),
     durationMs: totalDurationMs,
     attemptCount: attempt + 1,
     abortedAttempts: params.abortedAttempts,

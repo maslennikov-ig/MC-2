@@ -254,6 +254,29 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       // Known model should calculate normally
       expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
+
+      // And the total says so. Ten thousand tokens contributed nothing to it,
+      // which without this field is indistinguishable from a course that really
+      // cost that much (mc2-heljn).
+      expect(cost.unpriced_models).toEqual(['unknown/model']);
+    });
+
+    it('leaves the marker off when every phase model had a rate', () => {
+      const metadata: GenerationMetadata = {
+        model_used: {
+          metadata: 'qwen/qwen3-max',
+          sections: 'openai/gpt-oss-20b',
+        },
+        total_tokens: { metadata: 10000, sections: 50000, validation: 0, total: 60000 },
+        cost_usd: 0,
+        duration_ms: { metadata: 1000, sections: 5000, validation: 0, total: 6000 },
+        quality_scores: { metadata_similarity: 0.95, sections_similarity: [0.92], overall: 0.93 },
+        batch_count: 1,
+        retry_count: { metadata: 0, sections: [0] },
+        created_at: new Date().toISOString(),
+      };
+
+      expect(calculateGenerationCost(metadata).unpriced_models).toBeUndefined();
     });
   });
 
@@ -396,16 +419,28 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost).toBeCloseTo(0.0234, 6);
     });
 
-    it('should handle unknown model by returning $0', () => {
-      const cost = estimateCost('unknown/model', 10000, 0);
-
-      expect(cost).toBe(0);
+    it('answers "not measured" for an unknown model rather than "free"', () => {
+      // It used to answer $0, and a caller that reaches for an estimate has
+      // already failed to find a stated charge and an endpoint rate — so the
+      // zero was spent as if the call had been free. Same falsy-zero that once
+      // corrupted the query used to find unpriced calls (mc2-y452l, mc2-heljn).
+      expect(estimateCost('unknown/model', 10000, 0)).toBeUndefined();
     });
 
-    it('should handle zero tokens', () => {
-      const cost = estimateCost('openai/gpt-oss-20b', 0, 0);
+    it('prices the dated snapshot the provider actually served', () => {
+      // A request naming `openai/gpt-5.6-luna` came back
+      // `openai/gpt-5.6-luna-20260709` on 2026-08-25. Looked up by exact key
+      // that is an unknown model; `normalizeModelId` prices it from its base.
+      expect(estimateCost('openai/gpt-5.6-luna-20260709', 10000, 0)).toBe(
+        estimateCost('openai/gpt-5.6-luna', 10000, 0)
+      );
+      expect(estimateCost('openai/gpt-5.6-luna-20260709', 10000, 0)).toBeGreaterThan(0);
+    });
 
-      expect(cost).toBe(0);
+    it('still reports a genuine zero for zero tokens', () => {
+      // The distinction the return type now carries: nothing to charge for is a
+      // measurement, no rate to charge by is not.
+      expect(estimateCost('openai/gpt-oss-20b', 0, 0)).toBe(0);
     });
   });
 

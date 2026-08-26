@@ -71,6 +71,13 @@ export interface CareerPlaybookLLMResult {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  /**
+   * Set when no source could price the call, so `costUsd` is `0` for want of a
+   * rate rather than because the call was cheap. The node-cost rows carry it
+   * through as `cost_unknown`, the same marker an aborted attempt uses, and for
+   * the same reason: the total is then a lower bound, not the figure.
+   */
+  costUnknown?: boolean;
   // Total wall-clock across every attempt this call consumed, and how many attempts
   // ran before success. Required so downstream node-cost sites and the retry audit
   // always carry timing/attempt ground truth.
