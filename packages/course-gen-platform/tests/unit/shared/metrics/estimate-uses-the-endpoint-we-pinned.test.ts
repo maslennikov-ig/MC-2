@@ -18,19 +18,38 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { getModelCapabilities } from '@megacampus/shared-types';
+
 import { calculateLlmCostUsd } from '@/shared/metrics/llm-cost';
 
 const DEEPSEEK = 'deepseek/deepseek-v4-flash-0731';
 /** `open-inference/fp4`, the endpoint the pin actually chose on 2026-08-25. */
 const SERVED = { prompt: 0.035, completion: 0.1 };
 
+/**
+ * The catalogue rates, read rather than retyped.
+ *
+ * They were retyped here, and a re-read of this one entry on 2026-08-26 —
+ * $0.14/$0.28 down to $0.06/$0.12, having been $0.08/$0.18 two days before —
+ * turned both cases below red without either having found a defect. What these
+ * cases hold is which source wins, not what the numbers are; the numbers have
+ * an owner in `model-catalog.ts` and a nightly check against the published list.
+ */
+const CATALOGUE = getModelCapabilities(DEEPSEEK);
+
 describe('the estimate', () => {
   it('prices a pinned call at the endpoint rate, not the catalogue rate', () => {
     const usage = { model: DEEPSEEK, inputTokens: 1_000_000, outputTokens: 1_000_000 };
 
-    // Catalogue: 0.14 + 0.28. Endpoint: 0.035 + 0.100.
-    expect(calculateLlmCostUsd(usage)).toBeCloseTo(0.42, 10);
-    expect(calculateLlmCostUsd({ ...usage, endpointRate: SERVED })).toBeCloseTo(0.135, 10);
+    // A million tokens each way, so the per-million rates read straight through.
+    expect(calculateLlmCostUsd(usage)).toBeCloseTo(
+      CATALOGUE!.inputPricePerMillion + CATALOGUE!.outputPricePerMillion,
+      10
+    );
+    expect(calculateLlmCostUsd({ ...usage, endpointRate: SERVED })).toBeCloseTo(
+      SERVED.prompt + SERVED.completion,
+      10
+    );
   });
 
   it('does not halve an endpoint rate that already carries its tier', () => {
@@ -67,7 +86,7 @@ describe('the estimate', () => {
     // it. The catalogue estimate stands and waits for the receipt.
     expect(
       calculateLlmCostUsd({ model: DEEPSEEK, inputTokens: 1_000_000, outputTokens: 0 })
-    ).toBeCloseTo(0.14, 10);
+    ).toBeCloseTo(CATALOGUE!.inputPricePerMillion, 10);
   });
 
   it('still halves an unpinned call the provider says it served at flex', () => {
