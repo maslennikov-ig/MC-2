@@ -158,10 +158,24 @@ async function main(): Promise<void> {
   const models = [
     { label: 'deepseek', modelId: 'deepseek/deepseek-v4-flash-0731' },
     { label: 'luna', modelId: 'openai/gpt-5.6-luna' },
+    /**
+     * The candidate the owner named on 2026-08-26, in place of `luna-pro`.
+     *
+     * `z-ai/glm-5.3-flash` costs $0.075/$0.25 against luna's $0.20/$1.20, and
+     * `probe-model-substitution.ts` measured it 21-41% cheaper per call on the
+     * same prompt even though mandatory reasoning makes it write 5-12x more
+     * completion tokens. Two things it cannot do are already known and neither
+     * touches these groups: it refuses `reasoning: { enabled: false }` with a
+     * 400, and it ignores a strict `json_schema` and answers with a shape of
+     * its own. The groups write markdown prose and ask for no schema, so this
+     * is the one comparison the probe cannot settle — whether the prose is
+     * worth reading (mc2-lwrle).
+     */
+    { label: 'glm-flash', modelId: 'z-ai/glm-5.3-flash' },
   ].filter(model => args.models.includes(model.label));
 
   if (models.length === 0) {
-    throw new Error('--models matched nothing; known labels: deepseek, luna');
+    throw new Error('--models matched nothing; known labels: deepseek, luna, glm-flash');
   }
 
   const summary: Record<string, unknown>[] = [];
