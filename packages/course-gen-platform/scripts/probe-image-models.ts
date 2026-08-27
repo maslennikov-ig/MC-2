@@ -149,6 +149,17 @@ const CANDIDATES: Candidate[] = [
   { id: 'black-forest-labs/flux.2-klein-4b', aspectRatio: '16:9', listed: '~$0.0145' },
   { id: 'sourceful/riverflow-v2.5-fast', aspectRatio: '16:9', listed: '$0.019' },
   { id: 'black-forest-labs/flux.2-pro', aspectRatio: '16:9', listed: '~$0.031' },
+  // The only square-capable models that could still undercut the incumbent.
+  //
+  // Everything with a published rate is already dearer by construction: the
+  // cheapest per-frame model is flux.2-klein-4b at ~$0.0147 against the
+  // incumbent's measured $0.0091, and of the token-priced ones only
+  // gpt-image-1-mini shares its $0.000008 rate — the rest are 3.75x to 15x it.
+  // These four publish no price at all, so the only way to know is to buy one.
+  { id: 'x-ai/grok-imagine-image-2.0', aspectRatio: '1:1', listed: 'не опубликована' },
+  { id: 'x-ai/grok-imagine-image-quality', aspectRatio: '1:1', listed: 'не опубликована' },
+  { id: 'krea/krea-2-medium-turbo', aspectRatio: '1:1', listed: 'не опубликована' },
+  { id: 'krea/krea-2-large', aspectRatio: '1:1', listed: 'не опубликована' },
 ];
 
 function readFlag(flag: string, fallback: string): string {
