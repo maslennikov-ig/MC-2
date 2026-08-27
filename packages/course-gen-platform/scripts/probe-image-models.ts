@@ -33,15 +33,56 @@ import { join } from 'node:path';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
- * What the models are asked for.
+ * What the pipeline actually asks for.
  *
- * Built to fail in the ways that matter for a course card rather than to look
- * pretty: Cyrillic text that has to be spelled correctly (the failure that
- * disqualified `quality: 'low'` on the incumbent — it misspelled the one word it
- * rendered), a stated count, a stated spatial arrangement, and a stated palette.
- * A model can produce a beautiful picture and still fail every one of those.
+ * This is `stage7_card_course` as it stands in `prompt_templates` on 2026-08-27,
+ * with `DEFAULT_CARD_VISUAL_STYLE` filled in and the service's negative prompt
+ * appended the way `generateImage` appends it. Not an approximation of the real
+ * thing — the real thing.
+ *
+ * It matters that it demands **no text at all**, because the first version of
+ * this script asked instead for a cinematic desk scene with a Cyrillic headline,
+ * and every conclusion drawn from that run was about a job the product does not
+ * do. Worse, it was landscape by construction — a table shot with three objects
+ * arranged left to right and a headline across the top — so forcing it to 1:1
+ * clipped the headline, and the incumbent got blamed for a crop this prompt had
+ * caused. A card is abstract, square, centred and text-free; judge on that.
+ *
+ * `--hard-text` restores the old prompt. It is still worth having, just not for
+ * this decision: nothing we ship puts a word inside a generated image.
  */
-const DEFAULT_PROMPT = `Кинематографичная обложка онлайн-курса, вид сверху на деревянный стол в тёплом вечернем свете.
+const CARD_PROMPT = `Create a professional 1:1 square thumbnail image for an educational course catalog.
+
+SUBJECT CONTEXT:
+Course: "Основы машинного обучения"
+Topic: практическое введение в машинное обучение для аналитиков
+Language Context: Russian
+
+VISUAL STYLE (MUST FOLLOW):
+Color Scheme: blue and purple gradients with subtle accents
+Aesthetic: modern, professional, clean
+Visual Elements: abstract geometric shapes, flowing lines
+Mood: professional, engaging, educational
+
+COMPOSITION REQUIREMENTS:
+- 1:1 square format (optimized for thumbnail display)
+- Abstract or symbolic representation of the course topic
+- Professional, modern digital art aesthetic
+- Rich visual depth with layered composition
+- Centered focal point that works at small sizes
+- High contrast for visibility in catalog grids
+
+CRITICAL CONSTRAINTS - NO TEXT:
+ABSOLUTELY NO text, letters, words, numbers, characters, typography, writing in ANY alphabet.
+Also AVOID: logos, watermarks, signatures, human faces.
+The image must be 100% text-free.
+
+Remember: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, TEXT-FREE IMAGE.
+
+Do not include any watermarks, logos, or signatures.`;
+
+/** The original text-rendering torture test, kept behind `--hard-text`. */
+const HARD_TEXT_PROMPT = `Кинематографичная обложка онлайн-курса, вид сверху на деревянный стол в тёплом вечернем свете.
 На столе ровно три предмета, слева направо: раскрытый ноутбук с графиком на экране, стопка из двух книг в тёмно-синих обложках, и керамическая кружка с паром.
 Над столом парит полупрозрачная голограмма нейронной сети из светящихся узлов и связей.
 В верхней трети кадра крупная аккуратная надпись кириллицей: «Основы машинного обучения».
@@ -70,6 +111,22 @@ const CANDIDATES: Candidate[] = [
   { id: 'bytedance-seed/seedream-5-0-pro', aspectRatio: '16:9', listed: '$0.045' },
   { id: 'krea/krea-2-medium', aspectRatio: '16:9', listed: 'не опубликована' },
   { id: 'meta/muse-image', aspectRatio: '16:9', listed: 'не опубликована' },
+  // The incumbent without the language model bolted on top. Same
+  // `output_image` rate to the cent — $0.000008/token — and the same `quality`
+  // enum, but OpenRouter's own warning about the GPT-5 image models is that they
+  // "generate images through an LLM ... and may incur extra inference cost". If
+  // that surcharge is real, this is the same picture for less.
+  { id: 'openai/gpt-image-1-mini', aspectRatio: '1:1', quality: 'medium', listed: '$0.000008/tok' },
+  { id: 'google/gemini-3.1-flash-lite-image', aspectRatio: '1:1', listed: '$0.00003/tok' },
+  { id: 'google/gemini-3.1-flash-image', aspectRatio: '1:1', listed: '$0.00006/tok' },
+  // Billed per token like the OpenAI pair, but at 13.5x their output rate.
+  { id: 'microsoft/mai-image-2.5-pro', aspectRatio: '1:1', listed: '$0.000108/tok' },
+  { id: 'microsoft/mai-image-2.5', aspectRatio: '1:1', listed: '$0.000047/tok' },
+  // The newer OpenAI pair: 3.75x the mini rate per output token, but they are
+  // the only OpenAI image models here that publish `9:16` — which is the ratio
+  // the mini pair cannot do at all, and the one a vertical lesson banner needs.
+  { id: 'openai/gpt-image-2', aspectRatio: '1:1', quality: 'medium', listed: '$0.00003/tok' },
+  { id: 'openai/gpt-5.4-image-2', aspectRatio: '1:1', quality: 'medium', listed: '$0.00003/tok' },
 ];
 
 function readFlag(flag: string, fallback: string): string {
@@ -211,7 +268,12 @@ async function main(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
 
   const promptFile = readFlag('--prompt-file', '');
-  const prompt = promptFile ? readFileSync(promptFile, 'utf8') : DEFAULT_PROMPT;
+  const hardText = process.argv.includes('--hard-text');
+  const prompt = promptFile
+    ? readFileSync(promptFile, 'utf8')
+    : hardText
+      ? HARD_TEXT_PROMPT
+      : CARD_PROMPT;
 
   const only = readFlag('--only', '');
   const wanted = only ? new Set(only.split(',').map(s => s.trim())) : null;
