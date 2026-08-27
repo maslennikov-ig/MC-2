@@ -22,24 +22,63 @@
  * because routing must not depend on a third party being reachable, and a check
  * that fails when the network does teaches people to ignore it.
  *
- * Read-only. Talks to nothing but `GET /api/v1/models`, which needs no key.
+ * **`--write` applies the new rates rather than reporting them.** Filing a
+ * ticket to have a person retype two numbers a machine already knows is a
+ * ritual, not a control: the runtime ceiling reads the *live* rate and only
+ * falls back to this catalogue when that lookup fails, and the figure a course
+ * is actually billed comes from `GET /api/v1/generation` seconds later. So the
+ * catalogue's precision earns nobody's attention, and the nightly job now keeps
+ * it current by itself.
+ *
+ * What still earns attention is a *large* move, and the size is not invented:
+ * the ceiling is the catalogued rate times
+ * {@link PROVIDER_PRICE_CEILING_MULTIPLIER}, so a rise of that factor is exactly
+ * the point where a stale entry stops being untidy and starts refusing every
+ * call to the model. Anything smaller is written silently; anything at or beyond
+ * it is also written, and then said out loud.
+ *
+ * Talks to `GET /api/v1/models`, which needs no key, and to
+ * `/api/v1/images/models/.../endpoints` for ids the chat list does not carry.
  *
  * Usage:
  *   pnpm -F course-gen-platform exec tsx scripts/check-model-catalog-drift.ts
  *   ... --all      check every catalogued model, not only the live routing set
+ *   ... --write    apply the published rates to the catalogue and its snapshot
  *
  * Refs mc2-hc91g
  */
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { MODEL_CATALOG, type ModelCapabilities } from '@megacampus/shared-types';
 
+import { PROVIDER_PRICE_CEILING_MULTIPLIER } from '@/shared/llm/client';
 import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
 
 const EXIT_UNREACHABLE = 2;
 const EXIT_DRIFT = 1;
 const REQUEST_TIMEOUT_MS = 20_000;
 const MODELS_URL = 'https://openrouter.ai/api/v1/models';
+
+/**
+ * The move that is worth waking somebody for, in either direction.
+ *
+ * Taken from the ceiling multiplier rather than chosen, because that is what
+ * makes it matter: `max_price` is the catalogued rate times this, so a rise of
+ * this factor puts the frozen ceiling under the real price and every endpoint is
+ * refused. A fall of the same size is harmless to the ceiling but means a third
+ * of the price vanished overnight, which is usually the provider set changing
+ * rather than a tariff being edited.
+ *
+ * For scale: the drifts this gate has actually found sit at 1.03x, 1.11x, 1.23x
+ * and 1.57x, and the one real incident — `deepseek-v4-flash` on 2026-08-25 —
+ * moved 2.33x inside two hours.
+ */
+const LOUD_RATIO = PROVIDER_PRICE_CEILING_MULTIPLIER;
+
+/** Where the two files that carry these numbers live. */
+const CATALOGUE_PATH = new URL('../../shared-types/src/model-catalog.ts', import.meta.url);
+const SNAPSHOT_PATH = new URL('../tests/unit/model-catalog-coverage.test.ts', import.meta.url);
 
 /**
  * How far a catalogued rate may sit from the published one before it is drift.
@@ -198,8 +237,115 @@ export function findDrift(
   return { drift, absent };
 }
 
+/**
+ * A published rate as a TypeScript literal.
+ *
+ * The published figures are per-token decimals multiplied by a million here, so
+ * they arrive carrying float noise — `0.0000000886066` becomes
+ * `0.08860600000000001`. Six decimals is well inside {@link TOLERANCE} and reads
+ * like a price rather than an artefact.
+ */
+export function formatRate(value: number): string {
+  return String(Number(value.toFixed(6)));
+}
+
+/**
+ * Replace one rate inside one model's entry in `model-catalog.ts`.
+ *
+ * Anchored on the entry's own key and stopped at the next one, so a field name
+ * that appears in twenty entries is only rewritten in the intended one. Returns
+ * the source unchanged when the field is not there — an entry that does not
+ * carry a rate is not one to invent a rate for.
+ */
+export function applyRateToCatalogue(
+  source: string,
+  modelId: string,
+  field: string,
+  value: number
+): string {
+  const key = `'${modelId}': {`;
+  const start = source.indexOf(key);
+  if (start === -1) return source;
+
+  // The entry ends at the line that closes it: two spaces, brace, comma. Every
+  // entry in this file is indented that way, and nothing nested inside one is.
+  const end = source.indexOf('\n  },', start);
+  if (end === -1) return source;
+
+  const block = source.slice(start, end);
+  const replaced = block.replace(
+    new RegExp(`(\\b${field}:\\s*)[\\d.]+`, 'u'),
+    `$1${formatRate(value)}`
+  );
+  return replaced === block ? source : source.slice(0, start) + replaced + source.slice(end);
+}
+
+/**
+ * Replace one rate in the hand-verified snapshot beside the catalogue.
+ *
+ * Two shapes live there: `'id': [input, output],` for text rates and
+ * `'id': N,` for the image ones. Every occurrence of the id is updated rather
+ * than the first — the retired-model table states the same published fact as the
+ * live one, and leaving one of them behind would make the pair disagree about
+ * what OpenRouter charges.
+ */
+export function applyRateToSnapshot(
+  source: string,
+  modelId: string,
+  field: string,
+  value: number
+): string {
+  const literal = formatRate(value);
+  const id = modelId.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+  if (field === 'inputPricePerMillion' || field === 'outputPricePerMillion') {
+    const slot = field === 'inputPricePerMillion' ? 1 : 2;
+    return source.replace(
+      new RegExp(`('${id}':\\s*\\[)([\\d.]+)(,\\s*)([\\d.]+)(\\])`, 'gu'),
+      (_match, open: string, input: string, gap: string, output: string, close: string) =>
+        slot === 1
+          ? `${open}${literal}${gap}${output}${close}`
+          : `${open}${input}${gap}${literal}${close}`
+    );
+  }
+
+  return source.replace(new RegExp(`('${id}':\\s*)[\\d.]+(,)`, 'gu'), `$1${literal}$2`);
+}
+
+/** Write every finding into both files, and say how many landed. */
+function applyFindings(findings: DriftFinding[]): number {
+  let catalogue = readFileSync(CATALOGUE_PATH, 'utf8');
+  let snapshot = readFileSync(SNAPSHOT_PATH, 'utf8');
+  let applied = 0;
+
+  for (const finding of findings) {
+    const nextCatalogue = applyRateToCatalogue(
+      catalogue,
+      finding.modelId,
+      finding.field,
+      finding.published
+    );
+    if (nextCatalogue === catalogue) {
+      console.warn(
+        `  could not find ${finding.modelId} ${finding.field} in the catalogue; left as it was`
+      );
+      continue;
+    }
+    catalogue = nextCatalogue;
+    snapshot = applyRateToSnapshot(snapshot, finding.modelId, finding.field, finding.published);
+    applied += 1;
+  }
+
+  if (applied > 0) {
+    writeFileSync(CATALOGUE_PATH, catalogue);
+    writeFileSync(SNAPSHOT_PATH, snapshot);
+  }
+  return applied;
+}
+
 async function main(): Promise<void> {
   const checkAll = process.argv.includes('--all');
+  const write = process.argv.includes('--write');
   // Derived from the registries that can actually put a model on the wire, not
   // from a hand-kept list of them. The list held seven ids; sixty days of
   // `generation_trace` to 2026-08-25 held eleven, six of which were therefore
@@ -294,20 +440,46 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('::error::MODEL_CATALOG no longer matches the published OpenRouter rates.');
-  for (const finding of drift) {
-    console.error(
-      `  ${finding.modelId} ${finding.field}: catalogue ${finding.catalogued}, ` +
-        `published ${finding.published} (${finding.ratio.toFixed(2)}x)`
+  // As a signed change, not as `ratio`. `ratio` is catalogued/published, so a
+  // price that doubled reads "0.46x" — true, and the opposite of how anyone will
+  // read it at 03:20 on a phone.
+  const describe = (finding: DriftFinding) => {
+    const change = (finding.published / finding.catalogued - 1) * 100;
+    return (
+      `${finding.modelId} ${finding.field}: ${finding.catalogued} → ${finding.published} ` +
+      `(${change > 0 ? '+' : ''}${change.toFixed(0)}%)`
+    );
+  };
+
+  const loud = drift.filter(
+    finding => finding.ratio >= LOUD_RATIO || finding.ratio <= 1 / LOUD_RATIO
+  );
+
+  if (!write) {
+    console.error('::error::MODEL_CATALOG no longer matches the published OpenRouter rates.');
+    for (const finding of drift) console.error(`  ${describe(finding)}`);
+    console.error('Re-run with --write to apply these, or edit the two files by hand.');
+    process.exit(EXIT_DRIFT);
+  }
+
+  const applied = applyFindings(drift);
+  console.log(`applied ${applied} of ${drift.length} published rate(s):`);
+  for (const finding of drift) console.log(`  ${describe(finding)}`);
+
+  if (loud.length > 0) {
+    // The workflow reads this file to decide whether anybody hears about it. A
+    // file rather than an exit code, because "the catalogue moved a lot" and
+    // "the job failed" are different things and a nightly job that fails on the
+    // first is one people stop reading.
+    writeFileSync(
+      new URL('../drift-loud.txt', import.meta.url),
+      `${loud.map(describe).join('\n')}\n`
+    );
+    console.log(
+      `\n${loud.length} of them moved by ${LOUD_RATIO}x or more — the factor the price ` +
+        `ceiling is built from, so this is where a stale entry starts refusing calls.`
     );
   }
-  console.error(
-    'Update packages/shared-types/src/model-catalog.ts and the snapshot in\n' +
-      'tests/unit/model-catalog-coverage.test.ts. A stale price is not only a wrong\n' +
-      'report: provider.max_price is built from these numbers, and a ceiling under\n' +
-      'every endpoint refuses the call outright.'
-  );
-  process.exit(EXIT_DRIFT);
 }
 
 // Only run when invoked directly: the comparison above is imported by tests.

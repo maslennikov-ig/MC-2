@@ -145,3 +145,7 @@ docs/plans/telegram-notifications-plan.md
 .dolt/
 *.db
 .beads-credential-key
+
+# Written by the nightly price sync so the workflow can tell whether a move was
+# large enough to say out loud. A run artefact, not a record.
+packages/course-gen-platform/drift-loud.txt
