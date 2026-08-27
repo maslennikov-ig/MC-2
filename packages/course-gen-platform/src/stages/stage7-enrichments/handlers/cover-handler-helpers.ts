@@ -22,7 +22,11 @@ import { createPromptService } from '@/shared/prompts/prompt-service';
 import { uploadEnrichmentAsset, buildPublicUrl } from '../services/unified-storage-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
-import { generateImage, base64ToBuffer, convertToWebP } from '../services/image-generation-service';
+import {
+  generateCoverImage,
+  base64ToBuffer,
+  convertToWebP,
+} from '../services/image-generation-service';
 import { getLessonContent } from '../services/database-service';
 import {
   retryWithBackoff,
@@ -371,8 +375,20 @@ export async function processImagePipeline(
   lessonId: string,
   enrichmentId: string
 ): Promise<ImagePipelineResult> {
-  const imageResult = await generateImage(imagePrompt, {
-    costContext: { courseId, stage: 'stage_7', phase: 'stage_7_cover', lessonId },
+  // `generateCoverImage`, not `generateImage`. The difference is that the
+  // wrapper resolves `stage_7_cover` from `llm_model_config`; calling
+  // `generateImage` with no model took `DEFAULT_IMAGE_MODEL` and nothing else,
+  // so the row an operator edits in pipeline-admin decided nothing and the
+  // screen quietly lied about which model drew the banner (mc2-emxdq).
+  //
+  // The wrapper was not dead code — it was live only in a test, which is worse:
+  // `image-is-priced.test.ts` proved routing worked on a function production
+  // never called.
+  const imageResult = await generateCoverImage(imagePrompt, {
+    courseId,
+    stage: 'stage_7',
+    phase: 'stage_7_cover',
+    lessonId,
   });
   logger.info(
     { enrichmentId, mimeType: imageResult.mimeType, costUsd: imageResult.costUsd },

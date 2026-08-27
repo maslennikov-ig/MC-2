@@ -183,6 +183,22 @@ export async function uploadCourseCard(
 }
 
 /**
+ * Where {@link uploadCourseCard} put the course card.
+ *
+ * The two backends do not agree on the shape — local writes `{courseId}/card.webp`
+ * and Supabase writes `{courseId}/course-card/card.webp` — and until something
+ * needed to read the card back, nothing had to know that. Reconstructing it at
+ * the call site would put a copy of both conventions somewhere that does not own
+ * either, so it lives here, beside the function whose choice it is.
+ */
+export function courseCardStoragePath(courseId: string, extension = 'webp'): string {
+  const normalizedExtension = toNormalizedExtension(extension);
+  return useLocalStorage()
+    ? `${courseId}/card.${normalizedExtension}`
+    : `${courseId}/course-card/card.${normalizedExtension}`;
+}
+
+/**
  * Upload Career Playbook card image.
  *
  * Uses path career-playbooks/{playbookId}/card.webp on both storage backends.

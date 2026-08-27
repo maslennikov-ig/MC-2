@@ -209,6 +209,20 @@ export interface ImageGenerationOptions {
   negativePrompt?: string;
   /** Whether to skip negative prompt (default: false) */
   skipNegativePrompt?: boolean;
+  /**
+   * Pictures for the model to match, as `data:` URLs.
+   *
+   * Until now a course held its look together by describing it: `visual_style`
+   * became four lines of prose — "blue and purple gradients with subtle
+   * accents", "abstract geometric shapes, flowing lines" — and every card was
+   * drawn from that description alone, never having seen its siblings. Two cards
+   * from one course could satisfy every word of it and still look unrelated.
+   *
+   * A reference image is the same instruction in the medium the model actually
+   * works in. Both endpoints take them, by different names: `input_references`
+   * on the Images API, ordinary `image_url` content parts on chat completions.
+   */
+  referenceImages?: string[];
 }
 
 export interface ImageGenerationResult {
@@ -329,21 +343,67 @@ function parseImageDataUrl(imageDataUrl: string): { mimeType: string; base64Data
   return { mimeType: dataUrlMatch[1], base64Data: dataUrlMatch[2] };
 }
 
+/**
+ * Ask for the cheaper endpoint when the model publishes one.
+ *
+ * `google/gemini-2.5-flash-image` serves the same picture from
+ * `google-ai-studio/flex` at exactly half price, and **OpenRouter does not pick
+ * it on its own**. Measured 2026-08-27 on one prompt, billed by the provider:
+ * no pin $0.038553, flex pinned $0.019247, base pinned $0.038469. The route
+ * makes no difference — the same call through the Images API billed $0.038807 —
+ * so the flex pin is the entire saving (mc2-6qwia).
+ *
+ * `allow_fallbacks` stays **true** and the base tier is listed behind flex on
+ * purpose. Flex refuses rather than queues when capacity is short, and this
+ * repository has already paid for learning that a hard pin turns a busy tier
+ * into a failed call rather than a dearer one. A banner that costs full price is
+ * a worse outcome than one that costs half, and a much better one than no banner.
+ *
+ * Only Gemini publishes tiers here; every OpenAI image model has a single
+ * endpoint, so for them this is correctly absent rather than merely unset.
+ */
+function preferredEndpoints(model: string): string[] {
+  if (!model.startsWith('google/')) return [];
+  return [
+    'google-ai-studio/flex',
+    'google-vertex/global/flex',
+    'google-ai-studio',
+    'google-vertex/global',
+  ];
+}
+
 /** `image_config` is a Gemini-only extension; sending it to other models is an OpenRouter error. */
 function buildChatImageRequest(
   model: string,
   fullPrompt: string,
   aspectRatio: string,
-  imageSize: string
+  imageSize: string,
+  referenceImages: string[] = []
 ): Record<string, unknown> {
+  // Chat completions has no `input_references`; a reference here is an ordinary
+  // `image_url` content part, and the text part has to survive alongside it —
+  // which is why `content` becomes an array only when there is something to add.
+  const content =
+    referenceImages.length > 0
+      ? [
+          { type: 'text', text: fullPrompt },
+          ...referenceImages.map(url => ({ type: 'image_url', image_url: { url } })),
+        ]
+      : fullPrompt;
+
   const requestOptions: Record<string, unknown> = {
     model,
-    messages: [{ role: 'user', content: fullPrompt }],
+    messages: [{ role: 'user', content }],
     modalities: ['text', 'image'],
   };
 
   if (supportsImageConfig(model)) {
     requestOptions.image_config = { aspect_ratio: aspectRatio, image_size: imageSize };
+  }
+
+  const order = preferredEndpoints(model);
+  if (order.length > 0) {
+    requestOptions.provider = { order, allow_fallbacks: true };
   }
 
   return requestOptions;
@@ -358,6 +418,7 @@ export async function generateImage(
   const imageSize = options.imageSize ?? DEFAULT_IMAGE_SIZE;
   const negativePrompt = options.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT;
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
+  const referenceImages = options.referenceImages ?? [];
   const viaImagesApi = usesImagesApi(model);
   const quality = viaImagesApi ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
 
@@ -406,6 +467,7 @@ export async function generateImage(
           model,
           prompt: fullPrompt,
           ...(quality ? { quality } : {}),
+          ...(referenceImages.length > 0 ? { inputReferences: referenceImages } : {}),
           aspectRatio,
           signal: abortController.signal,
         });
@@ -418,7 +480,13 @@ export async function generateImage(
       // stayed an invented constant for as long as the service existed
       // (mc2-l17v5).
       const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
-      const requestOptions = buildChatImageRequest(model, fullPrompt, aspectRatio, imageSize);
+      const requestOptions = buildChatImageRequest(
+        model,
+        fullPrompt,
+        aspectRatio,
+        imageSize,
+        referenceImages
+      );
       // cost-exempt: an image is billed per image token, not per text token, so
       // this call prices itself with `recordImageCallCost` below rather than
       // through either LLM wrapper — and then replaces that estimate with the
@@ -594,34 +662,46 @@ async function recordFailedImageSpend(params: {
  */
 export async function generateCardImage(
   prompt: string,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  referenceImages: string[] = []
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: await resolveImageModel('stage_7_card', CARD_IMAGE_MODEL, costContext?.courseId),
     aspectRatio: '1:1',
     imageSize: '1K',
     costContext,
+    ...(referenceImages.length > 0 ? { referenceImages } : {}),
   });
 }
 
 /**
- * Generate a cover image (21:9 cinematic) using Gemini
+ * Generate a wide lesson banner.
  *
- * Convenience wrapper for cover generation with optimal settings.
- * Gemini produces high-quality 21:9 cinematic covers at 1536x672.
+ * **16:9, not 21:9.** Both cover templates in `prompt_templates` tell the model
+ * it is composing a "16:9 hero banner" — `stage7_cover_system` under Style
+ * Guidelines and `stage7_cover_user` in its closing instruction — while this
+ * function asked the API for 21:9. The model laid out for one frame and was
+ * rendered into a wider one. The owner's requirement is a widescreen banner
+ * rather than that exact ratio, so the code now agrees with the prompt instead
+ * of the prompt being rewritten to excuse the code.
+ *
+ * It also widens the field considerably: 43 of the 48 image models publish 16:9,
+ * against 19 that publish 21:9.
  *
  * @param prompt - Cover image prompt
- * @returns Generated cover image data
+ * @returns Generated image data
  */
 export async function generateCoverImage(
   prompt: string,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  referenceImages: string[] = []
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: await resolveImageModel('stage_7_cover', DEFAULT_IMAGE_MODEL, costContext?.courseId),
-    aspectRatio: '21:9',
+    aspectRatio: '16:9',
     imageSize: '1K',
     costContext,
+    ...(referenceImages.length > 0 ? { referenceImages } : {}),
   });
 }
 

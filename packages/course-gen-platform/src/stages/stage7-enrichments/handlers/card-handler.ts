@@ -18,6 +18,8 @@ import {
   uploadEnrichmentAsset,
   uploadCourseCard,
   buildPublicUrl,
+  courseCardStoragePath,
+  assetExists,
 } from '../services/unified-storage-service';
 import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
@@ -169,6 +171,37 @@ function applyCustomPrompt(imagePrompt: string, customPrompt: string): string {
     : `${imagePrompt} ${customPrompt}`;
 }
 
+/**
+ * The course's own card, for a lesson card to be drawn in the family of.
+ *
+ * A course kept its look together by *describing* it: `visual_style` became four
+ * lines of prose in the prompt, and every card was drawn from that description
+ * having never seen a sibling. Two cards could satisfy every word — "blue and
+ * purple gradients", "abstract geometric shapes" — and still look like they came
+ * from different products. The model now gets shown the thing instead.
+ *
+ * Every failure here returns `undefined`. A reference is an improvement to a
+ * card, never a reason not to have one: a course whose own card has not been
+ * generated yet is the ordinary case for the first card in a run, and a storage
+ * hiccup must not cost a lesson its image.
+ */
+async function loadCourseCardReference(courseId: string): Promise<string | undefined> {
+  try {
+    const storagePath = courseCardStoragePath(courseId);
+    if (!(await assetExists(storagePath))) return undefined;
+
+    const response = await fetch(buildPublicUrl(storagePath));
+    if (!response.ok) return undefined;
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const mimeType = response.headers.get('content-type') ?? 'image/webp';
+    return `data:${mimeType};base64,${buffer.toString('base64')}`;
+  } catch (err) {
+    logger.debug({ courseId, error: err }, 'Card handler: no course card to reference');
+    return undefined;
+  }
+}
+
 /** The full image prompt for one card: database template, inline fallback, user additions. */
 async function buildCardPrompt(
   input: EnrichmentHandlerInput,
@@ -299,13 +332,22 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   try {
     const imagePrompt = await buildCardPrompt(input, { isCourseCard, lessonContent });
 
+    // A lesson card is shown the course card so the set looks like a set. The
+    // course card itself has nothing to match and gets none — it is the thing
+    // being matched.
+    const reference = isCourseCard ? undefined : await loadCourseCardReference(course.id);
+
     // Generate image using GPT-5 Image Mini (1024x1024)
-    const imageResult = await generateCardImage(imagePrompt, {
-      courseId: course.id,
-      stage: 'stage_7',
-      phase: 'stage_7_card',
-      lessonId: lesson.id,
-    });
+    const imageResult = await generateCardImage(
+      imagePrompt,
+      {
+        courseId: course.id,
+        stage: 'stage_7',
+        phase: 'stage_7_card',
+        lessonId: lesson.id,
+      },
+      reference ? [reference] : []
+    );
     // `?? 0` only for the enrichment's own metadata field, which is a display
     // number and not the ledger. The ledger row is in `generation_trace`, where
     // an unestimated call is left genuinely unpriced and then settled against

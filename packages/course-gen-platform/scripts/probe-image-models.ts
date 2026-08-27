@@ -81,6 +81,21 @@ Remember: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, TEXT-FREE IMAGE.
 
 Do not include any watermarks, logos, or signatures.`;
 
+/**
+ * A lesson banner, in the shape `stage7_cover_system` demands of the LLM that
+ * writes these: abstract, 1-3 sentences, 50-100 words, ending in the no-text
+ * clause.
+ *
+ * Note what the template says and what the code asks for. Both
+ * `stage7_cover_system` and `stage7_cover_user` say "16:9 hero banner", twice;
+ * `DEFAULT_ASPECT_RATIO` is `'21:9'` and `getImageDimensions` returns 1536x672
+ * for it. So the model is told to compose for one frame and rendered into a
+ * wider one.
+ */
+const COVER_PROMPT = `An abstract hero banner representing supervised machine learning: layered translucent planes of deep blue and violet receding into depth, a luminous cluster of connected nodes drifting slightly left of centre, thin flowing gradient lines sweeping across the frame. Modern, clean, high-quality digital art with rich colour and a clear sense of depth. Absolutely no text, text-free image.
+
+Do not include any watermarks, logos, or signatures.`;
+
 /** The original text-rendering torture test, kept behind `--hard-text`. */
 const HARD_TEXT_PROMPT = `Кинематографичная обложка онлайн-курса, вид сверху на деревянный стол в тёплом вечернем свете.
 На столе ровно три предмета, слева направо: раскрытый ноутбук с графиком на экране, стопка из двух книг в тёмно-синих обложках, и керамическая кружка с паром.
@@ -127,6 +142,13 @@ const CANDIDATES: Candidate[] = [
   // the mini pair cannot do at all, and the one a vertical lesson banner needs.
   { id: 'openai/gpt-image-2', aspectRatio: '1:1', quality: 'medium', listed: '$0.00003/tok' },
   { id: 'openai/gpt-5.4-image-2', aspectRatio: '1:1', quality: 'medium', listed: '$0.00003/tok' },
+  // Widescreen candidates, for the banner rather than the card. The owner's
+  // constraint is "wide", not 21:9 specifically, which matters: 43 models do
+  // 16:9 against 19 that do 21:9, and 16:9 is what both cover templates already
+  // tell the model it is composing for.
+  { id: 'black-forest-labs/flux.2-klein-4b', aspectRatio: '16:9', listed: '~$0.0145' },
+  { id: 'sourceful/riverflow-v2.5-fast', aspectRatio: '16:9', listed: '$0.019' },
+  { id: 'black-forest-labs/flux.2-pro', aspectRatio: '16:9', listed: '~$0.031' },
 ];
 
 function readFlag(flag: string, fallback: string): string {
@@ -269,11 +291,14 @@ async function main(): Promise<void> {
 
   const promptFile = readFlag('--prompt-file', '');
   const hardText = process.argv.includes('--hard-text');
+  const cover = process.argv.includes('--cover');
   const prompt = promptFile
     ? readFileSync(promptFile, 'utf8')
     : hardText
       ? HARD_TEXT_PROMPT
-      : CARD_PROMPT;
+      : cover
+        ? COVER_PROMPT
+        : CARD_PROMPT;
 
   const only = readFlag('--only', '');
   const wanted = only ? new Set(only.split(',').map(s => s.trim())) : null;
@@ -284,7 +309,17 @@ async function main(): Promise<void> {
   // run at 16:9 compares something we do not ship. `--aspect` forces the whole
   // field onto one ratio so the pictures are answerable side by side.
   const aspect = readFlag('--aspect', '');
-  const candidates = aspect ? selected.map(c => ({ ...c, aspectRatio: aspect })) : selected;
+  const withAspect = aspect ? selected.map(c => ({ ...c, aspectRatio: aspect })) : selected;
+
+  // `--quality` forces the tier on every candidate that has one. The incumbent's
+  // tier was chosen against a prompt that asked for a word and got it misspelled
+  // at `low`; the production card prompt forbids letters entirely, so that
+  // evidence never applied to it and the tier is worth re-deciding on the real
+  // brief.
+  const quality = readFlag('--quality', '') as '' | 'auto' | 'low' | 'medium' | 'high';
+  const candidates = quality
+    ? withAspect.map(c => (c.quality ? { ...c, quality } : c))
+    : withAspect;
 
   console.log(
     `Промпт (${prompt.length} символов), ${candidates.length} моделей, вывод в ${outDir}\n`
