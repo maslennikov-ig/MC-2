@@ -192,10 +192,31 @@ chunk of each new document outranks the true answer. That is not a bug — it is
 diversity _is_. `group_size` is not the lever either: 3 is marginally better than 2, and 4 and above
 are much worse.
 
-**This is a trade — diversity against relevance — and it reverses an accepted decision
-(`mc2-jz6y0.16`), so it is reported and not decided here.** Nothing in the Stage 6 request shape was
-changed. The three options are: keep grouping as it is; raise `group_size` to 3 for a small gain; or
-turn grouping off for Stage 6 and accept that one document may dominate a lesson's context.
+### The diversity it costs that for: 0.11 documents per lesson
+
+The tables above score one query at a time, which is the right unit for ranking and the wrong one for
+the question grouping exists to answer. Stage 6 issues up to ten queries per lesson and keeps their
+union, so what matters is how concentrated **that** is. Measured with `benchmark:rag concentration`,
+running each course's real objectives together as one lesson's query set, taking the union the way
+`runQueryPass` does and keeping the top 7 by score:
+
+|                             | Documents per lesson | Largest document's share of the context | Lessons from a single document |
+| --------------------------- | -------------------- | --------------------------------------- | ------------------------------ |
+| grouping on (as configured) | **1.78**             | 86%                                     | 6 of 9                         |
+| grouping off                | **1.67**             | 87%                                     | 6 of 9                         |
+
+**Grouping buys 0.11 documents per lesson.** One document already dominates most lessons with the cap
+in force — in six of nine it supplies the whole context — because these courses simply do not have
+several documents that bear on the same lesson. The cap is paying 22.6 points of recall for diversity
+the corpus cannot supply.
+
+It also starves the reranker. With grouping on, five queries returned a union of 9 chunks for four of
+the nine courses; with it off the same five queries returned 27 to 38. `candidateMultiplier: 4` exists
+to give the cross-encoder four candidates per kept chunk, and only the second arm delivers that.
+
+**This reverses an accepted decision (`mc2-jz6y0.16`), so it is the owner's call and nothing in the
+Stage 6 request shape was changed here.** On the evidence the recommendation is to turn grouping off
+for Stage 6: it costs 22.6 points of recall@5 and returns 0.11 documents of diversity.
 
 Two consequences worth carrying into that decision:
 

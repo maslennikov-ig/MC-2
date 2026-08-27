@@ -69,7 +69,10 @@ const { QDRANT_COLLECTION_ALIAS } = await import('../src/shared/qdrant/config.js
 const { extractPayload } = await import('../src/shared/qdrant/search-helpers.js');
 const { getSupabaseAdmin } = await import('../src/shared/supabase/admin.js');
 const { createOpenRouterModel } = await import('../src/shared/llm/langchain-models.js');
-const { ENTRY_POINTS, entryPoint } = await import('../src/shared/rag-eval/entry-points.js');
+const { ENTRY_POINTS, entryPoint, lessonCandidateLimit } = await import(
+  '../src/shared/rag-eval/entry-points.js'
+);
+const { searchChunks } = await import('../src/shared/qdrant/search.js');
 const { EVAL_SET_VERSION, assertEvalSet, roundVector, scorableQueries } = await import(
   '../src/shared/rag-eval/eval-set.js'
 );
@@ -876,6 +879,106 @@ async function commandVariants(): Promise<void> {
   console.log(`\nFull results: ${path.relative(PACKAGE_ROOT, outputPath)}`);
 }
 
+// ---------------------------------------------------------------------------
+// concentration
+// ---------------------------------------------------------------------------
+
+/**
+ * How many documents a whole lesson's context would actually come from.
+ *
+ * `run` and `variants` score one query at a time, which is the right unit for
+ * ranking but the wrong one for the question grouping exists to answer. Stage 6
+ * issues up to `MAX_QUERIES` queries per lesson and keeps the union of what they
+ * return, so the concentration that matters is the concentration of that union
+ * — and a single-query measurement overstates it, because one query has one
+ * best document while ten queries pull in whatever each of them finds.
+ *
+ * This runs a course's real objectives together as one lesson's query set, takes
+ * the union the way `runQueryPass` does, keeps the top `TARGET_CHUNKS` by score,
+ * and reports how many distinct documents those chunks came from — with the cap
+ * on and with it off. Read-only, no reranker, no spend.
+ */
+async function commandConcentration(): Promise<void> {
+  const name = collectionName();
+  await assertOurCollection();
+  const set = readJson<EvalSet>(EVAL_SET_PATH);
+  assertEvalSet(set);
+  await seedEmbeddingCache(readJson<EvalEmbeddings>(EMBEDDINGS_PATH)).catch(() => 0);
+  await clearSearchCache().catch(() => 0);
+
+  const stage6 = entryPoint('stage6');
+  const byCourse = new Map<string, EvalQuery[]>();
+  for (const query of set.queries) {
+    if (query.source !== 'lesson-objective') continue;
+    const list = byCourse.get(query.course_id);
+    if (list) list.push(query);
+    else byCourse.set(query.course_id, [query]);
+  }
+
+  const shapes = [
+    { label: 'grouping on (as configured)', patch: {} },
+    { label: 'grouping off', patch: { group_by_document: false } },
+  ] as const;
+
+  const rows = [];
+  for (const shape of shapes) {
+    console.log(`\n   ${shape.label}`);
+    const perCourse = [];
+    for (const [courseId, queries] of byCourse) {
+      const best = new Map<string, { documentId: string; score: number }>();
+      for (const query of queries) {
+        const options = {
+          ...stage6.buildOptions(query, stage6.defaultThreshold),
+          ...shape.patch,
+          // The whole lesson shares the candidate budget, exactly as the stage
+          // divides it across the queries a lesson produced.
+          limit: lessonCandidateLimit(7, queries.length),
+        };
+        const response = await searchChunks(query.query, {
+          ...options,
+          collection_name: name,
+        });
+        for (const result of response.results) {
+          const seen = best.get(result.chunk_id);
+          if (!seen || result.score > seen.score) {
+            best.set(result.chunk_id, { documentId: result.document_id, score: result.score });
+          }
+        }
+      }
+
+      const top = [...best.values()].sort((left, right) => right.score - left.score).slice(0, 7);
+      const perDocument = new Map<string, number>();
+      for (const chunk of top) {
+        perDocument.set(chunk.documentId, (perDocument.get(chunk.documentId) ?? 0) + 1);
+      }
+      const largest = Math.max(0, ...perDocument.values());
+      perCourse.push({
+        courseId,
+        queries: queries.length,
+        unionChunks: best.size,
+        contextChunks: top.length,
+        documentsInContext: perDocument.size,
+        largestDocumentShare: top.length > 0 ? largest / top.length : 0,
+      });
+      console.log(
+        `      ${courseId.slice(0, 8)}  ${queries.length} queries  union=${String(best.size).padStart(3)}` +
+          `  context=${top.length} chunks from ${perDocument.size} document(s)` +
+          `  biggest share ${(top.length > 0 ? (largest / top.length) * 100 : 0).toFixed(0)}%`
+      );
+    }
+
+    const single = perCourse.filter(course => course.documentsInContext <= 1).length;
+    console.log(
+      `      -> mean ${mean(perCourse.map(c => c.documentsInContext)).toFixed(2)} documents per lesson;` +
+        ` largest document holds ${(mean(perCourse.map(c => c.largestDocumentShare)) * 100).toFixed(0)}% of the context on average;` +
+        ` ${single}/${perCourse.length} lessons come from a single document`
+    );
+    rows.push({ shape: shape.label, perCourse });
+  }
+
+  writeJson(path.join(DATA_DIR, 'last-concentration.json'), { collection: name, rows });
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? 'run';
   if (command === 'build') await commandBuild();
@@ -884,12 +987,20 @@ async function main(): Promise<void> {
       throw new Error(`No evaluation set at ${EVAL_SET_PATH}; run \`pnpm benchmark:rag build\``);
     }
     await commandVariants();
+  } else if (command === 'concentration') {
+    if (!existsSync(EVAL_SET_PATH)) {
+      throw new Error(`No evaluation set at ${EVAL_SET_PATH}; run \`pnpm benchmark:rag build\``);
+    }
+    await commandConcentration();
   } else if (command === 'run') {
     if (!existsSync(EVAL_SET_PATH)) {
       throw new Error(`No evaluation set at ${EVAL_SET_PATH}; run \`pnpm benchmark:rag build\``);
     }
     await commandRun();
-  } else throw new Error(`Unknown command "${command}". Use "build", "run" or "variants".`);
+  } else
+    throw new Error(
+      `Unknown command "${command}". Use "build", "run", "variants" or "concentration".`
+    );
 }
 
 await main()

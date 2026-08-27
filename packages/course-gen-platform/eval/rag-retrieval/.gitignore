@@ -3,4 +3,5 @@
 # eval-set.json and query-embeddings.json — are what make a re-run free and
 # repeatable; these are what the re-run produces.
 last-run.json
+last-concentration.json
 last-variants.json
