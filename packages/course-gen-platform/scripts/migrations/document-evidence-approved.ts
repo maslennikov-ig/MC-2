@@ -578,8 +578,11 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // single UPDATE of `llm_model_config`, so no new `after-*` digest — and this
 // time the re-pin happened in the same edit as the migration rather than after
 // CI said so, which is what the two notes above were asking for.
+// Re-pinned again 2026-08-27: 245 files, adding
+// 20260827180000_lesson_banner_moves_to_riverflow.sql. Another single UPDATE of
+// `llm_model_config`, so no new `after-*` digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '4e84535b4bbdef78c46a401e3c76b1d47c33e1fb5bda2446ea426e16cdaddbc1';
+  '36251d98d3de2d921766a5367bf713fd8857ce65654165ddc4af94bc95fa8436';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

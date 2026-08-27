@@ -295,6 +295,14 @@ export interface ImageCallUsage {
  */
 export function calculateImageCostUsd(usage: ImageCallUsage): number | undefined {
   const capabilities = getModelCapabilities(usage.model);
+
+  // A flat per-image price is not convertible to a token rate and does not need
+  // to be: the models that charge this way report no output tokens at all, so
+  // the arithmetic below would return `undefined` for them no matter what rate
+  // was on file. Checked first because where both exist, the flat figure is the
+  // one the provider actually bills.
+  if (capabilities?.imagePriceFlatUsd !== undefined) return capabilities.imagePriceFlatUsd;
+
   if (!capabilities?.imageOutputPricePerMillion) return undefined;
   // `== null`, not falsy: a call that genuinely reported zero output tokens is a
   // measurement, and pricing it as "unknown" is the shape that once corrupted

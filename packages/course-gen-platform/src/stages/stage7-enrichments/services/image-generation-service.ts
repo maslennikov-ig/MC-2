@@ -39,7 +39,18 @@ import { createModelConfigService } from '@/shared/llm/model-config-service';
  * They stay as a floor rather than being deleted: a database that will not
  * answer must not stop a course from getting its cover.
  */
-const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
+/**
+ * The banner model, chosen 2026-08-27 by measuring every 16:9-capable model on
+ * OpenRouter rather than by reputation.
+ *
+ * Billed, one prompt each: riverflow $0.013954, flux.2-klein-4b $0.015000,
+ * gpt-image-2 $0.032775, seedream-5-0-lite $0.035000, the previous
+ * gemini-2.5-flash-image $0.038725 — $0.019247 of that recoverable by pinning
+ * flex, which is now done and still leaves it 38% dearer than this. The picture
+ * is also the better one: asked for layered translucent planes with a node
+ * cluster left of centre in blue and violet, it produced exactly that, text-free.
+ */
+const DEFAULT_IMAGE_MODEL = 'sourceful/riverflow-v2.5-fast';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
@@ -137,7 +148,33 @@ function supportsImageConfig(model: string): boolean {
  * we were paying to hold the picture.
  */
 function usesImagesApi(model: string): boolean {
-  return model.startsWith('openai/');
+  // Images API unless the model is one chat completions can actually serve.
+  //
+  // This read `startsWith('openai/')` until 2026-08-27, which is the wrong
+  // question and quietly made 37 of the 48 image models unreachable: anything
+  // that was not OpenAI went to chat completions, and only 9 image models exist
+  // there at all — six Google and three OpenAI. `sourceful/riverflow-v2.5-fast`
+  // renders through `/images` perfectly well and would have failed as an unknown
+  // chat model, which reads like the model being broken rather than the route.
+  //
+  // Google is the exception in the other direction. `/images` publishes no tiers
+  // for it, chat completions publishes `google-ai-studio/flex` at half price,
+  // and `image_config` is a chat-only extension. So Gemini earns its detour;
+  // nothing else does.
+  return !model.startsWith('google/');
+}
+
+/**
+ * Whether asking this model for less detail is a thing it understands.
+ *
+ * Seven of the forty-eight publish `quality`, and they are the OpenAI image
+ * models plus `x-ai/grok-imagine-image-2.0`. Sending it to the other
+ * forty-one is a 400, so the tier cannot simply follow "went through the Images
+ * API" the way it used to — that was true only while OpenAI was the only model
+ * on that route.
+ */
+function supportsQuality(model: string): boolean {
+  return model.startsWith('openai/') || model === 'x-ai/grok-imagine-image-2.0';
 }
 
 /**
@@ -420,7 +457,8 @@ export async function generateImage(
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
   const referenceImages = options.referenceImages ?? [];
   const viaImagesApi = usesImagesApi(model);
-  const quality = viaImagesApi ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
+  const quality =
+    viaImagesApi && supportsQuality(model) ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
 
   // Append negative prompt to strengthen text avoidance
   // Gemini works best with natural language instructions

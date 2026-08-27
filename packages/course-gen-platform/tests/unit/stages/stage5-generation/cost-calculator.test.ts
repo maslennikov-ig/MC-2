@@ -67,9 +67,16 @@ describe('Stage 5 Cost Calculator Service', () => {
     });
 
     it('should have positive pricing values for all models', () => {
-      Object.entries(OPENROUTER_PRICING).forEach(([, pricing]) => {
-        expect(pricing.inputPricePerMillion).toBeGreaterThan(0);
-        expect(pricing.outputPricePerMillion).toBeGreaterThan(0);
+      // Except the image-only ones, whose endpoints publish no text leg to
+      // quote. `sourceful/riverflow-v2.5-fast` charges a flat price per frame;
+      // the zeros here mean "not offered", and its real rate is asserted in
+      // `model-catalog-coverage` as `imagePriceFlatUsd`. A model with no
+      // positive price of any kind still fails there, which is the case this
+      // check is guarding against.
+      Object.entries(OPENROUTER_PRICING).forEach(([modelId, pricing]) => {
+        if (MODEL_CATALOG[modelId]?.imagePriceFlatUsd !== undefined) return;
+        expect(pricing.inputPricePerMillion, modelId).toBeGreaterThan(0);
+        expect(pricing.outputPricePerMillion, modelId).toBeGreaterThan(0);
       });
     });
   });

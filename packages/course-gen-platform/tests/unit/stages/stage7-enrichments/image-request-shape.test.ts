@@ -51,6 +51,7 @@ vi.mock('openai', () => ({
 import {
   generateCardImage,
   generateCoverImage,
+  generateImage,
 } from '@/stages/stage7-enrichments/services/image-generation-service';
 
 const COURSE_ID = '944e6795-580c-45b7-8eee-75a67c123965';
@@ -97,15 +98,30 @@ beforeEach(() => {
   });
 });
 
+/**
+ * The chat route, named rather than assumed.
+ *
+ * These used to call `generateCoverImage` and read the chat mock, which worked
+ * only because the banner happened to be a Gemini model. It is riverflow now,
+ * and riverflow goes through the Images API — so the tests broke on a change
+ * they were not about. A test about the chat path should say which model it
+ * means.
+ */
+const GEMINI = 'google/gemini-2.5-flash-image';
+
 describe('what a picture request carries', () => {
   it('asks the banner model for the frame its own prompt describes', async () => {
     await generateCoverImage('a banner', { courseId: COURSE_ID, stage: 'stage_7' });
 
-    expect(chatRequest().image_config).toMatchObject({ aspect_ratio: '16:9' });
+    // Both cover templates say "16:9 hero banner"; the code asked for 21:9.
+    expect(imagesRequestBody().aspect_ratio).toBe('16:9');
   });
 
   it('names the flex endpoint first, and lets the call fall back off it', async () => {
-    await generateCoverImage('a banner', { courseId: COURSE_ID, stage: 'stage_7' });
+    await generateImage('a banner', {
+      model: GEMINI,
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
 
     const provider = chatRequest().provider as { order: string[]; allow_fallbacks: boolean };
     expect(provider.order[0]).toBe('google-ai-studio/flex');
@@ -141,7 +157,11 @@ describe('what a picture request carries', () => {
   });
 
   it('carries a reference through chat completions as a content part', async () => {
-    await generateCoverImage('a banner', { courseId: COURSE_ID, stage: 'stage_7' }, [REFERENCE]);
+    await generateImage('a banner', {
+      model: GEMINI,
+      referenceImages: [REFERENCE],
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
 
     const messages = chatRequest().messages as Array<{ content: unknown }>;
     // Chat completions has no `input_references`. The prompt has to survive
@@ -153,9 +173,52 @@ describe('what a picture request carries', () => {
   });
 
   it('leaves the prompt a plain string when no reference is given', async () => {
-    await generateCoverImage('a banner', { courseId: COURSE_ID, stage: 'stage_7' });
+    await generateImage('a banner', {
+      model: GEMINI,
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
 
     const messages = chatRequest().messages as Array<{ content: unknown }>;
     expect(typeof messages[0].content).toBe('string');
+  });
+
+  it('routes a model chat completions does not carry through the Images API', async () => {
+    // The route rule asked `startsWith('openai/')` until 2026-08-27, which sent
+    // everything else to chat completions. Only 9 of the 48 image models exist
+    // there — six Google and three OpenAI — so the other 37, this banner model
+    // among them, would have failed as unknown chat models rather than as a
+    // routing mistake.
+    await generateImage('a banner', {
+      model: 'sourceful/riverflow-v2.5-fast',
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
+
+    expect(createCompletionMock).not.toHaveBeenCalled();
+    expect(imagesRequestBody().model).toBe('sourceful/riverflow-v2.5-fast');
+  });
+
+  it('does not ask a model for a detail tier it has never heard of', async () => {
+    // Seven of the forty-eight publish `quality`. Sending it to the other
+    // forty-one is a 400, and the tier used to follow "went through the Images
+    // API" — true only while OpenAI was the only model on that route.
+    await generateImage('a banner', {
+      model: 'sourceful/riverflow-v2.5-fast',
+      quality: 'medium',
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
+
+    expect(imagesRequestBody()).not.toHaveProperty('quality');
+  });
+
+  it('prices a per-frame model, which reports no tokens to price', async () => {
+    // Flat-priced models return no output token count, so the token arithmetic
+    // yields `undefined` however good the rate is, and the banner would trace
+    // unpriced until the receipt landed.
+    const result = await generateImage('a banner', {
+      model: 'sourceful/riverflow-v2.5-fast',
+      costContext: { courseId: COURSE_ID, stage: 'stage_7' },
+    });
+
+    expect(result.costUsd).toBe(0.019);
   });
 });

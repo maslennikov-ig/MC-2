@@ -167,16 +167,29 @@ describe('Stage 7 image generation', () => {
     });
   });
 
-  it('sends no quality on the cover, which has no such control', async () => {
+  it('sends no quality on the banner, which has no such control', async () => {
+    // This used to read the chat mock, because the banner was a Gemini model and
+    // chat completions has no `quality` to send. The banner is
+    // `sourceful/riverflow-v2.5-fast` from 2026-08-27 and goes through the
+    // Images API — where the parameter does exist and would be a 400 for this
+    // model, since only 7 of the 48 publish it. Same claim, sharper: the tier is
+    // now withheld deliberately rather than by the route not offering it.
+    const calls = stubImagesApi(IMAGE_RESPONSE);
+
     await generateCoverImage('a cover', {
       courseId: COURSE_ID,
       stage: 'stage_7',
       phase: 'stage_7_cover',
     });
 
-    const [, request] = createCompletionMock.mock.calls[0] as [unknown, Record<string, unknown>];
-    expect(request).not.toHaveProperty('quality');
-    expect(request).toMatchObject({ modalities: ['text', 'image'] });
+    const [url, init] = calls.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://openrouter.ai/api/v1/images');
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('quality');
+    expect(body).toMatchObject({
+      model: 'sourceful/riverflow-v2.5-fast',
+      aspect_ratio: '16:9',
+    });
   });
 
   it('leaves the row unpriced when the response reported no tokens', async () => {
