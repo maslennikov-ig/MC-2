@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-25. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-27. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -110,16 +110,44 @@ Stage 5 advisory enrichment group deliberately, because their job is per-documen
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
-Seven live models: the workhorse is `deepseek/deepseek-v4-flash-0731` — a **pinned snapshot** — with
-`openai/gpt-5.6-luna` as its fallback (owner, 2026-08-22), `z-ai/glm-5.2` for the deciding judge and
-Stage 6's last chance, plus `google/gemini-3.7-flash`, `minimax/minimax-m3` and the two image
-models. Four invariants: judges keep three separate vendors, `emergency` stays off OpenAI, every
-fallback crosses vendors, and the three escalation phases avoid the default model on both hops
-because by the time they run it has already failed.
+Ten live models. The workhorse is `deepseek/deepseek-v4-flash-0731` — a **pinned snapshot** — with
+`openai/gpt-5.6-luna` as its fallback (owner, 2026-08-22), `z-ai/glm-5.3-flash` for prose,
+`z-ai/glm-5.2` for the deciding judge and Stage 6's last chance, plus `google/gemini-3.7-flash`,
+`minimax/minimax-m3` and four image models. Four invariants: judges keep three separate vendors,
+`emergency` stays off OpenAI, every fallback crosses vendors, and the three escalation phases avoid
+the default model on both hops because by the time they run it has already failed.
+
+**Images, settled 2026-08-27** (`abf4209d3`). Card `openai/gpt-5-image-mini` at `quality: 'medium'`,
+$0.0091 a frame — measured against all 47 square-capable models on OpenRouter and cheapest of them,
+so this is a finished search rather than a preference. Banner `sourceful/riverflow-v2.5-fast`,
+$0.013954 against the previous Gemini's $0.038725, fallback `openai/gpt-image-2` because the mini
+line cannot do 16:9 at all. Three things had to be true first and none of them were: the route asked
+`startsWith('openai/')` and so sent 37 of the 48 image models to a chat endpoint that does not carry
+them; `quality` went to every model on the Images API when only 7 publish it; and the catalogue
+priced images per token when 26 of the 48 charge per frame and report no tokens
+(`imagePriceFlatUsd`). Banner ratio is **16:9, matching the prompt templates**, which had said so
+all along while the code asked for 21:9. Gemini keeps a flex pin — half price, and OpenRouter never
+selects it unasked — for whenever it is routed to again. Card prompts carry `input_references`: a
+lesson card is shown the course card, so a set looks like a set rather than merely satisfying the
+same four lines of prose.
 
 **Judges, reshuffled 2026-08-22 by price** (`mc2-d1d09`): primary `gpt-5.6-luna`, secondary
 **`deepseek-v4-flash-0731`**, tiebreaker **`glm-5.2`** (fallback `minimax-m3`). `executeSingleJudge`
 takes `judgeModels.secondary`, the **most frequent judge call** — 1318 of 1911 lessons.
+
+**Superseded 2026-08-27 (`a8df57ecc`, `mc2-r8shw`): prose now runs on `z-ai/glm-5.3-flash`.** Same
+seats as the 2026-08-23 ruling below — `stage_6_content` and its tier variants, `section_expander`,
+`refinement`, and the playbook's prose groups, 18 rows. Like for like on one topic through one
+pipeline: total $0.019854 against $0.037859, Stage 6 $0.005267 against $0.024493 — 48% and 78%
+lower. The 78% is `content` and `section_expander` only: `refinement` had been on DeepSeek at
+$0.064/1M against this model's $0.074, so that move bought better prose at the same price and no
+saving. Judges, every `chat_*`, Stage 2/4/5, the playbook spec and both escalation hops stayed put —
+those parse the answer, and this model ignores a strict `json_schema`, replying in a shape of its
+own. The trap it exposed is the one to remember: `requiresReasoning` shipped in the same commit as
+the routing, so the first live run measured a container that did not yet know the model and looked
+like a model failure. **Never measure a model on a container that has not been told about it.**
+
+The 2026-08-23 ruling it replaces, kept for its method:
 
 **Settled 2026-08-23 (`d179a18d0`, `2e01e0b02`): whatever AUTHORS prose the reader opens runs on
 Luna** — `stage_6_content` and its three tier variants, `section_expander`, `refinement`, both
@@ -136,9 +164,16 @@ stored configuration — a global `UPDATE` moves other people's runs on the shar
 `llm_model_config.course_id` cannot reference a playbook at all.
 
 Reasoning is on for `stage_6_complex`, `stage_5_escalation` and `stage_6_auto_last_chance` only.
-Cost by tokens: **Stage 6 is ~90%** — 37.9% lesson generation, 30.0% judging, 20.2% section
-generation; Stage 5 ~5.5%, Stage 4 ~1.9% (epic `mc2-4clyr`). Two inactive duplicate rows remain
-(`mc2-f6del`).
+Two inactive duplicate rows remain (`mc2-f6del`).
+
+**Where the money goes, remeasured 2026-08-27 in dollars rather than tokens** (epic `mc2-4clyr`).
+The old "Stage 6 is ~90%" was a token count taken before the card was billed at all, and it is no
+longer the shape. A month of real courses to 2026-08-26 came to $0.9728: Stage 6 prose 49.6%, the
+**cover image 25.6%**, judges 13.1%, Stage 4 6.4%, Stage 5 4.9%. After the prose move that leaves
+the card as the largest single line of a small course — 47% of a four-lesson one, since it is one
+picture per course while Stage 6 scales with lessons. All three of the epic's levers have landed:
+the judge cascade (a cheap secondary gate settles 37% of lessons alone, which is why judging fell
+from 30% to 13%), the model substitution, and cost accounting itself.
 
 **The `~`-alias question is settled: routing stays on the pinned snapshot** (owner, 2026-08-22).
 Both reasons — the 2026-08-17 latency incident and the empty endpoint list that silently disables
@@ -151,7 +186,12 @@ go through `buildProviderParams`, held by `tests/unit/phase-config-provider-cont
 collision fallback `LARGE_CONTEXT_MODEL_ID`. `stage_5_escalation` is now first in
 `getEscalationChain('generation')`, ahead of `stage_4_expert`, which had been retrying Stage 5 on
 the model that just failed with a SMALLER output budget than a normal attempt; output ceilings were
-checked BEFORE wiring it up (`mc2-s1vg5`, `mc2-9yrgb`, `mc2-p6u8k` closed).
+checked BEFORE wiring it up (`mc2-s1vg5`, `mc2-9yrgb`, `mc2-p6u8k` closed). Giving those rows a
+caller also made one of them matter: five pointed at Luna and the sixth, `en`/`standard`, at
+DeepSeek, so an English standard course escalated _downwards_ — and for `stage_5_simple` onto the
+model that had just failed, the exact thing the change was written to stop. Corrected 2026-08-27
+before it ever fired (`602c4c075`, `mc2-v1p12`); `routing-seed-integrity` now fails any phase whose
+model changes with language alone, which found exactly that one row.
 
 ## Cost accounting: where it stands
 
@@ -321,10 +361,18 @@ never actually escalated, the judge's new terminal path has never fired — both
 forced to fail — and **no real NLM generation has run since the cookies were restored**, which now
 needs only a run. Use $orchestrator-stage when the next track becomes an epic.
 
-New and open: `mc2-h6nlv` — the bridge healthcheck in both compose files opens a TCP socket and never
-asks `/health`, so it stays green with dead auth, a dead hop or no master token. Removing the
-override is NOT the fix: the container has `HTTP_PROXY=socks5h://…`, urllib takes the proxy branch
-even for loopback, and the Dockerfile's own check dies on `unknown url type: socks5h`.
+Open after 2026-08-27, both small and neither blocking: `mc2-v6r1p` — two catalogue prices have
+drifted (deepseek-v4-flash 1.11x, qwen3-235b 1.57x on output), and the question is not the numbers
+but whether either model belongs in live routing at all: the first is an **alias** beside its own
+pinned snapshot, the second has had zero calls in 90 days. `mc2-z08mv` — revisit `glm-5.3` when it
+has more than one provider. The image search is finished and needs nothing: nothing on OpenRouter
+undercuts the card model, and no image model anywhere has a `:batch` sibling, with flex published
+for exactly one (`gemini-2.5-flash-image`, and only through chat completions).
+
+`mc2-h6nlv` is closed — the bridge healthcheck asks `/health` now and the same string is in the
+image and all three compose files. The trap it left behind is worth keeping: the container has
+`HTTP_PROXY=socks5h://…`, urllib takes the proxy branch even for loopback, so the check uses
+`http.client`, which does not.
 
 `mc2-ibzcc` is **closed**, but its docling-mcp 3.1.0 image is **neither published nor deployed** —
 that is the manual `build-docling-images.yml` workflow and a recorded `image@sha256`, a production
