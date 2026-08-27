@@ -271,21 +271,21 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
-**`mc2-78ya6` — `develop` is red and it is telling the truth.**
-`tests/unit/ops/q12-window-preflight.test.ts` fails three tests because
-`docker-compose.infra.yml` in the tree (`e447c928…`) differs from
-`q12-deployed-asset-manifest.json` (`dce8e074…`) — and the **host matches the manifest**. The
-divergence is commit `27790d81d`, the bridge healthcheck fix, which was committed and never
-deployed, so `megacampus-notebooklm-bridge` still carries the bare TCP-connect healthcheck that hid a
-dead tunnel for four months. **Do not repair this by rewriting the manifest**: the manifest is right
-about the host and rewriting it would erase a correct signal. It is fixed by delivering the compose
-file, which is a production mutation and needs a fresh decision. Predates `mc2-xg6g8` and was found
-by it.
-
 `mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
 writer is configured on staging, which is idle, and not on dev, where the runs happen.
 
 `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
+
+**Settled 2026-08-27, `mc2-78ya6` — the bridge healthcheck took both halves.** The Q12 asset manifest
+pins `docker-compose.infra.yml`, so `27790d81d` moved its sha and H2 went red; `4268a8e7a`
+regenerated the manifest from the tree. That alone would have turned the test green while the **host
+still ran the old healthcheck** — the manifest tracks the repository, and only a deploy makes the
+host agree with it. Delivered on owner authorization 2026-08-27: the compose file was copied to
+`/opt/megacampus` (previous version kept beside it as
+`docker-compose.infra.yml.bak-bridge-healthcheck-20260827T044334Z`) and `notebooklm-bridge` was
+recreated with `--no-deps`. Tree, manifest and host now all read `e447c928…`, and the container's
+health is earned rather than asserted: `/health` answers 200 with the proxy reachable and the session
+good to 2028-08-24. Nothing else on the host was touched.
 
 ## NotebookLM and languages
 
