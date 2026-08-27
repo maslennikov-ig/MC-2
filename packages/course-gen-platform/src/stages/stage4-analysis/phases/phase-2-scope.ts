@@ -29,6 +29,7 @@ import {
   preprocessRawOutput,
   parseWithRepairCascade,
   postProcessAndValidate,
+  reconcileUpstreamPhase1Output,
 } from './phase-2-scope-helpers';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 /**
@@ -43,8 +44,9 @@ import { createPromptService } from '@/shared/prompts/prompt-service';
  * @throws Error if LLM output fails schema validation
  */
 export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> {
-  // Validate input
-  const validatedInput = Phase2InputSchema.parse(input);
+  // Validate input, after reconciling what Phase 1 was allowed to hand down
+  // unvalidated (see reconcileUpstreamPhase1Output).
+  const validatedInput = Phase2InputSchema.parse(reconcileUpstreamPhase1Output(input));
 
   // Estimate total document tokens for model tier selection
   // If documents exceed 260K threshold, ModelConfigService selects extended tier (1M context)

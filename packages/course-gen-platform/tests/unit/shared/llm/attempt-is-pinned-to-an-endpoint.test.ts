@@ -124,8 +124,7 @@ function endpoints() {
 const sentProviderBlocks: Array<Record<string, unknown> | undefined> = [];
 
 function recordSentRouting(request: unknown): void {
-  const provider = (request as { extra_body?: { provider?: Record<string, unknown> } }).extra_body
-    ?.provider;
+  const provider = (request as { provider?: Record<string, unknown> }).provider;
   sentProviderBlocks.push(provider ? structuredClone(provider) : undefined);
 }
 

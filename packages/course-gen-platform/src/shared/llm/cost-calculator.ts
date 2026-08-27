@@ -10,7 +10,7 @@
  */
 
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
-import { MODEL_CATALOG } from '@megacampus/shared-types';
+import { MODEL_CATALOG, getModelCapabilities } from '@megacampus/shared-types';
 import { baseLogger as logger } from '../logger/shared-logger-runtime';
 
 // ============================================================================
@@ -158,6 +158,15 @@ export interface CostBreakdown {
     sections_model: string;
     validation_model: string;
   };
+  /**
+   * Models no rate could be found for, whose phases therefore contributed
+   * nothing to `total_cost_usd`.
+   *
+   * Present only when there are any. A total assembled from an unpriced phase is
+   * a lower bound, and without this field it is indistinguishable from a course
+   * that genuinely cost that much.
+   */
+  unpriced_models?: string[];
 }
 
 /**
@@ -190,12 +199,40 @@ export interface CostStatus {
  * @internal
  */
 function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens: number): number {
-  const pricing = OPENROUTER_PRICING[modelName];
+  const cost = estimatePhaseCostUsd(modelName, totalTokens, inputTokens);
 
-  if (!pricing) {
+  if (cost === undefined) {
     logger.warn(`[cost-calculator] Unknown model: ${modelName}, defaulting to $0 cost`);
     return 0;
   }
+
+  return cost;
+}
+
+/**
+ * What this phase is predicted to cost, or `undefined` when nothing prices it.
+ *
+ * The distinction `calculatePhaseCost` cannot make. A model absent from the
+ * catalogue returned `0`, and every caller then read an unmeasured phase as a
+ * free one — the same falsy-zero that once corrupted the very query used to find
+ * unpriced calls (mc2-y452l). `calculateLlmCostUsd` in `shared/metrics/llm-cost`
+ * has returned `undefined` for exactly this reason since; this is its
+ * counterpart for the token-only estimate.
+ *
+ * Looked up through `getModelCapabilities` rather than by exact key, because the
+ * provider answers with the snapshot it served: a request naming
+ * `openai/gpt-5.6-luna` came back `openai/gpt-5.6-luna-20260709` on 2026-08-25.
+ * `normalizeModelId` strips the date, so the dated id is priced from its base
+ * model instead of silently costing nothing.
+ */
+export function estimatePhaseCostUsd(
+  modelName: string,
+  totalTokens: number,
+  inputTokens: number = 0
+): number | undefined {
+  const pricing = getModelCapabilities(modelName);
+
+  if (!pricing) return undefined;
 
   // If combinedPricePerMillion exists (OSS models), use it
   if (pricing.combinedPricePerMillion) {
@@ -281,7 +318,21 @@ export function calculateGenerationCost(metadata: GenerationMetadata): CostBreak
   // Total cost
   const totalCost = metadataCost + sectionsCost + validationCost;
 
+  // Which of those three, if any, the catalogue could not price. Checked
+  // separately from the sum because a phase that contributed $0 for want of a
+  // rate looks exactly like one that was free.
+  const unpricedModels = [
+    ...new Set(
+      [
+        model_used.metadata,
+        model_used.sections,
+        ...(model_used.validation && total_tokens.validation > 0 ? [model_used.validation] : []),
+      ].filter(model => model && estimatePhaseCostUsd(model, 1) === undefined)
+    ),
+  ];
+
   return {
+    ...(unpricedModels.length > 0 ? { unpriced_models: unpricedModels } : {}),
     metadata_cost_usd: metadataCost,
     sections_cost_usd: sectionsCost,
     validation_cost_usd: validationCost,
@@ -395,10 +446,15 @@ export function hasUnifiedPricing(modelName: string): boolean {
  *
  * Useful for pre-generation cost estimation and budget planning.
  *
+ * Returns `undefined` when nothing prices the model, rather than `$0`. Callers
+ * reach for this as the last resort after a stated charge and an endpoint rate,
+ * so a zero here is not a cheap call — it is the absence of an answer, and it
+ * was being spent as if it were free.
+ *
  * @param modelName - OpenRouter model identifier
  * @param totalTokens - Estimated token count
  * @param inputTokens - Estimated input tokens (0 = assume 50/50 split)
- * @returns Estimated cost in USD
+ * @returns Estimated cost in USD, or `undefined` if the model has no rate
  *
  * @example
  * ```typescript
@@ -411,7 +467,7 @@ export function hasUnifiedPricing(modelName: string): boolean {
  * validateQwen3MaxContext(inputTokens); // Throws at 32K
  *
  * const estimatedCost = estimateCost("qwen/qwen3-max", totalTokens, inputTokens);
- * console.log(`Estimated cost: ${formatCost(estimatedCost)}`);
+ * console.log(`Estimated cost: ${estimatedCost === undefined ? 'not measured' : formatCost(estimatedCost)}`);
  * // Expected: ~$0.096 (with new $1.20/$6.00 pricing)
  * ```
  */
@@ -419,8 +475,8 @@ export function estimateCost(
   modelName: string,
   totalTokens: number,
   inputTokens: number = 0
-): number {
-  return calculatePhaseCost(modelName, totalTokens, inputTokens);
+): number | undefined {
+  return estimatePhaseCostUsd(modelName, totalTokens, inputTokens);
 }
 
 /**

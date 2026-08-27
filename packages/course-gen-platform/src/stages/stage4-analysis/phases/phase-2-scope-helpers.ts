@@ -11,6 +11,7 @@
  */
 
 import {
+  Phase1OutputSchema,
   Phase2OutputSchema,
   type Phase2Input,
   type Phase2Output,
@@ -43,6 +44,108 @@ export interface RepairMetadata {
   successful_fields: string[];
   regenerated_fields: string[];
   models_tried: string[];
+}
+
+// ============================================================================
+// UPSTREAM INPUT
+// ============================================================================
+
+/**
+ * Fields of Phase 1's output that Phase 2 will accept a substitute for, and what
+ * it puts there.
+ *
+ * Each one is advisory: Phase 2 interpolates it into a prompt as text and does
+ * nothing else with it. The substitutes are the least committal member of each
+ * enum — `mixed` and `medium` genuinely mean "no strong signal". `professional`
+ * is not neutral, it is this product's modal category; it is a bounded
+ * fabrication on an advisory field, logged with the value it replaced, and it is
+ * preferred to killing a course over a word.
+ */
+const SUBSTITUTABLE_PHASE1_FIELDS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
+  ['course_category.primary', 'professional'],
+  ['course_category.secondary', null],
+  ['topic_analysis.complexity', 'medium'],
+  ['topic_analysis.target_audience', 'mixed'],
+]);
+
+function readAtPath(root: unknown, path: readonly (string | number)[]): unknown {
+  return path.reduce<unknown>(
+    (node, key) => (node as Record<string | number, unknown> | undefined)?.[key],
+    root
+  );
+}
+
+function writeAtPath(root: unknown, path: readonly (string | number)[], value: unknown): void {
+  const parent = readAtPath(root, path.slice(0, -1));
+  if (parent && typeof parent === 'object') {
+    (parent as Record<string | number, unknown>)[path[path.length - 1]] = value;
+  }
+}
+
+/**
+ * Accept Phase 1's output even when Phase 1 itself did not fully validate it.
+ *
+ * Phase 1 runs its regenerator with `allowWarningFallback: true` — by design it
+ * may return an object marked `validated: false` rather than fail the course.
+ * Phase 2 then ran `Phase2InputSchema.parse` over that same object and threw.
+ * One object, two policies, and the strict one sat downstream where a retry
+ * re-reads the identical input: on 2026-08-25 a course died on
+ * `complexity: "beginner"` after three attempts that could not have differed
+ * (mc2-4m29k).
+ *
+ * This does not paper over bad output. It draws the line at the fields Phase 2
+ * only reads as prompt text, substitutes a stated value, and says so. Anything
+ * else — a missing topic, too few key concepts — still throws, and now throws
+ * once instead of three times.
+ */
+export function reconcileUpstreamPhase1Output(input: Phase2Input): Phase2Input {
+  const strict = Phase1OutputSchema.safeParse(input.phase1_output);
+  if (strict.success) return input;
+
+  const repaired = structuredClone(input.phase1_output) as Record<string, unknown>;
+  const substituted: string[] = [];
+  const stillInvalid: string[] = [];
+  let droppedContextualLanguage = false;
+
+  for (const issue of strict.error.issues) {
+    const path = issue.path.join('.');
+
+    // `contextual_language` is optional and deprecated, and Phase 2 never reads
+    // it. Dropping a malformed one costs a Stage 5 prompt hint; keeping the
+    // strict check costs the course.
+    if (path.startsWith('contextual_language')) {
+      if (repaired.contextual_language !== undefined) {
+        delete repaired.contextual_language;
+        droppedContextualLanguage = true;
+      }
+      continue;
+    }
+
+    if (SUBSTITUTABLE_PHASE1_FIELDS.has(path)) {
+      const replacement = SUBSTITUTABLE_PHASE1_FIELDS.get(path);
+      substituted.push(
+        `${path}: ${JSON.stringify(readAtPath(repaired, issue.path))} → ${JSON.stringify(replacement)}`
+      );
+      writeAtPath(repaired, issue.path, replacement);
+      continue;
+    }
+
+    stillInvalid.push(path);
+  }
+
+  if (!droppedContextualLanguage && substituted.length === 0) return input;
+
+  logger.warn(
+    {
+      courseId: input.course_id,
+      substituted,
+      droppedContextualLanguage,
+      stillInvalid,
+    },
+    '[Phase 2] Phase 1 handed down output it had not validated; substituting advisory fields rather than failing the course'
+  );
+
+  return { ...input, phase1_output: repaired as Phase2Input['phase1_output'] };
 }
 
 // ============================================================================
@@ -343,7 +446,15 @@ export function postProcessSections(sections: unknown[]): Record<string, unknown
           ? sec.pedagogical_approach
           : 'Hands-on practice with incremental complexity and real-world examples',
       section_id: sec.section_id || '1',
-      estimated_duration_hours: Math.max((sec.estimated_duration_hours as number) || 0.5, 0.5),
+      // Only has to be a positive number to clear the first parse:
+      // `normalizeRecommendedStructure` recomputes it for every section from
+      // the lesson count that survives. The old `Math.max(..., 0.5)` was
+      // raising the model's figure to meet a schema floor that no longer
+      // exists, and raising a figure nothing reads (mc2-ythy6).
+      estimated_duration_hours:
+        typeof sec.estimated_duration_hours === 'number' && sec.estimated_duration_hours > 0
+          ? sec.estimated_duration_hours
+          : 0.5,
       difficulty: (VALID_DIFFICULTY as readonly string[]).includes(sec.difficulty as string)
         ? sec.difficulty
         : 'intermediate',

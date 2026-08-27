@@ -51,7 +51,8 @@ const TRANSPORT_EXCEPTIONS: Record<string, string> = {
 const NON_TRANSPORT_ENDPOINTS: Record<string, string> = {
   'shared/llm/openrouter-generation.ts':
     'reads GET /api/v1/generation and /api/v1/providers — the receipt, not a call',
-  'shared/llm/openrouter-batch-eligibility.ts': 'reads GET /api/v1/models to check batch support',
+  'shared/llm/openrouter-catalogue.ts':
+    'reads GET /api/v1/models for the published price list — the ceiling and the batch eligibility check both read it through here (mc2-qch4w)',
   'services/openrouter-models.ts': 'reads GET /api/v1/models for the admin model list',
   'server/routers/pipeline-admin/api-keys.ts':
     'calls GET /api/v1/models to validate a key an admin just pasted',

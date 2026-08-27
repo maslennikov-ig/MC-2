@@ -27,7 +27,6 @@ import {
   handleUnknownError,
   applyMandatoryReasoningFloor,
   applyProviderRouting,
-  buildProviderPriceCeiling,
 } from './client-helpers';
 import type { ReasoningRequest, OpenRouterRequestOptions } from './client-helpers';
 import {
@@ -38,6 +37,8 @@ import {
 import { buildOpenRouterClient } from './openrouter-client';
 import { fetchGenerationFact, resolveProviderSlug } from './openrouter-generation';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from './openrouter-endpoints';
+import { resolveServiceTier, type ServiceTier } from './service-tier';
+import { resolveProviderPriceCeiling } from './openrouter-catalogue';
 import {
   isMandatoryReasoningRejection,
   rememberMandatoryReasoning,
@@ -183,6 +184,16 @@ export interface LLMClientOptions {
    * six such waits — 32 minutes — before giving up (mc2-b7olk.8).
    */
   maxRetries?: number;
+  /**
+   * The cheapest service tier this call may be served by.
+   *
+   * Omit it and the tier follows `costContext.phase` — background work gets
+   * flex at half price, anything a person is waiting on stays on the default
+   * tier. Set it only where the caller knows something the phase name does not.
+   *
+   * @see shared/llm/service-tier
+   */
+  serviceTier?: ServiceTier;
 }
 
 export interface LLMClientConstructionOptions {
@@ -224,6 +235,30 @@ export interface LLMResponse {
    * cannot be derived from one another (see `resolveProviderSlug`).
    */
   providerName?: string;
+  /**
+   * What the pinned endpoint charges, in dollars per million.
+   *
+   * Set only when the attempt named one endpoint with `allow_fallbacks: false`,
+   * because that is the only case where the price is known before the receipt.
+   */
+  endpointRate?: { prompt: number; completion: number };
+  /**
+   * What OpenRouter charged for this call, from `usage.cost` in the response.
+   *
+   * Not an estimate and not a second lookup: the provider states it in the same
+   * body, and it matches `GET /api/v1/generation` exactly. Absent only for a
+   * call whose body never arrived.
+   */
+  actualCostUsd?: number;
+  /**
+   * The tariff this call was actually served at, as the provider reported it:
+   * `default`, `flex` or `priority`.
+   *
+   * What was asked for is in the request; this is what happened. Flex is half
+   * price and may refuse for capacity, so the estimate has to follow the answer
+   * rather than the intention.
+   */
+  serviceTier?: string;
 }
 
 /**
@@ -356,6 +391,7 @@ export class LLMClient {
       reasoning,
       costContext,
       maxRetries,
+      serviceTier = resolveServiceTier(costContext?.phase),
     } = options;
 
     logger.info(
@@ -390,7 +426,7 @@ export class LLMClient {
         model,
         inputContentLength,
         'LLM',
-        maxRetries
+        { maxRetries, serviceTier }
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -423,6 +459,7 @@ export class LLMClient {
       reasoning,
       costContext,
       maxRetries,
+      serviceTier = resolveServiceTier(costContext?.phase),
     } = options;
 
     logger.info(
@@ -451,7 +488,7 @@ export class LLMClient {
         model,
         inputContentLength,
         'Chat completion',
-        maxRetries
+        { maxRetries, serviceTier }
       );
       await this.recordCost(response, costContext, startedAt);
       return response;
@@ -542,6 +579,9 @@ export class LLMClient {
         outputTokens: response.outputTokens,
         ...(response.generationId ? { generationId: response.generationId } : {}),
         ...(response.providerName ? { providerName: response.providerName } : {}),
+        ...(response.serviceTier ? { serviceTier: response.serviceTier } : {}),
+        ...(response.endpointRate ? { endpointRate: response.endpointRate } : {}),
+        ...(response.actualCostUsd === undefined ? {} : { actualCostUsd: response.actualCostUsd }),
       },
       costContext ? { durationMs: Date.now() - startedAt, ...costContext } : undefined
     );
@@ -652,6 +692,7 @@ export class LLMClient {
    * @param model - Model identifier for logging and for the price ceiling
    * @param inputContentLength - Input content length for token estimation
    * @param label - Label for log messages (e.g., 'LLM' or 'Chat completion')
+   * @param call - This call's retry budget and the tier it may be served by
    * @returns The LLMResponse from the first attempt that succeeds
    */
   private async executeWithRetry(
@@ -660,15 +701,23 @@ export class LLMClient {
     model: string,
     inputContentLength: number,
     label: string,
-    callMaxRetries?: number
+    call: { maxRetries?: number; serviceTier: ServiceTier }
   ): Promise<LLMResponse> {
-    const maxRetries = callMaxRetries ?? this.maxRetries;
+    const maxRetries = call.maxRetries ?? this.maxRetries;
 
     // Local to this call by construction. No cache, no module state, nothing
     // that outlives the return.
     const ignoredProviderSlugs = new Set<string>();
 
-    const priceCeiling = buildProviderPriceCeiling(model, PROVIDER_PRICE_CEILING_MULTIPLIER);
+    // Read live, not remembered. The frozen catalogue rate drifts, and a ceiling
+    // built from a stale low number narrows the provider pool silently and, low
+    // enough, refuses every endpoint (see openrouter-catalogue.ts). The lookup
+    // is cached and costs nothing extra here: the attempt below already awaits
+    // `listModelEndpoints` for the same model.
+    const priceCeiling = await resolveProviderPriceCeiling(
+      model,
+      PROVIDER_PRICE_CEILING_MULTIPLIER
+    );
     if (priceCeiling) {
       applyProviderRouting(requestOptions, { max_price: priceCeiling });
     } else {
@@ -690,7 +739,8 @@ export class LLMClient {
       const endpoint = pickCheapestUntriedEndpoint(
         await listModelEndpoints(model),
         triedEndpointTags,
-        requestOptions.extra_body?.provider?.max_price
+        requestOptions.provider?.max_price,
+        call.serviceTier
       );
       if (endpoint) triedEndpointTags.add(endpoint.tag);
 
@@ -703,7 +753,24 @@ export class LLMClient {
         ...(endpoint ? { allow_fallbacks: false } : {}),
       });
       try {
-        return await this.executeSingleRequest(requestOptions, timeout, model, inputContentLength);
+        const response = await this.executeSingleRequest(
+          requestOptions,
+          timeout,
+          model,
+          inputContentLength
+        );
+        // The pin is what makes this knowable: one endpoint, no fallbacks, so
+        // the price it publishes is the price of this call. Without a pin the
+        // estimate stays on the catalogue and waits for the receipt.
+        return endpoint
+          ? {
+              ...response,
+              endpointRate: {
+                prompt: endpoint.promptPricePerMillion,
+                completion: endpoint.completionPricePerMillion,
+              },
+            }
+          : response;
       } catch (error) {
         // A ceiling nothing can meet is a refusal, not a cheaper route:
         // OpenRouter answers "No endpoints found that satisfy the max price for
@@ -716,7 +783,7 @@ export class LLMClient {
             { model, priceCeiling },
             '[Routing] No provider is within the price ceiling; retrying without it and leaving the catalogue price to be corrected'
           );
-          delete requestOptions.extra_body?.provider?.max_price;
+          delete requestOptions.provider?.max_price;
           throw error;
         }
         // Only worth asking when nothing was pinned. With a pin we already know

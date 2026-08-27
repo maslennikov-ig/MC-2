@@ -32,11 +32,9 @@
  */
 import { fileURLToPath } from 'node:url';
 
-import {
-  LIVE_ROUTING_MODEL_IDS,
-  MODEL_CATALOG,
-  type ModelCapabilities,
-} from '@megacampus/shared-types';
+import { MODEL_CATALOG, type ModelCapabilities } from '@megacampus/shared-types';
+
+import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
 
 const EXIT_UNREACHABLE = 2;
 const EXIT_DRIFT = 1;
@@ -147,7 +145,22 @@ export function findDrift(
 
 async function main(): Promise<void> {
   const checkAll = process.argv.includes('--all');
-  const modelIds = checkAll ? Object.keys(MODEL_CATALOG) : [...LIVE_ROUTING_MODEL_IDS];
+  // Derived from the registries that can actually put a model on the wire, not
+  // from a hand-kept list of them. The list held seven ids; sixty days of
+  // `generation_trace` to 2026-08-25 held eleven, six of which were therefore
+  // running on frozen, unverified prices (mc2-a6qxc).
+  const modelIds = checkAll ? Object.keys(MODEL_CATALOG) : collectRoutableModelIds();
+
+  const uncatalogued = modelIds.filter(modelId => !(modelId in MODEL_CATALOG));
+  for (const modelId of uncatalogued) {
+    // Not drift — worse. There is no number to compare, so the cost path falls
+    // back to a default and `provider.max_price` is built from a guess.
+    console.warn(
+      `  routable but not in MODEL_CATALOG: ${modelId} — routed from ${describeRoutableModel(
+        modelId
+      ).join(', ')}`
+    );
+  }
 
   let rows: Array<Record<string, unknown>>;
   try {
@@ -181,9 +194,18 @@ async function main(): Promise<void> {
   }
 
   if (drift.length === 0) {
+    // Says what was compared, not what was asked for. `absent` never reached the
+    // published list and `uncatalogued` has no number to compare, so counting
+    // either as a match would report full coverage of a check that skipped them.
+    const compared = modelIds.length - absent.length - uncatalogued.length;
+    const skipped = [
+      ...(absent.length > 0 ? [`${absent.length} not in the published list`] : []),
+      ...(uncatalogued.length > 0 ? [`${uncatalogued.length} not in MODEL_CATALOG`] : []),
+    ];
     console.log(
-      `model catalogue drift check OK: ${modelIds.length - absent.length} of ${modelIds.length} ` +
-        `${checkAll ? 'catalogued' : 'live routing'} models match the published rates`
+      `model catalogue drift check OK: ${compared} of ${modelIds.length} ` +
+        `${checkAll ? 'catalogued' : 'routable'} models match the published rates` +
+        (skipped.length > 0 ? ` (${skipped.join(', ')})` : '')
     );
     return;
   }

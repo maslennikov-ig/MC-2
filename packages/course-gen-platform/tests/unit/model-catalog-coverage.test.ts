@@ -13,6 +13,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { MODELS } from '@/shared/llm/model-selector';
+import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
+
 import {
   MODEL_CATALOG,
   LIVE_ROUTING_MODEL_IDS,
@@ -66,7 +69,7 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedBatchRates);
   });
 
-  it('prices every live routing model at the OpenRouter base rates verified on 2026-08-21', () => {
+  it('prices every live routing model at the OpenRouter base rates last verified for each', () => {
     // The models a course actually runs on. Three of these were wrong at once on
     // 2026-08-20 and the errors pointed in opposite directions, which is why the
     // invoice gap looked smaller than its causes: openai/gpt-5.6-luna was
@@ -74,9 +77,14 @@ describe('model catalogue coverage', () => {
     // z-ai/glm-5.2 was 1.23x and ~deepseek/...-latest up to 1.8x too dear
     // (mc2-v1pn2, mc2-156kg).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v4-flash-0731': [0.08, 0.18],
+      // Re-read 2026-08-26; it read $0.14/$0.28 the day before and $0.08/$0.18
+      // the day before that, and moved 2.33x within two hours on 2026-08-25.
+      'deepseek/deepseek-v4-flash-0731': [0.06, 0.12],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [0.966, 3.036],
+      'z-ai/glm-5.2': [1.19, 3.74],
+      // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
+      // exactly this rate and novita at twice it (mc2-r8shw).
+      'z-ai/glm-5.3-flash': [0.075, 0.25],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.375, 1.875],
       'openai/gpt-5-image-mini': [2.5, 2],
@@ -124,25 +132,27 @@ describe('model catalogue coverage', () => {
     expect(actual).toEqual(verifiedImageRates);
   });
 
-  it('prices listed retired models at the OpenRouter rates verified on 2026-08-21', () => {
+  it('prices listed retired models at the OpenRouter rates last verified for each', () => {
+    // Dated per row rather than per test: these are re-read when something
+    // sends somebody to look, not on one day together, and a single date in the
+    // title claims a freshness the rows do not share.
     const verifiedRates: Record<string, [input: number, output: number]> = {
       'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
-      // The three DeepSeek rows below were re-read 2026-08-23 by the first run
-      // of the nightly drift check (mc2-ts9i2), which is what that check is for:
-      // this snapshot is only as current as the last person who remembered to
-      // re-read it, and nobody had for two days.
-      //
       // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
       // would, because `normalizeModelId` prices every undated V4 Flash snapshot
-      // from here (mc2-hc91g). It was 1.50x dear; `deepseek-v4-pro` was 4.03x,
-      // the largest gap this catalogue has held.
-      'deepseek/deepseek-v4-flash': [0.05306, 0.10612],
+      // from here (mc2-hc91g). Re-read 2026-08-26 at $0.088606/$0.177212: the
+      // snapshot held $0.05306, 40% UNDER, which is the direction that refuses
+      // calls rather than merely misreporting them. It has now been corrected
+      // four times in four days, each time by somebody re-reading it, which is
+      // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
+      'deepseek/deepseek-v4-flash': [0.088606, 0.177212],
       '~deepseek/deepseek-v4-flash-latest': [0.05, 0.13],
       'deepseek/deepseek-v4-pro': [0.396894, 0.793788],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],
       'qwen/qwen3-235b-a22b-2507': [0.09, 0.55],
+      'qwen/qwen-plus-2025-07-28': [0.26, 0.78],
       'qwen/qwen3-max': [0.78, 3.9],
       'qwen/qwen3.7-plus': [0.32, 1.28],
       'z-ai/glm-4.6': [0.5, 2],
@@ -177,6 +187,76 @@ describe('model catalogue coverage', () => {
     const unpriced = LIVE_ROUTING_MODEL_IDS.filter(modelId => !getModelCapabilities(modelId));
 
     expect(unpriced).toEqual([]);
+  });
+
+  /**
+   * Everything the code can route to, derived rather than restated.
+   *
+   * `LIVE_ROUTING_MODEL_IDS` is seven ids typed by hand. Sixty days of
+   * `generation_trace` to 2026-08-25 held eleven, and the six that were missing
+   * were not scripts: `stage_6_refinement` ran on `qwen/qwen3.7-plus`,
+   * `z-ai/glm-5` and `minimax/minimax-m2.1`, and `moonshotai/kimi-k2-thinking`
+   * served `stage_4_clarifying`. They reached the wire through registries the
+   * hand-written list knew nothing about — a per-phase fallback table, an
+   * escalation registry, a provider rename map, the Stage 6 repair tiers
+   * (mc2-a6qxc).
+   */
+  describe('models the code can route to', () => {
+    const routable = collectRoutableModelIds();
+
+    /**
+     * Routable ids with no catalogue entry, as found on 2026-08-26.
+     *
+     * Grandfathered rather than fixed here, because adding a price is a claim
+     * about what a provider charges and belongs with a reading of the published
+     * list, not with a test. Both are entries in `MODELS` — the escalation
+     * registry in `model-selector.ts` — and nothing selects them today: the only
+     * paths that could return them are `getModelByKey` and
+     * `getModelsWithCapability`, and neither is called anywhere outside the
+     * barrel that re-exports it. The point of listing them is that a *new* one
+     * fails here instead of joining them.
+     */
+    const UNCATALOGUED_TODAY = ['moonshotai/kimi-linear-48b-a3b-instruct'];
+
+    it('prices every model the code can route to, apart from the two already known', () => {
+      const unpriced = routable.filter(modelId => !getModelCapabilities(modelId));
+
+      expect(unpriced.sort()).toEqual([...UNCATALOGUED_TODAY].sort());
+    });
+
+    it('covers everything the hand-written live list claims', () => {
+      // The list stays for its `shared-types` consumers, but stops being the
+      // authority: if it names something no registry routes to, one of the two
+      // is wrong and this says so rather than letting them drift apart.
+      const missing = LIVE_ROUTING_MODEL_IDS.filter(modelId => !routable.includes(modelId));
+
+      expect(missing).toEqual([]);
+    });
+
+    it('finds more than the hand-written list did, and says who routes to each', () => {
+      // Guards the derivation itself: if `collectRoutableModelSources` silently
+      // stopped reading a registry, this is what notices.
+      expect(routable.length).toBeGreaterThan(LIVE_ROUTING_MODEL_IDS.length);
+
+      for (const modelId of routable) {
+        expect(describeRoutableModel(modelId).length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  it('keeps prices out of the routing registry', () => {
+    // `MODELS` carried `costPer1kInput`/`costPer1kOutput` for eleven entries: a
+    // fourth pricing surface beside this catalogue, `llm_model_config` and the
+    // rates accounting reads. It was dead — the only reader was
+    // `estimateModelCost`, which nothing called — and that is what made it
+    // dangerous, because rates nothing verifies go stale silently while sitting
+    // next to a registry routing genuinely uses (mc2-zcfh1). The fields are
+    // gone; this is what stops them coming back under another name.
+    const priced = Object.entries(MODELS)
+      .filter(([, config]) => Object.keys(config).some(key => /cost|price/i.test(key)))
+      .map(([key]) => key);
+
+    expect(priced).toEqual([]);
   });
 
   it('never carries a zero or negative price', () => {

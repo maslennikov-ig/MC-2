@@ -1,8 +1,9 @@
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shared/llm/client';
-import { buildProviderPriceCeiling } from '@/shared/llm/client-helpers';
+import { resolveProviderPriceCeiling } from '@/shared/llm/openrouter-catalogue';
 import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
 import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
+import { resolveServiceTier } from '@/shared/llm/service-tier';
 import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
   selectAttemptModel,
@@ -70,6 +71,13 @@ export interface CareerPlaybookLLMResult {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  /**
+   * Set when no source could price the call, so `costUsd` is `0` for want of a
+   * rate rather than because the call was cheap. The node-cost rows carry it
+   * through as `cost_unknown`, the same marker an aborted attempt uses, and for
+   * the same reason: the total is then a lower bound, not the figure.
+   */
+  costUnknown?: boolean;
   // Total wall-clock across every attempt this call consumed, and how many attempts
   // ran before success. Required so downstream node-cost sites and the retry audit
   // always carry timing/attempt ground truth.
@@ -307,9 +315,11 @@ export function createCareerPlaybookRuntime(
         const timeoutMs = normalizeTimeoutMs(phaseConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS);
         const attemptStartedAt = Date.now();
 
+        // Live, not remembered — see openrouter-catalogue.ts. The lookup is
+        // cached and adds no round trip the pin below was not already making.
         const priceCeiling = priceCeilingRefused
           ? undefined
-          : buildProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
+          : await resolveProviderPriceCeiling(modelId, PROVIDER_PRICE_CEILING_MULTIPLIER);
 
         // Pin this attempt to one endpoint, so that whatever happens to it is
         // attributable without asking anyone afterwards. Routing around a
@@ -319,7 +329,10 @@ export function createCareerPlaybookRuntime(
         const endpoint = pickCheapestUntriedEndpoint(
           await listModelEndpoints(modelId),
           triedEndpointTags,
-          priceCeiling
+          priceCeiling,
+          // The wizard's two phases answer a person; the six group phases and
+          // the spec run after they have submitted (see service-tier.ts).
+          resolveServiceTier(options.phaseName)
         );
         if (endpoint) triedEndpointTags.add(endpoint.tag);
 
@@ -383,6 +396,14 @@ export function createCareerPlaybookRuntime(
             attemptStartedAt,
             callStartedAt,
             abortedAttempts,
+            ...(endpoint
+              ? {
+                  endpointRate: {
+                    prompt: endpoint.promptPricePerMillion,
+                    completion: endpoint.completionPricePerMillion,
+                  },
+                }
+              : {}),
           });
         } catch (error) {
           lastError = error;

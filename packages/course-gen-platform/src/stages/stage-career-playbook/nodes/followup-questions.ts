@@ -161,6 +161,7 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  costUnknown?: boolean;
   durationMs?: number;
   attemptCount?: number;
   generationId?: string;
@@ -171,6 +172,7 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    ...(result.costUnknown ? { cost_unknown: true } : {}),
     duration_ms: result.durationMs,
     attempts: result.attemptCount,
     // Carried so `settleCareerPlaybookNodeCosts` can replace the estimate above
@@ -185,6 +187,7 @@ function buildAggregatedNodeCost(
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
+    costUnknown?: boolean;
     durationMs?: number;
   }[]
 ): CareerPlaybookNodeCost {
@@ -205,6 +208,8 @@ function buildAggregatedNodeCost(
     input_tokens: results.reduce((sum, result) => sum + result.inputTokens, 0),
     output_tokens: results.reduce((sum, result) => sum + result.outputTokens, 0),
     cost_usd: results.reduce((sum, result) => sum + result.costUsd, 0),
+    // One unpriced call makes the folded total a lower bound for all of them.
+    ...(results.some(result => result.costUnknown) ? { cost_unknown: true } : {}),
     ...(durationValues.length > 0
       ? { duration_ms: durationValues.reduce((sum, value) => sum + value, 0) }
       : {}),

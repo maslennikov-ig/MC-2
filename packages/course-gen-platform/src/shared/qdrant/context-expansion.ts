@@ -16,6 +16,22 @@
  * Expansion is an enhancement, never a dependency. Every failure path returns
  * the caller what it already retrieved.
  *
+ * ## It is not running on the live corpus (measured 2026-08-26)
+ *
+ * `sibling_chunk_ids` is empty on **all 6856 points** of the production
+ * collection, so the branch below that returns a lone chunk unexpanded is the
+ * only branch that executes. Measured over 7310 Stage 5 results and 475 Stage 6
+ * results: zero widened, 1.00x tokens. The 5.5x average recorded in
+ * `.codex/handoff.md` was measured on freshly chunked documents and is what
+ * expansion WILL cost once such documents are indexed; it is not what production
+ * is paying today.
+ *
+ * The reason is in the corpus, not here. Every point carries
+ * `total_chunks: 1` and was indexed in July 2026, before `selectIndexableChunks`
+ * stopped degenerate one-child parents from reaching the index. A parent with a
+ * single child gives that child no siblings, so there is nothing to stitch. Any
+ * document indexed after that change will expand normally.
+ *
  * @module shared/qdrant/context-expansion
  */
 

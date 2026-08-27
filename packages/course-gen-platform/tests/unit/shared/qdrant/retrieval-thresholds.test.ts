@@ -20,11 +20,19 @@ import {
 import { LESSON_RAG_CONFIG, TWO_TIER_CONFIG } from '@/stages/stage6-lesson-content/rag/constants';
 
 /**
- * Highest dense score seen for a query whose answer is verbatim in the corpus,
- * measured 2026-08-12 against production. Any threshold at or above this is a
- * search that cannot return anything.
+ * Highest dense score seen for a query whose answer is verbatim in the corpus.
+ *
+ * 0.58 came from three hand-run queries on 2026-08-12. Re-measured 2026-08-26
+ * over 760 dense scores from the 76-query evaluation set against the live
+ * collection: the best single score was 0.6497 and the 90th percentile of the
+ * per-query best was 0.5859. The lower figure is kept here on purpose — it is
+ * the value the guards have to hold at, and raising it would weaken every
+ * assertion below on the strength of one query.
  */
 const BEST_MEASURED_RELEVANT_SCORE = 0.58;
+
+/** The single highest dense score the live corpus produced, 2026-08-26. */
+const HIGHEST_MEASURED_SCORE = 0.6497;
 
 /** Lowest score of a chunk that was genuinely relevant, same measurement. */
 const WORST_MEASURED_RELEVANT_SCORE = 0.343;
@@ -39,6 +47,13 @@ describe('dense retrieval thresholds', () => {
     // The exact failure being prevented: 0.7 > 0.58 means zero hits, always.
     expect(DENSE_SCORE_THRESHOLD).toBeLessThan(BEST_MEASURED_RELEVANT_SCORE);
     expect(MAX_OBSERVED_DENSE_SCORE).toBeGreaterThanOrEqual(BEST_MEASURED_RELEVANT_SCORE);
+  });
+
+  it('does not claim a ceiling the corpus has already exceeded', () => {
+    // A ceiling below a score that was actually produced calls a reachable
+    // threshold unreachable, which is the same class of wrongness as 0.7 was,
+    // pointing the other way. 0.6 was below the measured 0.6497 for two weeks.
+    expect(MAX_OBSERVED_DENSE_SCORE).toBeGreaterThanOrEqual(HIGHEST_MEASURED_SCORE);
   });
 
   it('keeps a positive floor so an unrelated query can still return nothing', () => {

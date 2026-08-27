@@ -73,6 +73,7 @@
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
     "benchmark-llm": "tsx scripts/benchmark-llm/index.ts",
     "benchmark:docling": "tsx scripts/docling-quality-benchmark.ts",
+    "benchmark:rag": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/rag-quality-benchmark.ts",
     "smoke:career-playbook:preflight": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-smoke-preflight.ts",
     "smoke:career-playbook:live": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-live-smoke.ts",
     "smoke:career-playbook:load": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-load-test.ts"

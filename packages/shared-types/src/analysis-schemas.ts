@@ -181,9 +181,22 @@ const llmCourseCategoryEnum = createLLMEnumSchema(
     research: 'academic',
   },
   'course_category'
+).describe(
+  // The synonym map is Latin-only, so a course generated in Chinese answered
+  // `专业` — the correct category, in the language the rest of the prompt asked
+  // for, and unmappable (mc2-4m29k).
+  'use one of these English words verbatim, even when the rest of the output is in another language'
 );
 
 // complexity enum (used in Phase1, Phase2Input, AnalysisResult)
+//
+// The name and the values disagree: `complexity` reads as difficulty, the values
+// measure breadth. A model asked for "complexity" answers `beginner` — which is
+// a perfectly good answer to the question the field name asks, and an invalid
+// value for the question the enum asks. The description is what closes that gap,
+// and it only reaches the model because zodToPromptSchema now renders pipelines
+// (mc2-4m29k). Renaming the field would be cleaner and is not free: it is stored
+// in analysis_result, read by the web panels and by Phase 0.5, 2 and 3.
 const llmComplexityEnum = createLLMEnumSchema(
   ['narrow', 'medium', 'broad'] as const,
   {
@@ -201,7 +214,7 @@ const llmComplexityEnum = createLLMEnumSchema(
     comprehensive: 'broad',
   },
   'complexity'
-);
+).describe('how much ground the topic covers, NOT how hard it is for the learner');
 
 // target_audience enum (used in Phase1, Phase2Input, AnalysisResult)
 const llmTargetAudienceEnum = createLLMEnumSchema(
@@ -223,6 +236,8 @@ const llmTargetAudienceEnum = createLLMEnumSchema(
     universal: 'mixed',
   },
   'target_audience'
+).describe(
+  'the learner proficiency level, one of these words only — not a description of who the learners are'
 );
 
 // difficulty_progression enum (used in SectionBreakdown)
@@ -349,7 +364,27 @@ export const SectionBreakdownSchema = z.object({
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
   section_id: z.string().optional(), // Unique identifier (e.g., "1", "2", "3")
-  estimated_duration_hours: z.number().min(0.5).max(20).optional(), // Time to complete section
+  /**
+   * Time to complete the section, bounded away from zero and nowhere else.
+   *
+   * The model proposes a value and `normalizeRecommendedStructure` then
+   * overwrites every section with `estimated_lessons x lesson_duration_minutes
+   * / 60` — arithmetic on two fields this same schema has already validated. A
+   * `.min(0.5).max(20)` here was therefore a second opinion able to veto the
+   * first: one 3-minute lesson computes 0.05 hours, one section of 40 lessons
+   * at 45 minutes computes 30, and neither is a wrong number. Both were
+   * rejected on the second parse in `postProcessAndValidate`, which kills a
+   * course after it has been paid for — the way mc2-zwp7f was found. Walking
+   * the grid rather than an example, 451 of 1440 combinations of profile,
+   * lesson duration and shape were refused, across every profile and not only
+   * the small ones (mc2-ythy6).
+   *
+   * Clamping instead of rejecting would be worse than either. Stage 5 derives
+   * lesson lengths back out of this field in `lesson-helpers.ts`, so a section
+   * rounded up from 0.05 to the floor hands the learner 30-minute lessons the
+   * user never asked for.
+   */
+  estimated_duration_hours: z.number().positive().optional(),
   difficulty: llmDifficultyEnum.optional(), // Difficulty level
   // Deprecated: kept optional for backward compat with stored analysis data
   prerequisites: z.array(z.string()).optional(), // section_ids that must be completed first
@@ -439,20 +474,35 @@ export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine
 export { SectionBreakdownSchemaWithAlignment as SectionBreakdownSchemaAligned };
 
 /**
+ * How much text `calculation_explanation` has to carry.
+ *
+ * Exported because the field is not written by the model alone: Stage 4
+ * normalizes the structure afterwards and recomputes this sentence from the
+ * lesson count that survived, so the code composing it has to satisfy the same
+ * floor this schema enforces. It was a bare `50` in one place and an assumption
+ * in the other, and the assumption was wrong for 176 combinations of lesson
+ * count, lesson duration and profile label — which killed a course that had
+ * already been paid for (mc2-zwp7f). One constant, read by both.
+ */
+export const CALCULATION_EXPLANATION_MIN_LENGTH = 50;
+
+/**
  * Phase 2 output schema: Scope and structure recommendations
  */
 export const Phase2OutputSchema = z.object({
   recommended_structure: z.object({
-    estimated_content_hours: z.number().min(0.5, 'Minimum content hours: 0.5'), // Removed .max(200) - let LLM decide scope
+    // Derived, like the per-section hours above: the normalizer recomputes it
+    // from `total_lessons x lesson_duration_minutes / 60`. A 0.5 floor refused
+    // 68 of the 1440 grid combinations, every one of them a course the user had
+    // explicitly asked to be that short (mc2-ythy6).
+    estimated_content_hours: z.number().positive('Content hours must be positive'),
     scope_reasoning: z.string().min(100, 'Scope reasoning must be at least 100 characters'), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z
       .number()
       .int()
       .min(3, 'Minimum lesson duration: 3 minutes')
       .max(45, 'Maximum lesson duration: 45 minutes'), // Keep .max(45) - pedagogical constraint per FR-014
-    calculation_explanation: z
-      .string()
-      .min(50, 'Calculation explanation must be at least 50 characters'), // Removed .max(300) - allow thorough explanations
+    calculation_explanation: atLeastInformationChars(CALCULATION_EXPLANATION_MIN_LENGTH), // Removed .max(300) - allow thorough explanations
     total_lessons: z.number().int().min(1, 'Minimum 1 lesson required'), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1, 'Minimum 1 section'), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
@@ -485,86 +535,6 @@ export const Phase2OutputSchema = z.object({
       })
       .optional(),
   }),
-});
-
-/**
- * Phase 2 input schema: Course classification from Phase 1 + user input
- */
-export const Phase2InputSchema = z.object({
-  course_id: z.string().uuid('Invalid course ID'),
-  language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
-  topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
-  document_summaries: z.array(z.string()).nullable().optional(),
-  phase1_output: z.object({
-    course_category: z.object({
-      primary: llmCourseCategoryEnum,
-      confidence: z.number().min(0).max(1),
-      reasoning: z.string().min(1),
-      secondary: llmCourseCategoryEnum.nullable().optional(),
-    }),
-    contextual_language: z
-      .object({
-        why_matters_context: atLeastInformationChars(50), // Removed .max(300) - allow rich context
-        motivators: atLeastInformationChars(50), // Reduced from 100 - realistic minimum for motivators text
-        experience_prompt: atLeastInformationChars(100), // Removed .max(600) - allow detailed prompts
-        problem_statement_context: atLeastInformationChars(50), // Removed .max(300) - encourage thorough problem statements
-        knowledge_bridge: atLeastInformationChars(100), // Removed .max(600) - allow comprehensive bridging
-        practical_benefit_focus: atLeastInformationChars(100), // Removed .max(600) - encourage detailed benefits
-      })
-      .optional(),
-    topic_analysis: z.object({
-      determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
-      information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
-      complexity: llmComplexityEnum,
-      reasoning: atLeastInformationChars(50),
-      target_audience: llmTargetAudienceEnum,
-      missing_elements: z.array(z.string()).nullable(),
-      key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
-      domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
-    }),
-    phase_metadata: z.object({
-      duration_ms: z.number().int().nonnegative(),
-      model_used: z.string().min(1),
-      tokens: z.object({
-        input: z.number().int().nonnegative(),
-        output: z.number().int().nonnegative(),
-        total: z.number().int().nonnegative(),
-      }),
-      quality_score: z.number().min(0).max(1),
-      retry_count: z.number().int().nonnegative(),
-    }),
-  }),
-  // Course size fields (advisory - LLM may deviate if needed)
-  course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
-  structure_profile: z.enum(['general_auto', 'role_playbook_bridge', 'explicit_size']).optional(),
-  target_lessons: z.number().int().positive().optional(),
-  target_sections: z.number().int().positive().optional(),
-  size_guidance: z.string().min(1).optional(),
-  /** Minimum lessons count (hard constraint from size preset) */
-  min_lessons: z.number().int().positive().optional(),
-  /** Maximum lessons count (soft constraint from size preset) */
-  max_lessons: z.number().int().positive().optional(),
-
-  /** Course description (user-provided context) */
-  course_description: z.string().optional(),
-
-  /** Learning outcomes (user-specified goals) */
-  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
-
-  /** Overlap detection feedback from previous attempt (for retry) */
-  overlap_feedback: z.string().optional(),
-
-  /** Clarifying answers from Phase 0.5 */
-  clarifying_answers: z
-    .array(
-      z.object({
-        question: z.string(),
-        answer: z.string(),
-        priority: z.string(),
-        category: z.string().nullable(),
-      })
-    )
-    .optional(),
 });
 
 /**
@@ -609,6 +579,52 @@ export const Phase1OutputSchema = z.object({
     quality_score: z.number().min(0).max(1),
     retry_count: z.number().int().nonnegative(),
   }),
+});
+
+/**
+ * Phase 2 input schema: Course classification from Phase 1 + user input
+ */
+export const Phase2InputSchema = z.object({
+  course_id: z.string().uuid('Invalid course ID'),
+  language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
+  topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
+  document_summaries: z.array(z.string()).nullable().optional(),
+  // The same schema Phase 1 validates against, not a copy of it. It was a
+  // field-for-field duplicate until 2026-08-25: two hand-maintained statements
+  // of one contract, either of which could drift into rejecting what the other
+  // accepts, on the boundary where a rejection kills the course (mc2-4m29k).
+  phase1_output: Phase1OutputSchema,
+  // Course size fields (advisory - LLM may deviate if needed)
+  course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
+  structure_profile: z.enum(['general_auto', 'role_playbook_bridge', 'explicit_size']).optional(),
+  target_lessons: z.number().int().positive().optional(),
+  target_sections: z.number().int().positive().optional(),
+  size_guidance: z.string().min(1).optional(),
+  /** Minimum lessons count (hard constraint from size preset) */
+  min_lessons: z.number().int().positive().optional(),
+  /** Maximum lessons count (soft constraint from size preset) */
+  max_lessons: z.number().int().positive().optional(),
+
+  /** Course description (user-provided context) */
+  course_description: z.string().optional(),
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
+
+  /** Overlap detection feedback from previous attempt (for retry) */
+  overlap_feedback: z.string().optional(),
+
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+        priority: z.string(),
+        category: z.string().nullable(),
+      })
+    )
+    .optional(),
 });
 
 /**
@@ -751,7 +767,7 @@ export const AnalysisResultSchema = z.object({
   }),
 
   recommended_structure: z.object({
-    estimated_content_hours: z.number().min(0.5), // Removed .max(200) - let LLM decide scope
+    estimated_content_hours: z.number().positive(), // Derived; see Phase2OutputSchema (mc2-ythy6)
     scope_reasoning: atLeastInformationChars(100), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z.number().int().min(3).max(45), // Keep .max(45) - pedagogical constraint per FR-014
     calculation_explanation: atLeastInformationChars(20), // Removed .max(300) - allow thorough explanations

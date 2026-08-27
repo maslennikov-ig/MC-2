@@ -14,6 +14,7 @@ import { generateQueryEmbedding } from '../embeddings/generate';
 import type { ResolvedSearchOptions } from './search-types';
 import type { QdrantScoredPoint } from './types';
 import { buildQdrantFilter } from './search-helpers';
+import { COLLECTION_CREATE_PARAMS } from './collection-schema';
 import { logger } from '../logger/index.js';
 import { createBm25Document } from './config';
 import { recordHybridSearchOutcome } from './metrics-textfile';
@@ -21,13 +22,45 @@ import { recordHybridSearchOutcome } from './metrics-textfile';
 const MIN_PREFETCH_LIMIT = 30;
 const PREFETCH_LIMIT_MULTIPLIER = 3;
 
+/**
+ * The deepest candidate list the collection will serve.
+ *
+ * Read from the schema rather than restated, because it is only correct while
+ * it matches the strict mode actually in force. It applies to a PREFETCH limit
+ * exactly as it applies to the outer one — measured 2026-08-26 against the live
+ * collection, where a prefetch of 101 is `Bad Request` and 100 is served.
+ */
+export const STRICT_MODE_MAX_QUERY_LIMIT =
+  COLLECTION_CREATE_PARAMS.strict_mode_config.max_query_limit;
+
 export interface HybridSearchOutcome {
   points: QdrantScoredPoint[];
   fallbackUsed: boolean;
 }
 
-function getPrefetchLimit(limit: number): number {
-  return Math.max(limit * PREFETCH_LIMIT_MULTIPLIER, MIN_PREFETCH_LIMIT);
+/**
+ * How deep each branch of the hybrid looks before the two are fused.
+ *
+ * Deeper than the caller's limit on purpose: RRF ranks by position, so a
+ * candidate that is 40th in one branch and 3rd in the other only exists to be
+ * fused if both branches looked that far. The ceiling is not a tuning choice —
+ * a prefetch above `STRICT_MODE_MAX_QUERY_LIMIT` is rejected outright, and the
+ * rejection is caught upstream and served as a dense-only fallback, so the
+ * request that asked for the deepest pool was the one that got no sparse
+ * branch at all.
+ *
+ * Measured 2026-08-26: Stage 5 section retrieval sizes its per-query limit as
+ * `TARGET_CHUNKS * candidateMultiplier / queryCount`, which is 100, 50 or 34
+ * for a plan of 1, 2 or 3 queries — tripled, that is 300, 150 or 102, and all
+ * three came back `Bad Request` and ran dense-only. Clamped, all three are
+ * served and hybrid. Nothing below a caller limit of 34 is affected, so Stage 6
+ * (30 at its widest) and `search_documents` (10) keep the pool they had.
+ */
+export function getPrefetchLimit(limit: number): number {
+  return Math.min(
+    Math.max(limit * PREFETCH_LIMIT_MULTIPLIER, MIN_PREFETCH_LIMIT),
+    STRICT_MODE_MAX_QUERY_LIMIT
+  );
 }
 
 /** Build the two candidate sources consumed by server-side RRF. */

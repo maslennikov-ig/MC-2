@@ -86,6 +86,41 @@ describe('OpenRouterBatchClient', () => {
       expect.objectContaining({ method: 'GET' })
     );
   });
+
+  it('polls the identifier format OpenRouter actually issues', async () => {
+    // The guard required `batch_` and OpenRouter returns `batch-`. Read off a
+    // live submission on 2026-08-25: `batch-1787647619-as0NWfE8y270wkfYc6aq`.
+    // Every batch could therefore be created and never read: the coordinator
+    // would poll nothing, wait out its whole window and fall back to
+    // synchronous generation, which looks like a slow provider (mc2-g4fdf).
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 'batch-1787647619-as0NWfE8y270wkfYc6aq' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new OpenRouterBatchClient({ apiKey: 'test-key' }).getBatch(
+      'batch-1787647619-as0NWfE8y270wkfYc6aq'
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/beta/batches/batch-1787647619-as0NWfE8y270wkfYc6aq',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('still refuses anything that is not an identifier', async () => {
+    const client = new OpenRouterBatchClient({ apiKey: 'test-key' });
+
+    await expect(client.getBatch('../../v1/chat/completions')).rejects.toThrow(
+      'Invalid OpenRouter batch identifier'
+    );
+    await expect(client.getBatch('batchsomething')).rejects.toThrow(
+      'Invalid OpenRouter batch identifier'
+    );
+  });
 });
 
 describe('mapCompletedBatchResultsByPosition', () => {

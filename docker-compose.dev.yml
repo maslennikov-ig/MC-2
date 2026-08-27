@@ -77,11 +77,19 @@ services:
       # unattended. The long-lived cookies last ~400 days; the rotating ones do
       # not, and they are what the requests actually carry.
       - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:rw
+    # Asks /health over `http.client`, byte for byte the image's own HEALTHCHECK.
+    #
+    # A bare TCP connect proved that uvicorn bound the port and nothing else,
+    # which is how a dead session and a severed geo-bypass tunnel both sat
+    # behind `Up (healthy)` for months. `urllib` cannot be used instead: this
+    # container carries HTTP_PROXY=socks5h://..., and urllib routes loopback
+    # through it and fails. `ops/notebooklm-bridge-healthcheck.test.ts` keeps
+    # this string equal to the Dockerfile's (mc2-h6nlv).
     healthcheck:
       test:
         [
           'CMD-SHELL',
-          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+          'python -c "import http.client, sys; c = http.client.HTTPConnection(''127.0.0.1'', 8000, timeout=5); c.request(''GET'', ''/health''); sys.exit(0 if c.getresponse().status == 200 else 1)"',
         ]
       interval: 30s
       timeout: 10s

@@ -62,18 +62,46 @@ work from here:
   `stage_4_*` status now counts as initialised, and one the RPC cannot accept is reported rather
   than attempted. 37 of the 182 FSM initialisations in this database came from this path.
 
-## RAG retrieval, chunking and parent expansion (2026-08-12/13)
+## RAG retrieval, chunking and parent expansion (2026-08-12/13, measured 2026-08-26)
 
 Closed: `mc2-pdmgu`, `mc2-7frdr`, `mc2-5fpaf`, `mc2-18ujf`, `mc2-o3s4r`; `mc2-lrav0` on the owner's
 "no backfill". What still constrains work:
 
-Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.6
+Thresholds have one source, `src/shared/qdrant/retrieval-thresholds.ts` (0.25 / 0.15 widened / 0.65
 ceiling); why, and the rule it produced, are in `.codex/repository-failure-modes.md`. Degenerate
 parents no longer reach the index (`selectIndexableChunks`). Only children are indexed, plus any
 childless parent; the passage is rebuilt at retrieval time from siblings, **after reranking** in the
 two paths that rerank. On for Stage 5 section RAG, Stage 6 lesson RAG and `search_documents`; off for
-evidence retrieval, where a citation must point at the fragment that matched. Average expansion
-5.5x; **quality** unmeasured.
+evidence retrieval, where a citation must point at the fragment that matched.
+
+**Expansion runs at 1.00x on the live corpus, not 5.5x** (`mc2-xg6g8`). `sibling_chunk_ids` is empty
+on all 6856 points — every one was indexed in July 2026 with `total_chunks: 1`, before degenerate
+parents were kept out — so there is nothing to stitch and 0 of 7785 measured results widened. The
+5.5x is what expansion **will** cost once a document is indexed with the current chunker; it is not
+what production pays today. The token ceilings (20K Stage 6, 40K Stage 5) are never approached.
+
+**Retrieval quality is a number now:** recall@5 **0.9677** Stage 5, **0.7419** Stage 6, **0.4839**
+`search_documents` (the only path that does not ask for hybrid). Re-run with
+`pnpm --filter @megacampus/course-gen-platform benchmark:rag run` against the live collection
+read-only; the 76-query set and its vectors are in `packages/course-gen-platform/eval/rag-retrieval/`.
+Full results and method: `docs/rag/2026-08-26-retrieval-quality-measurement.md`; the read-only
+platform pass is `docs/rag/2026-08-26-qdrant-operations-recheck.md`.
+
+Three things that measurement changed or exposed:
+
+- **Stage 5 was never hybrid for a section plan of three or fewer queries.** `max_query_limit` is 100
+  and applies to a prefetch limit; Stage 5 asked for 300/150/102 and got `Bad Request` → dense-only,
+  on every such query. `getPrefetchLimit` now clamps to the collection's own ceiling. Stage 5
+  recall@5 0.7742 → 0.9677, MRR 0.6290 → 0.9097, fallbacks 76/76 → 0/76.
+- **The dense threshold costs nothing between 0.15 and 0.30** on any entry point, and above 0.30 only
+  the dense-only path loses answers. 0.25 stays, now measured rather than inherited.
+- **A fused RRF score is NOT on a different scale from a dense cosine one.** The old comment said 0.7
+  was unreachable for RRF by construction; measured, fused scores reach 1.0000 against dense bests of
+  0.45–0.65. The advice stands, the stated reason was wrong in the dangerous direction.
+
+Open and owner-gated: `mc2-zewto` — Stage 6's `group_by_document` costs **22.6 points of recall@5**
+(0.7419 against 0.9677 with it off) and holds the reranker to 6.25 candidates where it asks for 30.
+That is diversity against relevance, it reverses `mc2-jz6y0.16`, and nothing was changed for it.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -207,10 +235,9 @@ current, one at a time. `mc2-hqfc3` video stays parked.
 
 **Answered 2026-08-23, all delivered:** `stage_5_escalation` joins the Stage 5 chain (`mc2-9yrgb`);
 course edits count inside the course total (`mc2-b7olk.5`); the playbook model is decided by
-measurement (`mc2-gg65o`); the 14 `course_override` rows are **deleted**, contents in `mc2-sjwm0`.
-
-**Answered 2026-08-23:** `mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own
-`generation_id`s, not by a second key; the job-description rework (plan 4.5) **stays parked**.
+measurement (`mc2-gg65o`); the 14 `course_override` rows are **deleted**, contents in `mc2-sjwm0`;
+`mc2-yson0` is fixed by **rewriting the reconciliation procedure** onto own `generation_id`s, not by
+a second key; the job-description rework (plan 4.5) **stays parked**.
 **Answered 2026-08-25:** the `develop → master` release for `mc2-cuk7j.2` was authorized and run.
 
 **Still open:** `mc2-v6fqp` — which third language. "ru and en" stays the test language.
@@ -244,6 +271,22 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
+`mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
+writer is configured on staging, which is idle, and not on dev, where the runs happen.
+
+`mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
+
+**Settled 2026-08-27, `mc2-78ya6` — the bridge healthcheck took both halves.** The Q12 asset manifest
+pins `docker-compose.infra.yml`, so `27790d81d` moved its sha and H2 went red; `4268a8e7a`
+regenerated the manifest from the tree. That alone would have turned the test green while the **host
+still ran the old healthcheck** — the manifest tracks the repository, and only a deploy makes the
+host agree with it. Delivered on owner authorization 2026-08-27: the compose file was copied to
+`/opt/megacampus` (previous version kept beside it as
+`docker-compose.infra.yml.bak-bridge-healthcheck-20260827T044334Z`) and `notebooklm-bridge` was
+recreated with `--no-deps`. Tree, manifest and host now all read `e447c928…`, and the container's
+health is earned rather than asserted: `/health` answers 200 with the proxy reachable and the session
+good to 2028-08-24. Nothing else on the host was touched.
+
 ## NotebookLM and languages
 
 **The hop is live** (`mc2-xjykw`): SOCKS5 through `helixa-new` (82.26.152.8, NL), own revocable key,
@@ -268,22 +311,23 @@ Accepted stage id: `mc2-51epl` · Current stage id: none · Next stage id: **own
 `brawny-mellow-quokka.md` is finished and nothing in it is owed. Recommended action: pick the next
 track — `mc2-db696` (Career Playbook) and `mc2-uv7n7` (UI redesign, 22 Stitch screens) are the two
 standing directions, and `specs/026-post-triage-priorities/spec.md` holds the backlog order.
-Two small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
-never actually escalated and the judge's new terminal path has never fired, both needing a
-generation forced to fail. Use $orchestrator-stage when the next track becomes an epic.
+Three small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
+never actually escalated, the judge's new terminal path has never fired — both needing a generation
+forced to fail — and **no real NLM generation has run since the cookies were restored**, which now
+needs only a run. Use $orchestrator-stage when the next track becomes an epic.
 
-`mc2-ibzcc` is **closed**: docling-mcp is on 3.1.0 and most of the cache wrapper is gone, but the
-image is **neither published nor deployed** — that runs through the manual
-`build-docling-images.yml` workflow and a recorded `image@sha256`, a production mutation of its own.
-`mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`. `mc2-8m90f` moved
-without firing: 7 accepted `document_evidence_runs` against 0 on 2026-08-01, none on the six
-affected courses — re-measured 2026-08-24, still none, so its reopen gate narrows from "any
-post-window Stage 4 run" to "a run on one of those six courses". New: `mc2-pdcb7` (covers drawn
-without their visual style — fixed; whether to pay to redraw is the owner's).
+New and open: `mc2-h6nlv` — the bridge healthcheck in both compose files opens a TCP socket and never
+asks `/health`, so it stays green with dead auth, a dead hop or no master token. Removing the
+override is NOT the fix: the container has `HTTP_PROXY=socks5h://…`, urllib takes the proxy branch
+even for loopback, and the Dockerfile's own check dies on `unknown url type: socks5h`.
 
-`mc2-o5ktb` (Stage 4 evidence output budget), `mc2-b7olk.8` and the inbox triage epic `mc2-p2908`
-are **closed with their evidence in the tickets**; the rule the first produced is in
-`.codex/repository-failure-modes.md`.
+`mc2-ibzcc` is **closed**, but its docling-mcp 3.1.0 image is **neither published nor deployed** —
+that is the manual `build-docling-images.yml` workflow and a recorded `image@sha256`, a production
+mutation of its own. `mc2-vlskb` stays open: 3.1.0 still drops
+`service_timeout`/`service_max_retries`. `mc2-8m90f`'s reopen gate narrowed to "a run on one of the
+six affected courses" — re-measured 2026-08-24, still none. `mc2-pdcb7`: covers drawn without their
+visual style, fixed; whether to pay to redraw is the owner's. `mc2-o5ktb`, `mc2-b7olk.8` and
+`mc2-p2908` are closed with their evidence in the tickets.
 
 ## Starter prompt for next orchestrator
 

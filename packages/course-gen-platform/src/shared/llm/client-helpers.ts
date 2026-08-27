@@ -36,12 +36,23 @@ export type MessageWithCacheControl = ChatCompletionMessageParam & {
  * Extends standard OpenAI params with provider-specific fields
  */
 /**
- * Per-request provider routing, as `extra_body.provider`.
+ * Per-request provider routing, sent as a top-level `provider` field.
  *
  * `ignore` is the only lever OpenRouter gives us against a provider that is
  * merely slow: `allow_fallbacks` moves on for a refusal or an outage but not for
  * a crawl, and there is no per-request provider timeout. `max_price` is the
  * counterweight — leaving a provider out must not buy us a dearer one.
+ *
+ * **Top-level, and it has to be.** This lived under `extra_body` until
+ * 2026-08-25, which is a python-openai convention: that SDK unwraps the envelope
+ * before sending. The Node SDK does not — it passes unknown fields through
+ * verbatim — so OpenRouter received a field called `extra_body`, which means
+ * nothing to it, and every control in here was silently discarded. Measured
+ * against the live API on identical requests: `extra_body.provider.order:
+ * ['openai/flex']` served `service_tier: "default"`, the same routing at the top
+ * level served `"flex"`. So the endpoint pin (mc2-6crnj), the price ceiling
+ * (mc2-qch4w) and the per-chain provider skip list were all no-ops for as long
+ * as they had existed — the code was right and the envelope was never opened.
  */
 export interface OpenRouterProviderRouting {
   /** Provider *slugs* (`open-inference`), never display names (`OpenInference`). */
@@ -60,10 +71,9 @@ export interface OpenRouterProviderRouting {
 }
 
 export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & {
-  extra_body?: {
-    provider?: OpenRouterProviderRouting & {
-      cache_control?: boolean;
-    };
+  /** Routing for this request. Top-level — see {@link OpenRouterProviderRouting}. */
+  provider?: OpenRouterProviderRouting & {
+    cache_control?: boolean;
   };
   /**
    * OpenRouter reasoning controls. Always sent to a model that can reason:
@@ -263,17 +273,16 @@ export function toProviderKwargs(
 /**
  * Merge provider routing into a request without clobbering what is already there.
  *
- * The Anthropic cache flag and the routing controls both live under
- * `extra_body.provider`, and the routing controls are re-applied between
- * attempts of the same call. Assigning the object wholesale — which is what the
- * cache branch used to do — would drop whichever of the two was written first.
+ * The Anthropic cache flag and the routing controls both live on the same
+ * `provider` object, and the routing controls are re-applied between attempts of
+ * the same call. Assigning the object wholesale — which is what the cache branch
+ * used to do — would drop whichever of the two was written first.
  */
 export function applyProviderRouting(
   requestOptions: OpenRouterRequestOptions,
   routing: OpenRouterProviderRouting & { cache_control?: boolean }
 ): void {
-  const extraBody = (requestOptions.extra_body ??= {});
-  const provider = (extraBody.provider ??= {});
+  const provider = (requestOptions.provider ??= {});
 
   if (routing.cache_control !== undefined) provider.cache_control = routing.cache_control;
   if (routing.max_price !== undefined) provider.max_price = routing.max_price;
@@ -468,15 +477,31 @@ export function parseCompletionResponse(
   // needs in order to route around it.
   const servedBy = (completion as unknown as Record<string, unknown>).provider;
 
+  // Alongside it, in the same body, the tariff the call was served at:
+  // `default`, `flex`, `priority`, or absent when the provider offers none.
+  // A fact rather than an inference — flex can refuse for capacity, so asking
+  // for it and getting it are different things (mc2-a9w19).
+  const servedTier = (completion as unknown as Record<string, unknown>).service_tier;
+
+  // And the charge itself, in the same body. OpenRouter puts `usage.cost` on
+  // every completion — measured 2026-08-25, present with and without
+  // `usage: {include: true}`, and equal to the cent to what
+  // `GET /api/v1/generation` reports eleven seconds later: $0.000004257 both
+  // times. Every estimate below this line exists for the calls that never
+  // return a body at all.
+  const billed = (usage as unknown as Record<string, unknown> | undefined)?.cost;
+
   return {
     content: choice.message.content,
     inputTokens,
     outputTokens,
     totalTokens,
     model: completion.model || model,
+    ...(typeof billed === 'number' && Number.isFinite(billed) ? { actualCostUsd: billed } : {}),
     finishReason: choice.finish_reason || 'unknown',
     requestId: (completion as unknown as Record<string, unknown>)._request_id as string | undefined,
     ...(typeof servedBy === 'string' && servedBy.length > 0 ? { providerName: servedBy } : {}),
+    ...(typeof servedTier === 'string' && servedTier.length > 0 ? { serviceTier: servedTier } : {}),
   };
 }
 

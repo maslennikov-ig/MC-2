@@ -100,6 +100,85 @@ describe('Stage 6 Batch processor', () => {
     expect(job.moveToDelayed).toHaveBeenCalledWith(61_000, 'lock-token');
   });
 
+  it('asks the eligibility check to beat the flex price this phase actually pays', async () => {
+    // Not the catalogue price. `/models` publishes the default tariff for both
+    // the base and the `:batch` id, and batch@default is exactly what a
+    // synchronous flex call costs — a discount on paper, a day of waiting in
+    // practice (mc2-g4fdf).
+    const job = createCoordinatorJob();
+    const resolve = vi.fn().mockResolvedValue({
+      eligible: false,
+      baseModelId: 'google/gemini-3.7-flash',
+      batchModelId: 'google/gemini-3.7-flash:batch',
+      reason: 'no_discount',
+    });
+    const processor = createStage6BatchProcessor({
+      prepareLesson: vi.fn(async item => ({
+        ...item,
+        prompt: `Prompt ${item.position}`,
+        baseModelId: 'google/gemini-3.7-flash',
+        maxTokens: 8_000,
+        reasoning: { enabled: false, effort: 'low', maxTokens: null },
+      })),
+      eligibilityResolver: { resolve },
+      createClient: vi.fn().mockResolvedValue({ submitChatBatch: vi.fn(), getBatch: vi.fn() }),
+      getLessonJob: vi.fn().mockResolvedValue(null),
+      now: () => 1_000,
+      pollIntervalMs: 60_000,
+      maxWaitMs: 2 * 60 * 60 * 1000,
+    });
+
+    await processor(job as unknown as Job, 'lock-token').catch(() => undefined);
+
+    expect(resolve).toHaveBeenCalledWith(
+      'google/gemini-3.7-flash',
+      expect.objectContaining({ serviceTier: 'flex' })
+    );
+  });
+
+  it('does not ask a batch for a tier, because the Batch API does not give one', async () => {
+    // Measured twice on 2026-08-25, 13+5 tokens, $0.0000043 either way — the
+    // default batch rate to the cent — once with `service_tier: 'flex'` and once
+    // with `provider.only: ['openai/flex']`. Sending a field the provider
+    // ignores is how `extra_body` passed review for months (mc2-5pt54).
+    const job = createCoordinatorJob();
+    const submitChatBatch = vi.fn().mockResolvedValue(validatingBatch());
+    const processor = createStage6BatchProcessor({
+      prepareLesson: vi.fn(async item => ({
+        ...item,
+        prompt: `Prompt ${item.position}`,
+        baseModelId: 'google/gemini-3.7-flash',
+        maxTokens: 8_000,
+        reasoning: { enabled: true, effort: 'low', maxTokens: null },
+      })),
+      eligibilityResolver: {
+        resolve: vi.fn().mockResolvedValue({
+          eligible: true,
+          baseModelId: 'google/gemini-3.7-flash',
+          batchModelId: 'google/gemini-3.7-flash:batch',
+          inputDiscountRatio: 0.5,
+          outputDiscountRatio: 0.5,
+          supportedParameters: new Set(['max_tokens', 'reasoning']),
+          comparedAgainstTier: 'flex',
+        }),
+      },
+      createClient: vi.fn().mockResolvedValue({ submitChatBatch, getBatch: vi.fn() }),
+      getLessonJob: vi.fn(),
+      now: () => 1_000,
+      pollIntervalMs: 60_000,
+      maxWaitMs: 2 * 60 * 60 * 1000,
+    });
+
+    await processor(job as unknown as Job, 'lock-token').catch(() => undefined);
+
+    const requests = submitChatBatch.mock.calls[0][0].requests as Array<{
+      body: Record<string, unknown>;
+    }>;
+    expect(requests).toHaveLength(10);
+    expect(requests.every(request => !('service_tier' in request.body))).toBe(true);
+    expect(requests.every(request => !('provider' in request.body))).toBe(true);
+  });
+
   it('routes a failed item to synchronous generation without failing successful lessons', async () => {
     const data = coordinatorInput();
     data.state = {

@@ -1,0 +1,7 @@
+# Run outputs, not inputs. They are regenerated in full by every `benchmark:rag`
+# run and would otherwise churn the diff on each one. The two committed files —
+# eval-set.json and query-embeddings.json — are what make a re-run free and
+# repeatable; these are what the re-run produces.
+last-run.json
+last-concentration.json
+last-variants.json

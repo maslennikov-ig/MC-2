@@ -16,8 +16,13 @@
  */
 
 import { searchChunks } from '@/shared/qdrant/search';
-import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
-import type { SearchOptions, SearchResult } from '@/shared/qdrant/search-types';
+import type { SearchResult } from '@/shared/qdrant/search-types';
+import {
+  SECTION_RAG_DEFAULTS,
+  SECTION_RERANKER_CONFIG,
+  buildSectionSearchOptions,
+  sectionCandidateLimit,
+} from './section-search-options';
 import { logger } from '@/shared/logger';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
@@ -29,37 +34,10 @@ import { expandToSiblingContext } from '@/shared/qdrant/context-expansion';
 // CONSTANTS
 // ============================================================================
 
-/**
- * Default configuration for section-level RAG retrieval
- */
-const SECTION_RAG_DEFAULTS = {
-  /** Target number of chunks (middle of 20-30 range) */
-  TARGET_CHUNKS: 25,
-  /** Maximum chunks to retrieve */
-  MAX_CHUNKS: 30,
-  /** Minimum chunks for acceptable coverage */
-  MIN_CHUNKS: 20,
-  /** Minimum dense similarity score threshold */
-  SCORE_THRESHOLD: DENSE_SCORE_THRESHOLD,
-  /** Maximum token budget for RAG context */
-  MAX_TOKENS: 40_000,
-  /** Enable hybrid search (dense + sparse) - ENABLED: sparse vectors now uploaded + native Query API with server-side RRF */
-  ENABLE_HYBRID: true,
-  /** Chunks per query to request (may return fewer after deduplication) */
-  CHUNKS_PER_QUERY: 15,
-} as const;
-
-/**
- * Reranker configuration for improving retrieval quality
- */
-const RERANKER_CONFIG = {
-  /** Enable reranking with Jina Reranker v2 */
-  enabled: true,
-  /** Fetch N times more candidates for reranking (100 total for 25 target) */
-  candidateMultiplier: 4,
-  /** Use Qdrant scores if reranker fails */
-  fallbackOnError: true,
-} as const;
+// The request shape and the numbers behind it live in `section-search-options`,
+// so that a benchmark measuring this entry point sends the request this stage
+// sends instead of a copy of it.
+const RERANKER_CONFIG = SECTION_RERANKER_CONFIG;
 
 // ============================================================================
 // TYPES
@@ -279,11 +257,7 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
     const seenChunkIds = new Set<string>();
 
     // Calculate how many chunks to fetch per query
-    const chunksPerQuery = RERANKER_CONFIG.enabled
-      ? Math.ceil(
-          (targetChunks * RERANKER_CONFIG.candidateMultiplier) / ragPlan.search_queries.length
-        )
-      : SECTION_RAG_DEFAULTS.CHUNKS_PER_QUERY;
+    const chunksPerQuery = sectionCandidateLimit(targetChunks, ragPlan.search_queries.length);
 
     for (const query of ragPlan.search_queries) {
       try {
@@ -646,20 +620,15 @@ async function executeSearchQuery(params: {
 }): Promise<Omit<RAGChunk, 'matchedQuery'>[]> {
   const { query, courseId, primaryDocuments, scoreThreshold, limit } = params;
 
-  const searchOptions: SearchOptions = {
-    limit,
-    score_threshold: scoreThreshold,
-    enable_hybrid: SECTION_RAG_DEFAULTS.ENABLE_HYBRID,
-    filters: {
-      course_id: courseId,
-      // Filter by primary documents if specified
-      ...(primaryDocuments && primaryDocuments.length > 0
-        ? { document_ids: primaryDocuments }
-        : {}),
-    },
-  };
-
-  const response = await searchChunks(query, searchOptions);
+  const response = await searchChunks(
+    query,
+    buildSectionSearchOptions({
+      courseId,
+      ...(primaryDocuments ? { primaryDocuments } : {}),
+      scoreThreshold,
+      limit,
+    })
+  );
 
   return response.results.map((result: SearchResult) => ({
     chunkId: result.chunk_id,

@@ -180,12 +180,42 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * this figure is what a price ceiling and a budget estimate are built from.
    */
   'z-ai/glm-5.2': {
-    inputPricePerMillion: 0.966,
-    outputPricePerMillion: 3.036,
+    // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
+    inputPricePerMillion: 1.19,
+    outputPricePerMillion: 3.74,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
     supportsReasoning: true,
+  },
+  /**
+   * Read live 2026-08-26, the day the model was published (mc2-r8shw).
+   *
+   * Two endpoints only — `z-ai` at exactly this rate and `novita` at twice it —
+   * so unlike `glm-5.2` above there is no wide provider spread to hedge
+   * against, and equally little to reroute to if z-ai goes down. No `:batch`
+   * sibling exists.
+   *
+   * `requiresReasoning` here is not inherited from the family, it is measured:
+   * both endpoints answer `400 Reasoning is mandatory for this endpoint and
+   * cannot be disabled`. That costs real tokens — 791 of them on a prompt whose
+   * answer was three sentences — and the rate still comes out ahead of luna's
+   * $0.20/$1.20 per call.
+   *
+   * Not recorded here because the catalogue has no field for it: this model
+   * ignores a strict `json_schema` and answers with a shape of its own, so the
+   * three call sites that ask for one stay on luna. `supported_parameters` omits
+   * `structured_outputs`, which turned out to be the truth rather than an
+   * oversight.
+   */
+  'z-ai/glm-5.3-flash': {
+    inputPricePerMillion: 0.075,
+    outputPricePerMillion: 0.25,
+    contextLength: 1048576,
+    maxOutputTokens: 131072,
+    supportsTemperature: true,
+    supportsReasoning: true,
+    requiresReasoning: true,
   },
   /**
    * Re-read 2026-08-21: $1.40/$4.40. The entry had carried $0.70/$2.20 on the
@@ -218,8 +248,14 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * tail. A ceiling under every endpoint is a refusal, not a saving (mc2-qch4w).
    */
   'deepseek/deepseek-v4-flash-0731': {
-    inputPricePerMillion: 0.08,
-    outputPricePerMillion: 0.18,
+    // Re-read 2026-08-26: $0.06/$0.12. It read $0.14/$0.28 the day before, and
+    // $0.08/$0.18 the day before that — this one moved 2.33x within two hours on
+    // 2026-08-25. Chasing it by hand is not the plan: the ceiling reads the
+    // published list live, and this figure is what it falls back on when it
+    // cannot. Being high there costs an overstated estimate; being low refuses
+    // the call.
+    inputPricePerMillion: 0.06,
+    outputPricePerMillion: 0.12,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -286,12 +322,15 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'deepseek/deepseek-v4-flash': {
-    // Re-read 2026-08-23 by the first run of the nightly drift check: $0.05306/
-    // $0.10612, against $0.0798/$0.1596 here — 1.50x over on both legs. Third
-    // correction to this one entry in three days, which is the argument for the
-    // check running nightly instead of when somebody remembers.
-    inputPricePerMillion: 0.05306,
-    outputPricePerMillion: 0.10612,
+    // Re-read 2026-08-26: $0.088606/$0.177212. The entry held $0.05306/$0.10612
+    // — 40% UNDER, which is the dangerous direction. `provider.max_price` is
+    // built from this number, and a ceiling below every endpoint is answered
+    // with a refusal rather than a cheaper route (mc2-a6qxc). Fourth correction
+    // to this one entry; the value moves faster than anybody re-reads it, which
+    // is why the frozen figure is only a fallback for when the live list cannot
+    // be read, and why too high is the safe way to be wrong.
+    inputPricePerMillion: 0.088606,
+    outputPricePerMillion: 0.177212,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -409,6 +448,22 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: false,
   },
+  /**
+   * Reachable from the `MODELS` escalation registry in `model-selector.ts` and
+   * absent from every pricing table in the repo until 2026-08-26, so it priced
+   * at the pessimistic default and its ceiling was a guess (mc2-a6qxc).
+   *
+   * Read from the published list that day: $0.26/$0.78, 1M context, 32768
+   * output, `supported_parameters` carries `temperature` and no `reasoning`.
+   */
+  'qwen/qwen-plus-2025-07-28': {
+    inputPricePerMillion: 0.26,
+    outputPricePerMillion: 0.78,
+    contextLength: 1000000,
+    maxOutputTokens: 32768,
+    supportsTemperature: true,
+    supportsReasoning: false,
+  },
   'qwen/qwen3-max': {
     inputPricePerMillion: 0.78,
     outputPricePerMillion: 3.9,
@@ -509,6 +564,7 @@ export const LIVE_ROUTING_MODEL_IDS = [
   'deepseek/deepseek-v4-flash-0731',
   'openai/gpt-5.6-luna',
   'z-ai/glm-5.2',
+  'z-ai/glm-5.3-flash',
   'minimax/minimax-m3',
   'google/gemini-3.7-flash',
   'openai/gpt-5-image-mini',

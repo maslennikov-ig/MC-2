@@ -7,9 +7,25 @@
  * only way to answer "what did this course cost" was the provider's own key
  * counter, which knows nothing about courses, stages or models (mc2-o7740).
  *
- * Prices come from `MODEL_CATALOG` and nowhere else: a second price table in
- * this repository would drift from the routing configuration that picks the
- * models.
+ * A price is taken from the most specific source that knows it, in this order:
+ *
+ * 1. The provider's own receipt, `GET /api/v1/generation`, which arrives about
+ *    ten seconds later and overwrites everything below.
+ * 2. The endpoint this attempt was pinned to, whose live rate is exactly what
+ *    this call will be billed.
+ * 3. `MODEL_CATALOG`, the frozen mainstream rate, times the flex multiplier when
+ *    the answer said flex.
+ *
+ * The third is a fallback and not a base: it holds the price the mainstream
+ * providers charge, while the per-attempt pin routes to the cheapest, so it
+ * overstates. Measured 2026-08-25 for `deepseek-v4-flash-0731`: catalogue $0.14
+ * against a served $0.035, four times over. That correction used to arrive with
+ * the receipt — but 92 of 509 rows over the previous fortnight never got one,
+ * because an aborted or failed call has no receipt to collect, and those rows
+ * carried 17% of the ledger on the overstated number.
+ *
+ * No second price table is introduced by any of this. Every figure above is
+ * OpenRouter's own, read at a different moment.
  */
 
 import {
@@ -66,7 +82,46 @@ export interface LlmCallUsage {
   generationId?: string;
   /** Display name of the endpoint that served the call, when it is known. */
   providerName?: string;
+  /**
+   * The tariff the provider says it served this call at: `default`, `flex` or
+   * `priority`. Read from the response body, not from what was requested.
+   */
+  serviceTier?: string;
+  /**
+   * What the endpoint this attempt was pinned to charges, in dollars per
+   * million. Present only when the attempt named one endpoint with
+   * `allow_fallbacks: false`, which is the only case where we know who served
+   * it before the receipt arrives.
+   */
+  endpointRate?: { prompt: number; completion: number };
+  /**
+   * What OpenRouter says it charged, from `usage.cost` in the completion body.
+   *
+   * The charge itself, not an estimate of it, and it costs nothing to have:
+   * measured 2026-08-25, it is on every completion with or without
+   * `usage: {include: true}` and equals `GET /api/v1/generation` to the cent.
+   * Absent only when no body arrived — an aborted or timed-out call — which is
+   * exactly the case the deferred lookup and the estimates below exist for.
+   */
+  actualCostUsd?: number;
 }
+
+/**
+ * What the flex tier charges, as a fraction of the catalogued rate.
+ *
+ * Half, on every model that offers it. Read from the live catalogue on
+ * 2026-08-25: luna $0.10/$0.60 against $0.20/$1.20, gemini-3.7-flash
+ * $0.1875/$0.9375 against $0.375/$1.875, gemini-2.5-flash-image $0.15/$1.25
+ * against $0.30/$2.50. It is a published tier multiplier rather than a
+ * per-model price, which is why one constant is honest here where a second
+ * price table would not be.
+ *
+ * Applied only when the *answer* said flex. A request that asked for flex and
+ * was served at the default rate — a model with no flex endpoint, or one that
+ * refused for capacity — must not be estimated at half, because an
+ * underestimate hides money where an overestimate merely reserves it.
+ */
+const FLEX_TARIFF_MULTIPLIER = 0.5;
 
 /**
  * Replace an estimated price with what OpenRouter actually charged.
@@ -115,6 +170,11 @@ export function settleTraceCostFromProvider(
               finishReason: fact.finishReason,
               nativeTokensPrompt: fact.nativeTokensPrompt,
               nativeTokensCompletion: fact.nativeTokensCompletion,
+              nativeTokensReasoning: fact.nativeTokensReasoning,
+              // Which tariff this call was actually served at. The routing
+              // decision is an intention; flex can refuse for capacity, and
+              // this is the only record of which one happened (mc2-a9w19).
+              serviceTier: fact.serviceTier,
             },
           })
           .eq('id', traceId);
@@ -152,17 +212,55 @@ export function settleTraceCostFromProvider(
 }
 
 /**
- * Price of one call in USD, or `undefined` when the model is not catalogued.
+ * Price of one call in USD, or `undefined` when nothing prices the model.
  *
- * An uncatalogued model is a routing bug, not a rounding problem, so it is
- * reported rather than silently priced at zero.
+ * An uncatalogued model with no pinned endpoint is a routing bug, not a rounding
+ * problem, so it is reported rather than silently priced at zero.
+ *
+ * `settleTraceCostFromProvider` replaces this figure with the real charge about
+ * ten seconds later — but only for a call that produced a receipt. An aborted or
+ * failed call never does, and for those this estimate is the only number the row
+ * will ever carry, which is why it is worth taking from the pinned endpoint
+ * rather than from the catalogue.
  */
 export function calculateLlmCostUsd(usage: LlmCallUsage): number | undefined {
+  // Nothing to estimate when the provider already stated the charge.
+  if (usage.actualCostUsd !== undefined) return usage.actualCostUsd;
+
+  return estimateLlmCostUsd(usage);
+}
+
+/**
+ * What this call was predicted to cost, ignoring anything the provider said.
+ *
+ * Kept separate so a settled row can carry both numbers. The estimate is the
+ * only thing that can show a catalogue entry has drifted, and it cannot do that
+ * from a field that was overwritten with the answer it was supposed to be
+ * compared against — three entries were wrong at once on 2026-08-20, and only
+ * the gap between prediction and charge would have said so.
+ */
+export function estimateLlmCostUsd(usage: LlmCallUsage): number | undefined {
+  // The price of the endpoint we pinned beats the catalogue on every count: it
+  // is live, it is the endpoint that actually served the call, and it already
+  // carries the tier, so no multiplier is guessed on top. The catalogue holds
+  // the mainstream providers' rate and the pin routes to the cheapest — for
+  // `deepseek-v4-flash-0731` on 2026-08-25 that was $0.035 against a published
+  // $0.14, so the catalogue estimate overstated by four times. It also prices a
+  // `~` alias, which the catalogue declines to price exactly at all.
+  if (usage.endpointRate) {
+    return (
+      (usage.inputTokens * usage.endpointRate.prompt) / 1_000_000 +
+      (usage.outputTokens * usage.endpointRate.completion) / 1_000_000
+    );
+  }
+
   const capabilities = getModelCapabilities(usage.model);
   if (!capabilities) return undefined;
+  const tariff = usage.serviceTier === 'flex' ? FLEX_TARIFF_MULTIPLIER : 1;
   return (
-    (usage.inputTokens * capabilities.inputPricePerMillion) / 1_000_000 +
-    (usage.outputTokens * capabilities.outputPricePerMillion) / 1_000_000
+    ((usage.inputTokens * capabilities.inputPricePerMillion) / 1_000_000 +
+      (usage.outputTokens * capabilities.outputPricePerMillion) / 1_000_000) *
+    tariff
   );
 }
 
@@ -300,6 +398,8 @@ export async function recordLlmCallCost(
   }
 
   const costUsd = calculateLlmCostUsd(usage);
+  // The prediction, kept even when it was not used: see `estimateLlmCostUsd`.
+  const estimatedCostUsd = estimateLlmCostUsd(usage);
   if (costUsd === undefined) {
     logger.warn(
       { model: usage.model, courseId: context.courseId, stage: context.stage },
@@ -331,6 +431,21 @@ export async function recordLlmCallCost(
       ...(costUsd === undefined ? {} : { costUsd }),
       durationMs: context.durationMs ?? 0,
       ...(context.retryAttempt === undefined ? {} : { retryAttempt: context.retryAttempt }),
+      // A row whose price came from the response body is settled the moment it
+      // is written. Saying so here rather than waiting for the deferred lookup
+      // matters: 83 of 509 rows over the fortnight to 2026-08-25 never got an
+      // `output_data` at all, so every reconciliation read them as unpriced
+      // guesses when their number was already right.
+      ...(usage.actualCostUsd === undefined
+        ? {}
+        : {
+            outputData: {
+              billedByProvider: true,
+              ...(usage.generationId ? { generationId: usage.generationId } : {}),
+              ...(usage.providerName ? { providerName: usage.providerName } : {}),
+              ...(usage.serviceTier ? { serviceTier: usage.serviceTier } : {}),
+            },
+          }),
       inputData: {
         // Says "a provider charged for this", so a reconciliation can tell a
         // call from a stage progress marker. Token counts cannot: `judge_complete`
@@ -341,12 +456,17 @@ export async function recordLlmCallCost(
         billedCall: true,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
+        ...(usage.actualCostUsd === undefined ? {} : { billedInResponse: true }),
         // The catalogue figure is kept alongside the provider's so a wrong
         // catalogue entry stays visible after the row is settled, instead of
-        // being quietly overwritten by the truth it should have matched.
-        ...(costUsd === undefined ? {} : { estimatedCostUsd: costUsd }),
+        // being quietly overwritten by the truth it should have matched. It has
+        // to be the *estimate* and not `costUsd`, which on a settled row is the
+        // charge — writing that here made the field agree with itself and say
+        // nothing.
+        ...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
         ...(usage.generationId ? { generationId: usage.generationId } : {}),
         ...(usage.providerName ? { providerName: usage.providerName } : {}),
+        ...(usage.serviceTier ? { serviceTier: usage.serviceTier } : {}),
       },
     });
 

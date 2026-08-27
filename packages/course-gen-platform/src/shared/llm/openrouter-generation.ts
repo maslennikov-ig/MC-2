@@ -56,6 +56,22 @@ export interface OpenRouterGenerationFact {
   router: string | null;
   /** Display name, e.g. `Sail Research`. Not the slug — see {@link resolveProviderSlug}. */
   providerName: string | null;
+  /**
+   * Which service tier actually served the call: `default`, `flex`, `priority`,
+   * or `null` when the provider offers none.
+   *
+   * The receipt's answer to a question the request can only ask. Flex is half
+   * price and can refuse for capacity, so "did this call get the discount" is
+   * not something the routing decision alone can be trusted about — and without
+   * this field the only evidence would be arithmetic on the total.
+   */
+  serviceTier: string | null;
+  /**
+   * Reasoning tokens the provider billed, which are output tokens by another
+   * name. The difference between a model and its `-pro` variant is entirely
+   * here: identical tariff, different appetite.
+   */
+  nativeTokensReasoning: number | null;
 }
 
 /**
@@ -129,6 +145,8 @@ async function requestGeneration(
     model: readString(data, 'model'),
     router: readString(data, 'router'),
     providerName: readString(data, 'provider_name'),
+    serviceTier: readString(data, 'service_tier'),
+    nativeTokensReasoning: readNumber(data, 'native_tokens_reasoning'),
   };
 }
 

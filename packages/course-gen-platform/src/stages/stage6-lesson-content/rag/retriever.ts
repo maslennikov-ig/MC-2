@@ -10,6 +10,7 @@ import { RequiredRagUnavailableError } from '@/shared/rag/document-availability'
 import { publishDocumentEvidenceMetricsSafely } from '@/shared/metrics/document-evidence-textfile';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
+import { buildLessonSearchOptions } from './search-options';
 import type { LessonRAGParams, LessonRAGResult } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { resolveTier1ShadowSelection } from './shadow-retrieval';
@@ -677,19 +678,15 @@ async function retrieveLessonContextCore(
   };
 
   const filteringByDocs = Boolean(primaryDocIds && primaryDocIds.length > 0);
-  const baseSearchOptions: Omit<SearchOptions, 'score_threshold'> = {
-    limit: Math.ceil(candidateCount / queries.length) + 2,
-    enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
-    enable_priority_boost: enablePriorityBoost,
-    filters: {
-      organization_id: tenantOrganizationId,
-      course_id: courseId,
-      ...(filteringByDocs && { document_ids: primaryDocIds }),
-    },
-    include_payload: Boolean(evidenceContext),
-    group_by_document: true,
-    group_size: 2,
-  };
+  const baseSearchOptions: Omit<SearchOptions, 'score_threshold'> = buildLessonSearchOptions({
+    organizationId: tenantOrganizationId,
+    courseId,
+    ...(primaryDocIds ? { primaryDocumentIds: primaryDocIds } : {}),
+    targetChunks,
+    queryCount: queries.length,
+    enablePriorityBoost,
+    includePayload: Boolean(evidenceContext),
+  });
 
   logger.debug(
     {

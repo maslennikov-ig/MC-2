@@ -35,6 +35,7 @@ import { buildReasoningPayload, toProviderKwargs } from './client-helpers';
 import type { OpenRouterProviderRouting } from './client-helpers';
 import { instrumentFetchWithGenerationId } from './generation-id-capture';
 import { guardAgainstEmptyCompletion } from './empty-response-guard';
+import { resolveServiceTier, withFlexCapacityFallbackFetch } from './service-tier';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import type { LanguageCode } from '@/shared/workspace-utils';
@@ -72,18 +73,23 @@ const modelConfigService = createModelConfigService();
  * afterwards is dropped — which is how structured calls lost their price
  * (mc2-258fi) and their mandatory-reasoning recovery (mc2-148j9).
  *
- * Order matters, and there are two reasons for this one. The recovery is
- * outermost, so the generation id deposited by the retry replaces the refused
- * request's and the ledger names the call that was actually served. The
- * empty-completion guard sits below it and above the id capture: below, because
- * a 400 the recovery is about to retry must reach it as a response and not as a
- * throw; above, because the id has to be in the slot before the guard can put it
- * into the error (mc2-f1tqd).
+ * Order matters, and there are three reasons for this one. The reasoning
+ * recovery is outermost, so the generation id deposited by the retry replaces
+ * the refused request's and the ledger names the call that was actually served.
+ * The flex fallback sits directly below it, so a request re-sent at the default
+ * tariff is still covered by the recovery if the provider then refuses it for a
+ * different reason. The empty-completion guard sits below both and above the id
+ * capture: below, because a 400 the recovery is about to retry must reach it as
+ * a response and not as a throw; above, because the id has to be in the slot
+ * before the guard can put it into the error (mc2-f1tqd).
  */
 function openRouterTransport(modelId: string): typeof globalThis.fetch {
   return withMandatoryReasoningRecoveryFetch(
     modelId,
-    guardAgainstEmptyCompletion(instrumentFetchWithGenerationId())
+    withFlexCapacityFallbackFetch(
+      modelId,
+      guardAgainstEmptyCompletion(instrumentFetchWithGenerationId())
+    )
   );
 }
 
@@ -101,12 +107,19 @@ export function buildProviderParams(
   temperature: number,
   maxTokens: number,
   reasoning?: LangchainReasoningRequest,
-  providerRouting?: OpenRouterProviderRouting
+  providerRouting?: OpenRouterProviderRouting,
+  phase?: string
 ): {
   temperature?: number;
   maxTokens: number;
   modelKwargs: Record<string, unknown>;
 } {
+  // `usage: {include: true}` is kept, and it is worth saying that it buys
+  // nothing today: measured on the live API 2026-08-25, OpenRouter returns
+  // `usage.cost` with or without it. It stays because it is the documented way
+  // to ask for the accounting block we now read the charge out of, it costs
+  // nothing, and the alternative is depending on undocumented default behaviour
+  // for a number the ledger is built on.
   const modelKwargs: Record<string, unknown> = { usage: { include: true } };
   let effectiveMaxTokens = maxTokens;
 
@@ -114,6 +127,12 @@ export function buildProviderParams(
   // carries it on the direct SDK path.
   const provider = toProviderKwargs(providerRouting);
   if (provider) modelKwargs.provider = provider;
+
+  // Half price for work nobody is waiting on. Named as a tier rather than as an
+  // endpoint tag because this path has no endpoint list to choose a tag from;
+  // a model with no flex endpoint is simply served normally. A phase we cannot
+  // name gets the default tariff — see `resolveServiceTier`.
+  if (resolveServiceTier(phase) === 'flex') modelKwargs.service_tier = 'flex';
 
   if (reasoning?.enabled) {
     if (modelSupportsReasoning(modelId)) {
@@ -207,7 +226,14 @@ export function createOpenRouterModel(
     apiKey,
     ...(callbacks ? { callbacks } : {}),
     ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
+    ...buildProviderParams(
+      modelId,
+      temperature,
+      maxTokens,
+      reasoning,
+      providerRouting,
+      costContext?.phase
+    ),
   });
 }
 
@@ -305,7 +331,14 @@ export async function createOpenRouterModelAsync(
     apiKey,
     ...(callbacks ? { callbacks } : {}),
     ...(timeoutMs ? { timeout: timeoutMs } : {}),
-    ...buildProviderParams(modelId, temperature, maxTokens, reasoning, providerRouting),
+    ...buildProviderParams(
+      modelId,
+      temperature,
+      maxTokens,
+      reasoning,
+      providerRouting,
+      costContext?.phase
+    ),
   });
 }
 

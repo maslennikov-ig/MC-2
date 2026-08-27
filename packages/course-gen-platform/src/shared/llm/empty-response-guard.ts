@@ -22,10 +22,16 @@
  * — the property that `configuration.fetch` has and an overridden method does
  * not (langchainjs#8586).
  *
+ * Having read the body, it also keeps the one number LangChain is about to throw
+ * away: `usage.cost`, the charge OpenRouter states on every completion. That is
+ * `stated-charge-capture`, and it is here rather than in a fifth wrapper because
+ * this is the only place on the path where the body is already parsed.
+ *
  * @module shared/llm/empty-response-guard
  */
 
 import { readGenerationIdSlot } from './generation-id-capture';
+import { rememberStatedChargeFromBody } from './stated-charge-capture';
 
 /** How much of the body the error quotes. Enough to recognise, short enough to log. */
 const BODY_EXCERPT_LIMIT = 400;
@@ -74,33 +80,43 @@ function isCompletionRequest(input: RequestInfo | URL): boolean {
 }
 
 /**
- * Why this body cannot be parsed as a completion, or `null` when it can.
+ * What the body turned out to be: a usable completion, or the reason it is not.
+ *
+ * One reading serves both jobs. The guard needs to know whether a completion is
+ * there; the ledger needs `usage.cost` out of the same object, because the
+ * LangChain path has no other way to reach it (see `stated-charge-capture`).
+ * Parsing twice for that would be the only expensive thing in this file.
+ */
+type BodyReading = { completion: Record<string, unknown> } | { reason: string };
+
+/**
+ * Read the body as a completion, or say why it is not one.
  *
  * An `error` member with a 2xx status is included on purpose: OpenRouter does
  * return one, and a caller reading `choices` finds the same `undefined` either
  * way. The difference is that here the provider said what went wrong, and that
  * sentence is worth far more than our own stack.
  */
-function describeUnusableBody(text: string): string | null {
-  if (text.trim() === '') return 'empty body';
+function readCompletionBody(text: string): BodyReading {
+  if (text.trim() === '') return { reason: 'empty body' };
 
   let payload: unknown;
   try {
     payload = JSON.parse(text);
   } catch {
-    return 'body is not JSON';
+    return { reason: 'body is not JSON' };
   }
-  if (typeof payload !== 'object' || payload === null) return 'body is not an object';
+  if (typeof payload !== 'object' || payload === null) return { reason: 'body is not an object' };
 
   const body = payload as { choices?: unknown; error?: unknown };
   if (body.error !== undefined && body.choices === undefined) {
-    return 'body carries an error member instead of choices';
+    return { reason: 'body carries an error member instead of choices' };
   }
-  if (body.choices === undefined) return 'no choices member';
-  if (!Array.isArray(body.choices)) return 'choices is not an array';
-  if (body.choices.length === 0) return 'choices is empty';
+  if (body.choices === undefined) return { reason: 'no choices member' };
+  if (!Array.isArray(body.choices)) return { reason: 'choices is not an array' };
+  if (body.choices.length === 0) return { reason: 'choices is empty' };
 
-  return null;
+  return { completion: payload as Record<string, unknown> };
 }
 
 /**
@@ -136,8 +152,14 @@ export function guardAgainstEmptyCompletion(
       return response;
     }
 
-    const reason = describeUnusableBody(text);
-    if (reason === null) {
+    const reading = readCompletionBody(text);
+    if ('completion' in reading) {
+      // The only place on this path where the charge is still in reach. It is
+      // left in a map and collected by the cost callback, which already holds
+      // the key; nothing is written to the ledger from here, or the row would
+      // be counted twice.
+      rememberStatedChargeFromBody(reading.completion);
+
       return new Response(text, {
         status: response.status,
         statusText: response.statusText,
@@ -149,7 +171,7 @@ export function guardAgainstEmptyCompletion(
       status: response.status,
       generationId: readGenerationIdSlot()?.generationId,
       bodyExcerpt: text.slice(0, BODY_EXCERPT_LIMIT),
-      reason,
+      reason: reading.reason,
     });
   };
 }

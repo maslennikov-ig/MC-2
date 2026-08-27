@@ -63,6 +63,7 @@ function buildNodeCost(result: {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  costUnknown?: boolean;
   durationMs?: number;
   attemptCount?: number;
   generationId?: string;
@@ -73,6 +74,7 @@ function buildNodeCost(result: {
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
     cost_usd: result.costUsd,
+    ...(result.costUnknown ? { cost_unknown: true } : {}),
     duration_ms: result.durationMs,
     attempts: result.attemptCount,
     // Carried so `settleCareerPlaybookNodeCosts` can replace the estimate above
