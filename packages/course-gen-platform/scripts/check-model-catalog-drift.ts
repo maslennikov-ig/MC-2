@@ -92,19 +92,34 @@ export function readPublishedPricing(
   return published;
 }
 
+/** What the image catalogue charges for one output image, and in what unit. */
+export interface PublishedImagePrice {
+  /** USD for one whole picture, when the model is billed that way. */
+  flatUsd?: number;
+  /** USD per 1M image output tokens, when it is billed that way instead. */
+  perMillionTokens?: number;
+}
+
 /**
- * What one image costs, from the image catalogue rather than the chat one.
+ * What an image costs, from the image catalogue rather than the chat one.
  *
- * Returns the base per-image price — the `output_image` entry with no `variant`.
- * The variants are real and matter (`seedream-5-0-pro` doubles at
- * `high_resolution`, which a 1:1 request silently selects), but they price a
- * different request than the one this catalogue entry describes.
+ * Both halves are read because both exist: 26 of the 48 quote a flat price per
+ * frame and 17 quote a per-token rate, and a gate that understood only one of
+ * them would leave the other's prices unchecked. That gap was real and mine —
+ * `openai/gpt-image-2` went in as the banner's fallback and was reported as
+ * "delisted, or misspelled" because this only knew about flat prices.
  *
- * `null` when the model is not in this catalogue either, or prices by token or
- * megapixel rather than by the frame — all cases where there is nothing here to
- * compare a flat figure against.
+ * The base entry only, never a `variant`. The variants are real and matter —
+ * `seedream-5-0-pro` doubles at `high_resolution`, which a 1:1 request silently
+ * selects — but they price a different request than the catalogue entry
+ * describes.
+ *
+ * `null` when the model is not in this catalogue either, which is the genuine
+ * "delisted or misspelled" case the caller reports.
  */
-export async function readFlatImagePrice(modelId: string): Promise<number | null> {
+export async function readPublishedImagePrice(
+  modelId: string
+): Promise<PublishedImagePrice | null> {
   try {
     const response = await fetch(
       `https://openrouter.ai/api/v1/images/models/${modelId}/endpoints`,
@@ -116,10 +131,15 @@ export async function readFlatImagePrice(modelId: string): Promise<number | null
     };
     for (const endpoint of body.endpoints ?? []) {
       const base = (endpoint.pricing ?? []).find(
-        price =>
-          price.billable === 'output_image' && price.unit === 'image' && price.variant === undefined
+        price => price.billable === 'output_image' && price.variant === undefined
       );
-      if (base && typeof base.cost_usd === 'number') return base.cost_usd;
+      if (!base || typeof base.cost_usd !== 'number') continue;
+      if (base.unit === 'image') return { flatUsd: base.cost_usd };
+      if (base.unit === 'token') return { perMillionTokens: base.cost_usd * 1_000_000 };
+      // Megapixel pricing depends on the frame requested, so there is no single
+      // number to compare an entry against. Say so by returning the model as
+      // found but unpriceable rather than as missing.
+      return {};
     }
     return null;
   } catch {
@@ -231,20 +251,23 @@ async function main(): Promise<void> {
   // (mc2-a6qxc).
   const stillAbsent: string[] = [];
   for (const modelId of absent) {
-    const flat = MODEL_CATALOG[modelId]?.imagePriceFlatUsd;
-    const livePrice = flat === undefined ? null : await readFlatImagePrice(modelId);
-    if (livePrice === null) {
+    const entry = MODEL_CATALOG[modelId];
+    const live = await readPublishedImagePrice(modelId);
+    if (live === null) {
       stillAbsent.push(modelId);
       continue;
     }
-    if (Math.abs(livePrice / flat! - 1) > TOLERANCE) {
-      drift.push({
-        modelId,
-        field: 'imagePriceFlatUsd',
-        catalogued: flat!,
-        published: livePrice,
-        ratio: livePrice / flat!,
-      });
+
+    const comparisons: Array<[string, number | undefined, number | undefined]> = [
+      ['imagePriceFlatUsd', entry?.imagePriceFlatUsd, live.flatUsd],
+      ['imageOutputPricePerMillion', entry?.imageOutputPricePerMillion, live.perMillionTokens],
+    ];
+
+    for (const [field, catalogued, publishedRate] of comparisons) {
+      if (catalogued == null || publishedRate == null) continue;
+      const ratio = publishedRate / catalogued;
+      if (Math.abs(ratio - 1) <= TOLERANCE) continue;
+      drift.push({ modelId, field, catalogued, published: publishedRate, ratio });
     }
   }
 
