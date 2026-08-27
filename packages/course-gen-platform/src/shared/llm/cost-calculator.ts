@@ -41,6 +41,12 @@ export interface ModelPricing {
  * `@megacampus/shared-types` and every consumer sees it at once.
  */
 export const OPENROUTER_PRICING: Record<string, ModelPricing> = Object.fromEntries(
+  // Everything in the catalogue, including the image-only models whose text
+  // legs are zero because no such rate is published for them. Filtering those
+  // out was the first instinct and it is wrong: the guard directly below this
+  // table exists so that a model added to MODEL_CATALOG cannot quietly fail to
+  // appear here and get priced at a default instead. Present-with-zero is
+  // visible; absent is not.
   Object.entries(MODEL_CATALOG).map(([modelId, capabilities]) => [
     modelId,
     {

@@ -32,7 +32,7 @@ Recall@5 and MRR over the 31 scorable queries, at the settings in force (thresho
 | Entry point                 | Recall@5   | MRR    | nDCG@5 | Results per query | Hybrid |
 | --------------------------- | ---------- | ------ | ------ | ----------------- | ------ |
 | Stage 5 section retrieval   | **0.9677** | 0.7952 | 0.8374 | 96.2              | yes    |
-| Stage 6 lesson retrieval    | **0.7419** | 0.6237 | 0.6534 | 6.25              | yes    |
+| Stage 6 lesson retrieval    | **0.9677** | 0.7774 | 0.8241 | 29.97             | yes    |
 | `search_documents` defaults | **0.4839** | 0.4032 | 0.4243 | 9.28              | **no** |
 
 Two runs of the harness produce identical recall, MRR, nDCG and coverage. Branch attribution counts
@@ -83,11 +83,11 @@ Recall@5 across the sweep, over the same 31 scorable queries:
 
 | Threshold | Stage 5 | Stage 6 | `search_documents` | Queries returning nothing (of 76) |
 | --------- | ------- | ------- | ------------------ | --------------------------------- |
-| 0.15      | 0.9677  | 0.7419  | 0.4839             | 0                                 |
-| 0.20      | 0.9677  | 0.7419  | 0.4839             | 0                                 |
-| **0.25**  | 0.9677  | 0.7419  | 0.4839             | 3                                 |
-| 0.30      | 0.9677  | 0.7419  | 0.4839             | 6                                 |
-| 0.35      | 0.9677  | 0.7419  | **0.4516**         | 9                                 |
+| 0.15      | 0.9677  | 0.9677  | 0.4839             | 0                                 |
+| 0.20      | 0.9677  | 0.9677  | 0.4839             | 0                                 |
+| **0.25**  | 0.9677  | 0.9677  | 0.4839             | 3                                 |
+| 0.30      | 0.9677  | 0.9677  | 0.4839             | 6                                 |
+| 0.35      | 0.9677  | 0.9677  | **0.4516**         | 9                                 |
 
 **The curve bends at 0.30, and only for the dense-only path.** Both hybrid entry points are flat
 across the whole sweep, because the sparse branch keeps supplying candidates when the dense gate
@@ -123,7 +123,7 @@ depth (100).
 | Entry point | Dense only | Sparse only | Both | Beyond prefetch | Queries with a unique dense result | with a unique sparse result |
 | ----------- | ---------- | ----------- | ---- | --------------- | ---------------------------------- | --------------------------- |
 | Stage 5     | 2086       | 1813        | 3411 | 0               | 70 / 76                            | 71 / 76                     |
-| Stage 6     | 60         | 137         | 154  | **124**         | 34 / 76                            | 39 / 76                     |
+| Stage 6     | 470        | 434         | 1374 | 0               | 65 / 76                            | 56 / 76                     |
 
 Neither branch is idle. At Stage 5 the split is close to even; at Stage 6 the sparse branch
 contributes more unique results than the dense one.
@@ -132,11 +132,13 @@ contributes more unique results than the dense one.
 problem in any case — it counts hard degradation, which is exactly what happened, but on staging it
 has recorded **2 hybrid requests total, last written 2026-08-12**. See §6.
 
-**A quarter of Stage 6's answer does not come from hybrid fusion.** The `beyondBranchDepth` column
-counts accepted results that appear in neither branch's top-100. Probed directly: a grouped query
-returned 20 results of which 10 were outside both branch lists, and the identical query with grouping
-off had zero. That is Qdrant's per-document group fill, and at Stage 6 it is 124 of 475 accepted
-results.
+**Until 2026-08-27, a quarter of Stage 6's answer did not come from hybrid fusion at all.** The
+`beyondBranchDepth` column counts accepted results that appear in neither branch's top-100. While
+Stage 6 grouped by document it was **124 of 475** accepted results: Qdrant fills each document's group
+past what the prefetch returned. Probed directly at the time, a grouped query returned 20 results of
+which 10 were outside both branch lists, and the identical query with grouping off had zero. Removing
+the per-document cap (§5) took the column to **0** — every accepted result now arrives through the
+fusion the call asks for.
 
 ## 4. Parent expansion is not running at all
 
@@ -205,18 +207,33 @@ running each course's real objectives together as one lesson's query set, taking
 | grouping on (as configured) | **1.78**             | 86%                                     | 6 of 9                         |
 | grouping off                | **1.67**             | 87%                                     | 6 of 9                         |
 
-**Grouping buys 0.11 documents per lesson.** One document already dominates most lessons with the cap
-in force — in six of nine it supplies the whole context — because these courses simply do not have
-several documents that bear on the same lesson. The cap is paying 22.6 points of recall for diversity
-the corpus cannot supply.
+**Grouping bought 0.11 documents per lesson.** One document already dominated most lessons with the
+cap in force — in six of nine it supplied the whole context — because these courses simply do not
+have several documents that bear on the same lesson. The cap was paying 22.6 points of recall for
+diversity the corpus cannot supply.
 
-It also starves the reranker. With grouping on, five queries returned a union of 9 chunks for four of
+It also starved the reranker. With grouping on, five queries returned a union of 9 chunks for four of
 the nine courses; with it off the same five queries returned 27 to 38. `candidateMultiplier: 4` exists
 to give the cross-encoder four candidates per kept chunk, and only the second arm delivers that.
 
-**This reverses an accepted decision (`mc2-jz6y0.16`), so it is the owner's call and nothing in the
-Stage 6 request shape was changed here.** On the evidence the recommendation is to turn grouping off
-for Stage 6: it costs 22.6 points of recall@5 and returns 0.11 documents of diversity.
+### Settled 2026-08-27: the cap is gone
+
+The owner authorised reversing `mc2-jz6y0.16` for lesson content (`mc2-zewto`).
+`buildLessonSearchOptions` no longer sends `group_by_document`, and the measured result:
+
+|                 | Recall@5   | MRR        | nDCG@5     | Candidates per query | Accepted outside the fusion |
+| --------------- | ---------- | ---------- | ---------- | -------------------- | --------------------------- |
+| before (cap on) | 0.7419     | 0.6237     | 0.6534     | 6.25                 | 124 of 475                  |
+| after (cap off) | **0.9677** | **0.7774** | **0.8241** | **29.97**            | **0**                       |
+
+Stage 6 now matches Stage 5 on recall, the reranker receives the pool its multiplier asks for, and the
+threshold sweep is flat for it across the whole 0.15–0.35 range.
+
+Grouping is not wrong in general and is untouched where it earns its keep: Stage 4 evidence preflight,
+conflict detection and Stage 5 advisory enrichment all group deliberately, because their job is
+per-document coverage rather than the single best passage. Pinned by
+`tests/unit/stages/stage6-lesson-content/rag/lesson-search-shape.test.ts`, shown failing against the
+pre-change builder with `expected true to be false`.
 
 Two consequences worth carrying into that decision:
 

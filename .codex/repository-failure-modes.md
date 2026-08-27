@@ -310,9 +310,42 @@ restarting and dead for four months. The browserless cookie re-mint was put in t
 FastAPI lifespan instead: it arrives wherever the image arrives, it needs no root install, and its
 evidence is the mtime of the file it rewrites.
 
+**A server-side limit can apply to a sub-query, and the refusal is served as a quieter answer.**
+Qdrant's `strict_mode_config.max_query_limit` bounds a PREFETCH limit exactly as it bounds the outer
+one. `getPrefetchLimit` asked for three times the caller's limit with no ceiling, so Stage 5 section
+retrieval — sizing its per-query limit as `25 * 4 / queryCount` — sent 300, 150 or 102 whenever a
+section plan carried one, two or three queries. Qdrant answered `Bad Request`,
+`hybridSearchWithFallback` caught it, and the search ran dense-only. Every layer above kept saying
+hybrid: the call, the log line, and `search_type` in the response metadata; only `fallback_used` and
+a `warn` disagreed. Two general points. A limit that a caller derives arithmetically from other
+constants needs a ceiling read from the schema in force, not from a number retyped beside it. And a
+`catch` that degrades to a lesser mode should be treated as a defect report, not a resilience
+feature — the 4xx it produced was visible in `QdrantRestErrorRateHigh` for months and nobody was
+looking, because the product behaved.
+
+**A quality cap has to be measured on the unit it caps.** Stage 6 grouped retrieval by document with
+`group_size: 2`, so one uploaded file could not fill a lesson. Measured per query it cost 22.6 points
+of recall@5, and the mechanism was not subtle: grouping reaches deeper to fill each group, discovers
+more documents, and the best chunk of each newly discovered document outranks the one that answers
+the question. But per query is the wrong unit for the benefit — Stage 6 issues up to ten queries per
+lesson and keeps their union, and it is the union that can be dominated. Measured there, the cap
+bought **0.11 documents per lesson**: one document already supplied the whole context in six lessons
+of nine WITH the cap in force, because those courses hold no second document bearing on the same
+lesson. Both halves of a trade have to be measured at the same granularity, and the granularity that
+matters is the one the user receives. Related: a grouped Qdrant query returns points the prefetch
+never produced — 124 of 475 accepted results at Stage 6 — so "hybrid with RRF" was describing three
+quarters of the answer.
+
 ## Local traps that waste an afternoon
 
-- Host port **6333 is the DEV Qdrant and is empty**. Production answers on **6335**.
+- Host port **6333 is the DEV Qdrant** and holds **12 points** across one course (2026-08-27).
+  Production answers on **6335** with 6856. A RAG measurement against 6333 is a measurement of
+  twelve chunks; on a developer workstation `localhost:6333` is a DIFFERENT project's Qdrant,
+  with a collection of the same name. Reach ours read-only with
+  `ssh -N -L 16335:127.0.0.1:6335 megacampus-prod` and the read-only key, which refuses every
+  write — verified, `403 Forbidden` on an empty alias change. A write against a collection that
+  does not exist answers 404 instead, because Qdrant resolves the collection first; that 404
+  reads like "the key can write" and does not mean it.
 - Production workers take their environment from `/opt/megacampus/.env.<active_color>` — read
   `active_color` first. `.env.production` is the compose default and is not what runs. A variable
   that must survive a deploy goes into **both** `.env.green` and `.env.blue`.

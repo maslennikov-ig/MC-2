@@ -114,6 +114,15 @@ export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
  * It writes about 24% less than Luna. That is the trade, and it is visible in
  * the artifacts rather than inferred from a score.
  *
+ * One correction to the headline, made 2026-08-27 against a month of real
+ * courses. The 78% belongs to `stage_6_content` and `stage_6_section_expander`;
+ * `stage_6_refinement` is not part of it. Refinement is the largest Stage 6
+ * phase by tokens — 535k in the month to 2026-08-26 — and most of it had been
+ * running on deepseek at $0.064 per 1M tokens against this model's measured
+ * $0.074. So moving refinement here bought better prose at the same price, not
+ * a saving, and saying otherwise would credit this change with money it did not
+ * find.
+ *
  * Two things this model cannot do, measured on both of its endpoints: it refuses
  * `reasoning: {enabled: false}` — which is why the catalogue entry above must
  * keep `requiresReasoning`, and why moving this constant without deploying the

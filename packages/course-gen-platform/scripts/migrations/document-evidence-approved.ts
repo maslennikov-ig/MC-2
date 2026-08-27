@@ -573,8 +573,16 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // 20260827000000_stage6_prose_moves_to_glm_5_3_flash.sql. Same shape as the one
 // above — a single UPDATE of `llm_model_config` — so again no new `after-*`
 // digest.
+// Re-pinned 2026-08-27: 244 files, adding
+// 20260827120000_stage_5_escalation_stops_forking_by_language.sql. Another
+// single UPDATE of `llm_model_config`, so no new `after-*` digest — and this
+// time the re-pin happened in the same edit as the migration rather than after
+// CI said so, which is what the two notes above were asking for.
+// Re-pinned again 2026-08-27: 245 files, adding
+// 20260827180000_lesson_banner_moves_to_riverflow.sql. Another single UPDATE of
+// `llm_model_config`, so no new `after-*` digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'd806371e598045fea6f7d4b02b97154629f58501c4ae6cb3c6b459584175214f';
+  '36251d98d3de2d921766a5367bf713fd8857ce65654165ddc4af94bc95fa8436';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

@@ -39,7 +39,18 @@ import { createModelConfigService } from '@/shared/llm/model-config-service';
  * They stay as a floor rather than being deleted: a database that will not
  * answer must not stop a course from getting its cover.
  */
-const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
+/**
+ * The banner model, chosen 2026-08-27 by measuring every 16:9-capable model on
+ * OpenRouter rather than by reputation.
+ *
+ * Billed, one prompt each: riverflow $0.013954, flux.2-klein-4b $0.015000,
+ * gpt-image-2 $0.032775, seedream-5-0-lite $0.035000, the previous
+ * gemini-2.5-flash-image $0.038725 — $0.019247 of that recoverable by pinning
+ * flex, which is now done and still leaves it 38% dearer than this. The picture
+ * is also the better one: asked for layered translucent planes with a node
+ * cluster left of centre in blue and violet, it produced exactly that, text-free.
+ */
+const DEFAULT_IMAGE_MODEL = 'sourceful/riverflow-v2.5-fast';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
@@ -137,7 +148,33 @@ function supportsImageConfig(model: string): boolean {
  * we were paying to hold the picture.
  */
 function usesImagesApi(model: string): boolean {
-  return model.startsWith('openai/');
+  // Images API unless the model is one chat completions can actually serve.
+  //
+  // This read `startsWith('openai/')` until 2026-08-27, which is the wrong
+  // question and quietly made 37 of the 48 image models unreachable: anything
+  // that was not OpenAI went to chat completions, and only 9 image models exist
+  // there at all — six Google and three OpenAI. `sourceful/riverflow-v2.5-fast`
+  // renders through `/images` perfectly well and would have failed as an unknown
+  // chat model, which reads like the model being broken rather than the route.
+  //
+  // Google is the exception in the other direction. `/images` publishes no tiers
+  // for it, chat completions publishes `google-ai-studio/flex` at half price,
+  // and `image_config` is a chat-only extension. So Gemini earns its detour;
+  // nothing else does.
+  return !model.startsWith('google/');
+}
+
+/**
+ * Whether asking this model for less detail is a thing it understands.
+ *
+ * Seven of the forty-eight publish `quality`, and they are the OpenAI image
+ * models plus `x-ai/grok-imagine-image-2.0`. Sending it to the other
+ * forty-one is a 400, so the tier cannot simply follow "went through the Images
+ * API" the way it used to — that was true only while OpenAI was the only model
+ * on that route.
+ */
+function supportsQuality(model: string): boolean {
+  return model.startsWith('openai/') || model === 'x-ai/grok-imagine-image-2.0';
 }
 
 /**
@@ -209,6 +246,20 @@ export interface ImageGenerationOptions {
   negativePrompt?: string;
   /** Whether to skip negative prompt (default: false) */
   skipNegativePrompt?: boolean;
+  /**
+   * Pictures for the model to match, as `data:` URLs.
+   *
+   * Until now a course held its look together by describing it: `visual_style`
+   * became four lines of prose — "blue and purple gradients with subtle
+   * accents", "abstract geometric shapes, flowing lines" — and every card was
+   * drawn from that description alone, never having seen its siblings. Two cards
+   * from one course could satisfy every word of it and still look unrelated.
+   *
+   * A reference image is the same instruction in the medium the model actually
+   * works in. Both endpoints take them, by different names: `input_references`
+   * on the Images API, ordinary `image_url` content parts on chat completions.
+   */
+  referenceImages?: string[];
 }
 
 export interface ImageGenerationResult {
@@ -329,21 +380,67 @@ function parseImageDataUrl(imageDataUrl: string): { mimeType: string; base64Data
   return { mimeType: dataUrlMatch[1], base64Data: dataUrlMatch[2] };
 }
 
+/**
+ * Ask for the cheaper endpoint when the model publishes one.
+ *
+ * `google/gemini-2.5-flash-image` serves the same picture from
+ * `google-ai-studio/flex` at exactly half price, and **OpenRouter does not pick
+ * it on its own**. Measured 2026-08-27 on one prompt, billed by the provider:
+ * no pin $0.038553, flex pinned $0.019247, base pinned $0.038469. The route
+ * makes no difference — the same call through the Images API billed $0.038807 —
+ * so the flex pin is the entire saving (mc2-6qwia).
+ *
+ * `allow_fallbacks` stays **true** and the base tier is listed behind flex on
+ * purpose. Flex refuses rather than queues when capacity is short, and this
+ * repository has already paid for learning that a hard pin turns a busy tier
+ * into a failed call rather than a dearer one. A banner that costs full price is
+ * a worse outcome than one that costs half, and a much better one than no banner.
+ *
+ * Only Gemini publishes tiers here; every OpenAI image model has a single
+ * endpoint, so for them this is correctly absent rather than merely unset.
+ */
+function preferredEndpoints(model: string): string[] {
+  if (!model.startsWith('google/')) return [];
+  return [
+    'google-ai-studio/flex',
+    'google-vertex/global/flex',
+    'google-ai-studio',
+    'google-vertex/global',
+  ];
+}
+
 /** `image_config` is a Gemini-only extension; sending it to other models is an OpenRouter error. */
 function buildChatImageRequest(
   model: string,
   fullPrompt: string,
   aspectRatio: string,
-  imageSize: string
+  imageSize: string,
+  referenceImages: string[] = []
 ): Record<string, unknown> {
+  // Chat completions has no `input_references`; a reference here is an ordinary
+  // `image_url` content part, and the text part has to survive alongside it —
+  // which is why `content` becomes an array only when there is something to add.
+  const content =
+    referenceImages.length > 0
+      ? [
+          { type: 'text', text: fullPrompt },
+          ...referenceImages.map(url => ({ type: 'image_url', image_url: { url } })),
+        ]
+      : fullPrompt;
+
   const requestOptions: Record<string, unknown> = {
     model,
-    messages: [{ role: 'user', content: fullPrompt }],
+    messages: [{ role: 'user', content }],
     modalities: ['text', 'image'],
   };
 
   if (supportsImageConfig(model)) {
     requestOptions.image_config = { aspect_ratio: aspectRatio, image_size: imageSize };
+  }
+
+  const order = preferredEndpoints(model);
+  if (order.length > 0) {
+    requestOptions.provider = { order, allow_fallbacks: true };
   }
 
   return requestOptions;
@@ -358,8 +455,10 @@ export async function generateImage(
   const imageSize = options.imageSize ?? DEFAULT_IMAGE_SIZE;
   const negativePrompt = options.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT;
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
+  const referenceImages = options.referenceImages ?? [];
   const viaImagesApi = usesImagesApi(model);
-  const quality = viaImagesApi ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
+  const quality =
+    viaImagesApi && supportsQuality(model) ? (options.quality ?? DEFAULT_CARD_QUALITY) : undefined;
 
   // Append negative prompt to strengthen text avoidance
   // Gemini works best with natural language instructions
@@ -406,6 +505,7 @@ export async function generateImage(
           model,
           prompt: fullPrompt,
           ...(quality ? { quality } : {}),
+          ...(referenceImages.length > 0 ? { inputReferences: referenceImages } : {}),
           aspectRatio,
           signal: abortController.signal,
         });
@@ -418,7 +518,13 @@ export async function generateImage(
       // stayed an invented constant for as long as the service existed
       // (mc2-l17v5).
       const client = await createOpenRouterClient({ timeoutMs: API_TIMEOUT_MS });
-      const requestOptions = buildChatImageRequest(model, fullPrompt, aspectRatio, imageSize);
+      const requestOptions = buildChatImageRequest(
+        model,
+        fullPrompt,
+        aspectRatio,
+        imageSize,
+        referenceImages
+      );
       // cost-exempt: an image is billed per image token, not per text token, so
       // this call prices itself with `recordImageCallCost` below rather than
       // through either LLM wrapper — and then replaces that estimate with the
@@ -594,34 +700,46 @@ async function recordFailedImageSpend(params: {
  */
 export async function generateCardImage(
   prompt: string,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  referenceImages: string[] = []
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: await resolveImageModel('stage_7_card', CARD_IMAGE_MODEL, costContext?.courseId),
     aspectRatio: '1:1',
     imageSize: '1K',
     costContext,
+    ...(referenceImages.length > 0 ? { referenceImages } : {}),
   });
 }
 
 /**
- * Generate a cover image (21:9 cinematic) using Gemini
+ * Generate a wide lesson banner.
  *
- * Convenience wrapper for cover generation with optimal settings.
- * Gemini produces high-quality 21:9 cinematic covers at 1536x672.
+ * **16:9, not 21:9.** Both cover templates in `prompt_templates` tell the model
+ * it is composing a "16:9 hero banner" — `stage7_cover_system` under Style
+ * Guidelines and `stage7_cover_user` in its closing instruction — while this
+ * function asked the API for 21:9. The model laid out for one frame and was
+ * rendered into a wider one. The owner's requirement is a widescreen banner
+ * rather than that exact ratio, so the code now agrees with the prompt instead
+ * of the prompt being rewritten to excuse the code.
+ *
+ * It also widens the field considerably: 43 of the 48 image models publish 16:9,
+ * against 19 that publish 21:9.
  *
  * @param prompt - Cover image prompt
- * @returns Generated cover image data
+ * @returns Generated image data
  */
 export async function generateCoverImage(
   prompt: string,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  referenceImages: string[] = []
 ): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: await resolveImageModel('stage_7_cover', DEFAULT_IMAGE_MODEL, costContext?.courseId),
-    aspectRatio: '21:9',
+    aspectRatio: '16:9',
     imageSize: '1K',
     costContext,
+    ...(referenceImages.length > 0 ? { referenceImages } : {}),
   });
 }
 

@@ -58,6 +58,41 @@ export function lessonCandidateLimit(targetChunks: number, queryCount: number): 
  * `score_threshold` is deliberately absent: the two-tier retriever runs the
  * same options at two different thresholds, so the threshold belongs to the
  * pass rather than to the request shape.
+ *
+ * ## Why there is no per-document cap here (measured 2026-08-26/27)
+ *
+ * This used to send `group_by_document: true, group_size: 2`, so that one
+ * uploaded file could not fill a lesson's context. `pnpm benchmark:rag` against
+ * the live collection, 31 known-answer pairs:
+ *
+ *   recall@5    with the cap 0.7419    without 0.9677
+ *   MRR         with the cap 0.6237    without 0.7774
+ *   candidates  6.25 per query         29.97 per query
+ *
+ * And the diversity it was buying, counted over a whole lesson's query set
+ * rather than one query — the union of up to ten queries is the thing that can
+ * actually be dominated:
+ *
+ *   documents per lesson    with the cap 1.78    without 1.67
+ *   lessons from one document      6 of 9              6 of 9
+ *
+ * 0.11 documents per lesson, for 22.6 points of recall@5. One document already
+ * supplied the entire context in two lessons out of three WITH the cap in
+ * force: these courses do not hold several documents bearing on the same
+ * lesson, so the cap was paying for diversity the corpus cannot supply. The
+ * mechanism by which it cost so much is visible per query — grouping reaches
+ * deeper to fill each group, discovers more documents, and the best chunk of
+ * each newly discovered document outranks the one that answers the question.
+ *
+ * It was also starving the reranker: `candidateMultiplier` fetches four
+ * candidates per kept chunk, and 6.25 candidates is fewer than the seven chunks
+ * the reranker is meant to select from them.
+ *
+ * Grouping is NOT wrong in general and stays where it earns its keep — Stage 4
+ * evidence preflight, conflict detection and Stage 5 advisory enrichment all
+ * group deliberately, because their job is per-document coverage rather than
+ * the single best passage. This decision is about lesson content only, and it
+ * reverses `mc2-jz6y0.16` on the owner's authorization (`mc2-zewto`).
  */
 export function buildLessonSearchOptions(
   input: LessonSearchOptionsInput
@@ -75,7 +110,9 @@ export function buildLessonSearchOptions(
       ...(filteringByDocs && { document_ids: input.primaryDocumentIds }),
     },
     include_payload: input.includePayload ?? false,
-    group_by_document: true,
-    group_size: 2,
+    // Stated rather than left to the default, so that the measurement above has
+    // something to sit beside. `group_size` is omitted because with grouping
+    // off nothing reads it.
+    group_by_document: false,
   };
 }

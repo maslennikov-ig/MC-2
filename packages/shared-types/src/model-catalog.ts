@@ -75,6 +75,21 @@ export interface ModelCapabilities {
    * answers with the charge itself.
    */
   imageOutputPricePerMillion?: number;
+  /**
+   * USD for one generated image, flat, for models that charge by the picture
+   * rather than by its tokens.
+   *
+   * Both halves of the image catalogue exist and they are not convertible. 17 of
+   * the 48 quote a per-token rate, which {@link imageOutputPricePerMillion}
+   * covers; 26 quote a flat per-frame or per-megapixel price and report no
+   * output tokens at all, so the token arithmetic yields `undefined` for them
+   * however good the rate is. Modelling a flat price as a token rate would mean
+   * inventing a token count, which is how the private price table this catalogue
+   * replaced went 6.4x wrong.
+   *
+   * Where both are present the flat price wins: it is what the provider charges.
+   */
+  imagePriceFlatUsd?: number;
   /** No longer offered by OpenRouter; retained so old cost reports still resolve */
   delisted?: true;
 }
@@ -87,6 +102,68 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     contextLength: 32768,
     maxOutputTokens: 8192,
     supportsTemperature: true,
+    supportsReasoning: false,
+    billedPerImage: true,
+    imageOutputPricePerMillion: 30,
+  },
+  /**
+   * The lesson banner, from 2026-08-27.
+   *
+   * Chosen by measurement across every 16:9-capable model on OpenRouter: it
+   * billed $0.013954 against gemini-2.5-flash-image's $0.038725, and against
+   * $0.019247 for that model once the flex endpoint is pinned. The picture is
+   * the better one too — asked for layered translucent planes with a node
+   * cluster left of centre, it produced exactly that, in the requested palette,
+   * with no text.
+   *
+   * Priced per image, not per token, which is why `imagePriceFlatUsd` had to
+   * exist. `input`/`output` per million are the endpoint's text rates and are
+   * not what a banner is charged at.
+   *
+   * The $0.019 here is the **published** base rate, which is what the drift gate
+   * compares against, and it is deliberately not the $0.013954 that was billed:
+   * the 1K frame came in under list. An estimate that undercuts the receipt
+   * would be the more dangerous error, and either way it stands for about ten
+   * seconds before `GET /api/v1/generation` replaces it with the charge itself.
+   *
+   * It is Images-API only — not one of the nine image models chat completions
+   * carries — which is what `usesImagesApi` had to be corrected for, and it
+   * publishes no `quality`.
+   */
+  'sourceful/riverflow-v2.5-fast': {
+    // Zero here means "this endpoint publishes no such rate", not "free". Its
+    // whole `pricing` array is one `output_image` entry; there is no text leg to
+    // quote. Nothing reads these — the model is only ever reached through the
+    // image path, which prices from `imagePriceFlatUsd` — and the zero-price
+    // guard now requires a positive price of *some* kind rather than a positive
+    // text rate specifically, so a genuinely unpriced model still fails it.
+    inputPricePerMillion: 0,
+    outputPricePerMillion: 0,
+    contextLength: 4096,
+    maxOutputTokens: 4096,
+    supportsTemperature: false,
+    supportsReasoning: false,
+    billedPerImage: true,
+    imagePriceFlatUsd: 0.019,
+  },
+  /**
+   * The banner's fallback, and the reason it is not the card's model.
+   *
+   * `gpt-5-image-mini` and `gpt-image-1-mini` publish `1:1, 3:2, 2:3, auto` and
+   * nothing wider, so neither could have drawn a 16:9 banner had the old
+   * fallback ever been reached. `gpt-image-2` is the only OpenAI image model
+   * that publishes 16:9 — and 9:16, if vertical banners are ever wanted.
+   *
+   * Priced per token like the rest of the OpenAI line, at 3.75x the mini rate:
+   * measured $0.032775 for one square card against the incumbent's $0.009085.
+   * Acceptable for a hop that is only taken when the primary is down.
+   */
+  'openai/gpt-image-2': {
+    inputPricePerMillion: 5,
+    outputPricePerMillion: 30,
+    contextLength: 32768,
+    maxOutputTokens: 8192,
+    supportsTemperature: false,
     supportsReasoning: false,
     billedPerImage: true,
     imageOutputPricePerMillion: 30,
@@ -569,6 +646,8 @@ export const LIVE_ROUTING_MODEL_IDS = [
   'google/gemini-3.7-flash',
   'openai/gpt-5-image-mini',
   'google/gemini-2.5-flash-image',
+  'sourceful/riverflow-v2.5-fast',
+  'openai/gpt-image-2',
 ] as const;
 
 /** True when the provider honours `temperature`; unknown models are assumed to. */

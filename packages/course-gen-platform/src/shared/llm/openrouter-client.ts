@@ -99,6 +99,19 @@ export interface OpenRouterImageRequest {
    */
   quality?: 'auto' | 'low' | 'medium' | 'high';
   aspectRatio?: string;
+  /**
+   * Pictures the model should look at before drawing, as `data:` URLs.
+   *
+   * The wire shape is not guessed. `POST /api/v1/images` validates this with Zod
+   * and says what it wants: an array of `{type: 'image_url', image_url: {url}}`,
+   * exactly the chat content-part shape. An array of bare data-URL strings is
+   * rejected with "expected object", and `{url}` without `type` with "invalid
+   * value". `openai/gpt-5-image-mini` accepts up to 16.
+   *
+   * Charged as `input_image` — $0.0000025 per token on the incumbent, which is
+   * a rounding error against the picture it is steering.
+   */
+  inputReferences?: string[];
   signal?: AbortSignal;
 }
 
@@ -149,6 +162,14 @@ export async function createOpenRouterImage(
       prompt: request.prompt,
       ...(request.quality ? { quality: request.quality } : {}),
       ...(request.aspectRatio ? { aspect_ratio: request.aspectRatio } : {}),
+      ...(request.inputReferences?.length
+        ? {
+            input_references: request.inputReferences.map(url => ({
+              type: 'image_url',
+              image_url: { url },
+            })),
+          }
+        : {}),
     }),
     ...(request.signal ? { signal: request.signal } : {}),
   });

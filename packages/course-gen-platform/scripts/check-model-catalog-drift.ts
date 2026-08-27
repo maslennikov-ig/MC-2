@@ -93,6 +93,41 @@ export function readPublishedPricing(
 }
 
 /**
+ * What one image costs, from the image catalogue rather than the chat one.
+ *
+ * Returns the base per-image price — the `output_image` entry with no `variant`.
+ * The variants are real and matter (`seedream-5-0-pro` doubles at
+ * `high_resolution`, which a 1:1 request silently selects), but they price a
+ * different request than the one this catalogue entry describes.
+ *
+ * `null` when the model is not in this catalogue either, or prices by token or
+ * megapixel rather than by the frame — all cases where there is nothing here to
+ * compare a flat figure against.
+ */
+export async function readFlatImagePrice(modelId: string): Promise<number | null> {
+  try {
+    const response = await fetch(
+      `https://openrouter.ai/api/v1/images/models/${modelId}/endpoints`,
+      { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }
+    );
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      endpoints?: Array<{ pricing?: Array<Record<string, unknown>> }>;
+    };
+    for (const endpoint of body.endpoints ?? []) {
+      const base = (endpoint.pricing ?? []).find(
+        price =>
+          price.billable === 'output_image' && price.unit === 'image' && price.variant === undefined
+      );
+      if (base && typeof base.cost_usd === 'number') return base.cost_usd;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where the catalogue disagrees with the published rates.
  *
  * A model the published list does not carry at all is reported separately: it is
@@ -187,7 +222,33 @@ async function main(): Promise<void> {
   const published = readPublishedPricing(rows);
   const { drift, absent } = findDrift(MODEL_CATALOG, published, modelIds);
 
+  // An id missing from `/api/v1/models` is not necessarily delisted. Image
+  // generation has its own catalogue of 48 at `/api/v1/images/models`, and only
+  // nine models appear in both; `sourceful/riverflow-v2.5-fast` draws every
+  // lesson banner and is absent from the chat list by design. Reporting it as
+  // "delisted, or misspelled" and moving on would leave a live-routed price
+  // unverified, which is the exact failure this gate was widened to stop
+  // (mc2-a6qxc).
+  const stillAbsent: string[] = [];
   for (const modelId of absent) {
+    const flat = MODEL_CATALOG[modelId]?.imagePriceFlatUsd;
+    const livePrice = flat === undefined ? null : await readFlatImagePrice(modelId);
+    if (livePrice === null) {
+      stillAbsent.push(modelId);
+      continue;
+    }
+    if (Math.abs(livePrice / flat! - 1) > TOLERANCE) {
+      drift.push({
+        modelId,
+        field: 'imagePriceFlatUsd',
+        catalogued: flat!,
+        published: livePrice,
+        ratio: livePrice / flat!,
+      });
+    }
+  }
+
+  for (const modelId of stillAbsent) {
     console.warn(
       `  not in the published list: ${modelId} — delisted, or the id is misspelled in MODEL_CATALOG`
     );

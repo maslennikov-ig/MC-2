@@ -89,6 +89,12 @@ describe('model catalogue coverage', () => {
       'google/gemini-3.7-flash': [0.375, 1.875],
       'openai/gpt-5-image-mini': [2.5, 2],
       'google/gemini-2.5-flash-image': [0.3, 2.5],
+      // Read 2026-08-27 from `/api/v1/images/models/.../endpoints`, because
+      // neither of these is in the chat catalogue at all. The banner model
+      // publishes no text leg — see the entry — and its real rate is the flat
+      // per-frame figure checked below.
+      'sourceful/riverflow-v2.5-fast': [0, 0],
+      'openai/gpt-image-2': [5, 30],
     };
 
     expect([...LIVE_ROUTING_MODEL_IDS].sort()).toEqual(Object.keys(verifiedRates).sort());
@@ -115,12 +121,27 @@ describe('model catalogue coverage', () => {
     const verifiedImageRates: Record<string, number> = {
       'openai/gpt-5-image-mini': 8,
       'google/gemini-2.5-flash-image': 30,
+      'openai/gpt-image-2': 30,
+    };
+
+    // The other half of the image catalogue charges by the frame and reports no
+    // output tokens at all, so there is no token rate to verify and the flat
+    // figure is the whole price. 26 of the 48 are priced this way; keeping them
+    // in the same check as the token-priced ones would mean asserting a rate
+    // that does not exist.
+    const verifiedFlatImagePrices: Record<string, number> = {
+      // Published base rate, read 2026-08-27. Deliberately not the $0.013954
+      // that a 1K frame actually billed — the catalogue tracks what is
+      // published, and the receipt replaces the estimate seconds later.
+      'sourceful/riverflow-v2.5-fast': 0.019,
     };
 
     const billedPerImage = Object.entries(MODEL_CATALOG)
       .filter(([, capabilities]) => capabilities.billedPerImage)
       .map(([modelId]) => modelId);
-    expect(billedPerImage.sort()).toEqual(Object.keys(verifiedImageRates).sort());
+    expect(billedPerImage.sort()).toEqual(
+      [...Object.keys(verifiedImageRates), ...Object.keys(verifiedFlatImagePrices)].sort()
+    );
 
     const actual = Object.fromEntries(
       Object.keys(verifiedImageRates).map(modelId => [
@@ -130,6 +151,15 @@ describe('model catalogue coverage', () => {
     );
 
     expect(actual).toEqual(verifiedImageRates);
+
+    const actualFlat = Object.fromEntries(
+      Object.keys(verifiedFlatImagePrices).map(modelId => [
+        modelId,
+        getModelCapabilities(modelId)?.imagePriceFlatUsd ?? null,
+      ])
+    );
+
+    expect(actualFlat).toEqual(verifiedFlatImagePrices);
   });
 
   it('prices listed retired models at the OpenRouter rates last verified for each', () => {
@@ -260,11 +290,26 @@ describe('model catalogue coverage', () => {
   });
 
   it('never carries a zero or negative price', () => {
+    // "Some positive rate", not "a positive text rate". A per-frame image model
+    // publishes no text leg at all — `sourceful/riverflow-v2.5-fast`'s entire
+    // `pricing` array is one `output_image` entry — so quoting a text rate for
+    // it would be inventing one, and the zeros there mean "not offered".
+    //
+    // The invariant this guard exists for is unchanged: no model may be
+    // reachable with nothing to charge it at. A model with every rate at zero
+    // still fails, which is the case that hides spend.
     const broken = Object.entries(MODEL_CATALOG)
-      .filter(
-        ([, capabilities]) =>
-          capabilities.inputPricePerMillion <= 0 || capabilities.outputPricePerMillion <= 0
-      )
+      .filter(([, capabilities]) => {
+        const rates = [
+          capabilities.inputPricePerMillion,
+          capabilities.outputPricePerMillion,
+          capabilities.imageOutputPricePerMillion,
+          capabilities.imagePriceFlatUsd,
+          capabilities.combinedPricePerMillion,
+        ];
+        if (rates.some(rate => rate !== undefined && rate < 0)) return true;
+        return !rates.some(rate => rate !== undefined && rate > 0);
+      })
       .map(([modelId]) => modelId);
 
     expect(broken).toEqual([]);

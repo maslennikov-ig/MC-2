@@ -94,6 +94,36 @@ describe('routing seed integrity', () => {
     expect(mismatched).toEqual([]);
   });
 
+  it('does not change which model a phase routes to based on language alone', () => {
+    // `stage_5_escalation` had six rows: five on gpt-5.6-luna and one — en,
+    // standard — on deepseek-v4-flash. Harmless while the phase had no caller,
+    // and live from 2026-08-23 when `getEscalationChain('generation')` started
+    // returning it. `selectPhaseConfig` prefers an exact language match over
+    // `any`, so an English standard course escalated to deepseek: a downgrade
+    // from stage_5_normal/complex, and for stage_5_simple the very model that
+    // had just failed — the thing that change set out to stop (mc2-v1p12).
+    //
+    // A tier may legitimately need a different model; a language may not. Two
+    // languages asking the same question of the same tier should get the same
+    // answer, or the difference should be a per-language phase, not a silent row.
+    const byPolicy = new Map<string, Map<string, string>>();
+    for (const row of rows) {
+      const policy = `${row.phase_name}/${row.judge_role ?? '-'}/${row.context_tier}`;
+      const languages = byPolicy.get(policy) ?? new Map<string, string>();
+      languages.set(row.language, row.model_id);
+      byPolicy.set(policy, languages);
+    }
+
+    const split = [...byPolicy.entries()]
+      .filter(([, languages]) => new Set(languages.values()).size > 1)
+      .map(
+        ([policy, languages]) =>
+          `${policy}: ${[...languages].map(([lang, model]) => `${lang}=${model}`).join(', ')}`
+      );
+
+    expect(split).toEqual([]);
+  });
+
   it('keeps the three Stage 6 judges on three distinct models', () => {
     const judges = rows.filter(row => row.phase_name === 'stage_6_judge' && row.judge_role);
     expect(judges.length).toBeGreaterThan(0);
