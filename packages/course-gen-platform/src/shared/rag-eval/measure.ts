@@ -259,12 +259,16 @@ export interface BranchAttribution {
    * Accepted, and in neither branch's list even at the deepest legal look.
    *
    * This is not noise and it is not a third retriever. Measured 2026-08-26: a
-   * grouped query (`group_by_document`, which Stage 6 turns on) fills each
-   * document's group past what the prefetch returned — 10 of 20 accepted
-   * results on one probe came from that fill, and the identical query with
-   * grouping off had zero. So for a grouped entry point this bucket is the
-   * share of the answer that did not come through hybrid fusion at all, and it
-   * is reported rather than folded into whichever branch is nearest.
+   * grouped query (`group_by_document`) fills each document's group past what
+   * the prefetch returned — 10 of 20 accepted results on one probe came from
+   * that fill, and the identical query with grouping off had zero. So for a
+   * grouped entry point this bucket is the share of the answer that did not
+   * come through hybrid fusion at all, and it is reported rather than folded
+   * into whichever branch is nearest.
+   *
+   * No entry point measured here groups any more — Stage 6 stopped on
+   * 2026-08-27 and the bucket went from 124 of 475 to zero — so a non-zero
+   * value now means something new and should be looked at rather than assumed.
    */
   fromBeyondBranchDepth: number;
   denseCandidates: number;

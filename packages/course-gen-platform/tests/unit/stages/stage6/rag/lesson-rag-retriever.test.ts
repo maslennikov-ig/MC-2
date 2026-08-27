@@ -259,7 +259,15 @@ describe('lesson-rag-retriever', () => {
     );
   });
 
-  it('uses accepted decisions and refs in grouped tenant-scoped live retrieval', async () => {
+  /**
+   * Renamed and re-pinned 2026-08-27: this used to assert `group_by_document: true,
+   * group_size: 2`. The cap was removed for lesson content on the owner's decision
+   * (`mc2-zewto`) after it measured at 22.6 points of recall@5 for 0.11 documents of
+   * diversity per lesson. What this test is really about — that live retrieval stays
+   * inside the tenant, the course and the accepted evidence refs — is unchanged, and
+   * that is what it still guards.
+   */
+  it('uses accepted decisions and refs in tenant-scoped live retrieval', async () => {
     const { searchChunks } = await import('@/shared/qdrant/search');
     mockAssertCourseRagReady.mockResolvedValue({
       availability: 'ready',
@@ -287,8 +295,7 @@ describe('lesson-rag-retriever', () => {
     for (const [, options] of vi.mocked(searchChunks).mock.calls) {
       expect(options).toMatchObject({
         include_payload: true,
-        group_by_document: true,
-        group_size: 2,
+        group_by_document: false,
         filters: {
           organization_id: 'organization-1',
           course_id: 'course-1',

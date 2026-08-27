@@ -113,29 +113,47 @@ Note the counter is per `service`/`instance`: `megacampus-worker` writes as `wor
 All four document-evidence rules. Every one of their six metrics returned **ABSENT** from Prometheus,
 and no `evidence-*.prom` file exists in `/var/lib/megacampus/qdrant-metrics/`:
 
-| Rule                                                 | Metric                                                                                 | Behaviour with the metric absent                                                                                                                                      |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DocumentEvidenceRunFailed`                          | `megacampus_document_evidence_runs_total`, `..._stage4_invocations_total`              | `increase()` over an absent series is empty → never fires                                                                                                             |
-| `DocumentEvidenceCoverageIncomplete`                 | `..._coverage_ratio`, `..._runs_total`                                                 | `min()` is empty and the `absent()` guard is itself gated on `sum(runs_total) > 0`, which is also empty → **never fires**, including the case it was written to catch |
-| `DocumentEvidenceDegradedAutomaticDecisionsRepeated` | `..._degraded_automatic_decisions_total`                                               | never fires                                                                                                                                                           |
-| `DocumentEvidenceCriticalConflictStale`              | `..._unresolved_critical_conflicts`, `..._oldest_unresolved_critical_unixtime_seconds` | `max() > 0` is empty → never fires                                                                                                                                    |
+| Rule                                                 | Metric                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `DocumentEvidenceRunFailed`                          | `megacampus_document_evidence_runs_total`, `..._stage4_invocations_total`              |
+| `DocumentEvidenceCoverageIncomplete`                 | `..._coverage_ratio`, `..._runs_total`                                                 |
+| `DocumentEvidenceDegradedAutomaticDecisionsRepeated` | `..._degraded_automatic_decisions_total`                                               |
+| `DocumentEvidenceCriticalConflictStale`              | `..._unresolved_critical_conflicts`, `..._oldest_unresolved_critical_unixtime_seconds` |
 
-**The cause is a configuration split, not broken code.** The writer keys off
+**The rules are not broken; there is nothing for them to read.** The writer keys off
 `QDRANT_METRICS_TEXTFILE_DIR`. The staging containers (`megacampus-worker`,
 `megacampus-worker-stage6`, `megacampus-api-green`) all set it and all have
 `DOCUMENT_EVIDENCE_ENABLED=true` — and have run essentially no evidence traffic. The **dev** workers
 (`megacampus-worker-dev`, `megacampus-worker-stage6-dev`) set neither variable, and dev is where the
 runs actually happen: the only Stage 6 evidence activity in `generation_trace` since the rebuild is
-three `evidence_scope_empty` rows from **2026-08-22, on dev**.
+three `evidence_scope_empty` rows from **2026-08-22, on dev**. The environment that works is not the
+environment that reports.
 
-So the environment that runs is not the environment that reports. `DocumentEvidenceCoverageIncomplete`
-is the one worth fixing rather than merely noting: it carries an `absent()` branch specifically so a
-missing signal is reported, and that branch is disarmed by a guard that is absent for the same
-reason.
+**A correction to an earlier draft of this document.** It called
+`DocumentEvidenceCoverageIncomplete` self-disarming, on the grounds that its `absent(coverage_ratio)`
+branch is guarded by `sum(runs_total) > 0`, which is absent for the same reason. Evaluated against
+the live Prometheus, the guard does hold the branch shut today:
 
-`.codex/repository-failure-modes.md` already records this class twice — a rule that can be
-permanently `absent()` and therefore permanently silent, and a tunnel dead for four months behind
-`Up (healthy)`. This is a third instance, found by asking each rule what would make it fire.
+```
+absent(coverage_ratio)                         -> fires
+sum(runs_total{stage="stage4"}) > 0            -> empty
+the branch as written                          -> empty
+```
+
+But that is the guard doing its job, not failing at it: "nothing has run" is not a coverage failure,
+and the branch is written to fire when runs ARE reported and coverage is not. There is no PromQL
+defect here to fix.
+
+What is genuinely missing is any way to tell "nothing ran" from "the reporter is misconfigured", and
+no rule can distinguish those without an independent signal that work was expected. That is the open
+item, and it is `mc2-kim48`.
+
+**Do not repair it by mounting the shared textfile directory into the dev workers before reading
+`updateStage4Aggregate`.** The per-service replica files are labelled and separable, but the Stage 4
+aggregate is a single `evidence-stage4-state.prom` written under fixed
+`service="stage4",instance="aggregate"` labels, reconciled by `(databaseStart, generation, revision)`
+against durable database totals — and dev and staging share one database. Whether a second writer is
+harmless, duplicative or damaging depends on that reconciliation, and this pass did not establish it.
 
 ## B4 — Reindex from source of truth
 

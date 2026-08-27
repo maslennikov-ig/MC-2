@@ -18,11 +18,12 @@ export const LESSON_RAG_CONFIG = {
   /**
    * Target number of chunks (middle of 5-10 range).
    *
-   * Measured and left unchanged, 2026-08-26, because the measurement says the
-   * target is not what is limiting Stage 6. With `group_by_document` on, a
-   * single query returns **6.25 chunks on average** — below this target and far
-   * below the 30 candidates the request asks for — so raising the target would
-   * ask for more of something the grouping step is already refusing to give.
+   * Measured and left unchanged, 2026-08-27. It was under suspicion while the
+   * per-document cap was in force, because a single query then returned 6.25
+   * chunks — below this target and far below the 30 candidates the request asks
+   * for — but the cap was the constraint, not the target. With the cap removed
+   * a query returns 29.97, so the reranker selects seven from a full pool and
+   * there is nothing here to correct.
    * See `docs/rag/2026-08-26-retrieval-quality-measurement.md`.
    */
   TARGET_CHUNKS: 7,
@@ -52,12 +53,10 @@ export const RERANKER_CONFIG = {
   /**
    * Fetch N times more candidates for reranking.
    *
-   * Measured and left unchanged, 2026-08-26 — but it is currently buying much
-   * less than it claims. 4 x `TARGET_CHUNKS` asks Qdrant for 30 candidates per
-   * query; grouping hands back 6.25, so the cross-encoder usually has fewer
-   * candidates than the seven chunks it is meant to select from them. Raising
-   * the multiplier does not fix that, because the ceiling is the grouping, and
-   * lowering it would only make the shortfall permanent.
+   * Measured and left unchanged, 2026-08-27, and it now buys what it claims.
+   * 4 x `TARGET_CHUNKS` asks Qdrant for 30 candidates per query; until the
+   * per-document cap was removed it received 6.25, fewer than the seven chunks
+   * the cross-encoder is meant to select from them. It receives 29.97 today.
    */
   candidateMultiplier: 4,
   /** Use Qdrant scores if reranker fails */

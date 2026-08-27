@@ -80,7 +80,7 @@ parents were kept out — so there is nothing to stitch and 0 of 7785 measured r
 5.5x is what expansion **will** cost once a document is indexed with the current chunker; it is not
 what production pays today. The token ceilings (20K Stage 6, 40K Stage 5) are never approached.
 
-**Retrieval quality is a number now:** recall@5 **0.9677** Stage 5, **0.7419** Stage 6, **0.4839**
+**Retrieval quality is a number now:** recall@5 **0.9677** Stage 5, **0.9677** Stage 6, **0.4839**
 `search_documents` (the only path that does not ask for hybrid). Re-run with
 `pnpm --filter @megacampus/course-gen-platform benchmark:rag run` against the live collection
 read-only; the 76-query set and its vectors are in `packages/course-gen-platform/eval/rag-retrieval/`.
@@ -99,9 +99,14 @@ Three things that measurement changed or exposed:
   was unreachable for RRF by construction; measured, fused scores reach 1.0000 against dense bests of
   0.45–0.65. The advice stands, the stated reason was wrong in the dangerous direction.
 
-Open and owner-gated: `mc2-zewto` — Stage 6's `group_by_document` costs **22.6 points of recall@5**
-(0.7419 against 0.9677 with it off) and holds the reranker to 6.25 candidates where it asks for 30.
-That is diversity against relevance, it reverses `mc2-jz6y0.16`, and nothing was changed for it.
+**Stage 6 no longer caps results per document** (`mc2-zewto`, owner-authorised 2026-08-27, reversing
+`mc2-jz6y0.16` for lesson content only). The cap cost 22.6 points of recall@5 and bought 0.11
+documents per lesson: one document already supplied the whole context in six lessons of nine WITH it
+in force, because these courses do not hold several documents bearing on one lesson. Removing it took
+Stage 6 to recall@5 0.9677, MRR 0.7774, 29.97 candidates per query — the pool `candidateMultiplier: 4`
+was always asking for — and took accepted-results-outside-the-fusion from 124 of 475 to zero.
+Grouping is untouched where it earns its keep: Stage 4 evidence preflight, conflict detection and
+Stage 5 advisory enrichment group deliberately, because their job is per-document coverage.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
