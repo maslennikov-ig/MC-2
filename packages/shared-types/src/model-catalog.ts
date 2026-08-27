@@ -356,8 +356,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.05,
-    outputPricePerMillion: 0.13,
+    inputPricePerMillion: 0.03,
+    outputPricePerMillion: 0.1,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -406,8 +406,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.088606,
-    outputPricePerMillion: 0.177212,
+    inputPricePerMillion: 0.07798,
+    outputPricePerMillion: 0.15596,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -418,8 +418,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // over, the largest gap the catalogue has held. Not on a live route, so it
     // cost nothing; had it been, `provider.max_price` would have been built four
     // times too high and bought nothing.
-    inputPricePerMillion: 0.396894,
-    outputPricePerMillion: 0.793788,
+    inputPricePerMillion: 0.87,
+    outputPricePerMillion: 1.74,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
@@ -518,8 +518,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     delisted: true,
   },
   'qwen/qwen3-235b-a22b-2507': {
-    inputPricePerMillion: 0.09,
-    outputPricePerMillion: 0.55,
+    inputPricePerMillion: 0.0875,
+    outputPricePerMillion: 0.35,
     contextLength: 262144,
     maxOutputTokens: 16384,
     supportsTemperature: true,
@@ -558,8 +558,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   'z-ai/glm-4.6': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 2,
+    inputPricePerMillion: 0.43,
+    outputPricePerMillion: 1.75,
     contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,

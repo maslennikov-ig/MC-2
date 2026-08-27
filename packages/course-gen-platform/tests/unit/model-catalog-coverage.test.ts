@@ -175,17 +175,17 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.088606, 0.177212],
-      '~deepseek/deepseek-v4-flash-latest': [0.05, 0.13],
-      'deepseek/deepseek-v4-pro': [0.396894, 0.793788],
+      'deepseek/deepseek-v4-flash': [0.07798, 0.15596],
+      '~deepseek/deepseek-v4-flash-latest': [0.03, 0.1],
+      'deepseek/deepseek-v4-pro': [0.87, 1.74],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],
-      'qwen/qwen3-235b-a22b-2507': [0.09, 0.55],
+      'qwen/qwen3-235b-a22b-2507': [0.0875, 0.35],
       'qwen/qwen-plus-2025-07-28': [0.26, 0.78],
       'qwen/qwen3-max': [0.78, 3.9],
       'qwen/qwen3.7-plus': [0.32, 1.28],
-      'z-ai/glm-4.6': [0.5, 2],
+      'z-ai/glm-4.6': [0.43, 1.75],
       'z-ai/glm-5': [0.6, 1.92],
     };
 

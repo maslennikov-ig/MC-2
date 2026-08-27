@@ -1,4 +1,4 @@
-# Nightly model catalogue drift check (mc2-ts9i2).
+# Nightly model catalogue price sync (mc2-ts9i2).
 #
 # `scripts/check-model-catalog-drift.ts` existed since 2026-08-21 and ran
 # nowhere: not in CI, not as an npm script. The one manual `--all` on the day it
@@ -7,15 +7,22 @@
 # Deliberately NOT part of the blocking pipeline, and deliberately its own
 # workflow so it cannot gate a deploy: a price is a fact about somebody else's
 # service, and a provider changing a tariff overnight must not fail our build.
-# The stake is still real — `provider.max_price` is built from these numbers, and
-# a ceiling under every endpoint is a refused call, not a cheaper route.
 #
-# On drift it opens (or updates) one GitHub issue. The repository's tracker is
-# beads, which lives in a Dolt database this runner has no credentials for, so
-# the issue is the handoff: `bd github pull` brings it in, and beads issues here
-# already carry their GitHub number.
+# **It writes the new rates rather than reporting them (2026-08-27).** For two
+# months this opened a GitHub issue instead, which asked a person to retype two
+# numbers the job already had. That was a ritual, not a control: `max_price` is
+# resolved from the *live* rate at call time and only falls back to the
+# catalogue when that lookup fails, and what a course is billed comes from
+# `GET /api/v1/generation` seconds after the call. Nobody was ever going to
+# decide anything from the ticket, so the ticket trained people to close it.
+#
+# What is worth interrupting somebody for is a LARGE move, and the size is not a
+# taste: `PROVIDER_PRICE_CEILING_MULTIPLIER` is 1.5, so a rise of that factor is
+# where a stale entry stops being untidy and starts refusing every call to the
+# model. Those go to the same Telegram channel Alertmanager already uses. The
+# rest are committed silently.
 
-name: Model Catalogue Drift
+name: Model Catalogue Price Sync
 
 on:
   schedule:
@@ -29,21 +36,23 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
-  issues: write
+  # To push the updated rates. It was `issues: write`; it is the same job doing
+  # the same work, one step further along.
+  contents: write
 
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '10.34.5'
-  DRIFT_ISSUE_LABEL: 'model-catalog-drift'
 
 jobs:
   drift:
-    name: Compare MODEL_CATALOG to the published rates
+    name: Apply the published rates to MODEL_CATALOG
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: develop
       - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -54,68 +63,75 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check drift across the whole catalogue
+      - name: Apply the published rates across the whole catalogue
         id: drift
         continue-on-error: true
         run: |
           set +e
-          pnpm -F course-gen-platform check:model-catalog-drift:all 2>&1 | tee drift.log
+          pnpm -F course-gen-platform exec tsx scripts/check-model-catalog-drift.ts \
+            --all --write 2>&1 | tee drift.log
           status=${PIPESTATUS[0]}
           echo "status=${status}" >> "$GITHUB_OUTPUT"
-          # 0 clean, 1 the catalogue is wrong, 2 we could not reach the API.
-          # Those must not look alike, which is why the script separates them.
+          # 0 done, 2 we could not reach the API. Those must not look alike,
+          # which is why the script separates them.
           exit 0
 
       - name: Report the API being unreachable, and stop
         if: steps.drift.outputs.status == '2'
-        run: |
-          echo "::notice::OpenRouter was unreachable; the catalogue was not checked. Not a finding."
+        run: echo "::notice::OpenRouter was unreachable; the catalogue was not checked."
 
-      - name: Close a stale drift issue once the catalogue agrees again
+      # The snapshot beside the catalogue is rewritten too, so this proves the
+      # pair still agree before anything is pushed. A sync that leaves the tree
+      # red is worse than one that never ran.
+      - name: Prove the catalogue and its snapshot still agree
         if: steps.drift.outputs.status == '0'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          number=$(gh issue list --label "$DRIFT_ISSUE_LABEL" --state open \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body \
-              "Catalogue matches the published rates again as of run ${GITHUB_RUN_ID}. Closing."
-            gh issue close "$number"
-          fi
+          pnpm -F shared-types build
+          pnpm -F course-gen-platform exec vitest run --config vitest.config.unit.ts \
+            tests/unit/model-catalog-coverage.test.ts \
+            tests/unit/stages/stage5-generation/cost-calculator.test.ts
 
-      - name: File the drift
-        if: steps.drift.outputs.status == '1'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit the new rates
+        if: steps.drift.outputs.status == '0'
         run: |
-          gh label create "$DRIFT_ISSUE_LABEL" --color 'B60205' \
-            --description 'MODEL_CATALOG disagrees with the published OpenRouter rates' \
-            2>/dev/null || true
-
-          body=$(printf '%s\n' \
-            'The nightly check found `MODEL_CATALOG` disagreeing with the rates OpenRouter publishes.' \
-            '' \
-            'This does not block anything on purpose. It matters because `provider.max_price` is' \
-            'built from these numbers: a ceiling below every endpoint is answered with a refusal,' \
-            'not a cheaper route, so one stale entry can fail every call to a model.' \
-            '' \
-            'Fix in `packages/shared-types/src/model-catalog.ts` and the snapshot in' \
-            '`packages/course-gen-platform/tests/unit/model-catalog-coverage.test.ts`.' \
-            '' \
-            "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            '' \
-            '```' ; tail -c 40000 drift.log ; printf '```\n')
-
-          number=$(gh issue list --label "$DRIFT_ISSUE_LABEL" --state open \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            # One standing issue, not one per night: a nightly job that opens an
-            # issue a night trains people to close them unread.
-            gh issue comment "$number" --body "$body"
-          else
-            gh issue create \
-              --title 'MODEL_CATALOG drifted from the published OpenRouter rates' \
-              --label "$DRIFT_ISSUE_LABEL" \
-              --body "$body"
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "catalogue already matched the published rates"
+            exit 0
           fi
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add packages/shared-types/src/model-catalog.ts \
+                  packages/course-gen-platform/tests/unit/model-catalog-coverage.test.ts
+          git commit -m "chore(cost): sync MODEL_CATALOG with the published OpenRouter rates
+
+          $(sed -n 's/^  \(.*→.*\)$/- \1/p' drift.log)
+
+          Applied by the nightly price sync. The catalogue is the frozen fallback
+          for provider.max_price; the live rate is preferred at call time and the
+          receipt settles the real cost."
+          git push origin HEAD:develop
+
+      - name: Say so in Telegram when a price moved far enough to matter
+        if: steps.drift.outputs.status == '0' && hashFiles('packages/course-gen-platform/drift-loud.txt') != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          moves=$(cat packages/course-gen-platform/drift-loud.txt)
+          text=$(printf '%s\n' \
+            '*Цены моделей сильно сдвинулись*' \
+            '' \
+            'Ночная сверка с OpenRouter. Новые цены уже записаны в каталог и запушены в `develop` — делать ничего не нужно. Это к сведению.' \
+            '' \
+            'Порог — 1.5x, столько же, во сколько раз потолок `max_price` строится от цены. За ним замороженная цена начинает отбивать вызовы.' \
+            '' \
+            '```' "$moves" '```' \
+            '' \
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg c "$TELEGRAM_CHAT_ID" --arg t "$text" \
+                  '{chat_id:$c, text:$t, parse_mode:"Markdown"}')" >/dev/null
