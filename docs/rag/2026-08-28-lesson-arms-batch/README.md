@@ -86,6 +86,19 @@ The worst offender in the worst course turned out not to be content at all: an E
 sentence about an unrenderable Mermaid diagram, in 19 lessons of a Russian course — `mc2-zxzgf`, 123
 lessons across 12 courses.
 
+**That one is history, not a live defect, and the first reading of it here was wrong.** By month, as
+a share of the completed lessons written that month: January 0 of 214, February 8 of 946, **March 120
+of 454 (26.4%)**, and then zero — April 0 of 218, and none since, across 296 lessons. Every affected
+lesson was written by a model generation no longer in the routing set (`kimi-k2-thinking`,
+`qwen3.5-plus-02-15`, `mimo-v2-flash`). The five-stage repair pipeline has been in place since
+January and its own metrics over today's 20 runs say it is working: **153 diagrams processed, 89
+fixed by regex, 0 by the LLM fixer, 0 simplified, 0 split, 0 fallbacks.**
+
+Two things survive that reading. The fallback string is hardcoded English and would be English again
+if it ever fired. And 58% of generated diagrams are still syntactically broken as written — the
+models have not got better at Mermaid, the sanitiser just repairs them deterministically before
+anyone sees it.
+
 **Inside a single lesson, repetition is real.** 18 lessons of 340 (5.3%) contain a duplicated block,
 and nine of those repeat 4–13% of their own text verbatim. Every heavy case is a long lesson —
 23–47k characters against a median of 9.4k — which points at the section-by-section path duplicating
