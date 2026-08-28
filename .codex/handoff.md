@@ -6,6 +6,16 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
+**The callout fix, verified live 2026-08-28** (`mc2-ctlar`,
+`docs/rag/2026-08-28-lesson-arms-batch/after-the-callout-fix.md`): ten lessons regenerated for
+$0.065383 — `needs_review` **11 of 20 → 0 of 10**, regenerations 1.20 → 0.00, quality 0.830 → 0.897
+with the whole gain on the five lessons the gate used to damage, cost per lesson −39%. Two things the
+fix predicted did not happen: **callouts rose, 4.70 → 5.30**, and a third arm with the pre-fix
+prompts restored says the wording is why (3.00 against 5.00 on the same three lessons) — the rule,
+not the prompt, is doing all the work; and `src/shared/prompts/stage6/expander.ts` is rendered by
+nothing, so that third of the prompt edit is unread. Both lessons read by eye keep the mandatory
+practical example, in prose instead of a callout box.
+
 **Ten lessons per arm, 2026-08-28** (`docs/rag/2026-08-28-lesson-arms-batch/`). The larger sample
 corrects two things the single lesson implied and raises three defects. The arms share **3.2 of 7
 chunks**, not four, and the cap buys **+1.0 documents** in what the model reads — the 0.11 figure was

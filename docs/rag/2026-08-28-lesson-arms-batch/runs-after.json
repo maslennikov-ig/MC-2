@@ -1,0 +1,1751 @@
+[
+  {
+    "arm": "after-fix",
+    "lesson": "3.1",
+    "title": "Механизм ценового преимущества: суть, нормативная база и условия применения",
+    "startedAt": "2026-08-28T15:59:35.700Z",
+    "finishedAt": "2026-08-28T16:01:45.843Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 3
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 2
+        }
+      ],
+      "coverageScore": 0.85,
+      "totalContentChars": 5506,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_120_712939989",
+        "child_106_860634894",
+        "child_117_261330709",
+        "child_3_2066155051",
+        "child_13_1198828616",
+        "child_143_1040072453"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 12746
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 22427,
+        "durationMs": 117224,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.92,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 7,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "lesson_flags": ["callout_density_warning"],
+        "remediation_action": "WARN_ONLY",
+        "quality_retry_count": 0
+      },
+      "totalWords": 2141
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "3.2",
+    "title": "Алгоритм оценки заявок с применением преимущества: пошаговая инструкция",
+    "startedAt": "2026-08-28T16:01:45.845Z",
+    "finishedAt": "2026-08-28T16:03:40.020Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 10,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 4
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 1
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.7833333333333332,
+      "totalContentChars": 5937,
+      "chunkIds": [
+        "child_3_2066155051",
+        "child_143_1040072453",
+        "child_172_929149499",
+        "child_8_892853650",
+        "child_104_298598333",
+        "child_60_1511009293",
+        "child_43_532460948"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8767
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 25874,
+        "durationMs": 105233,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 5,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1619
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "3.3",
+    "title": "Реестровые записи как основное доказательство происхождения продукции",
+    "startedAt": "2026-08-28T16:03:40.022Z",
+    "finishedAt": "2026-08-28T16:05:09.134Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.8166666666666667,
+      "totalContentChars": 5348,
+      "chunkIds": [
+        "child_8_1063207335",
+        "child_263_427390936",
+        "child_113_1343969839",
+        "child_140_1868446354",
+        "child_53_665562428",
+        "child_210_222233285",
+        "child_56_1163541570"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8423
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16472,
+        "durationMs": 80525,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.93,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 5,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1591
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "3.4",
+    "title": "Специфика подтверждения происхождения для ПО и радиоэлектронной продукции",
+    "startedAt": "2026-08-28T16:05:09.136Z",
+    "finishedAt": "2026-08-28T16:07:03.483Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 1,
+      "documents": [
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 7
+        }
+      ],
+      "coverageScore": 0.5833333333333333,
+      "totalContentChars": 5059,
+      "chunkIds": [
+        "child_214_1324781302",
+        "child_215_625297703",
+        "child_8_2076045943",
+        "child_5_443030902",
+        "child_9_313545324",
+        "child_216_1124274512",
+        "child_145_1467633336"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8170
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 21321,
+        "durationMs": 106010,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.93,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 6,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1967
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "3.5",
+    "title": "Формирование лотов и комплексные закупки: риски и лучшие практики",
+    "startedAt": "2026-08-28T16:07:03.485Z",
+    "finishedAt": "2026-08-28T16:08:41.065Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        }
+      ],
+      "coverageScore": 0.6833333333333333,
+      "totalContentChars": 6354,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_3_2066155051",
+        "child_11_305278457",
+        "child_92_412591020",
+        "child_0_607032379",
+        "child_22_1697053230",
+        "child_19_168089566"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 9583
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 22014,
+        "durationMs": 87836,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 4,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1748
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "4.1",
+    "title": "Нормативная база и расчет обязательных объемов закупок у СМСП",
+    "startedAt": "2026-08-28T16:08:41.066Z",
+    "finishedAt": "2026-08-28T16:10:24.796Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 2,
+      "documents": [
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 6
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.8600000000000001,
+      "totalContentChars": 6431,
+      "chunkIds": [
+        "child_16_1841579566",
+        "child_71_1265314409",
+        "child_289_250007955",
+        "child_73_197103492",
+        "child_30_305646375",
+        "child_107_307182474",
+        "child_108_1821485224"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 7160
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 22477,
+        "durationMs": 96404,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 5,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1760
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "4.2",
+    "title": "Перечень товаров и работ для закупок исключительно у СМСП",
+    "startedAt": "2026-08-28T16:10:24.799Z",
+    "finishedAt": "2026-08-28T16:12:32.589Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 6,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 1
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 1
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.915,
+      "totalContentChars": 5242,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_3_2066155051",
+        "child_11_305278457",
+        "child_289_250007955",
+        "child_44_1862257313",
+        "child_51_3227924",
+        "child_38_1020425921"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 7435
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 24467,
+        "durationMs": 120192,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 5,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1832
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "4.3",
+    "title": "Организация процедур закупок для СМСП: от извещения до контракта",
+    "startedAt": "2026-08-28T16:12:32.590Z",
+    "finishedAt": "2026-08-28T16:14:23.750Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 2
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 3
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 2
+        }
+      ],
+      "coverageScore": 0.6199999999999999,
+      "totalContentChars": 5708,
+      "chunkIds": [
+        "child_20_329669666",
+        "child_223_1275959706",
+        "child_212_1666435452",
+        "child_61_1522563564",
+        "child_142_593804307",
+        "child_62_88310577",
+        "child_21_1940415744"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 7980
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 26155,
+        "durationMs": 103004,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 5,
+          "callout_count": 6,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "lesson_flags": ["callout_density_warning"],
+        "remediation_action": "WARN_ONLY",
+        "quality_retry_count": 0
+      },
+      "totalWords": 1771
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "4.4",
+    "title": "Авансирование и программы развития сотрудничества с СМСП",
+    "startedAt": "2026-08-28T16:14:23.753Z",
+    "finishedAt": "2026-08-28T16:16:39.061Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 4
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.7466666666666667,
+      "totalContentChars": 5331,
+      "chunkIds": [
+        "child_53_243521691",
+        "child_61_1522563564",
+        "child_8_695035512",
+        "child_216_1124274512",
+        "child_6_485810485",
+        "child_12_1788287935",
+        "child_62_88310577"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8197
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 23470,
+        "durationMs": 126945,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 4,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1861
+    }
+  },
+  {
+    "arm": "after-fix",
+    "lesson": "4.5",
+    "title": "Годовая отчетность о закупках у СМСП: формирование и размещение",
+    "startedAt": "2026-08-28T16:16:39.063Z",
+    "finishedAt": "2026-08-28T16:18:52.547Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 10,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 3
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.635,
+      "totalContentChars": 5248,
+      "chunkIds": [
+        "child_268_1660498259",
+        "child_82_1239057349",
+        "child_304_2002664821",
+        "child_55_918716873",
+        "child_27_1888078129",
+        "child_71_1265314409",
+        "child_179_2075906720"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8317
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 22775,
+        "durationMs": 124999,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.91,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 6,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 2111
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "3.1",
+    "title": "Механизм ценового преимущества: суть, нормативная база и условия применения",
+    "startedAt": "2026-08-28T15:42:35.411Z",
+    "finishedAt": "2026-08-28T15:43:42.159Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 10,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 3
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 2
+        }
+      ],
+      "coverageScore": 0.85,
+      "totalContentChars": 5506,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_120_712939989",
+        "child_106_860634894",
+        "child_3_2066155051",
+        "child_117_261330709",
+        "child_13_1198828616",
+        "child_143_1040072453"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 9337
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 12992,
+        "durationMs": 57243,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.75,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 899
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "3.2",
+    "title": "Алгоритм оценки заявок с применением преимущества: пошаговая инструкция",
+    "startedAt": "2026-08-28T15:43:42.161Z",
+    "finishedAt": "2026-08-28T15:44:51.366Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 10,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 4
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 1
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.7833333333333332,
+      "totalContentChars": 6073,
+      "chunkIds": [
+        "child_3_2066155051",
+        "child_143_1040072453",
+        "child_172_929149499",
+        "child_123_1425857542",
+        "child_8_892853650",
+        "child_104_298598333",
+        "child_60_1511009293"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8581
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16719,
+        "durationMs": 60452,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 927
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "3.3",
+    "title": "Реестровые записи как основное доказательство происхождения продукции",
+    "startedAt": "2026-08-28T15:44:51.369Z",
+    "finishedAt": "2026-08-28T15:46:05.041Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.8166666666666667,
+      "totalContentChars": 5348,
+      "chunkIds": [
+        "child_8_1063207335",
+        "child_263_427390936",
+        "child_140_1868446354",
+        "child_113_1343969839",
+        "child_53_665562428",
+        "child_210_222233285",
+        "child_56_1163541570"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8316
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16802,
+        "durationMs": 65189,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 2,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 978
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "3.4",
+    "title": "Специфика подтверждения происхождения для ПО и радиоэлектронной продукции",
+    "startedAt": "2026-08-28T15:46:05.044Z",
+    "finishedAt": "2026-08-28T15:47:23.463Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 1,
+      "documents": [
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 7
+        }
+      ],
+      "coverageScore": 0.5833333333333333,
+      "totalContentChars": 5059,
+      "chunkIds": [
+        "child_214_1324781302",
+        "child_215_625297703",
+        "child_8_2076045943",
+        "child_5_443030902",
+        "child_9_313545324",
+        "child_216_1124274512",
+        "child_145_1467633336"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 9115
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 12517,
+        "durationMs": 69145,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.9,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 770
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "3.5",
+    "title": "Формирование лотов и комплексные закупки: риски и лучшие практики",
+    "startedAt": "2026-08-28T15:47:23.465Z",
+    "finishedAt": "2026-08-28T15:48:34.032Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        }
+      ],
+      "coverageScore": 0.6833333333333333,
+      "totalContentChars": 6354,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_3_2066155051",
+        "child_11_305278457",
+        "child_92_412591020",
+        "child_0_607032379",
+        "child_22_1697053230",
+        "child_19_168089566"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 9834
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 15128,
+        "durationMs": 60567,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 815
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "4.1",
+    "title": "Нормативная база и расчет обязательных объемов закупок у СМСП",
+    "startedAt": "2026-08-28T15:48:34.033Z",
+    "finishedAt": "2026-08-28T15:49:50.426Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 2,
+      "documents": [
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 6
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.8600000000000001,
+      "totalContentChars": 6431,
+      "chunkIds": [
+        "child_16_1841579566",
+        "child_71_1265314409",
+        "child_289_250007955",
+        "child_73_197103492",
+        "child_30_305646375",
+        "child_107_307182474",
+        "child_108_1821485224"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8072
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 22681,
+        "durationMs": 68156,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1159
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "4.2",
+    "title": "Перечень товаров и работ для закупок исключительно у СМСП",
+    "startedAt": "2026-08-28T15:49:50.428Z",
+    "finishedAt": "2026-08-28T15:51:28.988Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 6,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 1
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 1
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.915,
+      "totalContentChars": 5242,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_3_2066155051",
+        "child_11_305278457",
+        "child_289_250007955",
+        "child_44_1862257313",
+        "child_51_3227924",
+        "child_38_1020425921"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 10158
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 25876,
+        "durationMs": 88215,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1112
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "4.3",
+    "title": "Организация процедур закупок для СМСП: от извещения до контракта",
+    "startedAt": "2026-08-28T15:51:28.993Z",
+    "finishedAt": "2026-08-28T15:52:50.012Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 2
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 3
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 2
+        }
+      ],
+      "coverageScore": 0.6199999999999999,
+      "totalContentChars": 5708,
+      "chunkIds": [
+        "child_20_329669666",
+        "child_223_1275959706",
+        "child_212_1666435452",
+        "child_61_1522563564",
+        "child_142_593804307",
+        "child_62_88310577",
+        "child_21_1940415744"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8279
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 21467,
+        "durationMs": 72576,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 5,
+          "callout_count": 4,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1140
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "4.4",
+    "title": "Авансирование и программы развития сотрудничества с СМСП",
+    "startedAt": "2026-08-28T15:52:50.014Z",
+    "finishedAt": "2026-08-28T15:54:10.679Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 4
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.7466666666666667,
+      "totalContentChars": 5331,
+      "chunkIds": [
+        "child_53_243521691",
+        "child_61_1522563564",
+        "child_8_695035512",
+        "child_216_1124274512",
+        "child_6_485810485",
+        "child_12_1788287935",
+        "child_62_88310577"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8679
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16807,
+        "durationMs": 71753,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.91,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 5,
+          "callout_count": 5,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 897
+    }
+  },
+  {
+    "arm": "after-fix-structure-duration",
+    "lesson": "4.5",
+    "title": "Годовая отчетность о закупках у СМСП: формирование и размещение",
+    "startedAt": "2026-08-28T15:54:10.682Z",
+    "finishedAt": "2026-08-28T15:55:18.317Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 10,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "2ab7b9d1-54cd-42a8-9717-640304b69d7f",
+          "chunks": 3
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.635,
+      "totalContentChars": 5248,
+      "chunkIds": [
+        "child_268_1660498259",
+        "child_82_1239057349",
+        "child_304_2002664821",
+        "child_55_918716873",
+        "child_27_1888078129",
+        "child_71_1265314409",
+        "child_179_2075906720"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8656
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16761,
+        "durationMs": 58805,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 2,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 981
+    }
+  },
+  {
+    "arm": "after-fix-rule-only-old-prompts",
+    "lesson": "3.3",
+    "title": "Реестровые записи как основное доказательство происхождения продукции",
+    "startedAt": "2026-08-28T16:28:56.513Z",
+    "finishedAt": "2026-08-28T16:30:54.846Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 4,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 1
+        },
+        {
+          "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        },
+        {
+          "document_id": "2d2ae50b-d140-4025-bfad-31d66ae041f5",
+          "chunks": 1
+        }
+      ],
+      "coverageScore": 0.8166666666666667,
+      "totalContentChars": 5348,
+      "chunkIds": [
+        "child_8_1063207335",
+        "child_263_427390936",
+        "child_140_1868446354",
+        "child_113_1343969839",
+        "child_53_665562428",
+        "child_56_1163541570",
+        "child_210_222233285"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 9304
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 21217,
+        "durationMs": 108858,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1720
+    }
+  },
+  {
+    "arm": "after-fix-rule-only-old-prompts",
+    "lesson": "3.4",
+    "title": "Специфика подтверждения происхождения для ПО и радиоэлектронной продукции",
+    "startedAt": "2026-08-28T16:30:54.848Z",
+    "finishedAt": "2026-08-28T16:32:21.380Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 1,
+      "documents": [
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 7
+        }
+      ],
+      "coverageScore": 0.5833333333333333,
+      "totalContentChars": 5059,
+      "chunkIds": [
+        "child_214_1324781302",
+        "child_215_625297703",
+        "child_8_2076045943",
+        "child_5_443030902",
+        "child_9_313545324",
+        "child_216_1124274512",
+        "child_145_1467633336"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8686
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 16389,
+        "durationMs": 77677,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.92,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1625
+    }
+  },
+  {
+    "arm": "after-fix-rule-only-old-prompts",
+    "lesson": "3.5",
+    "title": "Формирование лотов и комплексные закупки: риски и лучшие практики",
+    "startedAt": "2026-08-28T16:32:21.382Z",
+    "finishedAt": "2026-08-28T16:33:56.606Z",
+    "retrieval": {
+      "queriesPlanned": 5,
+      "queriesReturningResults": 9,
+      "chunksHandedToModel": 7,
+      "distinctDocuments": 3,
+      "documents": [
+        {
+          "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+          "chunks": 2
+        },
+        {
+          "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+          "chunks": 2
+        },
+        {
+          "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+          "chunks": 3
+        }
+      ],
+      "coverageScore": 0.6833333333333333,
+      "totalContentChars": 6354,
+      "chunkIds": [
+        "child_4_471988360",
+        "child_3_2066155051",
+        "child_11_305278457",
+        "child_92_412591020",
+        "child_0_607032379",
+        "child_22_1697053230",
+        "child_19_168089566"
+      ],
+      "cached": false,
+      "retrievalDurationMs": 8561
+    },
+    "generation": {
+      "success": true,
+      "errors": [],
+      "metrics": {
+        "tokensUsed": 21730,
+        "durationMs": 86493,
+        "modelUsed": "z-ai/glm-5.3-flash",
+        "selectedModel": null,
+        "fallbackModel": null,
+        "selectedModelTier": null,
+        "selectedModelTierReason": null,
+        "selectedModelPhase": null,
+        "selectedModelSource": null,
+        "qualityScore": 0.88,
+        "regenerateCount": 0,
+        "truncationCount": 0,
+        "rejectedTokens": 0,
+        "regenerationMode": null
+      },
+      "needsReview": false,
+      "reviewReasons": [],
+      "qaSignals": {
+        "version": 1,
+        "lesson_counters": {
+          "section_count": 6,
+          "callout_count": 3,
+          "code_block_count": 0,
+          "english_header_count": 0,
+          "duplicate_header_count": 0,
+          "conclusion_heading_count": 0
+        },
+        "quality_retry_count": 0
+      },
+      "totalWords": 1613
+    }
+  }
+]
