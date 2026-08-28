@@ -6,6 +6,18 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
+**Ten lessons per arm, 2026-08-28** (`docs/rag/2026-08-28-lesson-arms-batch/`). The larger sample
+corrects two things the single lesson implied and raises three defects. The arms share **3.2 of 7
+chunks**, not four, and the cap buys **+1.0 documents** in what the model reads — the 0.11 figure was
+measured on the pre-rerank union. Quality still does not move (0.830 against 0.841, sign changes
+lesson by lesson), so the setting stays. Found while looking: `mc2-udj0b` — the callout gate blocks
+5+ callouts per lesson, **0 of 20 lessons met it**, 11 of 20 were forced into two regenerations that
+came back with 5+ again, and all 11 `needs_review` in the sample are that one rule; blocked lessons
+score 0.778 against 0.907. `mc2-zxzgf` — the Mermaid fallback is hardcoded English, in 123 lessons
+across 12 courses. `mc2-hpful` — cross-lesson repetition is negligible (worst pair 4.9% of
+eight-word sequences over 340 lessons), but 5.3% of lessons duplicate a block **of themselves**, all
+of them long ones.
+
 `mc2-d0e2n` is **complete, six of six** (2026-08-28). Retrieval was read in a lesson for the first
 time and the two arms are **indistinguishable**; the predicted call volumes did not move and the
 arithmetic that predicted them is corrected; Jina has a price, records at the call and appears in
@@ -411,17 +423,25 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
-`mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
-writer is configured on staging, which is idle, and not on dev, where the runs happen. **Its three
-questions are answered in the bead (2026-08-28, `mc2-d0e2n.5`), the fix is not made.** A second
-writer against the shared `evidence-stage4-state.prom` is **idempotent**: it sets absolute totals
-from one database RPC keyed by `(pg_postmaster_start_time, generation, revision)`, and dev and
+`mc2-kim48` — **answered and fixed in the tree on 2026-08-28, not yet applied to the host.** The
+owner's decision: dev reports through the same channel, with a marker saying it is dev. It can,
+because an external label is applied "only when a time series does not have a given label yet"; what
+prevented it was the rules, not Alertmanager. All four aggregated bare, and bare `sum()` drops every
+label, so the alert could not carry an environment even in principle and `external_labels` then
+supplied `staging`. They now aggregate `by (environment)` and name it in the summary, the two
+`absent()` branches became per-environment `unless count by (environment)`, and the dev workers set
+`QDRANT_METRICS_TEXTFILE_DIR` with an instance ending `-dev` that `prometheus.yml` rewrites to
+`environment="dev"` with one `metric_relabel_config` — no second exporter, no second scrape target.
+Proved by `promtool test rules` (two environments failing raise two alerts naming their own; one
+healthy environment raises none) and shown red against the bare form first.
+
+A second writer against the shared `evidence-stage4-state.prom` is **idempotent**: it sets absolute
+totals from one database RPC keyed by `(pg_postmaster_start_time, generation, revision)`, and dev and
 staging share the database, so both compute the same tuple; the incrementing counters live in the
-per-service file and cannot collide. What blocks the fix is one layer up — `external_labels` stamps
-`environment: staging` on everything and not one of the four rules narrows by
-`service`/`instance`/`environment`, so turning the dev writer on today would page staging's on-call
-for a dev experiment. Narrow the rules first, then enable the writer; both need an owner decision on
-whether dev pages at all.
+per-service file and cannot collide.
+
+**Still to apply:** a dev deploy picks up the compose change, but the Prometheus config and rules
+need the monitoring stack reloaded on the host. Not done — that is a staging mutation.
 
 `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`, `semantic-matching.ts`)
 prices itself but is not attributed to a course. Neither module mentions `courseId` anywhere, so the
