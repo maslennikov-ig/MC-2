@@ -585,8 +585,16 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // 20260828090000_prose_falls_back_to_luna_not_deepseek.sql. Again one UPDATE of
 // `llm_model_config` — eighteen rows, fallback only — so no new `after-*`
 // digest, and re-pinned in the same edit as the migration.
+// Re-pinned again 2026-08-28: 247 files, adding
+// 20260828100000_stage_6_content_gets_a_row_the_panel_can_edit.sql. This one is
+// not only DML: it widens the `phase_name` CHECK by one value and inserts two
+// rows. The constraint is additive — no existing row can fail the wider list —
+// and `document_evidence` is untouched, so still no new `after-*` digest.
+// Re-pinned once more 2026-08-28: 248 files, adding
+// 20260828110000_delta_judge_rejoins_its_own_class.sql — one UPDATE of
+// `llm_model_config`, found by the guard added in the same commit.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '06cfa4cedf85ae2814f79da846ceda0d30b86a9b0a2289be8ca7a1d180f03cec';
+  '1f023809a1c3d03d4187960490083118c67adc4e5f61f8b0b35ae7fc3939a385';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

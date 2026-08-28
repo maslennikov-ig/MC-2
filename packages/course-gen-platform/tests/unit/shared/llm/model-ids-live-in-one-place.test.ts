@@ -178,7 +178,16 @@ describe('model identifiers are declared once', () => {
     // eroding in either direction. A patcher applies one named instruction to
     // one span and has no room to invent a statistic, which is what the
     // 2026-08-22 comparison found DeepSeek doing when it was authoring.
-    const notAuthoring = ['stage_6_patcher', 'stage_6_arbiter', 'stage_6_rag_planning'] as const;
+    const notAuthoring = [
+      'stage_6_patcher',
+      'stage_6_arbiter',
+      'stage_6_rag_planning',
+      // Added 2026-08-28. It was the one member of this class the database had
+      // on Luna, swept there by a bulk update on 2026-08-22 that put every
+      // sibling on the fast default. Stating it here is what stops the sweep
+      // being repeated (mc2-oyes7).
+      'stage_6_delta_judge',
+    ] as const;
 
     for (const phase of notAuthoring) {
       expect(STAGE6_CANONICAL_PHASE_DEFAULTS[phase].modelId, phase).toBe(DEFAULT_MODEL_ID);

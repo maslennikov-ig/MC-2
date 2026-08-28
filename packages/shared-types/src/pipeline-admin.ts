@@ -88,6 +88,22 @@ export const phaseNameSchema = z.enum([
   // Inline Operations
   'inline_block_regeneration',
   'inline_element_crud',
+  // Career Playbook — see the note on `PhaseName`. The database CHECK has
+  // accepted these all along; this enum is what the panel gates on.
+  'stage_career_playbook_department_classifier',
+  'stage_career_playbook_followup',
+  'stage_career_playbook_spec',
+  'stage_career_playbook_group_1',
+  'stage_career_playbook_group_2',
+  'stage_career_playbook_group_3',
+  'stage_career_playbook_group_4',
+  'stage_career_playbook_group_5',
+  'stage_career_playbook_group_6',
+  'stage_career_playbook_judge',
+  'stage_career_playbook_proofreader',
+  'stage_career_playbook_regenerator',
+  // Stage 6 single-call generation.
+  'stage_6_content',
   // Special
   'emergency',
   'quality_fallback',

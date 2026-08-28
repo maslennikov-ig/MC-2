@@ -25,6 +25,24 @@
  * Refs mc2-a2j1x, mc2-0a47t
  */
 
+/**
+ * The value a text rate takes when the provider publishes none.
+ *
+ * It is zero, and zero is the wrong word for it — which is the whole reason it
+ * has a name. `sourceful/riverflow-v2.5-fast` charges per frame; its entire
+ * OpenRouter `pricing` array is one `output_image` entry, so there is no prompt
+ * or completion rate to quote. Written as a bare `0` it reads as "free", and a
+ * reader scanning this table has no way to tell that apart from a rate somebody
+ * forgot to fill in — which is exactly the sort of number that has gone 6.4x
+ * wrong here before (mc2-f4n3q).
+ *
+ * Using it is not free either: `model-catalog-coverage` requires that an entry
+ * quoting it also declares `billedPerImage` and a positive per-image rate, so
+ * "no text rate" can never stand in for "no rate at all". A model with nothing
+ * to charge it at still fails.
+ */
+export const NO_PUBLISHED_TEXT_RATE = 0;
+
 export interface ModelCapabilities {
   /** USD per 1M input tokens */
   inputPricePerMillion: number;
@@ -131,14 +149,11 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * publishes no `quality`.
    */
   'sourceful/riverflow-v2.5-fast': {
-    // Zero here means "this endpoint publishes no such rate", not "free". Its
-    // whole `pricing` array is one `output_image` entry; there is no text leg to
-    // quote. Nothing reads these — the model is only ever reached through the
-    // image path, which prices from `imagePriceFlatUsd` — and the zero-price
-    // guard now requires a positive price of *some* kind rather than a positive
-    // text rate specifically, so a genuinely unpriced model still fails it.
-    inputPricePerMillion: 0,
-    outputPricePerMillion: 0,
+    // Its whole `pricing` array is one `output_image` entry; there is no text
+    // leg to quote. The model is only ever reached through the image path,
+    // which prices from `imagePriceFlatUsd` below.
+    inputPricePerMillion: NO_PUBLISHED_TEXT_RATE,
+    outputPricePerMillion: NO_PUBLISHED_TEXT_RATE,
     contextLength: 4096,
     maxOutputTokens: 4096,
     supportsTemperature: false,

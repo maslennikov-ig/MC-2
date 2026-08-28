@@ -18,6 +18,7 @@ import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/rou
 import {
   MODEL_CATALOG,
   LIVE_ROUTING_MODEL_IDS,
+  NO_PUBLISHED_TEXT_RATE,
   getModelCapabilities,
 } from '@megacampus/shared-types';
 
@@ -301,6 +302,33 @@ describe('model catalogue coverage', () => {
       .map(([modelId]) => modelId);
 
     expect(broken).toEqual([]);
+  });
+
+  it('only lets a text rate be absent when an image rate is present', () => {
+    // The counterpart of the guard above, and the reason `NO_PUBLISHED_TEXT_RATE`
+    // is a name rather than a bare `0`. That zero means "this provider quotes no
+    // prompt or completion rate", which is true of exactly one entry today and
+    // must stay tied to the thing that *is* charged. Without this, a model
+    // somebody forgot to price would wear identical clothes to a per-frame one
+    // and the table would read the same either way (mc2-f4n3q).
+    const untethered = Object.entries(MODEL_CATALOG)
+      .filter(([, capabilities]) => {
+        const noTextRate =
+          capabilities.inputPricePerMillion === NO_PUBLISHED_TEXT_RATE &&
+          capabilities.outputPricePerMillion === NO_PUBLISHED_TEXT_RATE;
+        if (!noTextRate) return false;
+        // A model billed per frame must say so, and say how much.
+        return (
+          capabilities.billedPerImage !== true ||
+          !(
+            (capabilities.imagePriceFlatUsd ?? 0) > 0 ||
+            (capabilities.imageOutputPricePerMillion ?? 0) > 0
+          )
+        );
+      })
+      .map(([modelId]) => modelId);
+
+    expect(untethered).toEqual([]);
   });
 
   it('keeps the seed within each provider output ceiling', () => {
