@@ -14,7 +14,14 @@ fix predicted did not happen: **callouts rose, 4.70 → 5.30**, and a third arm 
 prompts restored says the wording is why (3.00 against 5.00 on the same three lessons) — the rule,
 not the prompt, is doing all the work; and `src/shared/prompts/stage6/expander.ts` is rendered by
 nothing, so that third of the prompt edit is unread. Both lessons read by eye keep the mandatory
-practical example, in prose instead of a callout box. The lesson also came out shorter at the same
+practical example, in prose instead of a callout box. **The five Stage 6 prompts nothing rendered
+are gone** (`mc2-53h8i`, `45e5fe90d`): `renderPrompt` takes two Stage 6 keys, the registry declared
+seven, and the other five were the six-node pipeline's, kept "for historical reference" — one of them
+edited by the callout fix and read by no model. Their `prompt_templates` rows were **active**, so the
+admin screen offered them for editing; retired with `--deactivate`, text kept, one flag from
+reversible. 16 active rows and 5 orphans became **11 active, 0 orphans, 0 mismatches**.
+
+The lesson also came out shorter at the same
 word target (2718 → 1840); the owner ruled the same day that **length is not the criterion, meaning
 surviving is**, so it is recorded in the report and tracked nowhere (`mc2-c7ire`, opened and closed
 on that ruling).
