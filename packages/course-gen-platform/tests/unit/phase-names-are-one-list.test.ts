@@ -39,6 +39,23 @@ const seedPhases = [...new Set((seed as SeedRow[]).map(row => row.phase_name))].
 const panelPhases = new Set<string>(phaseNameSchema.options);
 
 describe('phase names are one list', () => {
+  it('names each phase once', () => {
+    // `z.enum` accepts a repeated member in silence, and `.options` is what the
+    // other guards here iterate — so a duplicate makes them do the same work
+    // twice and, worse, hides that somebody added a name without noticing it was
+    // already there. Three were found on 2026-08-28: `stage_6_auto_last_chance`
+    // and `stage_6_manual_regeneration` had been listed twice since the Stage 6
+    // tier block was added, and `stage_6_content` was added a second time while
+    // fixing the very drift this file guards.
+    const counts = new Map<string, number>();
+    for (const option of phaseNameSchema.options) {
+      counts.set(option, (counts.get(option) ?? 0) + 1);
+    }
+    const repeated = [...counts].filter(([, n]) => n > 1).map(([phase]) => phase);
+
+    expect(repeated).toEqual([]);
+  });
+
   it('the panel knows every phase the database has a row for', () => {
     const unreachable = seedPhases.filter(phase => !panelPhases.has(phase));
 
