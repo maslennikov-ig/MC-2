@@ -46,18 +46,24 @@ function devEnvNames(workflow: string): Set<string> {
   const opener = "cat > ${{ env.DEPLOY_PATH }}/.env.dev << 'ENVEOF'";
   const start = workflow.indexOf(opener);
   expect(start, 'the dev .env heredoc moved; this check is reading nothing').toBeGreaterThan(-1);
-  // Past the opener, not from it: the opening line names the delimiter too, so
-  // searching from `start` finds that one and reads an empty block — which would make
-  // every variable look missing and this check look like it works.
-  const end = workflow.indexOf('ENVEOF', start + opener.length);
-  return new Set(
-    workflow
-      .slice(start, end)
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => /^[A-Z0-9_]+=/u.test(line))
-      .map(line => line.slice(0, line.indexOf('=')))
-  );
+  // The whole step, not just the heredoc. Some values cannot come from the heredoc at
+  // all: it is quoted, so it does not expand, and `QDRANT_METRICS_GID` is read from
+  // the host with `stat` and appended afterwards. Reading only the heredoc would call
+  // that variable missing and push it back into a form that cannot work.
+  const end = workflow.indexOf('\n      - name:', start);
+  const step = workflow.slice(start, end < 0 ? undefined : end);
+
+  const names = new Set<string>();
+  for (const line of step.split('\n').map(text => text.trim())) {
+    // A plain `NAME=value` line inside the heredoc.
+    const direct = /^([A-Z0-9_]+)=/u.exec(line);
+    if (direct) names.add(direct[1]);
+    // An `echo "NAME=..." >> .env.dev` appended after it.
+    if (line.includes('.env.dev')) {
+      for (const match of line.matchAll(/([A-Z0-9_]+)=\\?\$/gu)) names.add(match[1]);
+    }
+  }
+  return names;
 }
 
 describe('the dev deploy writes every variable the dev compose file requires', () => {
