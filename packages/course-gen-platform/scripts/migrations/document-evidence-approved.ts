@@ -581,8 +581,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // Re-pinned again 2026-08-27: 245 files, adding
 // 20260827180000_lesson_banner_moves_to_riverflow.sql. Another single UPDATE of
 // `llm_model_config`, so no new `after-*` digest.
+// Re-pinned 2026-08-28: 246 files, adding
+// 20260828090000_prose_falls_back_to_luna_not_deepseek.sql. Again one UPDATE of
+// `llm_model_config` — eighteen rows, fallback only — so no new `after-*`
+// digest, and re-pinned in the same edit as the migration.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '36251d98d3de2d921766a5367bf713fd8857ce65654165ddc4af94bc95fa8436';
+  '06cfa4cedf85ae2814f79da846ceda0d30b86a9b0a2289be8ca7a1d180f03cec';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

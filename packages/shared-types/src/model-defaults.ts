@@ -134,8 +134,30 @@ export const LARGE_CONTEXT_MODEL_ID = 'google/gemini-3.7-flash';
  */
 export const PROSE_MODEL_ID = 'z-ai/glm-5.3-flash';
 
-/** Fallback for authoring phases — a different vendor, same rule as DEFAULT_*. */
-export const PROSE_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;
+/**
+ * Fallback for authoring phases. A different vendor, same rule as DEFAULT_* —
+ * but **not** `DEFAULT_MODEL_ID`, which is what it was until 2026-08-28.
+ *
+ * The cross-vendor rule was satisfied and the point was still missed. DeepSeek
+ * is not merely "the other model" for prose: it is the model this seat was taken
+ * away from, and for a specific fault. The comparison of 2026-08-22 (mc2-bneet)
+ * had it assert "по статистике, более 60% людей..." with no source — a
+ * fabricated figure inside the artifact a customer reads — while judge scores
+ * barely registered the difference (0.88 against 0.92).
+ *
+ * So a z-ai outage handed every lesson back to the model rejected for writing
+ * lessons, silently, and the judge that missed it the first time would have
+ * missed it again. Luna is the third vendor, was itself the prose model until
+ * 2026-08-26, and is already the primary on eleven other phases. It costs more
+ * per output token than DeepSeek, which is the price of a fallback being a
+ * fallback rather than a downgrade — and it is reached only when the primary
+ * fails (mc2-u8kwx).
+ *
+ * The `stage_6_content` seat has no database row of its own and is served from
+ * `STAGE6_CANONICAL_PHASE_DEFAULTS`, so this constant is the whole decision
+ * there; the other seventeen prose rows were updated to match.
+ */
+export const PROSE_FALLBACK_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
 
 // ============================================================================
 // ESCALATION
