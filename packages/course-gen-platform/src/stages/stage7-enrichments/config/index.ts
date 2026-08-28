@@ -38,12 +38,6 @@ export const STAGE7_CONFIG = {
 } as const;
 
 /**
- * Default job timeout in milliseconds (10 minutes for enrichment generation)
- * Enrichments like video/audio may take longer than lesson content
- */
-export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — enrichments (quiz, presentation) can be slow via OpenRouter
-
-/**
  * Model configuration for LLM-based enrichments (quiz, presentation)
  *
  * There is no `primary` here on purpose. The primary model belongs to

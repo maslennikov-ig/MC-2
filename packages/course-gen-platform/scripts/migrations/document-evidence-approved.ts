@@ -593,8 +593,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // Re-pinned once more 2026-08-28: 248 files, adding
 // 20260828110000_delta_judge_rejoins_its_own_class.sql — one UPDATE of
 // `llm_model_config`, found by the guard added in the same commit.
+// Re-pinned 2026-08-28: 249 files, adding
+// 20260828120000_a_timeout_that_fits_its_own_budget.sql — one UPDATE of
+// `llm_model_config` raising every configured timeout to fit its own token
+// budget. No `document_evidence` object is touched, so no new `after-*` digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '1f023809a1c3d03d4187960490083118c67adc4e5f61f8b0b35ae7fc3939a385';
+  '97231b28cd9cedff0e8617a52673d86fb4ba94538de0d0d946643cf70343c0ee';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

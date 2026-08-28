@@ -400,11 +400,21 @@ export async function getModelForPhase(
     // `config.reasoning` has to travel with the rest of the phase config: a
     // phase that reads its reasoning budget out of the database and then drops
     // it before the request is a phase that thinks it deliberates and does not.
+    //
+    // `config.timeoutMs` travels for the same reason, and did not until
+    // 2026-08-28: this argument was a literal `undefined`, so every phase's
+    // configured `timeout_ms` — a column, editable in the superadmin panel,
+    // set on seventeen rows — reached nothing on the main routing path and the
+    // OpenAI SDK's own 600 s default applied instead. The one function that
+    // read the column, `getJobTimeout`, had no callers (mc2-jm25g).
+    //
+    // A phase with no configured timeout keeps that SDK default, which is what
+    // 59 of the 76 rows do; passing `undefined` is how you ask for it.
     return await createOpenRouterModelAsync(
       config.modelId,
       config.temperature,
       config.maxTokens,
-      undefined,
+      config.timeoutMs ?? undefined,
       config.reasoning,
       undefined,
       { phase, ...(courseId ? { courseId } : {}) }

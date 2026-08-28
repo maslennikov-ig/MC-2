@@ -29,6 +29,7 @@ import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6
 
 import seed from '@/config/config-seed.json';
 import { DEFAULT_PHASE_CONFIGS } from '@/shared/llm/model-config-db';
+import { MIN_ENDPOINT_THROUGHPUT_TPS } from '@/shared/llm/openrouter-endpoints';
 
 interface SeedRow {
   phase_name: string;
@@ -72,6 +73,31 @@ describe('phase names are one list', () => {
     );
 
     expect(unresolvable).toEqual([]);
+  });
+
+  it('gives every phase enough time to spend its own token budget', () => {
+    // A timeout below the time the phase's own `max_tokens` needs is a phase
+    // able to abort its own work. The floor is `MIN_ENDPOINT_THROUGHPUT_TPS` —
+    // the slowest endpoint routing will accept — and the margin is a factor of
+    // two, because generation is the dominant term but connection and prompt
+    // processing come out of the same budget.
+    //
+    // All seventeen rows carrying a timeout were under it on 2026-08-28, and
+    // seven were not close: the Career Playbook groups allowed 238 s for 14 000
+    // tokens, which needs 934 s. That half was live — the playbook applies its
+    // configured timeout — so those phases could cut themselves off. The Stage 6
+    // half was not applied at all until the same commit wired the column
+    // through (mc2-jm25g).
+    const tooTight = (seed as Array<SeedRow & { max_tokens?: number; timeout_ms?: number | null }>)
+      .filter(row => !row.judge_role && typeof row.timeout_ms === 'number')
+      .filter(row => {
+        const budget = row.max_tokens ?? 0;
+        const requiredMs = (budget / MIN_ENDPOINT_THROUGHPUT_TPS) * 2 * 1000;
+        return (row.timeout_ms as number) < requiredMs;
+      })
+      .map(row => `${row.phase_name}: ${row.timeout_ms}ms for ${row.max_tokens} tokens`);
+
+    expect(tooTight).toEqual([]);
   });
 
   it('the compiled Stage 6 defaults agree with the seed they overwrite', () => {

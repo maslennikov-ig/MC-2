@@ -1,43 +1,17 @@
-import { logger } from '@/shared/logger';
-import {
-  createModelConfigService,
-  getEffectiveStageConfig,
-} from '@/shared/llm/model-config-service';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import { DEFAULT_JOB_TIMEOUT_MS } from '../config';
 
 /**
- * Get job timeout from database configuration
+ * `getJobTimeout` used to live here and was deleted on 2026-08-28 (mc2-jm25g).
+ *
+ * It read `stage_6_content`'s `timeout_ms` and called the result the Stage 6
+ * BullMQ job timeout — and nothing called it. It was exported from `handler.ts`
+ * and imported by no module, so the 300 000 ms it would have returned bounded
+ * nothing, and the `DEFAULT_JOB_TIMEOUT_MS = 1_800_000` it fell back to, with
+ * its comment about budget models needing generous timeouts, was never once
+ * consulted. Both are gone rather than wired up: a BullMQ job is bounded by the
+ * worker's lock and its renewal (`factory.ts`), and the per-request timeout is a
+ * property of the request, which is where it now goes.
  */
-export async function getJobTimeout(courseId?: string): Promise<number> {
-  try {
-    const modelConfigService = createModelConfigService();
-    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_content', courseId);
-    const effectiveConfig = getEffectiveStageConfig(phaseConfig);
-
-    const timeout = effectiveConfig.timeoutMs ?? DEFAULT_JOB_TIMEOUT_MS;
-
-    logger.info(
-      {
-        timeout,
-        source: phaseConfig.source,
-      },
-      'Using database-driven job timeout config'
-    );
-
-    return timeout;
-  } catch (error) {
-    logger.warn(
-      {
-        error: error instanceof Error ? error.message : String(error),
-        fallback: DEFAULT_JOB_TIMEOUT_MS,
-      },
-      'Failed to load job timeout config, using default'
-    );
-
-    return DEFAULT_JOB_TIMEOUT_MS;
-  }
-}
 
 /**
  * Detect language from lesson specification
