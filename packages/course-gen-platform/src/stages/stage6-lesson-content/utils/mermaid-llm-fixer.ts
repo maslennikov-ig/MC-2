@@ -41,6 +41,11 @@
 import { createCostRecordingModel } from '@/shared/llm/langchain-models';
 import { logger } from '@/shared/logger';
 import { HumanMessage } from '@langchain/core/messages';
+import {
+  DEFAULT_FALLBACK_MODEL_ID,
+  DEFAULT_MODEL_ID,
+  ESCALATION_MODEL_ID,
+} from '@megacampus/shared-types';
 
 // ============================================================================
 // CONSTANTS
@@ -61,11 +66,29 @@ const MAX_DIAGRAM_SIZE_FOR_LLM = 2000;
 /**
  * 3-tier model cascade for fixing diagrams.
  * T1 handles 90%+ of cases cheaply. T2/T3 escalate for complex failures.
+ *
+ * Retiered 2026-08-28 (mc2-u8kwx). It named `minimax/minimax-m2.1`,
+ * `qwen/qwen3.7-plus` and `z-ai/glm-5`, and the published rates made it not a
+ * ladder at all: $0.30, $0.32 and $0.60 per 1M input — T2 was 7% dearer than
+ * T1 — while `DEFAULT_MODEL_ID`, the model that writes the diagram in the first
+ * place, costs $0.06. So the cheap tier was five times the price of the default
+ * and the escalation was barely an escalation.
+ *
+ * None of the three was in `LIVE_ROUTING_MODEL_IDS`, and 90 days of
+ * `generation_trace` records no repair call on any of them: their 27 appearances
+ * are all `stage_6_judge`, `stage_6_content`, `stage_6_refinement` and
+ * `stage_5_generate_sections`, which is the deleted `PHASE_FALLBACK_CONFIG`
+ * showing through, not this cascade.
+ *
+ * The three roles are now the three the rest of the codebase already names, so
+ * a routing change reaches here by being made once: fast default, its
+ * cross-vendor fallback, then the escalation seat. $0.06 → $0.30 → $1.19, which
+ * is a ladder.
  */
 const LLM_MODELS = {
-  primary: 'minimax/minimax-m2.1', // T1: cheap, $0.30/1M input
-  secondary: 'qwen/qwen3.7-plus', // T2: strong, ~$3/1M input
-  ultimate: 'z-ai/glm-5', // T3: top model, expensive, last resort
+  primary: DEFAULT_MODEL_ID, // T1: the model that drew the diagram, $0.06/1M in
+  secondary: DEFAULT_FALLBACK_MODEL_ID, // T2: a different vendor, $0.30/1M in
+  ultimate: ESCALATION_MODEL_ID, // T3: last resort, $1.19/1M in
 } as const;
 
 /**

@@ -16,9 +16,9 @@
  *
  * So the rule is not "tidy the constants". It is: a routing decision lives in
  * `llm_model_config`, the superadmin panel edits it, `config-seed.json` is the
- * committed snapshot, and `model-defaults.ts` names the handful of roles
- * (default, fallback, large-context, prose) that a snapshot cannot express. A
- * literal anywhere else is a second answer nobody can see.
+ * committed snapshot, and `model-defaults.ts` names the five roles a snapshot
+ * cannot express: default, its cross-vendor fallback, large-context, prose and
+ * escalation. A literal anywhere else is a second answer nobody can see.
  *
  * The rule grandfathers what exists and fails only what is new.
  */
@@ -60,9 +60,9 @@ const REGISTRIES: Record<string, string> = {
   // The catalogue keys are model ids by definition.
   'shared-types/src/model-catalog.ts': 'catalogue keys and the live-routing list',
   // The four named roles every other file borrows from.
+  // The five named roles every other file borrows from: default, its
+  // cross-vendor fallback, large-context, prose, escalation.
   'shared-types/src/model-defaults.ts': 'the role constants themselves',
-  // Repair tiers, declared as an exported array the drift gate reads.
-  'src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.ts': 'MERMAID_REPAIR_MODEL_IDS',
   // Image models: a separate OpenRouter catalogue, no phase config covers them.
   'src/stages/stage7-enrichments/services/image-generation-service.ts': 'image model registry',
   // Substring tests against a served id, not ids to request.
@@ -119,12 +119,7 @@ describe('model identifiers are declared once', () => {
     const offenders: Record<string, string[]> = {};
 
     for (const file of ['stage6-model-config.ts', 'model-config.ts', 'pipeline-admin.ts']) {
-      const found = modelLiterals(`${SHARED_TYPES_SRC}${file}`).filter(
-        // `z-ai/glm-5.2` has no named constant yet: the two escalation phases
-        // use it precisely because it is neither of the defaults, so a constant
-        // would have to be named for that role before this entry can go.
-        id => id !== "'z-ai/glm-5.2'"
-      );
+      const found = modelLiterals(`${SHARED_TYPES_SRC}${file}`);
       if (found.length > 0) offenders[file] = found;
     }
 

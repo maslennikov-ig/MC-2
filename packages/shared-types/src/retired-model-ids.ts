@@ -8,24 +8,34 @@
  * three of these eight entries, so five retired ids survived a seed refresh and
  * only the runtime map caught them (mc2-u8kwx).
  *
- * Every replacement must itself be in `MODEL_CATALOG`, or the substitution
- * trades a known-retired id for an unknown one: cost silently resolves to the
+ * Every replacement must itself be in `LIVE_ROUTING_MODEL_IDS`, which is
+ * stronger than "in the catalogue" and stronger than it was. An uncatalogued
+ * replacement trades a known-retired id for an unknown one: cost resolves to the
  * pessimistic $1/$3 default and both capability predicates answer "unknown",
  * which reads as "no reasoning, temperature accepted" whether or not that is
- * true. `openai/gpt-5.4` pointed at `google/gemini-3.5-flash`, which is in no
- * catalogue in this repo.
+ * true — `openai/gpt-5.4` pointed at `google/gemini-3.5-flash`, in no catalogue
+ * here. But a *catalogued* replacement outside live routing is not much better:
+ * `qwen/qwen3.5-plus-02-15` pointed at `qwen/qwen3.7-plus`, which was the last
+ * model reachable from nowhere else, so retiring an id quietly kept an
+ * eleventh model on the wire. It goes to `DEFAULT_FALLBACK_MODEL_ID`, cheaper
+ * on both legs ($0.20/$1.20 against $0.32/$1.28) and gated like everything
+ * else.
  *
  * @module retired-model-ids
  */
 
-import { DEFAULT_MODEL_ID, LARGE_CONTEXT_MODEL_ID } from './model-defaults';
+import {
+  DEFAULT_FALLBACK_MODEL_ID,
+  DEFAULT_MODEL_ID,
+  LARGE_CONTEXT_MODEL_ID,
+} from './model-defaults';
 
 /** Retired id → the id to ask for instead. */
 export const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
   'xiaomi/mimo-v2-flash': DEFAULT_MODEL_ID,
   'x-ai/grok-4.1-fast': DEFAULT_MODEL_ID,
   'x-ai/grok-4-fast': DEFAULT_MODEL_ID,
-  'qwen/qwen3.5-plus-02-15': 'qwen/qwen3.7-plus',
+  'qwen/qwen3.5-plus-02-15': DEFAULT_FALLBACK_MODEL_ID,
   'deepseek/deepseek-v3.2': DEFAULT_MODEL_ID,
   'openai/gpt-5.4': LARGE_CONTEXT_MODEL_ID,
   'minimax/minimax-m2.5': 'minimax/minimax-m3',

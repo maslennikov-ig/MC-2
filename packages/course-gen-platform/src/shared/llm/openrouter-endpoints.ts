@@ -85,6 +85,14 @@ export interface ModelEndpoint {
   completionPricePerMillion: number;
   /** OpenRouter's own health figure; below zero is degraded or disabled. */
   status: number;
+  /**
+   * Median completion tokens per second over the last 30 minutes, or `null`
+   * when the endpoint publishes none.
+   *
+   * `null` means "not stated", never "slow": a new endpoint has no history, and
+   * refusing it for that would freeze routing onto whoever is already busy.
+   */
+  throughputTokensPerSecond: number | null;
   /** Which service tier this endpoint is, from its tag. */
   tier: EndpointTier;
 }
@@ -129,6 +137,26 @@ function readNumber(source: Record<string, unknown>, key: string): number | null
   return null;
 }
 
+/**
+ * The median of `throughput_last_30m`.
+ *
+ * It is an **object** — `{p50, p75, p90, p99}` — not a number, which is worth
+ * stating because reading it with `Number()` yields `NaN` and makes a fully
+ * populated field look empty. `uptime_last_30m`, right beside it, *is* a number.
+ * A plain number is still accepted here in case the shape changes back.
+ *
+ * p50 rather than p90: the question is what a typical call gets, and p90 would
+ * let one good half-hour excuse a provider that is usually slow.
+ */
+function readThroughput(record: Record<string, unknown>): number | null {
+  const raw = record.throughput_last_30m;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'object' && raw !== null) {
+    return readNumber(raw as Record<string, unknown>, 'p50');
+  }
+  return null;
+}
+
 function parseEndpoint(raw: unknown): ModelEndpoint | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
@@ -149,6 +177,7 @@ function parseEndpoint(raw: unknown): ModelEndpoint | null {
     promptPricePerMillion: prompt * 1_000_000,
     completionPricePerMillion: completion * 1_000_000,
     status: readNumber(record, 'status') ?? 0,
+    throughputTokensPerSecond: readThroughput(record),
     tier: readEndpointTier(tag),
   };
 }
@@ -294,6 +323,59 @@ export function cheapestEndpointAtTier(
 }
 
 /**
+ * The slowest endpoint worth the first attempt, in completion tokens per second.
+ *
+ * Derived, not chosen. The largest ordinary Stage 6 output budget is 8000 tokens
+ * and the phase config gives that call 300 s (`stage6-model-config.ts`), so an
+ * endpoint has to sustain ~27 tok/s just to finish inside its own timeout. 30 is
+ * that with a little air.
+ *
+ * What it excludes, measured 2026-08-28 against the live `/endpoints` lists: the
+ * first attempt for `deepseek/deepseek-v4-flash-0731` — the model most of the
+ * pipeline runs on — was going to `open-inference/fp4`, cheapest at $0.030/1M
+ * and **9 tok/s**. At that rate an 8000-token lesson needs 15 minutes and the
+ * 300 s timeout kills it first. The next endpoint up, `relace/fp4`, is $0.060
+ * and 100 tok/s: eleven times faster for three hundredths of a cent per million
+ * input tokens. `z-ai/glm-5.2` has the same shape — `sail-research/fp8` and
+ * `morph/fp4` both sit at 14 tok/s under a third of the list.
+ *
+ * This is the missing half of the 2026-08-21 incident. Pinning an attempt made a
+ * hung provider *attributable* (mc2-6crnj); it did nothing to stop us choosing
+ * the slow one first, every time, because price was the only sort key.
+ *
+ * Uptime is deliberately not part of this (owner, 2026-08-27): an endpoint that
+ * is down fails its attempt and the chain moves on, which already works. Being
+ * consistently slow is different — it does not fail, it just takes the whole
+ * budget.
+ */
+export const MIN_ENDPOINT_THROUGHPUT_TPS = 30;
+
+/**
+ * True when an endpoint is quick enough to be worth trying first.
+ *
+ * An endpoint with no published figure passes. "Not stated" is not "slow", and a
+ * new provider has no 30-minute history — refusing it would pin routing to
+ * whoever is already established.
+ */
+function isFastEnough(endpoint: ModelEndpoint): boolean {
+  return (
+    endpoint.throughputTokensPerSecond === null ||
+    endpoint.throughputTokensPerSecond >= MIN_ENDPOINT_THROUGHPUT_TPS
+  );
+}
+
+/**
+ * The cheapest of a price-sorted group that can keep up, or its cheapest member.
+ *
+ * The second half matters as much as the first: a floor able to refuse every
+ * endpoint is a floor able to stop a generation, and no throughput figure is
+ * worth that. A slow route beats no route.
+ */
+function cheapestFastEnough(group: readonly ModelEndpoint[]): ModelEndpoint | undefined {
+  return group.find(isFastEnough) ?? group[0];
+}
+
+/**
  * The cheapest endpoint this chain has not tried yet, within the tier it may use.
  *
  * Skips what OpenRouter's own routing skips — a negative `status` is degraded or
@@ -316,6 +398,10 @@ export function cheapestEndpointAtTier(
  * The ceiling is applied here, against the live price, rather than left to
  * `provider.max_price` alone: a pinned endpoint the ceiling then refuses costs a
  * whole attempt, and the ceiling is built from a catalogue that drifts.
+ *
+ * Cheapest is still the goal, but cheapest **among those that can finish** —
+ * see {@link MIN_ENDPOINT_THROUGHPUT_TPS}. When nothing clears the floor the
+ * cheapest eligible endpoint is returned anyway: a slow route beats no route.
  */
 export function pickCheapestUntriedEndpoint(
   endpoints: ModelEndpoint[],
@@ -323,7 +409,7 @@ export function pickCheapestUntriedEndpoint(
   ceiling?: { prompt?: number; completion?: number },
   allowedTier: ServiceTier = 'default'
 ): ModelEndpoint | undefined {
-  return endpoints.find(endpoint => {
+  const eligible = endpoints.filter(endpoint => {
     if (triedTags.has(endpoint.tag)) return false;
     if (endpoint.status < 0) return false;
     if (endpoint.tier === 'priority') return false;
@@ -339,4 +425,20 @@ export function pickCheapestUntriedEndpoint(
     }
     return true;
   });
+
+  // The floor applies **within** the tier that was asked for, never across it.
+  // `openai/flex` serves Luna at $0.10/1M and 26 tok/s against `azure` at $0.20
+  // and 68: a floor allowed to reach across tiers would answer a deliberate
+  // request for half price by doubling it. Flex is an opt-in with a known
+  // trade, and speed is not the term being traded.
+  //
+  // Falling through from an exhausted flex group to the default one is the
+  // documented behaviour and unchanged: a flex endpoint that refuses for
+  // capacity fails its attempt, and the next attempt finds the group empty.
+  const flex = eligible.filter(endpoint => endpoint.tier === 'flex');
+  const standard = eligible.filter(endpoint => endpoint.tier !== 'flex');
+
+  return (
+    (allowedTier === 'flex' ? cheapestFastEnough(flex) : undefined) ?? cheapestFastEnough(standard)
+  );
 }

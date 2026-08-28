@@ -260,13 +260,19 @@ describe('model catalogue coverage', () => {
       expect(missing).toEqual([]);
     });
 
-    it('finds more than the hand-written list did, and says who routes to each', () => {
-      // Guards the derivation itself: if `collectRoutableModelSources` silently
-      // stopped reading a registry, this is what notices.
-      expect(routable.length).toBeGreaterThan(LIVE_ROUTING_MODEL_IDS.length);
+    it('routes to exactly the models the live list declares, no more', () => {
+      // This used to assert the derived set was BIGGER than the hand-written
+      // one, because it was: 20 models against 10, the extra ten reachable
+      // through registries the list knew nothing about. After mc2-u8kwx the two
+      // are the same set, which is a stronger statement than either half — it
+      // fails both when a registry goes silent and when a new one appears
+      // without being declared live.
+      expect([...routable].sort()).toEqual([...LIVE_ROUTING_MODEL_IDS].sort());
+    });
 
+    it('can name at least one registry for every model it routes to', () => {
       for (const modelId of routable) {
-        expect(describeRoutableModel(modelId).length).toBeGreaterThan(0);
+        expect(describeRoutableModel(modelId).length, modelId).toBeGreaterThan(0);
       }
     });
   });

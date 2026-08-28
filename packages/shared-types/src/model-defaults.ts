@@ -138,6 +138,30 @@ export const PROSE_MODEL_ID = 'z-ai/glm-5.3-flash';
 export const PROSE_FALLBACK_MODEL_ID = DEFAULT_MODEL_ID;
 
 // ============================================================================
+// ESCALATION
+// ============================================================================
+
+/**
+ * The model asked after the ordinary one has already failed on this work.
+ *
+ * A role, not a preference, and the reason it is neither `DEFAULT_MODEL_ID` nor
+ * `PROSE_MODEL_ID`: by the time an escalation runs, the model that would
+ * otherwise take the job has just produced something a judge rejected or a
+ * parser could not read. Retrying it is a wasted attempt, so this seat is held
+ * by the most capable model in the catalogue rather than the cheapest — at
+ * $1.19/$3.74 per 1M it costs roughly twenty times `DEFAULT_MODEL_ID`, which is
+ * affordable precisely because it is reached rarely.
+ *
+ * Named on 2026-08-28. It was spelt out twice in `stage6-model-config.ts` and
+ * was the last literal `model-ids-live-in-one-place` had to grandfather: the
+ * role had no name, so the guard could not tell a declaration from a copy
+ * (mc2-u8kwx).
+ *
+ * @see llm_model_config — `stage_6_auto_last_chance`, `stage_6_manual_regeneration`.
+ */
+export const ESCALATION_MODEL_ID = 'z-ai/glm-5.2';
+
+// ============================================================================
 // CHAT MODEL IDS (Single Source of Truth)
 // ============================================================================
 
