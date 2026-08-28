@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-27. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-28. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
@@ -181,6 +181,23 @@ the attempt pin — are in `.codex/repository-failure-modes.md`, together with h
 changed (database first, then `pnpm generate:config-seed`) and why a reasoning budget is added to
 `max_tokens` rather than taken out of it.
 
+**One table decides which model a phase gets** (2026-08-28, `3cb14ffb6`, `mc2-u8kwx`). The decision
+lives in `llm_model_config`, the superadmin panel edits it, `config-seed.json` is the committed
+snapshot every offline path reads, and `model-defaults.ts` names the four roles a snapshot cannot
+express (default, fallback, large-context, prose). Everything else was a second answer and is gone:
+`PHASE_FALLBACK_CONFIG` (a hand-kept copy that disagreed with the database on **eleven** phases, and
+not dormant — `langchain-models.ts` routes every config-service failure into it, which is what put
+eleven distinct model ids into sixty days of `generation_trace`, the `mc2-a6qxc` mystery);
+pipeline-admin's `DEFAULT_MODEL_CONFIGS` (60 phases typed by hand, so "reset to default" wrote a
+third opinion — and could not reset the eleven `stage_career_playbook_*` phases at all);
+`shared/llm/model-selector.ts` in full (eleven models nothing selected, yet the price gate read it
+and believed four dead ids were live routes); Stage 5's `MODEL_FALLBACK` (its `modelOverride` was
+written into graph state and read by nothing, so the log named a model no call was made with).
+**The guard is `model-ids-live-in-one-place.test.ts`**: it walks every tracked file under `src/` and
+fails on a model id spelt out anywhere outside six named registries. Two further checks state the
+invariant directly — the panel's default and the runtime's default agree for every phase in
+`phaseNameSchema`, and every phase the panel can reset has something to reset to.
+
 **Phase configs** (2026-08-13, `7ad421986`): Stage 5, metadata generation and `getModelForPhase` all
 go through `buildProviderParams`, held by `tests/unit/phase-config-provider-contract.test.ts`;
 collision fallback `LARGE_CONTEXT_MODEL_ID`. `stage_5_escalation` is now first in
@@ -208,16 +225,20 @@ decimal on two runs of 2026-08-22. What still constrains work:
   `provider.max_price` ceiling; every call settles against the provider.
   `model-catalog-coverage.test.ts` stays offline on purpose, and
   `scripts/check-model-catalog-drift.ts` is the online half, in **no** CI job deliberately (a
-  provider's tariff change must not fail the build and with it the deploy). It runs nightly, filing
-  ONE standing GitHub issue; its first run found three entries 1.30x-4.03x over (`mc2-ts9i2`).
-  Never retype a rate in a test: that turned eight cases red for no defect.
+  provider's tariff change must not fail the build and with it the deploy). It runs nightly and
+  **writes** the published rates into the catalogue and its snapshot, committing to `develop`; only a
+  move of 1.5x or more — the same factor `max_price` is built from, past which a frozen rate starts
+  refusing calls — goes to Telegram. It filed a GitHub issue for two months instead, which asked a
+  person to retype two numbers the job already had. Never retype a rate in a test: that turned eight
+  cases red for no defect.
 - **One transport, one place.** Every OpenRouter client comes from `shared/llm/openrouter-client.ts`,
   the only place `instrumentFetchWithGenerationId` is attached; `one-openrouter-transport.test.ts`
   fails on a new one, and its exception list may shrink, never grow.
 - **Images price like everything else.** Cards go through `POST /api/v1/images` at `quality: medium`,
   the only endpoint carrying that control — $0.045076 to $0.0085605 per card (`mc2-xbqz8`). Covers
-  stay on chat completions by the owner's decision; the `stage_7_card`/`stage_7_cover` rows in
-  `llm_model_config` are read by nothing (`mc2-bnm62`).
+  stay on chat completions by the owner's decision. The `stage_7_cover` row is read again since
+  2026-08-27: `processImagePipeline` called `generateImage`, not `generateCoverImage`, so the
+  configured cover model was ignored for as long as the row existed (`mc2-bnm62`).
 - **A playbook is not a course**, and `generation_trace.course_id` is a foreign key into `courses`,
   so playbook money lives in `career_playbooks.cost_breakdown` (`mc2-j9pmq`, `mc2-ietzn`) — the same
   fact is why a playbook cannot have a `course_override` row. **Stage 6 and Stage 7 run their own
