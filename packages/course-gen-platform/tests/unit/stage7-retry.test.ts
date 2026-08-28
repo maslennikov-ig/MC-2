@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Job } from 'bullmq';
 
+import { DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 // ============================================================================
 // TEST 1: retry-strategy.ts - Pure function tests
 // ============================================================================
@@ -205,13 +206,13 @@ describe('retry-strategy.ts - Pure Functions', () => {
     it('should return fallback model for quiz on attempt 2', () => {
       const model = getModelForAttempt('quiz', 2);
 
-      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
+      expect(model).toBe(DEFAULT_FALLBACK_MODEL_ID);
     });
 
     it('should return fallback model for quiz on attempt 3', () => {
       const model = getModelForAttempt('quiz', 3);
 
-      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
+      expect(model).toBe(DEFAULT_FALLBACK_MODEL_ID);
     });
 
     it('should return null for presentation on attempt 1 so llm_model_config decides', () => {
@@ -223,7 +224,7 @@ describe('retry-strategy.ts - Pure Functions', () => {
     it('should return fallback model for presentation on attempt 3', () => {
       const model = getModelForAttempt('presentation', 3);
 
-      expect(model).toBe('qwen/qwen3-235b-a22b-2507');
+      expect(model).toBe(DEFAULT_FALLBACK_MODEL_ID);
     });
 
     it('should return null for non-LLM enrichment types (audio)', () => {

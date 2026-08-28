@@ -27,6 +27,7 @@ import type {
   Stage4ModelSelection,
 } from '../../stages/stage4-analysis/phases/stage4-budget-allocator';
 
+import { LARGE_CONTEXT_MODEL_ID } from '@megacampus/shared-types';
 // ============================================================================
 // ERROR DETECTION
 // ============================================================================
@@ -97,17 +98,17 @@ export function getContextOverflowFallback(
 ): ContextOverflowFallback | null {
   if (!tierConfig) {
     // Without tier config, use generic Gemini Flash as universal large-context fallback
-    if (currentModelId !== 'google/gemini-3.7-flash') {
+    if (currentModelId !== LARGE_CONTEXT_MODEL_ID) {
       logger.info(
         {
           currentModel: currentModelId,
-          fallbackModel: 'google/gemini-3.7-flash',
+          fallbackModel: LARGE_CONTEXT_MODEL_ID,
           reason: 'context_overflow_no_tier_config',
         },
         '[ContextOverflow] Escalating to Gemini 3 Flash (no tier config available)'
       );
       return {
-        modelId: 'google/gemini-3.7-flash',
+        modelId: LARGE_CONTEXT_MODEL_ID,
         maxContext: 1_000_000,
       };
     }

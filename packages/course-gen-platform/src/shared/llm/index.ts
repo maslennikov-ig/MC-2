@@ -11,33 +11,8 @@
  * - Archetype-based parameter routing
  */
 
-// Model Selector (NEW - language-aware routing)
-export {
-  // Types
-  type ModelConfig,
-  type ModelCapability,
-  type AnalysisModel,
-  type SupportedLanguage,
-  type GenerationModelSelection,
-
-  // Constants
-  MODEL_SELECTION_THRESHOLD,
-  MODELS,
-  ARCHETYPE_TEMPERATURES,
-
-  // Selection Functions
-  selectModelForAnalysis,
-  selectModelForGeneration,
-  getFallbackModel,
-  getAnalysisModelType,
-  selectModelForLargeContext,
-
-  // Utility Functions
-  getModelByKey,
-  getModelById,
-  getModelsWithCapability,
-  fitsInContext,
-} from './model-selector';
+// Stage 4 context thresholds
+export { STAGE4_CONTEXT_THRESHOLD, STAGE4_HARD_TOKEN_LIMIT } from './context-thresholds';
 
 // LLM Client for OpenRouter
 export { LLMClient, llmClient, type LLMClientOptions, type LLMResponse } from './client';

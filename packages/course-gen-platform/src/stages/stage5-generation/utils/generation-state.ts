@@ -24,6 +24,7 @@ import type { GenerationJobInput } from '@megacampus/shared-types/generation-job
 
 import type { CourseMetadata, Section } from '@megacampus/shared-types/generation-result';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 // ============================================================================
 // GENERATION PHASE TYPES
 // ============================================================================
@@ -640,7 +641,7 @@ export function updateStateWithQuality(
     },
     modelUsed: {
       ...state.modelUsed,
-      validation: result.method === 'llm_judge' ? 'deepseek/deepseek-v4-flash' : undefined,
+      validation: result.method === 'llm_judge' ? DEFAULT_MODEL_ID : undefined,
     },
     phaseDurations: {
       ...state.phaseDurations,

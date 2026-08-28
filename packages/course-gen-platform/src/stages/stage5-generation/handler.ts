@@ -59,12 +59,12 @@ import { isDocumentEvidenceStage5EnrichmentEnabled } from './evidence/rollout';
 import {
   type StructureGenerationJobResult,
   type GenerationErrorDetails,
-  MODEL_FALLBACK,
+  GENERATION_RETRY,
   cleanupPlaceholdersInStructure,
   classifyGenerationError,
   isRetryableError,
   determinePhaseFromError,
-  processWithFallback,
+  processWithRetry,
   buildNonRetryableResult,
 } from './handler-helpers';
 import {
@@ -300,10 +300,10 @@ export class Stage5GenerationHandler {
 
     jobLogger.info('Executing 4-phase generation pipeline');
 
-    const result: GenerationResult = await processWithFallback(
+    const result: GenerationResult = await processWithRetry(
       orchestrator,
       input,
-      MODEL_FALLBACK,
+      GENERATION_RETRY,
       jobLogger
     );
 

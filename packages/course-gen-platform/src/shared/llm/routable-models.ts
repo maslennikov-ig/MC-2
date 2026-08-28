@@ -36,6 +36,8 @@ import {
   LIVE_ROUTING_MODEL_IDS,
   PROSE_FALLBACK_MODEL_ID,
   PROSE_MODEL_ID,
+  COLLISION_FALLBACK_MODEL_ID,
+  RETIRED_MODEL_ID_REPLACEMENTS,
   normalizeModelId,
 } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
@@ -43,13 +45,7 @@ import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6
 import { MODEL_FALLBACK } from '@/stages/stage6-lesson-content/config';
 import { MERMAID_REPAIR_MODEL_IDS } from '@/stages/stage6-lesson-content/utils/mermaid-llm-fixer';
 
-import {
-  COLLISION_FALLBACK_MODEL_ID,
-  DEFAULT_PHASE_CONFIGS,
-  RETIRED_MODEL_ID_REPLACEMENTS,
-} from './model-config-db';
-import { PHASE_FALLBACK_CONFIG } from './phase-fallback-config';
-import { MODELS } from './model-selector';
+import { DEFAULT_PHASE_CONFIGS } from './model-config-db';
 
 /** One registry that can put a model on the wire, and what it holds. */
 export interface RoutableModelSource {
@@ -86,10 +82,6 @@ export function collectRoutableModelSources(): RoutableModelSource[] {
       ],
     },
     {
-      source: 'shared/llm/phase-fallback-config.ts PHASE_FALLBACK_CONFIG',
-      modelIds: Object.values(PHASE_FALLBACK_CONFIG).map(config => config.modelId),
-    },
-    {
       source: 'shared-types/stage6-model-config.ts STAGE6_CANONICAL_PHASE_DEFAULTS',
       modelIds: Object.values(STAGE6_CANONICAL_PHASE_DEFAULTS).flatMap(config => [
         config.modelId,
@@ -97,13 +89,9 @@ export function collectRoutableModelSources(): RoutableModelSource[] {
       ]),
     },
     {
-      source: 'shared/llm/model-selector.ts MODELS',
-      modelIds: Object.values(MODELS).map(model => model.modelId),
-    },
-    {
       // The replacements, not the retired ids: a retired id never reaches the
       // provider, the id it is rewritten to does.
-      source: 'shared/llm/model-config-db.ts RETIRED_MODEL_ID_REPLACEMENTS',
+      source: 'shared-types/retired-model-ids.ts RETIRED_MODEL_ID_REPLACEMENTS',
       modelIds: [...Object.values(RETIRED_MODEL_ID_REPLACEMENTS), COLLISION_FALLBACK_MODEL_ID],
     },
     {

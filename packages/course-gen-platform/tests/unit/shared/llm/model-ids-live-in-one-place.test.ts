@@ -1,81 +1,160 @@
 /**
- * Model identifiers belong in `model-defaults.ts` (as values) and in
- * `model-catalog.ts` (as registry keys). Everywhere else they are a copy.
+ * A model identifier is declared once, and one phase has one answer.
  *
- * Written 2026-08-23 after `stage6-model-config.ts` was found carrying six
- * hand-typed copies of `'openai/gpt-5.6-luna'` — three that had been there a
- * while, three added the same hour while returning the authoring phases to Luna.
- * A retyped identifier is not a style problem: it is the reason a routing change
- * lands in five of six places and the sixth is discovered by a paid run.
+ * Written 2026-08-23 for two Stage 5 files, widened on 2026-08-28 to the whole
+ * platform source tree after `mc2-u8kwx` counted the damage: ten registries
+ * naming twenty models, and **eleven phases where the hardcoded emergency path
+ * disagreed with the database it was standing in for**. `stage_5_normal` and
+ * `stage_5_escalation` said `moonshotai/kimi-k2-thinking` where the table said
+ * Luna; `stage_5_complex` said `qwen/qwen3.7-plus`; `stage_7_cover` still named
+ * the image model replaced that morning.
  *
- * The rule grandfathers what exists and fails only what is new, so the
- * allowlist below is deliberate and each entry says why it is still a literal.
+ * None of it was dormant. `langchain-models.ts` routes every failure of
+ * `ModelConfigService` into that path, which is why sixty days of
+ * `generation_trace` held eleven distinct model ids against nine configured
+ * ones (mc2-a6qxc) — a mystery nobody could explain at the time.
+ *
+ * So the rule is not "tidy the constants". It is: a routing decision lives in
+ * `llm_model_config`, the superadmin panel edits it, `config-seed.json` is the
+ * committed snapshot, and `model-defaults.ts` names the handful of roles
+ * (default, fallback, large-context, prose) that a snapshot cannot express. A
+ * literal anywhere else is a second answer nobody can see.
+ *
+ * The rule grandfathers what exists and fails only what is new.
  */
 
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_MODEL_ID,
   PROSE_FALLBACK_MODEL_ID,
   PROSE_MODEL_ID,
+  phaseNameSchema,
 } from '@megacampus/shared-types';
 import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
+import { getDefaultModelConfig } from '@/server/routers/pipeline-admin/constants';
+import { resolveDefaultPhaseConfig } from '@/shared/llm/model-config-service';
 
+const PLATFORM_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SHARED_TYPES_SRC = fileURLToPath(
   new URL('../../../../../shared-types/src/', import.meta.url)
 );
 
-const PLATFORM_SRC = fileURLToPath(new URL('../../../../src/', import.meta.url));
-
-/**
- * The Stage 5 last-resort blocks (mc2-p6u8k).
- *
- * These two ran only when `llm_model_config` could not be read, so a wrong id
- * here was invisible until the worst possible moment. They named
- * `kimi-k2-thinking`, `qwen3.7-plus`, `qwen3-235b-a22b-2507` and
- * `deepseek-v3.1-terminus` for four months after the 2026-08-12 cut left seven
- * live routing models, because nothing compared the two lists.
- */
-const LAST_RESORT_BLOCKS = [
-  'stages/stage5-generation/utils/section-batch/constants.ts',
-  'stages/stage5-generation/utils/metadata-generator.ts',
-] as const;
-
 /** `vendor/model-name` as it appears in source, quoted. */
 const MODEL_ID_LITERAL = /'[a-z0-9-]+\/[a-z0-9][a-z0-9.\-:]*'/g;
 
+/** Vendors OpenRouter serves. Narrow on purpose: `openai/resources/chat` is an import path. */
+const OPENROUTER_VENDOR =
+  /^'(openai|google|deepseek|qwen|moonshotai|anthropic|z-ai|minimax|meta|mistralai|x-ai|sourceful|bytedance-seed|krea|microsoft|nvidia|amazon|cohere|perplexity|xiaomi)\//;
+
 /**
- * Literals that are allowed to stay, with the reason.
- *
- * `z-ai/glm-5.2` has no named constant yet. It is used by the two escalation
- * phases precisely because it is neither of the defaults, so a constant would
- * have to be named for that role before this entry can go.
+ * The files allowed to name a model, and why each is a declaration rather than
+ * a copy. Anything not on this list must route through a named constant or the
+ * phase config.
  */
-const GRANDFATHERED = new Set(["'z-ai/glm-5.2'"]);
+const REGISTRIES: Record<string, string> = {
+  // The rename map: retired ids are the keys, so they have to be spelt out.
+  'shared-types/src/retired-model-ids.ts': 'the retired ids themselves',
+  // The catalogue keys are model ids by definition.
+  'shared-types/src/model-catalog.ts': 'catalogue keys and the live-routing list',
+  // The four named roles every other file borrows from.
+  'shared-types/src/model-defaults.ts': 'the role constants themselves',
+  // Repair tiers, declared as an exported array the drift gate reads.
+  'src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.ts': 'MERMAID_REPAIR_MODEL_IDS',
+  // Image models: a separate OpenRouter catalogue, no phase config covers them.
+  'src/stages/stage7-enrichments/services/image-generation-service.ts': 'image model registry',
+  // Substring tests against a served id, not ids to request.
+  'src/stages/stage6-lesson-content/judge/clev-voter-helpers.ts': 'judge-weight heuristics',
+};
+
+function sourceFiles(): string[] {
+  return execFileSync('git', ['ls-files', '--', 'src/**/*.ts'], {
+    cwd: PLATFORM_ROOT,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .filter(
+      relativePath =>
+        // Probes and one-off benchmarks name a model because naming it is the
+        // experiment. They reach no pipeline.
+        !relativePath.startsWith('src/experiments/') &&
+        !relativePath.startsWith('src/scripts/') &&
+        !relativePath.endsWith('.example.ts')
+    );
+}
+
+/** Comments are where the history lives; only code counts. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/gm, '$1');
+}
+
+function modelLiterals(absolutePath: string): string[] {
+  const code = stripComments(readFileSync(absolutePath, 'utf8'));
+  return [
+    ...new Set((code.match(MODEL_ID_LITERAL) ?? []).filter(id => OPENROUTER_VENDOR.test(id))),
+  ];
+}
 
 describe('model identifiers are declared once', () => {
-  it('stage6-model-config.ts names no model except the grandfathered escalation one', () => {
-    const source = readFileSync(`${SHARED_TYPES_SRC}stage6-model-config.ts`, 'utf8');
-    const found = (source.match(MODEL_ID_LITERAL) ?? []).filter(
-      literal => !GRANDFATHERED.has(literal)
-    );
+  it('no platform source file names a model outside the declared registries', () => {
+    const offenders: Record<string, string[]> = {};
 
-    expect(found).toEqual([]);
+    for (const relativePath of sourceFiles()) {
+      if (REGISTRIES[relativePath]) continue;
+      const found = modelLiterals(`${PLATFORM_ROOT}${relativePath}`);
+      if (found.length > 0) offenders[relativePath] = found;
+    }
+
+    // A new entry here is a routing decision written where the panel cannot
+    // reach it. Use DEFAULT_MODEL_ID / DEFAULT_FALLBACK_MODEL_ID /
+    // LARGE_CONTEXT_MODEL_ID / PROSE_MODEL_ID, or the phase config.
+    expect(offenders).toEqual({});
   });
 
-  it.each(LAST_RESORT_BLOCKS)('%s names no model literally', relativePath => {
-    const source = readFileSync(`${PLATFORM_SRC}${relativePath}`, 'utf8');
+  it('the shared-types registries are the only ones there too', () => {
+    const offenders: Record<string, string[]> = {};
 
-    // Comments are where the history lives — "it used to name kimi-k2-thinking"
-    // is worth keeping and is not a routing decision. Only code counts.
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    for (const file of ['stage6-model-config.ts', 'model-config.ts', 'pipeline-admin.ts']) {
+      const found = modelLiterals(`${SHARED_TYPES_SRC}${file}`).filter(
+        // `z-ai/glm-5.2` has no named constant yet: the two escalation phases
+        // use it precisely because it is neither of the defaults, so a constant
+        // would have to be named for that role before this entry can go.
+        id => id !== "'z-ai/glm-5.2'"
+      );
+      if (found.length > 0) offenders[file] = found;
+    }
 
-    const found = (code.match(MODEL_ID_LITERAL) ?? []).filter(
-      literal => !GRANDFATHERED.has(literal)
-    );
+    expect(offenders).toEqual({});
+  });
 
-    expect(found).toEqual([]);
+  it('one phase has one answer: the admin default and the runtime default agree', () => {
+    // These were separate tables until 2026-08-28 — `DEFAULT_MODEL_CONFIGS` in
+    // pipeline-admin against `PHASE_FALLBACK_CONFIG` in shared/llm against the
+    // seed — so "reset to default" in the panel could write a model the runtime
+    // would never have chosen, and did: `stage_7_cover` was two routing
+    // decisions behind and `stage_4_clarifying` fell back to
+    // `anthropic/claude-sonnet-4`, an id in no catalogue here.
+    const disagreements: Array<{ phase: string; admin?: string; runtime?: string }> = [];
+
+    for (const phase of phaseNameSchema.options) {
+      const admin = getDefaultModelConfig(phase);
+      const runtime = resolveDefaultPhaseConfig(phase);
+      if (admin?.modelId !== runtime?.modelId) {
+        disagreements.push({ phase, admin: admin?.modelId, runtime: runtime?.modelId });
+      }
+    }
+
+    expect(disagreements).toEqual([]);
+  });
+
+  it('every phase the panel can reset has a default to reset to', () => {
+    const missing = phaseNameSchema.options.filter(phase => getDefaultModelConfig(phase) === null);
+
+    expect(missing).toEqual([]);
   });
 
   it('every Stage 6 phase that authors prose resolves to PROSE_MODEL_ID', () => {

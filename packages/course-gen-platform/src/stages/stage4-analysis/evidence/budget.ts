@@ -1,5 +1,5 @@
 import type { DocumentEvidenceMode } from '@megacampus/shared-types';
-import { STAGE4_HARD_TOKEN_LIMIT } from '@/shared/llm/model-selector';
+import { STAGE4_HARD_TOKEN_LIMIT } from '@/shared/llm/context-thresholds';
 
 export interface EvidenceBudgetDocument {
   documentId: string;

@@ -29,7 +29,7 @@ import { buildCompletionRequest, buildReasoningPayload } from '@/shared/llm/clie
 import {
   COLLISION_FALLBACK_MODEL_ID,
   RETIRED_MODEL_ID_REPLACEMENTS,
-} from '@/shared/llm/model-config-db';
+} from '@megacampus/shared-types';
 import seed from '@/config/config-seed.json';
 
 interface SeedRow {

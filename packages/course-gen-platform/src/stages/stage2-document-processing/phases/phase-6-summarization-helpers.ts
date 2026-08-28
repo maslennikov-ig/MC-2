@@ -32,6 +32,7 @@ import type {
   SummarizationAttemptResult,
 } from './phase-6-summarization';
 
+import { LARGE_CONTEXT_MODEL_ID } from '@megacampus/shared-types';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -77,7 +78,7 @@ Return ONLY the title, no explanations.`,
  * Default model for lightweight title generation
  * Uses fast, cheap model since title extraction is simple
  */
-const TITLE_GENERATION_MODEL = 'google/gemini-3.7-flash';
+const TITLE_GENERATION_MODEL = LARGE_CONTEXT_MODEL_ID;
 
 // ============================================================================
 // DOCUMENT LOADING

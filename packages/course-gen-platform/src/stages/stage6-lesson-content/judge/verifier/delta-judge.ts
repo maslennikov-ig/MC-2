@@ -17,6 +17,7 @@ import type {
   JudgeConfidence,
 } from '@megacampus/shared-types';
 import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { logger } from '@/shared/logger';
@@ -141,7 +142,7 @@ export async function verifyPatch(
 
   try {
     // Get model configuration
-    let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
+    let modelId = fallbackConfig?.modelId ?? DEFAULT_MODEL_ID;
     let temperature = fallbackConfig?.temperature ?? 0.0;
     let maxTokens = fallbackConfig?.maxTokens ?? 512;
 

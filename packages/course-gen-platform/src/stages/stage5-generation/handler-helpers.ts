@@ -5,8 +5,8 @@
  * Contains:
  * - Placeholder cleanup logic
  * - Error classification utilities
- * - Model fallback configuration
- * - Model fallback execution
+ * - Retry configuration
+ * - Retry execution
  * - Non-retryable result builder
  *
  * Database helpers (materialization, status updates, worker validation)
@@ -96,22 +96,29 @@ export interface StructureGenerationJobResult {
 }
 
 // ============================================================================
-// MODEL FALLBACK CONFIGURATION
+// RETRY CONFIGURATION
 // ============================================================================
 
 /**
- * Model fallback configuration for Stage 5
- * Similar to Stage 6 pattern for consistency
+ * How many times Stage 5 re-runs the pipeline before giving up.
+ *
+ * It used to carry three model ids as well — `qwen/qwen3-235b-a22b-2507` for
+ * Russian, `deepseek/deepseek-v3.1-terminus` for English and
+ * `moonshotai/kimi-k2-thinking` as the rescue — and the retry logged which one
+ * it had switched to. None of them was ever requested: the id travelled to
+ * `orchestrator.execute` as `modelOverride`, was written into the graph state
+ * and read by nothing. Every call went to whatever `llm_model_config` said for
+ * the phase (mc2-u8kwx).
+ *
+ * The models are gone rather than wired up. Stage 5's phases each resolve their
+ * own primary and fallback from the table the superadmin panel edits, and a
+ * handler-level override would be a fourth opinion outside it.
  *
  * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
  */
-export const MODEL_FALLBACK = {
-  primary: {
-    ru: 'qwen/qwen3-235b-a22b-2507',
-    en: 'deepseek/deepseek-v3.1-terminus',
-  },
-  fallback: 'moonshotai/kimi-k2-thinking',
-  maxPrimaryAttempts: 2,
+export const GENERATION_RETRY = {
+  /** Attempts before the job is failed. */
+  maxAttempts: 2,
 } as const;
 
 // ============================================================================
@@ -319,75 +326,66 @@ export function determinePhaseFromError(error: Error | string): string | undefin
 }
 
 // ============================================================================
-// MODEL FALLBACK EXECUTION
+// RETRY EXECUTION
 // ============================================================================
 
 /**
- * Execute generation with model fallback strategy.
- * Tries primary model up to maxPrimaryAttempts times, then falls back.
+ * Run the generation pipeline, retrying the whole run on a retryable failure.
+ *
+ * Was `processWithFallback`, and the name promised more than it did: it took a
+ * `MODEL_FALLBACK` table, logged "Falling back to secondary model" and passed
+ * the id to `orchestrator.execute`, which dropped it. The retry is real; the
+ * model switch never happened. What actually varies between attempts is the
+ * model each phase resolves from `llm_model_config`, which the panel owns.
  *
  * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
  */
-export async function processWithFallback(
+export async function processWithRetry(
   orchestrator: GenerationOrchestrator,
   input: GenerationJobInput,
-  modelConfig: typeof MODEL_FALLBACK,
+  retryConfig: typeof GENERATION_RETRY,
   phaseLogger: pino.Logger
 ): Promise<GenerationResult> {
   const courseId = input.course_id;
-  const language = input.frontend_parameters?.language || 'ru';
-  const primaryModel =
-    modelConfig.primary[language as keyof typeof modelConfig.primary] || modelConfig.primary.ru;
+  let lastError: unknown;
 
-  // Try primary model
-  for (let attempt = 1; attempt <= modelConfig.maxPrimaryAttempts; attempt++) {
+  for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
     try {
       phaseLogger.info(
-        {
-          courseId,
-          attempt,
-          maxAttempts: modelConfig.maxPrimaryAttempts,
-          model: primaryModel,
-          source: 'primary',
-        },
-        'Stage 5: Attempting generation with primary model'
+        { courseId, attempt, maxAttempts: retryConfig.maxAttempts },
+        'Stage 5: Attempting generation'
       );
-      return await orchestrator.execute(input, primaryModel);
+      return await orchestrator.execute(input);
     } catch (error) {
+      lastError = error;
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Bail out immediately for non-retryable errors (e.g. structural validation mismatch)
       const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
       if (!isRetryableError(errorCode)) {
         phaseLogger.warn(
-          { courseId, attempt, model: primaryModel, errorCode, error: errorMessage },
-          'Stage 5: Non-retryable error, skipping remaining attempts and fallback'
+          { courseId, attempt, errorCode, error: errorMessage },
+          'Stage 5: Non-retryable error, skipping remaining attempts'
         );
         throw error;
       }
 
       phaseLogger.warn(
-        {
-          courseId,
-          attempt,
-          maxAttempts: modelConfig.maxPrimaryAttempts,
-          model: primaryModel,
-          error: errorMessage,
-        },
-        'Stage 5: Primary model attempt failed'
+        { courseId, attempt, maxAttempts: retryConfig.maxAttempts, error: errorMessage },
+        'Stage 5: Generation attempt failed'
       );
 
       await logTrace({
         courseId,
         stage: 'stage_5',
-        phase: 'model_fallback',
-        stepName: 'primary_attempt_failed',
-        inputData: { attempt, model: primaryModel },
+        phase: 'retry',
+        stepName: 'attempt_failed',
+        inputData: { attempt },
         errorData: { error: errorMessage },
         durationMs: 0,
       });
 
-      if (attempt < modelConfig.maxPrimaryAttempts) {
+      if (attempt < retryConfig.maxAttempts) {
         const delayMs = 1000 * Math.pow(2, attempt - 1);
         phaseLogger.debug({ courseId, delayMs }, 'Stage 5: Waiting before retry');
         await new Promise(r => setTimeout(r, delayMs));
@@ -395,28 +393,7 @@ export async function processWithFallback(
     }
   }
 
-  // Fallback to secondary model
-  phaseLogger.info(
-    {
-      courseId,
-      primaryModel,
-      fallbackModel: modelConfig.fallback,
-      reason: 'Primary model exhausted all attempts',
-    },
-    'Stage 5: Falling back to secondary model'
-  );
-
-  await logTrace({
-    courseId,
-    stage: 'stage_5',
-    phase: 'model_fallback',
-    stepName: 'fallback_activated',
-    inputData: { primaryModel, fallbackModel: modelConfig.fallback },
-    outputData: { reason: 'Primary model exhausted all attempts' },
-    durationMs: 0,
-  });
-
-  return await orchestrator.execute(input, modelConfig.fallback);
+  throw lastError;
 }
 
 // ============================================================================

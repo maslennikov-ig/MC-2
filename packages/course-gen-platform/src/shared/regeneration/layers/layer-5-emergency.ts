@@ -20,6 +20,7 @@ import { getModelForPhase } from '@/shared/llm/langchain-models';
 import logger from '@/shared/logger';
 import { extractJSON } from '@/shared/workspace-utils';
 
+import { LARGE_CONTEXT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Quality fallback result
  */
@@ -65,7 +66,7 @@ export async function qualityFallback(
 
   try {
     const fallbackModel = await getModelForPhase('quality_fallback', courseId);
-    const fallbackModelId = fallbackModel.model || 'moonshotai/kimi-k2-thinking';
+    const fallbackModelId = fallbackModel.model || LARGE_CONTEXT_MODEL_ID;
 
     logger.info({ fallbackModelId }, 'Invoking quality fallback model');
 

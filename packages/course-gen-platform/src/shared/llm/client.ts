@@ -51,6 +51,7 @@ import {
 import { logTrace } from '../trace-logger';
 import { tokenEstimator } from './token-estimator';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Wall-clock budget for a single LLM call, in milliseconds.
  *
@@ -886,7 +887,7 @@ export class LLMClient {
     maxTokens?: number;
     temperature?: number;
   }): Promise<LLMResponse> {
-    const { text, model = 'openai/gpt-oss-20b', maxTokens = 10000, temperature = 0.7 } = params;
+    const { text, model = DEFAULT_MODEL_ID, maxTokens = 10000, temperature = 0.7 } = params;
 
     const systemPrompt = `You are a highly skilled document summarizer. Your task is to create a comprehensive yet concise summary that:
 1. Preserves all key information, concepts, and insights

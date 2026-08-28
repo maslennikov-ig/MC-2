@@ -69,7 +69,7 @@ async function defaultLLMCall(
   const modelService = createModelConfigService();
   const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_patcher');
 
-  let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
+  let modelId = fallbackConfig?.modelId ?? DEFAULT_MODEL_ID;
   try {
     const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
     modelId = config.modelId || fallbackConfig?.modelId || modelId;
@@ -118,6 +118,7 @@ async function defaultLLMCall(
  */
 import { getTokenMultiplier, getCharsPerToken } from '@megacampus/shared-types';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Minimum ratio of patched content length to original content length
  * If patch results in content shorter than this ratio, it's considered truncated

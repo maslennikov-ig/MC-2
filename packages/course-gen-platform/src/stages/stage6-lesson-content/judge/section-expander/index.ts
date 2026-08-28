@@ -51,6 +51,7 @@
 import type { SectionExpanderInput, SectionExpanderOutput } from '@megacampus/shared-types';
 import { calculateRequiredTokens } from '@megacampus/shared-types';
 import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import {
   buildExpanderPrompt,
   buildExpanderSystemPrompt,
@@ -133,7 +134,7 @@ export async function executeExpansion(
     const modelService = createModelConfigService();
     const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_section_expander');
 
-    let modelId = fallbackConfig?.modelId ?? 'deepseek/deepseek-v4-flash';
+    let modelId = fallbackConfig?.modelId ?? DEFAULT_MODEL_ID;
     let temperature = fallbackConfig?.temperature ?? 0.7;
 
     try {

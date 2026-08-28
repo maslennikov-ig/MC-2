@@ -13,6 +13,7 @@ export * from './summarization-result';
 export * from './model-config';
 export * from './model-defaults';
 export * from './model-catalog';
+export * from './retired-model-ids';
 export * from './analysis-job';
 export * from './analysis-schemas'; // Includes enhanced Analyze types
 export { createLLMEnumSchema } from './analysis-schemas'; // Export LLM-tolerant enum helper

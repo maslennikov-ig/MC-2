@@ -13,7 +13,6 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { MODELS } from '@/shared/llm/model-selector';
 import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
 
 import {
@@ -235,18 +234,16 @@ describe('model catalogue coverage', () => {
     const routable = collectRoutableModelIds();
 
     /**
-     * Routable ids with no catalogue entry, as found on 2026-08-26.
+     * Empty since 2026-08-28, and that is the point.
      *
-     * Grandfathered rather than fixed here, because adding a price is a claim
-     * about what a provider charges and belongs with a reading of the published
-     * list, not with a test. Both are entries in `MODELS` — the escalation
-     * registry in `model-selector.ts` — and nothing selects them today: the only
-     * paths that could return them are `getModelByKey` and
-     * `getModelsWithCapability`, and neither is called anywhere outside the
-     * barrel that re-exports it. The point of listing them is that a *new* one
-     * fails here instead of joining them.
+     * It held `moonshotai/kimi-linear-48b-a3b-instruct`, an entry in
+     * `model-selector.ts MODELS` — a registry of eleven models that nothing
+     * outside its own barrel ever selected from, yet which
+     * `collectRoutableModelSources` read, so the gate believed four dead ids
+     * were live routes. Deleting the registry retired the exception rather than
+     * pricing a model nobody calls (mc2-u8kwx).
      */
-    const UNCATALOGUED_TODAY = ['moonshotai/kimi-linear-48b-a3b-instruct'];
+    const UNCATALOGUED_TODAY: string[] = [];
 
     it('prices every model the code can route to, apart from the two already known', () => {
       const unpriced = routable.filter(modelId => !getModelCapabilities(modelId));
@@ -272,21 +269,6 @@ describe('model catalogue coverage', () => {
         expect(describeRoutableModel(modelId).length).toBeGreaterThan(0);
       }
     });
-  });
-
-  it('keeps prices out of the routing registry', () => {
-    // `MODELS` carried `costPer1kInput`/`costPer1kOutput` for eleven entries: a
-    // fourth pricing surface beside this catalogue, `llm_model_config` and the
-    // rates accounting reads. It was dead — the only reader was
-    // `estimateModelCost`, which nothing called — and that is what made it
-    // dangerous, because rates nothing verifies go stale silently while sitting
-    // next to a registry routing genuinely uses (mc2-zcfh1). The fields are
-    // gone; this is what stops them coming back under another name.
-    const priced = Object.entries(MODELS)
-      .filter(([, config]) => Object.keys(config).some(key => /cost|price/i.test(key)))
-      .map(([key]) => key);
-
-    expect(priced).toEqual([]);
   });
 
   it('never carries a zero or negative price', () => {

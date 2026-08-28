@@ -14,11 +14,12 @@ import type { DocumentPriorityLevel } from '@megacampus/shared-types';
 import {
   STAGE4_HARD_TOKEN_LIMIT,
   STAGE4_CONTEXT_THRESHOLD,
-} from '../../../shared/llm/model-selector';
+} from '../../../shared/llm/context-thresholds';
 import logger from '../../../shared/logger';
 
+import { LARGE_CONTEXT_MODEL_ID } from '@megacampus/shared-types';
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3.7-flash';
+const EMERGENCY_FALLBACK_MODEL = LARGE_CONTEXT_MODEL_ID;
 
 // ============================================================================
 // TYPE DEFINITIONS

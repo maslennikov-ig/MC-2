@@ -28,9 +28,8 @@ import {
   withMandatoryReasoningRecoveryFetch,
 } from './mandatory-reasoning-recovery';
 import { costRecordingCallbacks } from './model-cost-callbacks';
-import { PHASE_FALLBACK_CONFIG } from './phase-fallback-config';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
-import { createModelConfigService } from './model-config-service';
+import { createModelConfigService, resolveDefaultPhaseConfig } from './model-config-service';
 import { buildReasoningPayload, toProviderKwargs } from './client-helpers';
 import type { OpenRouterProviderRouting } from './client-helpers';
 import { instrumentFetchWithGenerationId } from './generation-id-capture';
@@ -420,43 +419,43 @@ export async function getModelForPhase(
 }
 
 /**
- * Retrieves hardcoded fallback model for a specific phase (sync version)
+ * The model for a phase when `ModelConfigService` cannot answer at all.
  *
- * Used when database is unavailable or config not found.
- * Uses PHASE_FALLBACK_CONFIG for model configuration.
+ * Reads the committed snapshot of `llm_model_config` — the same table the
+ * superadmin panel edits — and falls through to its `global_default` row for a
+ * phase the snapshot does not name.
  *
- * @param phase - Analysis phase identifier
- * @returns Configured ChatOpenAI instance with hardcoded settings
- * @throws Error if phase is unknown
- */
-export function getHardcodedFallbackModel(phase: PhaseName): ChatOpenAI {
-  const config = PHASE_FALLBACK_CONFIG[phase];
-
-  if (!config) {
-    throw new Error(`Unknown phase: ${phase}. Cannot determine hardcoded fallback.`);
-  }
-
-  return createOpenRouterModel(config.modelId, config.temperature, config.maxTokens);
-}
-
-/**
- * Async version of getHardcodedFallbackModel with database-first API key resolution
+ * It used to read `PHASE_FALLBACK_CONFIG`, a second table of the same fact kept
+ * by hand. By 2026-08-27 the two disagreed on **eleven** phases: `stage_5_normal`
+ * and `stage_5_escalation` said `moonshotai/kimi-k2-thinking` where the database
+ * said Luna, `stage_5_complex` said `qwen/qwen3.7-plus`, `stage_7_cover` still
+ * named the image model replaced that morning, and `emergency` named an alias
+ * rather than a pinned snapshot. This is not a dormant branch: every failure of
+ * the config service lands here, which is why sixty days of `generation_trace`
+ * held eleven distinct model ids against nine configured ones (mc2-a6qxc,
+ * mc2-u8kwx).
  *
- * Used when database is unavailable or config not found.
- * Uses PHASE_FALLBACK_CONFIG for model configuration.
+ * A hand-kept copy of a table the operator can already edit is not a safety net.
+ * It is a second answer nobody can see, reached at the worst possible moment.
  *
  * @param phase - Analysis phase identifier
- * @returns Promise<ChatOpenAI> - Configured ChatOpenAI instance with hardcoded settings
- * @throws Error if phase is unknown
+ * @returns Promise<ChatOpenAI> - Configured ChatOpenAI instance
+ * @throws Error if neither the phase nor `global_default` is in the snapshot
  */
 async function getHardcodedFallbackModelAsync(phase: PhaseName): Promise<ChatOpenAI> {
-  const config = PHASE_FALLBACK_CONFIG[phase];
+  const config = resolveDefaultPhaseConfig(phase);
 
   if (!config) {
     throw new Error(`Unknown phase: ${phase}. Cannot determine hardcoded fallback.`);
   }
 
-  return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
+  return await createOpenRouterModelAsync(
+    config.modelId,
+    config.temperature,
+    config.maxTokens,
+    undefined,
+    config.reasoning
+  );
 }
 
 /**
