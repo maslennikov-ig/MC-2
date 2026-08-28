@@ -1351,6 +1351,16 @@ jobs:
           NEXT_PUBLIC_USERBACK_TOKEN=${{ secrets.NEXT_PUBLIC_USERBACK_TOKEN }}
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=1024
+          # mc2-kim48. The dev workers publish document-evidence metrics into the
+          # host directory the shared node_exporter reads, so the dev compose file
+          # mounts it — with the same `:?` required form the staging compose uses,
+          # because a silent default would mount the wrong path rather than say so.
+          # That means the variable has to exist HERE: `.env.dev` is rewritten from
+          # scratch on every dev deploy, so anything the dev compose file needs and
+          # this block does not write simply is not there. It was not, and the
+          # deploy failed with `required variable QDRANT_METRICS_TEXTFILE_HOST_DIR
+          # is missing a value` while every test in the pipeline was green.
+          QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev"
 
