@@ -21,8 +21,8 @@ of them long ones.
 `mc2-d0e2n` is **complete, six of six** (2026-08-28). Retrieval was read in a lesson for the first
 time and the two arms are **indistinguishable**; the predicted call volumes did not move and the
 arithmetic that predicted them is corrected; Jina has a price, records at the call and appears in
-`cost-report.ts` beside OpenRouter; `mc2-kim48`'s three questions are answered and its fix is
-deferred with the reason. Two explicit defers below: `mc2-kim48` and `mc2-sv89s`. Details in
+`cost-report.ts` beside OpenRouter; `mc2-kim48` is answered, fixed and live — dev evidence metrics
+now reach Prometheus labelled `environment="dev"`. One explicit defer below: `mc2-sv89s`. Details in
 `docs/rag/2026-08-28-retrieval-on-a-lesson-and-jina-priced.md`.
 
 The technical-debt epic `mc2-cuk7j` is **complete, six of six**. Four closed 2026-08-24 (`.1` web
@@ -423,25 +423,45 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
-`mc2-kim48` — **answered and fixed in the tree on 2026-08-28, not yet applied to the host.** The
-owner's decision: dev reports through the same channel, with a marker saying it is dev. It can,
-because an external label is applied "only when a time series does not have a given label yet"; what
-prevented it was the rules, not Alertmanager. All four aggregated bare, and bare `sum()` drops every
-label, so the alert could not carry an environment even in principle and `external_labels` then
-supplied `staging`. They now aggregate `by (environment)` and name it in the summary, the two
-`absent()` branches became per-environment `unless count by (environment)`, and the dev workers set
-`QDRANT_METRICS_TEXTFILE_DIR` with an instance ending `-dev` that `prometheus.yml` rewrites to
-`environment="dev"` with one `metric_relabel_config` — no second exporter, no second scrape target.
-Proved by `promtool test rules` (two environments failing raise two alerts naming their own; one
-healthy environment raises none) and shown red against the bare form first.
+`mc2-kim48` — **answered, fixed and live on 2026-08-28.** The owner's decision: dev reports through
+the same channel, marked as dev. It always could have — an external label is applied "only when a
+time series does not have a given label yet". What prevented it was our own rules: all four
+aggregated bare, and bare `sum()` drops every label, so the alert could not carry an environment and
+`external_labels` then supplied `staging`. They now aggregate `by (environment)`, name it in the
+summary, and the two `absent()` branches became per-environment `unless count by (environment)`.
+Dev writes metrics with an instance ending `-dev`, which one `metric_relabel_config` rewrites to
+`environment="dev"` — no second exporter, no second scrape target.
+
+Installed with `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh` (stage into
+`ops-staged`, it validates with promtool from the running image, backs up as
+`.bak-20260828T113730Z` and restarts Prometheus, because a single-file bind mount pins the inode).
+21 rules loaded, none unhealthy, nothing firing. **Proved end to end**: the real publisher run inside
+`megacampus-worker-stage6-dev` produced `evidence-stage6-stage6-dev.prom` and Prometheus scraped it
+as `environment="dev", service="stage6", exported_instance="stage6-dev"`. That file's counters carry
+a synthetic 1 from that probe; real dev runs add to them.
+
+Two things this cost, both mine, both now guarded. The dev compose demanded
+`QDRANT_METRICS_TEXTFILE_HOST_DIR` that the dev deploy never wrote, and Compose refused the file —
+green pipeline, dead deploy. Then mounting the directory turned out not to be write access: the
+containers run as uid 1001 against a setgid directory and need `group_add`, and the failure is
+silent because `publishDocumentEvidenceMetricsSafely` swallows it. **`QDRANT_METRICS_GID` is read
+from the directory with `stat` at deploy time, not from a secret** — `secrets.QDRANT_METRICS_GID`
+does not exist in this repository, which is how the first attempt wrote an empty value.
+`tests/unit/ops/dev-compose-variables-are-written.test.ts` now compares every `${VAR:?}` in
+`docker-compose.dev.yml` against what the deploy writes.
+
+The live monitoring tree is now **ahead of `master`** until these files reach it by the ordinary
+release; the drift job compares the live tree against the deployed branch's checkout, so a
+production deploy before then would report drift.
 
 A second writer against the shared `evidence-stage4-state.prom` is **idempotent**: it sets absolute
 totals from one database RPC keyed by `(pg_postmaster_start_time, generation, revision)`, and dev and
 staging share the database, so both compute the same tuple; the incrementing counters live in the
 per-service file and cannot collide.
 
-**Still to apply:** a dev deploy picks up the compose change, but the Prometheus config and rules
-need the monitoring stack reloaded on the host. Not done — that is a staging mutation.
+`mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from that same non-existent secret.
+Not burning: the host carries 900 by some other means, not established. It burns when
+`.env.production` is rewritten and the infra stack recreated.
 
 `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`, `semantic-matching.ts`)
 prices itself but is not attributed to a course. Neither module mentions `courseId` anywhere, so the
