@@ -166,10 +166,10 @@ Visual Enhancement (REQUIRED):
 - Use visuals that enhance understanding, not decoration
 
 Practical Examples:
-- Include concrete examples using callout format:
-  > [!INFO]
-  > **Example: [Situation Name]**
-  > [Specific details, 2-4 sentences]
+- Include concrete examples. The example is required, the callout form is not —
+  prose, a table or a callout all count, and varying them reads better than the
+  same box in every section:
+  **Example: [Situation Name]** — [specific details, 2-4 sentences]
 
 Output markdown content for this section only (no header needed).
 </task>`,

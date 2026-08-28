@@ -88,14 +88,24 @@ export function summarizeDetailedHeuristicResult(
     reasons.push('exact duplicate section headers detected');
   }
 
-  if (calloutCount >= 5) {
-    action = bumpAction(action, QualityRemediationAction.FULL_REGEN);
-    lessonFlags.push('callout_density_blocking');
-    reasons.push(`callout count ${calloutCount} exceeds hard cap`);
-  } else if (calloutCount >= 3) {
+  // Callout density advises; it never regenerates. It used to force a FULL_REGEN at
+  // five or more, the same lever as "the content has zero sections" — and that mapping
+  // arrived as a side effect of a refactor on 2026-04-04, three days after the filter
+  // was added as a 0.03-weight score deduction. Nothing decided it.
+  //
+  // Measured on 20 generations (mc2-udj0b): callouts ran 3 to 8 with a mean of 4.8, so
+  // 11 of 20 lessons were regenerated twice and every one came back over the cap
+  // again — the prompts ask for a visual per section and name the callout as one of
+  // the forms, so the model was answering the brief. All 11 then landed in
+  // review_required, and they scored 0.778 against 0.907 for the lessons left alone.
+  // A regeneration that cannot succeed is paid for twice and makes the lesson worse.
+  //
+  // The budget itself now scales with the section count; see `checkCalloutDensity`.
+  const calloutBudget = result.metrics.calloutDensity?.calloutBudget ?? 2;
+  if (calloutCount > calloutBudget) {
     action = bumpAction(action, QualityRemediationAction.WARN_ONLY);
     lessonFlags.push('callout_density_warning');
-    reasons.push(`callout count ${calloutCount} exceeds soft cap`);
+    reasons.push(`callout count ${calloutCount} exceeds the budget of ${calloutBudget}`);
   }
 
   const contentArchetype = result.metrics.codeBlockAudienceMatch?.contentArchetype ?? '';

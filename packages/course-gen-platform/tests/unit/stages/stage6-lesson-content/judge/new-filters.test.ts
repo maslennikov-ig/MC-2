@@ -19,6 +19,54 @@ import { checkHeaderLanguage } from '@/stages/stage6-lesson-content/judge/filter
 // ============================================================================
 
 describe('checkCalloutDensity', () => {
+  /**
+   * mc2-udj0b. The cap was a flat two per lesson, chosen without looking at what
+   * lessons contain. Measured over 20 generations: callouts ran 3 to 8, mean 4.8, and
+   * NOT ONE lesson met it — while the prompts asked for a visual element per section
+   * and named the callout as one of the forms. The rule counted per lesson what the
+   * prompts produce per section, so the budget now scales with the sections.
+   */
+  const callouts = (n: number, sections: number): string => {
+    const parts: string[] = ['# Lesson'];
+    for (let index = 0; index < sections; index += 1) {
+      parts.push(`## Section ${index + 1}`, 'Some prose for this section.');
+    }
+    for (let index = 0; index < n; index += 1) {
+      parts.push('> [!TIP]', '> A genuinely useful tip.');
+    }
+    return parts.join('\n\n');
+  };
+
+  it('lets a six-section lesson carry six callouts', () => {
+    const result = checkCalloutDensity(callouts(6, 6), 6);
+
+    expect(result.passed).toBe(true);
+    expect(result.calloutBudget).toBe(6);
+    expect(result.scoreContribution).toBe(1.0);
+  });
+
+  it('still flags a six-section lesson that carries thirteen', () => {
+    // Twice the budget is where it stops being a matter of taste.
+    const result = checkCalloutDensity(callouts(13, 6), 6);
+
+    expect(result.passed).toBe(false);
+    expect(result.failure?.severity).toBe('critical');
+  });
+
+  it('gives a one-section lesson a floor of two, not a budget of one', () => {
+    const result = checkCalloutDensity(callouts(2, 1), 1);
+
+    expect(result.calloutBudget).toBe(2);
+    expect(result.passed).toBe(true);
+  });
+
+  it('says what it allowed, so the suggestion is actionable', () => {
+    const result = checkCalloutDensity(callouts(9, 4), 4);
+
+    expect(result.actual).toContain('budget of 4');
+    expect(result.suggestion).toContain('one per section');
+  });
+
   it('should pass with score 1.0 when there are no callouts', () => {
     const content = `## Introduction
 This lesson covers the basics of feature engineering.

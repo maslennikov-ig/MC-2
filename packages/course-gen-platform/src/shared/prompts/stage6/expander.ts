@@ -106,10 +106,11 @@ Write the full content for the "{{sectionTitle}}" section. Requirements:
    - Callout for key insight or warning
    - Code block with filename for technical content
 
-5. **REQUIRED: Practical Example** — Use callout format:
-   > [!INFO]
-   > **Example: [Situation Name]**
-   > [Specific situation with concrete details, numbers, or names (2-4 sentences)]
+5. **REQUIRED: Practical Example** — the example is required, its form is not.
+   Prose, a table or a callout all count; vary it rather than reaching for the same
+   one every section:
+   **Example: [Situation Name]** — [specific situation with concrete details,
+   numbers or names (2-4 sentences)]
 
 6. **Include Keywords**: Naturally incorporate: {{requiredKeywords}}
 7. **Avoid Terms**: Do not use: {{prohibitedTerms}}
