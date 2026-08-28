@@ -147,6 +147,16 @@ own. The trap it exposed is the one to remember: `requiresReasoning` shipped in 
 the routing, so the first live run measured a container that did not yet know the model and looked
 like a model failure. **Never measure a model on a container that has not been told about it.**
 
+**Its fallback stopped being DeepSeek on 2026-08-28** (`24d14edd6`). The cross-vendor rule was
+satisfied and the point was still missed: DeepSeek is not the other model for prose, it is the one
+this seat was taken away from — the 0.88-against-0.92 lesson below is exactly what a z-ai outage
+would have served, and the judge that missed the fabricated "более 60% людей" once would have missed
+it again. `PROSE_FALLBACK_MODEL_ID` is `openai/gpt-5.6-luna`: third vendor, itself the prose model
+until 2026-08-26, ten times DeepSeek's output rate and reached only when the primary fails, which in
+90 days of `generation_trace` it never has. Eighteen rows plus `stage_6_content`, which has no row
+and is served from `STAGE6_CANONICAL_PHASE_DEFAULTS`. Judges, `patcher` and `arbiter` stay on
+DeepSeek for the reason below.
+
 The 2026-08-23 ruling it replaces, kept for its method:
 
 **Settled 2026-08-23 (`d179a18d0`, `2e01e0b02`): whatever AUTHORS prose the reader opens runs on
