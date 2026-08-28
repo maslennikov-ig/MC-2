@@ -14,7 +14,10 @@ fix predicted did not happen: **callouts rose, 4.70 → 5.30**, and a third arm 
 prompts restored says the wording is why (3.00 against 5.00 on the same three lessons) — the rule,
 not the prompt, is doing all the work; and `src/shared/prompts/stage6/expander.ts` is rendered by
 nothing, so that third of the prompt edit is unread. Both lessons read by eye keep the mandatory
-practical example, in prose instead of a callout box.
+practical example, in prose instead of a callout box. The lesson also came out shorter at the same
+word target (2718 → 1840); the owner ruled the same day that **length is not the criterion, meaning
+surviving is**, so it is recorded in the report and tracked nowhere (`mc2-c7ire`, opened and closed
+on that ruling).
 
 **Ten lessons per arm, 2026-08-28** (`docs/rag/2026-08-28-lesson-arms-batch/`). The larger sample
 corrects two things the single lesson implied and raises three defects. The arms share **3.2 of 7

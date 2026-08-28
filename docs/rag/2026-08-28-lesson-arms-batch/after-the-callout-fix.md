@@ -145,7 +145,8 @@ prompt, not from the example requirement.
 computes the three comparison prices correctly (765 000, 858 500, 800 000) and then ranks them
 wrongly, putting 858 500 ahead of 800 000 and closing with the meaningless "№ 1 (800 000 — вне
 очередности между ними)". The winner it names is right; the order it lists is not. A generated-content
-arithmetic slip, in the exercise block, which no filter checks. Recorded, not fixed here.
+arithmetic slip, in the exercise block, which no filter checks. `mc2-hoke7`, with the frequency
+unmeasured — two lessons of ten were read, and one carried it.
 
 ## 6. One number that moved and is not explained by the fix
 
@@ -157,8 +158,13 @@ those three.
 So something between the baseline run and now changed the length, and it is not the callout fix. The
 only stage 6 commit in between is `ebea0dc6f` itself. The likeliest remaining explanation is the
 baseline probe's own construction — it was deleted by design, so what it passed to `executeStage6`
-(analysis result, style, duration) cannot be read back. Recorded here as an open observation with the
-measurement that exonerates the fix, not as a defect with a cause.
+(analysis result, style, duration) cannot be read back.
+
+**The owner's ruling, same day: length is not the criterion, the meaning surviving is.** A shorter
+lesson that keeps its worked examples, its exercises and its reasoning is not a regression, so this
+is recorded as a measurement and nothing is tracked against it. `mc2-c7ire` was opened and closed on
+that ruling. What §5 checked — that the mandatory practical example survived the prompt edit rather
+than vanishing — is the test that matters, and both lessons read in full pass it.
 
 ## Method
 
