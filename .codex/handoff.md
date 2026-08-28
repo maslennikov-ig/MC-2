@@ -6,6 +6,13 @@ Current state only. History lives in commits, `bd` close reasons and stage summa
 
 ## Current stage
 
+`mc2-d0e2n` is **complete, six of six** (2026-08-28). Retrieval was read in a lesson for the first
+time and the two arms are **indistinguishable**; the predicted call volumes did not move and the
+arithmetic that predicted them is corrected; Jina has a price, records at the call and appears in
+`cost-report.ts` beside OpenRouter; `mc2-kim48`'s three questions are answered and its fix is
+deferred with the reason. Two explicit defers below: `mc2-kim48` and `mc2-sv89s`. Details in
+`docs/rag/2026-08-28-retrieval-on-a-lesson-and-jina-priced.md`.
+
 The technical-debt epic `mc2-cuk7j` is **complete, six of six**. Four closed 2026-08-24 (`.1` web
 tests that could not parse, `.5` lint warnings to zero, `.3` closed as WRONG — the pipeline had
 built the bridge image since 2026-07-12 — and `.6` the Q12 manifest generator plus the dead
@@ -107,6 +114,27 @@ Stage 6 to recall@5 0.9677, MRR 0.7774, 29.97 candidates per query — the pool 
 was always asking for — and took accepted-results-outside-the-fusion from 124 of 475 to zero.
 Grouping is untouched where it earns its keep: Stage 4 evidence preflight, conflict detection and
 Stage 5 advisory enrichment group deliberately, because their job is per-document coverage.
+
+**A lesson has now been read, and the two lessons are indistinguishable** (`mc2-d0e2n`, 2026-08-28,
+`docs/rag/2026-08-28-retrieval-on-a-lesson-and-jina-priced.md`, both artifacts kept in
+`docs/rag/2026-08-28-lesson-arms/`). Course `8baaa75e`, lesson 3.2, generated twice on dev with the
+cap restored as an uncommitted two-line change. Same four documents, same seven chunks in count, and
+**four of the seven are literally the same chunks** — the cap moves only the tail below the
+reranker's top selections, which is why the lessons read the same. No retrieval constant is changed
+by this and nothing showed a defect the benchmark cannot see.
+
+**The predicted call volumes were wrong, and the reason generalises.** The design expected seven
+Qdrant queries down to two and 40–46 reranker candidates up to 60; measured, neither moved — 9
+queries and 44 against 42 candidates. The prediction used the benchmark's 29.97 candidates per query,
+which is measured on a **one-query** harness where `lessonCandidateLimit(7, 1) = 30`. A real lesson
+issues nine or ten, so the per-query limit is 6, the collector cannot overshoot `enoughCandidates`,
+and grouped results are re-capped to the same limit anyway. **A per-query retrieval rate does not
+describe a ten-query lesson**, because the per-query limit is a function of the query count.
+
+Two measurement traps for the next run: `[Lesson RAG] Retrieval complete` logs
+`queriesExecuted: queries.length`, which is the number **planned**, not issued; and the dev workers
+point at `qdrant-dev` with **12 points**, so a lesson driven through the dev queue does not touch the
+6856-point corpus on 6335.
 
 ## Routing and models (2026-08-12, `43ab557d6`)
 
@@ -251,6 +279,22 @@ decimal on two runs of 2026-08-22. What still constrains work:
   that returned nothing. The record takes ~9.6 s to become readable; for a call still running, never.
   A paid call prices itself at the call; a node-level summary row keeps tokens and carries **no**
   price, and a priced call is _stamped_ `input_data.billedCall`. Guard: Guard: `tests/unit/shared/metrics/no-anonymous-spend`.
+- **The ledger holds two providers since 2026-08-28** (`mc2-d0e2n`). Jina was paid on four call
+  sites and recorded on none — `generation_trace` was OpenRouter only, which is why `mc2-4clyr`'s
+  "Stage 6 is 90% of cost" counted one provider. **A lesson costs $0.00045 in Jina beside $0.0053 in
+  OpenRouter — 7.9% of its bill** (lesson 3.2 of `8baaa75e`, dev, 2026-08-28: 9 query embeddings at
+  241 tokens, one reranker call at 8755 tokens; the reranker is 97% of it because it receives the
+  whole accumulated union). That is the correction for a _lesson_, not a course: Stage 4 preflight,
+  Stage 5 retrieval and document indexing all embed too. The rate is the provider's own —
+  `GET https://api.jina.ai/v1/models`, field `pricing.prompt`, $0.05/1M for both
+  `jina-embeddings-v3` and `jina-reranker-v2-base-multilingual` — recorded in
+  `src/shared/jina/pricing.ts` and watched by `pnpm -F course-gen-platform check:jina-pricing-drift`.
+  Do **not** put Jina in `MODEL_CATALOG`: `check-model-catalog-drift.ts` reconciles that against
+  OpenRouter, which does not list these models. Jina rows are stamped `provider: 'jina'` and
+  `cost-report.ts` keeps them **out** of the OpenRouter reconciliation — Jina issues no per-call
+  receipt, so comparing the whole ledger against `/api/v1/generation` would report a gap exactly the
+  size of the retrieval bill. `no-anonymous-spend` gained two detectors for this, shown red against
+  the pre-change source: 3 unpriced Jina HTTP call sites, 10 unattributed retrieval entry points.
 - **The catalogue is an estimate, not the price.** `MODEL_CATALOG` builds budgets and the
   `provider.max_price` ceiling; every call settles against the provider.
   `model-catalog-coverage.test.ts` stays offline on purpose, and
@@ -368,7 +412,22 @@ merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fi
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
 `mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
-writer is configured on staging, which is idle, and not on dev, where the runs happen.
+writer is configured on staging, which is idle, and not on dev, where the runs happen. **Its three
+questions are answered in the bead (2026-08-28, `mc2-d0e2n.5`), the fix is not made.** A second
+writer against the shared `evidence-stage4-state.prom` is **idempotent**: it sets absolute totals
+from one database RPC keyed by `(pg_postmaster_start_time, generation, revision)`, and dev and
+staging share the database, so both compute the same tuple; the incrementing counters live in the
+per-service file and cannot collide. What blocks the fix is one layer up — `external_labels` stamps
+`environment: staging` on everything and not one of the four rules narrows by
+`service`/`instance`/`environment`, so turning the dev writer on today would page staging's on-call
+for a dev experiment. Narrow the rules first, then enable the writer; both need an owner decision on
+whether dev pages at all.
+
+`mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`, `semantic-matching.ts`)
+prices itself but is not attributed to a course. Neither module mentions `courseId` anywhere, so the
+id would have to be threaded through several public signatures on Stage 3/5 paths `mc2-d0e2n` did not
+measure. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`, where the test
+requires each entry to carry a reason and an issue.
 
 `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
 

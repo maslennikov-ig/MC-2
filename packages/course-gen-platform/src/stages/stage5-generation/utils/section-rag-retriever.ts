@@ -336,7 +336,8 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
         const reranked: RerankResult[] = await rerankDocuments(
           combinedQuery,
           sortedChunks.map(chunk => chunk.content),
-          targetChunks
+          targetChunks,
+          { courseId, stage: 'stage_5', phase: 'section_rag_retrieval', stepName: 'jina_rerank' }
         );
 
         rerankerLatency = Date.now() - rerankerStartTime;
@@ -627,6 +628,7 @@ async function executeSearchQuery(params: {
       ...(primaryDocuments ? { primaryDocuments } : {}),
       scoreThreshold,
       limit,
+      costContext: { courseId, stage: 'stage_5', phase: 'section_rag_retrieval' },
     })
   );
 

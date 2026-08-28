@@ -132,6 +132,12 @@ async function retrieveSectionContextFresh(params: {
             document_ids: primaryDocIds,
           }),
         },
+        cost_context: {
+          courseId,
+          stage: 'stage_6',
+          phase: 'rag_retrieval',
+          lessonId: lessonSpec.lesson_id,
+        },
       };
 
       const response = await searchChunks(query, searchOptions);

@@ -92,6 +92,18 @@ function isBilledCallRow(row: TraceRow): boolean {
   return row.step_name === 'llm_call' || row.step_name === 'image_call';
 }
 
+/**
+ * Whether this row is a Jina call rather than an OpenRouter one.
+ *
+ * The ledger held one provider until 2026-08-28 and now holds two, and only one
+ * of them issues a per-call receipt. Every OpenRouter comparison in this report
+ * has to be able to leave these rows out, or the reconciliation would report a
+ * gap the size of the retrieval bill and call it a discrepancy.
+ */
+function isJinaRow(row: TraceRow): boolean {
+  return (row.input_data as { provider?: unknown } | null)?.provider === 'jina';
+}
+
 /** A billed call that still carries no price. These are the real holes. */
 function isLedgerHole(row: TraceRow): boolean {
   // `=== null`, never falsy: a measured $0 is a measurement (mc2-y452l).
@@ -329,6 +341,9 @@ async function main(): Promise<void> {
   }
 
   const traceTotal = rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
+  const jinaRows = rows.filter(isJinaRow);
+  const jinaTotal = jinaRows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
+  const openRouterTotal = traceTotal - jinaTotal;
   const playbookTotal = playbooks.reduce((sum, p) => sum + p.costUsd, 0);
   const total = traceTotal + playbookTotal;
   const tokens = rows.reduce((sum, r) => sum + (r.tokens_used ?? 0), 0);
@@ -360,6 +375,11 @@ async function main(): Promise<void> {
           traceCostUsd: Number(traceTotal.toFixed(6)),
           playbookCostUsd: Number(playbookTotal.toFixed(6)),
           totalTokens: tokens,
+          // The ledger holds two providers. Reported apart, because only one of
+          // them can be reconciled against a receipt.
+          openRouterCostUsd: Number(openRouterTotal.toFixed(6)),
+          jinaCostUsd: Number(jinaTotal.toFixed(6)),
+          jinaRows: jinaRows.length,
           billedCallRows: billedCalls.length,
           billedByProviderRows: billedByProvider.length,
           unpricedRows: unpriced.length,
@@ -405,6 +425,11 @@ async function main(): Promise<void> {
   console.log(`trace rows     ${rows.length}   (${billedCalls.length} of them billed calls)`);
   console.log(`tokens         ${tokens.toLocaleString('en-US')}`);
   console.log(`generation_trace ${usd(traceTotal)}`);
+  if (jinaRows.length > 0) {
+    console.log(
+      `  of which Jina  ${usd(jinaTotal)}   (${jinaRows.length} retrieval calls: query embeddings and reranking)`
+    );
+  }
   if (playbooks.length > 0 || !courseId) {
     console.log(
       `career playbooks ${usd(playbookTotal)}   (${playbooks.length} in window)` +
@@ -505,11 +530,26 @@ async function main(): Promise<void> {
     console.log(`generation ids in this window   ${provider.asked}`);
     console.log(`answered by /api/v1/generation  ${provider.answered}`);
     console.log(`sum of what OpenRouter charged  ${usd(provider.totalUsd)}`);
-    console.log(`recorded TOTAL                  ${usd(total)}`);
+    console.log(
+      `recorded OpenRouter cost        ${usd(openRouterTotal)}` +
+        (jinaTotal > 0 ? `   (of a recorded TOTAL of ${usd(total)})` : '')
+    );
+    if (jinaTotal > 0) {
+      console.log(
+        `recorded Jina cost              ${usd(jinaTotal)}   <- not part of this comparison; Jina issues no per-call receipt`
+      );
+    }
 
     // Half a cent per hundred calls is rounding; anything above it is a real
     // difference and worth naming.
-    const gap = total - provider.totalUsd;
+    //
+    // Compared against the OpenRouter half of the ledger, not the whole of it.
+    // `generation_trace` held one provider until 2026-08-28 and now holds two,
+    // so `total` stopped being the right side of this equation the moment Jina
+    // spend started being recorded — every run would have reported a gap
+    // exactly the size of the retrieval bill and called it a discrepancy
+    // (mc2-d0e2n.4).
+    const gap = openRouterTotal - provider.totalUsd;
     const tolerance = Math.max(1e-6, provider.answered * 1e-6);
     if (provider.missing.length > 0) {
       console.log(

@@ -18,6 +18,7 @@
 
 import { DENSE_SCORE_THRESHOLD } from '@/shared/qdrant/retrieval-thresholds';
 import type { SearchOptions } from '@/shared/qdrant/search-types';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 
 /**
  * Default configuration for section-level RAG retrieval
@@ -77,6 +78,13 @@ export interface SectionSearchOptionsInput {
   primaryDocuments?: string[];
   scoreThreshold: number;
   limit: number;
+  /**
+   * The course each query embedding is charged to.
+   *
+   * Optional so a harness can build the request the stage sends without
+   * inventing a course to bill; the stage always passes one.
+   */
+  costContext?: LlmCostContext;
 }
 
 /** Builds the search options every Stage 5 section query is issued with. */
@@ -87,6 +95,7 @@ export function buildSectionSearchOptions(input: SectionSearchOptionsInput): Sea
     limit,
     score_threshold: scoreThreshold,
     enable_hybrid: SECTION_RAG_DEFAULTS.ENABLE_HYBRID,
+    ...(input.costContext ? { cost_context: input.costContext } : {}),
     filters: {
       course_id: courseId,
       // Filter by primary documents if specified

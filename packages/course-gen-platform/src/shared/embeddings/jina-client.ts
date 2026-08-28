@@ -20,13 +20,16 @@
 import logger from '../logger';
 import { DistributedRateLimiter } from '../jina/distributed-rate-limiter';
 import { DistributedConcurrencyLimiter } from '../jina/distributed-concurrency-limiter';
+import { recordJinaCallCost } from '../metrics/jina-cost';
+import type { LlmCostContext } from '../metrics/llm-cost';
+import { JINA_EMBEDDING_MODEL } from './generate-utils';
 
 /**
  * Jina API request payload
  */
 interface JinaEmbeddingRequest {
   /** Model identifier (always "jina-embeddings-v3") */
-  model: 'jina-embeddings-v3';
+  model: typeof JINA_EMBEDDING_MODEL;
   /** Text input(s) to embed - single string or array of strings */
   input: string | string[];
   /** Task type for task-specific embeddings */
@@ -416,7 +419,10 @@ async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries =
  * @returns Embedding response
  * @throws {JinaEmbeddingError} On API errors
  */
-async function makeJinaRequest(payload: JinaEmbeddingRequest): Promise<JinaEmbeddingResponse> {
+async function makeJinaRequest(
+  payload: JinaEmbeddingRequest,
+  costContext?: LlmCostContext
+): Promise<JinaEmbeddingResponse> {
   validateJinaConfig();
 
   // Acquire concurrency slot (Jina API limits to 2 concurrent requests)
@@ -481,6 +487,19 @@ async function makeJinaRequest(payload: JinaEmbeddingRequest): Promise<JinaEmbed
       '[Jina] Embedding request completed'
     );
 
+    // The tracker above is in-process and read by nobody; this is the row that
+    // survives the process. Recorded here rather than in each entry point so a
+    // future one cannot be added without a price (mc2-d0e2n.4).
+    await recordJinaCallCost(
+      {
+        model: JINA_EMBEDDING_MODEL,
+        totalTokens: tokensUsed,
+        operation: 'embedding',
+        documentCount: data.data.length,
+      },
+      costContext
+    );
+
     return data;
   } finally {
     // Always release concurrency slot
@@ -526,17 +545,21 @@ async function makeJinaRequest(payload: JinaEmbeddingRequest): Promise<JinaEmbed
  */
 export async function generateEmbedding(
   text: string,
-  task: 'retrieval.passage' | 'retrieval.query'
+  task: 'retrieval.passage' | 'retrieval.query',
+  costContext?: LlmCostContext
 ): Promise<number[]> {
   const embedding = await retryWithExponentialBackoff(async () => {
-    const response = await makeJinaRequest({
-      model: 'jina-embeddings-v3',
-      input: text,
-      task,
-      dimensions: 768,
-      normalized: false, // Qdrant handles normalization for Cosine similarity
-      truncate: true, // Auto-truncate texts >8192 tokens
-    });
+    const response = await makeJinaRequest(
+      {
+        model: JINA_EMBEDDING_MODEL,
+        input: text,
+        task,
+        dimensions: 768,
+        normalized: false, // Qdrant handles normalization for Cosine similarity
+        truncate: true, // Auto-truncate texts >8192 tokens
+      },
+      costContext
+    );
 
     return response.data[0].embedding;
   });
@@ -597,7 +620,8 @@ export async function generateEmbedding(
  */
 export async function generateEmbeddings(
   texts: string[],
-  task: 'retrieval.passage' | 'retrieval.query'
+  task: 'retrieval.passage' | 'retrieval.query',
+  costContext?: LlmCostContext
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
@@ -612,14 +636,17 @@ export async function generateEmbeddings(
     const batch = texts.slice(i, i + BATCH_SIZE);
 
     const batchEmbeddings = await retryWithExponentialBackoff(async () => {
-      const response = await makeJinaRequest({
-        model: 'jina-embeddings-v3',
-        input: batch,
-        task,
-        dimensions: 768,
-        normalized: false,
-        truncate: true,
-      });
+      const response = await makeJinaRequest(
+        {
+          model: JINA_EMBEDDING_MODEL,
+          input: batch,
+          task,
+          dimensions: 768,
+          normalized: false,
+          truncate: true,
+        },
+        costContext
+      );
 
       return response.data.map(item => item.embedding);
     });
@@ -667,6 +694,8 @@ export async function generateEmbeddings(
 export async function healthCheck(): Promise<boolean> {
   try {
     validateJinaConfig();
+    // cost-exempt: a startup probe belongs to no course. One four-character
+    // input, and it runs only when a caller asks for it.
     const testEmbedding = await generateEmbedding('test', 'retrieval.query');
     return testEmbedding.length === 768;
   } catch (error) {

@@ -11,6 +11,22 @@
  * So the rule lives here, where all the call sites can be seen at once. A call
  * that cannot be attributed belongs in EXCEPTIONS with the reason and the issue
  * that will close it; that list may shrink, never grow silently.
+ *
+ * ## The fourth hole was a whole provider (mc2-d0e2n.4)
+ *
+ * Every detector above reads OpenRouter: `createOpenRouterModel*`, this
+ * repository's two completion wrappers, and the SDK method underneath them. So
+ * a guard that reported no anonymous spend was reporting on one provider, while
+ * Jina was paid on two hot paths — one query embedding per retrieval query and
+ * one reranker call per lesson — and recorded nowhere at all. Not underpriced:
+ * absent. `generation_trace` held OpenRouter calls only, which is also why
+ * `mc2-4clyr` could say "Stage 6 is 90% of cost" about a sum that had never
+ * counted the retrieval it was describing.
+ *
+ * A guard that cannot see a provider is exactly as quiet as no guard, so the
+ * Jina detectors below are the same rule applied to the same shape: the raw
+ * HTTP call must price itself, and the two entry points that reach it must be
+ * given a course.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -37,6 +53,44 @@ const EXCEPTIONS: Record<string, string> = {
 
 /** An inline opt-out for a call the surrounding code prices some other way. */
 const EXEMPT_MARK = 'cost-exempt:';
+
+/**
+ * Retrieval whose Jina spend is deliberately not charged to a course.
+ *
+ * Both entries are measurement harnesses that query the live collection to
+ * score retrieval itself. They run only when a person asks for them, and there
+ * is no course whose ledger a benchmark's embeddings belong in — charging one
+ * would put measurement cost into a customer's bill.
+ */
+const RETRIEVAL_EXCEPTIONS: Record<string, string> = {
+  'shared/rag-eval/measure.ts':
+    'the retrieval benchmark: it scores the entry points against the live collection and has no course to bill',
+  'shared/embeddings/dense-retrieval-eval.ts':
+    'the chunking A/B harness: it builds a throwaway collection and has no course to bill',
+};
+
+/**
+ * Retrieval spend that HAS a course somewhere above it and does not yet carry
+ * one down. Different from an exception in the only way that matters: these are
+ * holes, they are named, and each names the issue that closes it.
+ *
+ * `QualityValidator` and `semanticMatch` embed text on Stage 3 and Stage 5
+ * quality gates. Neither module mentions a course anywhere — the id would have
+ * to be threaded from their callers through several public signatures, which is
+ * a wider change than the epic that found this measured, so it is deferred
+ * rather than half-done.
+ */
+const RETRIEVAL_DEFERRED: Record<string, { reason: string; issue: string }> = {
+  'shared/validation/quality-validator.ts': {
+    reason:
+      'embeds section and metadata text for the quality gates; the class takes no course id and every caller would have to pass one',
+    issue: 'mc2-sv89s',
+  },
+  'shared/validation/semantic-matching.ts': {
+    reason: 'embeds candidate values for semantic matching; same missing course id as its caller',
+    issue: 'mc2-sv89s',
+  },
+};
 
 /**
  * Directories whose calls are spend on a course.
@@ -131,6 +185,70 @@ function rawSdkCompletions(text: string): number[] {
   return found;
 }
 
+/**
+ * Every position where Jina's paid HTTP API is called.
+ *
+ * Read from the URL rather than from a wrapper name, for the reason the raw-SDK
+ * detector exists: the two Jina clients are wrappers this repository wrote, and
+ * a third one would be invisible to a check that only knew the first two.
+ */
+function rawJinaRequests(text: string): number[] {
+  const found: number[] = [];
+  const pattern = /['"`]https:\/\/api\.jina\.ai\//gu;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, match.index - 400), match.index);
+    if (before.includes(EXEMPT_MARK)) continue;
+    // Prose about the endpoint is not a call to it.
+    if (/^\s*(?:\/\/|\*|\/\*)/u.test(before.split('\n').pop() ?? '')) continue;
+    found.push(match.index);
+  }
+  return found;
+}
+
+/**
+ * What each call to a Jina entry point passes.
+ *
+ * `searchChunks` is here because its options are where the query embedding's
+ * course lives: one search that misses the cache is one paid vector, and the
+ * caller is the only thing that knows which course asked for it. Both the
+ * inline-object and the named-variable shapes are read, for the same reason
+ * `completionOptions` reads both.
+ */
+function retrievalCallArguments(text: string): Array<{ entry: string; text: string }> {
+  const calls: Array<{ entry: string; text: string }> = [];
+  const pattern = /\b(searchChunks|rerankDocuments|generateQueryEmbedding|generateEmbeddings?)\(/gu;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, match.index - 400), match.index);
+    if (before.includes(EXEMPT_MARK)) continue;
+    // Declarations, imports, type positions and prose are not calls.
+    const line = before.split('\n').pop() ?? '';
+    if (/(?:import|export|function|typeof)\s[^;]*$/u.test(line)) continue;
+    if (/^\s*(?:\/\/|\*|\/\*)/u.test(line)) continue;
+
+    const end = text.indexOf(');', match.index);
+    const inline = text.slice(match.index, end === -1 ? text.length : end + 1);
+
+    // The options are often a variable, and often a spread of one — Stage 6
+    // builds its request shape once and reuses it for Tier 1, Tier 2 and the
+    // shadow cohort. Follow the name to its declaration, or the check would
+    // push every caller into inlining an options object to please it.
+    const referenced =
+      /\(\s*[^,()]+,\s*([A-Za-z_$][\w$]*)\s*\)/u.exec(inline)?.[1] ??
+      /\.\.\.([A-Za-z_$][\w$]*)/u.exec(inline)?.[1];
+    if (referenced) {
+      const declaration = new RegExp(`const ${referenced}(?::[^=]+)? = [\\s\\S]*?;\\n`, 'u').exec(
+        text
+      );
+      calls.push({ entry: match[1], text: inline + (declaration ? declaration[0] : '') });
+      continue;
+    }
+    calls.push({ entry: match[1], text: inline });
+  }
+  return calls;
+}
+
 describe('no paid call spends anonymously', () => {
   const files = sources();
 
@@ -203,6 +321,92 @@ describe('no paid call spends anonymously', () => {
     `;
 
     expect(rawSdkCompletions(marked)).toEqual([]);
+  });
+
+  it('makes every Jina HTTP call price itself', () => {
+    const anonymous: string[] = [];
+    for (const { path, text } of files) {
+      if (rawJinaRequests(text).length === 0) continue;
+      if (text.includes('recordJinaCallCost(')) continue;
+      anonymous.push(path);
+    }
+
+    expect(anonymous).toEqual([]);
+  });
+
+  it('gives every retrieval entry point a course to charge', () => {
+    const anonymous: string[] = [];
+    for (const { path, text } of files) {
+      if (RETRIEVAL_EXCEPTIONS[path] || RETRIEVAL_DEFERRED[path]) continue;
+      for (const [index, call] of retrievalCallArguments(text).entries()) {
+        // Either the call carries a course — inline, under a named field, or
+        // forwarded from a caller that is checked in its own file — or it does
+        // not. A context literal always names the stage it belongs to, which is
+        // what makes an inline one recognisable.
+        if (/cost_context|costContext|stage:\s*'stage_/u.test(call.text)) continue;
+        anonymous.push(`${path} ${call.entry} #${index + 1}`);
+      }
+    }
+
+    expect(anonymous).toEqual([]);
+  });
+
+  it('would have caught Jina, which every OpenRouter detector missed', () => {
+    // The shape that was invisible for the whole cost epic: a paid provider
+    // called over plain fetch, its `usage` thrown away, nothing recorded — and
+    // this file green the entire time.
+    const raw = `
+      const response = await fetch('https://api.jina.ai/v1/embeddings', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    `;
+
+    expect(rawModelBuilds(raw)).toEqual([]);
+    expect(completionOptions(raw)).toEqual([]);
+    expect(rawSdkCompletions(raw)).toEqual([]);
+    expect(rawJinaRequests(raw)).toHaveLength(1);
+  });
+
+  it('sees a retrieval call that names no course, and one that does', () => {
+    const anonymous = `
+      const response = await searchChunks(query, {
+        limit: 3,
+        filters: { course_id: courseId },
+      });
+    `;
+    const attributed = `
+      const response = await searchChunks(query, {
+        limit: 3,
+        filters: { course_id: courseId },
+        cost_context: { courseId, stage: 'stage_6', phase: 'rag_retrieval' },
+      });
+    `;
+
+    expect(retrievalCallArguments(anonymous)).toHaveLength(1);
+    expect(/cost_context/u.test(retrievalCallArguments(anonymous)[0].text)).toBe(false);
+    expect(/cost_context/u.test(retrievalCallArguments(attributed)[0].text)).toBe(true);
+  });
+
+  it('keeps the retrieval exception list to harnesses that genuinely have no course', () => {
+    for (const [path, reason] of Object.entries(RETRIEVAL_EXCEPTIONS)) {
+      expect(
+        files.some(file => file.path === path),
+        `${path} no longer exists`
+      ).toBe(true);
+      expect(reason.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('makes every deferred retrieval hole name the issue that closes it', () => {
+    for (const [path, defer] of Object.entries(RETRIEVAL_DEFERRED)) {
+      expect(
+        files.some(file => file.path === path),
+        `${path} no longer exists`
+      ).toBe(true);
+      expect(defer.reason.length).toBeGreaterThan(20);
+      expect(defer.issue).toMatch(/^mc2-[\w.]+$/u);
+    }
   });
 
   it('keeps the exception list to calls that genuinely have no course', () => {

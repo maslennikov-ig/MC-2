@@ -28,6 +28,7 @@
     "generate:config-seed": "tsx src/build/generate-config-seed.ts",
     "check:model-catalog-drift": "tsx scripts/check-model-catalog-drift.ts",
     "check:model-catalog-drift:all": "tsx scripts/check-model-catalog-drift.ts --all",
+    "check:jina-pricing-drift": "tsx scripts/check-jina-pricing-drift.ts",
     "check:config-seed-drift": "tsx scripts/check-config-seed-drift.ts",
     "check:migration-drift": "tsx scripts/check-migration-drift.ts",
     "start": "tsx dist/server/index.js",

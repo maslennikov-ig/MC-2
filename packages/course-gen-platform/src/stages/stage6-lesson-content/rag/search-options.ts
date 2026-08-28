@@ -17,6 +17,7 @@
  */
 
 import type { SearchOptions } from '@/shared/qdrant/search-types';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG } from './constants';
 
@@ -34,6 +35,14 @@ export interface LessonSearchOptionsInput {
   enablePriorityBoost?: boolean;
   /** Payload is only read back when evidence scope has to be re-checked. */
   includePayload?: boolean;
+  /**
+   * The course each query embedding is charged to.
+   *
+   * Optional so that `scripts/rag-quality-benchmark.ts` can build the very
+   * request the stage sends without inventing a course to bill; the stage
+   * always passes one, and the no-anonymous-spend guard is what says so.
+   */
+  costContext?: LlmCostContext;
 }
 
 /**
@@ -110,6 +119,7 @@ export function buildLessonSearchOptions(
       ...(filteringByDocs && { document_ids: input.primaryDocumentIds }),
     },
     include_payload: input.includePayload ?? false,
+    ...(input.costContext ? { cost_context: input.costContext } : {}),
     // Stated rather than left to the default, so that the measurement above has
     // something to sit beside. `group_size` is omitted because with grouping
     // off nothing reads it.

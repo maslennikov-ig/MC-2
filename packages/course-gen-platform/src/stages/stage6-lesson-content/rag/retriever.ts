@@ -686,6 +686,10 @@ async function retrieveLessonContextCore(
     queryCount: queries.length,
     enablePriorityBoost,
     includePayload: Boolean(evidenceContext),
+    // Rides on the base options, so every query this pass issues — Tier 1,
+    // Tier 2 and the shadow cohort alike — charges its Jina embedding to this
+    // lesson rather than to nobody.
+    costContext: { courseId, stage: 'stage_6', phase: 'rag_retrieval', lessonId },
   });
 
   logger.debug(
