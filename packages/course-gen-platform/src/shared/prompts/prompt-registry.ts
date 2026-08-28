@@ -22,7 +22,7 @@
  *
  * @example
  * ```typescript
- * const prompt = PROMPT_REGISTRY.get('stage6_planner');
+ * const prompt = PROMPT_REGISTRY.get('stage6_single_call_generator');
  * console.log(prompt.promptName); // "Stage 6 - Planner: Lesson Outline Generation"
  * console.log(prompt.variables); // [{ name: 'lessonSpec', required: true, ... }]
  * ```

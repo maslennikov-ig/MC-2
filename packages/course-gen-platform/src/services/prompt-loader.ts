@@ -14,7 +14,7 @@
  * ```typescript
  * const { template, variables, source } = await loadPrompt(
  *   'stage_6',
- *   'stage6_planner'
+ *   'stage6_single_call_generator'
  * );
  * console.log(`Loaded ${source} prompt: ${template.substring(0, 50)}...`);
  * ```
@@ -71,13 +71,13 @@ interface PromptTemplateRow {
  * 2. If not found or DB error: Fallback to `PROMPT_REGISTRY`
  *
  * @param stage - Prompt stage (stage_3, stage_4, stage_5, stage_6)
- * @param promptKey - Unique prompt identifier (e.g., "stage6_planner")
+ * @param promptKey - Unique prompt identifier (e.g., "stage6_single_call_generator")
  * @returns Prompt template with metadata
  * @throws Error if prompt not found in both DB and registry
  *
  * @example
  * ```typescript
- * const prompt = await loadPrompt('stage_6', 'stage6_planner');
+ * const prompt = await loadPrompt('stage_6', 'stage6_single_call_generator');
  * if (prompt.source === 'database') {
  *   console.log(`Using database version ${prompt.version}`);
  * }
