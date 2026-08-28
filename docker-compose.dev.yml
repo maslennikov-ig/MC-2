@@ -255,6 +255,16 @@ services:
       - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
       - QDRANT_METRICS_SERVICE=worker
       - QDRANT_METRICS_INSTANCE=worker-dev
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      # The metrics directory is root-owned, setgid, group-writable by a dedicated
+      # group. These containers run as uid 1001, so mounting the directory is not
+      # enough: without the supplementary group the writer gets EACCES on its own lock
+      # file and publishes nothing. Verified 2026-08-28 by running the real publisher
+      # inside the dev container, which is the only way this shows up — the mount looks
+      # correct and the code is silent about it (publishDocumentEvidenceMetricsSafely
+      # swallows the failure by design, so product work is never blocked by metrics).
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-json-cache
@@ -310,6 +320,16 @@ services:
       - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
       - QDRANT_METRICS_SERVICE=stage6
       - QDRANT_METRICS_INSTANCE=stage6-dev
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      # The metrics directory is root-owned, setgid, group-writable by a dedicated
+      # group. These containers run as uid 1001, so mounting the directory is not
+      # enough: without the supplementary group the writer gets EACCES on its own lock
+      # file and publishes nothing. Verified 2026-08-28 by running the real publisher
+      # inside the dev container, which is the only way this shows up — the mount looks
+      # correct and the code is silent about it (publishDocumentEvidenceMetricsSafely
+      # swallows the failure by design, so product work is never blocked by metrics).
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-json-cache

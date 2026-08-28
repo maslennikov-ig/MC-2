@@ -1361,6 +1361,10 @@ jobs:
           # deploy failed with `required variable QDRANT_METRICS_TEXTFILE_HOST_DIR
           # is missing a value` while every test in the pipeline was green.
           QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
+          # The directory is root-owned and setgid to a dedicated group; the dev
+          # containers run as uid 1001 and need it as a supplementary group, or the
+          # writer gets EACCES on its own lock file and publishes nothing at all.
+          QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev"
 
