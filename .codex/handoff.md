@@ -181,6 +181,26 @@ the attempt pin — are in `.codex/repository-failure-modes.md`, together with h
 changed (database first, then `pnpm generate:config-seed`) and why a reasoning budget is added to
 `max_tokens` rather than taken out of it.
 
+**Ten models, and the derived set is exactly the declared one.** `collectRoutableModelIds()`
+returned 20 before 2026-08-28 and returns 10 now, matching `LIVE_ROUTING_MODEL_IDS` element for
+element; `model-catalog-coverage` asserts the equality, which fails both when a registry goes silent
+and when a new one appears undeclared. The alias `deepseek/deepseek-v4-flash` and
+`qwen/qwen3-235b-a22b-2507` left routing entirely (`mc2-v6r1p` closed by that measurement, not by
+updating its numbers). The last thing keeping an eleventh model on the wire was the rename map —
+`qwen/qwen3.5-plus-02-15` pointed at `qwen/qwen3.7-plus`, named by nothing else — so a replacement
+must now be in **live routing**, not merely catalogued.
+
+**The cheapest endpoint is now the cheapest that can finish** (2026-08-28, `263ae6c37`, `mc2-6a1x4`).
+`MIN_ENDPOINT_THROUGHPUT_TPS = 30`, derived from the largest ordinary Stage 6 budget (8000 tokens)
+against its 300 s phase timeout. It matters because price-only sorting was sending the workhorse
+`deepseek/deepseek-v4-flash-0731` to a **9 tok/s** endpoint that could not finish inside that
+timeout, with a 99 tok/s one available for three hundredths of a cent more per million. Exactly two
+of the ten live models move. The floor cannot refuse every endpoint, ignores an endpoint that
+publishes no figure, and never reaches across service tiers — `openai/flex` at $0.10/26 tok/s
+against `azure` at $0.20/68 is why. `throughput_last_30m` is an **object** `{p50,p75,p90,p99}`;
+`uptime_last_30m` beside it is a number. Uptime is deliberately not a criterion (owner, 2026-08-27):
+a down endpoint fails its attempt and the chain moves on; a slow one just spends the budget.
+
 **One table decides which model a phase gets** (2026-08-28, `3cb14ffb6`, `mc2-u8kwx`). The decision
 lives in `llm_model_config`, the superadmin panel edits it, `config-seed.json` is the committed
 snapshot every offline path reads, and `model-defaults.ts` names the four roles a snapshot cannot
