@@ -35,6 +35,7 @@ import {
   type StructuralOperationProposal,
 } from '@megacampus/shared-types/chat-types';
 import type { CourseStructure } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { ensureStableIdsInMemory } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import {
@@ -123,13 +124,13 @@ function isFeatureFlagEnabled(flagValue: string | undefined): boolean {
  * Can be overridden via environment variables for flexibility without redeployment.
  *
  * Environment variables:
- * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: deepseek/deepseek-v4-flash)
+ * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: DEFAULT_MODEL_ID)
  * - CHAT_FALLBACK_TEMPERATURE: Temperature 0-1 (default: 0.7)
  * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 8192)
  */
 const CHAT_FALLBACK_CONFIG = {
   // Use same model as Stage 4/5 for potential OpenRouter prompt caching
-  modelId: process.env.CHAT_FALLBACK_MODEL || 'deepseek/deepseek-v4-flash',
+  modelId: process.env.CHAT_FALLBACK_MODEL || DEFAULT_MODEL_ID,
   temperature: parseFloat(process.env.CHAT_FALLBACK_TEMPERATURE || '0.7'),
   // Increased from 4096 to handle large course structures (49+ lessons)
   maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '8192', 10),

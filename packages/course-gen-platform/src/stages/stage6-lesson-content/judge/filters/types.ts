@@ -146,6 +146,8 @@ export interface HeuristicFilterResult {
     calloutDensity?: {
       calloutCount: number;
       calloutTypes: string[];
+      /** What the lesson was allowed, about one per section; see `checkCalloutDensity`. */
+      calloutBudget: number;
     };
     /** Code block audience match check results */
     codeBlockAudienceMatch?: {

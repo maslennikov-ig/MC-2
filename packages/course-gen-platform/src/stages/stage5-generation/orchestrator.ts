@@ -117,12 +117,6 @@ const GenerationStateAnnotation = Annotation.Root({
 
   // Error handling
   errors: Annotation<string[]>,
-
-  // Model override (for handler-level fallback retry)
-  modelOverride: Annotation<string | null>({
-    reducer: (x, y) => y ?? x,
-    default: () => null,
-  }),
 });
 
 /** Type alias for LangGraph state (inferred from Annotation) */
@@ -198,19 +192,24 @@ export class GenerationOrchestrator {
   /**
    * Execute the 4-phase generation pipeline
    *
+   * Takes no model argument. Each phase resolves its own model through
+   * `getModelForPhase`, which reads `llm_model_config` — the table the
+   * superadmin panel edits. A handler-level override used to be accepted here,
+   * carried into the graph state and logged as `handler_fallback`; nothing ever
+   * read it, so it named a model no call was made with (mc2-u8kwx).
+   *
    * @param input - Generation job input from BullMQ queue
-   * @param modelOverride - Optional model override for fallback retry
    * @returns GenerationResult with course_structure and generation_metadata
    * @throws Error if generation fails
    */
-  async execute(input: GenerationJobInput, modelOverride?: string): Promise<GenerationResult> {
-    this.logExecutionStart(input, modelOverride);
+  async execute(input: GenerationJobInput): Promise<GenerationResult> {
+    this.logExecutionStart(input);
     const startTime = Date.now();
 
-    await this.logInitTraces(input, modelOverride);
+    await this.logInitTraces(input);
 
     // STEP 1: Initialize state
-    const initialState = this.buildInitialState(input, modelOverride);
+    const initialState = this.buildInitialState(input);
     this.logger.info('Initial state initialized, invoking StateGraph');
 
     // STEP 2: Invoke LangGraph StateGraph
@@ -379,19 +378,12 @@ export class GenerationOrchestrator {
   // ==========================================================================
 
   /** Log execution start message */
-  private logExecutionStart(input: GenerationJobInput, modelOverride?: string): void {
-    if (modelOverride) {
-      this.logger.info(
-        { course_id: input.course_id, modelOverride, source: 'handler_fallback' },
-        'Starting 4-phase generation pipeline with model override'
-      );
-    } else {
-      this.logger.info({ course_id: input.course_id }, 'Starting 4-phase generation pipeline');
-    }
+  private logExecutionStart(input: GenerationJobInput): void {
+    this.logger.info({ course_id: input.course_id }, 'Starting 4-phase generation pipeline');
   }
 
   /** Log initialization traces */
-  private async logInitTraces(input: GenerationJobInput, modelOverride?: string): Promise<void> {
+  private async logInitTraces(input: GenerationJobInput): Promise<void> {
     await logTrace({
       courseId: input.course_id,
       stage: 'stage_5',
@@ -400,7 +392,6 @@ export class GenerationOrchestrator {
       inputData: {
         courseId: input.course_id,
         topic: input.analysis_result?.course_category?.primary,
-        ...(modelOverride && { modelOverride, source: 'handler_fallback' }),
       },
       durationMs: 0,
     });
@@ -426,10 +417,7 @@ export class GenerationOrchestrator {
   }
 
   /** Build initial state for StateGraph */
-  private buildInitialState(
-    input: GenerationJobInput,
-    modelOverride?: string
-  ): GenerationStateType {
+  private buildInitialState(input: GenerationJobInput): GenerationStateType {
     return {
       input,
       metadata: null,
@@ -441,7 +429,6 @@ export class GenerationOrchestrator {
       currentPhase: 'validate_input',
       phaseDurations: {},
       errors: [],
-      modelOverride: modelOverride || null,
     };
   }
 

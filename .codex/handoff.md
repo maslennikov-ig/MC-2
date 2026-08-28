@@ -1,10 +1,49 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-27. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-28. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries.
 
 ## Current stage
+
+**The callout fix, verified live 2026-08-28** (`mc2-ctlar`,
+`docs/rag/2026-08-28-lesson-arms-batch/after-the-callout-fix.md`): ten lessons regenerated for
+$0.065383 — `needs_review` **11 of 20 → 0 of 10**, regenerations 1.20 → 0.00, quality 0.830 → 0.897
+with the whole gain on the five lessons the gate used to damage, cost per lesson −39%. Two things the
+fix predicted did not happen: **callouts rose, 4.70 → 5.30**, and a third arm with the pre-fix
+prompts restored says the wording is why (3.00 against 5.00 on the same three lessons) — the rule,
+not the prompt, is doing all the work; and `src/shared/prompts/stage6/expander.ts` is rendered by
+nothing, so that third of the prompt edit is unread. Both lessons read by eye keep the mandatory
+practical example, in prose instead of a callout box. **The five Stage 6 prompts nothing rendered
+are gone** (`mc2-53h8i`, `45e5fe90d`): `renderPrompt` takes two Stage 6 keys, the registry declared
+seven, and the other five were the six-node pipeline's, kept "for historical reference" — one of them
+edited by the callout fix and read by no model. Their `prompt_templates` rows were **active**, so the
+admin screen offered them for editing; retired with `--deactivate`, text kept, one flag from
+reversible. 16 active rows and 5 orphans became **11 active, 0 orphans, 0 mismatches**.
+
+The lesson also came out shorter at the same
+word target (2718 → 1840); the owner ruled the same day that **length is not the criterion, meaning
+surviving is**, so it is recorded in the report and tracked nowhere (`mc2-c7ire`, opened and closed
+on that ruling).
+
+**Ten lessons per arm, 2026-08-28** (`docs/rag/2026-08-28-lesson-arms-batch/`). The larger sample
+corrects two things the single lesson implied and raises three defects. The arms share **3.2 of 7
+chunks**, not four, and the cap buys **+1.0 documents** in what the model reads — the 0.11 figure was
+measured on the pre-rerank union. Quality still does not move (0.830 against 0.841, sign changes
+lesson by lesson), so the setting stays. Found while looking: `mc2-udj0b` — the callout gate blocks
+5+ callouts per lesson, **0 of 20 lessons met it**, 11 of 20 were forced into two regenerations that
+came back with 5+ again, and all 11 `needs_review` in the sample are that one rule; blocked lessons
+score 0.778 against 0.907. `mc2-zxzgf` — the Mermaid fallback is hardcoded English, in 123 lessons
+across 12 courses. `mc2-hpful` — cross-lesson repetition is negligible (worst pair 4.9% of
+eight-word sequences over 340 lessons), but 5.3% of lessons duplicate a block **of themselves**, all
+of them long ones.
+
+`mc2-d0e2n` is **complete, six of six** (2026-08-28). Retrieval was read in a lesson for the first
+time and the two arms are **indistinguishable**; the predicted call volumes did not move and the
+arithmetic that predicted them is corrected; Jina has a price, records at the call and appears in
+`cost-report.ts` beside OpenRouter; `mc2-kim48` is answered, fixed and live — dev evidence metrics
+now reach Prometheus labelled `environment="dev"`. One explicit defer below: `mc2-sv89s`. Details in
+`docs/rag/2026-08-28-retrieval-on-a-lesson-and-jina-priced.md`.
 
 The technical-debt epic `mc2-cuk7j` is **complete, six of six**. Four closed 2026-08-24 (`.1` web
 tests that could not parse, `.5` lint warnings to zero, `.3` closed as WRONG — the pipeline had
@@ -108,6 +147,27 @@ was always asking for — and took accepted-results-outside-the-fusion from 124 
 Grouping is untouched where it earns its keep: Stage 4 evidence preflight, conflict detection and
 Stage 5 advisory enrichment group deliberately, because their job is per-document coverage.
 
+**A lesson has now been read, and the two lessons are indistinguishable** (`mc2-d0e2n`, 2026-08-28,
+`docs/rag/2026-08-28-retrieval-on-a-lesson-and-jina-priced.md`, both artifacts kept in
+`docs/rag/2026-08-28-lesson-arms/`). Course `8baaa75e`, lesson 3.2, generated twice on dev with the
+cap restored as an uncommitted two-line change. Same four documents, same seven chunks in count, and
+**four of the seven are literally the same chunks** — the cap moves only the tail below the
+reranker's top selections, which is why the lessons read the same. No retrieval constant is changed
+by this and nothing showed a defect the benchmark cannot see.
+
+**The predicted call volumes were wrong, and the reason generalises.** The design expected seven
+Qdrant queries down to two and 40–46 reranker candidates up to 60; measured, neither moved — 9
+queries and 44 against 42 candidates. The prediction used the benchmark's 29.97 candidates per query,
+which is measured on a **one-query** harness where `lessonCandidateLimit(7, 1) = 30`. A real lesson
+issues nine or ten, so the per-query limit is 6, the collector cannot overshoot `enoughCandidates`,
+and grouped results are re-capped to the same limit anyway. **A per-query retrieval rate does not
+describe a ten-query lesson**, because the per-query limit is a function of the query count.
+
+Two measurement traps for the next run: `[Lesson RAG] Retrieval complete` logs
+`queriesExecuted: queries.length`, which is the number **planned**, not issued; and the dev workers
+point at `qdrant-dev` with **12 points**, so a lesson driven through the dev queue does not touch the
+6856-point corpus on 6335.
+
 ## Routing and models (2026-08-12, `43ab557d6`)
 
 Ten live models. The workhorse is `deepseek/deepseek-v4-flash-0731` — a **pinned snapshot** — with
@@ -147,6 +207,16 @@ own. The trap it exposed is the one to remember: `requiresReasoning` shipped in 
 the routing, so the first live run measured a container that did not yet know the model and looked
 like a model failure. **Never measure a model on a container that has not been told about it.**
 
+**Its fallback stopped being DeepSeek on 2026-08-28** (`24d14edd6`). The cross-vendor rule was
+satisfied and the point was still missed: DeepSeek is not the other model for prose, it is the one
+this seat was taken away from — the 0.88-against-0.92 lesson below is exactly what a z-ai outage
+would have served, and the judge that missed the fabricated "более 60% людей" once would have missed
+it again. `PROSE_FALLBACK_MODEL_ID` is `openai/gpt-5.6-luna`: third vendor, itself the prose model
+until 2026-08-26, ten times DeepSeek's output rate and reached only when the primary fails, which in
+90 days of `generation_trace` it never has. Eighteen rows plus `stage_6_content`, which has no row
+and is served from `STAGE6_CANONICAL_PHASE_DEFAULTS`. Judges, `patcher` and `arbiter` stay on
+DeepSeek for the reason below.
+
 The 2026-08-23 ruling it replaces, kept for its method:
 
 **Settled 2026-08-23 (`d179a18d0`, `2e01e0b02`): whatever AUTHORS prose the reader opens runs on
@@ -181,6 +251,43 @@ the attempt pin — are in `.codex/repository-failure-modes.md`, together with h
 changed (database first, then `pnpm generate:config-seed`) and why a reasoning budget is added to
 `max_tokens` rather than taken out of it.
 
+**Ten models, and the derived set is exactly the declared one.** `collectRoutableModelIds()`
+returned 20 before 2026-08-28 and returns 10 now, matching `LIVE_ROUTING_MODEL_IDS` element for
+element; `model-catalog-coverage` asserts the equality, which fails both when a registry goes silent
+and when a new one appears undeclared. The alias `deepseek/deepseek-v4-flash` and
+`qwen/qwen3-235b-a22b-2507` left routing entirely (`mc2-v6r1p` closed by that measurement, not by
+updating its numbers). The last thing keeping an eleventh model on the wire was the rename map —
+`qwen/qwen3.5-plus-02-15` pointed at `qwen/qwen3.7-plus`, named by nothing else — so a replacement
+must now be in **live routing**, not merely catalogued.
+
+**The cheapest endpoint is now the cheapest that can finish** (2026-08-28, `263ae6c37`, `mc2-6a1x4`).
+`MIN_ENDPOINT_THROUGHPUT_TPS = 30`, derived from the largest ordinary Stage 6 budget (8000 tokens)
+against its 300 s phase timeout. It matters because price-only sorting was sending the workhorse
+`deepseek/deepseek-v4-flash-0731` to a **9 tok/s** endpoint that could not finish inside that
+timeout, with a 99 tok/s one available for three hundredths of a cent more per million. Exactly two
+of the ten live models move. The floor cannot refuse every endpoint, ignores an endpoint that
+publishes no figure, and never reaches across service tiers — `openai/flex` at $0.10/26 tok/s
+against `azure` at $0.20/68 is why. `throughput_last_30m` is an **object** `{p50,p75,p90,p99}`;
+`uptime_last_30m` beside it is a number. Uptime is deliberately not a criterion (owner, 2026-08-27):
+a down endpoint fails its attempt and the chain moves on; a slow one just spends the budget.
+
+**One table decides which model a phase gets** (2026-08-28, `3cb14ffb6`, `mc2-u8kwx`). The decision
+lives in `llm_model_config`, the superadmin panel edits it, `config-seed.json` is the committed
+snapshot every offline path reads, and `model-defaults.ts` names the four roles a snapshot cannot
+express (default, fallback, large-context, prose). Everything else was a second answer and is gone:
+`PHASE_FALLBACK_CONFIG` (a hand-kept copy that disagreed with the database on **eleven** phases, and
+not dormant — `langchain-models.ts` routes every config-service failure into it, which is what put
+eleven distinct model ids into sixty days of `generation_trace`, the `mc2-a6qxc` mystery);
+pipeline-admin's `DEFAULT_MODEL_CONFIGS` (60 phases typed by hand, so "reset to default" wrote a
+third opinion — and could not reset the eleven `stage_career_playbook_*` phases at all);
+`shared/llm/model-selector.ts` in full (eleven models nothing selected, yet the price gate read it
+and believed four dead ids were live routes); Stage 5's `MODEL_FALLBACK` (its `modelOverride` was
+written into graph state and read by nothing, so the log named a model no call was made with).
+**The guard is `model-ids-live-in-one-place.test.ts`**: it walks every tracked file under `src/` and
+fails on a model id spelt out anywhere outside six named registries. Two further checks state the
+invariant directly — the panel's default and the runtime's default agree for every phase in
+`phaseNameSchema`, and every phase the panel can reset has something to reset to.
+
 **Phase configs** (2026-08-13, `7ad421986`): Stage 5, metadata generation and `getModelForPhase` all
 go through `buildProviderParams`, held by `tests/unit/phase-config-provider-contract.test.ts`;
 collision fallback `LARGE_CONTEXT_MODEL_ID`. `stage_5_escalation` is now first in
@@ -204,20 +311,40 @@ decimal on two runs of 2026-08-22. What still constrains work:
   that returned nothing. The record takes ~9.6 s to become readable; for a call still running, never.
   A paid call prices itself at the call; a node-level summary row keeps tokens and carries **no**
   price, and a priced call is _stamped_ `input_data.billedCall`. Guard: Guard: `tests/unit/shared/metrics/no-anonymous-spend`.
+- **The ledger holds two providers since 2026-08-28** (`mc2-d0e2n`). Jina was paid on four call
+  sites and recorded on none — `generation_trace` was OpenRouter only, which is why `mc2-4clyr`'s
+  "Stage 6 is 90% of cost" counted one provider. **A lesson costs $0.00045 in Jina beside $0.0053 in
+  OpenRouter — 7.9% of its bill** (lesson 3.2 of `8baaa75e`, dev, 2026-08-28: 9 query embeddings at
+  241 tokens, one reranker call at 8755 tokens; the reranker is 97% of it because it receives the
+  whole accumulated union). That is the correction for a _lesson_, not a course: Stage 4 preflight,
+  Stage 5 retrieval and document indexing all embed too. The rate is the provider's own —
+  `GET https://api.jina.ai/v1/models`, field `pricing.prompt`, $0.05/1M for both
+  `jina-embeddings-v3` and `jina-reranker-v2-base-multilingual` — recorded in
+  `src/shared/jina/pricing.ts` and watched by `pnpm -F course-gen-platform check:jina-pricing-drift`.
+  Do **not** put Jina in `MODEL_CATALOG`: `check-model-catalog-drift.ts` reconciles that against
+  OpenRouter, which does not list these models. Jina rows are stamped `provider: 'jina'` and
+  `cost-report.ts` keeps them **out** of the OpenRouter reconciliation — Jina issues no per-call
+  receipt, so comparing the whole ledger against `/api/v1/generation` would report a gap exactly the
+  size of the retrieval bill. `no-anonymous-spend` gained two detectors for this, shown red against
+  the pre-change source: 3 unpriced Jina HTTP call sites, 10 unattributed retrieval entry points.
 - **The catalogue is an estimate, not the price.** `MODEL_CATALOG` builds budgets and the
   `provider.max_price` ceiling; every call settles against the provider.
   `model-catalog-coverage.test.ts` stays offline on purpose, and
   `scripts/check-model-catalog-drift.ts` is the online half, in **no** CI job deliberately (a
-  provider's tariff change must not fail the build and with it the deploy). It runs nightly, filing
-  ONE standing GitHub issue; its first run found three entries 1.30x-4.03x over (`mc2-ts9i2`).
-  Never retype a rate in a test: that turned eight cases red for no defect.
+  provider's tariff change must not fail the build and with it the deploy). It runs nightly and
+  **writes** the published rates into the catalogue and its snapshot, committing to `develop`; only a
+  move of 1.5x or more — the same factor `max_price` is built from, past which a frozen rate starts
+  refusing calls — goes to Telegram. It filed a GitHub issue for two months instead, which asked a
+  person to retype two numbers the job already had. Never retype a rate in a test: that turned eight
+  cases red for no defect.
 - **One transport, one place.** Every OpenRouter client comes from `shared/llm/openrouter-client.ts`,
   the only place `instrumentFetchWithGenerationId` is attached; `one-openrouter-transport.test.ts`
   fails on a new one, and its exception list may shrink, never grow.
 - **Images price like everything else.** Cards go through `POST /api/v1/images` at `quality: medium`,
   the only endpoint carrying that control — $0.045076 to $0.0085605 per card (`mc2-xbqz8`). Covers
-  stay on chat completions by the owner's decision; the `stage_7_card`/`stage_7_cover` rows in
-  `llm_model_config` are read by nothing (`mc2-bnm62`).
+  stay on chat completions by the owner's decision. The `stage_7_cover` row is read again since
+  2026-08-27: `processImagePipeline` called `generateImage`, not `generateCoverImage`, so the
+  configured cover model was ignored for as long as the row existed (`mc2-bnm62`).
 - **A playbook is not a course**, and `generation_trace.course_id` is a foreign key into `courses`,
   so playbook money lives in `career_playbooks.cost_breakdown` (`mc2-j9pmq`, `mc2-ietzn`) — the same
   fact is why a playbook cannot have a `course_override` row. **Stage 6 and Stage 7 run their own
@@ -316,8 +443,51 @@ Branches were swept 2026-08-22 (`mc2-3mq9b`); every deleted sha is in
 merely unrun, as for `mc2-rmbwo` and `mc2-p99f1`. `mc2-db696.106`/`.107` (PDF fidelity/grounding,
 separate deploy accounts) not planned; `mc2-gmab0` held by unit tests.
 
-`mc2-kim48` — four document-evidence alert rules cannot fire; their metrics are absent because the
-writer is configured on staging, which is idle, and not on dev, where the runs happen.
+`mc2-kim48` — **answered, fixed and live on 2026-08-28.** The owner's decision: dev reports through
+the same channel, marked as dev. It always could have — an external label is applied "only when a
+time series does not have a given label yet". What prevented it was our own rules: all four
+aggregated bare, and bare `sum()` drops every label, so the alert could not carry an environment and
+`external_labels` then supplied `staging`. They now aggregate `by (environment)`, name it in the
+summary, and the two `absent()` branches became per-environment `unless count by (environment)`.
+Dev writes metrics with an instance ending `-dev`, which one `metric_relabel_config` rewrites to
+`environment="dev"` — no second exporter, no second scrape target.
+
+Installed with `sudo /opt/megacampus/deploy/qdrant/install-monitoring-config.sh` (stage into
+`ops-staged`, it validates with promtool from the running image, backs up as
+`.bak-20260828T113730Z` and restarts Prometheus, because a single-file bind mount pins the inode).
+21 rules loaded, none unhealthy, nothing firing. **Proved end to end**: the real publisher run inside
+`megacampus-worker-stage6-dev` produced `evidence-stage6-stage6-dev.prom` and Prometheus scraped it
+as `environment="dev", service="stage6", exported_instance="stage6-dev"`. That file's counters carry
+a synthetic 1 from that probe; real dev runs add to them.
+
+Two things this cost, both mine, both now guarded. The dev compose demanded
+`QDRANT_METRICS_TEXTFILE_HOST_DIR` that the dev deploy never wrote, and Compose refused the file —
+green pipeline, dead deploy. Then mounting the directory turned out not to be write access: the
+containers run as uid 1001 against a setgid directory and need `group_add`, and the failure is
+silent because `publishDocumentEvidenceMetricsSafely` swallows it. **`QDRANT_METRICS_GID` is read
+from the directory with `stat` at deploy time, not from a secret** — `secrets.QDRANT_METRICS_GID`
+does not exist in this repository, which is how the first attempt wrote an empty value.
+`tests/unit/ops/dev-compose-variables-are-written.test.ts` now compares every `${VAR:?}` in
+`docker-compose.dev.yml` against what the deploy writes.
+
+The live monitoring tree is now **ahead of `master`** until these files reach it by the ordinary
+release; the drift job compares the live tree against the deployed branch's checkout, so a
+production deploy before then would report drift.
+
+A second writer against the shared `evidence-stage4-state.prom` is **idempotent**: it sets absolute
+totals from one database RPC keyed by `(pg_postmaster_start_time, generation, revision)`, and dev and
+staging share the database, so both compute the same tuple; the incrementing counters live in the
+per-service file and cannot collide.
+
+`mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from that same non-existent secret.
+Not burning: the host carries 900 by some other means, not established. It burns when
+`.env.production` is rewritten and the infra stack recreated.
+
+`mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`, `semantic-matching.ts`)
+prices itself but is not attributed to a course. Neither module mentions `courseId` anywhere, so the
+id would have to be threaded through several public signatures on Stage 3/5 paths `mc2-d0e2n` did not
+measure. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`, where the test
+requires each entry to carry a reason and an issue.
 
 `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
 

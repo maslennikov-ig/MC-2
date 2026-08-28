@@ -126,54 +126,78 @@ groups:
 
   - name: document-evidence-alerts
     rules:
+      # mc2-kim48. Every expression in this group aggregates `by (environment)` rather
+      # than bare. Bare `sum()` drops ALL labels, so an alert could not carry the
+      # environment it came from even in principle — and because the label was then
+      # absent, `external_labels: environment: staging` filled it in, which is applied
+      # "only when a time series does not have a given label yet". A dev failure would
+      # therefore have paged the staging on-call as staging, and a dev count would have
+      # been added to a staging count inside the same `sum`. Aggregating by environment
+      # fixes both: the environments are counted apart and the notification says which.
+      # Series with no environment label still read as staging, by the same external
+      # label, so nothing that works today changes.
       - alert: DocumentEvidenceRunFailed
         expr: |
-          sum(increase(megacampus_document_evidence_runs_total{stage="stage4",status="failed"}[10m])) > 0
+          sum by (environment) (increase(megacampus_document_evidence_runs_total{stage="stage4",status="failed"}[10m])) > 0
           or
-          sum(increase(megacampus_document_evidence_stage4_invocations_total{status="failed"}[10m])) > 0
+          sum by (environment) (increase(megacampus_document_evidence_stage4_invocations_total{status="failed"}[10m])) > 0
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: A document evidence run or invocation failed
-          description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
+          summary: 'A document evidence run or invocation failed ({{ or $labels.environment "unlabelled" }})'
+          description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes, in {{ or $labels.environment "unlabelled" }}.
 
+      # The second branch was `and absent(coverage_ratio)`, which asks whether the metric
+      # is missing EVERYWHERE. With two environments reporting, one of them losing its
+      # coverage signal would leave `absent()` empty and the branch silent. `unless
+      # count by (environment)` asks the same question per environment: runs reported
+      # here, no coverage reported here. The condition `sum(runs_total) > 0` is kept and
+      # still does its job — "nothing ran" is not a coverage failure (mc2-kim48).
       - alert: DocumentEvidenceCoverageIncomplete
         expr: |
-          min(megacampus_document_evidence_coverage_ratio) < 1
+          min by (environment) (megacampus_document_evidence_coverage_ratio) < 1
           or (
-            sum(megacampus_document_evidence_runs_total{stage="stage4"}) > 0
-            and absent(megacampus_document_evidence_coverage_ratio)
+            sum by (environment) (megacampus_document_evidence_runs_total{stage="stage4"}) > 0
+            unless
+            count by (environment) (megacampus_document_evidence_coverage_ratio)
           )
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: Document evidence coverage is incomplete
-          description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+          summary: 'Document evidence coverage is incomplete ({{ or $labels.environment "unlabelled" }})'
+          description: The latest Stage 4 evidence ledger in {{ or $labels.environment "unlabelled" }} is below exact full coverage or its coverage signal is missing.
 
       - alert: DocumentEvidenceDegradedAutomaticDecisionsRepeated
-        expr: sum(increase(megacampus_document_evidence_degraded_automatic_decisions_total[30m])) >= 3
+        expr: sum by (environment) (increase(megacampus_document_evidence_degraded_automatic_decisions_total[30m])) >= 3
         for: 0m
         labels:
           severity: warning
         annotations:
-          summary: Degraded automatic evidence decisions are repeating
-          description: At least three degraded automatic decisions occurred within thirty minutes.
+          summary: 'Degraded automatic evidence decisions are repeating ({{ or $labels.environment "unlabelled" }})'
+          description: At least three degraded automatic decisions occurred within thirty minutes, in {{ or $labels.environment "unlabelled" }}.
 
+      # Same treatment for the missing-age branch: `absent()` returns a label-less series,
+      # so it can neither be matched against a per-environment left side nor say which
+      # environment lost its age signal. `unless count by (environment)` does both.
       - alert: DocumentEvidenceCriticalConflictStale
         expr: |
-          max(megacampus_document_evidence_unresolved_critical_conflicts) > 0
+          max by (environment) (megacampus_document_evidence_unresolved_critical_conflicts) > 0
           and (
-            time() - min(megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0) > 60 * 60
-            or absent(megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0)
+            time() - min by (environment) (megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0) > 60 * 60
+            or (
+              max by (environment) (megacampus_document_evidence_unresolved_critical_conflicts) > 0
+              unless
+              count by (environment) (megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds > 0)
+            )
           )
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: A critical document conflict remains unresolved
-          description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+          summary: 'A critical document conflict remains unresolved ({{ or $labels.environment "unlabelled" }})'
+          description: A critical document conflict in {{ or $labels.environment "unlabelled" }} has remained unresolved for more than one hour, or its age signal is missing.
 
   - name: supabase-backup-alerts
     rules:

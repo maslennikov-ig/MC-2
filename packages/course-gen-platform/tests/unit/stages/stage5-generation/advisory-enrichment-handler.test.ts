@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   productionEnricher: vi.fn(),
   createProductionEnricher: vi.fn(),
   orchestratorConstructor: vi.fn(),
-  processWithFallback: vi.fn(),
+  processWithRetry: vi.fn(),
   getSupabaseAdmin: vi.fn(),
   updateStatusForGenerationStart: vi.fn(),
   materializeSectionsAndLessons: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock('@/stages/stage5-generation/handler-db-helpers', async importOriginal =>
 vi.mock('@/stages/stage5-generation/handler-helpers', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/stages/stage5-generation/handler-helpers')>();
-  return { ...actual, processWithFallback: mocks.processWithFallback };
+  return { ...actual, processWithRetry: mocks.processWithRetry };
 });
 
 import { Stage5GenerationHandler } from '@/stages/stage5-generation/handler';
@@ -157,7 +157,7 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
     vi.clearAllMocks();
     mocks.createProductionEnricher.mockReturnValue(mocks.productionEnricher);
     mocks.productionEnricher.mockResolvedValue({});
-    mocks.processWithFallback.mockImplementation(async orchestrator => orchestrator.execute());
+    mocks.processWithRetry.mockImplementation(async orchestrator => orchestrator.execute());
     mocks.updateStatusForGenerationStart.mockResolvedValue(undefined);
   });
 
@@ -220,7 +220,7 @@ describe('Stage 5 handler evidence wiring and atomic persistence', () => {
       expect.anything(),
       undefined
     );
-    expect(mocks.processWithFallback).toHaveBeenCalledTimes(1);
+    expect(mocks.processWithRetry).toHaveBeenCalledTimes(1);
     expect(mocks.productionEnricher).not.toHaveBeenCalled();
   });
 

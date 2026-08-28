@@ -23,6 +23,7 @@ import type { ResearchFlag } from '@megacampus/shared-types/analysis-result';
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution } from '@/stages/stage4-analysis/utils/observability';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 // Mock the langchain-models module
 vi.mock('@/shared/llm/langchain-models', () => ({
   getModelForPhase: vi.fn(),
@@ -591,7 +592,7 @@ describe('Research Flag Detector', () => {
       expect(trackPhaseExecution).toHaveBeenCalledWith(
         'research_flag_detection',
         'standalone',
-        'deepseek/deepseek-v4-flash',
+        DEFAULT_MODEL_ID,
         expect.any(Function)
       );
     });

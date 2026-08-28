@@ -45,6 +45,25 @@ scrape_configs:
           - 'node_exporter:9100'
         labels:
           environment: staging
+    # mc2-kim48. One node_exporter serves one host directory, and dev and staging
+    # containers write into it side by side. The files never collide — each writer owns
+    # `evidence-<service>-<instance>.prom` and the Stage 4 aggregate is reconciled from
+    # the shared database rather than accumulated — but the TARGET label above would
+    # stamp every one of them `staging`, so a dev failure would page as staging.
+    #
+    # The writer's own `instance` label survives the scrape as `exported_instance`
+    # (verified against the live Prometheus, 2026-08-28: `service="worker"`,
+    # `exported_instance="worker"`, `instance="node_exporter:9100"`), and dev writers
+    # end theirs in `-dev`. Rewriting `environment` from it is enough to tell them
+    # apart, and it costs neither a second exporter nor a second scrape target.
+    #
+    # `metric_relabel_configs` runs last, after target labels and after the
+    # `exported_` renaming, which is why the source label exists at this point.
+    metric_relabel_configs:
+      - source_labels: [exported_instance]
+        regex: '.*-dev'
+        target_label: environment
+        replacement: dev
 
   - job_name: alertmanager
     static_configs:

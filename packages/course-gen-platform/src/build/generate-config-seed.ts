@@ -43,6 +43,9 @@ import {
   STAGE6_CANONICAL_PHASE_DEFAULTS,
   STAGE6_EXPLICIT_PHASE_NAMES,
 } from '@megacampus/shared-types/stage6-model-config';
+// The same rename map the runtime applies. It used to be a three-entry copy
+// here against the runtime's eight, so five retired ids survived a refresh.
+import { RETIRED_MODEL_ID_REPLACEMENTS } from '@megacampus/shared-types';
 // Not `import { logger } from '@megacampus/shared-logger'`: under the tsconfig
 // path alias that package resolves to its CommonJS build, whose named exports
 // Node's ESM layer does not see, so the import threw at load and this script
@@ -57,12 +60,6 @@ const __dirname = path.dirname(__filename);
 const SEED_PATH = path.join(__dirname, '../config/config-seed.json'); // Git-tracked
 const DIST_PATH = path.join(__dirname, '../../dist/config/config-seed.json'); // Build artifact (matches bunker relative path)
 const MAX_SEED_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max
-
-const RETIRED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
-  'xiaomi/mimo-v2-flash': 'deepseek/deepseek-v4-flash',
-  'x-ai/grok-4.1-fast': 'deepseek/deepseek-v4-flash',
-  'x-ai/grok-4-fast': 'deepseek/deepseek-v4-flash',
-};
 
 function normalizeRuntimeModelId(modelId: string | null): string | null {
   if (!modelId) return null;

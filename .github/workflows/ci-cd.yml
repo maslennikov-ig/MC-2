@@ -1308,6 +1308,22 @@ jobs:
             scripts/lib/host-operation-lock.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/lib/
 
+      # The metrics group id is appended AFTER the heredoc, and read from the host.
+      #
+      # The dev containers run as uid 1001 and the metrics directory is root-owned and
+      # setgid to a dedicated group, so mounting it is not enough — without the group
+      # the writer gets EACCES on its own lock file and publishes nothing. Silently:
+      # `publishDocumentEvidenceMetricsSafely` swallows that by design, so the deploy
+      # is green, the workers run, and the alert rules still have nothing to read.
+      #
+      # It is NOT a secret — `secrets.QDRANT_METRICS_GID` does not exist in this
+      # repository, which is how the first attempt wrote an empty value and Compose
+      # refused the whole file. It is the numeric id of a group on the host, so it is
+      # read from the directory it has to match and cannot drift from it. `&&` makes
+      # it fail closed: if `stat` cannot see the directory nothing is appended, and
+      # Compose refuses rather than starting a worker that cannot write.
+      #
+      # Outside the heredoc because that one is quoted and does not expand.
       - name: Create .env.dev
         run: |
           ssh -i ~/.ssh/deploy_key \
@@ -1351,8 +1367,19 @@ jobs:
           NEXT_PUBLIC_USERBACK_TOKEN=${{ secrets.NEXT_PUBLIC_USERBACK_TOKEN }}
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=1024
+          # mc2-kim48. The dev workers publish document-evidence metrics into the
+          # host directory the shared node_exporter reads, so the dev compose file
+          # mounts it — with the same `:?` required form the staging compose uses,
+          # because a silent default would mount the wrong path rather than say so.
+          # That means the variable has to exist HERE: `.env.dev` is rewritten from
+          # scratch on every dev deploy, so anything the dev compose file needs and
+          # this block does not write simply is not there. It was not, and the
+          # deploy failed with `required variable QDRANT_METRICS_TEXTFILE_HOST_DIR
+          # is missing a value` while every test in the pipeline was green.
+          QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
           ENVEOF
-          chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev"
+          chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev
+          gid=\$(stat -c %g /var/lib/megacampus/qdrant-metrics) && echo \"QDRANT_METRICS_GID=\$gid\" >> ${{ env.DEPLOY_PATH }}/.env.dev"
 
       # Dev shares production's Docling stack, so a dev deploy writes only the
       # worker's half of this flag; the MCP container it talks to was configured

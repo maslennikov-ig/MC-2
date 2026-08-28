@@ -5,7 +5,7 @@ import {
   STAGE6_CANONICAL_PHASE_DEFAULTS,
   STAGE6_EXPLICIT_PHASE_NAMES,
 } from '@megacampus/shared-types/stage6-model-config';
-import { DEFAULT_MODEL_CONFIGS } from '@/server/routers/pipeline-admin/constants';
+import { getDefaultModelConfig } from '@/server/routers/pipeline-admin/constants';
 import { DEFAULT_PHASE_CONFIGS } from '@/shared/llm/model-config-db';
 
 const seedPath = new URL('../../../../src/config/config-seed.json', import.meta.url);
@@ -46,14 +46,14 @@ describe('stage6 fallback topology', () => {
   });
 
   it('aligns admin defaults and loader defaults with canonical Stage 6 mapping', () => {
-    expect(DEFAULT_MODEL_CONFIGS.stage_6_auto_last_chance).toMatchObject({
+    expect(getDefaultModelConfig('stage_6_auto_last_chance')).toMatchObject({
       modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.modelId,
       fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.fallbackModelId,
       temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.temperature,
       maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.maxTokens,
     });
 
-    expect(DEFAULT_MODEL_CONFIGS.stage_6_manual_regeneration).toMatchObject({
+    expect(getDefaultModelConfig('stage_6_manual_regeneration')).toMatchObject({
       modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
       fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId,
       temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,

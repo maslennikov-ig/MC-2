@@ -55,7 +55,13 @@ export async function rankAndAssemble(
 
   if (RERANKER_CONFIG.enabled && allChunks.length > 0) {
     const rerankStartTime = Date.now();
-    sortedChunks = await rerankChunks(allChunks, queries, lessonSpec.lesson_id, targetChunks);
+    sortedChunks = await rerankChunks(allChunks, queries, lessonSpec.lesson_id, targetChunks, {
+      courseId,
+      stage: 'stage_6',
+      phase: 'rag_retrieval',
+      lessonId: lessonSpec.lesson_id,
+      stepName: 'jina_rerank',
+    });
     rerankDurationMs = Date.now() - rerankStartTime;
   } else {
     // Fallback to Qdrant score sorting

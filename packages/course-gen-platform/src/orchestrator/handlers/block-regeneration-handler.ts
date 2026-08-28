@@ -27,6 +27,7 @@ import {
   CourseStructure,
 } from '@megacampus/shared-types';
 import { regenerationResponseSchema } from '@megacampus/shared-types/regeneration-types';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { BaseJobHandler } from './base-handler.js';
 import type { JobResult } from './base-handler.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin.js';
@@ -241,7 +242,7 @@ ${dynamicContext.content}
 </regeneration_task>`;
 
     // Get model config from bunker (with fallback)
-    let modelId = 'deepseek/deepseek-v4-flash';
+    let modelId: string = DEFAULT_MODEL_ID;
     let temperature = 0.7;
     let maxTokens = 2000;
 

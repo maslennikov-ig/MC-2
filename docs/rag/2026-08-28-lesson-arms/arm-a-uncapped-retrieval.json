@@ -1,0 +1,111 @@
+{
+  "arm": "uncapped",
+  "label": "3.2",
+  "queriesPlanned": 9,
+  "chunksHandedToModel": 7,
+  "distinctDocuments": 4,
+  "documents": [
+    {
+      "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+      "document_name": "a94458d4-93e6-41ff-a2e0-1a02f41d08c1.pdf",
+      "chunks": 1
+    },
+    {
+      "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+      "document_name": "4f6b6139-49a3-47cb-a321-03da86cbdcc3.docx",
+      "chunks": 4
+    },
+    {
+      "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+      "document_name": "c2529af2-4744-4d27-a957-ce0d3ef0d6d7.docx",
+      "chunks": 1
+    },
+    {
+      "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+      "document_name": "9ce9c4b3-68fb-48d3-9274-eecd006f4f58.docx",
+      "chunks": 1
+    }
+  ],
+  "coverageScore": 0.7395833333333333,
+  "totalContentChars": 6135,
+  "searchOptions": {
+    "limit": 6,
+    "enable_hybrid": true,
+    "enable_priority_boost": true,
+    "filters": {
+      "organization_id": "9b98a7d5-27ea-4441-81dc-de79d488e5db",
+      "course_id": "8baaa75e-bb85-496e-81df-807e770fd73d"
+    },
+    "include_payload": false,
+    "group_by_document": false
+  },
+  "queries": [
+    "Порядок ранжирования заявок по цене до применения преимущества",
+    "Механизм искусственного снижения цены российской заявки на 15%",
+    "Сценарий победы российской заявки с более высокой начальной ценой",
+    "Формирование цены контракта с победителем (без снижения реальной цены)",
+    "Особенности применения преимущества в аукционах и конкурсах",
+    "Отработать пошаговый алгоритм оценки заявок комиссией заказчика",
+    "Научиться определять победителя в ситуации применения преимущества",
+    "Разобрать сценарии, когда преимущество меняет очередность размещения заявок",
+    "Изучить порядок оформления протокола подведения итогов с учетом преимущества"
+  ],
+  "chunks": [
+    {
+      "chunk_id": "child_3_2066155051",
+      "document_id": "a31ec5d3-4ea5-41f0-b9e5-b2ee182c2b96",
+      "document_name": "a94458d4-93e6-41ff-a2e0-1a02f41d08c1.pdf",
+      "page_or_section": "Root",
+      "relevance_score": 0.43974733,
+      "chars": 983
+    },
+    {
+      "chunk_id": "child_143_1040072453",
+      "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+      "document_name": "4f6b6139-49a3-47cb-a321-03da86cbdcc3.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.32252598,
+      "chars": 795
+    },
+    {
+      "chunk_id": "child_172_929149499",
+      "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+      "document_name": "4f6b6139-49a3-47cb-a321-03da86cbdcc3.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.31742626,
+      "chars": 960
+    },
+    {
+      "chunk_id": "child_123_1425857542",
+      "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+      "document_name": "4f6b6139-49a3-47cb-a321-03da86cbdcc3.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.25832596,
+      "chars": 763
+    },
+    {
+      "chunk_id": "child_92_412591020",
+      "document_id": "349a57f2-ab6d-4ac3-af92-6d3b27172d43",
+      "document_name": "c2529af2-4744-4d27-a957-ce0d3ef0d6d7.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.21601155,
+      "chars": 941
+    },
+    {
+      "chunk_id": "child_8_892853650",
+      "document_id": "0e3ba5b5-f281-4aa3-860c-8f255ffd01d6",
+      "document_name": "9ce9c4b3-68fb-48d3-9274-eecd006f4f58.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.20307463,
+      "chars": 881
+    },
+    {
+      "chunk_id": "child_104_298598333",
+      "document_id": "4a6617cc-3aa2-4f2a-a863-5247378da558",
+      "document_name": "4f6b6139-49a3-47cb-a321-03da86cbdcc3.docx",
+      "page_or_section": "Root",
+      "relevance_score": 0.19930799,
+      "chars": 812
+    }
+  ]
+}

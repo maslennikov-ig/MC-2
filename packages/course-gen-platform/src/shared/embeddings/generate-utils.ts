@@ -8,11 +8,21 @@
 import { createHash } from 'crypto';
 
 /**
+ * The one embedding model this repository asks Jina for.
+ *
+ * Named rather than repeated so the request, the cache identity and the price
+ * table cannot drift apart: `JINA_PRICE_PER_MILLION_TOKENS` is keyed by exactly
+ * this string, and a rename that touched only the payload would price every
+ * embedding at nothing.
+ */
+export const JINA_EMBEDDING_MODEL = 'jina-embeddings-v3';
+
+/**
  * Jina-v3 API request with late chunking support
  */
 export interface JinaV3Request {
   /** Model identifier */
-  model: 'jina-embeddings-v3';
+  model: typeof JINA_EMBEDDING_MODEL;
   /** Text input(s) - array for late chunking */
   input: string[];
   /** Task type for task-specific adapters */

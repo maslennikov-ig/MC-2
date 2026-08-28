@@ -30,6 +30,8 @@ import { cache } from '../cache/redis';
 import logger from '../logger';
 import { ContentPolicyError } from '../errors/pipeline-errors';
 import { jinaConcurrencyLimiter, jinaRateLimiter } from './jina-client';
+import { recordJinaCallCost } from '../metrics/jina-cost';
+import type { LlmCostContext } from '../metrics/llm-cost';
 import {
   generateCacheKey,
   sleep,
@@ -38,6 +40,7 @@ import {
   FETCH_TIMEOUT_MS,
   MAX_RETRIES,
   BASE_RETRY_DELAY_MS,
+  JINA_EMBEDDING_MODEL,
   type EmbeddingCacheIdentity,
   type JinaV3Request,
   type JinaV3Response,
@@ -552,7 +555,10 @@ export async function generateEmbeddingsWithLateChunking(
  * });
  * ```
  */
-export async function generateQueryEmbedding(queryText: string): Promise<number[]> {
+export async function generateQueryEmbedding(
+  queryText: string,
+  costContext?: LlmCostContext
+): Promise<number[]> {
   const cacheKey = generateCacheKey(queryText, {
     task: 'retrieval.query',
     lateChunking: false,
@@ -596,14 +602,30 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   // Note: rateLimiter.waitForSlot() is called inside makeJinaV3Request(),
   // so we don't call it here to avoid double-waiting
 
+  const calledAt = Date.now();
   const response = await makeJinaV3Request(
     withProviderTruncation({
-      model: 'jina-embeddings-v3',
+      model: JINA_EMBEDDING_MODEL,
       input: [queryText],
       task: 'retrieval.query', // Use query-specific adapter
       dimensions: 768,
       late_chunking: false, // Not needed for single query
     })
+  );
+
+  // One retrieval query, one paid embedding, one priced row. `makeJinaV3Request`
+  // returns `usage` and every caller used to throw it away — no tracker, no log
+  // line, nothing — so this was the hotter of the two Jina paths and the more
+  // completely invisible one. Recorded after the call, so a cache hit above
+  // stays free.
+  await recordJinaCallCost(
+    {
+      model: JINA_EMBEDDING_MODEL,
+      totalTokens: response.usage?.total_tokens ?? 0,
+      operation: 'embedding',
+      durationMs: Date.now() - calledAt,
+    },
+    costContext
   );
 
   const embedding = response.data[0].embedding;

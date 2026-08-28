@@ -38,12 +38,17 @@ function payload() {
           provider_name: 'Relace',
           pricing: { prompt: '0.00000007', completion: '0.00000014' },
           status: 0,
+          // An object, not a number — see the test below.
+          throughput_last_30m: { p50: 100, p75: 130, p90: 160, p99: 190 },
+          uptime_last_30m: 99.9,
         },
         {
           tag: 'sail-research/fp4',
           provider_name: 'Sail Research',
           pricing: { prompt: '0.000000065', completion: '0.00000018' },
           status: 0,
+          throughput_last_30m: { p50: 9, p75: 12, p90: 15, p99: 21 },
+          uptime_last_30m: 99.9,
         },
         // No tag: nothing can be routed to it, so it is not a candidate.
         { provider_name: 'Nameless', pricing: { prompt: '0.00000001' }, status: 0 },
@@ -117,6 +122,38 @@ describe('reading the endpoint list', () => {
   });
 });
 
+describe('reading throughput', () => {
+  it('reads the median out of the object the API actually sends', async () => {
+    // `throughput_last_30m` is `{p50,p75,p90,p99}`; `uptime_last_30m`, right
+    // beside it, is a plain number. Reading the first with `Number()` gives NaN
+    // and makes a fully populated field look empty — which is exactly how the
+    // throughput data was once reported as missing.
+    global.fetch = respondWith(payload()) as unknown as typeof fetch;
+
+    const endpoints = await listModelEndpoints('deepseek/deepseek-v4-flash-0731');
+    const bySlug = new Map(endpoints.map(e => [e.tag, e]));
+
+    expect(bySlug.get('relace/fp4')?.throughputTokensPerSecond).toBe(100);
+    expect(bySlug.get('sail-research/fp4')?.throughputTokensPerSecond).toBe(9);
+  });
+
+  it('records no figure rather than a zero when the endpoint publishes none', async () => {
+    // Zero would mean "infinitely slow" to the floor and would refuse the
+    // endpoint; null means "not stated" and lets it through.
+    global.fetch = respondWith({
+      data: {
+        endpoints: [
+          { tag: 'new/fp4', pricing: { prompt: '0.0000001', completion: '0.0000002' }, status: 0 },
+        ],
+      },
+    }) as unknown as typeof fetch;
+
+    const [only] = await listModelEndpoints('vendor/newcomer');
+
+    expect(only.throughputTokensPerSecond).toBeNull();
+  });
+});
+
 describe('choosing among endpoints', () => {
   const list = [
     {
@@ -125,6 +162,7 @@ describe('choosing among endpoints', () => {
       promptPricePerMillion: 0.065,
       completionPricePerMillion: 0.18,
       status: 0,
+      throughputTokensPerSecond: 80,
     },
     {
       tag: 'b/fp4',
@@ -132,6 +170,7 @@ describe('choosing among endpoints', () => {
       promptPricePerMillion: 0.065,
       completionPricePerMillion: 0.18,
       status: -2,
+      throughputTokensPerSecond: 80,
     },
     {
       tag: 'c/fp4',
@@ -139,6 +178,7 @@ describe('choosing among endpoints', () => {
       promptPricePerMillion: 0.07,
       completionPricePerMillion: 0.14,
       status: 0,
+      throughputTokensPerSecond: 80,
     },
     {
       tag: 'd/fp8',
@@ -146,6 +186,7 @@ describe('choosing among endpoints', () => {
       promptPricePerMillion: 0.44,
       completionPricePerMillion: 1.2,
       status: 0,
+      throughputTokensPerSecond: 80,
     },
   ];
 
@@ -169,6 +210,106 @@ describe('choosing among endpoints', () => {
     expect(pickCheapestUntriedEndpoint(list, new Set(['a/fp4', 'c/fp4']), ceiling)).toBeUndefined();
     // Without a ceiling the same call has somewhere left to go.
     expect(pickCheapestUntriedEndpoint(list, new Set(['a/fp4', 'c/fp4']))?.tag).toBe('d/fp8');
+  });
+});
+
+/**
+ * Contract: cheapest **among the endpoints that can finish**.
+ *
+ * The numbers below are the live `/endpoints` list for
+ * `deepseek/deepseek-v4-flash-0731` on 2026-08-28, which is the model most of
+ * this pipeline runs on. Its cheapest endpoint served 9 tokens a second; the
+ * next one up, at twice the price, served 100. An 8000-token lesson is 15
+ * minutes at the first rate and 80 seconds at the second, and the phase config
+ * gives that call 300 s — so the cheap route could not have finished at all.
+ *
+ * Sorting on price alone had been choosing it since the sort was written. This
+ * is the half of the 2026-08-21 timeout that pinning did not fix: the pin made a
+ * slow provider nameable, it did not stop us picking one (mc2-6crnj, mc2-u8kwx).
+ */
+describe('the throughput floor', () => {
+  const endpoint = (
+    tag: string,
+    promptPricePerMillion: number,
+    throughputTokensPerSecond: number | null
+  ) => ({
+    tag,
+    providerName: tag,
+    promptPricePerMillion,
+    completionPricePerMillion: promptPricePerMillion * 2,
+    status: 0,
+    throughputTokensPerSecond,
+    tier: 'default' as const,
+  });
+
+  it('passes over the cheapest endpoint when it cannot keep up', () => {
+    const live = [
+      endpoint('open-inference/fp4', 0.03, 9),
+      endpoint('relace/fp4', 0.06, 100),
+      endpoint('deepinfra/fp8', 0.08, 58),
+    ];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set())?.tag).toBe('relace/fp4');
+  });
+
+  it('takes the cheapest of those that do keep up, not the fastest', () => {
+    const live = [
+      endpoint('slow/fp4', 0.03, 9),
+      endpoint('adequate/fp4', 0.06, 40),
+      endpoint('rapid/fp8', 0.08, 200),
+    ];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set())?.tag).toBe('adequate/fp4');
+  });
+
+  it('uses a slow endpoint rather than none when it is all there is', () => {
+    // A floor that can refuse everything is a floor that can stop a generation.
+    const live = [endpoint('slow/fp4', 0.03, 9), endpoint('slower/fp8', 0.08, 4)];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set())?.tag).toBe('slow/fp4');
+  });
+
+  it('treats an unpublished figure as no objection', () => {
+    // "Not stated" is not "slow". A new provider has no 30-minute history, and
+    // refusing it would pin routing to whoever is already established.
+    const live = [endpoint('newcomer/fp4', 0.03, null), endpoint('known/fp8', 0.08, 120)];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set())?.tag).toBe('newcomer/fp4');
+  });
+
+  it('does not answer a request for flex by leaving flex for something dearer', () => {
+    // Live numbers for `openai/gpt-5.6-luna` on 2026-08-28: the flex endpoint
+    // is $0.10/1M at 26 tok/s, the default one $0.20 at 68. A floor allowed to
+    // reach across tiers would double the price of a call that explicitly asked
+    // to halve it — speed is not the term flex trades away.
+    const live = [
+      { ...endpoint('openai/flex', 0.1, 26), tier: 'flex' as const },
+      { ...endpoint('azure', 0.2, 68), tier: 'default' as const },
+    ];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set(), undefined, 'flex')?.tag).toBe(
+      'openai/flex'
+    );
+  });
+
+  it('falls through to the default tier once the flex endpoint has been tried', () => {
+    const live = [
+      { ...endpoint('openai/flex', 0.1, 26), tier: 'flex' as const },
+      { ...endpoint('azure', 0.2, 68), tier: 'default' as const },
+    ];
+
+    expect(
+      pickCheapestUntriedEndpoint(live, new Set(['openai/flex']), undefined, 'flex')?.tag
+    ).toBe('azure');
+  });
+
+  it('still refuses a degraded endpoint however fast it claims to be', () => {
+    const live = [
+      { ...endpoint('degraded/fp4', 0.03, 500), status: -2 },
+      endpoint('healthy/fp8', 0.08, 60),
+    ];
+
+    expect(pickCheapestUntriedEndpoint(live, new Set())?.tag).toBe('healthy/fp8');
   });
 });
 

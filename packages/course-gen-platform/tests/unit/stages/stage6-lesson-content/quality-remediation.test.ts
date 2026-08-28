@@ -45,19 +45,20 @@ function createBaseResult(): HeuristicFilterResult {
 }
 
 describe('summarizeDetailedHeuristicResult', () => {
-  it('downgrades 3-4 callouts to WARN_ONLY', () => {
+  it('warns when callouts exceed the budget', () => {
     const result = createBaseResult();
     result.failures = [
       {
         filter: 'calloutDensity',
-        expected: 'At most 2 callout blocks',
-        actual: '3 callouts',
+        expected: 'At most 3 callout blocks (about one per section)',
+        actual: '4 callouts',
         severity: 'major',
       },
     ];
     result.metrics.calloutDensity = {
-      calloutCount: 3,
+      calloutCount: 4,
       calloutTypes: ['TIP'],
+      calloutBudget: 3,
     };
 
     const summary = summarizeDetailedHeuristicResult(result);
@@ -66,25 +67,53 @@ describe('summarizeDetailedHeuristicResult', () => {
     expect(summary.lessonFlags).toContain('callout_density_warning');
   });
 
-  it('upgrades 5+ callouts to FULL_REGEN', () => {
+  it('says nothing when the callouts fit the budget the sections earn', () => {
+    // Six sections, six callouts: exactly what the prompts ask for, and what the old
+    // flat cap of two called a critical failure.
     const result = createBaseResult();
-    result.failures = [
-      {
-        filter: 'calloutDensity',
-        expected: 'At most 2 callout blocks',
-        actual: '5 callouts',
-        severity: 'critical',
-      },
-    ];
     result.metrics.calloutDensity = {
-      calloutCount: 5,
-      calloutTypes: ['TIP', 'NOTE'],
+      calloutCount: 6,
+      calloutTypes: ['TIP', 'WARNING'],
+      calloutBudget: 6,
     };
 
     const summary = summarizeDetailedHeuristicResult(result);
 
-    expect(summary.action).toBe(QualityRemediationAction.FULL_REGEN);
-    expect(summary.lessonFlags).toContain('callout_density_blocking');
+    expect(summary.lessonFlags).not.toContain('callout_density_warning');
+    expect(summary.action).not.toBe(QualityRemediationAction.FULL_REGEN);
+  });
+
+  /**
+   * mc2-udj0b. Callouts used to force a FULL_REGEN at five or more — the same lever as
+   * "the content has zero sections" — and the mapping arrived as a side effect of a
+   * refactor, three days after the filter shipped as a 0.03-weight deduction.
+   *
+   * Measured over 20 generations: 0 of 20 lessons met the old cap, 11 were regenerated
+   * twice, every one came back over it again (once with eight), all 11 landed in
+   * review_required, and they scored 0.778 against 0.907 for the lessons left alone.
+   * Regenerating for this never worked and cost twice.
+   */
+  it('never regenerates for callouts, however many there are', () => {
+    const result = createBaseResult();
+    result.failures = [
+      {
+        filter: 'calloutDensity',
+        expected: 'At most 2 callout blocks (about one per section)',
+        actual: '12 callouts',
+        severity: 'critical',
+      },
+    ];
+    result.metrics.calloutDensity = {
+      calloutCount: 12,
+      calloutTypes: ['TIP', 'NOTE', 'WARNING'],
+      calloutBudget: 2,
+    };
+
+    const summary = summarizeDetailedHeuristicResult(result);
+
+    expect(summary.action).toBe(QualityRemediationAction.WARN_ONLY);
+    expect(summary.lessonFlags).toContain('callout_density_warning');
+    expect(summary.lessonFlags).not.toContain('callout_density_blocking');
   });
 
   it('downgrades 1-3 non-technical code blocks to WARN_ONLY', () => {

@@ -6,6 +6,8 @@
  * Handles lesson enrichment generation (quiz, audio, presentation, video, document).
  */
 
+import { DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
+
 /**
  * Stage 7 worker and queue configuration
  */
@@ -36,12 +38,6 @@ export const STAGE7_CONFIG = {
 } as const;
 
 /**
- * Default job timeout in milliseconds (10 minutes for enrichment generation)
- * Enrichments like video/audio may take longer than lesson content
- */
-export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — enrichments (quiz, presentation) can be slow via OpenRouter
-
-/**
  * Model configuration for LLM-based enrichments (quiz, presentation)
  *
  * There is no `primary` here on purpose. The primary model belongs to
@@ -54,11 +50,11 @@ export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — enrichments (quiz
 export const MODEL_CONFIG = {
   /** Last-resort fallback for quiz generation, used when the phase config has none */
   quiz: {
-    fallback: 'qwen/qwen3-235b-a22b-2507',
+    fallback: DEFAULT_FALLBACK_MODEL_ID,
   },
   /** Last-resort fallback for presentation generation, used when the phase config has none */
   presentation: {
-    fallback: 'qwen/qwen3-235b-a22b-2507',
+    fallback: DEFAULT_FALLBACK_MODEL_ID,
   },
   /**
    * Attempts the configured primary model gets before the fallback takes over.

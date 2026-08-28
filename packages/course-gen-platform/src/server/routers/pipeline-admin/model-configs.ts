@@ -179,7 +179,7 @@ export const modelConfigsRouter = router({
    * Reset model config to hardcoded default (T029)
    *
    * Deactivates current config and inserts hardcoded default as new version.
-   * Uses DEFAULT_MODEL_CONFIGS constant.
+   * Reads the committed snapshot of `llm_model_config` (config-seed.json).
    *
    * Authorization: Superadmin only
    */

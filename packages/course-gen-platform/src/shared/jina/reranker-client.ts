@@ -20,13 +20,25 @@ import { createHash } from 'crypto';
 import logger from '../logger';
 import { cache } from '../cache/redis';
 import { jinaConcurrencyLimiter, jinaRateLimiter } from '../embeddings/jina-client';
+import { recordJinaCallCost } from '../metrics/jina-cost';
+import type { LlmCostContext } from '../metrics/llm-cost';
+
+/**
+ * The one model this client calls.
+ *
+ * Named rather than repeated so the request, the log line and the price table
+ * cannot drift apart: `JINA_PRICE_PER_MILLION_TOKENS` is keyed by exactly this
+ * string, and a rename that touched only the payload would price the call at
+ * nothing.
+ */
+export const JINA_RERANKER_MODEL = 'jina-reranker-v2-base-multilingual';
 
 /**
  * Jina Reranker API request payload
  */
 interface JinaRerankerRequest {
   /** Model identifier (always "jina-reranker-v2-base-multilingual") */
-  model: 'jina-reranker-v2-base-multilingual';
+  model: typeof JINA_RERANKER_MODEL;
   /** Query text to compare against documents */
   query: string;
   /** Array of document texts to rerank */
@@ -379,7 +391,8 @@ async function makeJinaRequest(payload: JinaRerankerRequest): Promise<JinaRerank
 export async function rerankDocuments(
   query: string,
   documents: string[],
-  topN?: number
+  topN?: number,
+  costContext?: LlmCostContext
 ): Promise<RerankResult[]> {
   // Handle edge cases
   if (!query || query.trim().length === 0) {
@@ -442,16 +455,31 @@ export async function rerankDocuments(
     '[Jina Reranker] Cache miss, calling API'
   );
 
-  const results = await retryWithExponentialBackoff(async () => {
-    const response = await makeJinaRequest({
-      model: 'jina-reranker-v2-base-multilingual',
+  const calledAt = Date.now();
+  const response = await retryWithExponentialBackoff(async () =>
+    makeJinaRequest({
+      model: JINA_RERANKER_MODEL,
       query: query.trim(),
       documents,
       top_n: topN,
-    });
+    })
+  );
+  const results = response.results;
 
-    return response.results;
-  });
+  // Priced here and not at the cache read above, because a cache hit spends
+  // nothing. This is the whole accumulated union — `rankAndAssemble` hands the
+  // reranker every chunk the pass gathered — so it is the larger of the two
+  // Jina bills a lesson runs up, and it was the one nothing recorded.
+  await recordJinaCallCost(
+    {
+      model: JINA_RERANKER_MODEL,
+      totalTokens: response.usage?.total_tokens ?? 0,
+      operation: 'rerank',
+      documentCount: documents.length,
+      durationMs: Date.now() - calledAt,
+    },
+    costContext
+  );
 
   // Cache the results
   try {
@@ -507,6 +535,8 @@ export async function rerankDocuments(
 export async function healthCheck(): Promise<boolean> {
   try {
     validateJinaConfig();
+    // cost-exempt: a startup probe belongs to no course. Two four-word
+    // documents, and it runs only when a caller asks for it.
     const testResults = await rerankDocuments('test query', ['test document 1', 'test document 2']);
     return testResults.length === 2;
   } catch (error) {

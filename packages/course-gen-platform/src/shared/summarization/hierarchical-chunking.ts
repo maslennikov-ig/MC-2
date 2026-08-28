@@ -22,6 +22,7 @@ import type { LlmCostContext } from '../metrics/llm-cost';
 import { tokenEstimator } from '../llm/token-estimator';
 import logger from '../logger';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Compression level determines summarization prompt aggressiveness
  */
@@ -156,7 +157,7 @@ export async function hierarchicalChunking(
     maxIterations = 5,
     chunkSize = 115000,
     overlapPercent = 5,
-    model = 'openai/gpt-oss-20b',
+    model = DEFAULT_MODEL_ID,
     temperature = 0.7,
     maxTokensPerChunk = 10000,
     costContext,

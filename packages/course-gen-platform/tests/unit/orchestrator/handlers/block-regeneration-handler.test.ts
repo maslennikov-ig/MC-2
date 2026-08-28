@@ -66,6 +66,7 @@ import {
 } from '../../../../src/shared/regeneration/index.js';
 import { regenerationResponseSchema } from '@megacampus/shared-types/regeneration-types';
 
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Create a mock BullMQ job for testing
  */
@@ -252,7 +253,7 @@ describe('BlockRegenerationHandler', () => {
       expect(llmClient.generateCompletion).toHaveBeenCalledWith(
         expect.stringContaining('sections[0].lessons[0].lesson_title'),
         expect.objectContaining({
-          model: 'deepseek/deepseek-v4-flash',
+          model: DEFAULT_MODEL_ID,
           temperature: 0.7,
         })
       );

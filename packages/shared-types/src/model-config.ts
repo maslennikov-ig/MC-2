@@ -84,6 +84,28 @@ export type PhaseName =
   // Inline Operations
   | 'inline_block_regeneration'
   | 'inline_element_crud'
+  // Career Playbook. Added 2026-08-28 (mc2-oyes7): all twelve had live rows in
+  // `llm_model_config` and the database CHECK has always accepted them, but
+  // neither this union nor `phaseNameSchema` listed one, so the superadmin panel
+  // rejected the name before the handler ran. Twelve phases that generate and
+  // cost money, editable only by a deploy.
+  | 'stage_career_playbook_department_classifier'
+  | 'stage_career_playbook_followup'
+  | 'stage_career_playbook_spec'
+  | 'stage_career_playbook_group_1'
+  | 'stage_career_playbook_group_2'
+  | 'stage_career_playbook_group_3'
+  | 'stage_career_playbook_group_4'
+  | 'stage_career_playbook_group_5'
+  | 'stage_career_playbook_group_6'
+  | 'stage_career_playbook_judge'
+  | 'stage_career_playbook_proofreader'
+  | 'stage_career_playbook_regenerator'
+  // Stage 6 single-call generation. Its `timeout_ms` is the Stage 6 job timeout
+  // and its name labels every override-driven call, so it was never a spare
+  // constant — it simply had no row, because the CHECK constraint did not admit
+  // one until 20260828100000.
+
   // Special
   | 'emergency'
   | 'quality_fallback';

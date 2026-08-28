@@ -25,7 +25,7 @@ import { refinementConfigsRouter } from './refinement-configs';
 import { contextReserveRouter } from './context-reserve';
 
 // Re-export constants for use by other modules
-export { PIPELINE_STAGES, DEFAULT_MODEL_CONFIGS } from './constants';
+export { PIPELINE_STAGES, getDefaultModelConfig } from './constants';
 export type { PipelineStageDefinition, DefaultModelConfig } from './constants';
 
 /**

@@ -159,6 +159,7 @@ export function createSearchDocumentsTool(courseId: string): ToolDefinition {
             course_id: courseId,
             ...filter,
           },
+          cost_context: { courseId, stage: 'stage_5', phase: 'rag_tool' },
         };
 
         logger.info(

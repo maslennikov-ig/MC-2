@@ -29,7 +29,7 @@ import { buildCompletionRequest, buildReasoningPayload } from '@/shared/llm/clie
 import {
   COLLISION_FALLBACK_MODEL_ID,
   RETIRED_MODEL_ID_REPLACEMENTS,
-} from '@/shared/llm/model-config-db';
+} from '@megacampus/shared-types';
 import seed from '@/config/config-seed.json';
 
 interface SeedRow {
@@ -248,6 +248,19 @@ describe('phase configuration against the provider contract', () => {
         .map(([retired, replacement]) => `${retired} -> ${replacement}`);
 
       expect(unpriced).toEqual([]);
+    });
+
+    it('replaces a retired model id with one that is actually in live routing', () => {
+      // Priced is not enough. `qwen/qwen3.5-plus-02-15` pointed at
+      // `qwen/qwen3.7-plus`, priced and catalogued but named by nothing else,
+      // so retiring an id was quietly the only thing keeping an eleventh model
+      // reachable — and a substitution nobody chose is the worst place to
+      // discover a model (mc2-u8kwx, mc2-v6r1p).
+      const offRoute = Object.entries(RETIRED_MODEL_ID_REPLACEMENTS)
+        .filter(([, replacement]) => !liveRouting.has(replacement))
+        .map(([retired, replacement]) => `${retired} -> ${replacement}`);
+
+      expect(offRoute).toEqual([]);
     });
 
     it('never maps a retired id onto another retired id', () => {

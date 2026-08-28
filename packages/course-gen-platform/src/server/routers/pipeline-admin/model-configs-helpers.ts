@@ -15,7 +15,7 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
 import { getOpenRouterModels } from '../../../services/openrouter-models';
-import { DEFAULT_MODEL_CONFIGS } from './constants';
+import { getDefaultModelConfig } from './constants';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
 import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
@@ -533,7 +533,7 @@ export async function handleResetModelConfigToDefault(
 ) {
   const supabase = getSupabaseAdmin();
 
-  const defaultConfig = DEFAULT_MODEL_CONFIGS[input.phaseName];
+  const defaultConfig = getDefaultModelConfig(input.phaseName);
   if (!defaultConfig) {
     throw new TRPCError({
       code: 'BAD_REQUEST',

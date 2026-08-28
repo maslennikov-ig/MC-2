@@ -99,7 +99,8 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 
    Types: NOTE, TIP, WARNING, INFO
    CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
-   Use max 1-2 callouts per lesson for genuinely important tips.
+   Use them for genuinely important tips, and prefer variety: a table, a diagram or
+   plain prose often carries the same point better. About one per section is plenty.
 
 *Syntax keywords (mermaid, [!TIP]) stay in English regardless of output language.*
 

@@ -136,7 +136,7 @@ export async function denseSearch(
   options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
   const embeddingStartTime = Date.now();
-  const queryVector = await generateQueryEmbedding(queryText);
+  const queryVector = await generateQueryEmbedding(queryText, options.cost_context);
   const embeddingTime = Date.now() - embeddingStartTime;
   const filter = buildQdrantFilter(options.filters);
 
@@ -205,7 +205,7 @@ export async function hybridSearchNative(
   queryText: string,
   options: ResolvedSearchOptions
 ): Promise<QdrantScoredPoint[]> {
-  const queryVector = await generateQueryEmbedding(queryText);
+  const queryVector = await generateQueryEmbedding(queryText, options.cost_context);
   const prefetch = buildHybridPrefetch(queryText, queryVector, options);
   const prefetchLimit = getPrefetchLimit(options.limit);
   const rrfQuery: Schemas['RrfQuery'] = { rrf: {} };

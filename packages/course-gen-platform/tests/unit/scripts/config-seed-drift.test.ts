@@ -95,9 +95,21 @@ describe('config seed drift comparison', () => {
     expect(result.hasDrift).toBe(false);
   });
 
-  it('ignores stage_6_content, which the generator injects with no database row', () => {
-    const result = compareSeedToDatabase([row(), row({ phase_name: 'stage_6_content' })], [row()]);
+  it('compares stage_6_content like any other phase', () => {
+    // It was excluded while it had no database row. Since 20260828100000 it has
+    // two, and the exclusion inverted the check: the rows existed on both sides
+    // and the seed half was thrown away, so CI reported them missing from a file
+    // that contained them (mc2-oyes7).
+    const present = compareSeedToDatabase(
+      [row(), row({ phase_name: 'stage_6_content' })],
+      [row(), row({ phase_name: 'stage_6_content' })]
+    );
+    expect(present.hasDrift).toBe(false);
 
-    expect(result.hasDrift).toBe(false);
+    const absentFromSeed = compareSeedToDatabase(
+      [row()],
+      [row(), row({ phase_name: 'stage_6_content' })]
+    );
+    expect(absentFromSeed.missingFromSeed).toHaveLength(1);
   });
 });

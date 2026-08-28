@@ -552,22 +552,46 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
 const CALLOUT_REGEX = /^>\s*\[!(PRO\s*TIP|TIP|WARNING|NOTE|INFO|DANGER)\]/gim;
 
 /**
- * Check callout density in lesson content
+ * Check callout density in lesson content.
  *
  * Too many callout blocks (> [!TIP], > [!WARNING], etc.) fragment the reading flow
- * and dilute the signal each callout is meant to carry.
+ * and dilute the signal each callout is meant to carry. That complaint is real — it
+ * came from testers on 2026-04-01, who found excessive callouts in 20 lessons of 25.
  *
- * Thresholds:
- * - 0-2 callouts: pass (score 1.0)
- * - 3-4 callouts: major (score 0.5)
- * - 5+ callouts: critical (score 0.0)
+ * ## Why the threshold is a budget and not a number (measured 2026-08-28)
+ *
+ * It used to be a flat "at most 2 per lesson", chosen in a twenty-minute task without
+ * looking at what lessons contain. Measured over 20 generations:
+ *
+ *   callouts per lesson: min 3, max 8, mean 4.8
+ *   lessons inside the old pass band (<= 2):  0 of 20
+ *
+ * Not one lesson met it. A gate the whole output fails does not select anything, and
+ * this one was wired to force a full regeneration — which came back with five again,
+ * once with eight, because the prompts ask for a visual element PER SECTION and name
+ * the callout as one of the forms. The rule counted per lesson what the prompts
+ * produce per section.
+ *
+ * So the budget is per section, which is the unit the callouts are actually generated
+ * in, with a floor of two so a one-section lesson can still carry a tip and a warning.
+ * Over the same 20 lessons this passes the ordinary ones and still flags the outlier
+ * that carried eight across six sections.
+ *
+ * The severity is scoring only. `summarizeDetailedHeuristicResult` no longer escalates
+ * callouts to a regeneration at any count: regenerating never fixed one, and the
+ * lessons it regenerated came out worse (0.778 against 0.907). See `mc2-udj0b`.
  *
  * @param content - Lesson content (markdown string)
+ * @param sectionCount - Sections parsed from the same content; the budget scales with it
  * @returns Filter check result with callout count and types found
  */
-export function checkCalloutDensity(content: string): FilterCheckResult & {
+export function checkCalloutDensity(
+  content: string,
+  sectionCount = 0
+): FilterCheckResult & {
   calloutCount: number;
   calloutTypes: string[];
+  calloutBudget: number;
 } {
   const matches = Array.from(content.matchAll(CALLOUT_REGEX));
   const calloutCount = matches.length;
@@ -581,32 +605,38 @@ export function checkCalloutDensity(content: string): FilterCheckResult & {
     ),
   ];
 
-  if (calloutCount <= 2) {
+  // One per section is the rate the prompts ask for; two is the floor so a short
+  // lesson is not judged against a budget of zero.
+  const calloutBudget = Math.max(2, sectionCount);
+
+  if (calloutCount <= calloutBudget) {
     return {
       passed: true,
-      actual: `${calloutCount} callout(s)`,
+      actual: `${calloutCount} callout(s) against a budget of ${calloutBudget}`,
       scoreContribution: 1.0,
       calloutCount,
       calloutTypes,
+      calloutBudget,
     };
   }
 
-  const severity: 'major' | 'critical' = calloutCount <= 4 ? 'major' : 'critical';
-  const scoreContribution = calloutCount <= 4 ? 0.5 : 0.0;
+  const severity: 'major' | 'critical' = calloutCount <= calloutBudget * 2 ? 'major' : 'critical';
+  const scoreContribution = calloutCount <= calloutBudget * 2 ? 0.5 : 0.0;
 
   return {
     passed: false,
-    actual: `${calloutCount} callout(s)`,
+    actual: `${calloutCount} callout(s) against a budget of ${calloutBudget}`,
     scoreContribution,
     calloutCount,
     calloutTypes,
+    calloutBudget,
     failure: {
       filter: 'calloutDensity',
-      expected: 'At most 2 callout blocks',
+      expected: `At most ${calloutBudget} callout blocks (about one per section)`,
       actual: `${calloutCount} callouts (types: ${calloutTypes.join(', ')})`,
       severity,
     },
-    suggestion: `Reduce callout blocks from ${calloutCount} to at most 2. Found types: ${calloutTypes.join(', ')}. Merge related callouts or convert less important ones to regular text.`,
+    suggestion: `Reduce callout blocks from ${calloutCount} to about ${calloutBudget}, roughly one per section. Found types: ${calloutTypes.join(', ')}. Merge related callouts or convert less important ones to regular text, a table or a diagram.`,
   };
 }
 

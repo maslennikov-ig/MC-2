@@ -13,6 +13,7 @@ import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution } from './observability';
 import type { ResearchFlag } from '@megacampus/shared-types/analysis-result';
 import { estimateTokenCount } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { z } from 'zod';
 
 export interface ResearchFlagInput {
@@ -158,7 +159,7 @@ export async function detectResearchFlags(
     estimatedTokenCount,
     input.language
   );
-  const modelId = model.model || 'deepseek/deepseek-v4-flash'; // Get modelId from ChatOpenAI instance
+  const modelId = model.model || DEFAULT_MODEL_ID; // Get modelId from ChatOpenAI instance
 
   // Build prompt
   const prompt = buildResearchFlagPrompt(input);

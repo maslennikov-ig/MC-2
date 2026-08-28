@@ -1,6 +1,7 @@
 import {
   DEFAULT_FALLBACK_MODEL_ID,
   DEFAULT_MODEL_ID,
+  ESCALATION_MODEL_ID,
   PROSE_FALLBACK_MODEL_ID,
   PROSE_MODEL_ID,
 } from './model-defaults';
@@ -71,13 +72,13 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
   // primary and the fallback: by the time either runs, the default model has
   // already failed on this lesson, so retrying it is a wasted attempt.
   stage_6_auto_last_chance: createStage6Config({
-    modelId: 'z-ai/glm-5.2',
+    modelId: ESCALATION_MODEL_ID,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
     maxTokens: 12000,
   }),
   stage_6_manual_regeneration: createStage6Config({
     modelId: DEFAULT_FALLBACK_MODEL_ID,
-    fallbackModelId: 'z-ai/glm-5.2',
+    fallbackModelId: ESCALATION_MODEL_ID,
     maxTokens: 12000,
   }),
   stage_6_arbiter: createStage6Config({

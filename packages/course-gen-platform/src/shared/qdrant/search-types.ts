@@ -4,6 +4,8 @@
  * @module shared/qdrant/search-types
  */
 
+import type { LlmCostContext } from '../metrics/llm-cost';
+
 /**
  * Search result item
  */
@@ -147,6 +149,18 @@ export interface SearchOptions {
   group_by_document?: boolean;
   /** Maximum chunks returned per document group (default: 2). */
   group_size?: number;
+  /**
+   * The course to charge this search's query embedding to.
+   *
+   * Every search that misses the embedding cache pays Jina for one vector, and
+   * until 2026-08-28 nothing recorded that: `generation_trace` held OpenRouter
+   * calls only, so a stage's retrieval spend was outside every cost figure this
+   * repository reports. It is optional for the same reason `LlmCostContext` is
+   * optional at an LLM call — evaluation harnesses and maintenance scripts have
+   * no course — and `tests/unit/shared/metrics/no-anonymous-spend.test.ts`
+   * names the ones allowed to leave it out.
+   */
+  cost_context?: LlmCostContext;
 }
 
 /**
@@ -156,9 +170,13 @@ export interface SearchOptions {
  * searched, which is the right default for a caller that has no prompt budget
  * to spend.
  */
-export type ResolvedSearchOptions = Required<Omit<SearchOptions, 'filters' | 'expand_context'>> & {
+export type ResolvedSearchOptions = Required<
+  Omit<SearchOptions, 'filters' | 'expand_context' | 'cost_context'>
+> & {
   filters: SearchFilters;
   expand_context?: SearchOptions['expand_context'];
+  /** Stays optional: absent means the caller has no course to charge. */
+  cost_context?: LlmCostContext;
 };
 
 /**

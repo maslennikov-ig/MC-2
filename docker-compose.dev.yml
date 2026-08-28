@@ -246,10 +246,30 @@ services:
       # Stage 7 queue name - needed for triggerCourseCard() after Stage 5
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+      # mc2-kim48. The evidence metric writer turns on with this variable, and it was
+      # set on the staging containers — which see almost no evidence traffic — and not
+      # here, where the runs actually happen. So four alert rules had nothing to read.
+      # The instance name ends in `-dev`, which is what `prometheus.yml` matches to
+      # stamp `environment="dev"`; without that the shared node_exporter target would
+      # label these series `staging` and a dev failure would page as one.
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=worker
+      - QDRANT_METRICS_INSTANCE=worker-dev
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      # The metrics directory is root-owned, setgid, group-writable by a dedicated
+      # group. These containers run as uid 1001, so mounting the directory is not
+      # enough: without the supplementary group the writer gets EACCES on its own lock
+      # file and publishes nothing. Verified 2026-08-28 by running the real publisher
+      # inside the dev container, which is the only way this shows up — the mount looks
+      # correct and the code is silent about it (publishDocumentEvidenceMetricsSafely
+      # swallows the failure by design, so product work is never blocked by metrics).
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-json-cache
       - worker-dev-data:/app/data
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
     networks:
       - megacampus
     depends_on:
@@ -295,10 +315,26 @@ services:
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
+      # mc2-kim48, same reason as worker-dev above: this is the container Stage 6
+      # evidence retrieval actually runs in, and it published nothing.
+      - QDRANT_METRICS_TEXTFILE_DIR=/var/lib/megacampus/qdrant-metrics
+      - QDRANT_METRICS_SERVICE=stage6
+      - QDRANT_METRICS_INSTANCE=stage6-dev
+      - QDRANT_METRICS_GID=${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}
+    group_add:
+      # The metrics directory is root-owned, setgid, group-writable by a dedicated
+      # group. These containers run as uid 1001, so mounting the directory is not
+      # enough: without the supplementary group the writer gets EACCES on its own lock
+      # file and publishes nothing. Verified 2026-08-28 by running the real publisher
+      # inside the dev container, which is the only way this shows up — the mount looks
+      # correct and the code is silent about it (publishDocumentEvidenceMetricsSafely
+      # swallows the failure by design, so product work is never blocked by metrics).
+      - '${QDRANT_METRICS_GID:?QDRANT_METRICS_GID must be a numeric dedicated group ID}'
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-json-cache
       - worker-dev-data:/app/data
+      - ${QDRANT_METRICS_TEXTFILE_HOST_DIR:?QDRANT_METRICS_TEXTFILE_HOST_DIR must be set}:/var/lib/megacampus/qdrant-metrics
     networks:
       - megacampus
     depends_on:

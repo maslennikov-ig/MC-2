@@ -229,7 +229,9 @@ export function runHeuristicFilters(
   const truncationResult = checkContentTruncation(content);
   accumulateFilterResult(truncationResult, FILTER_WEIGHTS.contentTruncation, acc);
 
-  const calloutDensityResult = checkCalloutDensity(content);
+  // The budget is per section, so it reads the section count the density filter
+  // already parsed rather than counting headings a second time.
+  const calloutDensityResult = checkCalloutDensity(content, densityResult.sectionCount);
   accumulateFilterResult(calloutDensityResult, FILTER_WEIGHTS.calloutDensity, acc);
 
   const contentArchetype = lessonSpec.metadata?.content_archetype ?? 'concept_explainer';
@@ -324,6 +326,7 @@ export function runHeuristicFilters(
       calloutDensity: {
         calloutCount: calloutDensityResult.calloutCount,
         calloutTypes: calloutDensityResult.calloutTypes,
+        calloutBudget: calloutDensityResult.calloutBudget,
       },
       codeBlockAudienceMatch: {
         codeBlockCount: codeBlockAudienceResult.codeBlockCount,

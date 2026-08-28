@@ -1,5 +1,6 @@
 import { rerankDocuments, type RerankResult } from '@/shared/jina';
 import { logger } from '@/shared/logger';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 import { RERANKER_CONFIG } from './constants';
 import type { LessonRAGChunk } from './types';
 
@@ -16,13 +17,15 @@ import type { LessonRAGChunk } from './types';
  * @param queries - Search queries used for retrieval
  * @param lessonId - Lesson ID for logging
  * @param topN - Number of top chunks to return
+ * @param costContext - Course to charge the Jina reranker call to
  * @returns Reranked chunks with updated similarity scores
  */
 export async function rerankChunks(
   chunks: LessonRAGChunk[],
   queries: string[],
   lessonId: string,
-  topN: number
+  topN: number,
+  costContext?: LlmCostContext
 ): Promise<LessonRAGChunk[]> {
   const rerankStartTime = Date.now();
 
@@ -48,7 +51,8 @@ export async function rerankChunks(
     const rerankResults: RerankResult[] = await rerankDocuments(
       combinedQuery,
       documents,
-      topN // Request top N from API directly
+      topN, // Request top N from API directly
+      costContext
     );
 
     const rerankDurationMs = Date.now() - rerankStartTime;

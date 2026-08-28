@@ -208,6 +208,7 @@ export async function verifyEvidenceSourcesWithQdrant(
       course_id: input.courseId,
       document_ids: input.documentIds,
     },
+    cost_context: { courseId: input.courseId, stage: 'stage_4', phase: 'evidence_preflight' },
   });
   return {
     verifiedDocumentIds: [...new Set(response.results.map(result => result.document_id))].sort(),

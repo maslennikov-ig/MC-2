@@ -28,11 +28,11 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@/shared/workspace-utils';
-import { STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+import { STAGE4_CONTEXT_THRESHOLD } from './context-thresholds';
 import { getModelPricing } from './cost-calculator';
 
 /** Emergency universal fallback model when DB config is unavailable */
-export const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3.7-flash';
+export const EMERGENCY_FALLBACK_MODEL = LARGE_CONTEXT_MODEL_ID;
 import * as ModelConfigDB from './model-config-db';
 import { StaleWhileRevalidateCache } from './swr-cache';
 
@@ -54,6 +54,7 @@ export { getEffectiveStageConfig, type ResolveModelOptions } from './model-confi
 import { resolveModelWithFallback as _resolveModelWithFallback } from './model-config-helpers';
 import type { ResolveModelOptions } from './model-config-helpers';
 
+import { LARGE_CONTEXT_MODEL_ID } from '@megacampus/shared-types';
 /**
  * Resolve model ID with priority: settings → database → fallback.
  * Auto-injects ModelConfigService when not provided by caller.

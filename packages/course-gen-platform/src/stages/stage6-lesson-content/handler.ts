@@ -28,7 +28,7 @@ export {
   markForReview,
 } from './services/database-service';
 
-export { detectLanguage, getJobTimeout } from './services/model-service';
+export { detectLanguage } from './services/model-service';
 
 // Re-export Stage6Output for backward compatibility
 export type { Stage6Output } from './orchestrator';

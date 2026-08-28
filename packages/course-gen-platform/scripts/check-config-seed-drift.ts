@@ -54,12 +54,6 @@ export interface SeedRow {
 }
 
 /**
- * Stage 6 canonical phases are injected into the seed by the generator and
- * deliberately have no database row, so they cannot be compared against one.
- */
-const SEED_ONLY_PHASES = new Set(['stage_6_content']);
-
-/**
  * The seed carries global routing only.
  *
  * course_override rows are per-course settings, deliberately absent from the
@@ -105,12 +99,13 @@ export interface SeedDriftResult {
  */
 export function compareSeedToDatabase(seed: SeedRow[], dbRows: SeedRow[]): SeedDriftResult {
   const dbByKey = new Map(dbRows.filter(isGlobalRouting).map(row => [routingKey(row), row]));
-  const seedByKey = new Map(
-    seed
-      .filter(isGlobalRouting)
-      .filter(row => !SEED_ONLY_PHASES.has(row.phase_name))
-      .map(row => [routingKey(row), row])
-  );
+  // Nothing is excluded. `stage_6_content` used to be, on the premise that the
+  // generator injected it and no database row existed to compare against — true
+  // until 20260828100000 widened the `phase_name` CHECK and gave it two. The
+  // exclusion then did the opposite of its job: the database had the rows, the
+  // seed side dropped them, and the check reported the seed as missing what it
+  // actually contained (mc2-oyes7).
+  const seedByKey = new Map(seed.filter(isGlobalRouting).map(row => [routingKey(row), row]));
 
   const missingFromSeed: string[] = [];
   const staleInSeed: string[] = [];

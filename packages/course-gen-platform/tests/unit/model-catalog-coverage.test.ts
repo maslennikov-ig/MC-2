@@ -13,12 +13,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { MODELS } from '@/shared/llm/model-selector';
 import { collectRoutableModelIds, describeRoutableModel } from '@/shared/llm/routable-models';
 
 import {
   MODEL_CATALOG,
   LIVE_ROUTING_MODEL_IDS,
+  NO_PUBLISHED_TEXT_RATE,
   getModelCapabilities,
 } from '@megacampus/shared-types';
 
@@ -235,18 +235,16 @@ describe('model catalogue coverage', () => {
     const routable = collectRoutableModelIds();
 
     /**
-     * Routable ids with no catalogue entry, as found on 2026-08-26.
+     * Empty since 2026-08-28, and that is the point.
      *
-     * Grandfathered rather than fixed here, because adding a price is a claim
-     * about what a provider charges and belongs with a reading of the published
-     * list, not with a test. Both are entries in `MODELS` — the escalation
-     * registry in `model-selector.ts` — and nothing selects them today: the only
-     * paths that could return them are `getModelByKey` and
-     * `getModelsWithCapability`, and neither is called anywhere outside the
-     * barrel that re-exports it. The point of listing them is that a *new* one
-     * fails here instead of joining them.
+     * It held `moonshotai/kimi-linear-48b-a3b-instruct`, an entry in
+     * `model-selector.ts MODELS` — a registry of eleven models that nothing
+     * outside its own barrel ever selected from, yet which
+     * `collectRoutableModelSources` read, so the gate believed four dead ids
+     * were live routes. Deleting the registry retired the exception rather than
+     * pricing a model nobody calls (mc2-u8kwx).
      */
-    const UNCATALOGUED_TODAY = ['moonshotai/kimi-linear-48b-a3b-instruct'];
+    const UNCATALOGUED_TODAY: string[] = [];
 
     it('prices every model the code can route to, apart from the two already known', () => {
       const unpriced = routable.filter(modelId => !getModelCapabilities(modelId));
@@ -263,30 +261,21 @@ describe('model catalogue coverage', () => {
       expect(missing).toEqual([]);
     });
 
-    it('finds more than the hand-written list did, and says who routes to each', () => {
-      // Guards the derivation itself: if `collectRoutableModelSources` silently
-      // stopped reading a registry, this is what notices.
-      expect(routable.length).toBeGreaterThan(LIVE_ROUTING_MODEL_IDS.length);
+    it('routes to exactly the models the live list declares, no more', () => {
+      // This used to assert the derived set was BIGGER than the hand-written
+      // one, because it was: 20 models against 10, the extra ten reachable
+      // through registries the list knew nothing about. After mc2-u8kwx the two
+      // are the same set, which is a stronger statement than either half — it
+      // fails both when a registry goes silent and when a new one appears
+      // without being declared live.
+      expect([...routable].sort()).toEqual([...LIVE_ROUTING_MODEL_IDS].sort());
+    });
 
+    it('can name at least one registry for every model it routes to', () => {
       for (const modelId of routable) {
-        expect(describeRoutableModel(modelId).length).toBeGreaterThan(0);
+        expect(describeRoutableModel(modelId).length, modelId).toBeGreaterThan(0);
       }
     });
-  });
-
-  it('keeps prices out of the routing registry', () => {
-    // `MODELS` carried `costPer1kInput`/`costPer1kOutput` for eleven entries: a
-    // fourth pricing surface beside this catalogue, `llm_model_config` and the
-    // rates accounting reads. It was dead — the only reader was
-    // `estimateModelCost`, which nothing called — and that is what made it
-    // dangerous, because rates nothing verifies go stale silently while sitting
-    // next to a registry routing genuinely uses (mc2-zcfh1). The fields are
-    // gone; this is what stops them coming back under another name.
-    const priced = Object.entries(MODELS)
-      .filter(([, config]) => Object.keys(config).some(key => /cost|price/i.test(key)))
-      .map(([key]) => key);
-
-    expect(priced).toEqual([]);
   });
 
   it('never carries a zero or negative price', () => {
@@ -313,6 +302,33 @@ describe('model catalogue coverage', () => {
       .map(([modelId]) => modelId);
 
     expect(broken).toEqual([]);
+  });
+
+  it('only lets a text rate be absent when an image rate is present', () => {
+    // The counterpart of the guard above, and the reason `NO_PUBLISHED_TEXT_RATE`
+    // is a name rather than a bare `0`. That zero means "this provider quotes no
+    // prompt or completion rate", which is true of exactly one entry today and
+    // must stay tied to the thing that *is* charged. Without this, a model
+    // somebody forgot to price would wear identical clothes to a per-frame one
+    // and the table would read the same either way (mc2-f4n3q).
+    const untethered = Object.entries(MODEL_CATALOG)
+      .filter(([, capabilities]) => {
+        const noTextRate =
+          capabilities.inputPricePerMillion === NO_PUBLISHED_TEXT_RATE &&
+          capabilities.outputPricePerMillion === NO_PUBLISHED_TEXT_RATE;
+        if (!noTextRate) return false;
+        // A model billed per frame must say so, and say how much.
+        return (
+          capabilities.billedPerImage !== true ||
+          !(
+            (capabilities.imagePriceFlatUsd ?? 0) > 0 ||
+            (capabilities.imageOutputPricePerMillion ?? 0) > 0
+          )
+        );
+      })
+      .map(([modelId]) => modelId);
+
+    expect(untethered).toEqual([]);
   });
 
   it('keeps the seed within each provider output ceiling', () => {

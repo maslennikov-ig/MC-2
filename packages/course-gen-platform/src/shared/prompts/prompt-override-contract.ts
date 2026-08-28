@@ -67,7 +67,7 @@ export function checkOverrideContract(
   // against the variable list alone. A template legitimately contains braces
   // that are not variables — Mustache sections (`{{#name}}`, `{{/name}}`), and
   // the Helm and Jinja fragments that arrive inside RAG context — and
-  // `stage6_planner` carries a real `{{#userRefinementPrompt}}` pair. Judging
+  // the retired `stage6_planner` carried a real `{{#userRefinementPrompt}}` pair. Judging
   // those by a list of allowed prefixes means keeping a second list of every
   // templating language a source document might use; judging them by what the
   // maintained template itself contains needs no list at all.

@@ -191,15 +191,15 @@ tests:
   # evidence-counter-reset
   - interval: 1m
     input_series:
-      - series: 'megacampus_document_evidence_runs_total{stage="stage4",status="failed"}'
+      - series: 'megacampus_document_evidence_runs_total{environment="staging",stage="stage4",status="failed"}'
         values: '0+0x2 0+1x3'
-      - series: 'megacampus_document_evidence_coverage_ratio'
+      - series: 'megacampus_document_evidence_coverage_ratio{environment="staging"}'
         values: '0.75x10'
-      - series: 'megacampus_document_evidence_degraded_automatic_decisions_total'
+      - series: 'megacampus_document_evidence_degraded_automatic_decisions_total{environment="staging"}'
         values: '8 9 0 1 2 3 3 3 3 3'
-      - series: 'megacampus_document_evidence_unresolved_critical_conflicts'
+      - series: 'megacampus_document_evidence_unresolved_critical_conflicts{environment="staging"}'
         values: '1x130'
-      - series: 'megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds'
+      - series: 'megacampus_document_evidence_oldest_unresolved_critical_unixtime_seconds{environment="staging"}'
         values: '1x130'
     alert_rule_test:
       - eval_time: 5m
@@ -207,38 +207,42 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: A document evidence run or invocation failed
-              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
+              summary: A document evidence run or invocation failed (staging)
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes, in staging.
       - eval_time: 6m
         alertname: DocumentEvidenceCoverageIncomplete
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: Document evidence coverage is incomplete
-              description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+              summary: Document evidence coverage is incomplete (staging)
+              description: The latest Stage 4 evidence ledger in staging is below exact full coverage or its coverage signal is missing.
       - eval_time: 6m
         alertname: DocumentEvidenceDegradedAutomaticDecisionsRepeated
         exp_alerts:
           - exp_labels:
               severity: warning
+              environment: staging
             exp_annotations:
-              summary: Degraded automatic evidence decisions are repeating
-              description: At least three degraded automatic decisions occurred within thirty minutes.
+              summary: Degraded automatic evidence decisions are repeating (staging)
+              description: At least three degraded automatic decisions occurred within thirty minutes, in staging.
       - eval_time: 2h
         alertname: DocumentEvidenceCriticalConflictStale
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: A critical document conflict remains unresolved
-              description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+              summary: A critical document conflict remains unresolved (staging)
+              description: A critical document conflict in staging has remained unresolved for more than one hour, or its age signal is missing.
 
   # evidence-invocation-only-failure
   - interval: 1m
     input_series:
-      - series: 'megacampus_document_evidence_stage4_invocations_total{service="worker",instance="worker-1",status="failed",mode="active"}'
+      - series: 'megacampus_document_evidence_stage4_invocations_total{environment="staging",service="worker",instance="worker-1",status="failed",mode="active"}'
         values: '0+0x2 0+1x3'
     alert_rule_test:
       - eval_time: 5m
@@ -246,16 +250,84 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: A document evidence run or invocation failed
-              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes.
+              summary: A document evidence run or invocation failed (staging)
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes, in staging.
+
+  # evidence-two-environments: mc2-kim48. Dev and staging report into the same
+  # Prometheus. Before the rules aggregated by environment, a bare `sum()` added the
+  # two together and dropped the label, so a dev-only failure raised one alert that
+  # said `staging` — the external label filled in what the aggregation had erased.
+  # These cases assert the property that fixes it: two environments failing produce
+  # TWO alerts, each naming its own, and the same channel can tell them apart.
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_document_evidence_stage4_invocations_total{environment="dev",service="stage6",status="failed",mode="active"}'
+        values: '0+0x2 0+1x3'
+      - series: 'megacampus_document_evidence_stage4_invocations_total{environment="staging",service="stage6",status="failed",mode="active"}'
+        values: '0+0x2 0+1x3'
+      - series: 'megacampus_document_evidence_runs_total{environment="dev",stage="stage4",status="accepted"}'
+        values: '1x10'
+      - series: 'megacampus_document_evidence_coverage_ratio{environment="staging"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: DocumentEvidenceRunFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              environment: dev
+            exp_annotations:
+              summary: A document evidence run or invocation failed (dev)
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes, in dev.
+          - exp_labels:
+              severity: critical
+              environment: staging
+            exp_annotations:
+              summary: A document evidence run or invocation failed (staging)
+              description: At least one durable Stage 4 evidence run or best-effort Stage 4 invocation failed in the last ten minutes, in staging.
+      # Dev reports runs and no coverage; staging reports full coverage. Exactly one
+      # alert, and it names dev. The old `absent()` branch could not fire here at all,
+      # because the metric was present — in the other environment.
+      - eval_time: 6m
+        alertname: DocumentEvidenceCoverageIncomplete
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              environment: dev
+            exp_annotations:
+              summary: Document evidence coverage is incomplete (dev)
+              description: The latest Stage 4 evidence ledger in dev is below exact full coverage or its coverage signal is missing.
+
+  # evidence-one-environment-clean: staging alone, healthy, raises nothing. Guards the
+  # rewrite against the failure mode a per-environment split invites — an empty group
+  # that reads as a violation.
+  - interval: 1m
+    input_series:
+      - series: 'megacampus_document_evidence_runs_total{environment="staging",stage="stage4",status="accepted"}'
+        values: '1x10'
+      - series: 'megacampus_document_evidence_coverage_ratio{environment="staging"}'
+        values: '1x10'
+      - series: 'megacampus_document_evidence_unresolved_critical_conflicts{environment="staging"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DocumentEvidenceCoverageIncomplete
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: DocumentEvidenceRunFailed
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: DocumentEvidenceCriticalConflictStale
+        exp_alerts: []
 
   # evidence-series-absent
   - interval: 1m
     input_series:
-      - series: 'megacampus_document_evidence_runs_total{stage="stage4",status="accepted"}'
+      - series: 'megacampus_document_evidence_runs_total{environment="staging",stage="stage4",status="accepted"}'
         values: '1x10'
-      - series: 'megacampus_document_evidence_unresolved_critical_conflicts'
+      - series: 'megacampus_document_evidence_unresolved_critical_conflicts{environment="staging"}'
         values: '1x10'
     alert_rule_test:
       - eval_time: 6m
@@ -263,17 +335,19 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: Document evidence coverage is incomplete
-              description: The latest Stage 4 evidence ledger is below exact full coverage or its coverage signal is missing.
+              summary: Document evidence coverage is incomplete (staging)
+              description: The latest Stage 4 evidence ledger in staging is below exact full coverage or its coverage signal is missing.
       - eval_time: 6m
         alertname: DocumentEvidenceCriticalConflictStale
         exp_alerts:
           - exp_labels:
               severity: critical
+              environment: staging
             exp_annotations:
-              summary: A critical document conflict remains unresolved
-              description: A critical document conflict has remained unresolved for more than one hour or its age signal is missing.
+              summary: A critical document conflict remains unresolved (staging)
+              description: A critical document conflict in staging has remained unresolved for more than one hour, or its age signal is missing.
 
   # supabase-backup-stale: the metric is a timestamp, so a run that never happened leaves it
   # behind wall-clock time. Matches the QdrantSnapshotStale pattern above: hold the stamp at 0 and

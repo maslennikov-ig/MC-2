@@ -1,3 +1,5 @@
+import { DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
+
 /**
  * Handler configuration constants
  */
@@ -46,12 +48,6 @@ export const HANDLER_CONFIG = {
 } as const;
 
 /**
- * Default job timeout in milliseconds (5 minutes per lesson)
- * Used as fallback when database config is unavailable
- */
-export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — budget models via OpenRouter need generous timeouts
-
-/**
  * Model fallback configuration for retry strategy (FALLBACK ONLY)
  *
  * IMPORTANT: This is kept as a safety net only. Primary model selection
@@ -63,7 +59,7 @@ export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — budget models via
  */
 export const MODEL_FALLBACK = {
   /** Provider fallback model for every language. Phase defaults own primary model selection. */
-  fallback: 'qwen/qwen3.7-plus',
+  fallback: DEFAULT_FALLBACK_MODEL_ID,
   /** Max attempts before switching to fallback model */
   maxPrimaryAttempts: 2,
 } as const;
