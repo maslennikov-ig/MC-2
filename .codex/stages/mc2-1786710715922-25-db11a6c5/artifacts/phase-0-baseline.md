@@ -19,7 +19,7 @@ epic_id: mc2-db696
 stage_id: mc2-1786710715922-25-db11a6c5
 session_id: n/a
 milestone: cohesive-vertical-slice
-milestone_status: ready-for-acceptance
+milestone_status: accepted
 agent_type: worker
 subagent_model: gpt-5.6-sol
 reasoning_effort: medium
@@ -51,9 +51,9 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: manual integration
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: ignored dependency links were removed; prose-free checkpoint intentionally retained for zero-cost resume
 risk_level: medium

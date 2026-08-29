@@ -97,7 +97,7 @@
       "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-0-baseline.md",
       "task_id": "mc2-1786710716114-26-01631777-baseline",
       "stream_owner": "phase-0-worker",
-      "status": "planned"
+      "status": "accepted"
     },
     {
       "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-a-audiences.md",
