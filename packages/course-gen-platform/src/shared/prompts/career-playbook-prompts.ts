@@ -108,7 +108,8 @@ const GROUP_OUTPUT_CONTRACT = `Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+- RoleProfileSpec.block_boundaries is an ownership map, not a repetition budget: write everything your own subject genuinely needs, in full.
+- When a topic under your block's do_not_repeat belongs to another block, do not re-derive or re-explain that model — name it, point to the block that owns it, and move on.
 
 NUMBERS — the metric ledger is the only source of numeric truth:
 - Reproduce every value and traffic-light threshold from the metric ledger VERBATIM, including its review period.
@@ -321,8 +322,6 @@ Critical requirements:
   duties; ownership areas go into block_3 responsibility zones; strategic ties go
   into block_20 business goals. Never invent a new block or repurpose a block id
   for a role emphasis such as forecasting, compliance, or career pathing.
-- Put each topic in do_not_repeat only when another block id owns it; never list a
-  block's own canonical topic in its own do_not_repeat.
 - Extract anti_goals and failure_patterns explicitly.
 - Build metric_ledger: exactly one entry per metric in focus_areas.primary_kpis, each with a
   concrete target and green/yellow/red thresholds plus a review period. This ledger becomes the
