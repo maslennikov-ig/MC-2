@@ -223,9 +223,12 @@ the branch it delivered, so a report naming a branch again means something reall
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- `mc2-9d2ji` — the LLM judge can still fail a cross-audience repetition the owner allowed:
-  `block_audiences_md` reaches the group generators but not the judge. Prompt change, so it wants a
-  paid run to validate rather than a blind edit.
+- Three prompt-side items from the 028 review share one validation and should be batched into a
+  single paid arm-vs-arm run, not fixed one at a time: `mc2-9d2ji` (the judge never got
+  `block_audiences_md`, so it can still fail a cross-audience repetition the owner allowed),
+  `mc2-923ku` (the audience filter also cut the contradiction guard — 66 of 702 directed pairs, and
+  `block_12` lost both the anti-goals and the authority matrix), `mc2-eksyp` (`do_not_repeat` at
+  22.5 of 25 entries against a directive written for a short list).
 - `mc2-spkoj` / `mc2-akmx2` — the acceptance measurer keeps its own threshold and audience map
   (copies verified identical, not linked); Jina 429 backoff is now up to 300s per attempt.
 - `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
