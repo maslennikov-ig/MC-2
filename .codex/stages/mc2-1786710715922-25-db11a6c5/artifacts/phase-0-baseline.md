@@ -19,7 +19,7 @@ epic_id: mc2-db696
 stage_id: mc2-1786710715922-25-db11a6c5
 session_id: n/a
 milestone: cohesive-vertical-slice
-milestone_status: ready-for-acceptance
+milestone_status: accepted
 agent_type: worker
 subagent_model: gpt-5.6-sol
 reasoning_effort: medium
@@ -51,9 +51,9 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: manual integration
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: focused-test dependency link removed; prose-free checkpoint retained for resume
 risk_level: medium
@@ -68,6 +68,7 @@ docs_impact: behavior
 docs_reviewed: updated
 docs_review_notes: reproducible baseline saved without customer prose or open UUIDs
 verification:
+  - accepted correction SHA: 55e39060c
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp ../../node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (RED): one existing pass and one expected failure
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp ../../node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (GREEN): 2 tests passed
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json: passed for 14 complete playbooks
@@ -76,20 +77,22 @@ verification:
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (dual-mode GREEN): 3 tests passed
   - focused exact-one RED: duplicate exact id was incorrectly accepted
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (exact-one GREEN): 3 tests passed
+  - independent correction review: closed with no remaining finding
 changed_files:
   - packages/course-gen-platform/scripts/measure-playbook-repetition.ts
   - packages/course-gen-platform/tests/unit/scripts/measure-playbook-repetition.test.ts
   - .codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-0-baseline.md
 explicit_defers:
-  - root must re-accept this correction delta before the one paid evaluation run
+  - root must run the single paid evaluation by exact dev playbook UUID before cleanup
 ---
 
 # Summary
 
-The phase-0 baseline was previously accepted by root. A later docs review found that its CLI could
+Phase 0 and its correction are accepted by root. A later docs review found that the original CLI could
 not reproducibly evaluate the one new dev playbook: it required the whole database to contain
 exactly fourteen complete rows and always selected a threshold from the current cohort. This
-correction delta is returned ready for root re-acceptance. No phase A/B code or evidence was changed.
+accepted correction separates the fixed baseline cohort from exact-one evaluation. No phase A/B
+code or evidence was changed.
 
 # Scope / Routing
 
@@ -161,12 +164,12 @@ contains no customer prose.
 
 # Delivery / Cleanup
 
-The original baseline content was accepted before this correction. This dual-mode delta is returned
-ready for root re-acceptance and is not yet accepted. The ignored prose-free checkpoint remains in
-the worktree so unchanged baseline inputs and shared evaluation text avoid repeat payment.
+The baseline and dual-mode correction are accepted on `codex/role-guide-audiences`. The ignored
+prose-free checkpoint remains in the worktree so unchanged baseline inputs and shared evaluation
+text avoid repeat payment.
 
 # Risks / Follow-ups / Explicit Defers
 
-Root must re-accept this correction, then run the single real evaluation with the exact completed
-dev UUID before cleanup. That invocation is intentionally left to root; this correction made no
-paid or database call.
+Root must run the single real evaluation with the exact completed dev UUID before cleanup. That
+invocation is intentionally left to root; this correction made no paid or database call. Total
+observed Phase 0 Jina cost remains **$0.036985** across the failed and successful baseline attempts.

@@ -25,12 +25,13 @@ stage closes `mc2-1786710715922-25-db11a6c5` and `mc2-1786710716114-26-01631777`
 2. Phase A: accepted. Canonical employee/manager/HR views contain 20/20/14 stored blocks, their
    union is all 27 ids, full persistence is unchanged, prompts receive explicit readers, and the
    viewer exposes full plus three audience tabs.
-3. Phase B: implementation corrections and root acceptance are in progress. `do_not_repeat` is
-   canonical and model-independent, the prior-block digest is limited to generated shared-view
-   blocks, and the final-only semantic block/paragraph gate uses the Phase 0 threshold `0.85`.
-   Durable docs are updated; stage status remains in progress until root acceptance.
-4. Final acceptance: one paid dev generation, root reading of all three views, post-change metrics,
-   `pnpm type-check`, `pnpm test:unit`, delivery to `develop`, and numeric Beads close reasons.
+3. Phase B: accepted. `do_not_repeat` is canonical and model-independent, each real group target
+   receives its own digest from generated shared-view blocks, and the final-only semantic
+   block/paragraph gate uses `0.85`. Provider exhaustion is fail-closed and its accumulated costs
+   survive to the failed playbook ledger.
+4. Root acceptance and delivery remain: `pnpm type-check`, `pnpm test:unit`, dev delivery, one paid
+   generation, reading all four views, exact-ID post-change metrics, cleanup, numeric Beads close
+   reasons, graph refresh and stage closeout.
 
 ## Boundaries
 

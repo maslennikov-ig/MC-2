@@ -182,9 +182,10 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 1. Взять точный `playbookId` из JSON-артефакта раннера и прочитать по этому exact ID строку
    `career_playbooks`. Не вставлять ID, токены, service key или пользовательский текст в этот
    документ или вывод коммита.
-2. Убедиться, что `generation_warnings` не содержит строки, начинающейся с
-   `semantic repetition checks unavailable:`. Наличие warning означает provider degradation и не
-   подтверждает работу semantic-гейта.
+2. Убедиться, что строка завершилась как `completed` и `generation_error` не начинается с
+   `semantic repetition checks unavailable:`. После исчерпания retry эта ошибка fail-closed:
+   graph останавливается, handler ставит `failed`, и такой прогон нельзя принимать или повторять
+   второй платной генерацией.
 3. Проверить в `career_playbooks.cost_breakdown`, что есть хотя бы одна строка с
    `node = "semanticRepetition"`, `provider_name = "jina"` и положительным `input_tokens`.
    `generation_trace` для этой проверки не использовать: Career Playbook хранит расход здесь.

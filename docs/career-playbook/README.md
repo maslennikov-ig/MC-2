@@ -112,17 +112,19 @@ applicable view without a schema migration or backfill.
 
 Repetition control uses the same audience map. Canonical normalization discards
 model-produced `do_not_repeat` lists and rebuilds them from block topics, shared
-view membership, and non-overlapping aliases. A group receives prior generated
-content only from blocks that share at least one of its views. At the final judge,
+view membership, and non-overlapping aliases. Inside a real generation group,
+each target block receives its own prior-content section containing only blocks
+that share one of that target's views. At the final judge,
 semantic block pairs within a shared view and paragraph pairs within one block
 become critical `contradiction` issues at cosine similarity `0.85`; pairs that
 never occur in the same view are intentionally not compared.
 
 The semantic pass uses Jina embeddings. Its batch costs are recorded as
-`semanticRepetition` rows in `career_playbooks.cost_breakdown`. A provider failure
-is preserved as a generation warning and the judge continues with the other
-deterministic checks; such a degraded run is useful output but is not evidence
-that the repetition gate passed.
+`semanticRepetition` rows in `career_playbooks.cost_breakdown`. If Jina remains
+unavailable after bounded retries, the final graph fails closed: the playbook is
+marked `failed` and cannot be persisted as completed without the semantic gate.
+The handler still writes every paid `semanticRepetition` receipt accumulated
+before failure, so provider failure does not erase cost evidence.
 
 ## Visibility And Permissions
 

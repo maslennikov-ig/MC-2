@@ -108,11 +108,11 @@ client waits 60 seconds before retrying. Network and 5xx errors retain the
 existing 1/2/4-second exponential delays. This is a shared client rule and must
 not be replaced with a node-local immediate retry.
 
-If all Jina attempts fail, the semantic error is converted to a visible
-`semantic repetition checks unavailable: ...` generation warning. The judge
-then reruns the other deterministic checks with semantic repetition disabled.
-This degradation preserves liveness but does not prove the semantic gate passed;
-live acceptance must reject any run carrying that warning.
+If all Jina attempts fail, the final judge throws a semantic provider error and
+the graph fails closed. The error carries every `semanticRepetition` node cost
+observed before failure. The handler persists those receipts and marks the
+playbook `failed`; the graph cannot reach a completed state by rerunning the
+other checks without semantic repetition.
 
 Each successful Jina batch reports usage to the final judge, which emits a
 `semanticRepetition` node-cost row into `career_playbooks.cost_breakdown`.

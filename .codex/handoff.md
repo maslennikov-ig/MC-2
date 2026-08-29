@@ -14,11 +14,11 @@ Role Guide audience views and measurable repetition are in progress on
 phase A audience views → phase B repetition gate. Phase 0 is accepted: 14 complete playbooks,
 6,594 within-view block-pair occurrences, 6,829 within-block paragraph pairs, working threshold
 0.85, baseline rates 0.12% and 0.26%. Phase A is accepted: canonical views contain 20/20/14 blocks,
-cover all 27 stored ids, and persisted `final_markdown` remains the full document. Phase B is in
-correction and root acceptance: canonical `do_not_repeat`, the prior-block digest and the final-only
-0.85 semantic gate are audience-scoped; Jina spend is recorded as `semanticRepetition` in
-`career_playbooks.cost_breakdown`. Jina measurements and one paid dev generation are authorized;
-a second paid dev generation remains a stop condition. The stage also closes
+cover all 27 stored ids, and persisted `final_markdown` remains the full document. Phase B is
+accepted: canonical `do_not_repeat`, per-target prior-block digests and the final-only 0.85 semantic
+gate are audience-scoped. Semantic provider exhaustion is fail-closed; accumulated Jina spend still
+reaches `career_playbooks.cost_breakdown`. Jina measurements and one paid dev generation are
+authorized; a second paid dev generation remains a stop condition. The stage also closes
 `mc2-1786710716114-26-01631777`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
@@ -255,12 +255,12 @@ never lower the number.
 
 ## Remaining stage steps
 
-Root still owns Phase B acceptance, one final `pnpm type-check` plus `pnpm test:unit`, delivery to
-dev, and exactly one paid dev generation. For that exact playbook row: reject semantic provider
-degradation, verify `semanticRepetition` Jina cost rows, read employee/manager/HR/full views, run the
-fixed-0.85 final measurement before exact-ID cleanup, and record the delta against the Phase 0
-baseline. Then refresh Graphify, close both Beads with numeric reasons, run stage closeout and prove
-the commits reached `develop` with `check_stranded_commits.py`.
+Phase 0, A and B streams are accepted. Root still owns one final `pnpm type-check` plus
+`pnpm test:unit`, delivery to dev, and exactly one paid dev generation. For that exact playbook row:
+verify semantic completion and `semanticRepetition` Jina cost rows, read employee/manager/HR/full
+views, run the fixed-0.85 final measurement before exact-ID cleanup, and record the delta against
+the Phase 0 baseline. Then refresh Graphify, close both Beads with numeric reasons, run stage
+closeout and prove the commits reached `develop` with `check_stranded_commits.py`.
 
 Do not run a second paid dev generation, migrate schema, reindex, change audience checkmarks or
 close either issue on visual impression alone.

@@ -34,9 +34,17 @@ write_zone:
   - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/final-assembler.ts
   - packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts
   - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/group-generator.ts
+  - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/block-regenerator.ts
   - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/final-assembler.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/group-generator.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/block-regenerator.test.ts
+  - packages/web/app/[locale]/career-playbook/[id]/page-client.tsx
+  - packages/web/messages/en/career-playbook.json
+  - packages/web/messages/ru/career-playbook.json
   - packages/web/components/career-playbook/viewer/PlaybookViewer.tsx
+  - packages/web/stores/use-career-playbook-store.ts
+  - packages/web/tests/unit/career-playbook-store-viewer.test.ts
+  - packages/web/tests/unit/components/career-playbook/viewer-page-client.test.tsx
   - packages/web/tests/unit/components/career-playbook/viewer.test.tsx
   - .codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-a-audiences.md
 success_criteria:
@@ -78,9 +86,11 @@ invariants:
   - full-markdown-unchanged
   - generated-blocks-source
 docs_impact: behavior
-docs_reviewed: no-change-needed
-docs_review_notes: phase A behavior is defined by the specification; root owns final measured docs and graph refresh
+docs_reviewed: updated
+docs_review_notes: durable docs record canonical views, full persistence, localized labels and audience-scoped regeneration; root owns final measured docs and graph refresh
 verification:
+  - accepted correction SHA: 6a44cc685
+  - accepted viewer-metadata follow-up SHA: a5bf8c7d4
   - pnpm --filter @megacampus/shared-types exec vitest run tests/career-playbook.test.ts (RED): 1 expected failure because CareerPlaybookAudienceSchema was absent
   - SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts tests/unit/stages/stage-career-playbook/group-generator.test.ts (RED): 2 expected failures for missing audience assembler and prompt variable
   - pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/viewer.test.tsx (RED): 2 expected failures for missing tabs and empty state
@@ -88,6 +98,10 @@ verification:
   - SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-key pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/stages/stage-career-playbook/final-assembler.test.ts tests/unit/stages/stage-career-playbook/group-generator.test.ts tests/unit/shared/prompts/prompt-contract-validation.test.ts tests/unit/shared/prompts/prompt-override-contract.test.ts (GREEN): 93 passed
   - pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/viewer.test.tsx (GREEN): 17 passed; existing Vite and Next Image test warnings remain
   - targeted eslint on all ten implementation and test files with --max-warnings=0 (GREEN)
+  - correction shared/backend and prompt acceptance: 78 passed
+  - correction web viewer and page-client acceptance: 31 passed
+  - post-format block-regenerator acceptance: 13 passed
+  - independent correction review: no blockers
 changed_files:
   - packages/shared-types/src/career-playbook.ts
   - packages/shared-types/src/career-playbook-blocks.ts
@@ -95,20 +109,28 @@ changed_files:
   - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/final-assembler.ts
   - packages/course-gen-platform/src/shared/prompts/career-playbook-prompts.ts
   - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/group-generator.ts
+  - packages/course-gen-platform/src/stages/stage-career-playbook/nodes/block-regenerator.ts
   - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/final-assembler.test.ts
   - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/group-generator.test.ts
+  - packages/course-gen-platform/tests/unit/stages/stage-career-playbook/block-regenerator.test.ts
+  - packages/web/app/[locale]/career-playbook/[id]/page-client.tsx
+  - packages/web/messages/en/career-playbook.json
+  - packages/web/messages/ru/career-playbook.json
   - packages/web/components/career-playbook/viewer/PlaybookViewer.tsx
+  - packages/web/stores/use-career-playbook-store.ts
+  - packages/web/tests/unit/career-playbook-store-viewer.test.ts
+  - packages/web/tests/unit/components/career-playbook/viewer-page-client.test.tsx
   - packages/web/tests/unit/components/career-playbook/viewer.test.tsx
   - .codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-a-audiences.md
 explicit_defers:
   - root final type-check and full unit acceptance
   - root browser and paid-dev editorial reading of all three complete documents
-  - phase B audience-scoped repetition controls and final semantic measurement
+  - root final semantic measurement on the single paid dev playbook
 ---
 
 # Summary
 
-Phase A is ready for root acceptance. Audience ownership is now canonical block metadata rather
+Phase A and its correction are accepted. Audience ownership is canonical block metadata rather
 than model output: employee and manager each receive 20 stored blocks, HR receives 14, and every
 view includes the header. The three assignments cover all 27 stored ids. The specification's
 section 3 map was implemented without changing a checkbox.
@@ -125,6 +147,11 @@ generator formats the exact readers for only the blocks in its prompt and passes
 old employee-only claim was replaced with a per-block reader contract. The existing override guard
 rejects a stale database template that drops the new required variable; an exact check returned
 `droppedRequiredVariables: ["block_audiences_md"]`, so no DB update is needed.
+
+The block regenerator applies the same boundary: it receives the target block's canonical readers
+and summarizes only other generated blocks that share one of those readers. Callers cannot inject
+an unscoped summary. The production page passes audience labels from the existing i18n layer, with
+complete English and Russian keys instead of relying on component fallback copy.
 
 The viewer derives all four modes (`full`, `employee`, `manager`, `hr`) from its existing block
 array, whose metadata comes from the canonical catalogue. Radix Tabs 1.1.13 is controlled, uses
@@ -157,12 +184,11 @@ Per the task boundary, no root `pnpm type-check` or full `pnpm test:unit` was ru
 
 # Delivery / Cleanup
 
-The stream is returned on `codex/role-guide-audiences` for root acceptance and the sequential Phase
-B consumer. Temporary dependency links used by the isolated worktree are removed before return.
+The accepted stream and correction are integrated on `codex/role-guide-audiences`. Temporary
+dependency links used by the isolated worktree were removed before acceptance.
 
 # Risks / Follow-ups / Explicit Defers
 
 Root owns the one final type/unit acceptance and the one paid dev generation with an editorial read
-of all three documents. Phase B must now consume the same canonical audience map when deriving
-`do_not_repeat`, filtering prior-block digests and gating semantic similarity. No Phase A checkbox,
-schema, persistence or generation-layout decision remains open.
+of all three documents. Phase B is separately accepted against the same audience map. No Phase A
+checkbox, schema, persistence or generation-layout decision remains open.

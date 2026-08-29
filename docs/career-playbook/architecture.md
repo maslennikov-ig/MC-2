@@ -103,9 +103,10 @@ Audience membership also defines the repetition boundary:
 - `spec-builder-canonical.ts` replaces every model-produced `do_not_repeat`
   value with canonical topics from blocks that share a view and whose aliases do
   not overlap;
-- `prior-blocks-digest.ts` includes only already `generated` prior blocks that
-  share at least one target view before extracting anti-goals, authority,
-  numeric commitments, and cadences;
+- `prior-blocks-digest.ts` renders one section per real group target and includes
+  only already `generated` prior blocks that share a view with that specific
+  target before extracting anti-goals, authority, numeric commitments, and
+  cadences;
 - the final cross-block judge compares semantic block pairs only when they share
   a view, plus paragraph pairs within each block. Group-window judges skip this
   provider-backed pass.
@@ -120,10 +121,10 @@ cannot be reused across playbooks.
 Jina batch receipts are appended to Career Playbook node costs as
 `semanticRepetition`, which persists in `career_playbooks.cost_breakdown` rather
 than `generation_trace`. If Jina remains unavailable after its client retries,
-the judge records `semantic repetition checks unavailable: ...` and reruns its
-other deterministic checks without semantic repetition. This preserves
-generation availability, but a run carrying that warning cannot prove the
-semantic acceptance criterion.
+the final judge throws a provider error carrying its accumulated node costs and
+the graph cannot reach completion. The handler persists those costs while
+marking the playbook `failed`; it never converts this path into a completed run
+without semantic evidence.
 
 ## Generated Images
 
