@@ -25,6 +25,7 @@ import {
 import {
   dedupeCareerPlaybookQualityIssues,
   isInternalCareerPlaybookGenerationWarning,
+  type CareerPlaybookAudience,
   type CareerPlaybookQualityIssue,
   type CareerPlaybookViewerSnapshot,
   type CareerPlaybookVisibility,
@@ -35,6 +36,7 @@ import { PanelIconButton } from '@/components/common/panel-icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ImageSkeleton } from '@/components/ui/image-skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -58,6 +60,7 @@ import { ActionsBar, type ActionsBarCopy } from './ActionsBar'
 
 type PanelState = 'open' | 'closed'
 type ReaderMode = 'standard' | 'reading'
+type RoleGuideView = 'full' | CareerPlaybookAudience
 
 const PANEL_MOTION_TRANSITION = {
   duration: 0.22,
@@ -84,6 +87,12 @@ export interface PlaybookViewerCopy {
   readingMode?: string
   exitReadingMode?: string
   readingHint?: string
+  audienceTabsLabel?: string
+  audienceFull?: string
+  audienceEmployee?: string
+  audienceManager?: string
+  audienceHr?: string
+  audienceEmpty?: string
   inspectorLabel?: string
   inspectorTitle?: string
   inspectorStatusTitle?: string
@@ -153,6 +162,12 @@ const defaultCopy: Required<Omit<PlaybookViewerCopy, 'actions'>> = {
   readingMode: 'Режим чтения',
   exitReadingMode: 'Выйти из режима чтения',
   readingHint: 'Чистое чтение без боковых панелей',
+  audienceTabsLabel: 'Представление документа',
+  audienceFull: 'Полный документ',
+  audienceEmployee: 'Сотруднику',
+  audienceManager: 'Руководителю',
+  audienceHr: 'HR',
+  audienceEmpty: 'В выбранном представлении пока нет готовых разделов.',
   inspectorLabel: 'Инспектор документа',
   inspectorTitle: 'Инспектор документа',
   inspectorStatusTitle: 'Состояние',
@@ -327,6 +342,7 @@ export function PlaybookViewer({
   const [toc, setToc] = useState<PanelState>(() => readInitialPanelState('toc'))
   const [panel, setPanel] = useState<PanelState>(() => readInitialPanelState('panel'))
   const [internalMode, setInternalMode] = useState<ReaderMode>(readInitialReaderMode)
+  const [roleGuideView, setRoleGuideView] = useState<RoleGuideView>('full')
   const [activeBlockId, setActiveBlockId] = useState<CareerPlaybookBlockId | null>(() =>
     readInitialActiveBlockId(blocks)
   )
@@ -345,11 +361,20 @@ export function PlaybookViewer({
     viewerPermissions.canDelete
   const tocOpen = mode === 'standard' && toc === 'open'
   const panelOpen = mode === 'standard' && inspectorAvailable && panel === 'open'
-  const groupedBlocks = useMemo(() => groupBlocks(blocks), [blocks])
-  const blockIds = useMemo(() => blocks.map((block) => block.blockId), [blocks])
+  const audienceBlocks = useMemo(
+    () =>
+      roleGuideView === 'full'
+        ? blocks
+        : blocks.filter((block) =>
+            (block.audiences as readonly CareerPlaybookAudience[]).includes(roleGuideView)
+          ),
+    [blocks, roleGuideView]
+  )
+  const groupedBlocks = useMemo(() => groupBlocks(audienceBlocks), [audienceBlocks])
+  const blockIds = useMemo(() => audienceBlocks.map((block) => block.blockId), [audienceBlocks])
   const readyBlocks = useMemo(
-    () => blocks.filter((block) => block.state.content.trim().length > 0).length,
-    [blocks]
+    () => audienceBlocks.filter((block) => block.state.content.trim().length > 0).length,
+    [audienceBlocks]
   )
   const visibleBlocksRef = useRef(new Map<CareerPlaybookBlockId, { ratio: number; top: number }>())
 
@@ -443,18 +468,28 @@ export function PlaybookViewer({
             onExit={() => updateMode('standard')}
           />
           <section className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-10">
-            <DocumentPaper
-              snapshot={snapshot}
-              blocks={blocks}
+            <RoleGuideViewTabs
+              value={roleGuideView}
+              onValueChange={setRoleGuideView}
               labels={labels}
-              collapsedBlocks={collapsedBlocks}
-              onToggleBlock={setCollapsedBlocks}
-              onEditBlock={onEditBlock}
-              onRegenerateBlock={onRegenerateBlock}
-              interactive={false}
-              titleHeading="h1"
-              spacious
-            />
+            >
+              {audienceBlocks.length > 0 ? (
+                <DocumentPaper
+                  snapshot={snapshot}
+                  blocks={audienceBlocks}
+                  labels={labels}
+                  collapsedBlocks={collapsedBlocks}
+                  onToggleBlock={setCollapsedBlocks}
+                  onEditBlock={onEditBlock}
+                  onRegenerateBlock={onRegenerateBlock}
+                  interactive={false}
+                  titleHeading="h1"
+                  spacious
+                />
+              ) : (
+                <RoleGuideViewEmpty message={labels.audienceEmpty} />
+              )}
+            </RoleGuideViewTabs>
           </section>
         </>
       ) : (
@@ -527,19 +562,29 @@ export function PlaybookViewer({
                 onReadingMode={() => updateMode('reading')}
                 inspectorAvailable={inspectorAvailable}
               />
-              <div className="min-w-0 bg-[#ece7dd] p-4 md:p-7 dark:bg-slate-900">
-                <DocumentPaper
-                  snapshot={snapshot}
-                  blocks={blocks}
-                  labels={labels}
-                  collapsedBlocks={collapsedBlocks}
-                  onToggleBlock={setCollapsedBlocks}
-                  onEditBlock={onEditBlock}
-                  onRegenerateBlock={onRegenerateBlock}
-                  interactive={viewerPermissions.canEdit}
-                  titleHeading="p"
-                />
-              </div>
+              <RoleGuideViewTabs
+                value={roleGuideView}
+                onValueChange={setRoleGuideView}
+                labels={labels}
+              >
+                <div className="min-w-0 bg-[#ece7dd] p-4 md:p-7 dark:bg-slate-900">
+                  {audienceBlocks.length > 0 ? (
+                    <DocumentPaper
+                      snapshot={snapshot}
+                      blocks={audienceBlocks}
+                      labels={labels}
+                      collapsedBlocks={collapsedBlocks}
+                      onToggleBlock={setCollapsedBlocks}
+                      onEditBlock={onEditBlock}
+                      onRegenerateBlock={onRegenerateBlock}
+                      interactive={viewerPermissions.canEdit}
+                      titleHeading="p"
+                    />
+                  ) : (
+                    <RoleGuideViewEmpty message={labels.audienceEmpty} />
+                  )}
+                </div>
+              </RoleGuideViewTabs>
             </motion.section>
 
             <AnimatePresence initial={false} mode="popLayout">
@@ -558,8 +603,8 @@ export function PlaybookViewer({
                     labels={labels}
                     actionMessage={actionMessage}
                     readyBlocks={readyBlocks}
-                    totalBlocks={blocks.length}
-                    blocks={blocks}
+                    totalBlocks={audienceBlocks.length}
+                    blocks={audienceBlocks}
                     contentLanguage={snapshot.contentLanguage}
                     canManageVisibility={viewerPermissions.canManageVisibility}
                     canCreateCourse={viewerPermissions.canCreateCourse}
@@ -586,6 +631,59 @@ export function PlaybookViewer({
         </>
       )}
     </main>
+  )
+}
+
+function RoleGuideViewTabs({
+  value,
+  onValueChange,
+  labels,
+  children,
+}: {
+  value: RoleGuideView
+  onValueChange: (value: RoleGuideView) => void
+  labels: Required<Omit<PlaybookViewerCopy, 'actions'>> & { actions: Required<ActionsBarCopy> }
+  children: ReactNode
+}) {
+  const options: { value: RoleGuideView; label: string }[] = [
+    { value: 'full', label: labels.audienceFull },
+    { value: 'employee', label: labels.audienceEmployee },
+    { value: 'manager', label: labels.audienceManager },
+    { value: 'hr', label: labels.audienceHr },
+  ]
+
+  return (
+    <Tabs
+      value={value}
+      onValueChange={(nextValue) => onValueChange(nextValue as RoleGuideView)}
+      activationMode="automatic"
+    >
+      <div className="border-b border-[#d6c2a6] bg-[#f7f4ee] px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+        <TabsList
+          aria-label={labels.audienceTabsLabel}
+          className="h-auto max-w-full justify-start overflow-x-auto bg-slate-200/70 dark:bg-slate-800"
+        >
+          {options.map((option) => (
+            <TabsTrigger key={option.value} value={option.value}>
+              {option.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+      {options.map((option) => (
+        <TabsContent key={option.value} value={option.value} className="mt-0">
+          {option.value === value ? children : null}
+        </TabsContent>
+      ))}
+    </Tabs>
+  )
+}
+
+function RoleGuideViewEmpty({ message }: { message: string }) {
+  return (
+    <div className="career-playbook-document mx-auto grid min-h-72 max-w-4xl place-items-center px-6 py-12 text-center text-sm text-slate-600 dark:text-slate-300">
+      {message}
+    </div>
   )
 }
 

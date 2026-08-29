@@ -8,7 +8,7 @@
  * - 768-dimensional embeddings (matches Qdrant collection configuration)
  * - Task-specific embeddings: "retrieval.passage" (for indexing) and "retrieval.query" (for search)
  * - Rate limiting: 1500 requests per minute (40ms minimum between requests)
- * - Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s (max 3 retries)
+ * - Retry policy: full provider window for 429; exponential backoff for network/5xx
  * - Batch support: Up to 100 texts per request
  * - Russian language optimization
  * - Token usage tracking for cost monitoring
@@ -58,6 +58,15 @@ interface JinaEmbeddingResponse {
   };
 }
 
+/** Provider receipt exposed to callers that keep a non-course cost ledger. */
+export interface JinaEmbeddingUsage {
+  model: typeof JINA_EMBEDDING_MODEL;
+  totalTokens: number;
+  documentCount: number;
+}
+
+export type JinaEmbeddingUsageObserver = (usage: JinaEmbeddingUsage) => void;
+
 /**
  * Jina API error response structure
  */
@@ -79,12 +88,25 @@ export class JinaEmbeddingError extends Error {
     message: string,
     public readonly statusCode?: number,
     public readonly errorType?: string,
-    public readonly originalError?: unknown
+    public readonly originalError?: unknown,
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'JinaEmbeddingError';
     Object.setPrototypeOf(this, JinaEmbeddingError.prototype);
   }
+}
+
+const JINA_RATE_LIMIT_WINDOW_MS = 60_000;
+const JINA_MAX_RETRY_AFTER_MS = 5 * JINA_RATE_LIMIT_WINDOW_MS;
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined;
+
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+
+  return Math.min(seconds * 1000, JINA_MAX_RETRY_AFTER_MS);
 }
 
 /**
@@ -400,8 +422,20 @@ async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries =
         throw error;
       }
 
-      // Calculate backoff delay: 1s, 2s, 4s, 8s, 16s, 32s (max)
-      const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 32000);
+      // Jina meters tokens per minute. Retrying a 429 after one second burns the
+      // attempt budget inside the same closed provider window. Network and 5xx
+      // failures retain the existing exponential backoff.
+      const backoffDelay =
+        error instanceof JinaEmbeddingError && error.statusCode === 429
+          ? (error.retryAfterMs ?? JINA_RATE_LIMIT_WINDOW_MS)
+          : Math.min(1000 * Math.pow(2, attempt), 32000);
+
+      if (error instanceof JinaEmbeddingError && error.statusCode === 429) {
+        logger.warn(
+          { attempt, maxRetries, delayMs: backoffDelay },
+          '[Jina] Rate limit reached, waiting for the provider window before retrying'
+        );
+      }
 
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
@@ -421,7 +455,8 @@ async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries =
  */
 async function makeJinaRequest(
   payload: JinaEmbeddingRequest,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  onUsage?: JinaEmbeddingUsageObserver
 ): Promise<JinaEmbeddingResponse> {
   validateJinaConfig();
 
@@ -457,7 +492,13 @@ async function makeJinaRequest(
         errorMessage = response.statusText || errorMessage;
       }
 
-      throw new JinaEmbeddingError(errorMessage, response.status, errorType);
+      throw new JinaEmbeddingError(
+        errorMessage,
+        response.status,
+        errorType,
+        undefined,
+        parseRetryAfterMs(response.headers.get('retry-after'))
+      );
     }
 
     const data = (await response.json()) as JinaEmbeddingResponse;
@@ -499,6 +540,19 @@ async function makeJinaRequest(
       },
       costContext
     );
+
+    try {
+      onUsage?.({
+        model: JINA_EMBEDDING_MODEL,
+        totalTokens: tokensUsed,
+        documentCount: data.data.length,
+      });
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        '[Jina] Embedding usage observer failed'
+      );
+    }
 
     return data;
   } finally {
@@ -621,7 +675,8 @@ export async function generateEmbedding(
 export async function generateEmbeddings(
   texts: string[],
   task: 'retrieval.passage' | 'retrieval.query',
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  onUsage?: JinaEmbeddingUsageObserver
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
@@ -645,7 +700,8 @@ export async function generateEmbeddings(
           normalized: false,
           truncate: true,
         },
-        costContext
+        costContext,
+        onUsage
       );
 
       return response.data.map(item => item.embedding);

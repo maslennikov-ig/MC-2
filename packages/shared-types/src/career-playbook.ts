@@ -41,6 +41,9 @@ export type CareerPlaybookWizardPhase = z.infer<typeof CareerPlaybookWizardPhase
 export const CareerPlaybookVisibilitySchema = z.enum(['private', 'organization', 'public']);
 export type CareerPlaybookVisibility = z.infer<typeof CareerPlaybookVisibilitySchema>;
 
+export const CareerPlaybookAudienceSchema = z.enum(['employee', 'manager', 'hr']);
+export type CareerPlaybookAudience = z.infer<typeof CareerPlaybookAudienceSchema>;
+
 export const CareerPlaybookImageStatusSchema = enrichmentStatusSchema;
 export type CareerPlaybookImageStatus = z.infer<typeof CareerPlaybookImageStatusSchema>;
 
@@ -569,7 +572,7 @@ export const CareerPlaybookBlockGroupKeySchema = z.enum([
 ]);
 export type CareerPlaybookBlockGroupKey = z.infer<typeof CareerPlaybookBlockGroupKeySchema>;
 
-// The 26-entry block catalogue lives next door; re-exported here so that
+// The 27-entry stored block catalogue (header + 26 content blocks) lives next door; re-exported here so that
 // `CareerPlaybookBlockCatalogItem` and `CAREER_PLAYBOOK_BLOCK_CATALOG` keep the
 // import path they have always had.
 export * from './career-playbook-blocks';

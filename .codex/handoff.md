@@ -1,49 +1,29 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-28. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-29. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries. Durable traps
 live in `.codex/repository-failure-modes.md`; this file says what still binds work.
 
 ## Current stage
 
-**The callout fix is verified live and delivered to staging** (`mc2-ctlar`,
-`docs/rag/2026-08-28-lesson-arms-batch/after-the-callout-fix.md`, master `22401f40c`). Ten lessons
-regenerated for $0.065383: `needs_review` **11 of 20 → 0 of 10**, regenerations 1.20 → 0.00, quality
-0.830 → 0.897 with the whole gain on the five lessons the gate used to damage, cost per lesson −39%.
+Current stage id: `mc2-1786710715922-25-db11a6c5`
 
-Three findings the run produced, all recorded and none open:
+Role Guide audience views and measurable repetition are in progress on
+`codex/role-guide-audiences`, base `develop` `9250c1be9`. The ordered boundary is phase 0 baseline →
+phase A audience views → phase B repetition gate. Phase 0 is accepted: 14 complete playbooks,
+6,594 within-view block-pair occurrences, 6,829 within-block paragraph pairs, working threshold
+0.85, baseline rates 0.12% and 0.26%. Phase A is accepted: canonical views contain 20/20/14 blocks,
+cover all 27 stored ids, and persisted `final_markdown` remains the full document. Phase B is
+accepted: canonical `do_not_repeat`, per-target prior-block digests and the final-only 0.85 semantic
+gate are audience-scoped. Semantic provider exhaustion is fail-closed; accumulated Jina spend still
+reaches `career_playbooks.cost_breakdown`. Jina measurements and one paid dev generation are
+authorized; a second paid dev generation remains a stop condition. The stage also closes
+`mc2-1786710716114-26-01631777`.
 
-- **Callouts rose, 4.70 → 5.30.** A third arm with the pre-fix prompts restored under the new rule
-  put the same three lessons at 3.00 against 5.00, so the new wording ("about one per section is
-  plenty") reads as a licence where the old cap read as a rule the model ignored. The **rule**, not
-  the prompt, is what stopped the review flood. Both lessons read by eye keep the mandatory practical
-  example, in prose instead of a callout box.
-- **Five Stage 6 prompts nothing rendered are gone** (`mc2-53h8i`, `45e5fe90d`). `renderPrompt` takes
-  two Stage 6 keys; the registry declared seven. Their `prompt_templates` rows were **active**, so
-  the admin screen offered them for editing — retired with `--deactivate`, text kept. 16 active rows
-  with 5 orphans became **11 active, 0 orphans, 0 mismatches**.
-- **Lessons came out shorter at the same word target** (2718 → 1840). Owner ruling: length is not the
-  criterion, meaning surviving is. Recorded, tracked nowhere (`mc2-c7ire`). Same ruling closed
-  `mc2-hoke7`: one wrong equation in 141 checkable ones over 1910 stored lessons is model noise.
-
-**Ten lessons per arm, 2026-08-28** (`docs/rag/2026-08-28-lesson-arms-batch/`). The arms share **3.2
-of 7 chunks** and the cap buys **+1.0 documents** in what the model reads; quality does not move
-(0.830 against 0.841, sign changes lesson by lesson), so the setting stays. Still open from it:
-`mc2-zxzgf` — the Mermaid fallback is hardcoded English, in 123 lessons across 12 courses;
-`mc2-hpful` — cross-lesson repetition is negligible, but 5.3% of lessons duplicate a block **of
-themselves**, all of them long ones.
-
-`mc2-d0e2n` is **complete, six of six**; `mc2-cuk7j` (technical debt) is **complete, six of six**;
-`docs/plans/composed-dazzling-moore.md` (Docling stack jump) is complete and live;
-`docs/plans/brawny-mellow-quokka.md` is complete with phase 2 (`mc2-51epl`) accepted. The Career
-Playbook quality track stays accepted (`mc2-db696.110`); its two rules hold — read the artifact
-before calling a run accepted, and clean up **after** the editorial pass.
-
-The NotebookLM bridge **re-mints its own cookies** (`mc2-cuk7j.4`): a durable master token,
-`app/master_token_refresh.py` on a weekly interval in the FastAPI lifespan, and a `/health` check
-that FAILS while no token is present. Off-host Qdrant retention is **7 days** (owner, 2026-08-23);
-the allow-list interpolates `EXPECTED_RETENTION_DAYS` rather than repeating it.
+The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
+master `22401f40c`); its detailed proof stays in
+`docs/rag/2026-08-28-lesson-arms-batch/after-the-callout-fix.md`.
 
 ## RAG retrieval, chunking and parent expansion (measured 2026-08-26/28)
 
@@ -273,36 +253,14 @@ and handler.
 thresholds calibrated on Latin script, each invisible until the previous was fixed. Weight by script,
 never lower the number.
 
-## Next recommended
+## Remaining stage steps
 
-Accepted stage id: `mc2-51epl` · Current stage id: none · Next stage id: **owner's call**
+Phase 0, A and B streams are accepted. Root still owns one final `pnpm type-check` plus
+`pnpm test:unit`, delivery to dev, and exactly one paid dev generation. For that exact playbook row:
+verify semantic completion and `semanticRepetition` Jina cost rows, read employee/manager/HR/full
+views, run the fixed-0.85 final measurement before exact-ID cleanup, and record the delta against
+the Phase 0 baseline. Then refresh Graphify, close both Beads with numeric reasons, run stage
+closeout and prove the commits reached `develop` with `check_stranded_commits.py`.
 
-`brawny-mellow-quokka.md` is finished and nothing in it is owed. Recommended action: pick the next
-track — `mc2-db696` (Career Playbook) and `mc2-uv7n7` (UI redesign, 22 Stitch screens) are the two
-standing directions, and `specs/026-post-triage-priorities/spec.md` holds the backlog order.
-Use $orchestrator-stage when the next track becomes an epic.
-
-Three small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
-never actually escalated, the judge's terminal review path has never fired — both needing a
-generation forced to fail — and no real NLM generation has run since the cookies were restored.
-
-## Starter prompt for next orchestrator
-
-Read the section above for what is owed; `snuggly-wiggling-sutton.md` is **done** and
-`.codex/next-goal-four-doors.md` is **stale** — ignore both. **Do not ask — act and report**, inside
-the standing authorization under Safety boundary.
-
-The Helixa AIOS bridge belongs to another agent — leave it alone. **16 unique commits, 6149 lines**,
-reported by three refs; its three blockers are fixed on `fix/helixa-blockers` and handed over, not
-merged (`mc2-gxese`). Not covered by re-pinning the manifest: its migrations install six triggers on
-`courses`, `career_playbooks` and `file_catalog`, inert while `helixa_knowledge_sync_bindings` is
-empty but present at the database level, where the env flag does not reach — and dev and staging
-share one database. Both branches are in `.codex/stranded-commit-allowlist.txt`; remove the two
-entries together. That agent also broke the root `node_modules` once, so if a pre-commit hook cannot
-find `prettier-plugin-tailwindcss`, relink the symlink into `node_modules/.pnpm/...` by hand rather
-than running `pnpm install`.
-
-`pnpm test:unit` covers **all three** packages since `mc2-cuk7j.1`.
-
-Read first: `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.
+Do not run a second paid dev generation, migrate schema, reindex, change audience checkmarks or
+close either issue on visual impression alone.

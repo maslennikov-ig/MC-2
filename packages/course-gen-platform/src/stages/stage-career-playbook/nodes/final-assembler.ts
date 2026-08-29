@@ -1,9 +1,11 @@
 import type {
+  CareerPlaybookAudience,
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import { CAREER_PLAYBOOK_BLOCK_CATALOG } from '@megacampus/shared-types';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 import { remediateCareerPlaybookMermaidBlocks } from './mermaid-quality';
 
@@ -580,6 +582,19 @@ export function joinCareerPlaybookFinalBlocks(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): string {
   return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId => generatedBlocks[blockId]?.content.trim())
+    .filter((content): content is string => Boolean(content))
+    .join('\n\n');
+}
+
+/** Assemble one reader-specific view from the canonical generated block store. */
+export function buildRoleGuideView(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  audience: CareerPlaybookAudience
+): string {
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block =>
+    (block.audiences as readonly CareerPlaybookAudience[]).includes(audience)
+  )
+    .map(block => generatedBlocks[block.blockId]?.content.trim())
     .filter((content): content is string => Boolean(content))
     .join('\n\n');
 }

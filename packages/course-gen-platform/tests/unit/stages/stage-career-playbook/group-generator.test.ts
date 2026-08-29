@@ -193,6 +193,19 @@ describe('Career Playbook group generator', () => {
     ]);
   });
 
+  it('tells every output block to use only its matching prior-content section', () => {
+    const prompt = careerPlaybookPrompts.find(
+      entry => entry.promptKey === 'career_playbook_group_3_people'
+    );
+
+    expect(prompt?.promptTemplate).toContain(
+      'When writing block_N, use ONLY the `For block_N only:` subsection'
+    );
+    expect(prompt?.promptTemplate).toContain(
+      "ignore every other block's subsection even though it is visible in the prompt"
+    );
+  });
+
   it('registers group 3-6 prompts with headings that match their group specs', () => {
     for (const groupKey of [
       'group_3_people',
@@ -232,6 +245,12 @@ describe('Career Playbook group generator', () => {
     expect(renderPrompt).toHaveBeenCalledWith(
       'career_playbook_group_1_foundation',
       expect.objectContaining({
+        block_audiences_md: [
+          '- header: employee, manager, hr',
+          '- block_1: employee, manager, hr',
+          '- block_2: employee, manager',
+          '- block_5: employee, manager',
+        ].join('\n'),
         spec_json: expect.stringContaining('B2B Sales Manager'),
         content_language: 'ru',
       })

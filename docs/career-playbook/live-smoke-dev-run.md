@@ -173,6 +173,45 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 
 На этих реальных данных переоценивается `mc2-db696.61` (нужен ли source-evidence override ~24–32k для генератора follow-up-вопросов).
 
+## Шаг 6. Приёмка Role Guide по адресатам и повторам
+
+Выполнить этот раздел после **единственного** разрешённого dev-run и до ручного удаления строки.
+Не запускать вторую генерацию для исправления evidence: если доказательства не сняты с первой,
+остановиться и зафиксировать, чего не хватает.
+
+1. Взять точный `playbookId` из JSON-артефакта раннера и прочитать по этому exact ID строку
+   `career_playbooks`. Не вставлять ID, токены, service key или пользовательский текст в этот
+   документ или вывод коммита.
+2. Убедиться, что строка завершилась как `completed` и `generation_error` не начинается с
+   `semantic repetition checks unavailable:`. После исчерпания retry эта ошибка fail-closed:
+   graph останавливается, handler ставит `failed`, и такой прогон нельзя принимать или повторять
+   второй платной генерацией.
+3. Проверить в `career_playbooks.cost_breakdown`, что есть хотя бы одна строка с
+   `node = "semanticRepetition"`, `provider_name = "jina"` и положительным `input_tokens`.
+   `generation_trace` для этой проверки не использовать: Career Playbook хранит расход здесь.
+4. Из `generated_blocks` собрать на лету и полностью прочитать четыре документа: `employee`,
+   `manager`, `hr` и `full`. Для первых трёх использовать канонические audiences блока; `full`
+   содержит все 27 stored ids. Не считать просмотр отдельных вкладок достаточным без чтения
+   каждого документа от начала до конца.
+5. До cleanup снять итоговый semantic-замер ровно по этому playbook и фиксированному порогу:
+
+```bash
+TMPDIR=/tmp pnpm --dir packages/course-gen-platform exec tsx scripts/measure-playbook-repetition.ts \
+  --mode evaluation \
+  --playbook-id '<exact-playbook-id из артефакта>' \
+  --threshold 0.85 \
+  --out 'docs/career-playbook/2026-08-29-semantic-repetition-final.md' \
+  --cache '.cache/career-playbook-repetition/jina-embeddings-v3.json'
+```
+
+Команда должна выбрать ровно одну строку по exact ID и завершиться ошибкой при отсутствии или
+неполном наборе блоков. В итоговый документ входят только агрегаты, блоки и similarity; секреты и
+customer prose не копируются.
+
+Только после сохранения чтения, cost evidence и итогового замера выполнить ручной cleanup по
+точному ID из `cleanupManifest`, затем read-only запросом подтвердить отсутствие именно этой
+строки. Не использовать широкий фильтр, список ID или UUID из старого прогона.
+
 ## Нагрузочный прогон: ровно 10 генераций
 
 Команда `smoke:career-playbook:load` переиспользует тот же single-smoke и по умолчанию работает в

@@ -75,7 +75,9 @@ describe('Career Playbook block regenerator', () => {
           suggestion: 'Use concrete CRM metrics.',
         },
         userInstruction: 'Keep the traffic-light table.',
-        otherBlocksBrief: 'block_3: responsibility zones are already covered',
+        otherBlocks: {
+          block_3: generatedBlock('responsibility zones are already covered'),
+        },
         now: () => new Date('2026-05-13T10:15:30.000Z'),
       },
       { renderPrompt, invokeLLM }
@@ -91,6 +93,7 @@ describe('Career Playbook block regenerator', () => {
         suggestion: 'Use concrete CRM metrics.',
         user_instruction: 'Keep the traffic-light table.',
         other_blocks_brief: 'block_3: responsibility zones are already covered',
+        block_audiences_md: '- block_6: employee, manager',
         content_language: 'ru',
         spec_json: expect.stringContaining('B2B Sales Manager'),
       })
@@ -136,6 +139,57 @@ describe('Career Playbook block regenerator', () => {
 
     expect(brief).toBe(
       'header: ## Header Sales role guide.\nblock_2: ## 2. Anti-goals Do not own product roadmap.'
+    );
+  });
+
+  it('regenerates for the target readers and briefs only audience-overlapping peers in canonical order', async () => {
+    const renderPrompt = vi
+      .fn()
+      .mockImplementation((_promptKey: string, variables: Record<string, string>) =>
+        Promise.resolve(JSON.stringify(variables))
+      );
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: '## 9. Human-AI collaboration\n\nUse the approved tools for routine work.',
+      model: 'mock-career-model',
+      inputTokens: 120,
+      outputTokens: 80,
+      costUsd: 0.02,
+    });
+
+    await regenerateCareerPlaybookBlock(
+      {
+        blockId: 'block_9',
+        roleProfileSpec: spec,
+        language: 'en',
+        originalBlock: generatedBlock('## 9. Human-AI collaboration\n\nOld text.'),
+        issue: {
+          description: 'The block repeats unrelated recruiting guidance.',
+          suggestion: 'Keep the rewrite specific to the employee reader.',
+        },
+        otherBlocks: {
+          block_22: generatedBlock('## 22. Role README\n\nEmployee operating notes.'),
+          block_12: generatedBlock('## 12. Candidate profile\n\nHR recruiting criteria.'),
+          header: generatedBlock('## Header\n\nRole guide.'),
+          block_8: generatedBlock('## 8. Tools\n\nShared employee tool guidance.'),
+        },
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(renderPrompt).toHaveBeenCalledWith(
+      'career_playbook_block_regenerator',
+      expect.objectContaining({
+        block_audiences_md: '- block_9: employee',
+        other_blocks_brief:
+          'header: ## Header Role guide.\n' +
+          'block_8: ## 8. Tools Shared employee tool guidance.\n' +
+          'block_22: ## 22. Role README Employee operating notes.',
+      })
+    );
+    expect(renderPrompt.mock.calls[0]?.[1].other_blocks_brief).not.toContain('block_12');
+    expect(invokeLLM).toHaveBeenCalledWith(
+      expect.stringContaining('"block_audiences_md":"- block_9: employee"'),
+      expect.objectContaining({ promptKey: 'career_playbook_block_regenerator' })
     );
   });
 

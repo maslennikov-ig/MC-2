@@ -48,6 +48,11 @@ import {
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
 import { getCareerPlaybookBusinessContext } from './business-context';
+import {
+  CareerPlaybookSemanticEmbeddingCache,
+  CareerPlaybookSemanticRepetitionProviderError,
+  evaluateCareerPlaybookSemanticRepetition,
+} from './semantic-repetition';
 
 export {
   CAREER_PLAYBOOK_MERMAID_REQUIREMENTS,
@@ -76,6 +81,11 @@ export interface RunDeterministicChecksInput {
    * specs carry no ledgers and must still judge cleanly.
    */
   contract?: CareerPlaybookQualityCheckContext;
+  /** Disable for bounded group windows; the full-document final judge must run this gate. */
+  semanticRepetition?: boolean;
+  onSemanticRepetitionCost?: (cost: CareerPlaybookNodeCost) => void;
+  semanticEmbeddingCache?: CareerPlaybookSemanticEmbeddingCache;
+  semanticEmbeddingCacheNamespace?: string;
 }
 
 export interface CreateCrossBlockJudgeNodeOptions {
@@ -309,6 +319,16 @@ export async function runCareerPlaybookDeterministicChecks(
     issues.push(...runCareerPlaybookContractChecks(generatedBlocks, input.contract));
   }
 
+  if (input.semanticRepetition !== false) {
+    issues.push(
+      ...(await evaluateCareerPlaybookSemanticRepetition(generatedBlocks, {
+        onNodeCost: input.onSemanticRepetitionCost,
+        cache: input.semanticEmbeddingCache,
+        cacheNamespace: input.semanticEmbeddingCacheNamespace,
+      }))
+    );
+  }
+
   return verdictFromIssues(issues);
 }
 
@@ -470,6 +490,9 @@ function attachVerdictToBlocks(
 
 export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
+  const semanticEmbeddingCache = options.currentBlockIds
+    ? undefined
+    : new CareerPlaybookSemanticEmbeddingCache();
 
   return async function crossBlockJudgeNode(
     state: CareerPlaybookGraphStateType
@@ -520,14 +543,31 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         }
       : undefined;
 
-    const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
+    const nodeCosts: CareerPlaybookNodeCost[] = [];
+    const deterministicInput: RunDeterministicChecksInput = {
       generatedBlocks: currentBlocks,
       contentLanguage: state.language,
       contract: contractContext,
-    });
+      semanticRepetition: options.currentBlockIds === undefined,
+      onSemanticRepetitionCost: cost => nodeCosts.push(cost),
+      semanticEmbeddingCache,
+      semanticEmbeddingCacheNamespace: state.playbookId,
+    };
+    let deterministicVerdict: CareerPlaybookJudgeVerdict;
+    try {
+      deterministicVerdict = await runCareerPlaybookDeterministicChecks(deterministicInput);
+    } catch (error) {
+      if (!(error instanceof CareerPlaybookSemanticRepetitionProviderError)) throw error;
+      const warning = `semantic repetition checks unavailable: ${error.message}`;
+      throw new CareerPlaybookSemanticRepetitionProviderError(
+        warning,
+        { cause: error },
+        nodeCosts,
+        [warning]
+      );
+    }
 
     let verdict = deterministicVerdict;
-    const nodeCosts: CareerPlaybookNodeCost[] = [];
 
     if (options.useLLMJudge) {
       if (!state.roleProfileSpec) {
@@ -535,6 +575,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           lastJudgeVerdict: deterministicVerdict,
           lastJudgedBlockIds: windowBlockIds,
+          nodeCosts,
           errors: ['crossBlockJudge failed: roleProfileSpec is missing'],
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };

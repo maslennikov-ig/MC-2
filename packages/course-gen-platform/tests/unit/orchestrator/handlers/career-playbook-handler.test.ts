@@ -1271,4 +1271,64 @@ flowchart TD
       })
     );
   });
+
+  it('persists semantic provider receipts when the fail-closed graph error reaches the handler', async () => {
+    const semanticCost = {
+      node: 'semanticRepetition',
+      model: 'jina-embeddings-v3',
+      input_tokens: 321,
+      output_tokens: 0,
+      cost_usd: 0.00001605,
+      attempts: 1,
+      outcome: 'succeeded' as const,
+      provider_name: 'jina',
+      billed_by_provider: false,
+    };
+    const existingQAData = { fixed: [], followups: [], freeform: [] };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { cost_breakdown: null }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    const graphError = Object.assign(
+      new Error('semantic repetition checks unavailable: Jina quota exhausted'),
+      {
+        nodeCosts: [semanticCost],
+        warnings: ['semantic repetition checks unavailable: Jina quota exhausted'],
+      }
+    );
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockRejectedValue(graphError),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job({
+          ...baseJobData(),
+          operation: 'GENERATE_PLAYBOOK',
+          qaData: { fixed: [], followups: [], freeform: [] },
+        })
+      )
+    ).rejects.toThrow('semantic repetition checks unavailable');
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        cost_breakdown: expect.objectContaining({
+          nodeCosts: [semanticCost],
+          total_cost_usd: semanticCost.cost_usd,
+        }),
+        q_a_data: expect.objectContaining({
+          generation_error: 'semantic repetition checks unavailable: Jina quota exhausted',
+          generation_progress: expect.objectContaining({ stage: 'failed', percent: 100 }),
+        }),
+      })
+    );
+    expect(builder.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'completed' })
+    );
+  });
 });
