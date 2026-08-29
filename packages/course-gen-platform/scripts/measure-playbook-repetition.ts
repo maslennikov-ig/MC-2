@@ -1,11 +1,12 @@
 import 'dotenv/config';
 
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { generateEmbeddings, getJinaTokenStats, resetJinaTokenStats } from '@/shared/embeddings/jina-client';
+import { jinaCostUsd } from '@/shared/jina/pricing';
 import { QualityValidator } from '@/shared/validation/quality-validator';
 
 export type BaselineAudience = 'employee' | 'manager' | 'hr';
@@ -67,12 +68,16 @@ const BLOCK_LABELS: Readonly<Record<string, string>> = {
   block_26: 'Implementation checklist',
 };
 
-export const BASELINE_TOO_CLOSE_THRESHOLD = 0.85;
-const REPORT_THRESHOLDS = [0.75, 0.8, BASELINE_TOO_CLOSE_THRESHOLD, 0.9] as const;
+const REPORT_THRESHOLDS = [0.75, 0.8, 0.85, 0.9] as const;
 const MIN_PARAGRAPH_CHARACTERS = 100;
 const EXPECTED_PLAYBOOK_COUNT = 14;
 const MAX_INPUT_CHARACTERS = 2_500_000;
 const MAX_EMBEDDING_ITEMS = 4_000;
+const CHECKPOINT_SCHEMA = 'career-playbook-repetition-embeddings/v1';
+const CHECKPOINT_MODEL = 'jina-embeddings-v3';
+const DEFAULT_EMBEDDING_BATCH_SIZE = 40;
+const SAFE_TOKENS_PER_MINUTE = 75_000;
+const RATE_LIMIT_WINDOW_MS = 61_000;
 
 export interface EmbeddedBlock {
   blockId: string;
@@ -114,7 +119,7 @@ const validator = new QualityValidator();
 
 export function measureEmbeddedPlaybook(
   playbook: EmbeddedPlaybook,
-  threshold: number = BASELINE_TOO_CLOSE_THRESHOLD
+  threshold: number
 ): EmbeddedPlaybookMeasurement {
   const byId = new Map(playbook.blocks.map(block => [block.blockId, block]));
   const views = {} as EmbeddedPlaybookMeasurement['views'];
@@ -177,6 +182,147 @@ export function measureEmbeddedPlaybook(
     tooCloseParagraphCount: paragraphPairs.filter(pair => pair.tooClose).length,
     paragraphPairs,
   };
+}
+
+interface EmbeddingCheckpoint {
+  schemaVersion: typeof CHECKPOINT_SCHEMA;
+  model: typeof CHECKPOINT_MODEL;
+  embeddings: Record<string, number[]>;
+}
+
+export interface CheckpointEmbeddingOptions {
+  cachePath: string;
+  batchSize?: number;
+  embedBatch?: (texts: string[]) => Promise<number[][]>;
+  sleep?: (milliseconds: number) => Promise<void>;
+  maxRateLimitRetries?: number;
+  getTotalTokens?: () => number;
+}
+
+function embeddingCacheKey(text: string): string {
+  return createHash('sha256')
+    .update(`${CHECKPOINT_MODEL}\0retrieval.passage\0`)
+    .update(text)
+    .digest('hex');
+}
+
+async function loadEmbeddingCheckpoint(cachePath: string): Promise<EmbeddingCheckpoint> {
+  try {
+    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as Partial<EmbeddingCheckpoint>;
+    if (
+      parsed.schemaVersion !== CHECKPOINT_SCHEMA ||
+      parsed.model !== CHECKPOINT_MODEL ||
+      !parsed.embeddings ||
+      typeof parsed.embeddings !== 'object'
+    ) {
+      throw new Error(`Unsupported embedding checkpoint at ${cachePath}`);
+    }
+    for (const [hash, embedding] of Object.entries(parsed.embeddings)) {
+      if (!/^[a-f0-9]{64}$/u.test(hash) || !Array.isArray(embedding) || embedding.length !== 768) {
+        throw new Error(`Invalid embedding checkpoint entry at ${cachePath}`);
+      }
+    }
+    return parsed as EmbeddingCheckpoint;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { schemaVersion: CHECKPOINT_SCHEMA, model: CHECKPOINT_MODEL, embeddings: {} };
+    }
+    throw error;
+  }
+}
+
+async function saveEmbeddingCheckpoint(
+  cachePath: string,
+  checkpoint: EmbeddingCheckpoint
+): Promise<void> {
+  await mkdir(path.dirname(cachePath), { recursive: true });
+  const temporaryPath = `${cachePath}.${process.pid}.tmp`;
+  await writeFile(temporaryPath, `${JSON.stringify(checkpoint)}\n`, 'utf8');
+  await rename(temporaryPath, cachePath);
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const statusCode = (error as { statusCode?: unknown })?.statusCode;
+  const message = error instanceof Error ? error.message : String(error);
+  return statusCode === 429 || /(?:429|rate limit|tokens per minute)/iu.test(message);
+}
+
+/**
+ * Embed texts with a content-addressed checkpoint. Customer prose is used only
+ * for the provider call and never persisted; the cache stores SHA-256 keys and
+ * vectors. Each successful batch is atomically durable before the next starts.
+ */
+export async function embedTextsWithCheckpoint(
+  texts: string[],
+  options: CheckpointEmbeddingOptions
+): Promise<number[][]> {
+  const checkpoint = await loadEmbeddingCheckpoint(options.cachePath);
+  const batchSize = options.batchSize ?? DEFAULT_EMBEDDING_BATCH_SIZE;
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 100) {
+    throw new Error(`Embedding batch size must be between 1 and 100, got ${batchSize}`);
+  }
+  const embedBatch =
+    options.embedBatch ??
+    ((batch: string[]) => generateEmbeddings(batch, 'retrieval.passage'));
+  const sleep =
+    options.sleep ??
+    ((milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds)));
+  const maxRateLimitRetries = options.maxRateLimitRetries ?? 3;
+
+  const keyed = texts.map(text => ({ text, hash: embeddingCacheKey(text) }));
+  const missingByHash = new Map<string, string>();
+  for (const item of keyed) {
+    if (!checkpoint.embeddings[item.hash]) missingByHash.set(item.hash, item.text);
+  }
+  const missing = [...missingByHash].map(([hash, text]) => ({ hash, text }));
+  let estimatedTokensInWindow = 0;
+
+  for (let offset = 0; offset < missing.length; offset += batchSize) {
+    const batch = missing.slice(offset, offset + batchSize);
+    // UTF-8 bytes / 3 deliberately overestimates both observed RU and EN tokenization.
+    const estimatedTokens = batch.reduce(
+      (sum, item) => sum + Math.ceil(Buffer.byteLength(item.text, 'utf8') / 3),
+      0
+    );
+    if (estimatedTokensInWindow > 0 && estimatedTokensInWindow + estimatedTokens > SAFE_TOKENS_PER_MINUTE) {
+      await sleep(RATE_LIMIT_WINDOW_MS);
+      estimatedTokensInWindow = 0;
+    }
+
+    let embeddings: number[][];
+    let rateLimitAttempts = 0;
+    const tokensBefore = options.getTotalTokens?.() ?? 0;
+    while (true) {
+      try {
+        embeddings = await embedBatch(batch.map(item => item.text));
+        break;
+      } catch (error) {
+        if (!isRateLimitError(error) || rateLimitAttempts >= maxRateLimitRetries) throw error;
+        rateLimitAttempts += 1;
+        await sleep(RATE_LIMIT_WINDOW_MS);
+        estimatedTokensInWindow = 0;
+      }
+    }
+    if (embeddings.length !== batch.length) {
+      throw new Error(`Jina returned ${embeddings.length} embeddings for a ${batch.length}-item batch`);
+    }
+    for (let index = 0; index < batch.length; index += 1) {
+      const embedding = embeddings[index];
+      if (!Array.isArray(embedding) || embedding.length !== 768) {
+        throw new Error(`Jina returned an invalid embedding for batch item ${index + 1}`);
+      }
+      checkpoint.embeddings[batch[index].hash] = embedding;
+    }
+    await saveEmbeddingCheckpoint(options.cachePath, checkpoint);
+    const observedTokens = (options.getTotalTokens?.() ?? tokensBefore) - tokensBefore;
+    estimatedTokensInWindow += observedTokens > 0 ? observedTokens : estimatedTokens;
+  }
+
+  return keyed.map(item => {
+    const embedding = checkpoint.embeddings[item.hash];
+    if (!embedding) throw new Error(`Embedding checkpoint is missing ${item.hash}`);
+    return embedding;
+  });
 }
 
 interface StoredBlock {
@@ -264,7 +410,10 @@ async function loadCompletedPlaybooks(): Promise<TextPlaybook[]> {
   return playbooks;
 }
 
-async function embedPlaybooks(playbooks: TextPlaybook[]): Promise<EmbeddedPlaybook[]> {
+async function embedPlaybooks(
+  playbooks: TextPlaybook[],
+  cachePath: string
+): Promise<EmbeddedPlaybook[]> {
   const items = playbooks.flatMap(playbook =>
     playbook.blocks.flatMap(block => [
       { playbookId: playbook.playbookId, blockId: block.blockId, paragraphIndex: -1, text: block.content },
@@ -285,9 +434,9 @@ async function embedPlaybooks(playbooks: TextPlaybook[]): Promise<EmbeddedPlaybo
   }
 
   resetJinaTokenStats();
-  const embeddings = await generateEmbeddings(
+  const embeddings = await embedTextsWithCheckpoint(
     items.map(item => item.text),
-    'retrieval.passage'
+    { cachePath, getTotalTokens: () => getJinaTokenStats().totalTokens }
   );
   if (embeddings.length !== items.length) {
     throw new Error(`Jina returned ${embeddings.length} embeddings for ${items.length} inputs`);
@@ -329,10 +478,31 @@ function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 12);
 }
 
+function selectWorkingThreshold(
+  viewScores: number[],
+  paragraphScores: number[]
+): (typeof REPORT_THRESHOLDS)[number] {
+  const selected = [...REPORT_THRESHOLDS]
+    .reverse()
+    .find(
+      threshold =>
+        viewScores.filter(score => score >= threshold).length >= 5 &&
+        paragraphScores.filter(score => score >= threshold).length >= 5
+    );
+  if (selected === undefined) {
+    throw new Error(
+      'STOP: no meaningful repetition signal at thresholds 0.75/0.80/0.85/0.90 in both metrics'
+    );
+  }
+  return selected;
+}
+
 function formatReport(
   playbooks: TextPlaybook[],
   measurements: EmbeddedPlaybookMeasurement[],
-  generatedAt: string
+  generatedAt: string,
+  selectedThreshold: number,
+  cachePath: string
 ): string {
   const aliases = new Map(playbooks.map((playbook, index) => [playbook.playbookId, `P${String(index + 1).padStart(2, '0')}`]));
   const viewPairs = measurements.flatMap(measurement =>
@@ -358,25 +528,26 @@ function formatReport(
     '- Inter-block unit: one pair occurrence inside one audience-view. A block pair shared by two views is intentionally counted twice because those are two separately read documents; pairs with no shared view are not compared.',
     `- Intra-block unit: paragraphs of at least ${MIN_PARAGRAPH_CHARACTERS} normalized characters, split on Markdown blank lines; paragraphs are compared only with paragraphs from the same block.`,
     '- Embeddings: existing `generateEmbeddings(..., retrieval.passage)` Jina path, including the shared Jina distributed rate/concurrency limiters; cosine similarity is `QualityValidator.cosineSimilarity`.',
-    `- Primary too-close threshold: **${BASELINE_TOO_CLOSE_THRESHOLD.toFixed(2)}**. This is a high-precision baseline cut: it is stricter than the existing 0.75 Stage-5 broad overlap detector and avoids treating merely related role-guide topics as duplicates. The threshold matrix below preserves sensitivity at 0.75/0.80/0.90 for phase-B calibration.`,
+    `- Working too-close threshold: **${selectedThreshold.toFixed(2)}**, selected only after measurement as the highest candidate in 0.75/0.80/0.85/0.90 retaining at least five pair occurrences in both metric families. This favors precision while requiring a replicated signal; the full matrix remains the calibration evidence.`,
+    `- Resume cache: content-addressed SHA-256 → embedding records at \`${path.relative(process.cwd(), cachePath)}\`; it contains no source prose and is atomically replaced after every successful batch.`,
     '- No customer prose is stored in this artifact. Examples identify only the playbook alias, block topic and paragraph ordinal.',
     '',
     '## Snapshot',
     '',
-    '| Alias | Playbook id | id sha256/12 | Language | Characters | Semantic paragraphs |',
-    '| --- | --- | --- | --- | ---: | ---: |',
+    '| Alias | id sha256/12 | Language | Characters | Semantic paragraphs |',
+    '| --- | --- | --- | ---: | ---: |',
     ...playbooks.map(playbook => {
       const characters = playbook.blocks.reduce((sum, block) => sum + block.content.length, 0);
       const paragraphs = playbook.blocks.reduce((sum, block) => sum + block.paragraphs.length, 0);
-      return `| ${aliases.get(playbook.playbookId)} | \`${playbook.playbookId}\` | \`${shortHash(playbook.playbookId)}\` | ${playbook.language} | ${characters} | ${paragraphs} |`;
+      return `| ${aliases.get(playbook.playbookId)} | \`${shortHash(playbook.playbookId)}\` | ${playbook.language} | ${characters} | ${paragraphs} |`;
     }),
     '',
     '## Summary',
     '',
-    '| Unit | Compared pairs | ≥0.85 | Too-close rate | p50 | p90 | p95 | p99 | max |',
+    `| Unit | Compared pairs | ≥${selectedThreshold.toFixed(2)} | Too-close rate | p50 | p90 | p95 | p99 | max |`,
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
-    `| Audience-view block pairs | ${viewPairs.length} | ${viewPairs.filter(pair => pair.similarity >= BASELINE_TOO_CLOSE_THRESHOLD).length} | ${rate(viewPairs.filter(pair => pair.similarity >= BASELINE_TOO_CLOSE_THRESHOLD).length, viewPairs.length)} | ${percentile(viewScores, 0.5).toFixed(4)} | ${percentile(viewScores, 0.9).toFixed(4)} | ${percentile(viewScores, 0.95).toFixed(4)} | ${percentile(viewScores, 0.99).toFixed(4)} | ${percentile(viewScores, 1).toFixed(4)} |`,
-    `| Paragraph pairs within one block | ${paragraphPairs.length} | ${paragraphPairs.filter(pair => pair.similarity >= BASELINE_TOO_CLOSE_THRESHOLD).length} | ${rate(paragraphPairs.filter(pair => pair.similarity >= BASELINE_TOO_CLOSE_THRESHOLD).length, paragraphPairs.length)} | ${percentile(paragraphScores, 0.5).toFixed(4)} | ${percentile(paragraphScores, 0.9).toFixed(4)} | ${percentile(paragraphScores, 0.95).toFixed(4)} | ${percentile(paragraphScores, 0.99).toFixed(4)} | ${percentile(paragraphScores, 1).toFixed(4)} |`,
+    `| Audience-view block pairs | ${viewPairs.length} | ${viewPairs.filter(pair => pair.similarity >= selectedThreshold).length} | ${rate(viewPairs.filter(pair => pair.similarity >= selectedThreshold).length, viewPairs.length)} | ${percentile(viewScores, 0.5).toFixed(4)} | ${percentile(viewScores, 0.9).toFixed(4)} | ${percentile(viewScores, 0.95).toFixed(4)} | ${percentile(viewScores, 0.99).toFixed(4)} | ${percentile(viewScores, 1).toFixed(4)} |`,
+    `| Paragraph pairs within one block | ${paragraphPairs.length} | ${paragraphPairs.filter(pair => pair.similarity >= selectedThreshold).length} | ${rate(paragraphPairs.filter(pair => pair.similarity >= selectedThreshold).length, paragraphPairs.length)} | ${percentile(paragraphScores, 0.5).toFixed(4)} | ${percentile(paragraphScores, 0.9).toFixed(4)} | ${percentile(paragraphScores, 0.95).toFixed(4)} | ${percentile(paragraphScores, 0.99).toFixed(4)} | ${percentile(paragraphScores, 1).toFixed(4)} |`,
     '',
     '## Audience-view threshold matrix',
     '',
@@ -422,10 +593,10 @@ function formatReport(
     '```bash',
     'cd /home/me/code/mc2/packages/course-gen-platform',
     'set -a; . .env; set +a',
-    'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md',
+    'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json',
     '```',
     '',
-    `Jina run stats: ${stats.requestCount} HTTP batches, ${stats.totalTokens} input tokens.`,
+    `Jina run stats: ${stats.requestCount} paid HTTP batches in this invocation, ${stats.totalTokens} input tokens, $${(jinaCostUsd(CHECKPOINT_MODEL, stats.totalTokens) ?? 0).toFixed(6)} at the repository catalogue rate. Cache hits cost $0.`,
     '',
   ];
   return lines.join('\n');
@@ -438,18 +609,46 @@ function parseOutputPath(argv: string[]): string {
     : path.resolve('../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md');
 }
 
+function parseCachePath(argv: string[]): string {
+  const index = argv.indexOf('--cache');
+  return index >= 0 && argv[index + 1]
+    ? path.resolve(argv[index + 1])
+    : path.resolve('.cache/career-playbook-repetition/jina-embeddings-v3.json');
+}
+
 async function main(): Promise<void> {
   const outputPath = parseOutputPath(process.argv.slice(2));
+  const cachePath = parseCachePath(process.argv.slice(2));
   const playbooks = await loadCompletedPlaybooks();
-  const embedded = await embedPlaybooks(playbooks);
-  const measurements = embedded.map(playbook => measureEmbeddedPlaybook(playbook));
-  const report = formatReport(playbooks, measurements, new Date().toISOString());
+  const embedded = await embedPlaybooks(playbooks, cachePath);
+  const scoreOnlyMeasurements = embedded.map(playbook =>
+    measureEmbeddedPlaybook(playbook, Number.POSITIVE_INFINITY)
+  );
+  const selectedThreshold = selectWorkingThreshold(
+    scoreOnlyMeasurements.flatMap(measurement =>
+      measurement.viewPairs.map(pair => pair.similarity)
+    ),
+    scoreOnlyMeasurements.flatMap(measurement =>
+      measurement.paragraphPairs.map(pair => pair.similarity)
+    )
+  );
+  const measurements = embedded.map(playbook =>
+    measureEmbeddedPlaybook(playbook, selectedThreshold)
+  );
+  const report = formatReport(
+    playbooks,
+    measurements,
+    new Date().toISOString(),
+    selectedThreshold,
+    cachePath
+  );
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, report, 'utf8');
   console.log(`Wrote ${outputPath}`);
   console.log(`Completed playbooks: ${playbooks.length}`);
   console.log(`Audience-view pairs: ${measurements.reduce((sum, item) => sum + item.viewPairs.length, 0)}`);
   console.log(`Within-block paragraph pairs: ${measurements.reduce((sum, item) => sum + item.paragraphPairCount, 0)}`);
+  console.log(`Selected threshold: ${selectedThreshold.toFixed(2)}`);
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
