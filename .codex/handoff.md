@@ -223,12 +223,14 @@ the branch it delivered, so a report naming a branch again means something reall
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- Three prompt-side items from the 028 review share one validation and should be batched into a
-  single paid arm-vs-arm run, not fixed one at a time: `mc2-9d2ji` (the judge never got
-  `block_audiences_md`, so it can still fail a cross-audience repetition the owner allowed),
-  `mc2-923ku` (the audience filter also cut the contradiction guard — 66 of 702 directed pairs, and
-  `block_12` lost both the anti-goals and the authority matrix), `mc2-eksyp` (`do_not_repeat` at
-  22.5 of 25 entries against a directive written for a short list).
+- `mc2-9d2ji` / `mc2-923ku` / `mc2-eksyp` — code delivered in `c14e88c13`, each test proven red
+  against the pre-change source, CI green and Deploy to Dev green on its own conclusion. No
+  `prompt_templates` row shadows any of the eight edited keys, so the deployed code is what runs.
+  All three stay open: a prompt edit is a generation change and none is validated. They need ONE
+  paid dev run compared against `docs/career-playbook/2026-08-29-semantic-repetition-final.md`
+  (471 pairs, 0 at 0.85, max 0.8316; intra 375, 0, max 0.8096) — same English smoke fixture, so it
+  is a fair control. Blocked on the owner: `docs/career-playbook/live-smoke-dev-run.md` step 1
+  needs a browser JWT nobody else can mint.
 - `mc2-spkoj` / `mc2-akmx2` — the acceptance measurer keeps its own threshold and audience map
   (copies verified identical, not linked); Jina 429 backoff is now up to 300s per attempt.
 - `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
