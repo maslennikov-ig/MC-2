@@ -1,0 +1,115 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1786710715922-25-db11a6c5",
+  "goal_id": "mc2-1786710715922-25-db11a6c5",
+  "epic_id": "mc2-db696",
+  "profile_at_creation": "balanced-v2.20",
+  "status": "in_progress",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "role-guide-audience-views-and-measurable-repetition",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "career-playbook-shared-contracts",
+      "career-playbook-generation",
+      "career-playbook-quality",
+      "career-playbook-viewer"
+    ],
+    "risk_models": [
+      "audience-filter-data-loss",
+      "semantic-threshold-miscalibration",
+      "paid-dev-generation",
+      "cross-view-false-positive"
+    ],
+    "test_environments": [
+      "local-vitest",
+      "local-typecheck",
+      "dev-career-playbook-queue"
+    ],
+    "rollback_boundary": "revert-feature-branch-commits-without-schema-or-data-migration",
+    "acceptance_proofs": [
+      "pre-change-fourteen-playbook-baseline",
+      "deterministic-audience-and-boundary-unit-tests",
+      "one-paid-dev-playbook-read-by-root",
+      "post-change-metrics-below-baseline",
+      "develop-ancestry-and-stranded-commit-check"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1786710715922-25-db11a6c5",
+    "source_digest": "0a86b8feadd4caca75654c87aadcb6a580d7117cbaebd7143d3c1d338993a40c",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Каждое из трёх представлений читается как законченный документ.",
+        "text_digest": "129fdbc919e1900b27bc8990d98e15e084bfe27527bca8dad7b6bda5d421fc3b"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Ни один блок не потерян: объединение трёх представлений равно полному набору.",
+        "text_digest": "ed1c1713b47d09d211022b6b5c3c9d7cc9db8889fa1fca49e8e23fe883071050"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "`do_not_repeat` не зависит от ответа модели и содержит только блоки того же представления.",
+        "text_digest": "96a2348c4a0d869aabe827d5ecf426d37418e7bbf374c5eb3543544fe3a6a192"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Доля слишком близких пар внутри представления и внутриблочная близость абзацев ниже базовой линии фазы 0; близость между представлениями не проверяется.",
+        "text_digest": "19432dc335bac412afbe290e152e0053ea2df7d02e890d626e7000a5aec268a1"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "`pnpm type-check` и `pnpm test:unit` зелёные.",
+        "text_digest": "8a414668f713c09bac6027971d7c59888fe08ef765e315ab6797a2d9ba1a0bf9"
+      },
+      {
+        "criterion_id": "AC-6",
+        "text": "Базовая линия и итоговый замер сохранены в `docs/`; выполнен ровно один платный dev-прогон, его артефакт прочитан, а расход взят из `career_playbooks.cost_breakdown`.",
+        "text_digest": "6e8e0031c43fb6ec3abcf9ee29e4bb842465644a80e6a9408f31513947d57c4d"
+      },
+      {
+        "criterion_id": "AC-7",
+        "text": "Обе исходные Beads-задачи закрыты с числовой причиной, а обычные коммиты доставлены в `develop`.",
+        "text_digest": "d2686f089b632f266a59fc6c7380753b52da35b0a1a946a6e55d4f5c911be14f"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1786710715922-25-db11a6c5/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "0a86b8feadd4caca75654c87aadcb6a580d7117cbaebd7143d3c1d338993a40c",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-0-baseline.md",
+      "task_id": "mc2-1786710716114-26-01631777-baseline",
+      "stream_owner": "phase-0-worker",
+      "status": "planned"
+    },
+    {
+      "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-a-audiences.md",
+      "task_id": "mc2-1786710715922-25-db11a6c5",
+      "stream_owner": "phase-a-worker",
+      "status": "planned"
+    },
+    {
+      "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-b-repetition.md",
+      "task_id": "mc2-1786710716114-26-01631777",
+      "stream_owner": "phase-b-worker",
+      "status": "planned"
+    }
+  ]
+}
