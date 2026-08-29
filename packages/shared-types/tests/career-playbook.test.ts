@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CareerPlaybookBlockStateSchema,
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  CareerPlaybookAudienceSchema,
   CareerPlaybookBusinessContextSchema,
   CareerPlaybookBusinessContextDigestSchema,
   CareerPlaybookBusinessContextSourceSchema,
@@ -59,6 +61,83 @@ const baseRoleProfileSpec = {
 };
 
 describe('Career Playbook shared schemas', () => {
+  it('assigns the canonical blocks to the three complete audience views', () => {
+    const expectedBlockIdsByAudience = {
+      employee: [
+        'header',
+        'block_1',
+        'block_2',
+        'block_3',
+        'block_4',
+        'block_5',
+        'block_6',
+        'block_8',
+        'block_9',
+        'block_10',
+        'block_11',
+        'block_13',
+        'block_14',
+        'block_16',
+        'block_18',
+        'block_19',
+        'block_20',
+        'block_22',
+        'block_24',
+        'block_25',
+      ],
+      manager: [
+        'header',
+        'block_1',
+        'block_2',
+        'block_3',
+        'block_4',
+        'block_5',
+        'block_6',
+        'block_7',
+        'block_10',
+        'block_14',
+        'block_15',
+        'block_16',
+        'block_17',
+        'block_18',
+        'block_20',
+        'block_21',
+        'block_23',
+        'block_24',
+        'block_25',
+        'block_26',
+      ],
+      hr: [
+        'header',
+        'block_1',
+        'block_7',
+        'block_8',
+        'block_11',
+        'block_12',
+        'block_13',
+        'block_14',
+        'block_15',
+        'block_17',
+        'block_19',
+        'block_24',
+        'block_25',
+        'block_26',
+      ],
+    } as const;
+
+    for (const audience of CareerPlaybookAudienceSchema.options) {
+      expect(
+        CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block =>
+          (block.audiences as readonly string[]).includes(audience)
+        ).map(block => block.blockId)
+      ).toEqual(expectedBlockIdsByAudience[audience]);
+    }
+
+    expect(new Set(CAREER_PLAYBOOK_BLOCK_CATALOG.flatMap(block => block.audiences)).size).toBe(3);
+    expect(CAREER_PLAYBOOK_BLOCK_CATALOG).toHaveLength(27);
+    expect(CAREER_PLAYBOOK_BLOCK_CATALOG.every(block => block.audiences.length > 0)).toBe(true);
+  });
+
   it('exports the same 19 content languages as the course pipeline', () => {
     expect(SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES).toEqual([
       'ru',

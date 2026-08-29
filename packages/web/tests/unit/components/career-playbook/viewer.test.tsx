@@ -183,6 +183,110 @@ describe('Career Playbook viewer components', () => {
     expect(within(antiGoalsBlock).getByTestId('markdown-renderer')).toHaveTextContent('Anti-goals')
   })
 
+  it('switches the canonical audience views with keyboard-accessible tabs', async () => {
+    const user = userEvent.setup()
+
+    const { rerender } = render(
+      <PlaybookViewer
+        snapshot={snapshot}
+        blocks={makeBlocks()}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('tablist', { name: 'Представление документа' })).toBeInTheDocument()
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+    const fullTab = screen.getByRole('tab', { name: 'Полный документ' })
+    expect(fullTab).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getAllByRole('article')).toHaveLength(27)
+
+    await user.click(fullTab)
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Сотруднику' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getAllByRole('article')).toHaveLength(20)
+    expect(screen.queryByRole('article', { name: 'Профиль кандидата' })).not.toBeInTheDocument()
+
+    const editedBlocks = makeBlocks().map((block) =>
+      block.blockId === 'block_1'
+        ? {
+            ...block,
+            state: {
+              ...block.state,
+              content: '## Mission and key results\n\nEdited mission after manager review.',
+            },
+          }
+        : block
+    )
+    rerender(
+      <PlaybookViewer
+        snapshot={{
+          ...snapshot,
+          blocks: {
+            ...snapshot.blocks,
+            block_1: editedBlocks.find((block) => block.blockId === 'block_1')?.state,
+          },
+        }}
+        blocks={editedBlocks}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+    expect(
+      within(screen.getByRole('article', { name: 'Миссия и ключевые результаты' })).getByTestId(
+        'markdown-renderer'
+      )
+    ).toHaveTextContent('Edited mission after manager review.')
+
+    await user.click(screen.getByRole('tab', { name: 'Руководителю' }))
+    expect(screen.getAllByRole('article')).toHaveLength(20)
+    expect(screen.getByRole('article', { name: 'Компетенции' })).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Памятка роли' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'HR' }))
+    expect(screen.getAllByRole('article')).toHaveLength(14)
+    expect(screen.getByRole('article', { name: 'Профиль кандидата' })).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Бизнес-модель' })).not.toBeInTheDocument()
+
+    await user.click(fullTab)
+    expect(screen.getAllByRole('article')).toHaveLength(27)
+  })
+
+  it('keeps audience controls usable while generated blocks are empty', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PlaybookViewer
+        snapshot={{ ...snapshot, blocks: {} }}
+        blocks={[]}
+        copy={ruViewerCopy}
+        onEditBlock={vi.fn()}
+        onRegenerateBlock={vi.fn()}
+        onPdf={vi.fn()}
+        onShare={vi.fn()}
+        onCreateCourse={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('tab', { name: 'Сотруднику' }))
+
+    expect(screen.queryByRole('article')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('В выбранном представлении пока нет готовых разделов.')
+    ).toBeInTheDocument()
+  })
+
   it('renders the generated hero image and exposes owner image regeneration', async () => {
     const user = userEvent.setup()
     const handleRegenerateImage = vi.fn()

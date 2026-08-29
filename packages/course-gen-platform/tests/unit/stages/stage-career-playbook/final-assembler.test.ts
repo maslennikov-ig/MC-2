@@ -6,6 +6,8 @@ import type {
 } from '@megacampus/shared-types';
 import {
   assembleCareerPlaybookFinalMarkdown,
+  buildRoleGuideView,
+  joinCareerPlaybookFinalBlocks,
   prepareCareerPlaybookFinalBlocksWithQuality,
 } from '@/stages/stage-career-playbook/nodes/final-assembler';
 
@@ -65,6 +67,27 @@ const ruRoleProfileSpec: CareerPlaybookRoleProfileSpec = {
 };
 
 describe('Career Playbook final assembler', () => {
+  it('builds each audience view in canonical order without changing the full document', () => {
+    const blocks = completeBlocks();
+    const full = joinCareerPlaybookFinalBlocks(blocks);
+    const employee = buildRoleGuideView(blocks, 'employee');
+    const manager = buildRoleGuideView(blocks, 'manager');
+    const hr = buildRoleGuideView(blocks, 'hr');
+
+    expect(full.match(/^## /gm)).toHaveLength(27);
+    expect(employee.match(/^## /gm)).toHaveLength(20);
+    expect(manager.match(/^## /gm)).toHaveLength(20);
+    expect(hr.match(/^## /gm)).toHaveLength(14);
+    expect(employee.indexOf('## Header')).toBeLessThan(employee.indexOf('## 1. Block 1'));
+    expect(employee).toContain('## 22. Block 22');
+    expect(employee).not.toContain('## 12. Block 12');
+    expect(manager).toContain('## 26. Block 26');
+    expect(manager).not.toContain('## 22. Block 22');
+    expect(hr).toContain('## 12. Block 12');
+    expect(hr).not.toContain('## 20. Block 20');
+    expect(joinCareerPlaybookFinalBlocks(blocks)).toBe(full);
+  });
+
   it('assembles Header then blocks 1-26 and creates required Mermaid sections', () => {
     const markdown = assembleCareerPlaybookFinalMarkdown({ generatedBlocks: completeBlocks() });
 

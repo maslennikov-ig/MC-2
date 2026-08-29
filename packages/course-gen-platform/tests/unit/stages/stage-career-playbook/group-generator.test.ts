@@ -232,6 +232,12 @@ describe('Career Playbook group generator', () => {
     expect(renderPrompt).toHaveBeenCalledWith(
       'career_playbook_group_1_foundation',
       expect.objectContaining({
+        block_audiences_md: [
+          '- header: employee, manager, hr',
+          '- block_1: employee, manager, hr',
+          '- block_2: employee, manager',
+          '- block_5: employee, manager',
+        ].join('\n'),
         spec_json: expect.stringContaining('B2B Sales Manager'),
         content_language: 'ru',
       })

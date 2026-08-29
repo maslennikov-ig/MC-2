@@ -6,6 +6,7 @@ import type {
   CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import { CAREER_PLAYBOOK_BLOCK_CATALOG } from '@megacampus/shared-types';
 import type {
   CareerPlaybookGraphStateType,
   CareerPlaybookGraphStateUpdate,
@@ -380,6 +381,14 @@ function headingForBlock(
   return labels[headingKey] ?? `## ${blockId.replace('block_', '')}. ${blockTitle}`;
 }
 
+function formatGroupBlockAudiences(blockIds: readonly CareerPlaybookBlockId[]): string {
+  const blockIdSet = new Set(blockIds);
+
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block => blockIdSet.has(block.blockId))
+    .map(block => `- ${block.blockId}: ${block.audiences.join(', ')}`)
+    .join('\n');
+}
+
 function fallbackBlockContent(
   block: CareerPlaybookBlockSpec,
   input: GenerateCareerPlaybookGroupInput
@@ -503,6 +512,7 @@ export async function generateCareerPlaybookGroup(
       getCareerPlaybookEvidenceLedger(spec)
     ),
     generated_on: spec.generated_on ?? new Date().toISOString().slice(0, 10),
+    block_audiences_md: formatGroupBlockAudiences(groupSpec.blocks.map(block => block.blockId)),
     prior_blocks_digest: buildCareerPlaybookPriorBlocksDigest(
       input.generatedBlocks ?? {},
       groupSpec.blocks.map(block => block.blockId)

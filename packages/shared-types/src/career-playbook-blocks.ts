@@ -6,14 +6,19 @@
  * Split out of `career-playbook.ts` at 841 lines of code against a limit of 800.
  * The seam is the same one that worked for the course-size labels: the other
  * module defines what a playbook IS — questions, quality issues, judge verdicts,
- * cost, evidence — while this one is a 26-entry table of content. Adding a block
+ * cost, evidence — while this one is a 27-entry stored table of content (header
+ * plus 26 content blocks). Adding a block
  * no longer touches the schemas, and the schemas are readable without scrolling
  * past the table.
  *
  * Re-exported by `career-playbook.ts`, so every existing import is unaffected.
  */
 
-import type { CareerPlaybookBlockId, CareerPlaybookBlockGroupKey } from './career-playbook';
+import type {
+  CareerPlaybookAudience,
+  CareerPlaybookBlockId,
+  CareerPlaybookBlockGroupKey,
+} from './career-playbook';
 
 export interface CareerPlaybookBlockCatalogItem {
   blockId: CareerPlaybookBlockId;
@@ -21,6 +26,7 @@ export interface CareerPlaybookBlockCatalogItem {
   groupKey: CareerPlaybookBlockGroupKey;
   groupLabel: string;
   position: number;
+  audiences: readonly CareerPlaybookAudience[];
 }
 
 export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
@@ -30,6 +36,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_1_foundation',
     groupLabel: 'Foundation',
     position: 0,
+    audiences: ['employee', 'manager', 'hr'],
   },
   {
     blockId: 'block_1',
@@ -37,6 +44,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_1_foundation',
     groupLabel: 'Foundation',
     position: 1,
+    audiences: ['employee', 'manager', 'hr'],
   },
   {
     blockId: 'block_2',
@@ -44,6 +52,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_1_foundation',
     groupLabel: 'Foundation',
     position: 2,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_3',
@@ -51,6 +60,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_2_operations',
     groupLabel: 'Operations',
     position: 3,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_4',
@@ -58,6 +68,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_2_operations',
     groupLabel: 'Operations',
     position: 4,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_5',
@@ -65,6 +76,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_1_foundation',
     groupLabel: 'Foundation',
     position: 5,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_6',
@@ -72,6 +84,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_2_operations',
     groupLabel: 'Operations',
     position: 6,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_7',
@@ -79,6 +92,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_3_people',
     groupLabel: 'People',
     position: 7,
+    audiences: ['manager', 'hr'],
   },
   {
     blockId: 'block_8',
@@ -86,6 +100,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_2_operations',
     groupLabel: 'Operations',
     position: 8,
+    audiences: ['employee', 'hr'],
   },
   {
     blockId: 'block_9',
@@ -93,6 +108,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_3_people',
     groupLabel: 'People',
     position: 9,
+    audiences: ['employee'],
   },
   {
     blockId: 'block_10',
@@ -100,6 +116,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_5_system',
     groupLabel: 'System',
     position: 10,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_11',
@@ -107,6 +124,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_4_growth',
     groupLabel: 'Growth',
     position: 11,
+    audiences: ['employee', 'hr'],
   },
   {
     blockId: 'block_12',
@@ -114,6 +132,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_3_people',
     groupLabel: 'People',
     position: 12,
+    audiences: ['hr'],
   },
   {
     blockId: 'block_13',
@@ -121,6 +140,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_3_people',
     groupLabel: 'People',
     position: 13,
+    audiences: ['employee', 'hr'],
   },
   {
     blockId: 'block_14',
@@ -128,6 +148,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_4_growth',
     groupLabel: 'Growth',
     position: 14,
+    audiences: ['employee', 'manager', 'hr'],
   },
   {
     blockId: 'block_15',
@@ -135,6 +156,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_4_growth',
     groupLabel: 'Growth',
     position: 15,
+    audiences: ['manager', 'hr'],
   },
   {
     blockId: 'block_16',
@@ -142,6 +164,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_5_system',
     groupLabel: 'System',
     position: 16,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_17',
@@ -149,6 +172,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_4_growth',
     groupLabel: 'Growth',
     position: 17,
+    audiences: ['manager', 'hr'],
   },
   {
     blockId: 'block_18',
@@ -156,6 +180,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 18,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_19',
@@ -163,6 +188,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_5_system',
     groupLabel: 'System',
     position: 19,
+    audiences: ['employee', 'hr'],
   },
   {
     blockId: 'block_20',
@@ -170,6 +196,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_5_system',
     groupLabel: 'System',
     position: 20,
+    audiences: ['employee', 'manager'],
   },
   {
     blockId: 'block_21',
@@ -177,6 +204,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_5_system',
     groupLabel: 'System',
     position: 21,
+    audiences: ['manager'],
   },
   {
     blockId: 'block_22',
@@ -184,6 +212,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 22,
+    audiences: ['employee'],
   },
   {
     blockId: 'block_23',
@@ -191,6 +220,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 23,
+    audiences: ['manager'],
   },
   {
     blockId: 'block_24',
@@ -198,6 +228,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 24,
+    audiences: ['employee', 'manager', 'hr'],
   },
   {
     blockId: 'block_25',
@@ -205,6 +236,7 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 25,
+    audiences: ['employee', 'manager', 'hr'],
   },
   {
     blockId: 'block_26',
@@ -212,5 +244,6 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     groupKey: 'group_6_wrap',
     groupLabel: 'Wrap-up',
     position: 26,
+    audiences: ['manager', 'hr'],
   },
 ] as const satisfies readonly CareerPlaybookBlockCatalogItem[];
