@@ -15,6 +15,7 @@ import {
 } from '@megacampus/shared-types'
 import type {
   CareerPlaybookAnswerSubmission,
+  CareerPlaybookAudience,
   CareerPlaybookBlockCatalogItem,
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
@@ -201,7 +202,9 @@ export interface CareerPlaybookAutosaveResult {
   backendPending?: boolean
 }
 
-export interface CareerPlaybookViewerBlock extends CareerPlaybookBlockCatalogItem {
+export interface CareerPlaybookViewerBlock
+  extends Omit<CareerPlaybookBlockCatalogItem, 'audiences'> {
+  audiences: CareerPlaybookAudience[]
   state: CareerPlaybookBlockState
 }
 
@@ -1047,6 +1050,7 @@ function viewerBlocksFromSnapshot(
 ): CareerPlaybookViewerBlock[] {
   return CAREER_PLAYBOOK_BLOCK_CATALOG.map((block) => ({
     ...block,
+    audiences: [...block.audiences],
     state: snapshot.blocks[block.blockId] ?? emptyViewerBlockState(),
   }))
 }
