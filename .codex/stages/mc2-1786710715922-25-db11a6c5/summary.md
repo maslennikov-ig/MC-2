@@ -18,8 +18,11 @@ stage closes `mc2-1786710715922-25-db11a6c5` and `mc2-1786710716114-26-01631777`
 
 ## Ordered work
 
-1. Phase 0: save a fourteen-playbook semantic baseline in `docs/` before production-code changes.
-2. Phase A: add canonical audience data, on-the-fly view assembly, audience-aware prompts, and four
+1. Phase 0: accepted. Fourteen-playbook baseline saved in
+   `docs/career-playbook/2026-08-29-semantic-repetition-baseline.md`; at the measured 0.85 threshold,
+   8/6,594 audience-view block pairs (0.12%) and 18/6,829 within-block paragraph pairs (0.26%) are
+   too close.
+2. Phase A: in progress. Add canonical audience data, on-the-fly view assembly, audience-aware prompts, and four
    viewer tabs.
 3. Phase B: derive `do_not_repeat` and prior-block context from shared-view membership, then add a
    threshold calibrated from phase 0.
