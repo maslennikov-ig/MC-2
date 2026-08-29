@@ -106,9 +106,11 @@ contain 20, 20, and 14 stored blocks respectively, including `header`, and their
 union covers `header` plus all 26 content blocks.
 
 Persistence remains unchanged: `final_markdown` is always the complete Role
-Guide. Audience-specific markdown is assembled on demand with
-`buildRoleGuideView`; edits and regenerated blocks therefore appear in every
-applicable view without a schema migration or backfill.
+Guide. The viewer filters the stored blocks by audience on the client, so edits
+and regenerated blocks appear in every applicable view without a schema
+migration or backfill. `buildRoleGuideView` in `final-assembler.ts` builds the
+same markdown server-side and is available to backend callers, but no production
+path calls it today.
 
 Repetition control uses the same audience map. Canonical normalization discards
 model-produced `do_not_repeat` lists and rebuilds them from block topics, shared

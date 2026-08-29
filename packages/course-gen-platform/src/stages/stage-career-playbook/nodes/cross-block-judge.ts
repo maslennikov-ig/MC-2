@@ -21,6 +21,7 @@ import {
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   countCareerPlaybookRegenerationAttemptsForBlocks,
+  selectPendingCareerPlaybookRegenerations,
 } from './block-regenerator';
 import {
   invokeStructuredJudgeWithRepair,
@@ -424,6 +425,47 @@ function capRegenerationWhenBudgetExhausted(params: {
   };
 }
 
+/**
+ * Does the document still carry an unremediated semantic repetition?
+ *
+ * Asks the executor, not the verdict. The window-budget exemption above lives
+ * only in this node's bookkeeping: `selectPendingCareerPlaybookRegenerations`
+ * refuses every block once the window is spent, exempt or not, and
+ * `routeAfterBlockRegeneration` sends an empty batch straight to END. So "the
+ * block is still listed in needs_regeneration" and "something will actually
+ * regenerate it" are different questions, and only the second one decides
+ * whether the playbook completes with the repetition still in it.
+ */
+function buildSemanticGateErrors(params: {
+  isFinalWindow: boolean;
+  deterministicVerdict: CareerPlaybookJudgeVerdict;
+  routedVerdict: CareerPlaybookJudgeVerdict;
+  windowBlockIds: CareerPlaybookBlockId[];
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+}): string[] {
+  if (!params.isFinalWindow) return [];
+
+  const semanticRepetitionBlockIds = uniqueBlockIds(
+    params.deterministicVerdict.issues
+      .filter(isCareerPlaybookSemanticRepetitionIssue)
+      .map(issue => issue.block_id)
+  );
+  if (semanticRepetitionBlockIds.length === 0) return [];
+
+  const pending = selectPendingCareerPlaybookRegenerations({
+    verdict: params.routedVerdict,
+    blockIds: params.windowBlockIds,
+    attempts: params.attempts,
+  });
+  const willRemediate = pending.some(entry => semanticRepetitionBlockIds.includes(entry.blockId));
+
+  return willRemediate
+    ? []
+    : [
+        `final semantic repetition gate failed closed with no remaining remediation for ${semanticRepetitionBlockIds.join(', ')}`,
+      ];
+}
+
 function selectGeneratedBlocks(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
   blockIds?: CareerPlaybookBlockId[]
@@ -622,6 +664,17 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           nodeCosts.push(...error.nodeCosts);
         }
 
+        // A degraded LLM judge must not also degrade the deterministic semantic
+        // gate: the deterministic verdict returned here still carries its issues,
+        // so the same fail-closed question is asked on this path too.
+        const degradedSemanticErrors = buildSemanticGateErrors({
+          isFinalWindow: options.currentBlockIds === undefined,
+          deterministicVerdict,
+          routedVerdict: deterministicVerdict,
+          windowBlockIds,
+          attempts: state.blockRegenerationAttempts ?? {},
+        });
+
         return {
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           judgeVerdicts: [deterministicVerdict],
@@ -633,6 +686,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
               error instanceof Error ? error.message : String(error)
             }`,
           ],
+          ...(degradedSemanticErrors.length > 0 ? { errors: degradedSemanticErrors } : {}),
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
       }
@@ -655,17 +709,13 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       windowBudgetExemptBlockIds:
         options.currentBlockIds === undefined ? semanticRepetitionBlockIds : undefined,
     });
-    const hasEligibleSemanticRemediation = capped.verdict.needs_regeneration.some(blockId =>
-      semanticRepetitionBlockIds.includes(blockId)
-    );
-    const semanticErrors =
-      options.currentBlockIds === undefined &&
-      semanticRepetitionBlockIds.length > 0 &&
-      !hasEligibleSemanticRemediation
-        ? [
-            `final semantic repetition gate failed closed after max regeneration attempts for ${semanticRepetitionBlockIds.join(', ')}`,
-          ]
-        : [];
+    const semanticErrors = buildSemanticGateErrors({
+      isFinalWindow: options.currentBlockIds === undefined,
+      deterministicVerdict,
+      routedVerdict: capped.verdict,
+      windowBlockIds,
+      attempts: state.blockRegenerationAttempts ?? {},
+    });
 
     return {
       // Only the re-reviewed blocks receive the new verdict; accepted siblings retain the

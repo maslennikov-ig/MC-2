@@ -1058,19 +1058,66 @@ flowchart LR
     );
   }
 
-  it('reserves final semantic remediation after the general window budget is exhausted', async () => {
+  it('keeps the flagged block eligible while the window still has budget', async () => {
     mockOneWithinBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
-    const update = await node(
-      semanticFinalJudgeState({
-        block_8: 8,
-        block_11: 0,
-      })
-    );
+    const update = await node(semanticFinalJudgeState({ block_8: 7, block_11: 0 }));
 
     expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_11']);
     expect(update.errors).toBeUndefined();
+  });
+
+  /**
+   * The window-budget exemption is bookkeeping inside the judge;
+   * `selectPendingCareerPlaybookRegenerations` refuses every block once the
+   * window is spent, and `routeAfterBlockRegeneration` sends the empty batch to
+   * END. Keeping the block in `needs_regeneration` therefore reserves nothing,
+   * and asserting `errors: undefined` here pinned a fail-open: the playbook
+   * completed with an unremediated critical repetition, no error and no warning.
+   */
+  it('fails closed when the exhausted window leaves nothing to regenerate the block', async () => {
+    mockOneWithinBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    const update = await node(semanticFinalJudgeState({ block_8: 8, block_11: 0 }));
+
+    expect(update.errors).toEqual([
+      expect.stringContaining('final semantic repetition gate failed closed'),
+    ]);
+  });
+
+  /**
+   * The degraded-judge return sits above the semantic gate block, so a judge
+   * model that fails to produce a verdict used to take the deterministic gate
+   * down with it: the repetition was found, nothing remediated it, and the
+   * playbook completed with a warning instead of an error.
+   */
+  it('still fails the semantic gate closed when the LLM judge degrades', async () => {
+    mockOneWithinBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({
+      useLLMJudge: true,
+      runtime: {
+        renderPrompt: vi.fn().mockResolvedValue('rendered judge prompt'),
+        invokeLLM: vi.fn().mockResolvedValue({
+          content: '',
+          model: 'mock-judge-model',
+          inputTokens: 50,
+          outputTokens: 1,
+          costUsd: 0.001,
+        }),
+      },
+    });
+
+    const update = await node({
+      ...semanticFinalJudgeState({ block_8: 8, block_11: 0 }),
+      roleProfileSpec,
+    });
+
+    expect(update.warnings?.[0]).toContain('crossBlockJudge degraded to deterministic checks');
+    expect(update.errors).toEqual([
+      expect.stringContaining('final semantic repetition gate failed closed'),
+    ]);
   });
 
   it('fails the final semantic gate closed after the repeated block exhausts its cap', async () => {
