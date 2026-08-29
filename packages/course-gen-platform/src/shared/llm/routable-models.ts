@@ -118,10 +118,11 @@ export function collectRoutableModelSources(): RoutableModelSource[] {
  * provider answers with — `openai/gpt-5.6-luna-20260709` for a request naming
  * `openai/gpt-5.6-luna` — and it strips any trailing run of four to eight
  * digits. Applied to a declared id that is spelt that way, it destroys it:
- * `qwen/qwen3-235b-a22b-2507` is a catalogue key in its own right, and
- * normalizing turns it into `qwen/qwen3-235b-a22b`, which is nothing at all.
- * A gate built on that would have reported a priced model as unpriced and sent
- * somebody to add a duplicate entry for it.
+ * `deepseek/deepseek-v4-flash-0731` is a catalogue key in its own right — the
+ * busiest model in the pipeline — and normalizing turns it into
+ * `deepseek/deepseek-v4-flash`, a different entry at roughly twice the price. A
+ * gate built on that would report a priced model as unpriced and send somebody
+ * to add a duplicate entry for it.
  *
  * Lookups do their own normalizing anyway: `getModelCapabilities` tries the
  * exact id first and the normalized form second, so both spellings resolve.

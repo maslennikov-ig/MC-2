@@ -34,8 +34,10 @@ export interface QualityFallbackResult {
 /**
  * Invokes quality fallback model as last resort for validation/quality failures
  *
- * Uses the 'quality_fallback' phase from langchain-models, which defaults to
- * moonshotai/kimi-k2-thinking (S-TIER quality, reliable structured output).
+ * Uses the 'quality_fallback' phase from langchain-models, whose model comes
+ * from `llm_model_config` — `deepseek/deepseek-v4-flash-0731` in the committed
+ * seed. This line named `moonshotai/kimi-k2-thinking` until 2026-08-29, by which
+ * point that model was neither configured here nor in the catalogue.
  *
  * NOTE: This is NOT for context overflow. For large inputs, use 'emergency' phase.
  *
@@ -50,8 +52,8 @@ export interface QualityFallbackResult {
  *
  * try {
  *   const result = await qualityFallback(prompt, courseId);
- *   console.log(result.output); // Raw JSON from Kimi K2
- *   console.log(result.modelUsed); // 'moonshotai/kimi-k2-thinking'
+ *   console.log(result.output); // Raw JSON from the quality-fallback model
+ *   console.log(result.modelUsed); // whichever model the phase is configured with
  * } catch (error) {
  *   // This is a critical failure - all repair layers exhausted
  *   console.error('Quality fallback failed:', error);

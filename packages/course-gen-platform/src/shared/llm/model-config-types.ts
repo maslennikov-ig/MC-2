@@ -91,7 +91,7 @@ export interface PhaseModelConfig {
    * Null means no fallback (fail immediately on primary failure)
    *
    * @example 'deepseek/deepseek-v4-flash'
-   * @example 'qwen/qwen3-235b-a22b-2507'
+   * @example 'openai/gpt-5.6-luna'
    */
   fallback_model_id: string | null;
 

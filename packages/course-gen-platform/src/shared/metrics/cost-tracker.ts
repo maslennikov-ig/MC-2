@@ -136,7 +136,7 @@ export interface CostAlertConfig {
  * costTracker.recordStageCost('course-123', {
  *   stageId: 'stage2',
  *   stageName: 'Document Processing',
- *   modelId: 'qwen/qwen3-235b-a22b-2507',
+ *   modelId: 'openai/gpt-5.6-luna',
  *   tokenUsage: { inputTokens: 5000, outputTokens: 1000, totalTokens: 6000 },
  *   costUsd: 0.0011,
  *   durationMs: 2500,

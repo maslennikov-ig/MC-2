@@ -72,7 +72,7 @@ export interface CourseTokenSummary {
  *   courseId: 'uuid',
  *   stageNumber: 2,
  *   phaseName: 'classification',
- *   modelId: 'qwen/qwen3-235b-a22b-2507',
+ *   modelId: 'openai/gpt-5.6-luna',
  *   inputTokens: 5000,
  *   outputTokens: 1000,
  *   costUsd: 0.0011,

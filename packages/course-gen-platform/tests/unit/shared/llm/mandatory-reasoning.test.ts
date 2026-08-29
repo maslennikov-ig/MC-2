@@ -9,8 +9,8 @@
  * say "no reasoning" out loud and 2d4a9f1e3 routed Gemini to 3.7-flash.
  *
  * Measured against the live provider on 2026-08-15 across the whole catalogue:
- * five models refuse the disable — gemini-3.7-flash, minimax-m2, minimax-m2.1,
- * kimi-k2-thinking — and all of them accept `effort: 'low'`.
+ * five models refused the disable when the whole catalogue was measured;
+ * three of them have since left it, and the two that remain are below.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -132,11 +132,11 @@ describe('models that mandate reasoning', () => {
     expect(flagged.sort()).toEqual([
       'google/gemini-3.7-flash',
       'google/gemini-3.7-flash:batch',
-      // `minimax/minimax-m2` was measured here too, and left the list with its
-      // catalogue entry on 2026-08-29: neither ledger had ever charged a call
-      // to it (mc2-11jn5).
-      'minimax/minimax-m2.1',
-      'moonshotai/kimi-k2-thinking',
+      // `minimax-m2`, `minimax-m2.1` and `kimi-k2-thinking` were measured here
+      // too and left this list with their catalogue entries on 2026-08-29. The
+      // measurement still holds; the models are simply no longer callable, and a
+      // reasoning quirk of a model nothing can route to is not a contract
+      // (mc2-11jn5).
       // Measured 2026-08-26 on both of its endpoints — `z-ai` and `novita` —
       // because the refusal is a property of the model, not of one provider:
       // `400 Reasoning is mandatory for this endpoint and cannot be disabled`

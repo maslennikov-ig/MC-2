@@ -8,21 +8,31 @@
  * absent from every one of them, so their cost silently resolved to a $1/$3
  * default and reported a plausible wrong number.
  *
- * Prices are the current OpenRouter /models base per-token list prices at the
- * verification date below, not historical snapshots. Provider threshold
- * overrides are not representable by this flat catalogue and require a
- * model-specific routing guard (see Qwen 3 Max in cost-calculator.ts). A call is
- * priced once and the USD amount is persisted in generation_trace, so changing
- * this catalogue does not reprice old reports. Retired-but-still-listed models
- * stay current so re-enabling one cannot silently revive an obsolete tariff. A
- * `delisted` model has no current price; its last observed rate is retained only
- * as an explicitly marked fallback.
+ * Prices are the current OpenRouter base per-token list prices, not historical
+ * snapshots, and the nightly sync keeps them so. Provider threshold overrides
+ * are not representable by this flat table.
  *
- * Pricing verified against https://openrouter.ai/api/v1/models on 2026-08-14.
- * Keep it that way: a hand-typed price is indistinguishable from a correct one
- * until an invoice disagrees.
+ * **What belongs here is what can be called, not what once was.** Until
+ * 2026-08-29 the table held 36 entries against 10 the code could route to, on
+ * the stated grounds that a retired entry lets old cost reports still resolve.
+ * That mechanism does not exist: a call is priced once and the dollars are
+ * persisted — `generation_trace.cost_usd` for a course,
+ * `career_playbooks.cost_breakdown.nodeCosts[].cost_usd` for a playbook — and
+ * nothing outside the runtime paths reads this catalogue at all. Twenty entries
+ * went; what stayed is the live routing set, the Batch tariffs beside it, and
+ * `deepseek-v4-flash` with its `~latest` alias, which `normalizeModelId` needs
+ * to price every dated V4 Flash snapshot (mc2-11jn5).
  *
- * Refs mc2-a2j1x, mc2-0a47t
+ * The cost of that is worth stating: a model re-enabled without being added
+ * here first will have its calls recorded as unpriced rather than mispriced —
+ * `unpriced_models` on the breakdown, `undefined` from `estimateCost` — until
+ * the entry exists. Visible, not silent, which is the trade that was chosen.
+ *
+ * Keep the numbers honest: a hand-typed price is indistinguishable from a
+ * correct one until an invoice disagrees, which is why they are read nightly
+ * from the published list rather than typed (`check-model-catalog-drift.ts`).
+ *
+ * Refs mc2-a2j1x, mc2-0a47t, mc2-11jn5
  */
 
 /**
@@ -434,73 +444,6 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     outputPricePerMillion: 0.17024,
     contextLength: 1048576,
     maxOutputTokens: 384000,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'deepseek/deepseek-v4-pro': {
-    // Re-read 2026-08-23: $0.396894/$0.793788, against $1.60/$3.20 here — 4.03x
-    // over, the largest gap the catalogue has held. Not on a live route, so it
-    // cost nothing; had it been, `provider.max_price` would have been built four
-    // times too high and bought nothing.
-    inputPricePerMillion: 0.680862,
-    outputPricePerMillion: 1.361724,
-    contextLength: 1048576,
-    maxOutputTokens: 393216,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  /**
-   * Superseded by `google/gemini-3.7-flash` on 2026-08-14: same context window
-   * and output ceiling, less money. Kept so cost reports written while this was
-   * routed still resolve to a price.
-   */
-  'google/gemini-3-flash-preview': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 3,
-    contextLength: 1048576,
-    maxOutputTokens: 65536,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'minimax/minimax-m2.1': {
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 1.2,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'moonshotai/kimi-k2-thinking': {
-    inputPricePerMillion: 0.6,
-    outputPricePerMillion: 2.5,
-    contextLength: 262144,
-    maxOutputTokens: 100352,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'qwen/qwen3-235b-a22b-2507': {
-    inputPricePerMillion: 0.0875,
-    outputPricePerMillion: 0.35,
-    contextLength: 262144,
-    maxOutputTokens: 16384,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'qwen/qwen3.7-plus': {
-    inputPricePerMillion: 0.32,
-    outputPricePerMillion: 1.28,
-    contextLength: 1000000,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'z-ai/glm-5': {
-    inputPricePerMillion: 0.6,
-    outputPricePerMillion: 1.92,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
   },

@@ -165,20 +165,13 @@ describe('model catalogue coverage', () => {
     expect(actualFlat).toEqual(verifiedFlatImagePrices);
   });
 
-  it('prices listed retired models at the OpenRouter rates last verified for each', () => {
-    // Dated per row rather than per test: these are re-read when something
-    // sends somebody to look, not on one day together, and a single date in the
-    // title claims a freshness the rows do not share.
-    //
-    // Every row here has been paid for at least once, and that is now the whole
-    // admission rule. Eleven entries were dropped on 2026-08-29 because neither
-    // ledger had ever charged anything to them; five of those carried
-    // `delisted: true` and the words "retained so old cost reports still
-    // resolve", with no such report in existence. Both ledgers have to be read
-    // to make that call — a playbook's spend lives in
-    // `career_playbooks.cost_breakdown` and never reaches `generation_trace`,
-    // which is why `deepseek/deepseek-v4-pro` reads as unused in the obvious
-    // place while holding 189 calls in the other (mc2-11jn5).
+  it('prices the two entries kept outside the live routing set', () => {
+    // Two, and only for a mechanism rather than for history. Twenty entries left
+    // the catalogue on 2026-08-29: the stated reason for keeping them — "so old
+    // cost reports still resolve" — described a mechanism that does not exist,
+    // because the dollars are persisted at the call (`generation_trace.cost_usd`,
+    // `career_playbooks.cost_breakdown.nodeCosts[].cost_usd`) and no reporting
+    // path reads this catalogue (mc2-11jn5).
     const verifiedRates: Record<string, [input: number, output: number]> = {
       // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
       // would, because `normalizeModelId` prices every undated V4 Flash snapshot
@@ -189,11 +182,6 @@ describe('model catalogue coverage', () => {
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
       'deepseek/deepseek-v4-flash': [0.08512, 0.17024],
       '~deepseek/deepseek-v4-flash-latest': [0.03, 0.1],
-      'deepseek/deepseek-v4-pro': [0.680862, 1.361724],
-      'moonshotai/kimi-k2-thinking': [0.6, 2.5],
-      'qwen/qwen3-235b-a22b-2507': [0.0875, 0.35],
-      'qwen/qwen3.7-plus': [0.32, 1.28],
-      'z-ai/glm-5': [0.6, 1.92],
     };
 
     const actual = Object.fromEntries(
