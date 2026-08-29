@@ -71,7 +71,7 @@ the lockfile-routed L1 query was missing and was persisted into L1; all remainin
 repository-owned.
 
 graph-reviewed: updated - Graphify 0.9.45 rebuilt the local code graph without external semantic or
-label APIs to 61,004 nodes, 94,488 edges and 4,163 communities. A focused query resolves the
+label APIs to 61,008 nodes, 94,492 edges and 4,159 communities. A focused query resolves the
 audience catalogue, view docs, `audience-scope.ts`, `prior-blocks-digest.ts`,
 `semantic-repetition.ts` and `cross-block-judge.ts`; excluded runtime/noise source count is zero.
 
