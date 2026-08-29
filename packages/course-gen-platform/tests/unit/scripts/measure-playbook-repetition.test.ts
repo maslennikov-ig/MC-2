@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +10,19 @@ const scriptUrl = new URL('../../../scripts/measure-playbook-repetition.ts', imp
 
 function basisVector(axis: number): number[] {
   return Array.from({ length: 768 }, (_, index) => (index === axis ? 1 : 0));
+}
+
+function completedStoredPlaybook(id: string, complete = true) {
+  const blockIds = ['header', ...Array.from({ length: complete ? 26 : 1 }, (_, i) => `block_${i + 1}`)];
+  return {
+    id,
+    status: 'completed',
+    language: 'en',
+    created_at: '2026-08-29T00:00:00.000Z',
+    generated_blocks: Object.fromEntries(
+      blockIds.map(blockId => [blockId, { status: 'completed', content: `${blockId} content` }])
+    ),
+  };
 }
 
 describe('Career Playbook repetition measurement', () => {
@@ -113,5 +127,90 @@ describe('Career Playbook repetition measurement', () => {
     expect(resumedBatches).toEqual([['customer gamma'], ['customer gamma']]);
     expect(waits).toEqual([61_000]);
     expect(embeddings).toEqual([firstMeaning, secondMeaning, thirdMeaning]);
+  });
+
+  it('keeps an explicit baseline cohort stable and evaluates one exact playbook with zero repeats', async () => {
+    const {
+      formatReport,
+      measureEmbeddedPlaybook,
+      parseMeasurementArgs,
+      selectMeasurementCohort,
+    } = await import(scriptUrl.href);
+    const historicalIds = Array.from(
+      { length: 14 },
+      (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+    );
+    const newId = '00000000-0000-4000-8000-000000000015';
+    const cohortHashes = historicalIds.map(id =>
+      createHash('sha256').update(id).digest('hex').slice(0, 12)
+    );
+    const rows = [...historicalIds.map(id => completedStoredPlaybook(id)), completedStoredPlaybook(newId)];
+    const baselineArgs = parseMeasurementArgs(
+      cohortHashes.flatMap(hash => ['--cohort-hash', hash]),
+      '/tmp/course-platform'
+    );
+
+    expect(selectMeasurementCohort(rows, baselineArgs).map(playbook => playbook.playbookId)).toEqual(
+      historicalIds
+    );
+
+    const targetId = historicalIds[0];
+    const evaluationArgs = parseMeasurementArgs(
+      ['--playbook-id', targetId, '--threshold', '0.85', '--out', '/tmp/evaluation.md'],
+      '/tmp/course-platform'
+    );
+    const [target] = selectMeasurementCohort(rows, evaluationArgs);
+    expect(target.playbookId).toBe(targetId);
+    expect(() => parseMeasurementArgs(['--mode', 'evaluation'], '/tmp/course-platform')).toThrow(
+      /playbook-id/u
+    );
+    expect(() =>
+      parseMeasurementArgs(
+        ['--playbook-id', targetId, '--threshold', '0.80'],
+        '/tmp/course-platform'
+      )
+    ).toThrow(/0\.85/u);
+    expect(() => selectMeasurementCohort([], evaluationArgs)).toThrow(/completed 27-block/u);
+    expect(() =>
+      selectMeasurementCohort(
+        [completedStoredPlaybook(targetId), completedStoredPlaybook(targetId)],
+        evaluationArgs
+      )
+    ).toThrow(/exactly one completed 27-block/u);
+    expect(() =>
+      selectMeasurementCohort([completedStoredPlaybook(targetId, false)], evaluationArgs)
+    ).toThrow(/completed 27-block/u);
+
+    const zeroMeasurement = measureEmbeddedPlaybook(
+      {
+        playbookId: targetId,
+        blocks: [
+          {
+            blockId: 'header',
+            embedding: basisVector(0),
+            paragraphEmbeddings: [basisVector(0), basisVector(1)],
+          },
+          { blockId: 'block_1', embedding: basisVector(1), paragraphEmbeddings: [] },
+          { blockId: 'block_2', embedding: basisVector(2), paragraphEmbeddings: [] },
+          { blockId: 'block_7', embedding: basisVector(3), paragraphEmbeddings: [] },
+        ],
+      },
+      0.85
+    );
+    const report = formatReport(
+      [target],
+      [zeroMeasurement],
+      '2026-08-29T00:00:00.000Z',
+      0.85,
+      '/tmp/checkpoint.json',
+      evaluationArgs
+    );
+
+    expect(report).toContain('Cohort size: **1**');
+    expect(report).toContain('| Audience-view block pairs | 12 | 0 | 0.00% |');
+    expect(report).toContain('| Paragraph pairs within one block | 1 | 0 | 0.00% |');
+    expect(report).toContain('Fixed evaluation threshold: **0.85**');
+    expect(report).toContain('--playbook-id <completed-playbook-uuid> --threshold 0.85');
+    expect(report).not.toContain(targetId);
   });
 });

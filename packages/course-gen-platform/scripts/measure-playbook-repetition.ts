@@ -70,7 +70,23 @@ const BLOCK_LABELS: Readonly<Record<string, string>> = {
 
 const REPORT_THRESHOLDS = [0.75, 0.8, 0.85, 0.9] as const;
 const MIN_PARAGRAPH_CHARACTERS = 100;
-const EXPECTED_PLAYBOOK_COUNT = 14;
+const RECORDED_BASELINE_THRESHOLD = 0.85;
+export const HISTORICAL_BASELINE_COHORT_HASHES = [
+  '6395b5f9cd2e',
+  'e744615ce64f',
+  'fc063a949fda',
+  '6bb4cfe5ba7d',
+  '113e791d28b3',
+  '7e8ace983dea',
+  'e59fa24dc439',
+  'd09d3a64caf5',
+  '8eb6215118b3',
+  '7890f1e69f5a',
+  'ade84257b4ea',
+  'd373335584bf',
+  '6e6f47153972',
+  '0f49ec1f2b59',
+] as const;
 const MAX_INPUT_CHARACTERS = 2_500_000;
 const MAX_EMBEDDING_ITEMS = 4_000;
 const CHECKPOINT_SCHEMA = 'career-playbook-repetition-embeddings/v1';
@@ -330,8 +346,9 @@ interface StoredBlock {
   content?: unknown;
 }
 
-interface StoredPlaybook {
+export interface StoredPlaybook {
   id: string;
+  status: string;
   language: string | null;
   created_at: string;
   generated_blocks: Record<string, StoredBlock> | null;
@@ -343,11 +360,90 @@ interface TextBlock {
   paragraphs: string[];
 }
 
-interface TextPlaybook {
+export interface TextPlaybook {
   playbookId: string;
   language: string;
   createdAt: string;
   blocks: TextBlock[];
+}
+
+export type MeasurementArgs =
+  | {
+      mode: 'baseline';
+      cohortHashes: string[];
+      outputPath: string;
+      cachePath: string;
+    }
+  | {
+      mode: 'evaluation';
+      playbookId: string;
+      threshold: typeof RECORDED_BASELINE_THRESHOLD;
+      outputPath: string;
+      cachePath: string;
+    };
+
+function flagValue(argv: string[], flag: string): string | undefined {
+  const indexes = argv.flatMap((value, index) => (value === flag ? [index] : []));
+  if (indexes.length > 1) throw new Error(`${flag} may be provided only once`);
+  const index = indexes[0];
+  if (index === undefined) return undefined;
+  const value = argv[index + 1];
+  if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
+export function parseMeasurementArgs(argv: string[], cwd: string = process.cwd()): MeasurementArgs {
+  const requestedMode = flagValue(argv, '--mode');
+  if (requestedMode && requestedMode !== 'baseline' && requestedMode !== 'evaluation') {
+    throw new Error('--mode must be baseline or evaluation');
+  }
+  const playbookId = flagValue(argv, '--playbook-id');
+  const thresholdRaw = flagValue(argv, '--threshold');
+  const mode = requestedMode ?? (playbookId ? 'evaluation' : 'baseline');
+  const outputRaw = flagValue(argv, '--out');
+  const cacheRaw = flagValue(argv, '--cache');
+  const outputPath = path.resolve(
+    cwd,
+    outputRaw ??
+      (mode === 'baseline'
+        ? '../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md'
+        : '../../docs/career-playbook/evaluation-semantic-repetition.md')
+  );
+  const cachePath = path.resolve(
+    cwd,
+    cacheRaw ?? '.cache/career-playbook-repetition/jina-embeddings-v3.json'
+  );
+
+  if (mode === 'evaluation') {
+    if (!playbookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(playbookId)) {
+      throw new Error('evaluation mode requires a valid --playbook-id UUID');
+    }
+    if (thresholdRaw === undefined || Number(thresholdRaw) !== RECORDED_BASELINE_THRESHOLD) {
+      throw new Error('evaluation mode requires fixed --threshold 0.85');
+    }
+    if (argv.includes('--cohort-hash')) {
+      throw new Error('evaluation mode does not accept --cohort-hash');
+    }
+    return { mode, playbookId, threshold: RECORDED_BASELINE_THRESHOLD, outputPath, cachePath };
+  }
+
+  if (playbookId || thresholdRaw !== undefined) {
+    throw new Error('baseline mode does not accept --playbook-id or --threshold');
+  }
+  const cohortHashes = argv.flatMap((value, index) =>
+    value === '--cohort-hash' && argv[index + 1] ? [argv[index + 1]] : []
+  );
+  const selectedHashes = cohortHashes.length
+    ? cohortHashes
+    : [...HISTORICAL_BASELINE_COHORT_HASHES];
+  if (
+    selectedHashes.length !== 14 ||
+    new Set(selectedHashes).size !== 14 ||
+    selectedHashes.some(hash => !/^[0-9a-f]{12}$/u.test(hash))
+  ) {
+    throw new Error('baseline mode requires exactly 14 unique --cohort-hash values');
+  }
+  return { mode, cohortHashes: selectedHashes, outputPath, cachePath };
 }
 
 export function splitSemanticParagraphs(markdown: string): string[] {
@@ -381,7 +477,38 @@ function normalizePlaybook(row: StoredPlaybook): TextPlaybook | undefined {
   };
 }
 
-async function loadCompletedPlaybooks(): Promise<TextPlaybook[]> {
+export function selectMeasurementCohort(
+  rows: StoredPlaybook[],
+  args: MeasurementArgs
+): TextPlaybook[] {
+  if (args.mode === 'evaluation') {
+    const matches = rows.filter(candidate => candidate.id === args.playbookId);
+    const row = matches.length === 1 ? matches[0] : undefined;
+    const normalized = row?.status === 'completed' ? normalizePlaybook(row) : undefined;
+    if (!normalized) {
+      throw new Error('Evaluation requires exactly one completed 27-block playbook');
+    }
+    return [normalized];
+  }
+
+  const cohort = args.cohortHashes.map(hash => {
+    const matches = rows.filter(row => shortHash(row.id) === hash);
+    const normalized =
+      matches.length === 1 && matches[0].status === 'completed'
+        ? normalizePlaybook(matches[0])
+        : undefined;
+    if (!normalized) {
+      throw new Error('Historical baseline requires all 14 completed 27-block playbooks');
+    }
+    return normalized;
+  });
+  if (cohort.length !== 14) {
+    throw new Error('Historical baseline requires exactly 14 completed 27-block playbooks');
+  }
+  return cohort;
+}
+
+async function loadMeasurementCohort(args: MeasurementArgs): Promise<TextPlaybook[]> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -391,23 +518,14 @@ async function loadCompletedPlaybooks(): Promise<TextPlaybook[]> {
   const supabase = createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data, error } = await supabase
+  let query = supabase
     .from('career_playbooks')
-    .select('id, language, created_at, generated_blocks')
-    .eq('status', 'completed')
-    .order('created_at', { ascending: true });
+    .select('id, status, language, created_at, generated_blocks');
+  if (args.mode === 'evaluation') query = query.eq('id', args.playbookId);
+  const { data, error } = await query.order('created_at', { ascending: true });
 
-  if (error) throw new Error(`Failed to read completed Career Playbooks: ${error.message}`);
-  const playbooks = ((data ?? []) as StoredPlaybook[])
-    .map(normalizePlaybook)
-    .filter((playbook): playbook is TextPlaybook => playbook !== undefined);
-
-  if (playbooks.length !== EXPECTED_PLAYBOOK_COUNT) {
-    throw new Error(
-      `Expected ${EXPECTED_PLAYBOOK_COUNT} complete 27-block playbooks, found ${playbooks.length}`
-    );
-  }
-  return playbooks;
+  if (error) throw new Error(`Failed to read Career Playbooks: ${error.message}`);
+  return selectMeasurementCohort((data ?? []) as StoredPlaybook[], args);
 }
 
 async function embedPlaybooks(
@@ -497,12 +615,13 @@ function selectWorkingThreshold(
   return selected;
 }
 
-function formatReport(
+export function formatReport(
   playbooks: TextPlaybook[],
   measurements: EmbeddedPlaybookMeasurement[],
   generatedAt: string,
   selectedThreshold: number,
-  cachePath: string
+  cachePath: string,
+  args: MeasurementArgs
 ): string {
   const aliases = new Map(playbooks.map((playbook, index) => [playbook.playbookId, `P${String(index + 1).padStart(2, '0')}`]));
   const viewPairs = measurements.flatMap(measurement =>
@@ -516,19 +635,26 @@ function formatReport(
   const stats = getJinaTokenStats();
 
   const lines = [
-    '# Career Playbook semantic repetition baseline',
+    args.mode === 'baseline'
+      ? '# Career Playbook semantic repetition baseline'
+      : '# Career Playbook semantic repetition evaluation',
     '',
     `Generated: ${generatedAt}`,
+    `Cohort size: **${playbooks.length}**`,
     '',
     '## Method',
     '',
-    `- Source: read-only query of \`career_playbooks\` with \`status = completed\`; exactly ${playbooks.length} rows containing all 27 stored blocks were eligible. The incomplete two-block completed fixture was excluded.`,
+    args.mode === 'baseline'
+      ? `- Source: the fixed historical 14-playbook hash cohort from \`career_playbooks\`; every selected row must remain \`completed\` with all 27 stored blocks. Later completed rows do not change this cohort.`
+      : '- Source: one exact `career_playbooks.id` requested by the operator; it must resolve to exactly one `completed` row with all 27 stored blocks.',
     '- Stored shape: 27 blocks = `header` + 26 content blocks (`block_1`…`block_26`).',
     `- Audience views: canonical phase-0 map copied from \`specs/028-role-guide-audiences/spec.md\` section 3: employee ${BASELINE_AUDIENCE_BLOCKS.employee.length}, manager ${BASELINE_AUDIENCE_BLOCKS.manager.length}, HR ${BASELINE_AUDIENCE_BLOCKS.hr.length} blocks, including header.`,
     '- Inter-block unit: one pair occurrence inside one audience-view. A block pair shared by two views is intentionally counted twice because those are two separately read documents; pairs with no shared view are not compared.',
     `- Intra-block unit: paragraphs of at least ${MIN_PARAGRAPH_CHARACTERS} normalized characters, split on Markdown blank lines; paragraphs are compared only with paragraphs from the same block.`,
     '- Embeddings: existing `generateEmbeddings(..., retrieval.passage)` Jina path, including the shared Jina distributed rate/concurrency limiters; cosine similarity is `QualityValidator.cosineSimilarity`.',
-    `- Working too-close threshold: **${selectedThreshold.toFixed(2)}**, selected only after measurement as the highest candidate in 0.75/0.80/0.85/0.90 retaining at least five pair occurrences in both metric families. This favors precision while requiring a replicated signal; the full matrix remains the calibration evidence.`,
+    args.mode === 'baseline'
+      ? `- Recorded baseline threshold: **${selectedThreshold.toFixed(2)}**. The historical distribution must reproduce 0.85 as the highest candidate retaining at least five pair occurrences in both metric families.`
+      : `- Fixed evaluation threshold: **${selectedThreshold.toFixed(2)}**. Evaluation never selects a threshold from one playbook and zero too-close pairs is a valid measured result.`,
     `- Resume cache: content-addressed SHA-256 → embedding records at \`${path.relative(process.cwd(), cachePath)}\`; it contains no source prose and is atomically replaced after every successful batch.`,
     '- No customer prose is stored in this artifact. Examples identify only the playbook alias, block topic and paragraph ordinal.',
     '',
@@ -593,7 +719,9 @@ function formatReport(
     '```bash',
     'cd /home/me/code/mc2/packages/course-gen-platform',
     'set -a; . .env; set +a',
-    'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json',
+    args.mode === 'baseline'
+      ? 'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --mode baseline --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json'
+      : 'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --mode evaluation --playbook-id <completed-playbook-uuid> --threshold 0.85 --out <evaluation-report-path> --cache .cache/career-playbook-repetition/jina-embeddings-v3.json',
     '```',
     '',
     `Jina run stats: ${stats.requestCount} paid HTTP batches in this invocation, ${stats.totalTokens} input tokens, $${(jinaCostUsd(CHECKPOINT_MODEL, stats.totalTokens) ?? 0).toFixed(6)} at the repository catalogue rate. Cache hits cost $0.`,
@@ -602,36 +730,31 @@ function formatReport(
   return lines.join('\n');
 }
 
-function parseOutputPath(argv: string[]): string {
-  const index = argv.indexOf('--out');
-  return index >= 0 && argv[index + 1]
-    ? path.resolve(argv[index + 1])
-    : path.resolve('../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md');
-}
-
-function parseCachePath(argv: string[]): string {
-  const index = argv.indexOf('--cache');
-  return index >= 0 && argv[index + 1]
-    ? path.resolve(argv[index + 1])
-    : path.resolve('.cache/career-playbook-repetition/jina-embeddings-v3.json');
-}
-
 async function main(): Promise<void> {
-  const outputPath = parseOutputPath(process.argv.slice(2));
-  const cachePath = parseCachePath(process.argv.slice(2));
-  const playbooks = await loadCompletedPlaybooks();
-  const embedded = await embedPlaybooks(playbooks, cachePath);
-  const scoreOnlyMeasurements = embedded.map(playbook =>
-    measureEmbeddedPlaybook(playbook, Number.POSITIVE_INFINITY)
-  );
-  const selectedThreshold = selectWorkingThreshold(
-    scoreOnlyMeasurements.flatMap(measurement =>
-      measurement.viewPairs.map(pair => pair.similarity)
-    ),
-    scoreOnlyMeasurements.flatMap(measurement =>
-      measurement.paragraphPairs.map(pair => pair.similarity)
-    )
-  );
+  const args = parseMeasurementArgs(process.argv.slice(2));
+  const playbooks = await loadMeasurementCohort(args);
+  const embedded = await embedPlaybooks(playbooks, args.cachePath);
+  let selectedThreshold: number;
+  if (args.mode === 'baseline') {
+    const scoreOnlyMeasurements = embedded.map(playbook =>
+      measureEmbeddedPlaybook(playbook, Number.POSITIVE_INFINITY)
+    );
+    selectedThreshold = selectWorkingThreshold(
+      scoreOnlyMeasurements.flatMap(measurement =>
+        measurement.viewPairs.map(pair => pair.similarity)
+      ),
+      scoreOnlyMeasurements.flatMap(measurement =>
+        measurement.paragraphPairs.map(pair => pair.similarity)
+      )
+    );
+    if (selectedThreshold !== RECORDED_BASELINE_THRESHOLD) {
+      throw new Error(
+        `Historical baseline threshold drift: expected ${RECORDED_BASELINE_THRESHOLD.toFixed(2)}, got ${selectedThreshold.toFixed(2)}`
+      );
+    }
+  } else {
+    selectedThreshold = args.threshold;
+  }
   const measurements = embedded.map(playbook =>
     measureEmbeddedPlaybook(playbook, selectedThreshold)
   );
@@ -640,11 +763,12 @@ async function main(): Promise<void> {
     measurements,
     new Date().toISOString(),
     selectedThreshold,
-    cachePath
+    args.cachePath,
+    args
   );
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, report, 'utf8');
-  console.log(`Wrote ${outputPath}`);
+  await mkdir(path.dirname(args.outputPath), { recursive: true });
+  await writeFile(args.outputPath, report, 'utf8');
+  console.log(`Wrote ${args.outputPath}`);
   console.log(`Completed playbooks: ${playbooks.length}`);
   console.log(`Audience-view pairs: ${measurements.reduce((sum, item) => sum + item.viewPairs.length, 0)}`);
   console.log(`Within-block paragraph pairs: ${measurements.reduce((sum, item) => sum + item.paragraphPairCount, 0)}`);

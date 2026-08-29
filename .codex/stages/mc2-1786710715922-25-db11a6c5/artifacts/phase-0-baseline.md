@@ -7,7 +7,7 @@ orchestration_level: inner_loop
 scope_kind: foundation
 immediate_consumer: role-guide-audience phase A/B orchestrator
 public_facade: measure-playbook-repetition-cli
-bounded_acceptance: one focused RED/GREEN and one fourteen-playbook baseline run
+bounded_acceptance: focused RED/GREEN for reproducible baseline and single-playbook evaluation modes
 non_goals:
   - production audience map
   - phase A/B implementation
@@ -19,7 +19,7 @@ epic_id: mc2-db696
 stage_id: mc2-1786710715922-25-db11a6c5
 session_id: n/a
 milestone: cohesive-vertical-slice
-milestone_status: accepted
+milestone_status: ready-for-acceptance
 agent_type: worker
 subagent_model: gpt-5.6-sol
 reasoning_effort: medium
@@ -51,11 +51,11 @@ parallel_group: n/a
 depends_on_streams:
   - none
 parallel_decision: local
-status: accepted
-delivery_method: manual integration
-accepted_by_orchestrator: yes
+status: returned
+delivery_method: not accepted
+accepted_by_orchestrator: no
 cleanup_status: cleaned
-cleanup_notes: ignored dependency links were removed; prose-free checkpoint intentionally retained for zero-cost resume
+cleanup_notes: focused-test dependency link removed; prose-free checkpoint retained for resume
 risk_level: medium
 risk_tags:
   - data
@@ -72,21 +72,24 @@ verification:
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp ../../node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (GREEN): 2 tests passed
   - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json: passed for 14 complete playbooks
   - python3 scripts/orchestration/validate_artifact.py .codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-0-baseline.md: passed
+  - focused dual-mode RED after prior acceptance: 2 existing tests passed and 1 expected failure because parseMeasurementArgs was absent
+  - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (dual-mode GREEN): 3 tests passed
+  - focused exact-one RED: duplicate exact id was incorrectly accepted
+  - set -a; . /home/me/code/mc2/packages/course-gen-platform/.env; set +a; TMPDIR=/tmp node_modules/.bin/vitest run --config vitest.config.unit.ts tests/unit/scripts/measure-playbook-repetition.test.ts (exact-one GREEN): 3 tests passed
 changed_files:
   - packages/course-gen-platform/scripts/measure-playbook-repetition.ts
   - packages/course-gen-platform/tests/unit/scripts/measure-playbook-repetition.test.ts
-  - docs/career-playbook/2026-08-29-semantic-repetition-baseline.md
   - .codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-0-baseline.md
 explicit_defers:
-  - none
+  - root must re-accept this correction delta before the one paid evaluation run
 ---
 
 # Summary
 
-Phase 0 is ready for root acceptance. The reproducible baseline covers all fourteen complete
-27-block Career Playbooks, keeps block-pair and within-block paragraph metrics separate, and proves
-meaningful semantic repetition at the distribution-selected 0.85 threshold. No phase A/B or other
-production code was changed.
+The phase-0 baseline was previously accepted by root. A later docs review found that its CLI could
+not reproducibly evaluate the one new dev playbook: it required the whole database to contain
+exactly fourteen complete rows and always selected a threshold from the current cohort. This
+correction delta is returned ready for root re-acceptance. No phase A/B code or evidence was changed.
 
 # Scope / Routing
 
@@ -95,9 +98,11 @@ employee 20 blocks, manager 20, HR 14, each including `header`. It distinguishes
 (`header` plus 26 content blocks) from the 26 content/boundary blocks. Inter-block comparisons are
 counted per audience-view; paragraph comparisons never cross a block boundary. Similarity uses
 `QualityValidator.cosineSimilarity`, while embeddings use the existing Jina embedding client and
-therefore the shared Jina rate/concurrency limiters. Database selection is read-only and accepts
-exactly the fourteen rows containing all 27 non-empty blocks; the completed two-block fixture is
-excluded.
+therefore the shared Jina rate/concurrency limiters. Database selection is read-only. Baseline mode
+selects the immutable historical cohort by fourteen recorded SHA-256/12 identifiers, requires every
+member to remain completed with 27 non-empty blocks, ignores later rows, and fails if the recorded
+distribution no longer selects 0.85. Evaluation mode queries one exact UUID, requires explicit
+`--threshold 0.85`, validates completed/27-block state, and accepts zero too-close pairs.
 
 The first paid attempt exposed Jina's 100,000-token/minute limit after losing seven successful
 batches. The repaired script now hashes every text, persists only hashes and 768-number embeddings,
@@ -121,6 +126,16 @@ Focused TDD evidence for the repair:
 - The existing test still hand-checks 12 audience-view pair occurrences and two within-block
   paragraph pairs using literal orthogonal embeddings.
 - No broad type-check or unit suite was run; root owns final acceptance.
+
+Focused TDD evidence for the later two-mode correction:
+
+- RED: 2 existing tests passed; the new contract test failed only because `parseMeasurementArgs`
+  did not exist.
+- GREEN: 3/3 tests passed. The new test adds a fifteenth completed row while keeping the explicit
+  historical fourteen stable; validates exact evaluation UUID and fixed 0.85; rejects missing,
+  wrong-threshold and incomplete inputs; and renders `n=1`, 12 view pairs, one paragraph pair and
+  zero too-close pairs without exposing the UUID.
+- No DB or Jina call was made for this correction.
 
 The read-only preflight found 15 `completed` rows, of which exactly 14 have all 27 stored blocks.
 Those 14 contain 1,061,727 characters and 2,074 semantic paragraphs at the script's 100-character
@@ -146,10 +161,12 @@ contains no customer prose.
 
 # Delivery / Cleanup
 
-Returned ready for root acceptance; not yet accepted or integrated. Dependency links created only
-to run the focused test are removed before return. The ignored prose-free checkpoint remains in the
-worktree so an unchanged-input rerun makes zero paid calls.
+The original baseline content was accepted before this correction. This dual-mode delta is returned
+ready for root re-acceptance and is not yet accepted. The ignored prose-free checkpoint remains in
+the worktree so unchanged baseline inputs and shared evaluation text avoid repeat payment.
 
 # Risks / Follow-ups / Explicit Defers
 
-Root still owns acceptance and any transition to phase A. Phase 0 itself has no remaining defer.
+Root must re-accept this correction, then run the single real evaluation with the exact completed
+dev UUID before cleanup. That invocation is intentionally left to root; this correction made no
+paid or database call.
