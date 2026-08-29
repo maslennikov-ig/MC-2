@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getModelCapabilities } from '@megacampus/shared-types';
 import {
   OpenRouterBatchClient,
   mapCompletedBatchResultsByPosition,
@@ -207,15 +208,23 @@ describe('mapCompletedBatchResultsByPosition', () => {
 
     const results = mapCompletedBatchResultsByPosition(batch, ['lesson-0', 'lesson-1']);
 
-    // Priced at $0.375 in / $1.875 out per million: $0.005625 against $0.009375,
-    // so the longer answer carries 62.5% of the batch price.
-    expect(results).toEqual([
-      expect.objectContaining({ ok: true, costUsd: 0.01125 }),
-      expect.objectContaining({ ok: true, costUsd: 0.01875 }),
-    ]);
-    expect(results.reduce((sum, result) => sum + (result.ok ? (result.costUsd ?? 0) : 0), 0)).toBe(
-      0.03
-    );
+    // What each item is worth at the catalogued rates decides its share, so the
+    // longer answer carries the larger part of one batch price. The rates come
+    // from the catalogue rather than being retyped: the nightly sync rewrites
+    // them and cannot rewrite a number typed here (mc2-rhyac).
+    const rates = getModelCapabilities('google/gemini-3.7-flash');
+    const worth = (promptTokens: number, completionTokens: number): number =>
+      (promptTokens * (rates?.inputPricePerMillion ?? 0)) / 1e6 +
+      (completionTokens * (rates?.outputPricePerMillion ?? 0)) / 1e6;
+    const first = worth(10_000, 1_000);
+    const second = worth(10_000, 3_000);
+    const batchCost = 0.03;
+    const costs = results.map(result => (result.ok ? result.costUsd : null));
+
+    expect(costs[0]).toBeCloseTo((batchCost * first) / (first + second), 10);
+    expect(costs[1]).toBeCloseTo((batchCost * second) / (first + second), 10);
+    // And the whole batch price is still spent exactly once.
+    expect(costs.reduce((sum: number, cost) => sum + (cost ?? 0), 0)).toBeCloseTo(batchCost, 10);
   });
 
   it('allocates provider-level usage when result bodies omit per-request usage', () => {

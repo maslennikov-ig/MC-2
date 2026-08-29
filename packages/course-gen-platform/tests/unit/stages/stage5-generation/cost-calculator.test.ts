@@ -28,6 +28,21 @@ import {
 import { MODEL_CATALOG } from '@megacampus/shared-types';
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
 
+/**
+ * What a 50/50 token split costs at the catalogued rates.
+ *
+ * These cases assert the calculator's arithmetic — the split, the per-million
+ * division, the summing — and the rates they run on belong to `MODEL_CATALOG`.
+ * Typed out by hand they became a third copy of the same numbers, and the copy
+ * is not merely untidy: the nightly price sync rewrites the catalogue and its
+ * snapshot but cannot rewrite an expectation somebody typed, so every published
+ * price move turned this file red and the sync stopped before its commit step.
+ * It had therefore never delivered a single rate (mc2-rhyac, mc2-ts9i2).
+ */
+const halfSplitCost = (modelId: string, tokens: number): number =>
+  ((tokens / 2) * MODEL_CATALOG[modelId].inputPricePerMillion) / 1e6 +
+  ((tokens / 2) * MODEL_CATALOG[modelId].outputPricePerMillion) / 1e6;
+
 describe('Stage 5 Cost Calculator Service', () => {
   // ============================================================================
   // OPENROUTER_PRICING VALIDATION
@@ -136,12 +151,8 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       // What this case holds is the 50/50 token split and the summing, not the
       // rates — those belong to the catalogue (see the projection cases above).
-      const half = (modelId: string, tokens: number): number =>
-        ((tokens / 2) * MODEL_CATALOG[modelId].inputPricePerMillion) / 1e6 +
-        ((tokens / 2) * MODEL_CATALOG[modelId].outputPricePerMillion) / 1e6;
-
-      const expectedMetadata = half('qwen/qwen3-max', 5000);
-      const expectedSections = half('deepseek/deepseek-v4-flash', 45000);
+      const expectedMetadata = halfSplitCost('qwen/qwen3-max', 5000);
+      const expectedSections = halfSplitCost('deepseek/deepseek-v4-flash', 45000);
 
       expect(cost.metadata_cost_usd).toBeCloseTo(expectedMetadata, 6);
       expect(cost.sections_cost_usd).toBeCloseTo(expectedSections, 6);
@@ -190,17 +201,21 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50): (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.0234, 6);
+      // Each phase splits its own tokens 50/50 at its own model's rates, and the
+      // total is their sum — including the validation leg, which the two-phase
+      // case above never exercises.
+      const expectedMetadata = halfSplitCost('qwen/qwen3-max', 10000);
+      const expectedSections = halfSplitCost('openai/gpt-oss-20b', 50000);
+      const expectedValidation = halfSplitCost('google/gemini-3.7-flash', 5000);
 
-      // Sections cost (gpt-oss-20b, 50/50): (25000/1M * 0.03) + (25000/1M * 0.13) = 0.004
-      expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
+      expect(cost.metadata_cost_usd).toBeCloseTo(expectedMetadata, 6);
+      expect(cost.sections_cost_usd).toBeCloseTo(expectedSections, 6);
+      expect(cost.validation_cost_usd).toBeCloseTo(expectedValidation, 6);
 
-      // Validation cost (gemini-3.7-flash, split, 50/50): (2500/1M * 0.375) + (2500/1M * 1.875) = 0.0009375 + 0.0046875 = 0.005625
-      expect(cost.validation_cost_usd).toBeCloseTo(0.005625, 6);
-
-      // Total cost: 0.0234 + 0.004 + 0.005625 = 0.033025
-      expect(cost.total_cost_usd).toBeCloseTo(0.033025, 6);
+      expect(cost.total_cost_usd).toBeCloseTo(
+        expectedMetadata + expectedSections + expectedValidation,
+        6
+      );
 
       // Model breakdown
       expect(cost.model_breakdown.validation_model).toBe('google/gemini-3.7-flash');
@@ -260,7 +275,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost.metadata_cost_usd).toBe(0);
 
       // Known model should calculate normally
-      expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
+      expect(cost.sections_cost_usd).toBeCloseTo(halfSplitCost('openai/gpt-oss-20b', 50000), 6);
 
       // And the total says so. Ten thousand tokens contributed nothing to it,
       // which without this field is indistinguishable from a course that really
@@ -388,8 +403,12 @@ describe('Stage 5 Cost Calculator Service', () => {
       const pricing = getModelPricing('qwen/qwen3-max');
 
       expect(pricing).not.toBeNull();
-      expect(pricing?.inputPricePerMillion).toBe(0.78);
-      expect(pricing?.outputPricePerMillion).toBe(3.9);
+      expect(pricing?.inputPricePerMillion).toBe(
+        MODEL_CATALOG['qwen/qwen3-max'].inputPricePerMillion
+      );
+      expect(pricing?.outputPricePerMillion).toBe(
+        MODEL_CATALOG['qwen/qwen3-max'].outputPricePerMillion
+      );
     });
 
     it('should return null for unknown models', () => {
@@ -415,15 +434,16 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should estimate cost for gpt-oss-20b split pricing', () => {
       const cost = estimateCost('openai/gpt-oss-20b', 10000, 0);
 
-      // 50/50 split: (5000/1M * 0.03) + (5000/1M * 0.13) = 0.0008
-      expect(cost).toBeCloseTo(0.0008, 6);
+      // 50/50 split at whatever the catalogue charges for the two legs.
+      expect(cost).toBeCloseTo(halfSplitCost('openai/gpt-oss-20b', 10000), 6);
     });
 
     it('should estimate cost for split pricing model with 50/50 assumption', () => {
       const cost = estimateCost('qwen/qwen3-max', 10000, 0);
 
-      // 50/50 split: (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
-      expect(cost).toBeCloseTo(0.0234, 6);
+      // 50/50 split, with the dearer output leg counted at its own rate rather
+      // than blended into one figure.
+      expect(cost).toBeCloseTo(halfSplitCost('qwen/qwen3-max', 10000), 6);
     });
 
     it('answers "not measured" for an unknown model rather than "free"', () => {

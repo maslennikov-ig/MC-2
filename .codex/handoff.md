@@ -153,10 +153,10 @@ Epic `mc2-qrdkt` is complete and the ledger reconciles. What binds work:
   `provider: 'jina'` and stay **out** of the OpenRouter reconciliation, which compares against a
   per-call receipt Jina does not issue.
 - **The catalogue is an estimate, not the price.** `MODEL_CATALOG` builds budgets and the
-  `provider.max_price` ceiling; every call settles against the provider.
-  `check-model-catalog-drift.ts` is deliberately in **no** CI job — it runs nightly, writes published
-  rates into the catalogue and commits to `develop`, and only a 1.5x move goes to Telegram. Never
-  retype a rate in a test.
+  `provider.max_price` ceiling; every call settles against the provider. The nightly
+  `check-model-catalog-drift.ts` is in **no** CI job: it writes published rates and commits to
+  `develop`; a 1.5x move and a failed run both go to Telegram. Catalogue the **plain** tier — `/flex`
+  is half it, `/priority` double — and never retype a rate in a test.
 - **`provider.max_price` below every endpoint is a refusal**, not a cheaper route.
 - **One transport, one place**: every OpenRouter client comes from `shared/llm/openrouter-client.ts`,
   held by `one-openrouter-transport.test.ts`, whose exception list may shrink, never grow.

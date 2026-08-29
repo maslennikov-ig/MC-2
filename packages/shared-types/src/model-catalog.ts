@@ -183,9 +183,23 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     billedPerImage: true,
     imageOutputPricePerMillion: 30,
   },
+  /**
+   * The ordinary tariff, which is twice what this entry used to hold — and
+   * Google did not raise anything. The model publishes three tiers from each of
+   * two providers: `/flex` at $0.375/$1.875, the plain tag at $0.75/$3.75, and
+   * `/priority` at $1.35/$6.75. The entry had been filled from the flex row
+   * while `GET /api/v1/models` quotes the plain one, so the nightly sync read a
+   * permanent 2x drift it could never settle.
+   *
+   * The plain tier is the right one to freeze even though most phases request
+   * flex: `provider.max_price` is this figure times 1.5, and flex refuses rather
+   * than falling back, so the retry that follows runs at the ordinary tariff. At
+   * the flex rate that ceiling was $0.5625 — under the price of the call it was
+   * about to make (mc2-rhyac).
+   */
   'google/gemini-3.7-flash': {
-    inputPricePerMillion: 0.375,
-    outputPricePerMillion: 1.875,
+    inputPricePerMillion: 0.75,
+    outputPricePerMillion: 3.75,
     contextLength: 1048576,
     maxOutputTokens: 65536,
     supportsTemperature: true,
@@ -346,8 +360,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.06,
-    outputPricePerMillion: 0.12,
+    inputPricePerMillion: 0.045,
+    outputPricePerMillion: 0.09,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -421,8 +435,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.07798,
-    outputPricePerMillion: 0.15596,
+    inputPricePerMillion: 0.08512,
+    outputPricePerMillion: 0.17024,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -433,8 +447,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // over, the largest gap the catalogue has held. Not on a live route, so it
     // cost nothing; had it been, `provider.max_price` would have been built four
     // times too high and bought nothing.
-    inputPricePerMillion: 0.87,
-    outputPricePerMillion: 1.74,
+    inputPricePerMillion: 0.690954,
+    outputPricePerMillion: 1.381908,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,

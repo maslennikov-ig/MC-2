@@ -338,8 +338,16 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.375/1M input + $1.875/1M output = $2.25
-      expect(cost).toBeCloseTo(2.25, 4);
+      // One million of each leg, so the answer is the two catalogued rates
+      // added. Read from the catalogue rather than retyped: the nightly price
+      // sync rewrites those rates and cannot rewrite a number typed here, and
+      // this file going red is what stopped the sync from ever delivering one
+      // (mc2-rhyac).
+      const rates = getModelCapabilities('google/gemini-3.7-flash');
+      expect(cost).toBeCloseTo(
+        (rates?.inputPricePerMillion ?? 0) + (rates?.outputPricePerMillion ?? 0),
+        4
+      );
     });
 
     it('should use fallback pricing for unknown models', () => {

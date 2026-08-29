@@ -618,6 +618,7 @@ import {
   generateLessonSingleCall,
   generateTruncationContinuation,
 } from '@/stages/stage6-lesson-content/nodes/generator/generator-single-call';
+import { getModelCapabilities } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 
@@ -912,13 +913,20 @@ Main section.`,
       );
 
       expect(mockModelInvoke).toHaveBeenCalledTimes(1);
-      // gemini-3.7-flash is $0.375 in and $1.875 out per million:
-      // 10k in = $0.00375, 2k out = $0.00375, on top of the batch's own $0.004.
+      // The retry's own 10k in and 2k out at the synchronous tariff, on top of
+      // the batch's own $0.004. The tariff is read from the catalogue rather
+      // than retyped: the nightly price sync rewrites it and cannot rewrite a
+      // number typed here (mc2-rhyac).
+      const rates = getModelCapabilities('google/gemini-3.7-flash');
+      const retryCost =
+        (10_000 * (rates?.inputPricePerMillion ?? 0)) / 1e6 +
+        (2_000 * (rates?.outputPricePerMillion ?? 0)) / 1e6;
+
       expect(result).toMatchObject({
         modelUsed: 'google/gemini-3.7-flash',
         tokensUsed: 12_321,
       });
-      expect(result.costUsd).toBeCloseTo(0.0115, 10);
+      expect(result.costUsd).toBeCloseTo(0.004 + retryCost, 10);
     });
 
     it('reports the batch price unchanged when no corrective retry runs', async () => {
