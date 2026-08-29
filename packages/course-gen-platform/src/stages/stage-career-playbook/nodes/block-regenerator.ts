@@ -1,10 +1,12 @@
-import type {
-  CareerPlaybookBlockId,
-  CareerPlaybookBlockState,
-  CareerPlaybookJudgeIssue,
-  CareerPlaybookJudgeVerdict,
-  CareerPlaybookNodeCost,
-  CareerPlaybookRoleProfileSpec,
+import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  type CareerPlaybookAudience,
+  type CareerPlaybookBlockId,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookJudgeIssue,
+  type CareerPlaybookJudgeVerdict,
+  type CareerPlaybookNodeCost,
+  type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from './final-assembler';
 import {
@@ -64,7 +66,6 @@ export interface RegenerateCareerPlaybookBlockInput {
   issue: Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>;
   userInstruction?: string | null;
   otherBlocks?: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
-  otherBlocksBrief?: string;
   now?: () => Date;
 }
 
@@ -88,6 +89,17 @@ function compactMarkdown(content: string): string {
 
 export function getCareerPlaybookBlockName(blockId: CareerPlaybookBlockId): string {
   return BLOCK_NAMES[blockId];
+}
+
+function getCareerPlaybookBlockAudiences(
+  blockId: CareerPlaybookBlockId
+): readonly CareerPlaybookAudience[] {
+  const catalogItem = CAREER_PLAYBOOK_BLOCK_CATALOG.find(item => item.blockId === blockId);
+  if (!catalogItem) {
+    throw new Error(`Career Playbook audience mapping is missing for ${blockId}`);
+  }
+
+  return catalogItem.audiences;
 }
 
 function getExpectedHeadingPattern(blockId: CareerPlaybookBlockId): RegExp {
@@ -130,8 +142,14 @@ export function buildOtherBlocksBrief(
   otherBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> | undefined,
   targetBlockId: CareerPlaybookBlockId
 ): string {
+  const targetAudiences = getCareerPlaybookBlockAudiences(targetBlockId);
   const lines = CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.flatMap(blockId => {
     if (blockId === targetBlockId) return [];
+    if (
+      !getCareerPlaybookBlockAudiences(blockId).some(audience => targetAudiences.includes(audience))
+    ) {
+      return [];
+    }
 
     const content = otherBlocks?.[blockId]?.content;
     if (!content || content.trim().length === 0) return [];
@@ -162,8 +180,8 @@ export function buildBlockRegeneratorPromptVariables(
       getCareerPlaybookEvidenceLedger(input.roleProfileSpec)
     ),
     generated_on: input.roleProfileSpec.generated_on ?? new Date().toISOString().slice(0, 10),
-    other_blocks_brief:
-      input.otherBlocksBrief ?? buildOtherBlocksBrief(input.otherBlocks, input.blockId),
+    block_audiences_md: `- ${input.blockId}: ${getCareerPlaybookBlockAudiences(input.blockId).join(', ')}`,
+    other_blocks_brief: buildOtherBlocksBrief(input.otherBlocks, input.blockId),
     content_language: input.language,
   };
 }

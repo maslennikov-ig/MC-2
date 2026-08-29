@@ -123,6 +123,12 @@ const messages = {
       readingMode: 'Reading mode',
       exitReadingMode: 'Exit reading mode',
       readingHint: 'Clean reading without side panels',
+      audienceTabsLabel: 'Document view',
+      audienceFull: 'Full document',
+      audienceEmployee: 'Employee',
+      audienceManager: 'Manager',
+      audienceHr: 'HR',
+      audienceEmpty: 'No ready sections in this view yet.',
       inspectorLabel: 'Document inspector',
       inspectorTitle: 'Document inspector',
       inspectorStatusTitle: 'Status',
@@ -323,6 +329,12 @@ const ruMessages = {
       readingMode: 'Режим чтения',
       exitReadingMode: 'Выйти из режима чтения',
       readingHint: 'Чистое чтение без боковых панелей',
+      audienceTabsLabel: 'Вид документа',
+      audienceFull: 'Полный документ',
+      audienceEmployee: 'Сотруднику',
+      audienceManager: 'Руководителю',
+      audienceHr: 'HR',
+      audienceEmpty: 'В этом виде пока нет готовых разделов.',
       inspectorLabel: 'Инспектор документа',
       inspectorTitle: 'Инспектор документа',
       inspectorStatusTitle: 'Состояние',
@@ -517,6 +529,45 @@ describe('CareerPlaybookViewerPageClient', () => {
       screen.getByRole('navigation', { name: 'Содержание должностной инструкции' })
     ).toHaveTextContent('Миссия и ключевые результаты')
     expect(screen.queryByRole('link', { name: 'Mission and key results' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Полный документ' })).toBeInTheDocument()
+  })
+
+  it('passes English audience labels to the viewer', async () => {
+    const playbookId = '00000000-0000-4000-8000-000000002099'
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId,
+      title: 'Recruiting lead',
+      department: 'People',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        block_12: {
+          content: '## 12. Candidate profile\n\nRecruiting criteria.',
+          status: 'generated',
+          attempt: 0,
+        },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'en', playbookId })
+
+    const tabs = await screen.findByRole('tablist', { name: 'Document view' })
+    expect(within(tabs).getByRole('tab', { name: 'Full document' })).toBeInTheDocument()
+    expect(within(tabs).getByRole('tab', { name: 'Employee' })).toBeInTheDocument()
+    expect(within(tabs).getByRole('tab', { name: 'Manager' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Полный документ' })).not.toBeInTheDocument()
   })
 
   it('updates owner visibility from the reader inspector', async () => {

@@ -102,6 +102,16 @@ const ruViewerCopy = {
   },
 }
 
+const enAudienceCopy = {
+  ...ruViewerCopy,
+  audienceTabsLabel: 'Document view',
+  audienceFull: 'Full document',
+  audienceEmployee: 'Employee',
+  audienceManager: 'Manager',
+  audienceHr: 'HR',
+  audienceEmpty: 'No ready sections in this view yet.',
+}
+
 const PlaybookViewerWithVisibility = PlaybookViewer as unknown as (
   props: ComponentProps<typeof PlaybookViewer> & {
     isUpdatingVisibility?: boolean
@@ -262,14 +272,14 @@ describe('Career Playbook viewer components', () => {
     expect(screen.getAllByRole('article')).toHaveLength(27)
   })
 
-  it('keeps audience controls usable while generated blocks are empty', async () => {
+  it('keeps English audience controls and empty-state copy usable without generated blocks', async () => {
     const user = userEvent.setup()
 
     render(
       <PlaybookViewer
         snapshot={{ ...snapshot, blocks: {} }}
         blocks={[]}
-        copy={ruViewerCopy}
+        copy={enAudienceCopy}
         onEditBlock={vi.fn()}
         onRegenerateBlock={vi.fn()}
         onPdf={vi.fn()}
@@ -279,12 +289,11 @@ describe('Career Playbook viewer components', () => {
       />
     )
 
-    await user.click(screen.getByRole('tab', { name: 'Сотруднику' }))
+    expect(screen.getByRole('tablist', { name: 'Document view' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Employee' }))
 
     expect(screen.queryByRole('article')).not.toBeInTheDocument()
-    expect(
-      screen.getByText('В выбранном представлении пока нет готовых разделов.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('No ready sections in this view yet.')).toBeInTheDocument()
   })
 
   it('renders the generated hero image and exposes owner image regeneration', async () => {
