@@ -528,13 +528,20 @@ export function appendCareerPlaybookCalibrationTable(
   // carry two lists that disagree, bounded by the next third-level heading or the
   // end of the block. Built with String.raw because a template literal silently
   // turns [\s\S] into [sS], which quietly removed only the heading line.
-  const modelSection = new RegExp(
-    String.raw`^###[ \t]+(?:` +
-      `${escapeRegExp(CALIBRATION_HEADING.en)}|${escapeRegExp(CALIBRATION_HEADING.ru)}` +
-      String.raw`)[^\n]*\n(?:(?!^###[ \t])[\s\S])*`,
+  const localizedHeadings = `${escapeRegExp(CALIBRATION_HEADING.en)}|${escapeRegExp(CALIBRATION_HEADING.ru)}`;
+  const boldModelSection = new RegExp(
+    String.raw`^\*\*[ \t]*(?:${localizedHeadings})[ \t]*\*\*[^\n]*\n` +
+      String.raw`(?:(?!^(?:#{1,6}[ \t]+|\*\*[^*\n]+\*\*[ \t]*$))[\s\S])*`,
     'im'
   );
-  const withoutModelSection = checklist.content.replace(modelSection, '').trim();
+  const markdownModelSection = new RegExp(
+    String.raw`^###[ \t]+(?:${localizedHeadings})[^\n]*\n(?:(?!^###[ \t])[\s\S])*`,
+    'im'
+  );
+  const withoutModelSection = checklist.content
+    .replace(boldModelSection, '')
+    .replace(markdownModelSection, '')
+    .trim();
 
   const rows = items.map(
     item => `| ${blockLabel(item.blockId)} | ${item.value} | ${item.context} |`

@@ -91,6 +91,35 @@ describe('appendCareerPlaybookCalibrationTable', () => {
     const input = blocks({ block_26: '## 26. Implementation checklist\n\n- Align on KPI targets' });
     expect(appendCareerPlaybookCalibrationTable(input)).toBe(input);
   });
+
+  it('replaces a bold model calibration section and stays idempotent', () => {
+    const first = appendCareerPlaybookCalibrationTable(
+      blocks({
+        block_15: 'base $120,000 (example — replace).',
+        block_26: [
+          '## 26. Implementation checklist',
+          '',
+          '**Manager checklist**',
+          '',
+          '- Align on KPI targets',
+          '',
+          '**Calibrate before publishing**',
+          '',
+          '| # | Value in guide | Location | Replace with |',
+          '| --- | --- | --- | --- |',
+          '| 1 | Old model value | Block 15 | Approved value |',
+        ].join('\n'),
+      })
+    );
+    const second = appendCareerPlaybookCalibrationTable(first);
+    const content = second.block_26!.content;
+
+    expect(content.match(/Calibrate before publishing/g)).toHaveLength(1);
+    expect(content).toContain('Manager checklist');
+    expect(content).toContain('$120,000');
+    expect(content).not.toContain('Old model value');
+    expect(content).toBe(first.block_26!.content);
+  });
 });
 
 describe('normalizeCareerPlaybookBlockReferences', () => {

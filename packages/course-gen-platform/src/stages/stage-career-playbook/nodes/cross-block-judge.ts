@@ -52,6 +52,7 @@ import {
   CareerPlaybookSemanticEmbeddingCache,
   CareerPlaybookSemanticRepetitionProviderError,
   evaluateCareerPlaybookSemanticRepetition,
+  isCareerPlaybookSemanticRepetitionIssue,
 } from './semantic-repetition';
 
 export {
@@ -380,6 +381,7 @@ function capRegenerationWhenBudgetExhausted(params: {
   verdict: CareerPlaybookJudgeVerdict;
   currentBlockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+  windowBudgetExemptBlockIds?: readonly CareerPlaybookBlockId[];
 }): { verdict: CareerPlaybookJudgeVerdict; warnings: string[] } {
   const scopedNeedsRegeneration = params.verdict.needs_regeneration.filter(blockId =>
     params.currentBlockIds.includes(blockId)
@@ -395,11 +397,14 @@ function capRegenerationWhenBudgetExhausted(params: {
   );
   const windowBudgetExhausted =
     attemptCount >= CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS;
-  const perBlockBudgetExhausted = scopedNeedsRegeneration.every(
-    blockId => (params.attempts[blockId] ?? 0) >= CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS
+  const windowBudgetExemptBlockIds = new Set(params.windowBudgetExemptBlockIds ?? []);
+  const cappedBlockIds = scopedNeedsRegeneration.filter(
+    blockId =>
+      (params.attempts[blockId] ?? 0) >= CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS ||
+      (windowBudgetExhausted && !windowBudgetExemptBlockIds.has(blockId))
   );
 
-  if (!windowBudgetExhausted && !perBlockBudgetExhausted) {
+  if (cappedBlockIds.length === 0) {
     return { verdict: params.verdict, warnings: [] };
   }
   const budgetLabel = windowBudgetExhausted
@@ -410,7 +415,7 @@ function capRegenerationWhenBudgetExhausted(params: {
     verdict: {
       ...params.verdict,
       needs_regeneration: params.verdict.needs_regeneration.filter(
-        blockId => !params.currentBlockIds.includes(blockId)
+        blockId => !cappedBlockIds.includes(blockId)
       ),
     },
     warnings: [
@@ -635,11 +640,32 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
 
     // Cap/window-budget accounting always spans the full window so the per-block (2) and
     // per-window (8) regeneration caps are unchanged by delta scoping.
+    const semanticRepetitionBlockIds = uniqueBlockIds(
+      deterministicVerdict.issues
+        .filter(isCareerPlaybookSemanticRepetitionIssue)
+        .map(issue => issue.block_id)
+    );
     const capped = capRegenerationWhenBudgetExhausted({
       verdict,
       currentBlockIds: windowBlockIds,
       attempts: state.blockRegenerationAttempts ?? {},
+      // The full-document semantic gate is the final correctness boundary. A
+      // block it flags may use its own remaining per-block attempts even when
+      // unrelated group remediations already consumed the general window cap.
+      windowBudgetExemptBlockIds:
+        options.currentBlockIds === undefined ? semanticRepetitionBlockIds : undefined,
     });
+    const hasEligibleSemanticRemediation = capped.verdict.needs_regeneration.some(blockId =>
+      semanticRepetitionBlockIds.includes(blockId)
+    );
+    const semanticErrors =
+      options.currentBlockIds === undefined &&
+      semanticRepetitionBlockIds.length > 0 &&
+      !hasEligibleSemanticRemediation
+        ? [
+            `final semantic repetition gate failed closed after max regeneration attempts for ${semanticRepetitionBlockIds.join(', ')}`,
+          ]
+        : [];
 
     return {
       // Only the re-reviewed blocks receive the new verdict; accepted siblings retain the
@@ -650,6 +676,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       lastJudgedBlockIds: windowBlockIds,
       nodeCosts,
       ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
+      ...(semanticErrors.length > 0 ? { errors: semanticErrors } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',
     };
   };

@@ -17,6 +17,7 @@ import {
 
 const validator = new QualityValidator();
 export const CAREER_PLAYBOOK_SEMANTIC_EMBEDDING_CACHE_MAX_ENTRIES = 4_096;
+const CAREER_PLAYBOOK_SEMANTIC_REPETITION_ISSUE_MARKER = 'repeat semantically equivalent material';
 
 interface SemanticBlock {
   blockId: CareerPlaybookBlockId;
@@ -41,6 +42,10 @@ export interface EvaluateCareerPlaybookSemanticRepetitionOptions {
   cacheNamespace?: string;
 }
 
+export function isCareerPlaybookSemanticRepetitionIssue(issue: CareerPlaybookJudgeIssue): boolean {
+  return issue.description.includes(CAREER_PLAYBOOK_SEMANTIC_REPETITION_ISSUE_MARKER);
+}
+
 export class CareerPlaybookSemanticRepetitionProviderError extends Error {
   constructor(
     message: string,
@@ -61,9 +66,7 @@ export class CareerPlaybookSemanticRepetitionProviderError extends Error {
 export class CareerPlaybookSemanticEmbeddingCache {
   private readonly entries = new Map<string, number[]>();
 
-  constructor(
-    private readonly maxEntries = CAREER_PLAYBOOK_SEMANTIC_EMBEDDING_CACHE_MAX_ENTRIES
-  ) {
+  constructor(private readonly maxEntries = CAREER_PLAYBOOK_SEMANTIC_EMBEDDING_CACHE_MAX_ENTRIES) {
     if (!Number.isInteger(maxEntries) || maxEntries < 1) {
       throw new Error(`Semantic embedding cache maxEntries must be positive, got ${maxEntries}`);
     }
@@ -222,26 +225,21 @@ export async function evaluateCareerPlaybookSemanticRepetition(
     try {
       // cost-exempt: a playbook cannot use generation_trace's course foreign key;
       // each Jina batch receipt is copied into Career Playbook nodeCosts below.
-      embeddings = await generateEmbeddings(
-        missingTexts,
-        'retrieval.passage',
-        undefined,
-        usage => {
-          const costUsd = jinaCostUsd(usage.model, usage.totalTokens);
-          options.onNodeCost?.({
-            node: 'semanticRepetition',
-            model: usage.model,
-            input_tokens: usage.totalTokens,
-            output_tokens: 0,
-            cost_usd: costUsd ?? 0,
-            attempts: 1,
-            outcome: 'succeeded',
-            ...(costUsd === undefined ? { cost_unknown: true } : {}),
-            provider_name: 'jina',
-            billed_by_provider: false,
-          });
-        }
-      );
+      embeddings = await generateEmbeddings(missingTexts, 'retrieval.passage', undefined, usage => {
+        const costUsd = jinaCostUsd(usage.model, usage.totalTokens);
+        options.onNodeCost?.({
+          node: 'semanticRepetition',
+          model: usage.model,
+          input_tokens: usage.totalTokens,
+          output_tokens: 0,
+          cost_usd: costUsd ?? 0,
+          attempts: 1,
+          outcome: 'succeeded',
+          ...(costUsd === undefined ? { cost_unknown: true } : {}),
+          provider_name: 'jina',
+          billed_by_provider: false,
+        });
+      });
     } catch (error) {
       throw new CareerPlaybookSemanticRepetitionProviderError(
         error instanceof Error ? error.message : String(error),

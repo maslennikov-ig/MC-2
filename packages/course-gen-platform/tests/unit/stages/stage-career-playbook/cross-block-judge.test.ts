@@ -27,9 +27,7 @@ beforeEach(() => {
   generateEmbeddingsMock.mockReset();
   generateEmbeddingsMock.mockImplementation((texts: string[]) =>
     texts.map((_, index) =>
-      Array.from({ length: 768 }, (_unused, coordinate) =>
-        index === coordinate ? 1 : 0
-      )
+      Array.from({ length: 768 }, (_unused, coordinate) => (index === coordinate ? 1 : 0))
     )
   );
 });
@@ -294,10 +292,7 @@ ${'This long paragraph describes a repeated workflow for the manager audience on
   });
 
   it('uses the inclusive 0.85 baseline threshold for shared-audience pairs', async () => {
-    generateEmbeddingsMock.mockResolvedValue([
-      identicalEmbedding(),
-      embeddingAtCosine(0.85),
-    ]);
+    generateEmbeddingsMock.mockResolvedValue([identicalEmbedding(), embeddingAtCosine(0.85)]);
 
     const verdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: blocks([
@@ -1028,6 +1023,72 @@ flowchart LR
       currentNode: 'group2Generator' as const,
     };
   }
+
+  function semanticFinalJudgeState(attempts: Partial<Record<CareerPlaybookBlockId, number>>) {
+    const firstParagraph =
+      'The manager reviews the same readiness checklist, confirms every owner, and records the final handoff result. '.repeat(
+        2
+      );
+    const secondParagraph =
+      'The manager confirms every owner in the readiness checklist and records the final handoff result after review. '.repeat(
+        2
+      );
+
+    return {
+      ...baseJudgeState({
+        generatedBlocks: blocks([
+          ['block_8', '## 8. Tools\n\nDistinct tool categories.'],
+          ['block_11', `## 11. Career path\n\n${firstParagraph}\n\n${secondParagraph}`],
+        ]),
+        blockRegenerationAttempts: attempts,
+      }),
+      language: 'en',
+      roleProfileSpec: null,
+      currentNode: 'finalJudge' as const,
+    };
+  }
+
+  function mockOneWithinBlockSemanticRepeat() {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map((text, index) =>
+        text.startsWith('The manager')
+          ? identicalEmbedding()
+          : Array.from({ length: 768 }, (_unused, coordinate) => (coordinate === index + 1 ? 1 : 0))
+      )
+    );
+  }
+
+  it('reserves final semantic remediation after the general window budget is exhausted', async () => {
+    mockOneWithinBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    const update = await node(
+      semanticFinalJudgeState({
+        block_8: 8,
+        block_11: 0,
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_11']);
+    expect(update.errors).toBeUndefined();
+  });
+
+  it('fails the final semantic gate closed after the repeated block exhausts its cap', async () => {
+    mockOneWithinBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    const update = await node(
+      semanticFinalJudgeState({
+        block_8: 0,
+        block_11: 2,
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.errors).toEqual([
+      expect.stringContaining('final semantic repetition gate failed closed'),
+    ]);
+  });
 
   it('advances with a warning (not an error) when the judge window budget is exhausted', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
