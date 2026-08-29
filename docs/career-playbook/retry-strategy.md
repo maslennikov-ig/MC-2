@@ -95,6 +95,31 @@ union** of the deterministic `needs_regeneration` with only those LLM
 This is the property that makes an env-gated judge-model swap (Flash instead of
 Pro) safe for Criterion #1 without a database routing change.
 
+## Semantic Repetition Provider Boundary
+
+The final full-document judge adds one Jina-backed deterministic semantic pass.
+It compares block pairs only when the blocks share an audience view, and compares
+paragraphs only within their owning block. The fixed threshold is `0.85`; group
+judge windows disable the semantic pass, so they do not add provider calls.
+
+Jina HTTP 429 handling is window-aware. A positive numeric `Retry-After` header
+is honored, capped at five minutes; when the header is absent or invalid, the
+client waits 60 seconds before retrying. Network and 5xx errors retain the
+existing 1/2/4-second exponential delays. This is a shared client rule and must
+not be replaced with a node-local immediate retry.
+
+If all Jina attempts fail, the semantic error is converted to a visible
+`semantic repetition checks unavailable: ...` generation warning. The judge
+then reruns the other deterministic checks with semantic repetition disabled.
+This degradation preserves liveness but does not prove the semantic gate passed;
+live acceptance must reject any run carrying that warning.
+
+Each successful Jina batch reports usage to the final judge, which emits a
+`semanticRepetition` node-cost row into `career_playbooks.cost_breakdown`.
+Career Playbooks do not have the course foreign key required by
+`generation_trace`, so that table is not a valid spend or execution check for
+this pass.
+
 ## Failure Modes
 
 Trigger → absorbing layer → user-visible outcome → cost/latency effect.

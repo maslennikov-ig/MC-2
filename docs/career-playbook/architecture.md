@@ -88,6 +88,43 @@ preserving its prior content if generation fails. The viewer polls
 `careerPlaybook.generation.getBlock` until it observes the persisted terminal
 state; it does not synthesize regenerated content in the browser.
 
+## Audience Projections And Semantic Repetition
+
+`packages/shared-types/src/career-playbook-blocks.ts` is the single audience
+catalogue for `employee`, `manager`, and `hr`. `generated_blocks` remains the
+only stored block map. The viewer filters that map for the three reader views and
+also exposes an unfiltered full view; backend callers can build the same
+reader-specific markdown with `buildRoleGuideView`. `joinCareerPlaybookFinalBlocks`
+is deliberately unfiltered, so every persistence path continues to write the
+complete document into `final_markdown`.
+
+Audience membership also defines the repetition boundary:
+
+- `spec-builder-canonical.ts` replaces every model-produced `do_not_repeat`
+  value with canonical topics from blocks that share a view and whose aliases do
+  not overlap;
+- `prior-blocks-digest.ts` includes only already `generated` prior blocks that
+  share at least one target view before extracting anti-goals, authority,
+  numeric commitments, and cadences;
+- the final cross-block judge compares semantic block pairs only when they share
+  a view, plus paragraph pairs within each block. Group-window judges skip this
+  provider-backed pass.
+
+`repetition-thresholds.ts` owns the cosine threshold `0.85` and the 100-character
+paragraph minimum. Similarities at or above the threshold produce critical
+`contradiction` issues and enter the existing regeneration ledger. The final
+judge keeps a bounded process-local embedding cache keyed by playbook id and a
+SHA-256 content digest; customer prose is not stored in cache keys, and vectors
+cannot be reused across playbooks.
+
+Jina batch receipts are appended to Career Playbook node costs as
+`semanticRepetition`, which persists in `career_playbooks.cost_breakdown` rather
+than `generation_trace`. If Jina remains unavailable after its client retries,
+the judge records `semantic repetition checks unavailable: ...` and reruns its
+other deterministic checks without semantic repetition. This preserves
+generation availability, but a run carrying that warning cannot prove the
+semantic acceptance criterion.
+
 ## Generated Images
 
 Career Playbook images reuse the course card image pipeline without creating

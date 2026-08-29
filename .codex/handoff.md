@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-28. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-29. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries. Durable traps
 live in `.codex/repository-failure-modes.md`; this file says what still binds work.
@@ -14,9 +14,12 @@ Role Guide audience views and measurable repetition are in progress on
 phase A audience views → phase B repetition gate. Phase 0 is accepted: 14 complete playbooks,
 6,594 within-view block-pair occurrences, 6,829 within-block paragraph pairs, working threshold
 0.85, baseline rates 0.12% and 0.26%. Phase A is accepted: canonical views contain 20/20/14 blocks,
-cover all 27 stored ids, and the full document remains available. Phase B is current. Jina
-measurements and one paid dev generation are authorized; a second paid dev generation remains a
-stop condition. The stage also closes `mc2-1786710716114-26-01631777`.
+cover all 27 stored ids, and persisted `final_markdown` remains the full document. Phase B is in
+correction and root acceptance: canonical `do_not_repeat`, the prior-block digest and the final-only
+0.85 semantic gate are audience-scoped; Jina spend is recorded as `semanticRepetition` in
+`career_playbooks.cost_breakdown`. Jina measurements and one paid dev generation are authorized;
+a second paid dev generation remains a stop condition. The stage also closes
+`mc2-1786710716114-26-01631777`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
@@ -250,36 +253,14 @@ and handler.
 thresholds calibrated on Latin script, each invisible until the previous was fixed. Weight by script,
 never lower the number.
 
-## Next recommended
+## Remaining stage steps
 
-Accepted stage id: `mc2-51epl` · Current stage id: none · Next stage id: **owner's call**
+Root still owns Phase B acceptance, one final `pnpm type-check` plus `pnpm test:unit`, delivery to
+dev, and exactly one paid dev generation. For that exact playbook row: reject semantic provider
+degradation, verify `semanticRepetition` Jina cost rows, read employee/manager/HR/full views, run the
+fixed-0.85 final measurement before exact-ID cleanup, and record the delta against the Phase 0
+baseline. Then refresh Graphify, close both Beads with numeric reasons, run stage closeout and prove
+the commits reached `develop` with `check_stranded_commits.py`.
 
-`brawny-mellow-quokka.md` is finished and nothing in it is owed. Recommended action: pick the next
-track — `mc2-db696` (Career Playbook) and `mc2-uv7n7` (UI redesign, 22 Stitch screens) are the two
-standing directions, and `specs/026-post-triage-priorities/spec.md` holds the backlog order.
-Use $orchestrator-stage when the next track becomes an epic.
-
-Three small debts can ride any future paid run rather than justify one: `stage_5_escalation` has
-never actually escalated, the judge's terminal review path has never fired — both needing a
-generation forced to fail — and no real NLM generation has run since the cookies were restored.
-
-## Starter prompt for next orchestrator
-
-Read the section above for what is owed; `snuggly-wiggling-sutton.md` is **done** and
-`.codex/next-goal-four-doors.md` is **stale** — ignore both. **Do not ask — act and report**, inside
-the standing authorization under Safety boundary.
-
-The Helixa AIOS bridge belongs to another agent — leave it alone. **16 unique commits, 6149 lines**,
-reported by three refs; its three blockers are fixed on `fix/helixa-blockers` and handed over, not
-merged (`mc2-gxese`). Not covered by re-pinning the manifest: its migrations install six triggers on
-`courses`, `career_playbooks` and `file_catalog`, inert while `helixa_knowledge_sync_bindings` is
-empty but present at the database level, where the env flag does not reach — and dev and staging
-share one database. Both branches are in `.codex/stranded-commit-allowlist.txt`; remove the two
-entries together. That agent also broke the root `node_modules` once, so if a pre-commit hook cannot
-find `prettier-plugin-tailwindcss`, relink the symlink into `node_modules/.pnpm/...` by hand rather
-than running `pnpm install`.
-
-`pnpm test:unit` covers **all three** packages since `mc2-cuk7j.1`.
-
-Read first: `AGENTS.md`, `.codex/orchestrator.toml`, this file, `.codex/repository-failure-modes.md`,
-`.codex/project-index.md`, `graphify-out/GRAPH_REPORT.md`, `specs/026-post-triage-priorities/spec.md`.
+Do not run a second paid dev generation, migrate schema, reindex, change audience checkmarks or
+close either issue on visual impression alone.

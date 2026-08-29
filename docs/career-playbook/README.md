@@ -96,6 +96,34 @@ invalid judge output is retried once, then recorded as both a legacy
 `generation_warnings[]` string and structured `quality_issues[]` records that
 the private viewer groups by block with open/edit/regenerate actions.
 
+## Role Guide Views And Repetition
+
+The canonical block catalogue assigns every stored block to one or more readers:
+`employee`, `manager`, and `hr`. The private reader exposes those three views plus
+the full document. All four are projections of the same `generated_blocks` map;
+switching a view does not regenerate or copy content. The three audience views
+contain 20, 20, and 14 stored blocks respectively, including `header`, and their
+union covers `header` plus all 26 content blocks.
+
+Persistence remains unchanged: `final_markdown` is always the complete Role
+Guide. Audience-specific markdown is assembled on demand with
+`buildRoleGuideView`; edits and regenerated blocks therefore appear in every
+applicable view without a schema migration or backfill.
+
+Repetition control uses the same audience map. Canonical normalization discards
+model-produced `do_not_repeat` lists and rebuilds them from block topics, shared
+view membership, and non-overlapping aliases. A group receives prior generated
+content only from blocks that share at least one of its views. At the final judge,
+semantic block pairs within a shared view and paragraph pairs within one block
+become critical `contradiction` issues at cosine similarity `0.85`; pairs that
+never occur in the same view are intentionally not compared.
+
+The semantic pass uses Jina embeddings. Its batch costs are recorded as
+`semanticRepetition` rows in `career_playbooks.cost_breakdown`. A provider failure
+is preserved as a generation warning and the judge continues with the other
+deterministic checks; such a degraded run is useful output but is not evidence
+that the repetition gate passed.
+
 ## Visibility And Permissions
 
 As of 2026-06-05, Career Playbook visibility matches course visibility:
