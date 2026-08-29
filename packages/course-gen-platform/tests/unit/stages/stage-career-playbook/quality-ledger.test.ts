@@ -200,7 +200,13 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     return digest.slice(start, next < 0 ? undefined : next);
   }
 
-  it('isolates prior content per target inside real mixed-audience groups', () => {
+  // mc2-923ku: these four sections are contradiction guards over the single
+  // assembled document (anti-goals, decision authority, numeric commitments,
+  // cadences), not repetition-avoidance guidance, so a prior block reaches
+  // every later target regardless of whether they share a reader. block_12 is
+  // HR-only and block_22/block_9 are employee-only — no shared reader, and the
+  // digest still carries the content across that boundary.
+  it('carries prior content to every later target inside real mixed-audience groups, split per target only by generation status', () => {
     const peopleTargetIds = getCareerPlaybookGroupSpec('group_3_people').blocks.map(
       block => block.blockId
     );
@@ -223,8 +229,10 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(targetSection(peopleDigest, 'block_9')).toContain(
       'block_22: Weekly employee-only handoff review: 42%'
     );
-    expect(targetSection(peopleDigest, 'block_12')).not.toContain('block_22');
-    expect(targetSection(peopleDigest, 'block_12')).not.toContain('42%');
+    expect(targetSection(peopleDigest, 'block_12')).toContain(
+      'block_22: Weekly employee-only handoff review: 42%'
+    );
+    // block_1 is still "generating", not "generated" — excluded regardless of audience.
     expect(peopleDigest).not.toContain('Draft mission');
 
     const wrapTargetIds = getCareerPlaybookGroupSpec('group_6_wrap').blocks.map(
@@ -244,8 +252,9 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(targetSection(wrapDigest, 'block_26')).toContain(
       'block_12: Monthly HR-only candidate calibration: 77%'
     );
-    expect(targetSection(wrapDigest, 'block_22')).not.toContain('block_12');
-    expect(targetSection(wrapDigest, 'block_22')).not.toContain('77%');
+    expect(targetSection(wrapDigest, 'block_22')).toContain(
+      'block_12: Monthly HR-only candidate calibration: 77%'
+    );
     expect(Math.ceil(wrapDigest.length / 4)).toBeLessThanOrEqual(1_500);
   });
 });

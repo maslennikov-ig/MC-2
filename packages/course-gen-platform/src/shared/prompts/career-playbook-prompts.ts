@@ -132,7 +132,7 @@ DATES — today is {{generated_on}}:
 CONSISTENCY — do not contradict what is already published:
 - The digest below is split into explicit \`For block_N only:\` subsections.
 - When writing block_N, use ONLY the \`For block_N only:\` subsection; ignore every other block's subsection even though it is visible in the prompt.
-- Each subsection lists only anti-goals, decision authority, numeric commitments, and cadences from earlier blocks that share at least one reader with that output block.
+- Each subsection lists anti-goals, decision authority, numeric commitments, and cadences from every earlier block, regardless of reader: these four are consistency constraints on the single assembled document, not readership-scoped guidance.
 - Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
 
 AUTHORITY — Block 5 is the single source of decision authority:

@@ -16,7 +16,6 @@
  */
 
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
-import { careerPlaybookBlocksShareAudience } from './audience-scope';
 
 /** Token ceiling for the digest, applied by priority rather than by truncation at the tail. */
 export const CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS = 1_500;
@@ -170,12 +169,21 @@ function buildCareerPlaybookTargetPriorDigest(
   targetBlockId: CareerPlaybookBlockId,
   maxTokens: number
 ): string {
+  // All four sections below are contradiction guards over the single assembled
+  // document (anti-goals, decision authority, numeric commitments, cadences),
+  // not repetition-avoidance guidance — so selection is document-wide and does
+  // NOT scope by shared audience. Audience scoping answers "may I repeat this",
+  // which is a different question from "may I contradict this", and the owner
+  // ruling is that contradiction is never allowed anywhere. Scoping this by
+  // audience previously dropped 66 of 702 directed pairs, including block_12
+  // (HR-only) losing block_2's anti-goals and block_5's authority matrix — the
+  // two things this file's own module comment calls what a later block
+  // contradicts in practice.
   const priorBlockIds = Object.keys(generatedBlocks).filter(
     blockId =>
       !currentBlockIds.includes(blockId) &&
       Boolean(generatedBlocks[blockId]?.content) &&
-      generatedBlocks[blockId]?.status === 'generated' &&
-      careerPlaybookBlocksShareAudience(blockId, targetBlockId)
+      generatedBlocks[blockId]?.status === 'generated'
   );
 
   if (priorBlockIds.length === 0) return 'none';
@@ -185,7 +193,8 @@ function buildCareerPlaybookTargetPriorDigest(
   );
 
   const antiGoals = collectAntiGoals(eligiblePriorBlocks);
-  const authority = targetBlockId === 'block_5' ? [] : collectDecisionAuthority(eligiblePriorBlocks);
+  const authority =
+    targetBlockId === 'block_5' ? [] : collectDecisionAuthority(eligiblePriorBlocks);
   const commitments = collectNumericCommitments(eligiblePriorBlocks, priorBlockIds);
   const cadences = collectCadences(eligiblePriorBlocks, priorBlockIds);
 
@@ -253,10 +262,7 @@ export function buildCareerPlaybookPriorBlocksDigest(
     currentBlockIds.reduce((sum, blockId) => sum + `For ${blockId} only:\n`.length, 0) +
     Math.max(0, currentBlockIds.length - 1) * 2;
   const contentCharacters = Math.max(4, maxTokens * 4 - sectionOverheadCharacters);
-  const targetMaxTokens = Math.max(
-    1,
-    Math.floor(contentCharacters / currentBlockIds.length / 4)
-  );
+  const targetMaxTokens = Math.max(1, Math.floor(contentCharacters / currentBlockIds.length / 4));
 
   return currentBlockIds
     .map(blockId => {
