@@ -7,18 +7,19 @@ live in `.codex/repository-failure-modes.md`; this file says what still binds wo
 
 ## Current stage
 
-Current stage id: `mc2-1786710715922-25-db11a6c5`
+Accepted stage id: `mc2-1786710715922-25-db11a6c5`
 
-Role Guide audience views and measurable repetition are in progress on
-`codex/role-guide-audiences`, base `develop` `9250c1be9`. The ordered boundary is phase 0 baseline →
-phase A audience views → phase B repetition gate. Phase 0 is accepted: 14 complete playbooks,
-6,594 within-view block-pair occurrences, 6,829 within-block paragraph pairs, working threshold
-0.85, baseline rates 0.12% and 0.26%. Phase A is accepted: canonical views contain 20/20/14 blocks,
-cover all 27 stored ids, and persisted `final_markdown` remains the full document. Phase B is
-accepted: canonical `do_not_repeat`, per-target prior-block digests and the final-only 0.85 semantic
-gate are audience-scoped. Semantic provider exhaustion is fail-closed; accumulated Jina spend still
-reaches `career_playbooks.cost_breakdown`. Jina measurements and one paid dev generation are
-authorized; a second paid dev generation remains a stop condition. The stage also closes
+Role Guide audience views and measurable repetition are accepted on `develop` at `bf7de071f`.
+Canonical employee/manager/HR views contain 20/20/14 stored blocks and cover all 27 ids; persisted
+`final_markdown` remains full. Canonical `do_not_repeat`, per-target prior-block digests and the
+final-only 0.85 semantic gate are audience-scoped and provider failure is fail-closed. Against the
+14-playbook baseline, too-close rates fell from 8/6,594 (0.12%) to 0/471 and from 18/6,829 (0.26%)
+to 0/375. The accepted exact dev row carried 34 cost records, including two Jina rows with 49,026
+tokens / $0.0024513, and total cost $0.073384245. Root read all four documents; exact cleanup left
+0 playbook and 0 job-status rows. The first generation exposed the window-cap defect and was
+rejected; the owner authorized the successful second generation after `bf7de071f`. Full evidence is
+in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md` and
+`docs/career-playbook/2026-08-29-role-guide-audience-acceptance.md`. The stage also closes
 `mc2-1786710716114-26-01631777`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
@@ -253,14 +254,22 @@ and handler.
 thresholds calibrated on Latin script, each invisible until the previous was fixed. Weight by script,
 never lower the number.
 
-## Remaining stage steps
+## Accepted stage result
 
-Phase 0, A and B streams are accepted. Root still owns one final `pnpm type-check` plus
-`pnpm test:unit`, delivery to dev, and exactly one paid dev generation. For that exact playbook row:
-verify semantic completion and `semanticRepetition` Jina cost rows, read employee/manager/HR/full
-views, run the fixed-0.85 final measurement before exact-ID cleanup, and record the delta against
-the Phase 0 baseline. Then refresh Graphify, close both Beads with numeric reasons, run stage
-closeout and prove the commits reached `develop` with `check_stranded_commits.py`.
+Phase 0, A and B plus root acceptance are complete. Local `pnpm type-check` and `pnpm test:unit`,
+exact-SHA CI/dev deployment, the paid dev evidence, four-document reading, fixed-0.85 final
+measurement, exact cleanup and local Graphify refresh all passed. No schema migration, reindex,
+audience-checkbox change, secret/access mutation, force-push or third generation occurred.
 
-Do not run a second paid dev generation, migrate schema, reindex, change audience checkmarks or
-close either issue on visual impression alone.
+## Next recommended
+
+Next stage id: none selected.
+
+Recommended action: finish the ordinary closeout commit and `develop` delivery for the accepted
+Role Guide stage, then select the next ready Beads item rather than inventing follow-up scope here.
+
+## Starter prompt for next orchestrator
+
+Use $orchestrator-stage after selecting the next ready Beads goal. Read `AGENTS.md`,
+`.codex/orchestrator.toml`, this handoff and the selected issue before creating a new stage; do not
+reopen the accepted Role Guide boundary without a new owner request or measured regression.

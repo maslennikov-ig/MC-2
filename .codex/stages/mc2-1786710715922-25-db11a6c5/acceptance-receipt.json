@@ -1,0 +1,28 @@
+{
+  "command_results": [
+    {
+      "command": "pnpm run type-check && pnpm test:unit",
+      "deprecations": [
+        "packages/web test:unit: 6:15:36 PM [vite] warning: `esbuild` option was specified by \"vite:react-babel\" plugin. This option is deprecated, please use `oxc` instead.",
+        "packages/web test:unit: `optimizeDeps.rollupOptions` / `ssr.optimizeDeps.rollupOptions` is deprecated. Use `optimizeDeps.rolldownOptions` instead. Note that this option may be set by a plugin. Set VITE_DEPRECATION_TRACE=1 to see where it is called."
+      ],
+      "duration_seconds": 617.217,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "pnpm run type-check && pnpm test:unit"
+  ],
+  "completed_at": "2026-08-29T15:15:49.515947+00:00",
+  "diff_digest": "b8369ae8d8dc7a0415eba8ffea72a71f8ff8437502d96b8410f503edcdadd6ba",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.19.0,pnpm=10.34.5",
+  "git_head": "bf7de071fa8bb9aac79a936ff4892d34a1260b8c",
+  "idempotency_key": "b07b092d9a3d889412f97dc29a90a5fc7854d04436653354e97c061bccb348da",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1786710715922-25-db11a6c5",
+  "started_at": "2026-08-29T15:05:32.212897+00:00",
+  "verification_fingerprint": "b07b092d9a3d889412f97dc29a90a5fc7854d04436653354e97c061bccb348da"
+}

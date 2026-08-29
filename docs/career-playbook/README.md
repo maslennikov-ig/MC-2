@@ -126,6 +126,11 @@ marked `failed` and cannot be persisted as completed without the semantic gate.
 The handler still writes every paid `semanticRepetition` receipt accumulated
 before failure, so provider failure does not erase cost evidence.
 
+The 2026-08-29 measured rollout is recorded in the
+[baseline](./2026-08-29-semantic-repetition-baseline.md),
+[exact-playbook final measurement](./2026-08-29-semantic-repetition-final.md), and
+[audience/cost acceptance record](./2026-08-29-role-guide-audience-acceptance.md).
+
 ## Visibility And Permissions
 
 As of 2026-06-05, Career Playbook visibility matches course visibility:

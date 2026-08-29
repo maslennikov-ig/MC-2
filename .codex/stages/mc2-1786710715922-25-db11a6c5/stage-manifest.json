@@ -4,7 +4,7 @@
   "goal_id": "mc2-1786710715922-25-db11a6c5",
   "epic_id": "mc2-db696",
   "profile_at_creation": "balanced-v2.20",
-  "status": "in_progress",
+  "status": "accepted",
   "sequence": 1,
   "orchestration_level": "integration",
   "acceptance_boundary_id": "role-guide-audience-views-and-measurable-repetition",
@@ -33,7 +33,7 @@
     "acceptance_proofs": [
       "pre-change-fourteen-playbook-baseline",
       "deterministic-audience-and-boundary-unit-tests",
-      "one-paid-dev-playbook-read-by-root",
+      "owner-authorized-paid-dev-retry-after-first-exposed-gate-defect",
       "post-change-metrics-below-baseline",
       "develop-ancestry-and-stranded-commit-check"
     ]
