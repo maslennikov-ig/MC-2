@@ -99,7 +99,14 @@ jobs:
           SUPABASE_ANON_KEY: test-anon-key
           OPENROUTER_API_KEY: test-openrouter-key
         run: |
+          # All three, not just the catalogue's own package: both test files
+          # reach `shared/logger`, which imports `@megacampus/shared-logger` from
+          # its build output. A workspace package with no `dist` fails to resolve
+          # before a test is collected, and it never showed locally because the
+          # `dist` is already there.
           pnpm -F shared-types build
+          pnpm -F shared-logger build
+          pnpm -F shared-utils build
           pnpm -F course-gen-platform exec vitest run --config vitest.config.unit.ts \
             tests/unit/model-catalog-coverage.test.ts \
             tests/unit/stages/stage5-generation/cost-calculator.test.ts
