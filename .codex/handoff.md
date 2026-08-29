@@ -223,6 +223,9 @@ the branch it delivered, so a report naming a branch again means something reall
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
+- `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
+  average 22.5 of 25. The 028 plan promised 13–19. Not a defect (the run measured 0/471), but the
+  selectivity question needs a paid A/B and is untouched until then.
 - `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
 - `mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from a secret that does not exist.
   Not burning: the host carries 900 by some other means. It burns when `.env.production` is rewritten
