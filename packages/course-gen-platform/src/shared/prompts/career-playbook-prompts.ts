@@ -661,7 +661,7 @@ ${GROUP_USER_SECTION}`,
 Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
 
 Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these categories:
-- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
+- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A repeated topic is critical ONLY when block_audiences_md shows the two blocks share at least one reader — the same material appearing in blocks with no shared reader is correct (the Role Guide's views are read separately) and must never be flagged. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
 - "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
 - "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
@@ -701,6 +701,9 @@ Today is {{generated_on}}.
 RoleProfileSpec:
 {{spec_json}}
 
+Block audiences (who reads each block; use this to tell a same-view contradiction from allowed repetition between views):
+{{block_audiences_md}}
+
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
 
@@ -715,6 +718,11 @@ Current group output:
     variables: [
       { name: 'group_id', description: 'Current group or block ids under review', required: true },
       specJsonVariable,
+      {
+        name: 'block_audiences_md',
+        description: 'Canonical readers for every block in the Role Guide',
+        required: true,
+      },
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
