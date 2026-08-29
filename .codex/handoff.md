@@ -13,9 +13,10 @@ Role Guide audience views and measurable repetition are in progress on
 `codex/role-guide-audiences`, base `develop` `9250c1be9`. The ordered boundary is phase 0 baseline →
 phase A audience views → phase B repetition gate. Phase 0 is accepted: 14 complete playbooks,
 6,594 within-view block-pair occurrences, 6,829 within-block paragraph pairs, working threshold
-0.85, baseline rates 0.12% and 0.26%. Phase A is current. Jina measurements and one paid dev
-generation are authorized; a second paid dev generation remains a stop condition. The stage also
-closes `mc2-1786710716114-26-01631777`.
+0.85, baseline rates 0.12% and 0.26%. Phase A is accepted: canonical views contain 20/20/14 blocks,
+cover all 27 stored ids, and the full document remains available. Phase B is current. Jina
+measurements and one paid dev generation are authorized; a second paid dev generation remains a
+stop condition. The stage also closes `mc2-1786710716114-26-01631777`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in

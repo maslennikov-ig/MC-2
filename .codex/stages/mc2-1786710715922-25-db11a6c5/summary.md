@@ -22,9 +22,10 @@ stage closes `mc2-1786710715922-25-db11a6c5` and `mc2-1786710716114-26-01631777`
    `docs/career-playbook/2026-08-29-semantic-repetition-baseline.md`; at the measured 0.85 threshold,
    8/6,594 audience-view block pairs (0.12%) and 18/6,829 within-block paragraph pairs (0.26%) are
    too close.
-2. Phase A: in progress. Add canonical audience data, on-the-fly view assembly, audience-aware prompts, and four
-   viewer tabs.
-3. Phase B: derive `do_not_repeat` and prior-block context from shared-view membership, then add a
+2. Phase A: accepted. Canonical employee/manager/HR views contain 20/20/14 stored blocks, their
+   union is all 27 ids, full persistence is unchanged, prompts receive explicit readers, and the
+   viewer exposes full plus three audience tabs.
+3. Phase B: in progress. Derive `do_not_repeat` and prior-block context from shared-view membership, then add a
    threshold calibrated from phase 0.
 4. Final acceptance: one paid dev generation, root reading of all three views, post-change metrics,
    `pnpm type-check`, `pnpm test:unit`, delivery to `develop`, and numeric Beads close reasons.

@@ -20,7 +20,7 @@ epic_id: mc2-db696
 stage_id: mc2-1786710715922-25-db11a6c5
 session_id: n/a
 milestone: cohesive-vertical-slice
-milestone_status: ready-for-acceptance
+milestone_status: accepted
 agent_type: worker
 repo: mc2
 branch: codex/role-guide-audiences
@@ -59,9 +59,9 @@ parallel_group: n/a
 depends_on_streams:
   - phase-0-baseline
 parallel_decision: sequential-after-phase-0
-status: returned
+status: accepted
 delivery_method: manual integration
-accepted_by_orchestrator: no
+accepted_by_orchestrator: yes
 cleanup_status: cleaned
 cleanup_notes: temporary worktree dependency links removed after focused verification
 risk_level: medium

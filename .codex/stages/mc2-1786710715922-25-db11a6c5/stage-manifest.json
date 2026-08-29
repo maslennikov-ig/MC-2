@@ -103,7 +103,7 @@
       "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-a-audiences.md",
       "task_id": "mc2-1786710715922-25-db11a6c5",
       "stream_owner": "phase-a-worker",
-      "status": "planned"
+      "status": "accepted"
     },
     {
       "artifact_path": ".codex/stages/mc2-1786710715922-25-db11a6c5/artifacts/phase-b-repetition.md",
