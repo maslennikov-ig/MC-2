@@ -402,7 +402,7 @@ describe('model-config-service', () => {
 describe('model pricing health check (IMP-4)', () => {
   it('reports an unknown/deprecated model id as unpriced and a known catalog model as priced', () => {
     const result = checkPhaseModelPricingHealth({
-      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'openai/gpt-oss-20b' },
+      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'z-ai/glm-5.3-flash' },
       drifted_phase: {
         modelId: 'openai/gpt-oss-120b', // retired/deprecated id, no pricing entry
         fallbackModelId: 'deepseek/deepseek-v4-pro',

@@ -36,7 +36,7 @@ const SCHEMA = z.object({ answer: z.string() });
 
 function buildModel(): ChatOpenAI {
   return new ChatOpenAI({
-    model: 'openai/gpt-oss-20b',
+    model: 'z-ai/glm-5.3-flash',
     apiKey: 'test-key',
     // Nothing is allowed to leave the machine: every test here either stops at
     // the replaced `invoke` or asserts on the object graph.

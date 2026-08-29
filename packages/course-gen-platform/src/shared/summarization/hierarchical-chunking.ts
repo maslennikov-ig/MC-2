@@ -40,7 +40,7 @@ export interface HierarchicalChunkingOptions {
   chunkSize?: number;
   /** Overlap percentage between chunks (default: 5) */
   overlapPercent?: number;
-  /** LLM model to use (default: 'openai/gpt-oss-20b') */
+  /** LLM model to use (default: `DEFAULT_MODEL_ID`) */
   model?: string;
   /** Temperature for LLM generation (default: 0.7) */
   temperature?: number;

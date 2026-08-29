@@ -53,7 +53,7 @@ const { result, modelUsed } = await executeWithContextFallback(
 
 ```typescript
 export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
-  const model = getModelForPhase('openai/gpt-oss-20b', 0.3);
+  const model = getModelForPhase('deepseek/deepseek-v4-flash-0731', 0.3);
   const [systemMessage, humanMessage] = buildPrompt(input);
   const response = await model.invoke([systemMessage, humanMessage]);
   return parseResponse(response);
@@ -72,7 +72,7 @@ export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
       const [systemMessage, humanMessage] = buildPrompt(input);
       return await model.invoke([systemMessage, humanMessage]);
     },
-    'openai/gpt-oss-20b',
+    'deepseek/deepseek-v4-flash-0731',
     input.language === 'ru' ? 'ru' : 'en'
   );
 

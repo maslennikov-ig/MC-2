@@ -1,12 +1,15 @@
 /**
  * Metadata Generator - Course-Level Metadata Generation with Hybrid Model Routing
  *
- * Implements RT-001 Phase 2 hybrid model routing strategy:
- * - Critical fields → qwen3-max ALWAYS (learning_outcomes, learning_objectives,
- *   pedagogical_strategy, course_structure, domain_taxonomy)
- * - Non-critical fields → deepseek/deepseek-v4-flash first, escalate to qwen3-max if quality < 0.85
+ * The model comes from `llm_model_config` via `getModelForPhase`, with the roles
+ * in `MODELS` below as the last resort when the database cannot be read.
  *
- * Cost savings: 25-40% vs always using qwen3-max ($0.126-0.144 per course)
+ * The RT-001 design this file was written to described a split between
+ * `qwen3-max` for critical fields and `deepseek-v4-flash` for the rest. Neither
+ * id has been the configured one for months, and `qwen3-max` was never charged
+ * for a single call in either ledger — it left the catalogue on 2026-08-29
+ * (mc2-11jn5). What survives from that design is the shape: one careful seat,
+ * one cheaper seat, and a fallback from a different vendor.
  *
  * @module services/stage5/metadata-generator
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md (Phase 2)
@@ -32,7 +35,7 @@ import {
 } from './analysis-formatters';
 import { normalizeLanguageCode } from '@/shared/workspace-utils';
 import { buildUserContextSection } from './prompt-helpers';
-import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
+import { estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/workspace-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
@@ -178,25 +181,17 @@ export class MetadataGenerator {
     // Step 3: Build metadata prompt
     const prompt = this.buildMetadataPrompt(input, stylePrompt, language);
 
-    // Step 3.5: Validate Qwen 3 Max context length (128K limit check)
-    // CRITICAL: Qwen 3 Max costs 2.5x more above 128K tokens
+    // Step 3.5: measure the prompt, because the model is chosen partly by size.
+    //
+    // Until 2026-08-29 this threw here. The guard belonged to `qwen/qwen3-max`,
+    // whose base tariff ends at 32,000 input tokens — but it ran unconditionally,
+    // against whatever model the phase was actually configured for, and re-threw
+    // rather than falling through as its own comment claimed ("log warning but
+    // proceed"). That comment, and the one above it, also said 128K while the
+    // number enforced was 31,999. Neither ledger had ever charged a call to
+    // qwen3-max; the guard could only ever have stopped a generation that was
+    // going to run on something else (mc2-11jn5).
     const estimatedInputTokens = estimateTokenCount(prompt);
-    try {
-      validateQwen3MaxContext(estimatedInputTokens);
-    } catch (error) {
-      // If context exceeds 128K, log warning but proceed (metadata is typically safe at ~40-50K)
-      console.warn(
-        JSON.stringify({
-          msg: 'Qwen 3 Max context validation warning in metadata generation',
-          estimatedTokens: estimatedInputTokens,
-          limit: 128000,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          level: 'warn',
-        })
-      );
-      // Re-throw to prevent unexpected cost increase
-      throw error;
-    }
 
     // Step 4: Generate metadata with hybrid routing
     // Updated 2025-11-14: Language-aware model selection based on quality testing
@@ -553,7 +548,7 @@ export class MetadataGenerator {
    *
    * Handles both full Analyze and title-only scenarios:
    * - Full Analyze: Use analysis_result for context (~10-15K tokens)
-   * - Title-only (FR-003): Synthesize from qwen3-max knowledge base
+   * - Title-only (FR-003): synthesize from the model's own knowledge
    *
    * @param input - Generation job input
    * @param stylePrompt - Style prompt from getStylePrompt()

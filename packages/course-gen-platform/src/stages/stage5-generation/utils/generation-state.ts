@@ -10,6 +10,12 @@
  * - Phase 4: validate_quality
  * - Phase 5: validate_lessons
  *
+ * The model names in the comments below are RT-001's original casting —
+ * qwen3-max, OSS 120B, Gemini 2.5 Flash — and none of them is who runs these
+ * phases now: the model comes from `llm_model_config`, and qwen3-max and
+ * gpt-oss-20b left the catalogue on 2026-08-29 having never been charged for a
+ * call (mc2-11jn5). Read them as roles, not as configuration.
+ *
  * References:
  * - RT-001: Multi-Model Orchestration Strategy (model routing and cost tracking)
  * - RT-002: 5-Phase Generation Architecture (LangGraph workflow design)

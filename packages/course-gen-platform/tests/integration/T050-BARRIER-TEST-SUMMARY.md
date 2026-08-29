@@ -117,7 +117,7 @@ Coverage: Integration test coverage for Stage 4 barrier logic
     output_tokens: 50,
     total_tokens: 150,
     estimated_cost_usd: 0.001,
-    model_used: 'openai/gpt-oss-20b',
+    model_used: 'z-ai/glm-5.3-flash',
     strategy_used: 'full_text'
   }
 }

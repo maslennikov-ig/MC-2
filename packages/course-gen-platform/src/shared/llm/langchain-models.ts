@@ -184,14 +184,14 @@ export interface ModelCostContext {
  * Note: Uses environment variable only. For database-first key resolution,
  * use createOpenRouterModelAsync() instead.
  *
- * @param modelId - OpenRouter model identifier (e.g., 'openai/gpt-oss-20b')
+ * @param modelId - OpenRouter model identifier (e.g., 'z-ai/glm-5.3-flash')
  * @param temperature - Model temperature (0-2, default: 0.7)
  * @param maxTokens - Maximum output tokens (default: 4096)
  * @returns Configured ChatOpenAI instance
  *
  * @example
  * // Create 20B model for classification
- * const model = createOpenRouterModel('openai/gpt-oss-20b', 0.7, 4096);
+ * const model = createOpenRouterModel('z-ai/glm-5.3-flash', 0.7, 4096);
  *
  * @example
  * // Create 120B model for expert analysis
@@ -294,7 +294,7 @@ export async function createCostRecordingModelAsync(
  * This is the preferred method for creating OpenRouter models.
  * Resolves API key from database first, then falls back to env var.
  *
- * @param modelId - OpenRouter model identifier (e.g., 'openai/gpt-oss-20b')
+ * @param modelId - OpenRouter model identifier (e.g., 'z-ai/glm-5.3-flash')
  * @param temperature - Model temperature (0-2, default: 0.7)
  * @param maxTokens - Maximum output tokens (default: 4096)
  * @returns Promise<ChatOpenAI> - Configured ChatOpenAI instance

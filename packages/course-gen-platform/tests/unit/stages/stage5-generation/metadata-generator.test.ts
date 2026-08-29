@@ -14,6 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetadataGenerator } from '@/stages/stage5-generation/utils/metadata-generator';
+import { DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 import type { GenerationJobInput } from '@megacampus/shared-types/generation-job';
 import type { CourseStructure } from '@megacampus/shared-types/generation-result';
 import { ChatOpenAI } from '@langchain/openai';
@@ -132,7 +133,7 @@ describe('MetadataGenerator', () => {
 
     expect(result).toBeDefined();
     expect(result.metadata.course_title).toBe('Machine Learning Basics');
-    expect(result.modelUsed).toBe('qwen/qwen3-max');
+    expect(result.modelUsed).toBe(DEFAULT_FALLBACK_MODEL_ID);
     expect(result.quality.completeness).toBeGreaterThan(0.8);
   });
 
@@ -197,7 +198,7 @@ describe('MetadataGenerator', () => {
 
     expect(result).toBeDefined();
     expect(result.metadata.course_title).toBe('Introduction to Quantum Computing');
-    expect(result.modelUsed).toBe('qwen/qwen3-max'); // FR-003: qwen3-max for title-only
+    expect(result.modelUsed).toBe(DEFAULT_FALLBACK_MODEL_ID); // FR-003: qwen3-max for title-only
   });
 
   it('should use correct style prompts (FR-028)', async () => {

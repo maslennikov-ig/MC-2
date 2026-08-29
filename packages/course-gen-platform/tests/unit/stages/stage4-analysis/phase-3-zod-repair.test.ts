@@ -28,7 +28,7 @@ vi.mock('@/shared/llm/langchain-models', async importOriginal => {
   return {
     ...actual,
     getModelForPhase: vi.fn().mockResolvedValue({
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       invoke: vi.fn(),
     }),
     getTextContent: vi.fn((content: any) => {
@@ -126,7 +126,7 @@ const mockPhase1Output: Phase1Output = {
   },
   phase_metadata: {
     duration_ms: 5000,
-    model_used: 'openai/gpt-oss-20b',
+    model_used: 'z-ai/glm-5.3-flash',
     tokens: { input: 1000, output: 500, total: 1500 },
     quality_score: 0.0,
     retry_count: 0,
@@ -163,7 +163,7 @@ const mockPhase2Output: Phase2Output = {
   },
   phase_metadata: {
     duration_ms: 3000,
-    model_used: 'openai/gpt-oss-20b',
+    model_used: 'z-ai/glm-5.3-flash',
     tokens: { input: 800, output: 400, total: 1200 },
     quality_score: 0.0,
     retry_count: 0,
@@ -200,7 +200,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       });
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -224,7 +224,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'critique-revise',
           retryCount: 1,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -280,7 +280,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       });
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -304,7 +304,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'auto-repair',
           retryCount: 0,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -333,7 +333,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       });
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -357,7 +357,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'partial-regen',
           retryCount: 1,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -369,7 +369,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       expect(result.pedagogical_strategy.progression_logic.length).toBeGreaterThanOrEqual(100);
       expect(result.research_flags).toBeDefined();
       expect(result.phase_metadata).toBeDefined();
-      expect(result.phase_metadata.model_used).toBe('openai/gpt-oss-20b');
+      expect(result.phase_metadata.model_used).toBe('z-ai/glm-5.3-flash');
     });
 
     it('should validate repaired output against Phase3OutputSchema', async () => {
@@ -378,7 +378,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       const invalidOutput = JSON.stringify({});
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -400,7 +400,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'auto-repair',
           retryCount: 0,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -421,7 +421,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       });
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -438,7 +438,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'emergency',
           retryCount: 3,
-          modelsUsed: ['openai/gpt-oss-20b', 'deepseek/deepseek-v4-flash', 'gemini-2.0-flash-exp'],
+          modelsUsed: ['z-ai/glm-5.3-flash', 'deepseek/deepseek-v4-flash', 'gemini-2.0-flash-exp'],
         },
       });
 
@@ -456,7 +456,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       const invalidOutput = JSON.stringify({});
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -472,7 +472,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'partial-regen',
           retryCount: 2,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -490,7 +490,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       const invalidOutput = JSON.stringify({});
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -511,7 +511,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'auto-repair',
           retryCount: 0,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 
@@ -544,7 +544,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       });
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: validOutput,
           response_metadata: {
@@ -570,7 +570,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
       const invalidOutput = JSON.stringify({});
 
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidOutput,
           response_metadata: {
@@ -592,7 +592,7 @@ describe('Phase 3 Zod validation → UnifiedRegenerator repair path', () => {
         metadata: {
           layerUsed: 'auto-repair',
           retryCount: 0,
-          modelsUsed: ['openai/gpt-oss-20b'],
+          modelsUsed: ['z-ai/glm-5.3-flash'],
         },
       });
 

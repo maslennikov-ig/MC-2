@@ -42,7 +42,7 @@ function answer(): Response {
       id: GENERATION_ID,
       object: 'chat.completion',
       created: 1787317000,
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       choices: [
         {
           index: 0,
@@ -74,7 +74,7 @@ afterEach(() => {
 
 function model() {
   return createCostRecordingModel(
-    'openai/gpt-oss-20b',
+    'z-ai/glm-5.3-flash',
     0,
     256,
     'stage_3_classification',
@@ -88,7 +88,7 @@ describe('a LangChain call prices itself and keeps the receipt', () => {
 
     expect(recorded).toHaveLength(1);
     expect(recorded[0].usage).toMatchObject({
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       inputTokens: 41,
       outputTokens: 7,
       generationId: GENERATION_ID,
@@ -115,7 +115,7 @@ describe('a LangChain call prices itself and keeps the receipt', () => {
 
   it('records nothing without a course, which is the documented shape', async () => {
     const anonymous = createCostRecordingModel(
-      'openai/gpt-oss-20b',
+      'z-ai/glm-5.3-flash',
       0,
       256,
       'stage_3_classification'

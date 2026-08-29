@@ -74,7 +74,7 @@ export interface PhaseModelConfig {
    *
    * Format: "provider/model-name" or "provider/model-name:variant"
    *
-   * @example 'openai/gpt-oss-20b'
+   * @example 'z-ai/glm-5.3-flash'
    * @example 'deepseek/deepseek-v4-flash'
    * @example 'anthropic/claude-opus-4.5'
    */

@@ -56,7 +56,7 @@ describe('Phase 4: Document Synthesis', () => {
           },
           phase_metadata: {
             duration_ms: 5000,
-            model_used: 'openai/gpt-oss-20b',
+            model_used: 'z-ai/glm-5.3-flash',
             tokens: { input: 1000, output: 500, total: 1500 },
             quality_score: 0.9,
             retry_count: 0,
@@ -112,7 +112,7 @@ describe('Phase 4: Document Synthesis', () => {
           },
           phase_metadata: {
             duration_ms: 6000,
-            model_used: 'openai/gpt-oss-20b',
+            model_used: 'z-ai/glm-5.3-flash',
             tokens: { input: 1500, output: 800, total: 2300 },
             quality_score: 0.88,
             retry_count: 0,

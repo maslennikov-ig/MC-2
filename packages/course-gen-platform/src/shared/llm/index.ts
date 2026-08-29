@@ -29,7 +29,6 @@ export {
   hasUnifiedPricing,
   estimateCost,
   estimateTokenCount,
-  validateQwen3MaxContext,
   OPENROUTER_PRICING,
   COST_THRESHOLDS,
   type ModelPricing,

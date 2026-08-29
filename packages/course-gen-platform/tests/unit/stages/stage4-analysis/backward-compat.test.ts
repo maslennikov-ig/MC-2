@@ -188,10 +188,10 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         phase_4: 5000,
       },
       model_usage: {
-        phase_1: 'openai/gpt-oss-20b',
-        phase_2: 'openai/gpt-oss-20b',
+        phase_1: 'z-ai/glm-5.3-flash',
+        phase_2: 'z-ai/glm-5.3-flash',
         phase_3: 'deepseek/deepseek-v4-flash',
-        phase_4: 'openai/gpt-oss-20b',
+        phase_4: 'z-ai/glm-5.3-flash',
       },
       total_tokens: {
         input: 12000,

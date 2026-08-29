@@ -169,8 +169,17 @@ describe('model catalogue coverage', () => {
     // Dated per row rather than per test: these are re-read when something
     // sends somebody to look, not on one day together, and a single date in the
     // title claims a freshness the rows do not share.
+    //
+    // Every row here has been paid for at least once, and that is now the whole
+    // admission rule. Eleven entries were dropped on 2026-08-29 because neither
+    // ledger had ever charged anything to them; five of those carried
+    // `delisted: true` and the words "retained so old cost reports still
+    // resolve", with no such report in existence. Both ledgers have to be read
+    // to make that call — a playbook's spend lives in
+    // `career_playbooks.cost_breakdown` and never reaches `generation_trace`,
+    // which is why `deepseek/deepseek-v4-pro` reads as unused in the obvious
+    // place while holding 189 calls in the other (mc2-11jn5).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
       // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
       // would, because `normalizeModelId` prices every undated V4 Flash snapshot
       // from here (mc2-hc91g). Re-read 2026-08-26 at $0.088606/$0.177212: the
@@ -181,14 +190,9 @@ describe('model catalogue coverage', () => {
       'deepseek/deepseek-v4-flash': [0.08512, 0.17024],
       '~deepseek/deepseek-v4-flash-latest': [0.03, 0.1],
       'deepseek/deepseek-v4-pro': [0.680862, 1.361724],
-      'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
-      'openai/gpt-oss-20b': [0.03, 0.13],
       'qwen/qwen3-235b-a22b-2507': [0.0875, 0.35],
-      'qwen/qwen-plus-2025-07-28': [0.26, 0.78],
-      'qwen/qwen3-max': [0.78, 3.9],
       'qwen/qwen3.7-plus': [0.32, 1.28],
-      'z-ai/glm-4.6': [0.43, 1.75],
       'z-ai/glm-5': [0.6, 1.92],
     };
 
@@ -205,9 +209,11 @@ describe('model catalogue coverage', () => {
     );
 
     expect(actual).toEqual(verifiedRates);
-    expect(
-      getModelCapabilities('google/gemini-2.5-flash')?.combinedPricePerMillion
-    ).toBeUndefined();
+    // Split pricing throughout: a combined rate here would be quietly counted
+    // twice for whichever leg is dearer.
+    for (const modelId of Object.keys(verifiedRates)) {
+      expect(getModelCapabilities(modelId)?.combinedPricePerMillion, modelId).toBeUndefined();
+    }
   });
 
   it('prices every model the seed can route to', () => {

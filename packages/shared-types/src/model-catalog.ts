@@ -108,7 +108,19 @@ export interface ModelCapabilities {
    * Where both are present the flat price wins: it is what the provider charges.
    */
   imagePriceFlatUsd?: number;
-  /** No longer offered by OpenRouter; retained so old cost reports still resolve */
+  /**
+   * No longer offered by OpenRouter.
+   *
+   * It marks an entry the nightly price gate must not compare, because there is
+   * no published rate left to compare against — without it the gate named all
+   * five of them every night as "delisted, or the id is misspelled".
+   *
+   * No entry carries it today: on 2026-08-29 the five that did were deleted
+   * instead, because a delisted model is only worth keeping if some report
+   * actually needs its rate, and none of the five had ever been charged for
+   * (mc2-11jn5). Kept because the next delisting is a matter of time, and the
+   * gate already knows what to do with it.
+   */
   delisted?: true;
 }
 
@@ -394,32 +406,15 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
 
   // --- Retired from routing; kept so historical cost reports still resolve ---
-  'anthropic/claude-3.5-sonnet': {
-    inputPricePerMillion: 3,
-    outputPricePerMillion: 15,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'anthropic/claude-sonnet-4-20250514': {
-    inputPricePerMillion: 3,
-    outputPricePerMillion: 15,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'deepseek/deepseek-v3.1-terminus': {
-    inputPricePerMillion: 0.27,
-    outputPricePerMillion: 1.0,
-    contextLength: 163840,
-    maxOutputTokens: 32768,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
+  //
+  // Every entry below has been paid for at least once. Eleven others were
+  // removed on 2026-08-29 because they had not: five carried `delisted: true`
+  // with the words "retained so old cost reports still resolve", and there were
+  // no such reports to resolve. Checked against both ledgers, which is the part
+  // that is easy to get wrong — a playbook's spend is in
+  // `career_playbooks.cost_breakdown`, not in `generation_trace`, and
+  // `deepseek-v4-pro` reads as never-used in the second while holding 189 calls
+  // in the first (mc2-11jn5).
   /**
    * Re-read twice on 2026-08-21: $0.14/$0.28 was 1.7x over, and the $0.0826/
    * $0.1652 that replaced it was still 1.04x over. It matters more than a
@@ -454,32 +449,6 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: true,
   },
-  'google/gemini-2.0-flash-001': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.4,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'google/gemini-2.5-flash': {
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 2.5,
-    contextLength: 1048576,
-    maxOutputTokens: 65535,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'google/gemini-2.5-flash-preview': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.4,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
   /**
    * Superseded by `google/gemini-3.7-flash` on 2026-08-14: same context window
    * and output ceiling, less money. Kept so cost reports written while this was
@@ -492,15 +461,6 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     maxOutputTokens: 65536,
     supportsTemperature: true,
     supportsReasoning: true,
-  },
-  'minimax/minimax-m2': {
-    inputPricePerMillion: 0.255,
-    outputPricePerMillion: 1.02,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
   },
   'minimax/minimax-m2.1': {
     inputPricePerMillion: 0.3,
@@ -520,32 +480,6 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
     requiresReasoning: true,
   },
-  'openai/gpt-4-turbo': {
-    inputPricePerMillion: 10,
-    outputPricePerMillion: 30,
-    contextLength: 128000,
-    maxOutputTokens: 4096,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'openai/gpt-oss-20b': {
-    inputPricePerMillion: 0.03,
-    outputPricePerMillion: 0.13,
-    contextLength: 131072,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'openrouter/kimi-k2-instruct': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.6,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
   'qwen/qwen3-235b-a22b-2507': {
     inputPricePerMillion: 0.0875,
     outputPricePerMillion: 0.35,
@@ -554,42 +488,10 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsTemperature: true,
     supportsReasoning: false,
   },
-  /**
-   * Reachable from the `MODELS` escalation registry in `model-selector.ts` and
-   * absent from every pricing table in the repo until 2026-08-26, so it priced
-   * at the pessimistic default and its ceiling was a guess (mc2-a6qxc).
-   *
-   * Read from the published list that day: $0.26/$0.78, 1M context, 32768
-   * output, `supported_parameters` carries `temperature` and no `reasoning`.
-   */
-  'qwen/qwen-plus-2025-07-28': {
-    inputPricePerMillion: 0.26,
-    outputPricePerMillion: 0.78,
-    contextLength: 1000000,
-    maxOutputTokens: 32768,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'qwen/qwen3-max': {
-    inputPricePerMillion: 0.78,
-    outputPricePerMillion: 3.9,
-    contextLength: 262144,
-    maxOutputTokens: 65536,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
   'qwen/qwen3.7-plus': {
     inputPricePerMillion: 0.32,
     outputPricePerMillion: 1.28,
     contextLength: 1000000,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'z-ai/glm-4.6': {
-    inputPricePerMillion: 0.43,
-    outputPricePerMillion: 1.75,
-    contextLength: 204800,
     maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,

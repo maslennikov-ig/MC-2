@@ -306,21 +306,25 @@ describe('LLMClient', () => {
   });
 
   describe('estimateCost', () => {
-    it('should estimate cost for openai/gpt-oss-20b', () => {
+    it('should estimate cost for z-ai/glm-5.3-flash', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // $0.03/1M input + $0.13/1M output = $0.16
-      expect(cost).toBeCloseTo(0.16, 4);
+      // One million each way, so the answer is the two catalogued rates added.
+      const rates = getModelCapabilities('z-ai/glm-5.3-flash');
+      expect(cost).toBeCloseTo(
+        (rates?.inputPricePerMillion ?? 0) + (rates?.outputPricePerMillion ?? 0),
+        4
+      );
     });
 
     it('should estimate cost for deepseek/deepseek-v4-flash', () => {
@@ -397,14 +401,19 @@ describe('LLMClient', () => {
         inputTokens: 5_000,
         outputTokens: 2_000,
         totalTokens: 7_000,
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         finishReason: 'stop',
       };
 
       const cost = client.estimateCost(response);
 
-      // (5000/1M * 0.03) + (2000/1M * 0.13) = 0.00015 + 0.00026 = 0.00041
-      expect(cost).toBeCloseTo(0.00041, 6);
+      // Each leg at its own catalogued rate, not a blended one.
+      const rates = getModelCapabilities('z-ai/glm-5.3-flash');
+      expect(cost).toBeCloseTo(
+        (5_000 * (rates?.inputPricePerMillion ?? 0)) / 1e6 +
+          (2_000 * (rates?.outputPricePerMillion ?? 0)) / 1e6,
+        6
+      );
     });
   });
 

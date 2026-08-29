@@ -64,7 +64,7 @@ function createMockPhase1Output(): Phase1Output {
     },
     phase_metadata: {
       duration_ms: 5000,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 500, output: 300, total: 800 },
       quality_score: 0.85,
       retry_count: 0,
@@ -98,7 +98,7 @@ function createMockPhase2Output(): Phase2Output {
     },
     phase_metadata: {
       duration_ms: 8000,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 600, output: 400, total: 1000 },
       quality_score: 0.82,
       retry_count: 0,
@@ -151,7 +151,7 @@ function createMockPhase4Output(): Phase4Output {
     },
     phase_metadata: {
       duration_ms: 7000,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 700, output: 500, total: 1200 },
       quality_score: 0.8,
       retry_count: 0,
@@ -206,7 +206,7 @@ describe('Phase 5 Assembly Service', () => {
     expect(result.metadata.phase_durations_ms.phase_4).toBe(7000);
     expect(result.metadata.phase_durations_ms.phase_5).toBeGreaterThanOrEqual(0); // Assembly time (can be 0ms for fast operations)
 
-    expect(result.metadata.model_usage.phase_1).toBe('openai/gpt-oss-20b');
+    expect(result.metadata.model_usage.phase_1).toBe('z-ai/glm-5.3-flash');
     expect(result.metadata.model_usage.phase_3).toBe('deepseek/deepseek-v4-flash');
 
     expect(result.metadata.total_tokens.total).toBe(4800);

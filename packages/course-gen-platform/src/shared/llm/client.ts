@@ -152,7 +152,7 @@ function isProviderAnswerableFailure(error: unknown): boolean {
  * Options for LLM completion requests
  */
 export interface LLMClientOptions {
-  /** Model identifier (e.g., 'openai/gpt-oss-20b', 'google/gemini-3.7-flash') */
+  /** Model identifier (e.g., 'z-ai/glm-5.3-flash', 'google/gemini-3.7-flash') */
   model: string;
   /** Maximum output tokens to generate */
   maxTokens?: number;

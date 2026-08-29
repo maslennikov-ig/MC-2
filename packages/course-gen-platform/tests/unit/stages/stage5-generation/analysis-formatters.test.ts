@@ -87,7 +87,7 @@ function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): Analysis
       analysis_version: 'v1.0.0',
       total_duration_ms: 10000,
       phase_durations_ms: { phase_1: 3000, phase_2: 4000, phase_3: 3000 },
-      model_usage: { phase_1: 'openai/gpt-oss-20b' },
+      model_usage: { phase_1: 'z-ai/glm-5.3-flash' },
       total_tokens: { input: 1000, output: 2000, total: 3000 },
       total_cost_usd: 0.05,
       retry_count: 0,
