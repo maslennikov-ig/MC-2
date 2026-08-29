@@ -180,7 +180,7 @@ describe('model catalogue coverage', () => {
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
       'deepseek/deepseek-v4-flash': [0.08512, 0.17024],
       '~deepseek/deepseek-v4-flash-latest': [0.03, 0.1],
-      'deepseek/deepseek-v4-pro': [0.690954, 1.381908],
+      'deepseek/deepseek-v4-pro': [0.680862, 1.361724],
       'google/gemini-2.5-flash': [0.3, 2.5],
       'moonshotai/kimi-k2-thinking': [0.6, 2.5],
       'openai/gpt-oss-20b': [0.03, 0.13],

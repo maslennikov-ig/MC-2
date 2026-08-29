@@ -447,8 +447,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // over, the largest gap the catalogue has held. Not on a live route, so it
     // cost nothing; had it been, `provider.max_price` would have been built four
     // times too high and bought nothing.
-    inputPricePerMillion: 0.690954,
-    outputPricePerMillion: 1.381908,
+    inputPricePerMillion: 0.680862,
+    outputPricePerMillion: 1.361724,
     contextLength: 1048576,
     maxOutputTokens: 393216,
     supportsTemperature: true,
