@@ -16,7 +16,7 @@
  */
 
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
-import { careerPlaybookBlockSharesAnyTargetAudience } from './audience-scope';
+import { careerPlaybookBlocksShareAudience } from './audience-scope';
 
 /** Token ceiling for the digest, applied by priority rather than by truncation at the tail. */
 export const CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS = 1_500;
@@ -164,26 +164,18 @@ export interface BuildPriorBlocksDigestOptions {
   maxTokens?: number;
 }
 
-/**
- * Build the digest for the blocks accepted so far.
- *
- * Truncation is by priority, not by position: anti-goals and numeric
- * commitments are the two things a later block contradicts in practice, so they
- * survive; cadences and named parties are dropped first. Returns `'none'` for
- * the first group, which has no predecessors.
- */
-export function buildCareerPlaybookPriorBlocksDigest(
+function buildCareerPlaybookTargetPriorDigest(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
   currentBlockIds: readonly CareerPlaybookBlockId[],
-  options: BuildPriorBlocksDigestOptions = {}
+  targetBlockId: CareerPlaybookBlockId,
+  maxTokens: number
 ): string {
-  const maxTokens = options.maxTokens ?? CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS;
   const priorBlockIds = Object.keys(generatedBlocks).filter(
     blockId =>
       !currentBlockIds.includes(blockId) &&
       Boolean(generatedBlocks[blockId]?.content) &&
       generatedBlocks[blockId]?.status === 'generated' &&
-      careerPlaybookBlockSharesAnyTargetAudience(blockId, currentBlockIds)
+      careerPlaybookBlocksShareAudience(blockId, targetBlockId)
   );
 
   if (priorBlockIds.length === 0) return 'none';
@@ -193,14 +185,10 @@ export function buildCareerPlaybookPriorBlocksDigest(
   );
 
   const antiGoals = collectAntiGoals(eligiblePriorBlocks);
-  const authority = currentBlockIds.includes('block_5')
-    ? []
-    : collectDecisionAuthority(eligiblePriorBlocks);
+  const authority = targetBlockId === 'block_5' ? [] : collectDecisionAuthority(eligiblePriorBlocks);
   const commitments = collectNumericCommitments(eligiblePriorBlocks, priorBlockIds);
   const cadences = collectCadences(eligiblePriorBlocks, priorBlockIds);
 
-  // Highest-priority sections first so the trim below drops the least load-bearing
-  // context rather than whatever happens to be last.
   const sections: Array<[string, string[]]> = [
     ['Anti-goals already published (a duty must never violate these):', antiGoals],
     [
@@ -218,7 +206,6 @@ export function buildCareerPlaybookPriorBlocksDigest(
 
     const candidate = [...lines, ...rendered].join('\n');
     if (estimateTokens(candidate) > maxTokens) {
-      // Fit as many entries of this section as the remaining budget allows.
       for (const entry of entries) {
         const partial = [...lines, title, `- ${entry}`].join('\n');
         if (estimateTokens(partial) > maxTokens) break;
@@ -233,4 +220,53 @@ export function buildCareerPlaybookPriorBlocksDigest(
 
   const digest = lines.join('\n').trim();
   return digest.length > 0 ? digest : 'none';
+}
+
+/**
+ * Build the digest for the blocks accepted so far.
+ *
+ * Truncation is by priority, not by position: anti-goals and numeric
+ * commitments are the two things a later block contradicts in practice, so they
+ * survive; cadences and named parties are dropped first. Returns `'none'` for
+ * the first group, which has no predecessors.
+ */
+export function buildCareerPlaybookPriorBlocksDigest(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  currentBlockIds: readonly CareerPlaybookBlockId[],
+  options: BuildPriorBlocksDigestOptions = {}
+): string {
+  const maxTokens = options.maxTokens ?? CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS;
+  const hasPublishedPriorBlock = Object.keys(generatedBlocks).some(
+    blockId =>
+      !currentBlockIds.includes(blockId) &&
+      Boolean(generatedBlocks[blockId]?.content) &&
+      generatedBlocks[blockId]?.status === 'generated'
+  );
+
+  if (!hasPublishedPriorBlock || currentBlockIds.length === 0) return 'none';
+
+  // Every target must keep a visible section even when it has no eligible
+  // context. The shared ceiling is split by character budget so duplicated
+  // context across two legitimate views cannot exceed the original 1,500-token
+  // prompt contract.
+  const sectionOverheadCharacters =
+    currentBlockIds.reduce((sum, blockId) => sum + `For ${blockId} only:\n`.length, 0) +
+    Math.max(0, currentBlockIds.length - 1) * 2;
+  const contentCharacters = Math.max(4, maxTokens * 4 - sectionOverheadCharacters);
+  const targetMaxTokens = Math.max(
+    1,
+    Math.floor(contentCharacters / currentBlockIds.length / 4)
+  );
+
+  return currentBlockIds
+    .map(blockId => {
+      const digest = buildCareerPlaybookTargetPriorDigest(
+        generatedBlocks,
+        currentBlockIds,
+        blockId,
+        targetMaxTokens
+      );
+      return `For ${blockId} only:\n${digest}`;
+    })
+    .join('\n\n');
 }

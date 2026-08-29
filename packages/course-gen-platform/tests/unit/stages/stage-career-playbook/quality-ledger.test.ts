@@ -8,6 +8,7 @@ import {
   reconcileMetricLedgerSourceRefs,
 } from '@/stages/stage-career-playbook/nodes/quality-ledger';
 import { buildCareerPlaybookPriorBlocksDigest } from '@/stages/stage-career-playbook/nodes/prior-blocks-digest';
+import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
 import { parseRoleProfileSpecFromLLM } from '@/stages/stage-career-playbook/nodes/spec-builder';
 import type { CareerPlaybookWebResearchResult } from '@/stages/stage-career-playbook/rag/web-research';
 
@@ -191,16 +192,22 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(Math.ceil(digest.length / 4)).toBeLessThanOrEqual(120);
   });
 
-  it('includes only prior blocks sharing an audience with at least one target block', () => {
-    const digest = buildCareerPlaybookPriorBlocksDigest(
+  function targetSection(digest: string, blockId: string): string {
+    const marker = `For ${blockId} only:`;
+    const start = digest.indexOf(marker);
+    if (start < 0) return '';
+    const next = digest.indexOf('\nFor ', start + marker.length);
+    return digest.slice(start, next < 0 ? undefined : next);
+  }
+
+  it('isolates prior content per target inside real mixed-audience groups', () => {
+    const peopleTargetIds = getCareerPlaybookGroupSpec('group_3_people').blocks.map(
+      block => block.blockId
+    );
+    const peopleDigest = buildCareerPlaybookPriorBlocksDigest(
       {
-        block_8: {
-          content: '- Weekly tool adoption review: 42%',
-          status: 'generated',
-          attempt: 1,
-        },
-        block_9: {
-          content: '- Weekly automation review: 77%',
+        block_22: {
+          content: '- Weekly employee-only handoff review: 42%',
           status: 'generated',
           attempt: 1,
         },
@@ -210,16 +217,36 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
           attempt: 1,
         },
       },
-      ['block_12', 'block_21']
+      peopleTargetIds
     );
 
-    // block_8 shares HR with block_12. block_9 is employee-only and shares
-    // neither HR (block_12) nor manager (block_21).
-    expect(digest).toContain('block_8: Weekly tool adoption review: 42%');
-    expect(digest).not.toContain('block_9');
-    expect(digest).not.toContain('77%');
-    expect(digest).not.toContain('Draft mission');
-    expect(digest).not.toContain('99%');
+    expect(targetSection(peopleDigest, 'block_9')).toContain(
+      'block_22: Weekly employee-only handoff review: 42%'
+    );
+    expect(targetSection(peopleDigest, 'block_12')).not.toContain('block_22');
+    expect(targetSection(peopleDigest, 'block_12')).not.toContain('42%');
+    expect(peopleDigest).not.toContain('Draft mission');
+
+    const wrapTargetIds = getCareerPlaybookGroupSpec('group_6_wrap').blocks.map(
+      block => block.blockId
+    );
+    const wrapDigest = buildCareerPlaybookPriorBlocksDigest(
+      {
+        block_12: {
+          content: '- Monthly HR-only candidate calibration: 77%',
+          status: 'generated',
+          attempt: 1,
+        },
+      },
+      wrapTargetIds
+    );
+
+    expect(targetSection(wrapDigest, 'block_26')).toContain(
+      'block_12: Monthly HR-only candidate calibration: 77%'
+    );
+    expect(targetSection(wrapDigest, 'block_22')).not.toContain('block_12');
+    expect(targetSection(wrapDigest, 'block_22')).not.toContain('77%');
+    expect(Math.ceil(wrapDigest.length / 4)).toBeLessThanOrEqual(1_500);
   });
 });
 

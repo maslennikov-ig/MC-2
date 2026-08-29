@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { END } from '@langchain/langgraph';
 import type {
   CareerPlaybookBlockId,
@@ -16,6 +16,33 @@ import { CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS } from '@/stages/stage-
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
 import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
 import type { CareerPlaybookGraphStateType } from '@/stages/stage-career-playbook/state';
+
+const { generateEmbeddingsMock } = vi.hoisted(() => ({
+  generateEmbeddingsMock: vi.fn(),
+}));
+
+vi.mock('@/shared/embeddings/jina-client', () => ({
+  generateEmbeddings: generateEmbeddingsMock,
+}));
+
+let embeddingByText = new Map<string, number[]>();
+
+beforeEach(() => {
+  embeddingByText = new Map<string, number[]>();
+  generateEmbeddingsMock.mockReset();
+  generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+    texts.map(text => {
+      const existing = embeddingByText.get(text);
+      if (existing) return existing;
+      const index = embeddingByText.size;
+      const embedding = Array.from({ length: 768 }, (_unused, coordinate) =>
+        index === coordinate ? 1 : 0
+      );
+      embeddingByText.set(text, embedding);
+      return embedding;
+    })
+  );
+});
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -258,6 +285,54 @@ describe('Career Playbook graph', () => {
     expect(graphResult.finalMarkdown).toContain('```mermaid');
     expect(result.judgeVerdicts[0]?.pass).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  it('cannot reach graph completion when the final semantic provider is exhausted', async () => {
+    generateEmbeddingsMock.mockImplementation(
+      (
+        texts: string[],
+        _task: string,
+        _costContext: unknown,
+        onUsage?: (usage: { model: string; totalTokens: number; documentCount: number }) => void
+      ) => {
+        onUsage?.({
+          model: 'jina-embeddings-v3',
+          totalTokens: 321,
+          documentCount: texts.length,
+        });
+        throw new Error('Jina quota exhausted after bounded retries');
+      }
+    );
+    const runtime = {
+      renderPrompt: vi.fn().mockImplementation((promptKey: string) => Promise.resolve(promptKey)),
+      invokeLLM: vi.fn().mockImplementation((prompt: string) =>
+        Promise.resolve({
+          content:
+            prompt === 'career_playbook_spec_builder'
+              ? JSON.stringify(roleProfileSpec)
+              : (groupMarkdownByPromptKey[prompt] ?? JSON.stringify({ pass: true, score: 95 })),
+          model: 'mock-career-model',
+          inputTokens: 10,
+          outputTokens: 20,
+          costUsd: 0.001,
+        })
+      ),
+    };
+    const graph = createCareerPlaybookGraph({
+      runtime,
+      specBuilder: { webResearch: { client: () => Promise.resolve([]) } },
+    });
+
+    await expect(graph.invoke(initialGraphState())).rejects.toMatchObject({
+      name: 'CareerPlaybookSemanticRepetitionProviderError',
+      message: expect.stringContaining('Jina quota exhausted after bounded retries'),
+      nodeCosts: [
+        expect.objectContaining({
+          node: 'semanticRepetition',
+          input_tokens: 321,
+        }),
+      ],
+    });
   });
 
   it('runs the cross-block judge immediately after each group before advancing', async () => {

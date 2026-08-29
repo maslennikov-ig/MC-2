@@ -341,13 +341,27 @@ ${'This long paragraph describes a repeated workflow for the manager audience on
     );
   });
 
-  it('degrades visibly to the existing deterministic checks when Jina fails', async () => {
-    generateEmbeddingsMock.mockRejectedValue(new Error('Jina unavailable'));
+  it('fails the final judge closed and carries paid receipts when Jina is exhausted', async () => {
+    generateEmbeddingsMock.mockImplementation(
+      (
+        texts: string[],
+        _task: string,
+        _costContext: unknown,
+        onUsage?: (usage: { model: string; totalTokens: number; documentCount: number }) => void
+      ) => {
+        onUsage?.({
+          model: 'jina-embeddings-v3',
+          totalTokens: 200,
+          documentCount: texts.length,
+        });
+        throw new Error('Jina unavailable after retries');
+      }
+    );
     const node = createCrossBlockJudgeNode({
       useLLMJudge: false,
     });
 
-    const update = await node({
+    const result = node({
       playbookId: 'playbook-semantic-provider-failure',
       userId: 'user-1',
       organizationId: 'org-1',
@@ -365,10 +379,24 @@ ${'This long paragraph describes a repeated workflow for the manager audience on
       currentNode: 'crossBlockJudge',
     });
 
-    expect(update.lastJudgeVerdict).toMatchObject({ pass: true, needs_regeneration: [] });
-    expect(update.warnings).toEqual([
-      expect.stringContaining('semantic repetition checks unavailable: Jina unavailable'),
-    ]);
+    await expect(result).rejects.toMatchObject({
+      name: 'CareerPlaybookSemanticRepetitionProviderError',
+      message: expect.stringContaining(
+        'semantic repetition checks unavailable: Jina unavailable after retries'
+      ),
+      warnings: [
+        expect.stringContaining(
+          'semantic repetition checks unavailable: Jina unavailable after retries'
+        ),
+      ],
+      nodeCosts: [
+        expect.objectContaining({
+          node: 'semanticRepetition',
+          input_tokens: 200,
+          provider_name: 'jina',
+        }),
+      ],
+    });
   });
 
   it('flags Phase 3 minimum item failures for anti-goals, decisions, and failure modes', async () => {

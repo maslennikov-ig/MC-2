@@ -84,7 +84,7 @@ const groupContractVariables = [
   },
   {
     name: 'prior_blocks_digest',
-    description: 'Anti-goals, numeric commitments and cadences already published',
+    description: 'Per-output-block anti-goals, commitments and cadences already published',
     required: true,
   },
   {
@@ -129,7 +129,9 @@ DATES — today is {{generated_on}}:
 - Never write an absolute calendar year in a plan, a training record, or a milestone.
 
 CONSISTENCY — do not contradict what is already published:
-- The digest below lists anti-goals, decision authority, numeric commitments, and cadences that earlier blocks already state.
+- The digest below is split into explicit \`For block_N only:\` subsections.
+- When writing block_N, use ONLY the \`For block_N only:\` subsection; ignore every other block's subsection even though it is visible in the prompt.
+- Each subsection lists only anti-goals, decision authority, numeric commitments, and cadences from earlier blocks that share at least one reader with that output block.
 - Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
 
 AUTHORITY — Block 5 is the single source of decision authority:
@@ -159,7 +161,7 @@ Evidence ledger (the only citable sources):
 Block audiences (write directly to every listed reader for that block):
 {{block_audiences_md}}
 
-Already published content (do not contradict):
+Already published content (use only the subsection matching the output block):
 {{prior_blocks_digest}}`;
 
 export const careerPlaybookPrompts: HardcodedPrompt[] = [

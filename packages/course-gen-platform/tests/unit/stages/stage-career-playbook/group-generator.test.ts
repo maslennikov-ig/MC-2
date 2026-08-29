@@ -193,6 +193,19 @@ describe('Career Playbook group generator', () => {
     ]);
   });
 
+  it('tells every output block to use only its matching prior-content section', () => {
+    const prompt = careerPlaybookPrompts.find(
+      entry => entry.promptKey === 'career_playbook_group_3_people'
+    );
+
+    expect(prompt?.promptTemplate).toContain(
+      'When writing block_N, use ONLY the `For block_N only:` subsection'
+    );
+    expect(prompt?.promptTemplate).toContain(
+      "ignore every other block's subsection even though it is visible in the prompt"
+    );
+  });
+
   it('registers group 3-6 prompts with headings that match their group specs', () => {
     for (const groupKey of [
       'group_3_people',

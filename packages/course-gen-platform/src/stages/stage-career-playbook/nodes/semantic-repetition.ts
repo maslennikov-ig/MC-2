@@ -42,7 +42,12 @@ export interface EvaluateCareerPlaybookSemanticRepetitionOptions {
 }
 
 export class CareerPlaybookSemanticRepetitionProviderError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  constructor(
+    message: string,
+    options?: ErrorOptions,
+    readonly nodeCosts: CareerPlaybookNodeCost[] = [],
+    readonly warnings: string[] = []
+  ) {
     super(message, options);
     this.name = 'CareerPlaybookSemanticRepetitionProviderError';
   }

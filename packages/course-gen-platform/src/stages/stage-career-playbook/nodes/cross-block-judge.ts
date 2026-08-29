@@ -81,7 +81,7 @@ export interface RunDeterministicChecksInput {
    * specs carry no ledgers and must still judge cleanly.
    */
   contract?: CareerPlaybookQualityCheckContext;
-  /** Disable only for the explicit provider-failure fallback in the judge node. */
+  /** Disable for bounded group windows; the full-document final judge must run this gate. */
   semanticRepetition?: boolean;
   onSemanticRepetitionCost?: (cost: CareerPlaybookNodeCost) => void;
   semanticEmbeddingCache?: CareerPlaybookSemanticEmbeddingCache;
@@ -544,7 +544,6 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       : undefined;
 
     const nodeCosts: CareerPlaybookNodeCost[] = [];
-    const semanticWarnings: string[] = [];
     const deterministicInput: RunDeterministicChecksInput = {
       generatedBlocks: currentBlocks,
       contentLanguage: state.language,
@@ -559,11 +558,13 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       deterministicVerdict = await runCareerPlaybookDeterministicChecks(deterministicInput);
     } catch (error) {
       if (!(error instanceof CareerPlaybookSemanticRepetitionProviderError)) throw error;
-      semanticWarnings.push(`semantic repetition checks unavailable: ${error.message}`);
-      deterministicVerdict = await runCareerPlaybookDeterministicChecks({
-        ...deterministicInput,
-        semanticRepetition: false,
-      });
+      const warning = `semantic repetition checks unavailable: ${error.message}`;
+      throw new CareerPlaybookSemanticRepetitionProviderError(
+        warning,
+        { cause: error },
+        nodeCosts,
+        [warning]
+      );
     }
 
     let verdict = deterministicVerdict;
@@ -576,7 +577,6 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           lastJudgedBlockIds: windowBlockIds,
           nodeCosts,
           errors: ['crossBlockJudge failed: roleProfileSpec is missing'],
-          ...(semanticWarnings.length > 0 ? { warnings: semanticWarnings } : {}),
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
       }
@@ -624,7 +624,6 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           lastJudgedBlockIds: windowBlockIds,
           nodeCosts,
           warnings: [
-            ...semanticWarnings,
             `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
@@ -650,9 +649,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       lastJudgeVerdict: capped.verdict,
       lastJudgedBlockIds: windowBlockIds,
       nodeCosts,
-      ...(semanticWarnings.length > 0 || capped.warnings.length > 0
-        ? { warnings: [...semanticWarnings, ...capped.warnings] }
-        : {}),
+      ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',
     };
   };
