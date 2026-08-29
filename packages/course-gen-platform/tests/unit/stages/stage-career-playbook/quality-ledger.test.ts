@@ -190,6 +190,37 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(digest).toContain('Do not micromanage individual activity');
     expect(Math.ceil(digest.length / 4)).toBeLessThanOrEqual(120);
   });
+
+  it('includes only prior blocks sharing an audience with at least one target block', () => {
+    const digest = buildCareerPlaybookPriorBlocksDigest(
+      {
+        block_8: {
+          content: '- Weekly tool adoption review: 42%',
+          status: 'generated',
+          attempt: 1,
+        },
+        block_9: {
+          content: '- Weekly automation review: 77%',
+          status: 'generated',
+          attempt: 1,
+        },
+        block_1: {
+          content: '- Draft mission confidence: 99%',
+          status: 'generating',
+          attempt: 1,
+        },
+      },
+      ['block_12', 'block_21']
+    );
+
+    // block_8 shares HR with block_12. block_9 is employee-only and shares
+    // neither HR (block_12) nor manager (block_21).
+    expect(digest).toContain('block_8: Weekly tool adoption review: 42%');
+    expect(digest).not.toContain('block_9');
+    expect(digest).not.toContain('77%');
+    expect(digest).not.toContain('Draft mission');
+    expect(digest).not.toContain('99%');
+  });
 });
 
 /**

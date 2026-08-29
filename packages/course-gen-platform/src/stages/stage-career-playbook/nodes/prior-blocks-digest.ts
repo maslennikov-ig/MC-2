@@ -16,6 +16,7 @@
  */
 
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
+import { careerPlaybookBlockSharesAnyTargetAudience } from './audience-scope';
 
 /** Token ceiling for the digest, applied by priority rather than by truncation at the tail. */
 export const CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS = 1_500;
@@ -178,17 +179,25 @@ export function buildCareerPlaybookPriorBlocksDigest(
 ): string {
   const maxTokens = options.maxTokens ?? CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS;
   const priorBlockIds = Object.keys(generatedBlocks).filter(
-    blockId => !currentBlockIds.includes(blockId) && Boolean(generatedBlocks[blockId]?.content)
+    blockId =>
+      !currentBlockIds.includes(blockId) &&
+      Boolean(generatedBlocks[blockId]?.content) &&
+      generatedBlocks[blockId]?.status === 'generated' &&
+      careerPlaybookBlockSharesAnyTargetAudience(blockId, currentBlockIds)
   );
 
   if (priorBlockIds.length === 0) return 'none';
 
-  const antiGoals = collectAntiGoals(generatedBlocks);
+  const eligiblePriorBlocks = Object.fromEntries(
+    priorBlockIds.map(blockId => [blockId, generatedBlocks[blockId]])
+  );
+
+  const antiGoals = collectAntiGoals(eligiblePriorBlocks);
   const authority = currentBlockIds.includes('block_5')
     ? []
-    : collectDecisionAuthority(generatedBlocks);
-  const commitments = collectNumericCommitments(generatedBlocks, priorBlockIds);
-  const cadences = collectCadences(generatedBlocks, priorBlockIds);
+    : collectDecisionAuthority(eligiblePriorBlocks);
+  const commitments = collectNumericCommitments(eligiblePriorBlocks, priorBlockIds);
+  const cadences = collectCadences(eligiblePriorBlocks, priorBlockIds);
 
   // Highest-priority sections first so the trim below drops the least load-bearing
   // context rather than whatever happens to be last.

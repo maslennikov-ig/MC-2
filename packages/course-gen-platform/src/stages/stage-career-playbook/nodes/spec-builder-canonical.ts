@@ -5,10 +5,12 @@ import {
 } from '@megacampus/shared-types';
 import {
   CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS,
+  type CareerPlaybookCanonicalBlockTopic,
   findCanonicalBlocksForTopic,
   normalizeTopicKey,
   topicMatchesBlock,
 } from '@/shared/prompts/career-playbook-block-topics';
+import { careerPlaybookBlocksShareAudience } from './audience-scope';
 
 type CareerPlaybookBlockBoundary = CareerPlaybookRoleProfileSpec['block_boundaries'][string];
 
@@ -97,6 +99,23 @@ function dedupeByTopicKey(topics: string[]): string[] {
   return result;
 }
 
+export function canonicalBlockAliasesOverlap(
+  left: CareerPlaybookCanonicalBlockTopic,
+  right: CareerPlaybookCanonicalBlockTopic
+): boolean {
+  const leftAliases = new Set(left.aliases.map(normalizeTopicKey).filter(Boolean));
+  return right.aliases.some(alias => leftAliases.has(normalizeTopicKey(alias)));
+}
+
+function buildCanonicalDoNotRepeat(entry: CareerPlaybookCanonicalBlockTopic): string[] {
+  return CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS.filter(
+    other =>
+      other.blockId !== entry.blockId &&
+      careerPlaybookBlocksShareAudience(entry.blockId, other.blockId) &&
+      !canonicalBlockAliasesOverlap(entry, other)
+  ).map(other => other.primaryTopic);
+}
+
 export interface NormalizeCanonicalBlockTopicsResult {
   spec: CareerPlaybookRoleProfileSpec;
   changedBlockIds: string[];
@@ -106,7 +125,8 @@ export interface NormalizeCanonicalBlockTopicsResult {
  * Rebuild block_boundaries onto the canonical 26-block layout. Every content
  * block gets its canonical topic as the anchor primary topic; role-specific
  * wording that still belongs to the block is preserved, topics that belong to
- * another block id are dropped, and do_not_repeat keeps only cross-block guards.
+ * another block id are dropped, and do_not_repeat is rebuilt from canonical
+ * audience and alias data without reading the model-produced list.
  * The result is canonical by construction and re-validated against the schema;
  * on any unexpected failure the original (already valid) spec is returned so
  * normalization can never produce an invalid spec.
@@ -121,16 +141,12 @@ export function normalizeRoleProfileSpecToCanonicalBlockTopics(
   for (const entry of CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS) {
     const previous = previousBoundaries[entry.blockId];
     const previousPrimary = previous?.primary_topics ?? [];
-    const previousDoNotRepeat = previous?.do_not_repeat ?? [];
-
     const anchorKey = normalizeTopicKey(entry.primaryTopic);
     const keptRefinements = previousPrimary.filter(
       topic => topicMatchesBlock(topic, entry) && normalizeTopicKey(topic) !== anchorKey
     );
     const primary_topics = dedupeByTopicKey([entry.primaryTopic, ...keptRefinements]);
-    const do_not_repeat = dedupeByTopicKey(
-      previousDoNotRepeat.filter(topic => !topicMatchesBlock(topic, entry))
-    );
+    const do_not_repeat = buildCanonicalDoNotRepeat(entry);
 
     nextBoundaries[entry.blockId] = { primary_topics, do_not_repeat };
 
