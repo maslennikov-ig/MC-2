@@ -4,6 +4,7 @@ import {
   CareerPlaybookJudgeIssueSchema,
   CareerPlaybookJudgeVerdictSchema,
   isCareerPlaybookJudgeCriticalCategory,
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookJudgeIssue,
@@ -49,6 +50,7 @@ import {
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
 import { getCareerPlaybookBusinessContext } from './business-context';
+import { formatCareerPlaybookBlockAudiences } from './audience-scope';
 import {
   CareerPlaybookSemanticEmbeddingCache,
   CareerPlaybookSemanticRepetitionProviderError,
@@ -632,6 +634,13 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         const prompt = await runtime.renderPrompt(JUDGE_PROMPT_KEY, {
           group_id: currentBlockIds.join(', '),
           spec_json: JSON.stringify(state.roleProfileSpec, null, 2),
+          // Every canonical block, not just this window: the judge compares the
+          // current group against previously generated groups too, so it needs
+          // the full block-to-reader map to tell a same-view contradiction from
+          // allowed repetition between views with no shared reader.
+          block_audiences_md: formatCareerPlaybookBlockAudiences(
+            CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => block.blockId)
+          ),
           metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
             getCareerPlaybookMetricLedger(state.roleProfileSpec)
           ),

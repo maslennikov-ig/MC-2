@@ -108,7 +108,8 @@ const GROUP_OUTPUT_CONTRACT = `Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
+- RoleProfileSpec.block_boundaries is an ownership map, not a repetition budget: write everything your own subject genuinely needs, in full.
+- When a topic under your block's do_not_repeat belongs to another block, do not re-derive or re-explain that model — name it, point to the block that owns it, and move on.
 
 NUMBERS — the metric ledger is the only source of numeric truth:
 - Reproduce every value and traffic-light threshold from the metric ledger VERBATIM, including its review period.
@@ -132,7 +133,7 @@ DATES — today is {{generated_on}}:
 CONSISTENCY — do not contradict what is already published:
 - The digest below is split into explicit \`For block_N only:\` subsections.
 - When writing block_N, use ONLY the \`For block_N only:\` subsection; ignore every other block's subsection even though it is visible in the prompt.
-- Each subsection lists only anti-goals, decision authority, numeric commitments, and cadences from earlier blocks that share at least one reader with that output block.
+- Each subsection lists anti-goals, decision authority, numeric commitments, and cadences from every earlier block, regardless of reader: these four are consistency constraints on the single assembled document, not readership-scoped guidance.
 - Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
 
 AUTHORITY — Block 5 is the single source of decision authority:
@@ -321,8 +322,6 @@ Critical requirements:
   duties; ownership areas go into block_3 responsibility zones; strategic ties go
   into block_20 business goals. Never invent a new block or repurpose a block id
   for a role emphasis such as forecasting, compliance, or career pathing.
-- Put each topic in do_not_repeat only when another block id owns it; never list a
-  block's own canonical topic in its own do_not_repeat.
 - Extract anti_goals and failure_patterns explicitly.
 - Build metric_ledger: exactly one entry per metric in focus_areas.primary_kpis, each with a
   concrete target and green/yellow/red thresholds plus a review period. This ledger becomes the
@@ -661,7 +660,7 @@ ${GROUP_USER_SECTION}`,
 Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
 
 Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these categories:
-- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
+- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A repeated topic is critical ONLY when block_audiences_md shows the two blocks share at least one reader — the same material appearing in blocks with no shared reader is correct (the Role Guide's views are read separately) and must never be flagged. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
 - "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
 - "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
@@ -701,6 +700,9 @@ Today is {{generated_on}}.
 RoleProfileSpec:
 {{spec_json}}
 
+Block audiences (who reads each block; use this to tell a same-view contradiction from allowed repetition between views):
+{{block_audiences_md}}
+
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
 
@@ -715,6 +717,11 @@ Current group output:
     variables: [
       { name: 'group_id', description: 'Current group or block ids under review', required: true },
       specJsonVariable,
+      {
+        name: 'block_audiences_md',
+        description: 'Canonical readers for every block in the Role Guide',
+        required: true,
+      },
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
