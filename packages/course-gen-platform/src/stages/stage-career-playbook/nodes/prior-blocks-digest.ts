@@ -17,8 +17,19 @@
 
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
 
-/** Token ceiling for the digest, applied by priority rather than by truncation at the tail. */
-export const CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS = 1_500;
+/**
+ * Token ceiling for the digest, applied by priority rather than by truncation at
+ * the tail.
+ *
+ * 3,500 is the smallest measured ceiling at which numeric commitments — the
+ * second thing section 5 of the quality contract says is never dropped — reach
+ * at least 97% in every group across the 14 stored completed playbooks. At 1,500
+ * the last group delivered 40% of them and no cadence at all. The whole digest
+ * costs about 3,000 more input tokens per playbook, spread over five generator
+ * calls. A larger ceiling buys only cadences, the lowest priority of the four,
+ * and stops binding at all — which is not a ceiling.
+ */
+export const CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS = 3_500;
 
 /** Rough token estimate consistent with the runtime's length/4 heuristic. */
 function estimateTokens(text: string): number {
@@ -52,9 +63,56 @@ function isHeading(line: string): boolean {
   return /^#{1,6}\s/.test(line);
 }
 
-const NUMERIC_COMMITMENT = /(?:^|[\s(])(?:[<>]=?|≥|≤|±|\+\/-)?\s*\d+(?:[.,]\d+)?\s*(?:%|x|×|ч|h)?/i;
+/**
+ * A number that can be contradicted: one carrying a comparator, a unit, a
+ * currency or a scale.
+ *
+ * The previous rule accepted any line containing a digit, which on the 14 stored
+ * playbooks was 33% of every line — table row ordinals, list numbering, clock
+ * times, source ids. Those crowded the real thresholds out of a shared ceiling.
+ * It also missed a threshold written in bold (`**>=90%**`), because it required
+ * whitespace before the comparator and found an asterisk.
+ */
+const NUMERIC_COMMITMENT_SIGNAL = new RegExp(
+  [
+    // A comparator on either side of the number.
+    '(?:[<>]=?|≥|≤|±)\\s*\\d',
+    '\\d(?:[.,]\\d+)?\\s*(?:[<>]=?|≥|≤)',
+    // A number carrying a unit.
+    '\\d(?:[.,]\\d+)?\\s*(?:%|[xх×](?![\\p{L}])|ч(?![\\p{L}])|h(?![\\p{L}])|мин|min(?![\\p{L}])|hours?|days?|дн\\p{L}*|недел\\p{L}*|месяц\\p{L}*|балл\\p{L}*|points?)',
+    '[$€₽]\\s*\\d|\\d\\s*[$€₽]',
+    // A scale: "4 из 5", "4 out of 5".
+    '\\d\\s*(?:из|out of)\\s*\\d',
+    // A comparator spelled as a word.
+    '(?:не менее|не более|не ниже|не выше|не позднее|минимум|максимум|at least|at most|no more than|no less than|below|above|under|over|within)\\s+\\D{0,4}\\d',
+  ].join('|'),
+  'iu'
+);
+
+/** Numbers that are structure, not commitment, and must not decide the line. */
+function withoutStructuralNumbers(line: string): string {
+  return line
+    .replace(/\bblocks?\s*\d+/giu, ' ')
+    .replace(/\bблок\p{L}*\s*\d+/giu, ' ')
+    .replace(/\[S\d+\]/g, ' ')
+    .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
+    .replace(/^\|?\s*\*{0,2}\d+\*{0,2}\s*(?=\|)/u, ' ')
+    .replace(/^\d+[.)]\s/u, ' ');
+}
+
+function hasNumericCommitment(line: string): boolean {
+  return NUMERIC_COMMITMENT_SIGNAL.test(withoutStructuralNumbers(line));
+}
+
+/**
+ * `\b` is an ASCII word boundary, so it never matched a Cyrillic stem: for two
+ * months every Russian playbook shipped an empty cadence section. The Russian
+ * entries are stems that must keep matching their inflected endings
+ * («ежедневно», «ежеквартальный»), so only the English words take a closing
+ * boundary.
+ */
 const CADENCE =
-  /\b(daily|weekly|monthly|quarterly|ежедневн|еженедельн|ежемесячн|ежекварт|каждый день|каждую неделю)\b/i;
+  /(?<![\p{L}\p{N}])(?:(?:daily|weekly|monthly|quarterly)(?![\p{L}\p{N}])|ежедневн|еженедельн|ежемесячн|ежекварт|каждый день|каждую неделю)/iu;
 
 function collectAntiGoals(
   blocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
@@ -83,7 +141,7 @@ function collectNumericCommitments(
 
     for (const line of contentLines(content)) {
       if (isHeading(line) || isTableSeparator(line)) continue;
-      if (!NUMERIC_COMMITMENT.test(line)) continue;
+      if (!hasNumericCommitment(line)) continue;
 
       const statement = toStatement(line);
       if (statement.length < 8 || statement.length > 220) continue;

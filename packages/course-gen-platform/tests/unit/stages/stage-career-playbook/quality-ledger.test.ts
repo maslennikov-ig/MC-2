@@ -7,7 +7,10 @@ import {
   normalizeCareerPlaybookMetricLedger,
   reconcileMetricLedgerSourceRefs,
 } from '@/stages/stage-career-playbook/nodes/quality-ledger';
-import { buildCareerPlaybookPriorBlocksDigest } from '@/stages/stage-career-playbook/nodes/prior-blocks-digest';
+import {
+  CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS,
+  buildCareerPlaybookPriorBlocksDigest,
+} from '@/stages/stage-career-playbook/nodes/prior-blocks-digest';
 import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
 import { parseRoleProfileSpecFromLLM } from '@/stages/stage-career-playbook/nodes/spec-builder';
 import type { CareerPlaybookWebResearchResult } from '@/stages/stage-career-playbook/rag/web-research';
@@ -266,7 +269,9 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(targetSection(wrapDigest, 'block_22')).toContain(
       'block_12: Monthly HR-only candidate calibration: 77%'
     );
-    expect(Math.ceil(wrapDigest.length / 4)).toBeLessThanOrEqual(1_500);
+    expect(Math.ceil(wrapDigest.length / 4)).toBeLessThanOrEqual(
+      CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS
+    );
   });
 });
 
