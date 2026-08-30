@@ -984,6 +984,45 @@ interface CadenceObservation {
 }
 
 /**
+ * The rhythm the guide actually runs on when no ledger row governs it.
+ *
+ * Most blocks win, and a tie goes to the block that publishes earliest — the
+ * digest hands every later block what earlier ones committed to, so the earliest
+ * statement is the one the rest were written against. Majority rather than
+ * earliest-outright, because a single early slip should not send four correct
+ * blocks back for rewriting.
+ */
+function selectConsensusCadence(observations: readonly CadenceObservation[]): {
+  cadence: string;
+  firstBlockId: string;
+} {
+  const byCadence = new Map<string, CadenceObservation[]>();
+  for (const observation of observations) {
+    byCadence.set(observation.cadence, [
+      ...(byCadence.get(observation.cadence) ?? []),
+      observation,
+    ]);
+  }
+
+  const ranked = [...byCadence.entries()].sort(([, left], [, right]) => {
+    if (left.length !== right.length) return right.length - left.length;
+    return earliestPosition(left) - earliestPosition(right);
+  });
+
+  const [cadence, winners] = ranked[0];
+  return {
+    cadence,
+    firstBlockId: [...winners].sort(
+      (left, right) => blockPosition(left.blockId) - blockPosition(right.blockId)
+    )[0].blockId,
+  };
+}
+
+function earliestPosition(observations: readonly CadenceObservation[]): number {
+  return Math.min(...observations.map(entry => blockPosition(entry.blockId)));
+}
+
+/**
  * Flag every block whose rhythm for a recurring commitment differs from the
  * guide's rhythm for it.
  *
@@ -1036,13 +1075,11 @@ export function validateCadenceConsistency(
     if (!observations?.length) continue;
 
     const ledgerEntry = findCadenceLedgerEntry(duty, cadenceLedger);
-    const firstPublished = [...observations].sort(
-      (left, right) => blockPosition(left.blockId) - blockPosition(right.blockId)
-    )[0];
-    const canonical = ledgerEntry?.cadence ?? firstPublished.cadence;
+    const consensus = selectConsensusCadence(observations);
+    const canonical = ledgerEntry?.cadence ?? consensus.cadence;
     const authority = ledgerEntry
       ? 'the cadence ledger, which is the single source of rhythm for this guide'
-      : `${firstPublished.blockId}, which publishes it first`;
+      : `the rest of the guide, led by ${consensus.firstBlockId}`;
 
     const deviatingCadences = new Map<string, string[]>();
     for (const observation of observations) {
@@ -1054,12 +1091,16 @@ export function validateCadenceConsistency(
     }
     if (deviatingCadences.size === 0) continue;
 
+    const contested = observations.length > deviatingCadences.size;
+
     for (const [blockId, cadences] of deviatingCadences) {
       issues.push(
         issue(
           blockId,
           'contradiction',
-          `${blockId} states the ${duty.duty} as ${cadences.join(' and ')}, but this guide runs it ${canonical} per ${authority}. A reader holding both blocks cannot plan a week against two answers.`,
+          `${blockId} states the ${duty.duty} as ${cadences.join(' and ')}, but this guide runs it ${canonical} per ${authority}.${
+            contested ? ' A reader holding both blocks cannot plan a week against two answers.' : ''
+          }`,
           `Rewrite every ${duty.duty} mention in ${blockId} to ${canonical}. Change nothing in the other blocks: ${canonical} is the published rhythm and this block is the deviation.`
         )
       );

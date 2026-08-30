@@ -776,6 +776,37 @@ describe('validateCadenceConsistency', () => {
     expect(issues[0].description).toContain('weekly');
   });
 
+  // With no ledger row the guide's own consensus decides. Majority, not simply
+  // "whoever spoke first": one early slip must not send four correct blocks back.
+  it('does not rewrite four agreeing blocks because the earliest one slipped', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'The quarterly pipeline review closes the loop.',
+        block_13: 'Weekly pipeline review, Tuesday morning.',
+        block_14: 'Join the weekly pipeline review from week 2.',
+        block_16: 'Step 3: the weekly pipeline review.',
+        block_21: 'A missed weekly pipeline review is the first signal.',
+      }),
+      context()
+    );
+
+    expect(issues.map(item => item.block_id)).toEqual(['block_3']);
+    expect(issues[0].description).toContain('weekly');
+  });
+
+  it('breaks a tie in favour of the block that publishes first', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'The weekly pipeline review closes the loop.',
+        block_16: 'Step 3: the quarterly pipeline review.',
+      }),
+      context()
+    );
+
+    expect(issues.map(item => item.block_id)).toEqual(['block_16']);
+    expect(issues[0].description).toContain('weekly');
+  });
+
   it('accepts a rhythm that matches the ledger in every block', () => {
     const issues = validateCadenceConsistency(
       blocks({
