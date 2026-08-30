@@ -349,6 +349,40 @@ describe('parseRoleProfileSpecFromLLM metric ledger resilience', () => {
     expect(spec.generated_on).toBeUndefined();
   });
 
+  // Same tolerance for the cadence ledger, which is additive: a malformed row
+  // must never cost the 26 blocks or buy a repair call.
+  it('keeps a cadence row and tolerates the model naming the fields differently', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...baseSpec,
+        cadence_ledger: [
+          { key: 'pipeline_review', label: 'Pipeline review', cadence: 'weekly' },
+          { name: 'Forecast review', frequency: 'monthly', responsible: 'Manager' },
+        ],
+      })
+    );
+
+    expect(spec.cadence_ledger).toHaveLength(2);
+    expect(spec.cadence_ledger[1]).toMatchObject({
+      key: 'Forecast review',
+      label: 'Forecast review',
+      cadence: 'monthly',
+      owner: 'Manager',
+    });
+  });
+
+  it('drops a malformed cadence row instead of failing the whole spec', () => {
+    const spec = parseRoleProfileSpecFromLLM(
+      JSON.stringify({ ...baseSpec, cadence_ledger: ['weekly pipeline review', { cadence: 7 }] })
+    );
+
+    expect(spec.cadence_ledger).toEqual([]);
+  });
+
+  it('defaults to an empty cadence ledger for a spec that predates the field', () => {
+    expect(parseRoleProfileSpecFromLLM(JSON.stringify(baseSpec)).cadence_ledger).toEqual([]);
+  });
+
   it('survives an unknown provenance by treating it as an assumption', () => {
     const spec = parseRoleProfileSpecFromLLM(
       JSON.stringify({

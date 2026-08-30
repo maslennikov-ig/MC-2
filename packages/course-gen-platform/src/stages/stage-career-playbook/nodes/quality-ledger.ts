@@ -167,8 +167,10 @@ export function normalizeCareerPlaybookCadenceLedger(
   return [...byKey.values()];
 }
 
-const CADENCE_LEDGER_EMPTY =
-  'none — no recurring commitment was declared for this role, so state each rhythm once and never restate it differently elsewhere';
+// Data, not instruction: the rule about rhythms lives in the RHYTHMS section of
+// the contract, and a sentence phrased as guidance here is one more sentence the
+// model can mistake for content worth passing on to the reader.
+const CADENCE_LEDGER_EMPTY = 'none — no recurring commitment was declared for this role';
 
 /** Render the cadence ledger as the markdown table the block prompts quote from. */
 export function formatCareerPlaybookCadenceLedgerForPrompt(
