@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-29. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-30. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries. Durable traps
 live in `.codex/repository-failure-modes.md`; this file says what still binds work.
@@ -11,8 +11,9 @@ Accepted stage id: `mc2-1786710715922-25-db11a6c5`
 
 Role Guide audience views and measurable repetition are accepted on `develop` at `bf7de071f`.
 Canonical employee/manager/HR views contain 20/20/14 stored blocks and cover all 27 ids; persisted
-`final_markdown` remains full. Canonical `do_not_repeat`, per-target prior-block digests and the
-final-only 0.85 semantic gate are audience-scoped and provider failure is fail-closed. Against the
+`final_markdown` remains full. Canonical `do_not_repeat` and the final-only 0.85 semantic gate are
+audience-scoped and provider failure is fail-closed. The prior-blocks digest is **not** audience-
+scoped and is now **one section per group**, not one per target (see below). Against the
 14-playbook baseline, too-close rates fell from 8/6,594 (0.12%) to 0/471 and from 18/6,829 (0.26%)
 to 0/375. The accepted exact dev row carried 34 cost records, including two Jina rows with 49,026
 tokens / $0.0024513, and total cost $0.073384245. Root read all four documents; exact cleanup left
@@ -21,6 +22,17 @@ rejected; the owner authorized the successful second generation after `bf7de071f
 in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md` and
 `docs/career-playbook/2026-08-29-role-guide-audience-acceptance.md`. The stage also closes
 `mc2-1786710716114-26-01631777`.
+
+Three follow-ups closed on `develop` at `070b19865`, CI green with Deploy to Dev green on its own
+conclusion. `mc2-spkoj`: the acceptance measurer's `--mode evaluation` now reads the production
+catalogue, thresholds and paragraph splitter, so an owner checkbox reaches the script that grades a
+live playbook; baseline stays frozen. `mc2-akmx2`: the Jina 429 wait is a budget per
+`generateEmbeddings` call (300 s, one maximal Retry-After) instead of per batch, cutting the semantic
+gate's worst-case lock hold from ~4,500 s to 300 s. `mc2-4win5`: the prior-blocks digest spends its
+ceiling once per group. Measured on the 14 stored completed playbooks, `group_6_wrap` had been
+delivering 3% of the collected block 5 authority rows, no numeric commitments, and 66 of 84 targets
+lost a published anti-goal; it now delivers 100% and 100% at the same prompt cost. Nothing here is
+validated by a paid run — same block as `mc2-9d2ji`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
@@ -231,8 +243,14 @@ the branch it delivered, so a report naming a branch again means something reall
   (471 pairs, 0 at 0.85, max 0.8316; intra 375, 0, max 0.8096) — same English smoke fixture, so it
   is a fair control. Blocked on the owner: `docs/career-playbook/live-smoke-dev-run.md` step 1
   needs a browser JWT nobody else can mint.
-- `mc2-spkoj` / `mc2-akmx2` — the acceptance measurer keeps its own threshold and audience map
-  (copies verified identical, not linked); Jina 429 backoff is now up to 300s per attempt.
+- `mc2-539pz` — the digest's cadence regex uses `\b`, an ASCII word boundary, so it never matches
+  Russian: the "Cadences already promised" section is empty for every RU playbook. The same root
+  cause was fixed structurally for the decision-matrix header row in `7df7fc2d8`; the regex was left
+  alone because changing it changes what every RU digest collects and wants its own measurement.
+- `mc2-u3t9n` — after `7df7fc2d8` the digest delivers 100% of anti-goals and 100% of the block 5
+  authority matrix in every group, but late-group numeric commitments still fit only 16% of what is
+  collected. Most of that 16% denominator is `NUMERIC_COMMITMENT` matching any line with a digit;
+  narrow the collector before paying tokens to raise the 1,500-token ceiling.
 - `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
   average 22.5 of 25. The 028 plan promised 13–19. Not a defect (the run measured 0/471), but the
   selectivity question needs a paid A/B and is untouched until then.
