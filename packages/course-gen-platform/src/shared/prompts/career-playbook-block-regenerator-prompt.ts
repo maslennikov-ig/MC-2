@@ -39,8 +39,10 @@ Return only markdown for this one block.
   calendar year is allowed only in block 25.
 - References: this block is delivered inside a reader-specific guide. Name only the blocks listed
   under "Blocks this one may reference" below, in any wording. When the content you need lives
-  elsewhere, write it out here using the wording already published — never paraphrase an approval
-  level into different words.
+  elsewhere, carry across only the part this block needs — one threshold, one approval level, one
+  named owner — written for this block's readers. The framing may change; every number, threshold,
+  approval level, cadence and named party stays exactly as already published. If that part is
+  something these readers should not be handed, leave it out entirely.
 
 USER:
 RoleProfileSpec:

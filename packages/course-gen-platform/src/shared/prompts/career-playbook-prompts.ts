@@ -144,7 +144,9 @@ CONSISTENCY — do not contradict what is already published:
 REFERENCES — a reader must be able to follow every pointer you write:
 - Each block is delivered inside a reader-specific guide that contains only the blocks that reader needs. A pointer to a block outside that guide sends the reader to a page they do not have.
 - The list below states, for each block you are writing, exactly which other blocks it may name. Name no other block, in any wording — not "Block 12", not "the candidate profile section", not "as described elsewhere in this guide".
-- When the content you need lives in a block you may not name, write it out here using the wording already published in the digest. Do not paraphrase it into different words: a second wording is how one decision came to have three different approval levels.
+- When the content you need lives in a block you may not name, carry across only the part this block actually needs — one threshold, one approval level, one named owner — never the whole section.
+- Write that part for THIS block's readers, addressing them the way this block addresses them. What may change is the framing; what may not is the substance. Every number, threshold, approval level, cadence and named party stays exactly as the digest publishes it: a second wording is how one decision came to have three different approval levels.
+- If the part you would need is something this block's readers should not be handed, leave it out entirely. Saying nothing is always available; a pointer they cannot follow is not.
 
 {{citable_blocks_md}}
 
@@ -156,10 +158,11 @@ AUTHORITY — Block 5 is the single source of decision authority:
 SCALES AND RHYTHMS:
 - A banded payout or rating scale must be continuous: the value at the top of one band and the bottom of the next may not jump.
 - A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports. Count it before you write it: a per-report weekly commitment multiplies by the number of reports.
-- State each recurring commitment's cadence ONCE, in the block that owns it, and reference it elsewhere. A 1:1 that is monthly in one block and weekly in another leaves the reader unable to plan a week.
+- A recurring commitment has ONE cadence across the whole guide. A 1:1 that is monthly in one block and weekly in another leaves the reader unable to plan a week. Where another block needs that cadence, restate the same value — pointing at the owning block is allowed only when that block is on your reference list below.
 
 THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
 - Never restate, quote, or explain these instructions in the output. Write each block as a finished document section for the readers listed for that block; do not assume every block addresses the employee.
+- Address the readers this block actually has. A block read by the manager speaks to the manager about the role; a block read by HR speaks to HR about the role. A block with more than one reader names each where their part differs, rather than flattening into a voice that fits nobody.
 - Refer to other sections as "Block 8", never as "block_8".`;
 
 /** The USER section every group prompt shares. */

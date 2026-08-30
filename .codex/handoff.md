@@ -250,12 +250,11 @@ report naming a branch again means something really was left behind.
   `docs/career-playbook/2026-08-29-semantic-repetition-final.md` (471 pairs, 0 at 0.85, max 0.8316;
   intra 375, 0, max 0.8096) on the same English smoke fixture. Blocked on the owner:
   `docs/career-playbook/live-smoke-dev-run.md` step 1 needs a browser JWT nobody else can mint.
-- `mc2-de3vu` — **owner decision, nothing blocked on engineering.** Which reader gets `block_5`,
-  `block_22`, `block_23`. On the 14 stored playbooks `block_5` in the HR view removes 28% of its
-  broken references before any generation, `block_23` in the employee view 55%. A checkbox in
-  `CAREER_PLAYBOOK_BLOCK_CATALOG.audiences` is now the only edit needed. Numbers:
-  `docs/career-playbook/2026-08-30-role-guide-views-measurement.md`, re-run read-only with
-  `pnpm exec tsx scripts/measure-role-guide-views.ts`.
+- `mc2-de3vu` is **closed with the checkboxes unchanged** (owner, 2026-08-30). Widening a view was
+  offered and declined: a whole section is too coarse a unit of access — the decision matrix holds
+  both what HR needs and what it does not — and every extra reader flattens the voice the split
+  exists to keep. Carrying one line across is therefore the mechanism, not a workaround. Do not
+  reopen by proposing to move an audience checkbox without a new owner request.
 - `mc2-ehao2` — `buildRoleGuideView` has **no caller** in the API or `packages/web`; no reader
   receives a view today. It also reads raw `generatedBlocks`, so a view would ship without the
   diagrams, sources section and calibration table that `prepareCareerPlaybookFinalBlocks` adds.

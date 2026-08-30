@@ -117,4 +117,33 @@ describe('the rule reaches both the generator and the regenerator', () => {
       )
     ).toBe(true);
   });
+
+  // Owner ruling 2026-08-30 (mc2-de3vu): do not widen the audience checkboxes.
+  // A whole section is too coarse a unit of access — the decision matrix holds
+  // both what HR needs and what it does not — and every extra reader flattens
+  // the voice the split existed to keep. Carrying one line across is the
+  // mechanism, so the prompt has to say what "one line" means.
+  it('tells the writer to carry a part, write it for these readers, or say nothing', () => {
+    const prompt = careerPlaybookPrompts.find(
+      entry => entry.promptKey === 'career_playbook_group_3_people'
+    )!;
+
+    expect(prompt.promptTemplate).toContain('never the whole section');
+    expect(prompt.promptTemplate).toContain("Write that part for THIS block's readers");
+    expect(prompt.promptTemplate).toContain('leave it out entirely');
+    expect(careerPlaybookBlockRegeneratorPrompt.promptTemplate).toContain('leave it out entirely');
+  });
+
+  it('no longer tells a block to reference a cadence it may not name', () => {
+    for (const prompt of careerPlaybookPrompts.filter(entry =>
+      entry.promptKey.startsWith('career_playbook_group_')
+    )) {
+      expect(prompt.promptTemplate).not.toContain(
+        "State each recurring commitment's cadence ONCE, in the block that owns it, and reference it elsewhere"
+      );
+      expect(prompt.promptTemplate).toContain(
+        'pointing at the owning block is allowed only when that block is on your reference list'
+      );
+    }
+  });
 });
