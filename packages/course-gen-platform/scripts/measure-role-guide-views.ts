@@ -26,7 +26,7 @@ import { buildRoleGuideView } from '@/stages/stage-career-playbook/nodes/final-a
 const AUDIENCES: readonly CareerPlaybookAudience[] = ['employee', 'manager', 'hr'];
 
 /** "Block 5", "Блок 5", "блока 5", "Block №5". */
-const BLOCK_REFERENCE = /(?:\bblock|\bблок\p{L}*)\s*№?\s*(\d{1,2})/giu;
+const BLOCK_REFERENCE = /(?<![\p{L}\p{N}])(?:block|блок\p{L}*)\s*№?\s*(\d{1,2})/giu;
 
 const CANONICAL_BLOCK_IDS = CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => block.blockId);
 

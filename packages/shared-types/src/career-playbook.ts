@@ -488,6 +488,9 @@ export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
   'unsourced_claim',
   'stale_date',
   'unmarked_example',
+  // A block sending its reader to a block that reader was never given. A view is
+  // a separately read document, so this is a broken document, not a style note.
+  'unreadable_reference',
   'style',
 ] as const;
 export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
@@ -512,6 +515,7 @@ export const CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES = [
   'unsourced_claim',
   'stale_date',
   'unmarked_example',
+  'unreadable_reference',
 ] as const satisfies readonly CareerPlaybookJudgeIssueCategory[];
 export type CareerPlaybookJudgeCriticalCategory =
   (typeof CAREER_PLAYBOOK_JUDGE_CRITICAL_CATEGORIES)[number];

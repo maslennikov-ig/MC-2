@@ -1,6 +1,4 @@
 import {
-  CAREER_PLAYBOOK_BLOCK_CATALOG,
-  type CareerPlaybookAudience,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookJudgeIssue,
@@ -8,6 +6,10 @@ import {
   type CareerPlaybookNodeCost,
   type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import {
+  formatCareerPlaybookCitableBlocks,
+  getCareerPlaybookBlockAudiences,
+} from './audience-scope';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from './final-assembler';
 import {
   buildCareerPlaybookAbortedAttemptCosts,
@@ -91,17 +93,6 @@ export function getCareerPlaybookBlockName(blockId: CareerPlaybookBlockId): stri
   return BLOCK_NAMES[blockId];
 }
 
-function getCareerPlaybookBlockAudiences(
-  blockId: CareerPlaybookBlockId
-): readonly CareerPlaybookAudience[] {
-  const catalogItem = CAREER_PLAYBOOK_BLOCK_CATALOG.find(item => item.blockId === blockId);
-  if (!catalogItem) {
-    throw new Error(`Career Playbook audience mapping is missing for ${blockId}`);
-  }
-
-  return catalogItem.audiences;
-}
-
 function getExpectedHeadingPattern(blockId: CareerPlaybookBlockId): RegExp {
   if (blockId === 'header') {
     return /^##\s+Header\s*$/im;
@@ -181,6 +172,10 @@ export function buildBlockRegeneratorPromptVariables(
     ),
     generated_on: input.roleProfileSpec.generated_on ?? new Date().toISOString().slice(0, 10),
     block_audiences_md: `- ${input.blockId}: ${getCareerPlaybookBlockAudiences(input.blockId).join(', ')}`,
+    // A regeneration prompted by an unreadable reference is told the pointer is
+    // wrong; without this it is not told which pointers are right, and would
+    // spend both attempts reproducing the same defect.
+    citable_blocks_md: formatCareerPlaybookCitableBlocks([input.blockId]),
     other_blocks_brief: buildOtherBlocksBrief(input.otherBlocks, input.blockId),
     content_language: input.language,
   };

@@ -37,6 +37,10 @@ Return only markdown for this one block.
   the marker "(пример — заменить)" in Russian or "(example — replace)" in English.
 - Today is {{generated_on}}. Use relative labels ("Day 1-30", "Week 2") in plans; an absolute
   calendar year is allowed only in block 25.
+- References: this block is delivered inside a reader-specific guide. Name only the blocks listed
+  under "Blocks this one may reference" below, in any wording. When the content you need lives
+  elsewhere, write it out here using the wording already published — never paraphrase an approval
+  level into different words.
 
 USER:
 RoleProfileSpec:
@@ -50,6 +54,9 @@ Evidence ledger (the only citable sources):
 
 Target block readers:
 {{block_audiences_md}}
+
+Blocks this one may reference:
+{{citable_blocks_md}}
 
 Other blocks in the same audience view(s):
 {{other_blocks_brief}}
@@ -80,6 +87,11 @@ Content language: {{content_language}}`,
     {
       name: 'generated_on',
       description: 'Generation date (ISO), application-filled',
+      required: true,
+    },
+    {
+      name: 'citable_blocks_md',
+      description: 'Blocks every reader of the target block also receives',
       required: true,
     },
     {

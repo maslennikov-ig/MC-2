@@ -20,6 +20,7 @@ import type {
   CareerPlaybookJudgeIssue,
   CareerPlaybookMetricLedgerEntry,
 } from '@megacampus/shared-types';
+import { careerPlaybookBlockMayCite, getCareerPlaybookBlockAudiences } from './audience-scope';
 
 export interface CareerPlaybookQualityCheckContext {
   metricLedger: readonly CareerPlaybookMetricLedgerEntry[];
@@ -607,7 +608,68 @@ export function runCareerPlaybookContractChecks(
     ...validateContractLeakage(blocks, context),
     ...validateSourceAttribution(blocks, context),
     ...validateCadenceConsistency(blocks, context),
+    ...validateCrossViewReference(blocks, context),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 10. A reference the reader cannot follow
+// ---------------------------------------------------------------------------
+
+/** "Block 5", "Блок 5", "блока 5", "Block №5". */
+const BLOCK_REFERENCE = /(?<![\p{L}\p{N}])(?:block|блок\p{L}*)\s*№?\s*(\d{1,2})/giu;
+
+/**
+ * Flag a block that sends its reader to a block that reader was never given.
+ *
+ * A view is a separately read document. Measured on the 14 stored playbooks,
+ * 71% of the HR view's cross-references pointed at a block outside the HR view,
+ * and the two summary blocks every reader gets routinely cited `block_23`, which
+ * only a manager holds. That is not model noise: the group prompt told every
+ * block to cite Block 5 without saying who holds it.
+ *
+ * The fix is never "stop citing". Restating an approval level in different words
+ * is what produced three contradictory statements about one decision in the
+ * 2026-08-11 guide. The digest already carries the authority rows to every
+ * target, so a block with no citable target must carry the published wording
+ * itself rather than point at a page its reader does not have.
+ */
+export function validateCrossViewReference(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const unreachable = new Set<string>();
+    for (const match of stripFencedBlocks(content).matchAll(BLOCK_REFERENCE)) {
+      const target = `block_${Number(match[1])}`;
+      if (target === blockId) continue;
+      if (getCareerPlaybookBlockAudiences(target).length === 0) continue;
+      if (careerPlaybookBlockMayCite(blockId, target)) continue;
+      unreachable.add(target);
+    }
+    if (unreachable.size === 0) continue;
+
+    const readers = getCareerPlaybookBlockAudiences(blockId).join(', ');
+    const targets = [...unreachable]
+      .map(target => `${target} (${getCareerPlaybookBlockAudiences(target).join(', ')})`)
+      .join('; ');
+
+    issues.push(
+      issue(
+        blockId,
+        'unreadable_reference',
+        `${blockId} is read by ${readers} and points at ${targets}, which at least one of those readers never receives.`,
+        'State the referenced content here using the wording already published, or drop the pointer. Do not paraphrase an approval level into different words.'
+      )
+    );
+  }
+
+  return issues;
 }
 
 // ---------------------------------------------------------------------------

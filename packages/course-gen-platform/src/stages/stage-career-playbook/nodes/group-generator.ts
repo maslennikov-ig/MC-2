@@ -27,7 +27,10 @@ import {
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
 import { buildCareerPlaybookPriorBlocksDigest } from './prior-blocks-digest';
-import { formatCareerPlaybookBlockAudiences } from './audience-scope';
+import {
+  formatCareerPlaybookBlockAudiences,
+  formatCareerPlaybookCitableBlocks,
+} from './audience-scope';
 
 export interface CareerPlaybookBlockSpec {
   blockId: CareerPlaybookBlockId;
@@ -505,6 +508,12 @@ export async function generateCareerPlaybookGroup(
     ),
     generated_on: spec.generated_on ?? new Date().toISOString().slice(0, 10),
     block_audiences_md: formatCareerPlaybookBlockAudiences(
+      groupSpec.blocks.map(block => block.blockId)
+    ),
+    // Which other block each output block may send its reader to. The generator
+    // cannot derive it: it is told who reads its own blocks, not which blocks
+    // every one of those readers also holds.
+    citable_blocks_md: formatCareerPlaybookCitableBlocks(
       groupSpec.blocks.map(block => block.blockId)
     ),
     prior_blocks_digest: buildCareerPlaybookPriorBlocksDigest(
