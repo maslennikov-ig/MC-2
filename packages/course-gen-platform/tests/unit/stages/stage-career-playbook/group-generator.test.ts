@@ -199,10 +199,10 @@ describe('Career Playbook group generator', () => {
     );
 
     expect(prompt?.promptTemplate).toContain(
-      'When writing block_N, use ONLY the `For block_N only:` subsection'
+      'use the subsection whose heading names block_N or covers every output block in this group'
     );
     expect(prompt?.promptTemplate).toContain(
-      "ignore every other block's subsection even though it is visible in the prompt"
+      'ignore any other subsection even though it is visible in the prompt'
     );
   });
 

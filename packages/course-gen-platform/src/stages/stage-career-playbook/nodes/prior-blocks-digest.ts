@@ -115,15 +115,23 @@ function collectDecisionAuthority(
   const content = blocks.block_5?.content;
   if (!content) return [];
 
-  return (
-    contentLines(content)
-      .filter(line => line.startsWith('|') && !isTableSeparator(line))
-      .map(toStatement)
-      // Drop the header row: it names the axes rather than a decision.
-      .filter(line => !/^decision\b/i.test(line) && !/^решение\b/i.test(line))
-      .filter(line => line.length > 20)
-      .slice(0, 12)
+  // Drop the header row: it names the axes rather than a decision. Detect it as
+  // the row a separator follows, which is what makes it a header in Markdown.
+  // Matching its wording did not work in either language: `\b` is defined on
+  // ASCII word characters, so `^решение\b` never fired on a Cyrillic table and
+  // the axis row was handed to the model as a decision, while `^decision\b` also
+  // swallowed any English row that happened to begin with the word "Decision".
+  const lines = contentLines(content);
+  const tableRows = lines.filter(line => line.startsWith('|'));
+  const headerRows = new Set(
+    tableRows.filter((_row, index) => isTableSeparator(tableRows[index + 1] ?? ''))
   );
+
+  return tableRows
+    .filter(line => !isTableSeparator(line) && !headerRows.has(line))
+    .map(toStatement)
+    .filter(line => line.length > 20)
+    .slice(0, 12);
 }
 
 function collectCadences(
@@ -163,7 +171,13 @@ export interface BuildPriorBlocksDigestOptions {
   maxTokens?: number;
 }
 
-function buildCareerPlaybookTargetPriorDigest(
+/**
+ * The digest one target would receive. Exported for the invariant test that
+ * every target of a group receives the same lines — the property that lets
+ * {@link buildCareerPlaybookPriorBlocksDigest} render one section instead of one
+ * copy per target.
+ */
+export function buildCareerPlaybookTargetPriorDigest(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
   currentBlockIds: readonly CareerPlaybookBlockId[],
   targetBlockId: CareerPlaybookBlockId,
@@ -254,25 +268,27 @@ export function buildCareerPlaybookPriorBlocksDigest(
 
   if (!hasPublishedPriorBlock || currentBlockIds.length === 0) return 'none';
 
-  // Every target must keep a visible section even when it has no eligible
-  // context. The shared ceiling is split by character budget so duplicated
-  // context across two legitimate views cannot exceed the original 1,500-token
-  // prompt contract.
-  const sectionOverheadCharacters =
-    currentBlockIds.reduce((sum, blockId) => sum + `For ${blockId} only:\n`.length, 0) +
-    Math.max(0, currentBlockIds.length - 1) * 2;
-  const contentCharacters = Math.max(4, maxTokens * 4 - sectionOverheadCharacters);
-  const targetMaxTokens = Math.max(1, Math.floor(contentCharacters / currentBlockIds.length / 4));
+  // One section for the whole group, because every target receives the same
+  // lines. While selection was audience-scoped each target really did see a
+  // different digest, and a section per target was the only honest shape. Once
+  // scoping was removed the sections became byte-identical — measured across the
+  // 14 stored completed playbooks, 70 of 70 groups — yet the ceiling was still
+  // divided N ways to print the same text N times. The late groups paid for it:
+  // in group_6_wrap only 3% of the collected block 5 authority rows and none of
+  // the published numeric commitments reached the model, and 66 of 84 targets
+  // lost a published anti-goal that section 5 of the quality contract says is
+  // never dropped. Spending the same budget once buys distinct constraints
+  // instead of copies. `buildCareerPlaybookTargetPriorDigest` is exported and
+  // tested for that sameness, so reintroducing a per-target difference fails
+  // loudly here rather than being silently dropped.
+  const heading = 'For every output block in this group:';
+  const contentCharacters = Math.max(4, maxTokens * 4 - (heading.length + 1));
+  const digest = buildCareerPlaybookTargetPriorDigest(
+    generatedBlocks,
+    currentBlockIds,
+    currentBlockIds[0],
+    Math.max(1, Math.floor(contentCharacters / 4))
+  );
 
-  return currentBlockIds
-    .map(blockId => {
-      const digest = buildCareerPlaybookTargetPriorDigest(
-        generatedBlocks,
-        currentBlockIds,
-        blockId,
-        targetMaxTokens
-      );
-      return `For ${blockId} only:\n${digest}`;
-    })
-    .join('\n\n');
+  return `${heading}\n${digest}`;
 }

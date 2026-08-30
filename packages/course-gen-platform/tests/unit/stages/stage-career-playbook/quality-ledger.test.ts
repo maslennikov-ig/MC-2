@@ -192,12 +192,23 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     expect(Math.ceil(digest.length / 4)).toBeLessThanOrEqual(120);
   });
 
+  /**
+   * Return the section a given output block must read. A heading either names
+   * its blocks or covers the whole group, since targets that would receive
+   * identical lines now share one rendering instead of one copy each.
+   */
   function targetSection(digest: string, blockId: string): string {
-    const marker = `For ${blockId} only:`;
-    const start = digest.indexOf(marker);
-    if (start < 0) return '';
-    const next = digest.indexOf('\nFor ', start + marker.length);
-    return digest.slice(start, next < 0 ? undefined : next);
+    const sections = digest.split(/\n\n(?=For )/);
+    const match = sections.find(section => {
+      const heading = section.slice(0, section.indexOf('\n'));
+      if (heading === 'For every output block in this group:') return true;
+      return heading
+        .replace(/^For /, '')
+        .replace(/ only:$/, '')
+        .split(', ')
+        .includes(blockId);
+    });
+    return match ?? '';
   }
 
   // mc2-923ku: these four sections are contradiction guards over the single
