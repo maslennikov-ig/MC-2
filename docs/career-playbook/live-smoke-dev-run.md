@@ -182,10 +182,20 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 1. Взять точный `playbookId` из JSON-артефакта раннера и прочитать по этому exact ID строку
    `career_playbooks`. Не вставлять ID, токены, service key или пользовательский текст в этот
    документ или вывод коммита.
-2. Убедиться, что строка завершилась как `completed` и `generation_error` не начинается с
-   `semantic repetition checks unavailable:`. После исчерпания retry эта ошибка fail-closed:
-   graph останавливается, handler ставит `failed`, и такой прогон нельзя принимать или повторять
-   второй платной генерацией.
+2. Убедиться, что строка завершилась как `completed`, и прочитать
+   `q_a_data->>'generation_error'` — это **JSON-поле внутри `q_a_data`**, а не колонка;
+   колонки `generation_error` в `career_playbooks` нет (единственная колонка со словом error —
+   `image_error_message`, и она про картинку). Дубль того же сообщения лежит в
+   `job_status.error_message` по `job_id = 'career-playbook-<playbookId>'`.
+
+   Значение должно не начинаться с `semantic repetition checks unavailable:`. Только этот случай
+   fail-closed: мы не смогли измерить документ, graph останавливается, handler ставит `failed`,
+   и такой прогон нельзя принимать или повторять второй платной генерацией.
+
+   Обратный случай — «измерили, нашли повтор, за две попытки не исправили» — прогон **не** роняет
+   с 2026-08-30. Playbook завершается, а претензия с косинусом, порогом и обоими блоками пары
+   пишется в `generation_warnings`. Проверять её там, а не по статусу.
+
 3. Проверить в `career_playbooks.cost_breakdown`, что есть хотя бы одна строка с
    `node = "semanticRepetition"`, `provider_name = "jina"` и положительным `input_tokens`.
    `generation_trace` для этой проверки не использовать: Career Playbook хранит расход здесь.

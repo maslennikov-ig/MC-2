@@ -465,7 +465,14 @@ export class CareerPlaybookHandler {
     const errors = result.errors ?? [];
     if (errors.length > 0) {
       const message = errors.join('; ') || 'Career Playbook generation failed';
-      await this.throwAfterGenerationFailure(jobData, job, message, new Error(message));
+      // A graph that reached this line completed and billed every node it ran.
+      // `persistFailed` reads the spend off the error, so a bare `new Error`
+      // here throws the whole ledger away: on 2026-08-30 a run billed $0.08711
+      // across 55 calls and recorded $0.00018, the one pre-graph node.
+      const failure = Object.assign(new Error(message), {
+        nodeCosts: Array.isArray(result.nodeCosts) ? result.nodeCosts : [],
+      });
+      await this.throwAfterGenerationFailure(jobData, job, message, failure);
     }
 
     await this.persistCompleted(jobData, result);

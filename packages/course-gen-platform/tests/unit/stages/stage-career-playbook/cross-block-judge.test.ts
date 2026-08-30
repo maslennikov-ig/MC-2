@@ -1073,27 +1073,38 @@ flowchart LR
    * `selectPendingCareerPlaybookRegenerations` refuses every block once the
    * window is spent, and `routeAfterBlockRegeneration` sends the empty batch to
    * END. Keeping the block in `needs_regeneration` therefore reserves nothing,
-   * and asserting `errors: undefined` here pinned a fail-open: the playbook
+   * and asserting `errors: undefined` here once pinned a fail-open: the playbook
    * completed with an unremediated critical repetition, no error and no warning.
+   *
+   * Silence was the defect, not the missing throw. The gate now reports instead
+   * of discarding the document, so the assertion is on the warning and on the
+   * measurements inside it — a warning that names only a block id sent a real
+   * 2026-08-30 failure back for another paid run before it could be diagnosed.
    */
-  it('fails closed when the exhausted window leaves nothing to regenerate the block', async () => {
+  it('reports with measurements when the exhausted window leaves nothing to regenerate the block', async () => {
     mockOneWithinBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
     const update = await node(semanticFinalJudgeState({ block_8: 8, block_11: 0 }));
 
-    expect(update.errors).toEqual([
-      expect.stringContaining('final semantic repetition gate failed closed'),
-    ]);
+    expect(update.errors).toBeUndefined();
+    const warning = update.warnings?.find(entry =>
+      entry.includes('exhausted semantic repetition remediation')
+    );
+    expect(warning).toBeDefined();
+    expect(warning).toMatch(/for [^;]*block_11[^;]*;/);
+    expect(warning).toContain('cosine');
+    expect(warning).toContain('threshold');
   });
 
   /**
    * The degraded-judge return sits above the semantic gate block, so a judge
    * model that fails to produce a verdict used to take the deterministic gate
-   * down with it: the repetition was found, nothing remediated it, and the
-   * playbook completed with a warning instead of an error.
+   * down with it entirely: the repetition was found, nothing remediated it, and
+   * nothing said so. Both reports must survive this path — the degradation and
+   * the repetition are independent facts about the same run.
    */
-  it('still fails the semantic gate closed when the LLM judge degrades', async () => {
+  it('still reports the semantic gate when the LLM judge degrades', async () => {
     mockOneWithinBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({
       useLLMJudge: true,
@@ -1115,12 +1126,13 @@ flowchart LR
     });
 
     expect(update.warnings?.[0]).toContain('crossBlockJudge degraded to deterministic checks');
-    expect(update.errors).toEqual([
-      expect.stringContaining('final semantic repetition gate failed closed'),
-    ]);
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings).toContainEqual(
+      expect.stringContaining('exhausted semantic repetition remediation')
+    );
   });
 
-  it('fails the final semantic gate closed after the repeated block exhausts its cap', async () => {
+  it('reports the final semantic gate after the repeated block exhausts its cap', async () => {
     mockOneWithinBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
@@ -1132,9 +1144,10 @@ flowchart LR
     );
 
     expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
-    expect(update.errors).toEqual([
-      expect.stringContaining('final semantic repetition gate failed closed'),
-    ]);
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings).toContainEqual(
+      expect.stringContaining('exhausted semantic repetition remediation')
+    );
   });
 
   it('advances with a warning (not an error) when the judge window budget is exhausted', async () => {

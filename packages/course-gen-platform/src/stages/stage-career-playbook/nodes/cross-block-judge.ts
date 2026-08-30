@@ -437,22 +437,36 @@ function capRegenerationWhenBudgetExhausted(params: {
  * block is still listed in needs_regeneration" and "something will actually
  * regenerate it" are different questions, and only the second one decides
  * whether the playbook completes with the repetition still in it.
+ *
+ * The answer is reported, not fatal. "We could not measure" and "we measured,
+ * found one pair, and ran out of attempts" are different failures: the first
+ * leaves us blind to the document and stays fail-closed inside
+ * `CareerPlaybookSemanticRepetitionProviderError`; the second leaves us knowing
+ * exactly what is in it. On 2026-08-30 the second one discarded 27 finished
+ * blocks and $0.087 of billed generation over a single flagged pair, so it now
+ * completes the playbook and records the pair instead.
+ *
+ * The warning carries the measurements — both block ids, the cosine and the
+ * threshold all come from the issue description — because the same run proved
+ * a gate that names only a block id cannot be diagnosed without paying for
+ * another run. `for <ids>;` is load-bearing: `collectWarningQualityIssues`
+ * parses exactly that shape to attach the issue to its blocks.
  */
-function buildSemanticGateErrors(params: {
+function buildSemanticGateOutcome(params: {
   isFinalWindow: boolean;
   deterministicVerdict: CareerPlaybookJudgeVerdict;
   routedVerdict: CareerPlaybookJudgeVerdict;
   windowBlockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
-}): string[] {
-  if (!params.isFinalWindow) return [];
+}): { errors: string[]; warnings: string[] } {
+  const none = { errors: [], warnings: [] };
+  if (!params.isFinalWindow) return none;
 
-  const semanticRepetitionBlockIds = uniqueBlockIds(
-    params.deterministicVerdict.issues
-      .filter(isCareerPlaybookSemanticRepetitionIssue)
-      .map(issue => issue.block_id)
+  const semanticIssues = params.deterministicVerdict.issues.filter(
+    isCareerPlaybookSemanticRepetitionIssue
   );
-  if (semanticRepetitionBlockIds.length === 0) return [];
+  const semanticRepetitionBlockIds = uniqueBlockIds(semanticIssues.map(issue => issue.block_id));
+  if (semanticRepetitionBlockIds.length === 0) return none;
 
   const pending = selectPendingCareerPlaybookRegenerations({
     verdict: params.routedVerdict,
@@ -460,12 +474,18 @@ function buildSemanticGateErrors(params: {
     attempts: params.attempts,
   });
   const willRemediate = pending.some(entry => semanticRepetitionBlockIds.includes(entry.blockId));
+  if (willRemediate) return none;
 
-  return willRemediate
-    ? []
-    : [
-        `final semantic repetition gate failed closed with no remaining remediation for ${semanticRepetitionBlockIds.join(', ')}`,
-      ];
+  const measurements = [...new Set(semanticIssues.map(issue => issue.description))];
+
+  return {
+    errors: [],
+    warnings: [
+      `crossBlockJudge exhausted semantic repetition remediation for ${semanticRepetitionBlockIds.join(
+        ', '
+      )}; the playbook ships with the repetition recorded: ${measurements.join(' ')}`,
+    ],
+  };
 }
 
 function selectGeneratedBlocks(
@@ -675,8 +695,8 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
 
         // A degraded LLM judge must not also degrade the deterministic semantic
         // gate: the deterministic verdict returned here still carries its issues,
-        // so the same fail-closed question is asked on this path too.
-        const degradedSemanticErrors = buildSemanticGateErrors({
+        // so the same question is asked on this path too.
+        const degradedSemantic = buildSemanticGateOutcome({
           isFinalWindow: options.currentBlockIds === undefined,
           deterministicVerdict,
           routedVerdict: deterministicVerdict,
@@ -694,8 +714,9 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
             `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
+            ...degradedSemantic.warnings,
           ],
-          ...(degradedSemanticErrors.length > 0 ? { errors: degradedSemanticErrors } : {}),
+          ...(degradedSemantic.errors.length > 0 ? { errors: degradedSemantic.errors } : {}),
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
       }
@@ -718,13 +739,14 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       windowBudgetExemptBlockIds:
         options.currentBlockIds === undefined ? semanticRepetitionBlockIds : undefined,
     });
-    const semanticErrors = buildSemanticGateErrors({
+    const semantic = buildSemanticGateOutcome({
       isFinalWindow: options.currentBlockIds === undefined,
       deterministicVerdict,
       routedVerdict: capped.verdict,
       windowBlockIds,
       attempts: state.blockRegenerationAttempts ?? {},
     });
+    const warnings = [...capped.warnings, ...semantic.warnings];
 
     return {
       // Only the re-reviewed blocks receive the new verdict; accepted siblings retain the
@@ -734,8 +756,8 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       lastJudgeVerdict: capped.verdict,
       lastJudgedBlockIds: windowBlockIds,
       nodeCosts,
-      ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
-      ...(semanticErrors.length > 0 ? { errors: semanticErrors } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(semantic.errors.length > 0 ? { errors: semantic.errors } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',
     };
   };

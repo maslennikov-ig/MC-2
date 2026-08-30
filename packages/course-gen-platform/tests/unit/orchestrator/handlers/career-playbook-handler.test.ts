@@ -1232,6 +1232,69 @@ flowchart TD
     );
   });
 
+  it('keeps what a completed-but-rejected graph spent', async () => {
+    // A graph that returns `errors` has already run and billed every node in it.
+    // The handler used to raise a bare `new Error(message)` here, and
+    // `persistFailed` reads the spend off the error, so the whole ledger went
+    // out with the document: run 1a4a9ccb on 2026-08-30 billed $0.08711 across
+    // 55 calls and recorded $0.00018 — the one node that ran before the graph.
+    const followupCost = {
+      node: 'followupGenerator',
+      model: 'mock-model',
+      input_tokens: 942,
+      output_tokens: 1547,
+      cost_usd: 0.00018137784,
+      generation_id: 'gen-followup-2',
+      billed_by_provider: true,
+    };
+    const judgeCost = {
+      node: 'crossBlockJudge',
+      model: 'mock-model',
+      input_tokens: 14007,
+      output_tokens: 993,
+      cost_usd: 0.0421,
+      generation_id: 'gen-judge-1',
+      billed_by_provider: true,
+    };
+    const existingQAData = { fixed: [], followups: [], freeform: [] };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      {
+        data: {
+          cost_breakdown: { nodeCosts: [followupCost], total_cost_usd: 0.00018137784 },
+        },
+        error: null,
+      },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: ['crossBlockJudge rejected the document'],
+        nodeCosts: [judgeCost],
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job({
+          ...baseJobData(),
+          operation: 'GENERATE_PLAYBOOK',
+          qaData: { fixed: [], followups: [], freeform: [] },
+        })
+      )
+    ).rejects.toThrow('crossBlockJudge rejected the document');
+
+    const persisted = builder.update.mock.calls
+      .map(call => call[0] as { cost_breakdown?: { nodeCosts: unknown[]; total_cost_usd: number } })
+      .find(payload => payload.cost_breakdown);
+
+    expect(persisted?.cost_breakdown?.nodeCosts).toEqual([followupCost, judgeCost]);
+    expect(persisted?.cost_breakdown?.total_cost_usd).toBeCloseTo(0.04228137784, 8);
+  });
+
   it('persists failed status and generation_error when graph throws on the final attempt', async () => {
     const builder = createBuilder([
       { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
