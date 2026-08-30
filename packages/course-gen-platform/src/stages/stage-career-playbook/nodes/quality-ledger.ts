@@ -9,18 +9,22 @@
  * both >=2x and >=3x within a single generation call) and asserted precise
  * market statistics with nothing behind them.
  *
- * This module owns the two ledgers that fix that:
+ * This module owns the ledgers that fix that:
  *
  * - `metric_ledger` — built by the model, then deterministically normalized here,
  *   and quoted verbatim by every block.
  * - `evidence_ledger` — built here from the research result and never by the
  *   model, so a citation cannot be hallucinated.
+ * - `cadence_ledger` — the same treatment for recurring rhythms, added after the
+ *   2026-08-30 run declared the pipeline review weekly in six blocks and
+ *   quarterly in five. Numbers had an owner and agreed; rhythms had none.
  *
  * Same division of labour as `spec-builder-canonical.ts`: ask the model, then
  * make the result conform. See docs/career-playbook/quality-contract.md.
  */
 
 import type {
+  CareerPlaybookCadenceLedgerEntry,
   CareerPlaybookEvidenceEntry,
   CareerPlaybookMetricLedgerEntry,
   CareerPlaybookRoleProfileSpec,
@@ -86,6 +90,106 @@ export function normalizeCareerPlaybookMetricLedger(
   }
 
   return [...byKey.values()];
+}
+
+/**
+ * The fixed rhythm vocabulary, in both output languages.
+ *
+ * One list, two readers: the cadence ledger normalizes onto it, and
+ * `quality-checks.ts` recognises a block's stated rhythm with it. A second copy
+ * would let the ledger accept a word the checker cannot see, which is exactly
+ * how a rhythm escapes comparison.
+ */
+export const CAREER_PLAYBOOK_CADENCE_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\b(daily|every day|each day)\b|ежедневн|каждый день/i, 'daily'],
+  [/\b(weekly|every week|each week)\b|еженедельн|каждую неделю|раз в неделю/i, 'weekly'],
+  [
+    /\b(biweekly|fortnightly|every two weeks|every other week)\b|раз в две недели|каждые две недели/i,
+    'biweekly',
+  ],
+  [/\b(monthly|every month|each month)\b|ежемесячн|раз в месяц|каждый месяц/i, 'monthly'],
+  [
+    /\b(quarterly|every quarter|each quarter)\b|ежекварт|раз в квартал|каждый квартал/i,
+    'quarterly',
+  ],
+  [/\b(annual(ly)?|yearly|every year|each year)\b|ежегодн|раз в год|каждый год/i, 'annual'],
+];
+
+/** Canonical token for a rhythm written in any accepted wording, or null. */
+export function normalizeCareerPlaybookCadence(value: string): string | null {
+  const collapsed = collapseWhitespace(value);
+  if (!collapsed) return null;
+  for (const [pattern, name] of CAREER_PLAYBOOK_CADENCE_WORDS) {
+    if (pattern.test(collapsed)) return name;
+  }
+  return null;
+}
+
+/**
+ * Normalize a model-built cadence ledger: stable snake_case keys, one entry per
+ * commitment, and a rhythm drawn from the fixed vocabulary.
+ *
+ * An entry whose rhythm is not recognisable is dropped, for the same reason a
+ * target-less metric is dropped. It cannot constrain a block, and keeping it
+ * would let a block "quote the ledger" while still choosing its own rhythm —
+ * the failure the ledger exists to prevent.
+ */
+export function normalizeCareerPlaybookCadenceLedger(
+  entries: readonly CareerPlaybookCadenceLedgerEntry[] | undefined
+): CareerPlaybookCadenceLedgerEntry[] {
+  if (!entries?.length) return [];
+
+  const byKey = new Map<string, CareerPlaybookCadenceLedgerEntry>();
+
+  for (const entry of entries) {
+    const key = collapseWhitespace(entry.key)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const label = collapseWhitespace(entry.label);
+    const cadence = normalizeCareerPlaybookCadence(entry.cadence ?? '');
+
+    if (!key || !label || !cadence) continue;
+    // First occurrence wins, as in the metric ledger: a later duplicate is the
+    // second answer that made the commitment unplannable in the first place.
+    if (byKey.has(key)) continue;
+
+    byKey.set(key, {
+      ...entry,
+      key,
+      label,
+      cadence,
+      owner: collapseWhitespace(entry.owner ?? ''),
+      scope: collapseWhitespace(entry.scope ?? ''),
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+const CADENCE_LEDGER_EMPTY =
+  'none — no recurring commitment was declared for this role, so state each rhythm once and never restate it differently elsewhere';
+
+/** Render the cadence ledger as the markdown table the block prompts quote from. */
+export function formatCareerPlaybookCadenceLedgerForPrompt(
+  cadences: readonly CareerPlaybookCadenceLedgerEntry[]
+): string {
+  if (cadences.length === 0) return CADENCE_LEDGER_EMPTY;
+
+  const rows = cadences.map(
+    entry => `| ${entry.label} | ${entry.cadence} | ${entry.owner || '—'} | ${entry.scope || '—'} |`
+  );
+
+  return ['| Commitment | Cadence | Owner | Scope |', '| --- | --- | --- | --- |', ...rows].join(
+    '\n'
+  );
+}
+
+/** Convenience accessor used by prompt builders and deterministic checks alike. */
+export function getCareerPlaybookCadenceLedger(
+  spec: CareerPlaybookRoleProfileSpec | null | undefined
+): CareerPlaybookCadenceLedgerEntry[] {
+  return spec?.cadence_ledger ?? [];
 }
 
 /**

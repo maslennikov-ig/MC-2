@@ -13,18 +13,23 @@
  * for prose. See docs/career-playbook/quality-contract.md section 6.
  */
 
-import type {
-  CareerPlaybookBlockId,
-  CareerPlaybookBlockState,
-  CareerPlaybookEvidenceEntry,
-  CareerPlaybookJudgeIssue,
-  CareerPlaybookMetricLedgerEntry,
+import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  type CareerPlaybookBlockId,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookCadenceLedgerEntry,
+  type CareerPlaybookEvidenceEntry,
+  type CareerPlaybookJudgeIssue,
+  type CareerPlaybookMetricLedgerEntry,
 } from '@megacampus/shared-types';
 import { careerPlaybookBlockMayCite, getCareerPlaybookBlockAudiences } from './audience-scope';
+import { CAREER_PLAYBOOK_CADENCE_WORDS } from './quality-ledger';
 
 export interface CareerPlaybookQualityCheckContext {
   metricLedger: readonly CareerPlaybookMetricLedgerEntry[];
   evidenceLedger: readonly CareerPlaybookEvidenceEntry[];
+  /** Canonical rhythms. Empty for a spec built before the ledger existed. */
+  cadenceLedger?: readonly CareerPlaybookCadenceLedgerEntry[];
   generatedOn?: string;
   /** Only universal-mode runs treat an unmarked company value as a defect. */
   businessContextMode?: 'universal' | 'company_specific';
@@ -726,10 +731,36 @@ const SNAKE_CASE_BLOCK_ID = /\b[Bb]lock_\d{1,2}\b/g;
 
 /**
  * Sentences that address the author of the document rather than its reader.
- * The observed shape quotes a banned phrasing and tells the writer to avoid it.
+ *
+ * Two shapes, both observed. The first quotes a banned phrasing and tells the
+ * writer to avoid it. The second, from the 2026-08-30 run, explains the
+ * document's own construction to its reader: "Do not restate these levels in
+ * different words anywhere else in this guide" shipped inside a manager's
+ * implementation checklist, and two more blocks announced what they had chosen
+ * not to repeat. The rule that governs the writing is not information the
+ * manager needs.
+ *
+ * "In other words" is a normal discourse marker and is deliberately not matched;
+ * "in different words" is not, and neither is the Russian "другими словами"
+ * unless it carries the scope word that makes it a rule about the document.
  */
-const AUTHOR_INSTRUCTION =
-  /do not use\s+["“][^"”]{3,60}["”]\s+language|не используй\w*\s+формулировк|always measure\s+\w+\s+quality as/i;
+const AUTHOR_INSTRUCTION = new RegExp(
+  [
+    'do not use\\s+["“][^"”]{3,60}["”]\\s+language',
+    'не используй\\w*\\s+формулировк',
+    'always measure\\s+\\w+\\s+quality as',
+    // "restate", "reword" and "paraphrase" are always about wording, so the bare
+    // prohibition is enough. "redefine" and "repeat" have honest reader-facing
+    // uses, so they only count when the sentence is about a part of the document.
+    "\\b(?:do not|don't|never|does not|doesn't)\\s+(?:restate|re-state|reword|paraphrase)\\b",
+    "\\b(?:this|the)\\s+(?:block|section|guide|checklist|table)\\s+(?:does not|doesn't|must not|should not)\\s+(?:restate|redefine|repeat|reword)\\b",
+    'in different words',
+    'не\\s+(?:повторяй|переформулируй|переопредел\\w+|дублируй)',
+    'этот\\s+блок\\s+не\\s+(?:повтор\\w+|переопредел\\w+|дублир\\w+)',
+    'другими\\s+словами\\s+(?:нигде|больше|где-либо)',
+  ].join('|'),
+  'i'
+);
 
 /**
  * Flag generation-contract instructions that surfaced as reader guidance.
@@ -854,14 +885,8 @@ export function validateSourceAttribution(
 // 9. Cadence consistency across blocks
 // ---------------------------------------------------------------------------
 
-const CADENCE_WORDS: Array<[RegExp, string]> = [
-  [/\b(daily|every day)\b|ежедневн|каждый день/i, 'daily'],
-  [/\bweekly\b|еженедельн|каждую неделю/i, 'weekly'],
-  [/\b(biweekly|fortnightly|every two weeks)\b|раз в две недели/i, 'biweekly'],
-  [/\bmonthly\b|ежемесячн|раз в месяц/i, 'monthly'],
-  [/\bquarterly\b|ежекварт|раз в квартал/i, 'quarterly'],
-  [/\bannual(ly)?\b|ежегодн|раз в год/i, 'annual'],
-];
+/** One vocabulary, shared with the cadence ledger that normalizes onto it. */
+const CADENCE_WORDS = CAREER_PLAYBOOK_CADENCE_WORDS;
 
 /**
  * Recurring commitments a reader plans their week around.
@@ -926,19 +951,60 @@ function cadenceNearWithDistance(
   return best;
 }
 
+/** Publication order, so "which block said it first" is answerable. */
+const BLOCK_POSITION = new Map<string, number>(
+  CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => [block.blockId as string, block.position])
+);
+
+function blockPosition(blockId: string): number {
+  return BLOCK_POSITION.get(blockId) ?? Number.MAX_SAFE_INTEGER;
+}
+
 /**
- * Flag a recurring commitment stated with different cadences in different blocks.
+ * The ledger row that governs a duty family, matched by the family's own
+ * pattern. Matching on the label rather than on the key means the model may name
+ * the row however it likes and the binding still holds.
+ */
+function findCadenceLedgerEntry(
+  duty: (typeof RECURRING_DUTIES)[number],
+  cadenceLedger: readonly CareerPlaybookCadenceLedgerEntry[]
+): CareerPlaybookCadenceLedgerEntry | null {
+  return (
+    cadenceLedger.find(entry => {
+      const subject = `${entry.label} ${entry.scope ?? ''}`;
+      if (!duty.pattern.test(subject)) return false;
+      return duty.requires ? duty.requires.test(subject) : true;
+    }) ?? null
+  );
+}
+
+interface CadenceObservation {
+  blockId: string;
+  cadence: string;
+}
+
+/**
+ * Flag every block whose rhythm for a recurring commitment differs from the
+ * guide's rhythm for it.
  *
- * The v3 output listed rep 1:1 development sessions as monthly in the duties
- * block, then described "weekly 1:1s with each direct report" in the motivation
- * block and "two coaching 1:1s per rep" weekly in the FAQ. A reader cannot plan
- * a week against three answers, and no window-sized reviewer sees all three.
+ * Two lessons are built in. The first: the v3 output listed rep 1:1 sessions as
+ * monthly in the duties block, weekly in the motivation block and weekly in the
+ * FAQ, and no window-sized reviewer saw all three. The second, from 2026-08-30:
+ * naming ONE block for a disagreement between eleven made the defect
+ * unrepairable, because regenerating that block just moved the conflict to its
+ * counterpart, and the loop burned the regeneration cap without converging.
+ *
+ * So the check now answers "which block is wrong", not merely "these disagree".
+ * The cadence ledger decides when it has a row; otherwise the block that
+ * publishes the rhythm first holds it and every later deviation is named
+ * individually. Either way each issue lands on a block that can fix it alone.
  */
 export function validateCadenceConsistency(
   blocks: BlockMap,
-  _context: CareerPlaybookQualityCheckContext
+  context: CareerPlaybookQualityCheckContext
 ): CareerPlaybookJudgeIssue[] {
-  const stated = new Map<string, Map<string, string[]>>();
+  const cadenceLedger = context.cadenceLedger ?? [];
+  const observed = new Map<string, CadenceObservation[]>();
 
   for (const [blockId, blockState] of Object.entries(blocks)) {
     const content = blockState?.content;
@@ -954,35 +1020,50 @@ export function validateCadenceConsistency(
         const cadence = nearestCadenceAcrossMentions(line, pattern);
         if (!cadence) continue;
 
-        const byCadence = stated.get(duty) ?? new Map<string, string[]>();
-        const blockIds = byCadence.get(cadence) ?? [];
-        if (!blockIds.includes(blockId)) blockIds.push(blockId);
-        byCadence.set(cadence, blockIds);
-        stated.set(duty, byCadence);
+        const observations = observed.get(duty) ?? [];
+        if (!observations.some(entry => entry.blockId === blockId && entry.cadence === cadence)) {
+          observations.push({ blockId, cadence });
+        }
+        observed.set(duty, observations);
       }
     }
   }
 
   const issues: CareerPlaybookJudgeIssue[] = [];
 
-  for (const [duty, byCadence] of stated) {
-    if (byCadence.size < 2) continue;
+  for (const duty of RECURRING_DUTIES) {
+    const observations = observed.get(duty.duty);
+    if (!observations?.length) continue;
 
-    const summary = [...byCadence.entries()]
-      .map(([cadence, blockIds]) => `${cadence} (${blockIds.join(', ')})`)
-      .join(' vs ');
-    // Report against the block that mentions it last: the earlier statement is
-    // the published commitment, the later one is the deviation.
-    const lastBlock = [...byCadence.values()].flat().sort().at(-1) ?? 'block_4';
+    const ledgerEntry = findCadenceLedgerEntry(duty, cadenceLedger);
+    const firstPublished = [...observations].sort(
+      (left, right) => blockPosition(left.blockId) - blockPosition(right.blockId)
+    )[0];
+    const canonical = ledgerEntry?.cadence ?? firstPublished.cadence;
+    const authority = ledgerEntry
+      ? 'the cadence ledger, which is the single source of rhythm for this guide'
+      : `${firstPublished.blockId}, which publishes it first`;
 
-    issues.push(
-      issue(
-        lastBlock,
-        'contradiction',
-        `The ${duty} cadence is stated inconsistently across blocks: ${summary}.`,
-        `Pick one cadence for the ${duty} and have every other block reference it rather than restate it.`
-      )
-    );
+    const deviatingCadences = new Map<string, string[]>();
+    for (const observation of observations) {
+      if (observation.cadence === canonical) continue;
+      deviatingCadences.set(observation.blockId, [
+        ...(deviatingCadences.get(observation.blockId) ?? []),
+        observation.cadence,
+      ]);
+    }
+    if (deviatingCadences.size === 0) continue;
+
+    for (const [blockId, cadences] of deviatingCadences) {
+      issues.push(
+        issue(
+          blockId,
+          'contradiction',
+          `${blockId} states the ${duty.duty} as ${cadences.join(' and ')}, but this guide runs it ${canonical} per ${authority}. A reader holding both blocks cannot plan a week against two answers.`,
+          `Rewrite every ${duty.duty} mention in ${blockId} to ${canonical}. Change nothing in the other blocks: ${canonical} is the published rhythm and this block is the deviation.`
+        )
+      );
+    }
   }
 
   return issues;

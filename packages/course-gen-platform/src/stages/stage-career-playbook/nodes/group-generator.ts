@@ -21,8 +21,10 @@ import {
 } from './runtime';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
@@ -502,6 +504,12 @@ export async function generateCareerPlaybookGroup(
     // no idea what today's date was, and no generator could see earlier blocks.
     metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
       getCareerPlaybookMetricLedger(spec)
+    ),
+    // Rhythms need a canonical home for the same reason numbers did: without
+    // one, six blocks called the pipeline review weekly and five called it
+    // quarterly, and no single-block rewrite could reconcile them.
+    cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+      getCareerPlaybookCadenceLedger(spec)
     ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(spec)

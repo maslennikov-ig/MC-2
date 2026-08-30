@@ -18,8 +18,10 @@ import {
   type CareerPlaybookRuntime,
 } from './runtime';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
@@ -166,6 +168,11 @@ export function buildBlockRegeneratorPromptVariables(
     // invents a third value: it is told the block is wrong but not what right is.
     metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
       getCareerPlaybookMetricLedger(input.roleProfileSpec)
+    ),
+    // Same reasoning for rhythms: a regeneration prompted by a cadence conflict
+    // is told which block is wrong, and needs to be told which rhythm is right.
+    cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+      getCareerPlaybookCadenceLedger(input.roleProfileSpec)
     ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(input.roleProfileSpec)

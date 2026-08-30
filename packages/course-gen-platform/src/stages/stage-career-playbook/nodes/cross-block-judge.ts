@@ -44,8 +44,10 @@ import {
   type CareerPlaybookQualityCheckContext,
 } from './quality-checks';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
@@ -602,6 +604,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       ? {
           metricLedger: getCareerPlaybookMetricLedger(state.roleProfileSpec),
           evidenceLedger: getCareerPlaybookEvidenceLedger(state.roleProfileSpec),
+          cadenceLedger: getCareerPlaybookCadenceLedger(state.roleProfileSpec),
           generatedOn: state.roleProfileSpec.generated_on,
           businessContextMode: state.qaData
             ? getCareerPlaybookBusinessContext(state.qaData).mode
@@ -663,6 +666,9 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           ),
           metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
             getCareerPlaybookMetricLedger(state.roleProfileSpec)
+          ),
+          cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+            getCareerPlaybookCadenceLedger(state.roleProfileSpec)
           ),
           evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
             getCareerPlaybookEvidenceLedger(state.roleProfileSpec)

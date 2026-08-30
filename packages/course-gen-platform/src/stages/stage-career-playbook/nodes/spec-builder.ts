@@ -34,6 +34,7 @@ import {
 } from './runtime';
 import {
   buildCareerPlaybookEvidenceLedger,
+  normalizeCareerPlaybookCadenceLedger,
   normalizeCareerPlaybookMetricLedger,
   reconcileMetricLedgerSourceRefs,
 } from './quality-ledger';
@@ -325,6 +326,7 @@ export function applyCareerPlaybookLedgers(
   return {
     ...spec,
     metric_ledger: metricLedger,
+    cadence_ledger: normalizeCareerPlaybookCadenceLedger(spec.cadence_ledger),
     evidence_ledger: evidenceLedger,
     generated_on: isoDate,
   };

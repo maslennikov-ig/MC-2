@@ -684,6 +684,29 @@ export const CareerPlaybookMetricLedgerEntrySchema = z.object({
 export type CareerPlaybookMetricLedgerEntry = z.infer<typeof CareerPlaybookMetricLedgerEntrySchema>;
 
 /**
+ * One recurring commitment and the single rhythm it runs on.
+ *
+ * The numeric ledger fixed conflicting thresholds; rhythms had no owner, so
+ * every block declared its own. The 2026-08-30 run stated the pipeline review
+ * as weekly in six blocks and quarterly in five, which produced five separate
+ * judge complaints about one disagreement — and no single-block regeneration
+ * could resolve any of them, because rewriting one side just moved the conflict
+ * to the other. `cadence` is a free string here and normalized onto the fixed
+ * vocabulary in `quality-ledger.ts`, the same division of labour the metric
+ * ledger uses: ask the model, then make the answer conform.
+ */
+export const CareerPlaybookCadenceLedgerEntrySchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  cadence: z.string().min(1),
+  owner: z.string().default(''),
+  scope: z.string().default(''),
+});
+export type CareerPlaybookCadenceLedgerEntry = z.infer<
+  typeof CareerPlaybookCadenceLedgerEntrySchema
+>;
+
+/**
  * One citable source. Filled deterministically by the application from the web
  * research result, never by the model: the model previously wrote "research
  * shows" with no traceable URL because sources stopped at the spec-builder
@@ -730,6 +753,10 @@ export const CareerPlaybookRoleProfileSpecSchema = z.object({
   // threshold in the guide. Defaults to empty so specs persisted before the
   // quality contract still parse and round-trip.
   metric_ledger: z.array(CareerPlaybookMetricLedgerEntrySchema).default([]),
+  // Canonical rhythm ledger: what the metric ledger is to numbers, this is to
+  // recurring commitments. Defaults to empty so specs persisted before it
+  // existed still parse and round-trip.
+  cadence_ledger: z.array(CareerPlaybookCadenceLedgerEntrySchema).default([]),
   // Citable sources, application-filled. Anything the model puts here is
   // discarded and overwritten by the real research result.
   evidence_ledger: z.array(CareerPlaybookEvidenceEntrySchema).default([]),

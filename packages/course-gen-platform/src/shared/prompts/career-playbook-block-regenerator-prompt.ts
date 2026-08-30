@@ -31,6 +31,9 @@ Return only markdown for this one block.
 
 - Numbers: reproduce every value from the metric ledger VERBATIM. If the issue is a metric conflict,
   align the block to the ledger — never invent a third value to split the difference.
+- Rhythms: reproduce the cadence of every commitment from the cadence ledger VERBATIM. If the issue
+  is a cadence conflict, this block is the one that must change; align it to the rhythm the issue
+  names and leave every other block alone.
 - External statistics: allowed only with a [Sn] reference to the evidence ledger. Without a matching
   entry, rewrite without the precise number.
 - Unverified company-specific values (salary, bonus, ARR, budget, person name, internal tool) keep
@@ -50,6 +53,9 @@ RoleProfileSpec:
 
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
+
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
 
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
@@ -79,6 +85,11 @@ Content language: {{content_language}}`,
     {
       name: 'metric_ledger_md',
       description: 'Canonical metric ledger rendered as a markdown table',
+      required: true,
+    },
+    {
+      name: 'cadence_ledger_md',
+      description: 'Canonical recurring rhythms rendered as a markdown table',
       required: true,
     },
     {

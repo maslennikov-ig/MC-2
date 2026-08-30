@@ -111,6 +111,7 @@ export function scoreCareerPlaybook(
   const context: CareerPlaybookQualityCheckContext = {
     metricLedger: spec?.metric_ledger ?? [],
     evidenceLedger: spec?.evidence_ledger ?? [],
+    cadenceLedger: spec?.cadence_ledger ?? [],
     generatedOn: spec?.generated_on,
     businessContextMode: input.businessContextMode ?? spec?.business_context?.mode ?? 'universal',
     publishedAntiGoals: blocks.block_2?.content ? [blocks.block_2.content] : [],

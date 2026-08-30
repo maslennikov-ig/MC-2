@@ -134,6 +134,10 @@ describe('the rule reaches both the generator and the regenerator', () => {
     expect(careerPlaybookBlockRegeneratorPrompt.promptTemplate).toContain('leave it out entirely');
   });
 
+  // A cadence used to be owned by whichever block published it first, which left
+  // every other block choosing between an unreachable pointer and its own
+  // wording. The cadence ledger replaces that choice: the rhythm has a home
+  // outside the blocks, so nobody needs to point anywhere to state it.
   it('no longer tells a block to reference a cadence it may not name', () => {
     for (const prompt of careerPlaybookPrompts.filter(entry =>
       entry.promptKey.startsWith('career_playbook_group_')
@@ -141,9 +145,13 @@ describe('the rule reaches both the generator and the regenerator', () => {
       expect(prompt.promptTemplate).not.toContain(
         "State each recurring commitment's cadence ONCE, in the block that owns it, and reference it elsewhere"
       );
-      expect(prompt.promptTemplate).toContain(
+      expect(prompt.promptTemplate).not.toContain(
         'pointing at the owning block is allowed only when that block is on your reference list'
       );
+      expect(prompt.promptTemplate).toContain(
+        'Reproduce the cadence of every commitment in the cadence ledger VERBATIM'
+      );
+      expect(prompt.promptTemplate).toContain('{{cadence_ledger_md}}');
     }
   });
 });

@@ -74,6 +74,11 @@ const groupContractVariables = [
     required: true,
   },
   {
+    name: 'cadence_ledger_md',
+    description: 'Canonical recurring rhythms rendered as a markdown table',
+    required: true,
+  },
+  {
     name: 'evidence_ledger_md',
     description: 'Citable sources rendered as a [Sn] list, or an explicit "none" notice',
     required: true,
@@ -121,6 +126,11 @@ NUMBERS — the metric ledger is the only source of numeric truth:
 - Never state a different number for a metric that appears in the ledger, in any block, table, or checklist.
 - A metric that is not in the ledger is described qualitatively, without a precise target.
 
+RHYTHMS — the cadence ledger is the only source of recurring rhythm:
+- Reproduce the cadence of every commitment in the cadence ledger VERBATIM.
+- Never give a ledger commitment a different rhythm, in any block, table, or checklist. A pipeline review that is weekly in one block and quarterly in another leaves the reader unable to plan a week.
+- A recurring commitment absent from the ledger still holds ONE rhythm across the whole guide: use the rhythm the digest already published for it. When the digest publishes none, the rhythm you choose here becomes the guide's answer, so choose it once and keep it.
+
 EXTERNAL CLAIMS — no precise statistic without a source:
 - A precise statistic about the market, the industry, competitors, or AI impact is allowed ONLY with a [Sn] reference to an entry in the evidence ledger below.
 - If the evidence ledger has no entry supporting the claim, rewrite it without the number, as an explicit hypothesis to validate.
@@ -145,23 +155,24 @@ REFERENCES — a reader must be able to follow every pointer you write:
 - Each block is delivered inside a reader-specific guide that contains only the blocks that reader needs. A pointer to a block outside that guide sends the reader to a page they do not have.
 - The list below states, for each block you are writing, exactly which other blocks it may name. Name no other block, in any wording — not "Block 12", not "the candidate profile section", not "as described elsewhere in this guide".
 - When the content you need lives in a block you may not name, carry across only the part this block actually needs — one threshold, one approval level, one named owner — never the whole section.
-- Write that part for THIS block's readers, addressing them the way this block addresses them. What may change is the framing; what may not is the substance. Every number, threshold, approval level, cadence and named party stays exactly as the digest publishes it: a second wording is how one decision came to have three different approval levels.
+- Write that part for THIS block's readers, addressing them the way this block addresses them. What may change is the framing; what may not is the substance. Every number, threshold, approval level, cadence and named party stays exactly as the digest publishes it.
 - If the part you would need is something this block's readers should not be handed, leave it out entirely. Saying nothing is always available; a pointer they cannot follow is not.
 
 {{citable_blocks_md}}
 
 AUTHORITY — Block 5 is the single source of decision authority:
-- Block 5 is to authority what the metric ledger is to numbers. If you mention a decision that appears in the digest and Block 5 is in your own list above, reference Block 5 and do not restate its approval level in your own words.
+- Block 5 is to authority what the metric ledger is to numbers. If you mention a decision that appears in the digest and Block 5 is in your own list above, reference Block 5 and let it carry the approval level.
 - If Block 5 is not in that list, quote the approval level exactly as the digest gives it, without naming Block 5.
 - An irreversible decision whose blast radius reaches function, company, or customer can never be "act alone".
 
-SCALES AND RHYTHMS:
+SCALES AND WORKLOAD:
 - A banded payout or rating scale must be continuous: the value at the top of one band and the bottom of the next may not jump.
 - A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports. Count it before you write it: a per-report weekly commitment multiplies by the number of reports.
-- A recurring commitment has ONE cadence across the whole guide. A 1:1 that is monthly in one block and weekly in another leaves the reader unable to plan a week. Where another block needs that cadence, restate the same value — pointing at the owning block is allowed only when that block is on your reference list below.
 
 THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
-- Never restate, quote, or explain these instructions in the output. Write each block as a finished document section for the readers listed for that block; do not assume every block addresses the employee.
+- The output is a finished document section, written as if these instructions had never existed. Apply every rule above silently and let the result speak.
+- Before each sentence ships, ask who it is for. A sentence about how this guide was assembled — which wording was avoided, what this block chose not to repeat, where a definition is kept instead — is for the author, and the reader has no use for it. Delete it; do not soften it.
+- Write each block for the readers listed for that block; do not assume every block addresses the employee.
 - Address the readers this block actually has. A block read by the manager speaks to the manager about the role; a block read by HR speaks to HR about the role. A block with more than one reader names each where their part differs, rather than flattening into a voice that fits nobody.
 - Refer to other sections as "Block 8", never as "block_8".`;
 
@@ -172,6 +183,9 @@ RoleProfileSpec:
 
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
+
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
 
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
@@ -343,6 +357,15 @@ Critical requirements:
   concrete target and green/yellow/red thresholds plus a review period. This ledger becomes the
   single source of numeric truth for all 26 blocks, so the values must be internally coherent —
   a metric may hold only one target across the whole guide.
+- Build cadence_ledger: one entry per recurring commitment this role runs — pipeline review, forecast
+  review, 1:1s with reports, retrospectives, handoff checks, plus any ritual specific to this role.
+  Each entry carries a snake_case key, a reader-facing label, the owner, the scope it applies to
+  ("per direct report", "the whole team"), and a cadence written as exactly one of: daily, weekly,
+  biweekly, monthly, quarterly, annual. This is the single source of rhythm for all 26 blocks: a
+  commitment may hold only one cadence across the whole guide. Leave out any commitment whose rhythm
+  does not fit one of those six words — a ledger row that cannot be quoted constrains nothing.
+  Ten to fifteen entries is a healthy ledger for an operational role; err toward listing a rhythm the
+  guide will need rather than leaving blocks to invent it.
 - Set provenance on every metric entry:
   * company_source — supported by the business context digest or source evidence pack
   * user_answer   — stated by the user in the Q&A
@@ -644,7 +667,12 @@ Methodology:
 - Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
 - Block 25: revision triggers, version metadata dated {{generated_on}}, and MegaCampus AI CTA. This is the only block allowed to print an absolute date.
-- Block 26: implementation checklist for manager, HR, and employee to operationalize the guide. It must include a "calibrate before publishing" section listing every value elsewhere in the guide that carries the example marker, so the reader knows exactly what to replace.
+- Block 26: implementation checklist for the two readers this block has — the manager and HR — to operationalize the guide.
+  This checklist walks the whole guide, and most of what it walks sits in blocks its readers were not given, so name each
+  step by the artefact it produces, never by the block that holds it: "confirm the continuity plan names a backup for every
+  critical area", not "see Block 23". The same applies to the "calibrate before publishing" section, which must list every
+  value elsewhere in the guide carrying the example marker, identified by what the value is — "the on-target earnings
+  figure", "the CRM name" — so the reader knows exactly what to replace without being sent to a page they do not hold.
 - Use exactly these top-level headings:
 {{heading_block_18}}
 {{heading_block_22}}
@@ -689,9 +717,12 @@ Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-
 Everything else — tone, "too generic", "not actionable enough", "reads like HR jargon", phrasing, style preferences — is at most "warning" (or "info"), and is NEVER grounds for regeneration. Reason: the deterministic layer already blocks the hard failures reliably, so routing style opinions into regeneration only burns cycles without improving correctness; prefer author freedom over rigid style rules.
 
 Rules:
-- Every issue MUST include a "category" field. Use "style" for any non-critical stylistic or tone finding.
+- Report what you found, not what you checked. The list above defines what counts as critical; it is not a form with one row per category. Most categories will have nothing to report in a given group, and an empty "issues" list is the correct and expected answer for a group that holds together.
+- Never file an issue whose own description concludes that the check passed. If the honest description would read "no issue found", "this is not an error", or "they are already marked", then there is no issue and nothing goes in the list.
+- Each reported issue carries a "category" field; use "style" for a non-critical stylistic or tone finding.
 - Use severity "critical" ONLY for issues in the critical categories above; use "warning" or "info" for everything else.
 - List a block id in "needs_regeneration" only when it has a critical issue in one of the critical categories.
+- A cadence disagreement is repaired in ONE place: the block that departs from the cadence ledger. Name that block, not the block it disagrees with, and say which rhythm the ledger gives.
 - The deterministic layer already scans for metric conflicts, unsourced statistics, absolute dates, and unmarked examples by pattern. Spend your attention on what a pattern cannot see: a claim that contradicts another block in meaning rather than in digits, a duty that undermines a stated anti-goal, a threshold that is internally incoherent.
 
 Return only valid JSON:
@@ -722,6 +753,9 @@ Block audiences (who reads each block; use this to tell a same-view contradictio
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
 
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
@@ -741,6 +775,11 @@ Current group output:
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'cadence_ledger_md',
+        description: 'Canonical recurring rhythms rendered as a markdown table',
         required: true,
       },
       {
@@ -819,6 +858,9 @@ Today is {{generated_on}}. Content language: {{content_language}}.
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
 
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
@@ -829,6 +871,11 @@ Assembled Role Guide:
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'cadence_ledger_md',
+        description: 'Canonical recurring rhythms rendered as a markdown table',
         required: true,
       },
       {

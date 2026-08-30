@@ -32,8 +32,10 @@ import {
   type CareerPlaybookRuntime,
 } from './runtime';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
 } from './quality-ledger';
@@ -116,6 +118,9 @@ export function createCareerPlaybookProofreaderNode(
         full_document: document,
         metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
           getCareerPlaybookMetricLedger(state.roleProfileSpec)
+        ),
+        cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+          getCareerPlaybookCadenceLedger(state.roleProfileSpec)
         ),
         evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
           getCareerPlaybookEvidenceLedger(state.roleProfileSpec)

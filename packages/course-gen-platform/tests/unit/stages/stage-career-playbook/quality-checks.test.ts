@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookCadenceLedgerEntry,
   CareerPlaybookEvidenceEntry,
   CareerPlaybookMetricLedgerEntry,
 } from '@megacampus/shared-types';
@@ -513,6 +514,35 @@ describe('validateContractLeakage', () => {
 
     expect(issues).toEqual([]);
   });
+
+  // All three verbatim from playbook d5137bc5 (2026-08-30). Each explains the
+  // document's own construction to a reader who is trying to do a job.
+  it.each([
+    ['block_26', 'Do not restate these levels in different words anywhere else in this guide.'],
+    [
+      'block_17',
+      'This section does not restate the full metric definitions — the table above carries the exact thresholds this block needs.',
+    ],
+    [
+      'block_13',
+      'There are two cadences here — do not merge them; this block does not redefine either one.',
+    ],
+  ])('flags the rule about writing that shipped to the reader in %s', (blockId, line) => {
+    const issues = validateContractLeakage(blocks({ [blockId]: line }), context());
+
+    const leak = issues.find(item => item.category === 'contradiction');
+    expect(leak).toBeDefined();
+    expect(leak?.block_id).toBe(blockId);
+    expect(leak?.severity).toBe('critical');
+  });
+
+  it.each([
+    ['in other words', 'The quota is 4M, in other words about 330K a month.'],
+    ['другими словами', 'Квота — 4 млн, другими словами около 330 тысяч в месяц.'],
+    ['a repeat that is about the work', 'Repeat the discovery call whenever the buyer changes.'],
+  ])('leaves ordinary prose alone: %s', (_label, line) => {
+    expect(validateContractLeakage(blocks({ block_18: line }), context())).toEqual([]);
+  });
 });
 
 describe('validateUnsourcedStatistics citation support', () => {
@@ -683,6 +713,14 @@ describe('validateSourceAttribution', () => {
   });
 });
 
+const PIPELINE_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
+  key: 'pipeline_review',
+  label: 'Pipeline review',
+  cadence: 'weekly',
+  owner: 'Sales manager',
+  scope: 'the whole team',
+};
+
 describe('validateCadenceConsistency', () => {
   it('flags the real weekly/monthly 1:1 contradiction across blocks', () => {
     const issues = validateCadenceConsistency(
@@ -697,6 +735,57 @@ describe('validateCadenceConsistency', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].category).toBe('contradiction');
     expect(issues[0].description).toContain('one-to-one');
+    // Block 4 publishes the rhythm first, so block 15 is the deviation and the
+    // one that can repair it alone. The previous implementation sorted the block
+    // ids as strings, which put "block_4" after "block_15" and named the block
+    // that was right.
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('monthly');
+  });
+
+  // The 2026-08-30 shape: eleven blocks, one disagreement, and a regeneration
+  // loop that could never converge because only one block was ever named.
+  it('names every block that departs from the ledger, not one of them', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'Own the weekly pipeline review for the whole team.',
+        block_4: '| **Weekly** | Pipeline review with the team |',
+        block_13: 'The quarterly pipeline review is where coverage gaps surface.',
+        block_14: 'Join the quarterly pipeline review from week 4.',
+        block_16: 'Step 3: the quarterly pipeline review.',
+      }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues.map(item => item.block_id).sort()).toEqual(['block_13', 'block_14', 'block_16']);
+    for (const item of issues) {
+      expect(item.description).toContain('weekly');
+      expect(item.description).toContain('the cadence ledger');
+      expect(item.suggestion).toContain('Change nothing in the other blocks');
+    }
+  });
+
+  it('flags a single block that departs from the ledger with nothing to disagree with', () => {
+    const issues = validateCadenceConsistency(
+      blocks({ block_16: 'Step 3: the quarterly pipeline review.' }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_16');
+    expect(issues[0].description).toContain('weekly');
+  });
+
+  it('accepts a rhythm that matches the ledger in every block', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'Own the weekly pipeline review for the whole team.',
+        block_16: 'Step 3: the weekly pipeline review.',
+      }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it('accepts one cadence stated in several blocks', () => {

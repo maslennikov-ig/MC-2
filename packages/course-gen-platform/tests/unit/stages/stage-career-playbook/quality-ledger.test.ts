@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { CareerPlaybookMetricLedgerEntry } from '@megacampus/shared-types';
 import {
   buildCareerPlaybookEvidenceLedger,
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  normalizeCareerPlaybookCadence,
+  normalizeCareerPlaybookCadenceLedger,
   normalizeCareerPlaybookMetricLedger,
   reconcileMetricLedgerSourceRefs,
 } from '@/stages/stage-career-playbook/nodes/quality-ledger';
@@ -355,5 +358,84 @@ describe('parseRoleProfileSpecFromLLM metric ledger resilience', () => {
     );
 
     expect(spec.metric_ledger[0].provenance).toBe('assumption');
+  });
+});
+
+// The cadence ledger exists because the 2026-08-30 run stated the pipeline
+// review weekly in six blocks and quarterly in five, and no single-block rewrite
+// could reconcile them. Same treatment as the metric ledger: the model answers,
+// this module makes the answer conform.
+describe('normalizeCareerPlaybookCadenceLedger', () => {
+  it('normalizes the key and reads a rhythm written in either language', () => {
+    const ledger = normalizeCareerPlaybookCadenceLedger([
+      {
+        key: 'Pipeline Review!',
+        label: '  Pipeline review  ',
+        cadence: 'Every week',
+        owner: 'Manager',
+        scope: 'team',
+      },
+      { key: 'forecast', label: 'Forecast review', cadence: 'ежемесячно', owner: '', scope: '' },
+    ]);
+
+    expect(ledger).toHaveLength(2);
+    expect(ledger[0]).toMatchObject({
+      key: 'pipeline_review',
+      label: 'Pipeline review',
+      cadence: 'weekly',
+    });
+    expect(ledger[1]).toMatchObject({ key: 'forecast', cadence: 'monthly' });
+  });
+
+  it('keeps the first answer when the model states a commitment twice', () => {
+    const ledger = normalizeCareerPlaybookCadenceLedger([
+      { key: 'pipeline_review', label: 'Pipeline review', cadence: 'weekly', owner: '', scope: '' },
+      {
+        key: 'pipeline_review',
+        label: 'Pipeline review',
+        cadence: 'quarterly',
+        owner: '',
+        scope: '',
+      },
+    ]);
+
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].cadence).toBe('weekly');
+  });
+
+  it('drops a row whose rhythm cannot be quoted, as it constrains nothing', () => {
+    expect(
+      normalizeCareerPlaybookCadenceLedger([
+        { key: 'ritual', label: 'Deal desk', cadence: 'as needed', owner: '', scope: '' },
+      ])
+    ).toEqual([]);
+  });
+
+  it('recognises only the six words the checker can also see', () => {
+    expect(normalizeCareerPlaybookCadence('Quarterly')).toBe('quarterly');
+    expect(normalizeCareerPlaybookCadence('раз в две недели')).toBe('biweekly');
+    expect(normalizeCareerPlaybookCadence('twice a week')).toBeNull();
+    expect(normalizeCareerPlaybookCadence('')).toBeNull();
+  });
+});
+
+describe('formatCareerPlaybookCadenceLedgerForPrompt', () => {
+  it('renders a table a block can quote from', () => {
+    const rendered = formatCareerPlaybookCadenceLedgerForPrompt([
+      {
+        key: 'pipeline_review',
+        label: 'Pipeline review',
+        cadence: 'weekly',
+        owner: 'Manager',
+        scope: 'the whole team',
+      },
+    ]);
+
+    expect(rendered).toContain('| Commitment | Cadence | Owner | Scope |');
+    expect(rendered).toContain('| Pipeline review | weekly | Manager | the whole team |');
+  });
+
+  it('says so explicitly when no rhythm was declared', () => {
+    expect(formatCareerPlaybookCadenceLedgerForPrompt([])).toContain('none —');
   });
 });
