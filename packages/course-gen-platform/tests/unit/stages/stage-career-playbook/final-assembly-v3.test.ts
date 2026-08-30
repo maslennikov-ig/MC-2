@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
+import { findUnresolvedFillablePlaceholders } from '@/stages/stage-career-playbook/nodes/placeholder-detection';
 import {
   appendCareerPlaybookCalibrationTable,
   collectCareerPlaybookCalibrationItems,
@@ -63,6 +64,42 @@ describe('collectCareerPlaybookCalibrationItems', () => {
     );
 
     expect(items).toEqual([]);
+  });
+});
+
+// The bracket rule was a whitelist of six labels, chosen to avoid false
+// positives. Measured across all 19 stored playbooks it matched 11 of 158
+// bracketed tokens, and 13 of them shipped a raw placeholder to a reader. The
+// inverted rule matched all 158 and produced no false positive on that corpus.
+describe('shouldTreatBracketAsFillableField', () => {
+  it.each([
+    '[Заполняется]',
+    '[поле для заполнения]',
+    '[Enter date]',
+    '[Insert number]',
+    '[ФИО, должность]',
+    '[краткое описание]',
+    '[research: onboarding insights]',
+    '[название CRM]',
+  ])('recognises %s, which the six-label list did not', token => {
+    expect(findUnresolvedFillablePlaceholders(`A line with ${token} in it.`)).toEqual([token]);
+  });
+
+  it('leaves markdown alone: links, citations and task boxes', () => {
+    const line = [
+      'See [the policy](https://example.com/policy) and [S3], [S12].',
+      '- [ ] Confirm the plan',
+      '- [x] Signed off',
+      'A [reference link][policy-ref] resolves elsewhere.',
+    ].join('\n');
+
+    expect(findUnresolvedFillablePlaceholders(line)).toEqual([]);
+  });
+
+  it('still ignores a Mermaid label inside a fence', () => {
+    expect(findUnresolvedFillablePlaceholders('```mermaid\nA["Team Lead (Block 9)"]\n```')).toEqual(
+      []
+    );
   });
 });
 

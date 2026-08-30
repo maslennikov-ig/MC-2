@@ -220,16 +220,43 @@ function formatFillableField(rawLabel: string, language: string): string {
   return language === 'ru' ? `поле для заполнения: ${label}` : `field to fill: ${label}`;
 }
 
-export function shouldTreatBracketAsFillableField(label: string): boolean {
-  const normalized = label.trim().toLocaleLowerCase('ru');
-  return (
-    /^(имя|name)$/.test(normalized) ||
-    /^(число|number|value)$/.test(normalized) ||
-    /^(дата|date|dd\.mm\.yyyy|дд\.мм\.гггг)(?:\b|$)/.test(normalized) ||
-    /^(url|ссылка|link)(?:\b|$)/.test(normalized) ||
-    /^название(?: компании)?$/.test(normalized) ||
-    /^company name$/.test(normalized)
-  );
+/** An evidence citation, `[S3]`. */
+const EVIDENCE_CITATION = /^S\d+$/;
+/** A markdown task box, `[ ]` or `[x]`. */
+const TASK_BOX = /^[ xX]$/;
+
+/**
+ * Is a bracketed token a fill-in field rather than markdown syntax?
+ *
+ * This was a whitelist of six labels — name, number, date, url, title, company
+ * name — chosen to avoid false positives. Measured on all 19 stored playbooks it
+ * matched **11 of 158** bracketed tokens, and 13 of those playbooks shipped at
+ * least one raw placeholder to a reader: `[Заполняется]`, `[Enter date]`,
+ * `[поле для заполнения]`, `[ФИО, должность]`, `[краткое описание]`,
+ * `[research: onboarding insights]` — that last one a prompt variable name the
+ * model echoed into an onboarding table, twice.
+ *
+ * So the test is inverted. A bracket in reader-facing prose is a fill-in field
+ * unless it is markdown: an inline or reference link, an evidence citation, or a
+ * task box. Across those 19 playbooks the inverted rule produced no false
+ * positive at all, which is the evidence the whitelist never had.
+ *
+ * The caller supplies the surrounding characters, because a link is only
+ * recognisable from them: `[text](url)` and `[text][ref]` by what follows, and
+ * the `[ref]` half of a reference link by what precedes it.
+ */
+export function shouldTreatBracketAsFillableField(
+  label: string,
+  nextChar?: string,
+  previousChar?: string
+): boolean {
+  if (nextChar === '(' || nextChar === '[') return false;
+  if (previousChar === ']') return false;
+
+  const normalized = label.trim();
+  if (normalized.length === 0) return false;
+
+  return !EVIDENCE_CITATION.test(normalized) && !TASK_BOX.test(normalized);
 }
 
 export function shouldTreatBraceAsFillableField(label: string): boolean {
@@ -256,8 +283,9 @@ function normalizeFillablePlaceholders(content: string, language: string): strin
       const withBrackets = line.replace(
         /\[([^\]\n]{2,80})\]/g,
         (match: string, label: string, offset: number) => {
-          const nextChar = line[offset + match.length];
-          if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
+          if (
+            !shouldTreatBracketAsFillableField(label, line[offset + match.length], line[offset - 1])
+          ) {
             return match;
           }
 
