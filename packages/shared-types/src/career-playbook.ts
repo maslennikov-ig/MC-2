@@ -634,6 +634,12 @@ export const CareerPlaybookNodeCostSchema = z.object({
   generation_id: z.string().min(1).optional(),
   provider_name: z.string().min(1).optional(),
   billed_by_provider: z.boolean().optional(),
+  // Which tier actually served the call — `flex` is half price and may refuse
+  // for capacity, so whether a run got the discount is a fact about the receipt,
+  // not about the routing decision. Absent here, the only evidence is arithmetic
+  // on the total, and on 2026-08-30 that absence read as "flex is not in use"
+  // for a run in which every luna call had been served by it.
+  service_tier: z.string().min(1).optional(),
 });
 export type CareerPlaybookNodeCost = z.infer<typeof CareerPlaybookNodeCostSchema>;
 
