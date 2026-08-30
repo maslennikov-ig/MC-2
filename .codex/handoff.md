@@ -9,19 +9,15 @@ live in `.codex/repository-failure-modes.md`; this file says what still binds wo
 
 Accepted stage id: `mc2-1786710715922-25-db11a6c5`
 
-Role Guide audience views and measurable repetition are accepted on `develop` at `bf7de071f`.
-Canonical employee/manager/HR views contain 20/20/14 stored blocks and cover all 27 ids; persisted
-`final_markdown` remains full. Canonical `do_not_repeat` and the final-only 0.85 semantic gate are
-audience-scoped and provider failure is fail-closed. The prior-blocks digest is **not** audience-
-scoped and is now **one section per group**, not one per target (see below). Against the
-14-playbook baseline, too-close rates fell from 8/6,594 (0.12%) to 0/471 and from 18/6,829 (0.26%)
-to 0/375. The accepted exact dev row carried 34 cost records, including two Jina rows with 49,026
-tokens / $0.0024513, and total cost $0.073384245. Root read all four documents; exact cleanup left
-0 playbook and 0 job-status rows. The first generation exposed the window-cap defect and was
-rejected; the owner authorized the successful second generation after `bf7de071f`. Full evidence is
-in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md` and
-`docs/career-playbook/2026-08-29-role-guide-audience-acceptance.md`. The stage also closes
-`mc2-1786710716114-26-01631777`.
+Role Guide audience views and measurable repetition are accepted on `develop` at `bf7de071f`, and the
+stage also closes `mc2-1786710716114-26-01631777`. Canonical employee/manager/HR views contain
+20/20/14 stored blocks and cover all 27 ids; persisted `final_markdown` remains full. Canonical
+`do_not_repeat` and the final-only 0.85 semantic gate are audience-scoped and fail closed on provider
+error. The prior-blocks digest is **not** audience-scoped and is now one section per group. Against
+the 14-playbook baseline, too-close rates fell from 8/6,594 to 0/471 and from 18/6,829 to 0/375; the
+accepted dev row cost $0.073384245 over 34 records. Full evidence:
+`.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md` and
+`docs/career-playbook/2026-08-29-role-guide-audience-acceptance.md`.
 
 Three follow-ups closed on `develop` at `070b19865`, CI green with Deploy to Dev green on its own
 conclusion. `mc2-spkoj`: the acceptance measurer's `--mode evaluation` now reads the production
@@ -35,8 +31,18 @@ playbook), and a numeric commitment needs a comparator, a unit, a currency or a 
 just a digit somewhere on the line (33% of all lines → 14%). With the collector honest the ceiling
 was measured, not guessed: **3,500 tokens**, the smallest value at which numeric commitments reach
 97% in every group, about +3,000 input tokens per playbook. `group_6_wrap` end to end: anti-goals
-64% → 100%, authority 3% → 100%, numbers 0% → 97%, cadences 0% → 56%. Nothing here is validated by a
-paid run — same block as `mc2-9d2ji`.
+64% → 100%, authority 3% → 100%, numbers 0% → 97%, cadences 0% → 56%.
+
+`mc2-c0pdn`: **a block may only point at a block its reader was given** — subset of audiences, not
+intersection, so `block_26` (manager+hr) may not cite `block_5` (employee+manager). A new
+`citable_blocks_md` prompt variable names the permitted targets per output block, the AUTHORITY rule
+is conditional on it, and `validateCrossViewReference` enforces it under a new
+`unreadable_reference` critical category. The regenerator gets the same list, or it would spend both
+attempts reproducing the defect. Before the change the HR view broke 72% of its cross-references and
+every playbook in the sample was affected.
+
+Nothing here is validated by a paid run — same block as `mc2-9d2ji`, and that run is now the way to
+measure the citation rule's "after".
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
@@ -226,10 +232,9 @@ Outside it, needing a fresh decision each time: reindex, force-push, secrets or 
 other production mutation, and any migration the plan does not name.
 
 Do not touch `mc2-x72bq`, `mc2-vlskb`, `mc2-hqfc3`, `mc2-8m90f` or `mc2-1nots`; see §9 of the active
-spec for exact reopen gates.
-
-Before claiming delivery, run `scripts/orchestration/check_stranded_commits.py`. `/push-dev` deletes
-the branch it delivered, so a report naming a branch again means something really was left behind.
+spec for exact reopen gates. Before claiming delivery, run
+`scripts/orchestration/check_stranded_commits.py`. `/push-dev` deletes the branch it delivered, so a
+report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
@@ -238,40 +243,35 @@ the branch it delivered, so a report naming a branch again means something reall
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- `mc2-9d2ji` / `mc2-923ku` / `mc2-eksyp` — code delivered in `c14e88c13`, each test proven red
-  against the pre-change source, CI green and Deploy to Dev green on its own conclusion. No
-  `prompt_templates` row shadows any of the eight edited keys, so the deployed code is what runs.
-  All three stay open: a prompt edit is a generation change and none is validated. They need ONE
-  paid dev run compared against `docs/career-playbook/2026-08-29-semantic-repetition-final.md`
-  (471 pairs, 0 at 0.85, max 0.8316; intra 375, 0, max 0.8096) — same English smoke fixture, so it
-  is a fair control. Blocked on the owner: `docs/career-playbook/live-smoke-dev-run.md` step 1
-  needs a browser JWT nobody else can mint.
-- `mc2-c0pdn` — **the audience views cannot ship as they are.** Measured on the 14 stored playbooks:
-  the employee view breaks 12% of its cross-references, the manager view 16%, the HR view **71%**.
-  Structural, not model noise — the group prompt tells every block to cite Block 5 and Block 5 is not
-  in the HR view; `block_23` is manager-only and is cited from the two summary blocks all three
-  readers get. Which reader gets which block is the owner's call; the engineering alternatives are an
-  audience-aware citation rule or repair at assembly. Method and numbers:
+- `mc2-9d2ji` / `mc2-923ku` / `mc2-eksyp` — delivered in `c14e88c13`, each test proven red against
+  the pre-change source, CI and Deploy to Dev green, and no `prompt_templates` row shadows any of the
+  eight edited keys. All three stay open because a prompt edit is a generation change and none is
+  validated. They need ONE paid dev run against
+  `docs/career-playbook/2026-08-29-semantic-repetition-final.md` (471 pairs, 0 at 0.85, max 0.8316;
+  intra 375, 0, max 0.8096) on the same English smoke fixture. Blocked on the owner:
+  `docs/career-playbook/live-smoke-dev-run.md` step 1 needs a browser JWT nobody else can mint.
+- `mc2-de3vu` — **owner decision, nothing blocked on engineering.** Which reader gets `block_5`,
+  `block_22`, `block_23`. On the 14 stored playbooks `block_5` in the HR view removes 28% of its
+  broken references before any generation, `block_23` in the employee view 55%. A checkbox in
+  `CAREER_PLAYBOOK_BLOCK_CATALOG.audiences` is now the only edit needed. Numbers:
   `docs/career-playbook/2026-08-30-role-guide-views-measurement.md`, re-run read-only with
   `pnpm exec tsx scripts/measure-role-guide-views.ts`.
 - `mc2-ehao2` — `buildRoleGuideView` has **no caller** in the API or `packages/web`; no reader
   receives a view today. It also reads raw `generatedBlocks`, so a view would ship without the
   diagrams, sources section and calibration table that `prepareCareerPlaybookFinalBlocks` adds.
 - `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
-  average 22.5 of 25. The 028 plan promised 13–19. Not a defect (the run measured 0/471), but the
-  selectivity question needs a paid A/B and is untouched until then.
-- `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5. Owner's trade, measured, not acted on.
+  average 22.5 of 25 against the 028 plan's 13–19. Not a defect (the run measured 0/471), but the
+  selectivity question needs a paid A/B. `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5;
+  the owner's trade, measured, not acted on.
 - `mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from a secret that does not exist.
   Not burning: the host carries 900 by some other means. It burns when `.env.production` is rewritten
-  and the infra stack recreated.
+  and the infra stack is recreated.
 - `mc2-ibzcc` is closed, but its docling-mcp 3.1.0 image is **neither published nor deployed** — that
   is the manual `build-docling-images.yml` workflow and a recorded `image@sha256`, a production
-  mutation of its own. `mc2-vlskb` stays open: 3.1.0 still drops
-  `service_timeout`/`service_max_retries`.
+  mutation of its own. `mc2-vlskb` stays open: 3.1.0 still drops `service_timeout`/`service_max_retries`.
 - `mc2-v6r1p` — two catalogue prices have drifted; the question is whether either model belongs in
   live routing at all. `mc2-z08mv` — revisit `glm-5.3` when it has more than one provider.
-- `mc2-pdcb7` — covers drawn without their visual style, fixed; whether to pay to redraw is the
-  owner's.
+  `mc2-pdcb7` — covers drawn without their visual style, fixed; whether to pay to redraw is the owner's.
 
 ## NotebookLM and languages
 
