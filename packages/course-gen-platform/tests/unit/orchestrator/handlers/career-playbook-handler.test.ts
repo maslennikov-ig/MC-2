@@ -81,6 +81,7 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
   // the parsed value always carries these; an older fixture without them no
   // longer deep-equals what the regenerator receives.
   metric_ledger: [],
+  cadence_ledger: [],
   evidence_ledger: [],
   block_boundaries: {},
   content_language: 'ru',
