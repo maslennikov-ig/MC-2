@@ -8,6 +8,7 @@ import {
   countMermaidDiagrams,
   createCrossBlockJudgeNode,
   isCareerPlaybookDeltaReJudgeEnabled,
+  downgradeUnconfirmedPlaceholderIssues,
   parseCareerPlaybookJudgeVerdict,
   runCareerPlaybookDeterministicChecks,
   selectDeltaReJudgeBlockIds,
@@ -1677,6 +1678,72 @@ flowchart LR
       expect(resolveJudgeFallbackTokenThreshold('0')).toBe(28_000);
       expect(resolveJudgeFallbackTokenThreshold('-5')).toBe(28_000);
       expect(resolveJudgeFallbackTokenThreshold('')).toBe(28_000);
+    });
+  });
+
+  // Verbatim from playbook d5137bc5 (2026-08-30). All eight of the run's
+  // unresolved_placeholder criticals pointed at the marker the contract requires
+  // an unverified company value to carry, and each one bought a regeneration
+  // that could only make a correct block worse.
+  describe('downgradeUnconfirmedPlaceholderIssues', () => {
+    const contractedMarker =
+      "| CRM (Salesforce, HubSpot) (example — replace with the company's actual CRM) | System of record |";
+
+    function placeholderIssue(blockId: string, description: string) {
+      return {
+        block_id: blockId,
+        severity: 'critical' as const,
+        category: 'unresolved_placeholder' as const,
+        description,
+        suggestion: 'Remove the placeholder.',
+      };
+    }
+
+    it('downgrades a placeholder critical the deterministic scan cannot confirm', () => {
+      const [issue] = downgradeUnconfirmedPlaceholderIssues(
+        [
+          placeholderIssue(
+            'block_8',
+            "Tool entries contain unresolved replacement instructions such as “example — replace with the company's actual CRM.”"
+          ),
+        ],
+        { block_8: { content: contractedMarker, status: 'generated', attempt: 1 } }
+      );
+
+      expect(issue.severity).toBe('warning');
+      expect(issue.description).toContain('contracted output rather than a placeholder');
+    });
+
+    it('leaves a critical alone when a real fill-in field is present', () => {
+      const [issue] = downgradeUnconfirmedPlaceholderIssues(
+        [placeholderIssue('block_23', 'The backup contact table is not filled in.')],
+        {
+          block_23: {
+            content: '| Backup contact | [name] | [date] |',
+            status: 'generated',
+            attempt: 1,
+          },
+        }
+      );
+
+      expect(issue.severity).toBe('critical');
+      expect(issue.description).not.toContain('downgraded');
+    });
+
+    it('touches nothing outside a placeholder critical', () => {
+      const issues = [
+        {
+          block_id: 'block_4',
+          severity: 'critical' as const,
+          category: 'contradiction' as const,
+          description: 'The pipeline review cadence disagrees.',
+          suggestion: 'Align it.',
+        },
+        placeholderIssue('block_8', 'Marker present.'),
+      ];
+      issues[1].severity = 'warning' as never;
+
+      expect(downgradeUnconfirmedPlaceholderIssues(issues, {})).toEqual(issues);
     });
   });
 });

@@ -46,6 +46,18 @@ describe('cross-block judge: a category is a description, not a checklist row', 
     expect(judge.promptTemplate).toContain('no issue found');
   });
 
+  // Eight of the run's criticals attacked the marker an unverified company value
+  // is required to carry. Two rules of one contract, pulling opposite ways.
+  it('says the example marker is contracted output, never a placeholder', () => {
+    expect(judge.promptTemplate).toContain(
+      'The example marker "(пример — заменить)" / "(example — replace)" is NOT one'
+    );
+    expect(judge.promptTemplate).toContain("(example — replace with the company's actual CRM)");
+    expect(judge.promptTemplate).toContain(
+      'a missing marker is the defect, a present one never is'
+    );
+  });
+
   it('routes a cadence disagreement to the one block that can repair it', () => {
     expect(judge.promptTemplate).toContain('A cadence disagreement is repaired in ONE place');
     expect(judge.promptTemplate).toContain('{{cadence_ledger_md}}');

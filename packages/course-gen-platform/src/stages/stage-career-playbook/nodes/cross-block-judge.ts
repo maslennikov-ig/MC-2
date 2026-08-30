@@ -362,11 +362,45 @@ function downgradeNonTaxonomyCriticalIssues(
   });
 }
 
+/**
+ * A judge `unresolved_placeholder` critical that the deterministic scan cannot
+ * confirm is downgraded to a warning.
+ *
+ * All eight of them in the 2026-08-30 run pointed at the contract's own example
+ * marker — "(example — replace with the company's actual CRM)" — which every
+ * unverified company-specific value is REQUIRED to carry. Two rules of the same
+ * contract pull opposite ways there, and the judge resolved it wrongly eight
+ * times; each one bought a regeneration that could only make a correct block
+ * worse. `validateFillablePlaceholderResolution` already owns this question and
+ * answers it from the text, so it decides.
+ */
+export function downgradeUnconfirmedPlaceholderIssues(
+  issues: CareerPlaybookJudgeIssue[],
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookJudgeIssue[] {
+  return issues.map(issue => {
+    if (issue.severity !== 'critical' || issue.category !== 'unresolved_placeholder') return issue;
+
+    const content = generatedBlocks[issue.block_id]?.content ?? '';
+    if (findUnresolvedFillablePlaceholders(content).length > 0) return issue;
+
+    return {
+      ...issue,
+      severity: 'warning' as const,
+      description: `${issue.description} — downgraded: the placeholder scan finds no fill-in field here, and the example marker is contracted output rather than a placeholder.`,
+    };
+  });
+}
+
 function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
-  llm: CareerPlaybookJudgeVerdict
+  llm: CareerPlaybookJudgeVerdict,
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): CareerPlaybookJudgeVerdict {
-  const gatedLLMIssues = downgradeNonTaxonomyCriticalIssues(llm.issues);
+  const gatedLLMIssues = downgradeUnconfirmedPlaceholderIssues(
+    downgradeNonTaxonomyCriticalIssues(llm.issues),
+    generatedBlocks
+  );
   const regenerationEligibleBlockIds = uniqueBlockIds(
     gatedLLMIssues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
@@ -693,7 +727,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         );
         nodeCosts.push(...judgeResult.nodeCosts);
         const llmVerdict = judgeResult.verdict;
-        verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict);
+        verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict, currentBlocks);
       } catch (error) {
         if (error instanceof StructuredJudgeOutputError) {
           nodeCosts.push(...error.nodeCosts);
