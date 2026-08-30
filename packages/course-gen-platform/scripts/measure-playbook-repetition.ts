@@ -5,36 +5,112 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
-import { generateEmbeddings, getJinaTokenStats, resetJinaTokenStats } from '@/shared/embeddings/jina-client';
+import {
+  generateEmbeddings,
+  getJinaTokenStats,
+  resetJinaTokenStats,
+} from '@/shared/embeddings/jina-client';
 import { jinaCostUsd } from '@/shared/jina/pricing';
+import { splitCareerPlaybookSemanticParagraphs } from '@/stages/stage-career-playbook/nodes/semantic-repetition';
+import {
+  CAREER_PLAYBOOK_SEMANTIC_PARAGRAPH_MIN_CHARACTERS,
+  CAREER_PLAYBOOK_SEMANTIC_REPETITION_THRESHOLD,
+} from '@/stages/stage-career-playbook/nodes/repetition-thresholds';
 import { QualityValidator } from '@/shared/validation/quality-validator';
+import { CAREER_PLAYBOOK_BLOCK_CATALOG } from '@megacampus/shared-types';
 
 export type BaselineAudience = 'employee' | 'manager' | 'hr';
+export type MeasurementMode = 'baseline' | 'evaluation';
 
-const CANONICAL_BLOCK_IDS = [
+/**
+ * The two modes deliberately read different sources.
+ *
+ * `baseline` reproduces the recorded 2026-08-29 phase-0 measurement, so every
+ * input it depends on is frozen here: moving a production checkbox must not
+ * silently rewrite a published historical number.
+ *
+ * `evaluation` grades a live playbook and therefore reads production directly.
+ * Specs 028 section 3 promises the owner can move any checkbox in
+ * `career-playbook-blocks.ts` without touching logic; that promise is only kept
+ * if the acceptance measurer follows the same catalogue and the same thresholds
+ * the pipeline uses.
+ */
+const HISTORICAL_BLOCK_IDS = [
   'header',
   ...Array.from({ length: 26 }, (_, index) => `block_${index + 1}`),
 ] as const;
 
+const PRODUCTION_BLOCK_IDS = CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => block.blockId);
+
+function canonicalBlockIds(mode: MeasurementMode): readonly string[] {
+  return mode === 'baseline' ? HISTORICAL_BLOCK_IDS : PRODUCTION_BLOCK_IDS;
+}
+
 /**
- * Phase-0-only copy of specs/028-role-guide-audiences/spec.md section 3.
- * Production does not yet expose an audience map, so the baseline must remain
- * independent of the later implementation while still measuring the same views.
+ * Frozen phase-0 copy of specs/028-role-guide-audiences/spec.md section 3.
+ * Historical-baseline reproduction only — evaluation uses
+ * {@link PRODUCTION_AUDIENCE_BLOCKS}.
  */
 export const BASELINE_AUDIENCE_BLOCKS: Readonly<Record<BaselineAudience, readonly string[]>> = {
   employee: [
-    'header', 'block_1', 'block_2', 'block_3', 'block_4', 'block_5', 'block_6', 'block_8',
-    'block_9', 'block_10', 'block_11', 'block_13', 'block_14', 'block_16', 'block_18',
-    'block_19', 'block_20', 'block_22', 'block_24', 'block_25',
+    'header',
+    'block_1',
+    'block_2',
+    'block_3',
+    'block_4',
+    'block_5',
+    'block_6',
+    'block_8',
+    'block_9',
+    'block_10',
+    'block_11',
+    'block_13',
+    'block_14',
+    'block_16',
+    'block_18',
+    'block_19',
+    'block_20',
+    'block_22',
+    'block_24',
+    'block_25',
   ],
   manager: [
-    'header', 'block_1', 'block_2', 'block_3', 'block_4', 'block_5', 'block_6', 'block_7',
-    'block_10', 'block_14', 'block_15', 'block_16', 'block_17', 'block_18', 'block_20',
-    'block_21', 'block_23', 'block_24', 'block_25', 'block_26',
+    'header',
+    'block_1',
+    'block_2',
+    'block_3',
+    'block_4',
+    'block_5',
+    'block_6',
+    'block_7',
+    'block_10',
+    'block_14',
+    'block_15',
+    'block_16',
+    'block_17',
+    'block_18',
+    'block_20',
+    'block_21',
+    'block_23',
+    'block_24',
+    'block_25',
+    'block_26',
   ],
   hr: [
-    'header', 'block_1', 'block_7', 'block_8', 'block_11', 'block_12', 'block_13',
-    'block_14', 'block_15', 'block_17', 'block_19', 'block_24', 'block_25', 'block_26',
+    'header',
+    'block_1',
+    'block_7',
+    'block_8',
+    'block_11',
+    'block_12',
+    'block_13',
+    'block_14',
+    'block_15',
+    'block_17',
+    'block_19',
+    'block_24',
+    'block_25',
+    'block_26',
   ],
 };
 
@@ -68,9 +144,42 @@ const BLOCK_LABELS: Readonly<Record<string, string>> = {
   block_26: 'Implementation checklist',
 };
 
+/** Live audience views, read from the same catalogue the pipeline judges with. */
+export const PRODUCTION_AUDIENCE_BLOCKS: Readonly<Record<BaselineAudience, readonly string[]>> =
+  Object.freeze(
+    Object.fromEntries(
+      (['employee', 'manager', 'hr'] as const).map(audience => [
+        audience,
+        CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block => block.audiences.includes(audience)).map(
+          block => block.blockId
+        ),
+      ])
+    ) as Record<BaselineAudience, readonly string[]>
+  );
+
+export function audienceBlocksForMode(
+  mode: MeasurementMode
+): Readonly<Record<BaselineAudience, readonly string[]>> {
+  return mode === 'baseline' ? BASELINE_AUDIENCE_BLOCKS : PRODUCTION_AUDIENCE_BLOCKS;
+}
+
 const REPORT_THRESHOLDS = [0.75, 0.8, 0.85, 0.9] as const;
-const MIN_PARAGRAPH_CHARACTERS = 100;
+/** Frozen phase-0 measurement unit; evaluation uses the production constant. */
+const BASELINE_MIN_PARAGRAPH_CHARACTERS = 100;
+/** The number the published baseline recorded; a drift check, not a live knob. */
 const RECORDED_BASELINE_THRESHOLD = 0.85;
+
+export function minParagraphCharactersForMode(mode: MeasurementMode): number {
+  return mode === 'baseline'
+    ? BASELINE_MIN_PARAGRAPH_CHARACTERS
+    : CAREER_PLAYBOOK_SEMANTIC_PARAGRAPH_MIN_CHARACTERS;
+}
+
+export function thresholdForMode(mode: MeasurementMode): number {
+  return mode === 'baseline'
+    ? RECORDED_BASELINE_THRESHOLD
+    : CAREER_PLAYBOOK_SEMANTIC_REPETITION_THRESHOLD;
+}
 export const HISTORICAL_BASELINE_COHORT_HASHES = [
   '6395b5f9cd2e',
   'e744615ce64f',
@@ -135,14 +244,15 @@ const validator = new QualityValidator();
 
 export function measureEmbeddedPlaybook(
   playbook: EmbeddedPlaybook,
-  threshold: number
+  threshold: number,
+  audienceBlocks: Readonly<Record<BaselineAudience, readonly string[]>> = BASELINE_AUDIENCE_BLOCKS
 ): EmbeddedPlaybookMeasurement {
   const byId = new Map(playbook.blocks.map(block => [block.blockId, block]));
   const views = {} as EmbeddedPlaybookMeasurement['views'];
   const viewPairs: SimilarityPair[] = [];
 
   for (const audience of ['employee', 'manager', 'hr'] as const) {
-    const blocks = BASELINE_AUDIENCE_BLOCKS[audience]
+    const blocks = audienceBlocks[audience]
       .map(blockId => byId.get(blockId))
       .filter((block): block is EmbeddedBlock => block !== undefined);
     let tooCloseCount = 0;
@@ -278,8 +388,7 @@ export async function embedTextsWithCheckpoint(
     throw new Error(`Embedding batch size must be between 1 and 100, got ${batchSize}`);
   }
   const embedBatch =
-    options.embedBatch ??
-    ((batch: string[]) => generateEmbeddings(batch, 'retrieval.passage'));
+    options.embedBatch ?? ((batch: string[]) => generateEmbeddings(batch, 'retrieval.passage'));
   const sleep =
     options.sleep ??
     ((milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds)));
@@ -300,7 +409,10 @@ export async function embedTextsWithCheckpoint(
       (sum, item) => sum + Math.ceil(Buffer.byteLength(item.text, 'utf8') / 3),
       0
     );
-    if (estimatedTokensInWindow > 0 && estimatedTokensInWindow + estimatedTokens > SAFE_TOKENS_PER_MINUTE) {
+    if (
+      estimatedTokensInWindow > 0 &&
+      estimatedTokensInWindow + estimatedTokens > SAFE_TOKENS_PER_MINUTE
+    ) {
       await sleep(RATE_LIMIT_WINDOW_MS);
       estimatedTokensInWindow = 0;
     }
@@ -320,7 +432,9 @@ export async function embedTextsWithCheckpoint(
       }
     }
     if (embeddings.length !== batch.length) {
-      throw new Error(`Jina returned ${embeddings.length} embeddings for a ${batch.length}-item batch`);
+      throw new Error(
+        `Jina returned ${embeddings.length} embeddings for a ${batch.length}-item batch`
+      );
     }
     for (let index = 0; index < batch.length; index += 1) {
       const embedding = embeddings[index];
@@ -377,7 +491,7 @@ export type MeasurementArgs =
   | {
       mode: 'evaluation';
       playbookId: string;
-      threshold: typeof RECORDED_BASELINE_THRESHOLD;
+      threshold: number;
       outputPath: string;
       cachePath: string;
     };
@@ -415,16 +529,24 @@ export function parseMeasurementArgs(argv: string[], cwd: string = process.cwd()
   );
 
   if (mode === 'evaluation') {
-    if (!playbookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(playbookId)) {
+    if (
+      !playbookId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+        playbookId
+      )
+    ) {
       throw new Error('evaluation mode requires a valid --playbook-id UUID');
     }
-    if (thresholdRaw === undefined || Number(thresholdRaw) !== RECORDED_BASELINE_THRESHOLD) {
-      throw new Error('evaluation mode requires fixed --threshold 0.85');
+    const productionThreshold = thresholdForMode('evaluation');
+    if (thresholdRaw === undefined || Number(thresholdRaw) !== productionThreshold) {
+      throw new Error(
+        `evaluation mode requires --threshold ${productionThreshold.toFixed(2)}, the production value`
+      );
     }
     if (argv.includes('--cohort-hash')) {
       throw new Error('evaluation mode does not accept --cohort-hash');
     }
-    return { mode, playbookId, threshold: RECORDED_BASELINE_THRESHOLD, outputPath, cachePath };
+    return { mode, playbookId, threshold: productionThreshold, outputPath, cachePath };
   }
 
   if (playbookId || thresholdRaw !== undefined) {
@@ -446,7 +568,16 @@ export function parseMeasurementArgs(argv: string[], cwd: string = process.cwd()
   return { mode, cohortHashes: selectedHashes, outputPath, cachePath };
 }
 
-export function splitSemanticParagraphs(markdown: string): string[] {
+/**
+ * Baseline keeps the frozen phase-0 splitter; evaluation calls the production
+ * one, so a change to how the pipeline sees a paragraph cannot pass acceptance
+ * unnoticed.
+ */
+export function splitSemanticParagraphs(
+  markdown: string,
+  mode: MeasurementMode = 'baseline'
+): string[] {
+  if (mode === 'evaluation') return splitCareerPlaybookSemanticParagraphs(markdown);
   return markdown
     .split(/\n\s*\n+/u)
     .map(paragraph =>
@@ -455,17 +586,18 @@ export function splitSemanticParagraphs(markdown: string): string[] {
         .replace(/\s+/gu, ' ')
         .trim()
     )
-    .filter(paragraph => paragraph.length >= MIN_PARAGRAPH_CHARACTERS);
+    .filter(paragraph => paragraph.length >= BASELINE_MIN_PARAGRAPH_CHARACTERS);
 }
 
-function normalizePlaybook(row: StoredPlaybook): TextPlaybook | undefined {
+function normalizePlaybook(row: StoredPlaybook, mode: MeasurementMode): TextPlaybook | undefined {
   if (!row.generated_blocks) return undefined;
-  if (!CANONICAL_BLOCK_IDS.every(blockId => blockId in row.generated_blocks!)) return undefined;
+  const blockIds = canonicalBlockIds(mode);
+  if (!blockIds.every(blockId => blockId in row.generated_blocks!)) return undefined;
 
-  const blocks = CANONICAL_BLOCK_IDS.map(blockId => {
+  const blocks = blockIds.map(blockId => {
     const stored = row.generated_blocks![blockId];
     const content = typeof stored?.content === 'string' ? stored.content.trim() : '';
-    return { blockId, content, paragraphs: splitSemanticParagraphs(content) };
+    return { blockId, content, paragraphs: splitSemanticParagraphs(content, mode) };
   });
   if (blocks.some(block => block.content.length === 0)) return undefined;
 
@@ -484,9 +616,12 @@ export function selectMeasurementCohort(
   if (args.mode === 'evaluation') {
     const matches = rows.filter(candidate => candidate.id === args.playbookId);
     const row = matches.length === 1 ? matches[0] : undefined;
-    const normalized = row?.status === 'completed' ? normalizePlaybook(row) : undefined;
+    const normalized =
+      row?.status === 'completed' ? normalizePlaybook(row, 'evaluation') : undefined;
     if (!normalized) {
-      throw new Error('Evaluation requires exactly one completed 27-block playbook');
+      throw new Error(
+        `Evaluation requires exactly one completed ${PRODUCTION_BLOCK_IDS.length}-block playbook`
+      );
     }
     return [normalized];
   }
@@ -495,7 +630,7 @@ export function selectMeasurementCohort(
     const matches = rows.filter(row => shortHash(row.id) === hash);
     const normalized =
       matches.length === 1 && matches[0].status === 'completed'
-        ? normalizePlaybook(matches[0])
+        ? normalizePlaybook(matches[0], 'baseline')
         : undefined;
     if (!normalized) {
       throw new Error('Historical baseline requires all 14 completed 27-block playbooks');
@@ -534,7 +669,12 @@ async function embedPlaybooks(
 ): Promise<EmbeddedPlaybook[]> {
   const items = playbooks.flatMap(playbook =>
     playbook.blocks.flatMap(block => [
-      { playbookId: playbook.playbookId, blockId: block.blockId, paragraphIndex: -1, text: block.content },
+      {
+        playbookId: playbook.playbookId,
+        blockId: block.blockId,
+        paragraphIndex: -1,
+        text: block.content,
+      },
       ...block.paragraphs.map((text, paragraphIndex) => ({
         playbookId: playbook.playbookId,
         blockId: block.blockId,
@@ -578,7 +718,11 @@ async function embedPlaybooks(
         );
         return embeddings[index];
       });
-      return { blockId: block.blockId, embedding: embeddings[blockEmbeddingIndex], paragraphEmbeddings };
+      return {
+        blockId: block.blockId,
+        embedding: embeddings[blockEmbeddingIndex],
+        paragraphEmbeddings,
+      };
     }),
   }));
 }
@@ -623,7 +767,12 @@ export function formatReport(
   cachePath: string,
   args: MeasurementArgs
 ): string {
-  const aliases = new Map(playbooks.map((playbook, index) => [playbook.playbookId, `P${String(index + 1).padStart(2, '0')}`]));
+  const aliases = new Map(
+    playbooks.map((playbook, index) => [
+      playbook.playbookId,
+      `P${String(index + 1).padStart(2, '0')}`,
+    ])
+  );
   const viewPairs = measurements.flatMap(measurement =>
     measurement.viewPairs.map(pair => ({ ...pair, playbookId: measurement.playbookId }))
   );
@@ -633,6 +782,7 @@ export function formatReport(
   const viewScores = viewPairs.map(pair => pair.similarity).sort((a, b) => a - b);
   const paragraphScores = paragraphPairs.map(pair => pair.similarity).sort((a, b) => a - b);
   const stats = getJinaTokenStats();
+  const reportBlockIds = canonicalBlockIds(args.mode);
 
   const lines = [
     args.mode === 'baseline'
@@ -645,12 +795,14 @@ export function formatReport(
     '## Method',
     '',
     args.mode === 'baseline'
-      ? `- Source: the fixed historical 14-playbook hash cohort from \`career_playbooks\`; every selected row must remain \`completed\` with all 27 stored blocks. Later completed rows do not change this cohort.`
-      : '- Source: one exact `career_playbooks.id` requested by the operator; it must resolve to exactly one `completed` row with all 27 stored blocks.',
-    '- Stored shape: 27 blocks = `header` + 26 content blocks (`block_1`…`block_26`).',
-    `- Audience views: canonical phase-0 map copied from \`specs/028-role-guide-audiences/spec.md\` section 3: employee ${BASELINE_AUDIENCE_BLOCKS.employee.length}, manager ${BASELINE_AUDIENCE_BLOCKS.manager.length}, HR ${BASELINE_AUDIENCE_BLOCKS.hr.length} blocks, including header.`,
+      ? `- Source: the fixed historical 14-playbook hash cohort from \`career_playbooks\`; every selected row must remain \`completed\` with all ${HISTORICAL_BLOCK_IDS.length} stored blocks. Later completed rows do not change this cohort.`
+      : `- Source: one exact \`career_playbooks.id\` requested by the operator; it must resolve to exactly one \`completed\` row with all ${PRODUCTION_BLOCK_IDS.length} stored blocks.`,
+    `- Stored shape: ${reportBlockIds.length} blocks = \`header\` + ${reportBlockIds.length - 1} content blocks.`,
+    args.mode === 'baseline'
+      ? `- Audience views: frozen phase-0 map copied from \`specs/028-role-guide-audiences/spec.md\` section 3: employee ${BASELINE_AUDIENCE_BLOCKS.employee.length}, manager ${BASELINE_AUDIENCE_BLOCKS.manager.length}, HR ${BASELINE_AUDIENCE_BLOCKS.hr.length} blocks, including header.`
+      : `- Audience views: read live from \`CAREER_PLAYBOOK_BLOCK_CATALOG\`, the same map the pipeline judges with: employee ${PRODUCTION_AUDIENCE_BLOCKS.employee.length}, manager ${PRODUCTION_AUDIENCE_BLOCKS.manager.length}, HR ${PRODUCTION_AUDIENCE_BLOCKS.hr.length} blocks, including header.`,
     '- Inter-block unit: one pair occurrence inside one audience-view. A block pair shared by two views is intentionally counted twice because those are two separately read documents; pairs with no shared view are not compared.',
-    `- Intra-block unit: paragraphs of at least ${MIN_PARAGRAPH_CHARACTERS} normalized characters, split on Markdown blank lines; paragraphs are compared only with paragraphs from the same block.`,
+    `- Intra-block unit: paragraphs of at least ${minParagraphCharactersForMode(args.mode)} normalized characters, split on Markdown blank lines; paragraphs are compared only with paragraphs from the same block.`,
     '- Embeddings: existing `generateEmbeddings(..., retrieval.passage)` Jina path, including the shared Jina distributed rate/concurrency limiters; cosine similarity is `QualityValidator.cosineSimilarity`.',
     args.mode === 'baseline'
       ? `- Recorded baseline threshold: **${selectedThreshold.toFixed(2)}**. The historical distribution must reproduce 0.85 as the highest candidate retaining at least five pair occurrences in both metric families.`
@@ -703,7 +855,10 @@ export function formatReport(
     ...viewPairs
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 20)
-      .map((pair, index) => `| ${index + 1} | ${aliases.get(pair.playbookId)} | ${pair.audience} | ${pair.blockA} — ${BLOCK_LABELS[pair.blockA]} | ${pair.blockB} — ${BLOCK_LABELS[pair.blockB]} | ${pair.similarity.toFixed(4)} |`),
+      .map(
+        (pair, index) =>
+          `| ${index + 1} | ${aliases.get(pair.playbookId)} | ${pair.audience} | ${pair.blockA} — ${BLOCK_LABELS[pair.blockA]} | ${pair.blockB} — ${BLOCK_LABELS[pair.blockB]} | ${pair.similarity.toFixed(4)} |`
+      ),
     '',
     '## Top paragraph pairs within one block',
     '',
@@ -712,7 +867,10 @@ export function formatReport(
     ...paragraphPairs
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 20)
-      .map((pair, index) => `| ${index + 1} | ${aliases.get(pair.playbookId)} | ${pair.blockId} — ${BLOCK_LABELS[pair.blockId]} | ${pair.paragraphA} ↔ ${pair.paragraphB} | ${pair.similarity.toFixed(4)} |`),
+      .map(
+        (pair, index) =>
+          `| ${index + 1} | ${aliases.get(pair.playbookId)} | ${pair.blockId} — ${BLOCK_LABELS[pair.blockId]} | ${pair.paragraphA} ↔ ${pair.paragraphB} | ${pair.similarity.toFixed(4)} |`
+      ),
     '',
     '## Reproduction',
     '',
@@ -721,7 +879,7 @@ export function formatReport(
     'set -a; . .env; set +a',
     args.mode === 'baseline'
       ? 'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --mode baseline --out ../../docs/career-playbook/2026-08-29-semantic-repetition-baseline.md --cache .cache/career-playbook-repetition/jina-embeddings-v3.json'
-      : 'TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --mode evaluation --playbook-id <completed-playbook-uuid> --threshold 0.85 --out <evaluation-report-path> --cache .cache/career-playbook-repetition/jina-embeddings-v3.json',
+      : `TMPDIR=/tmp pnpm exec tsx scripts/measure-playbook-repetition.ts --mode evaluation --playbook-id <completed-playbook-uuid> --threshold ${thresholdForMode('evaluation').toFixed(2)} --out <evaluation-report-path> --cache .cache/career-playbook-repetition/jina-embeddings-v3.json`,
     '```',
     '',
     `Jina run stats: ${stats.requestCount} paid HTTP batches in this invocation, ${stats.totalTokens} input tokens, $${(jinaCostUsd(CHECKPOINT_MODEL, stats.totalTokens) ?? 0).toFixed(6)} at the repository catalogue rate. Cache hits cost $0.`,
@@ -734,10 +892,11 @@ async function main(): Promise<void> {
   const args = parseMeasurementArgs(process.argv.slice(2));
   const playbooks = await loadMeasurementCohort(args);
   const embedded = await embedPlaybooks(playbooks, args.cachePath);
+  const audienceBlocks = audienceBlocksForMode(args.mode);
   let selectedThreshold: number;
   if (args.mode === 'baseline') {
     const scoreOnlyMeasurements = embedded.map(playbook =>
-      measureEmbeddedPlaybook(playbook, Number.POSITIVE_INFINITY)
+      measureEmbeddedPlaybook(playbook, Number.POSITIVE_INFINITY, audienceBlocks)
     );
     selectedThreshold = selectWorkingThreshold(
       scoreOnlyMeasurements.flatMap(measurement =>
@@ -756,7 +915,7 @@ async function main(): Promise<void> {
     selectedThreshold = args.threshold;
   }
   const measurements = embedded.map(playbook =>
-    measureEmbeddedPlaybook(playbook, selectedThreshold)
+    measureEmbeddedPlaybook(playbook, selectedThreshold, audienceBlocks)
   );
   const report = formatReport(
     playbooks,
@@ -770,8 +929,12 @@ async function main(): Promise<void> {
   await writeFile(args.outputPath, report, 'utf8');
   console.log(`Wrote ${args.outputPath}`);
   console.log(`Completed playbooks: ${playbooks.length}`);
-  console.log(`Audience-view pairs: ${measurements.reduce((sum, item) => sum + item.viewPairs.length, 0)}`);
-  console.log(`Within-block paragraph pairs: ${measurements.reduce((sum, item) => sum + item.paragraphPairCount, 0)}`);
+  console.log(
+    `Audience-view pairs: ${measurements.reduce((sum, item) => sum + item.viewPairs.length, 0)}`
+  );
+  console.log(
+    `Within-block paragraph pairs: ${measurements.reduce((sum, item) => sum + item.paragraphPairCount, 0)}`
+  );
   console.log(`Selected threshold: ${selectedThreshold.toFixed(2)}`);
 }
 
