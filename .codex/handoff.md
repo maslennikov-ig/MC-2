@@ -28,11 +28,15 @@ conclusion. `mc2-spkoj`: the acceptance measurer's `--mode evaluation` now reads
 catalogue, thresholds and paragraph splitter, so an owner checkbox reaches the script that grades a
 live playbook; baseline stays frozen. `mc2-akmx2`: the Jina 429 wait is a budget per
 `generateEmbeddings` call (300 s, one maximal Retry-After) instead of per batch, cutting the semantic
-gate's worst-case lock hold from ~4,500 s to 300 s. `mc2-4win5`: the prior-blocks digest spends its
-ceiling once per group. Measured on the 14 stored completed playbooks, `group_6_wrap` had been
-delivering 3% of the collected block 5 authority rows, no numeric commitments, and 66 of 84 targets
-lost a published anti-goal; it now delivers 100% and 100% at the same prompt cost. Nothing here is
-validated by a paid run — same block as `mc2-9d2ji`.
+gate's worst-case lock hold from ~4,500 s to 300 s. `mc2-4win5`, `mc2-539pz`, `mc2-u3t9n`: the
+prior-blocks digest now spends its ceiling once per group instead of once per target, its cadence
+regex matches Russian at all (`\b` is an ASCII boundary; the section had been empty in every RU
+playbook), and a numeric commitment needs a comparator, a unit, a currency or a scale rather than
+just a digit somewhere on the line (33% of all lines → 14%). With the collector honest the ceiling
+was measured, not guessed: **3,500 tokens**, the smallest value at which numeric commitments reach
+97% in every group, about +3,000 input tokens per playbook. `group_6_wrap` end to end: anti-goals
+64% → 100%, authority 3% → 100%, numbers 0% → 97%, cadences 0% → 56%. Nothing here is validated by a
+paid run — same block as `mc2-9d2ji`.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
@@ -173,8 +177,7 @@ on is not a config switch — see `:batch` in `.codex/repository-failure-modes.m
 
 `specs/026-post-triage-priorities/spec.md` supersedes the older stage order; do not re-open the 27
 already closed with a commit or a measurement, and do not re-rank by tracker priority. Complete
-through `mc2-sznhi` (T1), `mc2-3sz3d` (T2), `mc2-jz6y0.13.6` (T3), `mc2-iioip` (T4),
-`mc2-wxun`/`mc2-vjbb` (T5).
+through T5 (`mc2-sznhi`, `mc2-3sz3d`, `mc2-jz6y0.13.6`, `mc2-iioip`, `mc2-wxun`/`mc2-vjbb`).
 
 ## Live operational facts
 
@@ -243,14 +246,17 @@ the branch it delivered, so a report naming a branch again means something reall
   (471 pairs, 0 at 0.85, max 0.8316; intra 375, 0, max 0.8096) — same English smoke fixture, so it
   is a fair control. Blocked on the owner: `docs/career-playbook/live-smoke-dev-run.md` step 1
   needs a browser JWT nobody else can mint.
-- `mc2-539pz` — the digest's cadence regex uses `\b`, an ASCII word boundary, so it never matches
-  Russian: the "Cadences already promised" section is empty for every RU playbook. The same root
-  cause was fixed structurally for the decision-matrix header row in `7df7fc2d8`; the regex was left
-  alone because changing it changes what every RU digest collects and wants its own measurement.
-- `mc2-u3t9n` — after `7df7fc2d8` the digest delivers 100% of anti-goals and 100% of the block 5
-  authority matrix in every group, but late-group numeric commitments still fit only 16% of what is
-  collected. Most of that 16% denominator is `NUMERIC_COMMITMENT` matching any line with a digit;
-  narrow the collector before paying tokens to raise the 1,500-token ceiling.
+- `mc2-c0pdn` — **the audience views cannot ship as they are.** Measured on the 14 stored playbooks:
+  the employee view breaks 12% of its cross-references, the manager view 16%, the HR view **71%**.
+  Structural, not model noise — the group prompt tells every block to cite Block 5 and Block 5 is not
+  in the HR view; `block_23` is manager-only and is cited from the two summary blocks all three
+  readers get. Which reader gets which block is the owner's call; the engineering alternatives are an
+  audience-aware citation rule or repair at assembly. Method and numbers:
+  `docs/career-playbook/2026-08-30-role-guide-views-measurement.md`, re-run read-only with
+  `pnpm exec tsx scripts/measure-role-guide-views.ts`.
+- `mc2-ehao2` — `buildRoleGuideView` has **no caller** in the API or `packages/web`; no reader
+  receives a view today. It also reads raw `generatedBlocks`, so a view would ship without the
+  diagrams, sources section and calibration table that `prepareCareerPlaybookFinalBlocks` adds.
 - `mc2-eksyp` — `do_not_repeat` is deterministic now but not shorter: 12–25 entries per block,
   average 22.5 of 25. The 028 plan promised 13–19. Not a defect (the run measured 0/471), but the
   selectivity question needs a paid A/B and is untouched until then.
@@ -285,19 +291,15 @@ and handler.
 thresholds calibrated on Latin script, each invisible until the previous was fixed. Weight by script,
 never lower the number.
 
-## Accepted stage result
-
-Phase 0, A and B plus root acceptance are complete. Local `pnpm type-check` and `pnpm test:unit`,
-exact-SHA CI/dev deployment, the paid dev evidence, four-document reading, fixed-0.85 final
-measurement, exact cleanup and local Graphify refresh all passed. No schema migration, reindex,
-audience-checkbox change, secret/access mutation, force-push or third generation occurred.
-
 ## Next recommended
 
-Next stage id: none selected.
+Next stage id: none selected. The accepted Role Guide stage is delivered; its verification record is
+in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md`. No schema migration, reindex,
+audience-checkbox change, secret/access mutation or force-push has occurred since.
 
-Recommended action: finish the ordinary closeout commit and `develop` delivery for the accepted
-Role Guide stage, then select the next ready Beads item rather than inventing follow-up scope here.
+Recommended action: the one paid dev run that unblocks `mc2-9d2ji`, `mc2-923ku` and `mc2-eksyp` —
+it now also validates the digest changes above. Then `mc2-c0pdn`, which needs an owner decision
+before any view can ship.
 
 ## Starter prompt for next orchestrator
 
