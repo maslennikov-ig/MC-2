@@ -41,8 +41,67 @@ is conditional on it, and `validateCrossViewReference` enforces it under a new
 attempts reproducing the defect. Before the change the HR view broke 72% of its cross-references and
 every playbook in the sample was affected.
 
-Nothing here is validated by a paid run — same block as `mc2-9d2ji`, and that run is now the way to
-measure the citation rule's "after".
+Two paid dev runs since then, both `Sales Manager B2B` / en, same wizard answers, so they are a
+clean A/B: baseline `d5137bc5` on the citation rule alone, and `638ed691` on `cf328ba25` with the
+five fixes below. Deploy verified on the container, not on CI: `megacampus-api-dev` and
+`megacampus-worker-dev` both report `org.opencontainers.image.revision cf328ba251b8...`.
+
+| Measure                            | `d5137bc5` | `638ed691`                  |
+| ---------------------------------- | ---------- | --------------------------- |
+| judge criticals (deduped)          | 25         | **9**                       |
+| `unresolved_placeholder` criticals | 8          | **0**                       |
+| rule-leak sentences in reader text | 5          | **0**                       |
+| block regenerations                | 30         | 25                          |
+| unreachable block references       | 15         | 28 → **1 after `3b81ac19`** |
+| wall clock                         | 24m09s     | ~20m                        |
+| cost                               | $0.104331  | $0.107929                   |
+
+What each fix answered:
+
+- **`mc2-b7rz8` — rhythms had no owner.** `cadence_ledger` joins the metric and evidence ledgers:
+  model-built, normalized in `quality-ledger.ts` onto the six-word vocabulary `quality-checks.ts`
+  reads, quoted verbatim by every block. The run built **15 entries**.
+  `validateCadenceConsistency` now answers _which block is wrong_ — ledger first, else the guide's
+  majority with the earliest block breaking a tie — and names each deviating block separately, so
+  what used to be an unrepairable eleven-block disagreement is one regeneration per block. Its
+  previous implementation sorted block ids as strings, which made `block_4` later than `block_15`
+  and sent the block that was right to be rewritten.
+- **`mc2-wtgsd` — the premise in the tracker was wrong and is corrected there.** No prose
+  placeholder was hiding from the bracket detector. All eight `unresolved_placeholder` criticals
+  attacked the example marker the contract _requires_, and satisfying any of them would have turned
+  a correct block into an `unmarked_example` defect. Filter first:
+  `downgradeUnconfirmedPlaceholderIssues` demotes any placeholder critical
+  `findUnresolvedFillablePlaceholders` cannot confirm in the block's own text. **8 → 0.**
+- **`mc2-qgg2e` — the prompt explained a rule through its consequence and the model published the
+  explanation.** Rationale removed, a per-sentence test given instead, `AUTHOR_INSTRUCTION` widened
+  to the "this block does not restate…" shape. **5 → 0**, no false positive on "in other words" or
+  "другими словами".
+- **`mc2-1mr7r` — `Every issue MUST include a "category" field` read as one issue per category.**
+  Three of the run's 25 criticals said in their own description that the check had passed. The
+  prompt now states that an empty issues list is the right answer for a clean group.
+- **`mc2-1q7q9` — our own code wrote the unfollowable pointers.** 27 of run `638ed691`'s 28
+  unreachable references came out of `appendCareerPlaybookCalibrationTable`, which is
+  application-built, appended into block 26 (manager+hr), scans every block, and labelled each row
+  "Block 8"/"Block 11"/"Block 23". No prompt and no regeneration could remove them — block 26 was
+  rewritten twice and the table was re-appended each time. Rows are now named by section title read
+  from the block's own heading. Replayed against the stored blocks of that run: **27 → 0**, leaving
+  one unreachable reference in the whole document (`block_13 -> block_2`).
+- **`mc2-xklll` — also a wrong premise, corrected in the tracker.** Career Playbook has used flex
+  since `4e0ab3486` (2026-08-25); `GET /api/v1/generation` confirms all 11 luna calls of `d5137bc5`
+  were served by `openai/flex`. Only luna publishes a flex endpoint — `deepseek-v4-flash` and
+  `glm-5.3-flash` have none and are already cheaper. The real gap was evidence: no cost row named a
+  tier, and that absence read as "flex is off". `settleCareerPlaybookNodeCosts` now keeps
+  `service_tier` from the receipt it was already fetching; run `638ed691` shows 12 rows as `flex`.
+
+Writing the calibration-table test surfaced a defect neither run would have shown: both copies of
+the example-marker regex used `\b(?:пример|example)\b`, and `\b` is ASCII-only without the `u`
+flag, so **no Russian playbook's markers were ever visible** to the marking check or the calibration
+table. One shared source now serves both.
+
+Still open on this track: `mc2-1mr7r`'s remaining shape (4 cadence deviations survived the
+regeneration cap in `638ed691`), two `metric_conflict` criticals on "Team quota attainment", and
+`mc2-ehao2` (`buildRoleGuideView` has no caller). Both dev rows are kept as A/B baselines and are
+not cleaned up.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
