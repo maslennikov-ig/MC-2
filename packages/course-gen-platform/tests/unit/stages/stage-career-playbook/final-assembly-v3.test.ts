@@ -77,7 +77,7 @@ describe('appendCareerPlaybookCalibrationTable', () => {
     );
 
     const content = result.block_26!.content;
-    const rows = content.split('\n').filter(line => /^\| Block \d+ \|/.test(line));
+    const rows = content.split('\n').filter(line => /^\| Motivation \|/.test(line));
 
     expect(rows).toHaveLength(2);
     expect(content).toContain('$120,000');
@@ -85,6 +85,41 @@ describe('appendCareerPlaybookCalibrationTable', () => {
     // The model's own six-row attempt must not survive alongside the real one.
     expect(content).not.toContain('lead SLA');
     expect(content).toContain('Manager checklist');
+  });
+
+  // Run d5137bc5 and 638ed691 both broke the citation rule from inside this
+  // function. Block 26 is read by the manager and HR; the table scans every
+  // block; and labelling a row "Block 8" pointed both readers at a page only one
+  // of them holds. 27 of the 28 unreachable references in run 638ed691 came from
+  // here, and neither the prompt nor two regenerations could remove them,
+  // because the table is re-appended at every assembly.
+  it('names a row by its section, never as a block a reader may not hold', () => {
+    const result = appendCareerPlaybookCalibrationTable(
+      blocks({
+        block_8:
+          '## 8. Tools and technologies\n\n| CRM | Salesforce (example — replace) | System of record |',
+        block_23: '## 23. Continuity plan\n\n- Backup contact: Dana Kovacs (example — replace).',
+        block_26: '## 26. Implementation checklist\n\n- Align on KPI targets',
+      })
+    );
+
+    const content = result.block_26!.content;
+    expect(content).toContain('| Section | Value to replace | Context |');
+    expect(content).toContain('| Tools and technologies |');
+    expect(content).toContain('| Continuity plan |');
+    expect(content).not.toMatch(/\|\s*Block\s*\d+\s*\|/);
+  });
+
+  it('uses the guide own localized heading rather than a second English copy', () => {
+    const result = appendCareerPlaybookCalibrationTable(
+      blocks({
+        block_8:
+          '## 8. Инструменты и технологии\n\n| CRM | Salesforce (пример — заменить) | Система учёта |',
+        block_26: '## 26. Чеклист внедрения\n\n- Согласовать цели',
+      })
+    );
+
+    expect(result.block_26!.content).toContain('| Инструменты и технологии |');
   });
 
   it('adds nothing when the document carries no marked value', () => {

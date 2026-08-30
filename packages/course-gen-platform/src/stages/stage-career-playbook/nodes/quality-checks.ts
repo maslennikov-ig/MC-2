@@ -23,7 +23,10 @@ import {
   type CareerPlaybookMetricLedgerEntry,
 } from '@megacampus/shared-types';
 import { careerPlaybookBlockMayCite, getCareerPlaybookBlockAudiences } from './audience-scope';
-import { CAREER_PLAYBOOK_CADENCE_WORDS } from './quality-ledger';
+import {
+  CAREER_PLAYBOOK_CADENCE_WORDS,
+  CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE,
+} from './quality-ledger';
 
 export interface CareerPlaybookQualityCheckContext {
   metricLedger: readonly CareerPlaybookMetricLedgerEntry[];
@@ -116,7 +119,7 @@ function thresholdNumbers(metric: CareerPlaybookMetricLedgerEntry): Set<string> 
 // The verb may follow the value: "(example: $100K — replace with your threshold)".
 // The marker may sit anywhere inside the parentheses and use any separator:
 // "(e.g., >$50,000 — example, replace with your threshold)".
-const EXAMPLE_MARKER = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/i;
+const EXAMPLE_MARKER = new RegExp(CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE, 'i');
 
 type ThresholdDirection = 'floor' | 'ceiling' | 'range';
 

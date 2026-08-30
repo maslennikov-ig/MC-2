@@ -8,6 +8,7 @@ import type {
 import { CAREER_PLAYBOOK_BLOCK_CATALOG } from '@megacampus/shared-types';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 import { remediateCareerPlaybookMermaidBlocks } from './mermaid-quality';
+import { CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE } from './quality-ledger';
 
 export const CAREER_PLAYBOOK_FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
   'header',
@@ -416,12 +417,12 @@ const CALIBRATION_INTRO = {
 } as const;
 
 const CALIBRATION_COLUMNS = {
-  en: '| Block | Value to replace | Context |',
-  ru: '| Блок | Значение к замене | Контекст |',
+  en: '| Section | Value to replace | Context |',
+  ru: '| Раздел | Значение к замене | Контекст |',
 } as const;
 
-/** Marker forms the guide may use, matching the deterministic check. */
-const EXAMPLE_MARKER_GLOBAL = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/gi;
+/** Marker forms the guide may use, from the one source the deterministic check reads. */
+const EXAMPLE_MARKER_GLOBAL = new RegExp(CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE, 'gi');
 
 export interface CareerPlaybookCalibrationItem {
   blockId: CareerPlaybookBlockId;
@@ -501,8 +502,31 @@ export function collectCareerPlaybookCalibrationItems(
   return items;
 }
 
-function blockLabel(blockId: CareerPlaybookBlockId): string {
-  return blockId === 'header' ? 'Header' : `Block ${blockId.replace('block_', '')}`;
+/**
+ * Name a calibration row's home by its section title, never as "Block N".
+ *
+ * This table is application-built and appended into block 26, which the manager
+ * and HR read — and it scans every block, most of which neither of them holds.
+ * Labelling the rows "Block 8", "Block 11", "Block 23" therefore wrote 27
+ * unfollowable pointers into the 2026-08-30 run, more than the whole rest of the
+ * guide produced, and no amount of prompt work or regeneration could remove
+ * them: they are re-appended at every assembly. The title says what kind of
+ * value it is, which is what someone calibrating the guide actually needs, and
+ * sends nobody to a page they were not given.
+ *
+ * Read from the block's own heading so it is the guide's real, localized wording
+ * rather than a second English copy of it; the leading number goes with it,
+ * because a number is the pointer this exists to avoid.
+ */
+function sectionLabel(
+  blockId: CareerPlaybookBlockId,
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): string {
+  const heading = generatedBlocks[blockId]?.content?.match(/^##[ \t]+(.+)$/m)?.[1];
+  const title = heading?.replace(/^\s*\d{1,2}\s*[.)]\s*/, '').trim();
+  if (title) return title;
+
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.find(block => block.blockId === blockId)?.title ?? blockId;
 }
 
 /**
@@ -544,7 +568,7 @@ export function appendCareerPlaybookCalibrationTable(
     .trim();
 
   const rows = items.map(
-    item => `| ${blockLabel(item.blockId)} | ${item.value} | ${item.context} |`
+    item => `| ${sectionLabel(item.blockId, generatedBlocks)} | ${item.value} | ${item.context} |`
   );
 
   return {

@@ -93,6 +93,23 @@ export function normalizeCareerPlaybookMetricLedger(
 }
 
 /**
+ * The example marker, in both output languages, as one source for every reader.
+ *
+ * Two copies of this existed — the deterministic marking check and the
+ * application-built calibration table — and both carried the same defect:
+ * `\b(?:пример|example)\b`. In JavaScript without the `u` flag `\w` is
+ * `[A-Za-z0-9_]`, so a Cyrillic letter is a NON-word character and `\b` never
+ * fires between `(` and `п`. Every Russian guide's markers were therefore
+ * invisible to both, and the calibration table has never had a row in Russian.
+ * The same `\b` trap emptied the digest's cadence section in every RU playbook.
+ *
+ * `пример` is matched without a boundary and `example` with one, so
+ * "(примерно 200 сотрудников)" still does not match — it carries no
+ * "заменить"/"replace", which the second half requires.
+ */
+export const CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE = String.raw`\([^)]*(?:\bexample\b|пример)[^)]*(?:заменит[ьи]|replace)[^)]*\)`;
+
+/**
  * The fixed rhythm vocabulary, in both output languages.
  *
  * One list, two readers: the cadence ledger normalizes onto it, and
