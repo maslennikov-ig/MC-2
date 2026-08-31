@@ -140,6 +140,11 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 - `--dir` задан абсолютным путём через `git rev-parse` — относительный путь ломается, если шелл не в корне репо.
 - Существующие playbook'и аккаунта не трогаются; курс не создаётся (нет `--include-course-bridge`).
 - Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked` / `fail`.
+- После публикации раннер сам открывает публичные страницы — каталожную и по одной на каждого читателя —
+  и требует HTTP 200 (проверка `public-page-render`). Проверка `public-share` читает только tRPC-запрос,
+  и в прогоне 4e355bf4 она была зелёной, пока все публичные страницы гайда отдавали 500 (mc2-j8ms8).
+  Origin берётся из `CAREER_PLAYBOOK_SMOKE_TRPC_URL`; если Next.js живёт не там, где tRPC,
+  задай `--web-url` или `CAREER_PLAYBOOK_SMOKE_WEB_URL`. Токены читательских ссылок в отчёт не попадают.
 - Если задан `CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN`, раннер при первом HTTP 401 один раз обновляет
   Supabase-сессию и повторяет запрос. Новый access/refresh token остаётся только в памяти процесса.
 - **Cleanup ничего не удаляет — только описывает** (см. раздел «Cleanup-семантика» ниже).

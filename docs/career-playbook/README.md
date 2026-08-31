@@ -219,6 +219,12 @@ pnpm --dir packages/course-gen-platform smoke:career-playbook:live \
 
 Use `--include-course-bridge` only when cleanup covers the created course, generated source documents, upload paths, outbox/jobs, and downstream generation artifacts.
 
+Evidence includes `public-page-render`: after publishing, the runner fetches the catalog page and every
+reader-scoped link and requires HTTP 200. `public-share` next to it reads only the tRPC share query — it
+was green for run 4e355bf4 while every public page of that guide returned 500 (mc2-j8ms8). The page origin
+is derived from the tRPC URL; pass `--web-url` (or `CAREER_PLAYBOOK_SMOKE_WEB_URL`) when the Next.js app
+answers elsewhere. Reader view tokens are redacted out of the evidence and the artifact.
+
 ## Admin Cost Evidence
 
 Career Playbook per-node cost evidence is available to admins at `/admin/generation/career-playbooks/costs`. The page reads `admin.getCareerPlaybookCostEvidence` and shows the filtered playbook count plus page totals and stage/node/model/token/USD rows from `career_playbooks.cost_breakdown`. Invalid cost payloads are marked instead of being treated as verified evidence.

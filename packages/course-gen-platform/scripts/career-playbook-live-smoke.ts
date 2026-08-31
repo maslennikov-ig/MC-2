@@ -20,6 +20,7 @@ interface ParsedArgs {
   mode: CareerPlaybookLiveSmokeMode;
   targetEnvironment?: CareerPlaybookLiveSmokeTarget;
   trpcUrl?: string;
+  webBaseUrl?: string;
   expectedUserId?: string;
   expectedOrganizationId?: string;
   queueName?: string;
@@ -390,6 +391,7 @@ Options:
   --target <local|development|dev|staging|production|prod>
                                            Target environment label
   --trpc-url <url>                         Backend tRPC URL, for example https://api.example.com/trpc
+  --web-url <url>                          Next.js origin for the public page gate (default: tRPC origin)
   --expected-user-id <uuid>                Disposable user id expected in staging
   --expected-organization-id <uuid>        Disposable organization id expected in staging
   --queue <name>                           Dedicated BULLMQ_QUEUE_NAME used by API and worker
@@ -461,6 +463,10 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--trpc-url':
         parsed.trpcUrl = readValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--web-url':
+        parsed.webBaseUrl = readValue(argv, index, arg);
         index += 1;
         break;
       case '--expected-user-id':
@@ -589,6 +595,10 @@ export function createTrpcLiveSmokeClient(
       withBearerTokenRefresh(tokenSource, () =>
         trpc.careerPlaybook.share.getPublicBySlug.query(input)
       ),
+    listViewLinks: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.share.listViewLinks.query(input)
+      ),
     createCourseFromPlaybook: input =>
       withBearerTokenRefresh(tokenSource, () =>
         trpc.careerPlaybook.courseBridge.createCourseFromPlaybook.mutate(input)
@@ -632,6 +642,7 @@ async function main(): Promise<void> {
         BULLMQ_QUEUE_NAME: args.queueName ?? process.env.BULLMQ_QUEUE_NAME,
       },
       trpcUrl,
+      webBaseUrl: args.webBaseUrl,
       token,
       expectedUserId: args.expectedUserId,
       expectedOrganizationId: args.expectedOrganizationId,

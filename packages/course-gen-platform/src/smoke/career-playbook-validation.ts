@@ -27,10 +27,24 @@ export interface CareerPlaybookSmokePdfEvidence {
   startsWithPdfHeader?: boolean;
 }
 
+/**
+ * One rendered public page and the HTTP status it actually returned.
+ *
+ * `url` is what the smoke fetched with any reader token redacted — a view token
+ * is a capability, and this evidence is written to an artifact.
+ */
+export interface CareerPlaybookSmokePageEvidence {
+  id: string;
+  url: string;
+  status: number | null;
+  error?: string;
+}
+
 export interface CareerPlaybookSmokeShareEvidence {
   isPublic: boolean;
   shareSlug?: string | null;
   publicFetchOk?: boolean;
+  pages?: CareerPlaybookSmokePageEvidence[];
 }
 
 export interface CareerPlaybookSmokeCourseBridgeEvidence {
@@ -256,7 +270,74 @@ function validateShare(
   return {
     id: 'public-share',
     status: 'pass',
-    note: `Public share ${share.shareSlug} rendered successfully.`,
+    // Deliberately not "rendered": this check reads the tRPC share query, and
+    // saying "rendered successfully" is what let a 500 page pass five paid runs.
+    note: `Public share ${share.shareSlug} is published and its share query answered.`,
+  };
+}
+
+export const CAREER_PLAYBOOK_SMOKE_CATALOG_PAGE_ID = 'catalog';
+export const CAREER_PLAYBOOK_SMOKE_READER_PAGE_PREFIX = 'reader:';
+
+function describePage(page: CareerPlaybookSmokePageEvidence): string {
+  return `${page.id} -> ${page.status ?? `no response (${page.error ?? 'unknown error'})`}`;
+}
+
+/**
+ * The public pages a reader opens, judged by the HTTP status they returned.
+ *
+ * `public-share` above reads a tRPC query, which answered correctly for run
+ * 4e355bf4 while every public page of that guide returned 500 — five paid runs
+ * passed over a defect that made the whole public surface unusable (mc2-j8ms8,
+ * mc2-558ah). A query is not a page; this check fetches the page.
+ *
+ * An empty or absent page list fails when surfaces are required: an absent
+ * measurement must not read as a passing one.
+ */
+function validateSharePages(
+  share: CareerPlaybookSmokeShareEvidence | undefined,
+  requireSurfaces: boolean
+): CareerPlaybookSmokeEvidenceCheck {
+  const pages = share?.pages;
+
+  if (!pages || pages.length === 0) {
+    return {
+      id: 'public-page-render',
+      status: requireSurfaces ? 'fail' : 'skipped',
+      note: 'No public page was fetched; a tRPC query is not evidence that the page renders.',
+    };
+  }
+
+  const failed = pages.filter(page => page.status !== 200);
+  if (failed.length > 0) {
+    return {
+      id: 'public-page-render',
+      status: 'fail',
+      note: `Public pages did not return HTTP 200: ${failed.map(describePage).join('; ')}.`,
+    };
+  }
+
+  const hasCatalog = pages.some(page => page.id === CAREER_PLAYBOOK_SMOKE_CATALOG_PAGE_ID);
+  const hasReader = pages.some(page =>
+    page.id.startsWith(CAREER_PLAYBOOK_SMOKE_READER_PAGE_PREFIX)
+  );
+
+  if (!hasCatalog || !hasReader) {
+    return {
+      id: 'public-page-render',
+      status: requireSurfaces ? 'fail' : 'pass',
+      note: `Public page coverage is incomplete: ${
+        hasCatalog ? '' : 'no catalog page; '
+      }${hasReader ? '' : 'no reader-scoped page; '}fetched ${pages
+        .map(page => page.id)
+        .join(', ')}.`,
+    };
+  }
+
+  return {
+    id: 'public-page-render',
+    status: 'pass',
+    note: `Public pages returned HTTP 200: ${pages.map(page => page.id).join(', ')}.`,
   };
 }
 
@@ -317,6 +398,7 @@ export function validateCareerPlaybookSmokeEvidence(
     validateDeterministicContent(input.playbook.generatedBlocks),
     validatePdf(input.pdf, requireSurfaces),
     validateShare(input.share, requireSurfaces),
+    validateSharePages(input.share, requireSurfaces),
     validateCourseBridge(input.courseBridge, requireCourseBridge),
   ];
 
