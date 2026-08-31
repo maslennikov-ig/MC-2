@@ -396,16 +396,35 @@ export function classifyCareerPlaybookSource(
   return 'unknown';
 }
 
+/**
+ * Slots the cap may not spend on vendor pages.
+ *
+ * Run b7925b1d retrieved eight primary-research findings — Forrester, McKinsey,
+ * Springer, IEEE — and shipped a ledger of twelve vendor blogs. The research
+ * lane runs last, so every one of its findings fell past `MAX_EVIDENCE_ENTRIES`
+ * and the run paid for a search whose result it then discarded. Reserving a
+ * third of the ledger keeps the lane's whole point intact without letting one
+ * lane crowd out the role-specific material the other three retrieve.
+ */
+const RESEARCH_ENTRY_RESERVE = 4;
+
 export function buildCareerPlaybookEvidenceLedger(
   research: CareerPlaybookWebResearchResult | null | undefined,
   retrievedAt: string
 ): CareerPlaybookEvidenceEntry[] {
   if (!research?.findings?.length) return [];
 
+  const reserved = research.findings
+    .filter(finding => classifyCareerPlaybookSource(finding.url?.trim() ?? '') === 'research')
+    .slice(0, RESEARCH_ENTRY_RESERVE);
+  // Reserved entries first, then everything in retrieval order; the URL dedupe
+  // below keeps a reserved finding from being taken twice.
+  const ordered = [...reserved, ...research.findings];
+
   const seenUrls = new Set<string>();
   const entries: CareerPlaybookEvidenceEntry[] = [];
 
-  for (const finding of research.findings) {
+  for (const finding of ordered) {
     if (entries.length >= MAX_EVIDENCE_ENTRIES) break;
 
     const url = finding.url.trim();

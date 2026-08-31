@@ -255,4 +255,47 @@ describe('validateMilestoneConsistency', () => {
       )
     ).toEqual([]);
   });
+
+  // Run b7925b1d. The paragraph states the deadline correctly and the NEXT
+  // sentence happens to mention another week; without a sentence boundary the
+  // neighbour sat closer to the anchor and block 18 was regenerated twice
+  // against a date it had got right.
+  it('does not read a deadline from the following sentence', () => {
+    const line =
+      'By Day 30 you complete your first documented coaching cycle, and by Day 60 you own one complete management and forecasting cycle. From Week 2 onward, you are in the seat.';
+
+    expect(
+      validateMilestoneConsistency(blocks([['block_18', line]]), {
+        milestoneLedger: [
+          {
+            key: 'first_full_owned_cycle',
+            label: 'Own one complete management and forecasting cycle',
+            offset: 'day 60',
+            owner: '',
+            scope: '',
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('still catches the deviation when the deadline in the same sentence is wrong', () => {
+    const line =
+      'By Week 2 you own one complete management and forecasting cycle. From Day 60 onward, you are in the seat.';
+
+    const issues = validateMilestoneConsistency(blocks([['block_18', line]]), {
+      milestoneLedger: [
+        {
+          key: 'first_full_owned_cycle',
+          label: 'Own one complete management and forecasting cycle',
+          offset: 'day 60',
+          owner: '',
+          scope: '',
+        },
+      ],
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('week 2');
+  });
 });
