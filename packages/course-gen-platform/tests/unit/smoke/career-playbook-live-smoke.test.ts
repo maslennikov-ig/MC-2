@@ -8,6 +8,8 @@ import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampu
 import {
   buildCareerPlaybookCleanupManifest,
   buildCareerPlaybookLiveSmokePlan,
+  buildCareerPlaybookPublicPageTargets,
+  resolveCareerPlaybookWebBaseUrl,
   runCareerPlaybookLiveSmoke,
   type CareerPlaybookLiveSmokeClient,
   type CareerPlaybookLiveSmokeReport,
@@ -83,6 +85,19 @@ flowchart TD
   return blocks;
 }
 
+function buildPageFetcher(status: number | Record<string, number> = 200) {
+  return vi.fn((url: string) =>
+    Promise.resolve({
+      status: typeof status === 'number' ? status : (statusFor(status, url) ?? 200),
+    })
+  );
+}
+
+function statusFor(map: Record<string, number>, url: string): number | undefined {
+  const match = Object.keys(map).find(fragment => url.includes(fragment));
+  return match ? map[match] : undefined;
+}
+
 function buildLiveSmokeClient(
   overrides: Partial<CareerPlaybookLiveSmokeClient> = {}
 ): CareerPlaybookLiveSmokeClient {
@@ -122,7 +137,24 @@ function buildLiveSmokeClient(
       shareSlug: 'cp-live-smoke',
       isPublic: true,
     }),
-    getPublicShare: vi.fn().mockResolvedValue({ ok: true }),
+    getPublicShare: vi.fn().mockResolvedValue({
+      shareSlug: 'cp-live-smoke',
+      organizationSlug: 'demo-org',
+      language: 'en',
+    }),
+    listViewLinks: vi.fn().mockResolvedValue({
+      isPublic: true,
+      links: [
+        {
+          audience: 'employee',
+          path: '/career-playbook/view/33333333-3333-3333-3333-333333333333/tok-employee',
+        },
+        {
+          audience: 'manager',
+          path: '/career-playbook/view/33333333-3333-3333-3333-333333333333/tok-manager',
+        },
+      ],
+    }),
     createCourseFromPlaybook: vi.fn().mockResolvedValue({
       courseId: '44444444-4444-4444-4444-444444444444',
       redirectUrl: '/courses/demo/sales-manager-b2b/generating',
@@ -163,7 +195,7 @@ describe('Career Playbook live smoke gates', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client }
+      { client, fetchPage: buildPageFetcher() }
     );
 
     expect(report.status).toBe('blocked');
@@ -262,7 +294,7 @@ describe('Career Playbook live smoke mutation report', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client }
+      { client, fetchPage: buildPageFetcher() }
     );
 
     expect(client.submitAnswer).toHaveBeenNthCalledWith(8, {
@@ -299,7 +331,7 @@ describe('Career Playbook live smoke mutation report', () => {
           CAREER_PLAYBOOK_SMOKE_ORGANIZATION_ID: '22222222-2222-2222-2222-222222222222',
         },
       },
-      { client: buildLiveSmokeClient() }
+      { client: buildLiveSmokeClient(), fetchPage: buildPageFetcher() }
     );
 
     expect(report.status).toBe('pass');
@@ -353,7 +385,7 @@ describe('Career Playbook live smoke mutation report', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client, sleep: vi.fn().mockResolvedValue(undefined) }
+      { client, sleep: vi.fn().mockResolvedValue(undefined), fetchPage: buildPageFetcher() }
     );
 
     expect(client.getCourseStatus).toHaveBeenCalledTimes(2);
@@ -395,7 +427,7 @@ describe('Career Playbook live smoke mutation report', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client }
+      { client, fetchPage: buildPageFetcher() }
     );
 
     expect(client.startSession).not.toHaveBeenCalled();
@@ -447,7 +479,7 @@ describe('Career Playbook live smoke mutation report', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client, sleep: vi.fn().mockResolvedValue(undefined) }
+      { client, sleep: vi.fn().mockResolvedValue(undefined), fetchPage: buildPageFetcher() }
     );
 
     expect(getStatus).toHaveBeenCalledTimes(3);
@@ -474,7 +506,7 @@ describe('Career Playbook live smoke mutation report', () => {
             BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
           },
         },
-        { client, sleep: vi.fn().mockResolvedValue(undefined) }
+        { client, sleep: vi.fn().mockResolvedValue(undefined), fetchPage: buildPageFetcher() }
       )
     ).rejects.toThrow(/consecutive attempts/u);
   });
@@ -503,7 +535,7 @@ describe('Career Playbook live smoke mutation report', () => {
           BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
         },
       },
-      { client }
+      { client, fetchPage: buildPageFetcher() }
     );
 
     expect(report.status).toBe('fail');
@@ -532,6 +564,18 @@ describe('Career Playbook live smoke evidence validation', () => {
         isPublic: true,
         shareSlug: 'cp-live-smoke',
         publicFetchOk: true,
+        pages: [
+          {
+            id: 'catalog',
+            url: 'https://web.example.test/en/career-playbooks/demo/cp',
+            status: 200,
+          },
+          {
+            id: 'reader:employee',
+            url: 'https://web.example.test/en/career-playbook/view/abc/<token>',
+            status: 200,
+          },
+        ],
       },
       courseBridge: {
         courseId: '44444444-4444-4444-4444-444444444444',
@@ -565,6 +609,126 @@ describe('Career Playbook live smoke evidence validation', () => {
         expect.objectContaining({ id: 'generated-blocks', status: 'fail' }),
         expect.objectContaining({ id: 'deterministic-content', status: 'fail' }),
       ])
+    );
+  });
+});
+
+describe('Career Playbook live smoke public page gate', () => {
+  const mutationOptions = {
+    mode: 'mutation-smoke',
+    targetEnvironment: 'staging',
+    trpcUrl: 'https://staging.example.test/api/trpc',
+    cleanupScope: 'playbook-only',
+    maxCostUsd: 3,
+    confirmLiveMutation: true,
+    env: {
+      TOKEN: 'secret-token',
+      BULLMQ_QUEUE_NAME: 'career-playbook-smoke-20260521',
+      CAREER_PLAYBOOK_SMOKE_USER_ID: '11111111-1111-1111-1111-111111111111',
+      CAREER_PLAYBOOK_SMOKE_ORGANIZATION_ID: '22222222-2222-2222-2222-222222222222',
+    },
+  } as const;
+
+  it('fails the run when a public page 500s while the share query still answers', async () => {
+    const report = await runCareerPlaybookLiveSmoke(
+      { ...mutationOptions },
+      {
+        client: buildLiveSmokeClient(),
+        fetchPage: buildPageFetcher({ '/career-playbooks/': 500 }),
+      }
+    );
+
+    expect(report.status).toBe('fail');
+    // The exact shape of run 4e355bf4: the tRPC gate is green, the page is not.
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({ id: 'public-share', status: 'pass' })
+    );
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({ id: 'public-page-render', status: 'fail' })
+    );
+  });
+
+  it('fails when a reader-scoped page 500s', async () => {
+    const report = await runCareerPlaybookLiveSmoke(
+      { ...mutationOptions },
+      {
+        client: buildLiveSmokeClient(),
+        fetchPage: buildPageFetcher({ '/career-playbook/view/': 500 }),
+      }
+    );
+
+    expect(report.status).toBe('fail');
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({ id: 'public-page-render', status: 'fail' })
+    );
+  });
+
+  it('fails when no page was fetched at all rather than reading the absence as a pass', async () => {
+    const client = buildLiveSmokeClient({
+      getPublicShare: vi.fn().mockResolvedValue({ shareSlug: 'cp-live-smoke' }),
+      listViewLinks: vi.fn().mockResolvedValue(null),
+    });
+
+    const report = await runCareerPlaybookLiveSmoke(
+      { ...mutationOptions },
+      { client, fetchPage: buildPageFetcher() }
+    );
+
+    expect(report.status).toBe('fail');
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({ id: 'public-page-render', status: 'fail' })
+    );
+  });
+
+  it('fetches the catalog page and every reader link, and keeps the tokens out of the evidence', async () => {
+    const fetchPage = buildPageFetcher();
+    const report = await runCareerPlaybookLiveSmoke(
+      { ...mutationOptions },
+      { client: buildLiveSmokeClient(), fetchPage }
+    );
+
+    expect(report.status).toBe('pass');
+    expect(report.evidence?.checks).toContainEqual(
+      expect.objectContaining({ id: 'public-page-render', status: 'pass' })
+    );
+
+    const fetched = fetchPage.mock.calls.map(call => call[0]);
+    expect(fetched).toEqual([
+      'https://staging.example.test/en/career-playbooks/demo-org/cp-live-smoke',
+      'https://staging.example.test/en/career-playbook/view/33333333-3333-3333-3333-333333333333/tok-employee',
+      'https://staging.example.test/en/career-playbook/view/33333333-3333-3333-3333-333333333333/tok-manager',
+    ]);
+
+    const serialized = JSON.stringify(report.evidence);
+    expect(serialized).not.toContain('tok-employee');
+    expect(serialized).not.toContain('tok-manager');
+  });
+
+  it('derives the web origin from the tRPC URL and prefers an explicit override', () => {
+    expect(
+      resolveCareerPlaybookWebBaseUrl({ trpcUrl: 'https://staging.example.test/api/trpc' }, {})
+    ).toBe('https://staging.example.test');
+    expect(
+      resolveCareerPlaybookWebBaseUrl(
+        { trpcUrl: 'https://api.example.test/api/trpc', webBaseUrl: 'https://web.example.test/' },
+        {}
+      )
+    ).toBe('https://web.example.test');
+    expect(resolveCareerPlaybookWebBaseUrl({}, {})).toBeNull();
+  });
+
+  it('builds no catalog target when the organization slug is missing', () => {
+    const targets = buildCareerPlaybookPublicPageTargets({
+      baseUrl: 'https://web.example.test',
+      shareSlug: 'cp-live-smoke',
+      organizationSlug: null,
+      viewLinks: [{ audience: 'hr', path: '/career-playbook/view/abc/secret-token' }],
+    });
+
+    expect(targets.map(target => target.id)).toEqual(['reader:hr']);
+    expect(targets[0].url).toContain('secret-token');
+    expect(targets[0].redactedUrl).toBe(
+      'https://web.example.test/en/career-playbook/view/abc/<token>'
     );
   });
 });

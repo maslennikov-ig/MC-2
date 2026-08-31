@@ -11,8 +11,21 @@ import type {
 import {
   validateCareerPlaybookSmokeEvidence,
   type CareerPlaybookSmokeEvidenceReport,
+  type CareerPlaybookSmokePageEvidence,
 } from './career-playbook-validation';
+import {
+  buildCareerPlaybookPublicPageTargets,
+  defaultPageFetcher,
+  fetchPublicPageEvidence,
+  resolveCareerPlaybookWebBaseUrl,
+} from './career-playbook-public-pages';
 import { getCareerPlaybookGenerationJobId } from '../server/routers/career-playbook/job-ids';
+
+export {
+  buildCareerPlaybookPublicPageTargets,
+  resolveCareerPlaybookWebBaseUrl,
+} from './career-playbook-public-pages';
+export type { CareerPlaybookPublicPageTarget } from './career-playbook-public-pages';
 
 export type CareerPlaybookLiveSmokeMode = 'plan' | 'mutation-smoke';
 export type CareerPlaybookLiveSmokeTarget =
@@ -47,6 +60,8 @@ export interface CareerPlaybookLiveSmokeOptions {
   pollIntervalMs?: number;
   includeCourseBridge?: boolean;
   resumePlaybookId?: string;
+  /** Origin of the Next.js app; derived from `trpcUrl` when absent. */
+  webBaseUrl?: string;
 }
 
 export interface CareerPlaybookLiveSmokeCheck {
@@ -108,6 +123,18 @@ export interface CareerPlaybookLiveSmokeLibraryDetail {
   completedAt?: string | null;
 }
 
+/** The subset of the public share response the page URLs are built from. */
+export interface CareerPlaybookLiveSmokePublicShare {
+  shareSlug?: string | null;
+  organizationSlug?: string | null;
+  language?: string | null;
+}
+
+export interface CareerPlaybookLiveSmokeViewLinks {
+  isPublic: boolean;
+  links: Array<{ audience: string; path: string }>;
+}
+
 export interface CareerPlaybookLiveSmokeClient {
   startSession: (input: { language: Language }) => Promise<CareerPlaybookLiveSmokeSessionResponse>;
   submitAnswer: (input: {
@@ -134,6 +161,9 @@ export interface CareerPlaybookLiveSmokeClient {
     isPublic: boolean;
   }) => Promise<{ shareSlug: string | null; isPublic: boolean }>;
   getPublicShare: (input: { shareSlug: string }) => Promise<unknown>;
+  listViewLinks: (input: {
+    playbookId: string;
+  }) => Promise<CareerPlaybookLiveSmokeViewLinks | null>;
   createCourseFromPlaybook: (input: {
     playbookId: string;
     includeWebResearch: boolean;
@@ -147,6 +177,8 @@ export interface CareerPlaybookLiveSmokeDependencies {
   client?: CareerPlaybookLiveSmokeClient;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
+  /** Injected so the page gate is testable without a network. */
+  fetchPage?: (url: string) => Promise<{ status: number }>;
 }
 
 export type CareerPlaybookCleanupItemType =
@@ -220,7 +252,7 @@ const LIVE_SMOKE_BUSINESS_CONTEXT: CareerPlaybookAnswerSubmission = {
   },
 };
 
-function hasValue(value: string | undefined): value is string {
+function hasValue(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
@@ -456,6 +488,10 @@ function pdfStartsWithHeader(pdfBase64: string): boolean {
   }
 }
 
+function isPublicShareResponse(value: unknown): value is CareerPlaybookLiveSmokePublicShare {
+  return Boolean(value) && typeof value === 'object';
+}
+
 async function waitForCompletion(
   client: CareerPlaybookLiveSmokeClient,
   playbookId: string,
@@ -657,9 +693,31 @@ export async function runCareerPlaybookLiveSmoke(
       }
     : undefined;
   const share = await client.toggleShare({ playbookId, isPublic: true });
+  let publicShare: CareerPlaybookLiveSmokePublicShare | null = null;
   if (share.shareSlug) {
-    await client.getPublicShare({ shareSlug: share.shareSlug });
+    const response = await client.getPublicShare({ shareSlug: share.shareSlug });
+    publicShare = isPublicShareResponse(response) ? response : null;
   }
+
+  // The tRPC query above answers correctly for a guide whose every public page
+  // is a 500 (mc2-j8ms8). Fetch the pages themselves and record their status.
+  const webBaseUrl = resolveCareerPlaybookWebBaseUrl(options, env);
+  const viewLinks = share.shareSlug
+    ? await client.listViewLinks({ playbookId }).catch(() => null)
+    : null;
+  const pageTargets = webBaseUrl
+    ? buildCareerPlaybookPublicPageTargets({
+        baseUrl: webBaseUrl,
+        locale: publicShare?.language,
+        shareSlug: share.shareSlug,
+        organizationSlug: publicShare?.organizationSlug,
+        viewLinks: viewLinks?.links,
+      })
+    : [];
+  const sharePages: CareerPlaybookSmokePageEvidence[] = await fetchPublicPageEvidence(
+    pageTargets,
+    dependencies.fetchPage ?? defaultPageFetcher
+  );
 
   let courseId: string | undefined;
   let sourceDocumentIds: string[] = [];
@@ -694,6 +752,7 @@ export async function runCareerPlaybookLiveSmoke(
       isPublic: share.isPublic,
       shareSlug: share.shareSlug,
       publicFetchOk: Boolean(share.shareSlug),
+      pages: sharePages,
     },
     courseBridge: options.includeCourseBridge
       ? {
