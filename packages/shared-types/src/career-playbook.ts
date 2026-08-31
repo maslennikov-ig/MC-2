@@ -394,11 +394,43 @@ export type CareerPlaybookQualityIssueAction = z.infer<
   typeof CareerPlaybookQualityIssueActionSchema
 >;
 
+export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
+  'contradiction',
+  'format_minimum',
+  'wrong_language',
+  'unresolved_placeholder',
+  'invented_number',
+  // Quality contract v2 categories. Each has a deterministic check as its first
+  // line of defence; the LLM judge is the second contour for the cases a regex
+  // cannot see (a semantic clash between blocks, a duty that violates an
+  // anti-goal). See docs/career-playbook/quality-contract.md section 7.
+  'metric_conflict',
+  'unsourced_claim',
+  'stale_date',
+  'unmarked_example',
+  // A block sending its reader to a block that reader was never given. A view is
+  // a separately read document, so this is a broken document, not a style note.
+  'unreadable_reference',
+  'style',
+] as const;
+export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
+  CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES
+);
+export type CareerPlaybookJudgeIssueCategory = z.infer<
+  typeof CareerPlaybookJudgeIssueCategorySchema
+>;
+
 export const CareerPlaybookQualityIssueSchema = z.object({
   id: z.string().min(1),
   source: CareerPlaybookQualityIssueSourceSchema,
   severity: z.enum(['critical', 'warning', 'info']),
   blockId: CareerPlaybookBlockIdSchema.optional(),
+  // Carried through from the judge issue so a defect CLASS is measurable from
+  // the stored row. Without it, "how many contradictions survived" could only be
+  // answered by reading judge_verdict on every block, which is why the 2026-08-31
+  // comparison of two runs had to be reconstructed by hand. Optional: rows
+  // written before this field, and system warnings, legitimately have none.
+  category: CareerPlaybookJudgeIssueCategorySchema.optional(),
   title: z.string().min(1),
   message: z.string().min(1),
   suggestion: z.string().min(1).optional(),
@@ -473,32 +505,6 @@ export const CareerPlaybookQADataSchema = z.object({
   quality_issues: z.array(CareerPlaybookQualityIssueSchema).default([]),
 });
 export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
-
-export const CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES = [
-  'contradiction',
-  'format_minimum',
-  'wrong_language',
-  'unresolved_placeholder',
-  'invented_number',
-  // Quality contract v2 categories. Each has a deterministic check as its first
-  // line of defence; the LLM judge is the second contour for the cases a regex
-  // cannot see (a semantic clash between blocks, a duty that violates an
-  // anti-goal). See docs/career-playbook/quality-contract.md section 7.
-  'metric_conflict',
-  'unsourced_claim',
-  'stale_date',
-  'unmarked_example',
-  // A block sending its reader to a block that reader was never given. A view is
-  // a separately read document, so this is a broken document, not a style note.
-  'unreadable_reference',
-  'style',
-] as const;
-export const CareerPlaybookJudgeIssueCategorySchema = z.enum(
-  CAREER_PLAYBOOK_JUDGE_ISSUE_CATEGORIES
-);
-export type CareerPlaybookJudgeIssueCategory = z.infer<
-  typeof CareerPlaybookJudgeIssueCategorySchema
->;
 
 // Critical taxonomy: the only issue categories that justify LLM-driven block
 // regeneration. 'style' is intentionally excluded — stylistic/tone findings stay
@@ -713,6 +719,33 @@ export type CareerPlaybookCadenceLedgerEntry = z.infer<
 >;
 
 /**
+ * One ramp commitment and the single point in time it is due.
+ *
+ * The third ledger, for the third fact every block restates in its own words.
+ * Numbers had conflicting targets until the metric ledger; rhythms had
+ * conflicting cadences until the cadence ledger; deadlines were still each
+ * block's own opinion. Run 2896e72f published a Role Canvas promising the first
+ * forecast "by week 4" over an onboarding plan that puts it at week 2, and
+ * block_26 requiring two quarters of training against a block_23 that asks for
+ * one shadowed handover. Neither is reachable by a check on numbers or rhythms:
+ * a ramp deadline is neither.
+ *
+ * `offset` is a free string here and normalized to a canonical "day/week/month/
+ * quarter N" in `quality-ledger.ts` — the same division of labour the other two
+ * use: ask the model, then make the answer conform.
+ */
+export const CareerPlaybookMilestoneLedgerEntrySchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  offset: z.string().min(1),
+  owner: z.string().default(''),
+  scope: z.string().default(''),
+});
+export type CareerPlaybookMilestoneLedgerEntry = z.infer<
+  typeof CareerPlaybookMilestoneLedgerEntrySchema
+>;
+
+/**
  * One citable source. Filled deterministically by the application from the web
  * research result, never by the model: the model previously wrote "research
  * shows" with no traceable URL because sources stopped at the spec-builder
@@ -763,6 +796,11 @@ export const CareerPlaybookRoleProfileSpecSchema = z.object({
   // recurring commitments. Defaults to empty so specs persisted before it
   // existed still parse and round-trip.
   cadence_ledger: z.array(CareerPlaybookCadenceLedgerEntrySchema).default([]),
+  // Canonical ramp ledger: what the cadence ledger is to "how often", this is to
+  // "by when". Defaults to empty so specs persisted before it existed still
+  // parse and round-trip — and so the milestone check stays silent on them
+  // rather than inventing an authority it does not have.
+  milestone_ledger: z.array(CareerPlaybookMilestoneLedgerEntrySchema).default([]),
   // Citable sources, application-filled. Anything the model puts here is
   // discarded and overwritten by the real research result.
   evidence_ledger: z.array(CareerPlaybookEvidenceEntrySchema).default([]),

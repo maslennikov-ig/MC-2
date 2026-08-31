@@ -14,25 +14,42 @@
  */
 
 import {
-  CAREER_PLAYBOOK_BLOCK_CATALOG,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookCadenceLedgerEntry,
   type CareerPlaybookEvidenceEntry,
   type CareerPlaybookJudgeIssue,
   type CareerPlaybookMetricLedgerEntry,
+  type CareerPlaybookMilestoneLedgerEntry,
 } from '@megacampus/shared-types';
 import { careerPlaybookBlockMayCite, getCareerPlaybookBlockAudiences } from './audience-scope';
+import {
+  blockPosition,
+  dedupeIssues,
+  enumerationSegmentAt,
+  issue,
+  lineNamesLabelLoosely,
+  proseLines,
+  stripFencedBlocks,
+  truncateLine,
+} from './quality-check-text';
+import { validateMilestoneConsistency } from './milestone-checks';
 import {
   CAREER_PLAYBOOK_CADENCE_WORDS,
   CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE,
 } from './quality-ledger';
+
+// Re-exported: `stripFencedBlocks` is part of this module's public surface and
+// the scorecard and tests import it from here.
+export { stripFencedBlocks } from './quality-check-text';
 
 export interface CareerPlaybookQualityCheckContext {
   metricLedger: readonly CareerPlaybookMetricLedgerEntry[];
   evidenceLedger: readonly CareerPlaybookEvidenceEntry[];
   /** Canonical rhythms. Empty for a spec built before the ledger existed. */
   cadenceLedger?: readonly CareerPlaybookCadenceLedgerEntry[];
+  /** Canonical ramp deadlines. Empty for a spec built before the ledger existed. */
+  milestoneLedger?: readonly CareerPlaybookMilestoneLedgerEntry[];
   generatedOn?: string;
   /** Only universal-mode runs treat an unmarked company value as a defect. */
   businessContextMode?: 'universal' | 'company_specific';
@@ -41,32 +58,6 @@ export interface CareerPlaybookQualityCheckContext {
 }
 
 type BlockMap = Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
-
-/**
- * Strip fenced blocks (Mermaid, code) before any prose scan. A diagram label
- * like `A["3x coverage"]` is not a claim about the role and must not be read as
- * one.
- */
-export function stripFencedBlocks(markdown: string): string {
-  return markdown.replace(/```[\s\S]*?```/g, '\n');
-}
-
-function proseLines(markdown: string): string[] {
-  return stripFencedBlocks(markdown)
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-}
-
-function issue(
-  blockId: string,
-  category: CareerPlaybookJudgeIssue['category'],
-  description: string,
-  suggestion: string,
-  severity: CareerPlaybookJudgeIssue['severity'] = 'critical'
-): CareerPlaybookJudgeIssue {
-  return { block_id: blockId, severity, category, description, suggestion };
-}
 
 // ---------------------------------------------------------------------------
 // 1. Metric ledger consistency
@@ -346,25 +337,6 @@ function looksLikeExternalClaim(line: string): boolean {
  * 95% weekly and 65% daily AI adoption, and a 28% response rate, all with the
  * phrase "research shows" and not one URL anywhere in the document.
  */
-/**
- * Does this line name a ledger metric with the label's own words, in any order?
- *
- * Words shorter than four characters are dropped: "B2B", "win" and "of" carry no
- * evidence that the sentence is about this role's metric rather than the market.
- * A label left with no long word matches nothing, which is the safe direction.
- */
-function lineNamesLedgerMetricLoosely(line: string, label: string): boolean {
-  const words = label
-    .split(/[\s/]+/)
-    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter(word => word.length >= 4);
-  if (words.length === 0) return false;
-
-  return words.every(word =>
-    new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'iu').test(line)
-  );
-}
-
 export function validateUnsourcedStatistics(
   blocks: BlockMap,
   context: CareerPlaybookQualityCheckContext
@@ -400,7 +372,7 @@ export function validateUnsourcedStatistics(
       if (
         !EXTERNAL_ATTRIBUTION.test(line) &&
         !(POPULATION_SHARE.test(line) && EXTERNAL_POPULATION.test(line)) &&
-        context.metricLedger.some(metric => lineNamesLedgerMetricLoosely(line, metric.label))
+        context.metricLedger.some(metric => lineNamesLabelLoosely(line, metric.label))
       ) {
         continue;
       }
@@ -625,21 +597,6 @@ export function validateAntiGoalConflict(
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function truncateLine(line: string): string {
-  return line.length <= 160 ? line : `${line.slice(0, 159)}…`;
-}
-
-/** Collapse repeats of the same finding in the same block to one issue. */
-function dedupeIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybookJudgeIssue[] {
-  const seen = new Set<string>();
-  return issues.filter(item => {
-    const key = `${item.block_id}|${item.category}|${item.description}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 /** Run every contract check. Ordered most-structural first for readable reports. */
 export function runCareerPlaybookContractChecks(
   blocks: BlockMap,
@@ -655,6 +612,7 @@ export function runCareerPlaybookContractChecks(
     ...validateContractLeakage(blocks, context),
     ...validateSourceAttribution(blocks, context),
     ...validateCadenceConsistency(blocks, context),
+    ...validateMilestoneConsistency(blocks, context),
     ...validateCrossViewReference(blocks, context),
   ];
 }
@@ -953,6 +911,25 @@ const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp
     duty: 'forecast review',
   },
   { pattern: /retrospective|ретроспектив/i, duty: 'retrospective' },
+  {
+    pattern: /career (conversation|discussion|check-in)|карьерн\w* (разговор|беседа|диалог)/i,
+    duty: 'career conversation',
+  },
+  {
+    pattern: /stay interview|retention interview|stay-интервью|интервью\w* удержани/i,
+    duty: 'stay interview',
+  },
+  {
+    pattern: /performance review|перформанс-ревью|оценк\w* результативност|ревью результатов/i,
+    duty: 'performance review',
+  },
+  // The rhythms of managing people, added 2026-08-31 with the spec-builder rule
+  // that requires them in the ledger for a role with reports. Both halves land
+  // together on purpose: a family the checker knows but the ledger does not
+  // carry falls back to consensus, and consensus among invented rhythms is how
+  // block_15 and block_17 published a quarterly career conversation that no
+  // ledger sanctioned. The guide needs these conversations; what it lacked was
+  // an owner for how often they happen.
 ];
 
 /**
@@ -963,24 +940,6 @@ const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp
  * cadence word in the line attributed "daily" to the pipeline review. The
  * nearest cadence word wins instead.
  */
-/**
- * Enumeration items inside one line.
- *
- * Nearest-wins is still wrong across a list. Run `88fc2368` published "(pipeline
- * and forecast reviews, daily triage, coaching, forecast submission, CRM
- * configuration)" — a continuity checklist where every item carries its own
- * rhythm. "daily" belongs to triage, but it is the nearest cadence word to
- * "forecast submission", so the guide was told it runs its forecast review
- * daily against a weekly ledger. Block 26 was regenerated twice and shipped the
- * critical anyway, because no rewrite of a correct sentence can satisfy it.
- *
- * The accepted cost is the mirror case: a cadence stated across a separator
- * ("the pipeline review, held monthly, ...") is no longer read. That direction
- * loses a finding; the other direction spends a paid regeneration on a block
- * that is right.
- */
-const ENUMERATION_SEPARATOR = /[,;()]|\s[–—-]\s/;
-
 /** Closest cadence word to any mention of the duty, within that mention's list item. */
 function nearestCadenceAcrossMentions(line: string, pattern: RegExp): string | null {
   const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
@@ -994,20 +953,6 @@ function nearestCadenceAcrossMentions(line: string, pattern: RegExp): string | n
   }
 
   return best?.name ?? null;
-}
-
-/** The list item containing `index`, as text plus its offset in the line. */
-function enumerationSegmentAt(line: string, index: number): { text: string; start: number } {
-  const separators = new RegExp(ENUMERATION_SEPARATOR.source, 'g');
-  let start = 0;
-
-  for (const match of line.matchAll(separators)) {
-    const at = match.index ?? 0;
-    if (at >= index) return { text: line.slice(start, at), start };
-    start = at + match[0].length;
-  }
-
-  return { text: line.slice(start), start };
 }
 
 function cadenceNearWithDistance(
@@ -1025,15 +970,6 @@ function cadenceNearWithDistance(
   }
 
   return best;
-}
-
-/** Publication order, so "which block said it first" is answerable. */
-const BLOCK_POSITION = new Map<string, number>(
-  CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => [block.blockId as string, block.position])
-);
-
-function blockPosition(blockId: string): number {
-  return BLOCK_POSITION.get(blockId) ?? Number.MAX_SAFE_INTEGER;
 }
 
 /**
@@ -1153,9 +1089,6 @@ export function validateCadenceConsistency(
     const ledgerEntry = findCadenceLedgerEntry(duty, cadenceLedger);
     const consensus = selectConsensusCadence(observations);
     const canonical = ledgerEntry?.cadence ?? consensus.cadence;
-    const authority = ledgerEntry
-      ? 'the cadence ledger, which is the single source of rhythm for this guide'
-      : `the rest of the guide, led by ${consensus.firstBlockId}`;
 
     const deviatingCadences = new Map<string, string[]>();
     for (const observation of observations) {
@@ -1170,14 +1103,32 @@ export function validateCadenceConsistency(
     const contested = observations.length > deviatingCadences.size;
 
     for (const [blockId, cadences] of deviatingCadences) {
+      // A block can disagree with itself: run 2896e72f's block_15 stated the
+      // career conversation as both quarterly and monthly, so the consensus
+      // leader and the deviation were the same block. Citing "the rest of the
+      // guide, led by block_15" against block_15 reads as a bug in the checker
+      // and tells the regenerator nothing it can act on.
+      const selfContradiction = !ledgerEntry && consensus.firstBlockId === blockId;
+      const authority = ledgerEntry
+        ? 'the cadence ledger, which is the single source of rhythm for this guide'
+        : selfContradiction
+          ? 'its own earlier statement in this same block'
+          : `the rest of the guide, led by ${consensus.firstBlockId}`;
+
       issues.push(
         issue(
           blockId,
           'contradiction',
           `${blockId} states the ${duty.duty} as ${cadences.join(' and ')}, but this guide runs it ${canonical} per ${authority}.${
-            contested ? ' A reader holding both blocks cannot plan a week against two answers.' : ''
+            selfContradiction
+              ? ' One block giving one commitment two rhythms is unreadable on its own.'
+              : contested
+                ? ' A reader holding both blocks cannot plan a week against two answers.'
+                : ''
           }`,
-          `Rewrite every ${duty.duty} mention in ${blockId} to ${canonical}. Change nothing in the other blocks: ${canonical} is the published rhythm and this block is the deviation.`
+          selfContradiction
+            ? `State the ${duty.duty} as ${canonical} everywhere in ${blockId}; the block currently gives it more than one rhythm.`
+            : `Rewrite every ${duty.duty} mention in ${blockId} to ${canonical}. Change nothing in the other blocks: ${canonical} is the published rhythm and this block is the deviation.`
         )
       );
     }

@@ -133,6 +133,7 @@ const roleProfileSpec = {
   // schema, so the queued job always carries these defaults.
   metric_ledger: [],
   cadence_ledger: [],
+  milestone_ledger: [],
   evidence_ledger: [],
   block_boundaries: {},
   content_language: 'en',

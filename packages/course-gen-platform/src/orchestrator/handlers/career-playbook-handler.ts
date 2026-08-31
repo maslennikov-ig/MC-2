@@ -295,6 +295,10 @@ function collectJudgeQualityIssues(
         source: 'cross_block_judge',
         severity: issue.severity,
         blockId: issue.block_id,
+        // The class, not just the text. Comparing two runs by defect class used
+        // to mean reading judge_verdict off every block, because the stored row
+        // dropped the one field that answers it.
+        ...(issue.category ? { category: issue.category } : {}),
         title: qualityIssueTitleForSeverity(issue.severity),
         message: issue.description,
         ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),

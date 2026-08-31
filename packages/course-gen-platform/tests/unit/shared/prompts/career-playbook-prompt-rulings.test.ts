@@ -220,3 +220,53 @@ describe('the cadence ledger reaches every prompt that can state a rhythm', () =
     );
   });
 });
+
+describe('the milestone ledger reaches every prompt that can state a deadline', () => {
+  it.each([
+    'career_playbook_group_1_foundation',
+    'career_playbook_group_2_operations',
+    'career_playbook_group_3_people',
+    'career_playbook_group_4_growth',
+    'career_playbook_group_5_system',
+    'career_playbook_group_6_wrap',
+    'career_playbook_cross_block_judge',
+    'career_playbook_final_proofreader',
+    'career_playbook_block_regenerator',
+  ])('%s carries the ledger and declares the variable', promptKey => {
+    const entry = prompt(promptKey);
+    expect(entry.promptTemplate).toContain('{{milestone_ledger_md}}');
+    expect(entry.variables?.some(variable => variable.name === 'milestone_ledger_md')).toBe(true);
+  });
+
+  it('asks the spec builder to build it in the units the checker reads', () => {
+    const specBuilder = prompt('career_playbook_spec_builder');
+    expect(specBuilder.promptTemplate).toContain('Build milestone_ledger');
+    expect(specBuilder.promptTemplate).toContain('"day 30", "week 2", "month 1", "quarter 2"');
+    expect(specBuilder.promptTemplate).toContain(
+      'a commitment may hold only one due date across the whole guide'
+    );
+  });
+
+  // mc2-i6l0i: the Role Canvas is a summary block, and it restated the first
+  // forecast at week 4 over an onboarding plan that set it at week 2.
+  it('tells a summary block to carry a governed date across, not to set one', () => {
+    for (const entry of GROUP_PROMPTS) {
+      expect(entry.promptTemplate).toContain(
+        'A summary block restates these dates rather than setting them'
+      );
+    }
+  });
+});
+
+describe('the cadence ledger has to cover the rhythms of managing people', () => {
+  // mc2-tub8q / mc2-r1qen: the model invented a quarterly career conversation
+  // and a quarterly stay interview because the guide needs both and the ledger
+  // carried neither. A ban would have contradicted the work; a ledger row does not.
+  it('requires them for a role with reports', () => {
+    const specBuilder = prompt('career_playbook_spec_builder');
+    expect(specBuilder.promptTemplate).toContain('context.has_subordinates is true');
+    expect(specBuilder.promptTemplate).toContain(
+      'the career conversation, the retention (stay) interview, the performance review'
+    );
+  });
+});

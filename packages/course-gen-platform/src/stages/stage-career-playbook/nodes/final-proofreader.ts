@@ -35,9 +35,11 @@ import {
   formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
   getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import { parseCareerPlaybookJudgeVerdict } from './cross-block-judge';
 
@@ -121,6 +123,9 @@ export function createCareerPlaybookProofreaderNode(
         ),
         cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
           getCareerPlaybookCadenceLedger(state.roleProfileSpec)
+        ),
+        milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+          getCareerPlaybookMilestoneLedger(state.roleProfileSpec)
         ),
         evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
           getCareerPlaybookEvidenceLedger(state.roleProfileSpec)

@@ -56,7 +56,7 @@ import type {
   CareerPlaybookBlockId,
   CareerPlaybookViewerBlock,
 } from '@/stores/use-career-playbook-store'
-import { ActionsBar, type ActionsBarCopy } from './ActionsBar'
+import { ActionsBar, type ActionsBarCopy, type ActionsBarReaderLink } from './ActionsBar'
 
 type PanelState = 'open' | 'closed'
 type ReaderMode = 'standard' | 'reading'
@@ -132,6 +132,8 @@ interface PlaybookViewerProps {
   onShare: () => void
   publicShareUrl?: string | null
   onCopyShareLink?: () => void
+  readerLinks?: ActionsBarReaderLink[]
+  onCopyReaderLink?: (url: string) => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   openCourseHref?: string | null
@@ -201,6 +203,7 @@ const defaultActionsCopy: Required<ActionsBarCopy> = {
   share: 'Поделиться',
   shareLinkLabel: 'Публичная ссылка',
   shareCopyButton: 'Скопировать',
+  readerLinksLabel: 'Ссылка для каждого читателя',
   createCourse: 'Создать курс из инструкции',
   openCourse: 'Перейти в курс',
   delete: 'Удалить',
@@ -324,6 +327,8 @@ export function PlaybookViewer({
   onShare,
   publicShareUrl,
   onCopyShareLink,
+  readerLinks,
+  onCopyReaderLink,
   onCreateCourse,
   createCourseAction,
   openCourseHref,
@@ -614,6 +619,8 @@ export function PlaybookViewer({
                     onShare={onShare}
                     publicShareUrl={publicShareUrl}
                     onCopyShareLink={onCopyShareLink}
+                    readerLinks={readerLinks}
+                    onCopyReaderLink={onCopyReaderLink}
                     onEditBlock={onEditBlock}
                     onRegenerateBlock={onRegenerateBlock}
                     onCreateCourse={onCreateCourse}
@@ -854,6 +861,8 @@ function InspectorRail({
   onShare,
   publicShareUrl,
   onCopyShareLink,
+  readerLinks,
+  onCopyReaderLink,
   onEditBlock,
   onRegenerateBlock,
   onCreateCourse,
@@ -879,6 +888,8 @@ function InspectorRail({
   onShare: () => void
   publicShareUrl?: string | null
   onCopyShareLink?: () => void
+  readerLinks?: ActionsBarReaderLink[]
+  onCopyReaderLink?: (url: string) => void
   onEditBlock: (blockId: CareerPlaybookBlockId) => void
   onRegenerateBlock: (blockId: CareerPlaybookBlockId) => void
   onCreateCourse: () => void
@@ -917,6 +928,8 @@ function InspectorRail({
           onShare={onShare}
           publicShareUrl={publicShareUrl}
           onCopyShareLink={onCopyShareLink}
+          readerLinks={readerLinks}
+          onCopyReaderLink={onCopyReaderLink}
           onCreateCourse={onCreateCourse}
           createCourseAction={createCourseAction}
           canCreateCourse={canCreateCourse}

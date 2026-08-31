@@ -44,11 +44,13 @@ import { CatalogStatistics } from '@/components/catalog/catalog-statistics'
 import {
   deleteCareerPlaybook,
   fetchCareerPlaybookLibraryPage,
+  fetchCareerPlaybookViewLinks,
   updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
 import {
   buildCareerPlaybookPublicPath,
   buildCareerPlaybookPublicUrl,
+  buildCareerPlaybookViewLinkUrl,
 } from '@/components/career-playbook/library/public-url'
 import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
 import { CareerPlaybookWorkspace } from '@/components/career-playbook/layout/document-workspace'
@@ -106,6 +108,14 @@ function getStatusTone(status: CareerPlaybookLibraryItem['status']) {
   if (status === 'failed') return 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'
   return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
 }
+
+// Who each reader link is for. The library card has room for a label, not for
+// the block counts the viewer's panel shows.
+const READER_LINK_LABEL_KEYS = {
+  employee: 'readerLinkEmployee',
+  manager: 'readerLinkManager',
+  hr: 'readerLinkHr',
+} as const
 
 const visibilityConfig: Record<
   CareerPlaybookVisibility,
@@ -218,6 +228,11 @@ export default function CareerPlaybookLibraryPageClient({
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [visibilityUpdatingIds, setVisibilityUpdatingIds] = useState<Set<string>>(new Set())
+  // One entry per card whose share menu has been opened. The empty array is a
+  // real answer — asked, and the server has none to give — so the menu asks once.
+  const [readerLinks, setReaderLinks] = useState<
+    Record<string, Array<{ audience: 'employee' | 'manager' | 'hr'; url: string }>>
+  >({})
   const [publicLinkMessages, setPublicLinkMessages] = useState<Record<string, 'success' | 'error'>>(
     {}
   )
@@ -321,6 +336,36 @@ export default function CareerPlaybookLibraryPageClient({
 
     const copied = await copyToClipboard(url)
     setPublicLinkMessages((prev) => ({ ...prev, [item.id]: copied ? 'success' : 'error' }))
+  }
+
+  /**
+   * The three reader links for one card, fetched when its menu opens.
+   *
+   * Lazily, and once: a library page shows fifty playbooks and an owner shares
+   * one. `null` records "asked and got nothing" — an older deployment without
+   * the procedure, or a playbook the server will not hand links for — so the
+   * menu stops asking and simply offers the public link.
+   */
+  const loadReaderLinks = async (playbookId: string) => {
+    if (playbookId in readerLinks) return
+
+    try {
+      const result = await fetchCareerPlaybookViewLinks(playbookId)
+      const links = result?.isPublic
+        ? result.links.map((link) => ({
+            audience: link.audience,
+            url: buildCareerPlaybookViewLinkUrl(locale, link.path),
+          }))
+        : []
+      setReaderLinks((prev) => ({ ...prev, [playbookId]: links }))
+    } catch {
+      setReaderLinks((prev) => ({ ...prev, [playbookId]: [] }))
+    }
+  }
+
+  const handleCopyReaderLink = async (playbookId: string, url: string) => {
+    const copied = await copyToClipboard(url)
+    setPublicLinkMessages((prev) => ({ ...prev, [playbookId]: copied ? 'success' : 'error' }))
   }
 
   const handleLoadMore = async () => {
@@ -487,24 +532,45 @@ export default function CareerPlaybookLibraryPageClient({
                     <span className="sr-only">{t('card.publicLink')}</span>
                   </Link>
                 </CatalogActionButton>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                      aria-label={t('card.copyPublicLink')}
-                      onClick={() => void handleCopyPublicLink(item)}
-                    >
-                      <Share2 className="h-3.5 w-3.5" aria-hidden />
-                      <span className="sr-only">{t('card.copyPublicLink')}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{t('card.copyPublicLink')}</p>
-                  </TooltipContent>
-                </Tooltip>
+                <DropdownMenu onOpenChange={(open) => open && void loadReaderLinks(item.id)}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                          aria-label={t('card.copyPublicLink')}
+                        >
+                          <Share2 className="h-3.5 w-3.5" aria-hidden />
+                          <span className="sr-only">{t('card.copyPublicLink')}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{t('card.copyPublicLink')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => void handleCopyPublicLink(item)}>
+                      {t('card.copyPublicLink')}
+                    </DropdownMenuItem>
+                    {/*
+                      The three reader links are offered only once the server has
+                      returned them. A menu row that copies nothing is worse than
+                      a menu without the row.
+                    */}
+                    {(readerLinks[item.id] ?? []).map((link) => (
+                      <DropdownMenuItem
+                        key={link.audience}
+                        onClick={() => void handleCopyReaderLink(item.id, link.url)}
+                      >
+                        {t(`card.${READER_LINK_LABEL_KEYS[link.audience]}` as never)}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : null}
             {canEdit ? (

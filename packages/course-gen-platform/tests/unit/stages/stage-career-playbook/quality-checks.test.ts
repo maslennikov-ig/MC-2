@@ -759,6 +759,78 @@ const FORECAST_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
 };
 
 describe('validateCadenceConsistency', () => {
+  // mc2-tub8q / mc2-r1qen: the model published a quarterly career conversation
+  // and a quarterly stay interview in two blocks each, because the guide needs
+  // both and the ledger carried neither. The fix is a ledger row, not a ban —
+  // so the checker has to be able to see the family at all.
+  it('governs the rhythms of managing people once the ledger carries them', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15: 'Hold a quarterly career conversation with each report.',
+        block_17: 'A missed monthly career conversation is a red flag.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'career_conversation',
+            label: 'Career conversation',
+            cadence: 'monthly',
+            owner: 'Manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('career conversation');
+    expect(issues[0].description).toContain('monthly');
+  });
+
+  // Found by replaying 2896e72f: block_15 gave the career conversation two
+  // rhythms, so the consensus leader and the accused were the same block, and
+  // the message cited "the rest of the guide, led by block_15" against block_15.
+  it('says a block contradicts itself rather than citing it as its own authority', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15:
+          'Hold a monthly career conversation with each report.\nThe quarterly career conversation is where growth is reviewed.',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('its own earlier statement in this same block');
+    expect(issues[0].description).not.toContain('led by block_15');
+    expect(issues[0].suggestion).toContain('the block currently gives it more than one rhythm');
+  });
+
+  it('reads a stay interview and a performance review as their own commitments', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15: 'Stay interviews run quarterly; the performance review is annual.',
+        block_22: 'Stay-интервью проводятся ежемесячно.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'stay_interview',
+            label: 'Stay interview',
+            cadence: 'quarterly',
+            owner: 'Manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_22');
+    expect(issues[0].description).toContain('stay interview');
+  });
+
   it('flags the real weekly/monthly 1:1 contradiction across blocks', () => {
     const issues = validateCadenceConsistency(
       blocks({

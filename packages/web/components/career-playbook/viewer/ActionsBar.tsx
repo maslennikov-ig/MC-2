@@ -8,12 +8,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+/**
+ * One reader's link, ready to hand out.
+ *
+ * The three are not variants of one link: each opens a different document, and
+ * the server decides which from the token. So the owner needs all three side by
+ * side, labelled by reader — being told "there are three URLs" is not the same
+ * as being able to copy the right one.
+ */
+export interface ActionsBarReaderLink {
+  audience: 'employee' | 'manager' | 'hr'
+  label: string
+  description: string
+  url: string
+}
+
 export interface ActionsBarCopy {
   actionsLabel?: string
   pdf?: string
   share?: string
   shareLinkLabel?: string
   shareCopyButton?: string
+  readerLinksLabel?: string
   createCourse?: string
   openCourse?: string
   delete?: string
@@ -26,6 +42,9 @@ interface ActionsBarProps {
   onShare: () => void
   publicShareUrl?: string | null
   onCopyShareLink?: () => void
+  /** Empty while the playbook is private: the server refuses those reads. */
+  readerLinks?: ActionsBarReaderLink[]
+  onCopyReaderLink?: (url: string) => void
   onCreateCourse: () => void
   createCourseAction?: (trigger: ReactNode) => ReactNode
   canCreateCourse?: boolean
@@ -39,6 +58,7 @@ const defaultCopy: Required<ActionsBarCopy> = {
   share: 'Share',
   shareLinkLabel: 'Public link',
   shareCopyButton: 'Copy',
+  readerLinksLabel: 'A link per reader',
   createCourse: 'Create course',
   openCourse: 'Open course',
   delete: 'Delete',
@@ -51,6 +71,8 @@ export function ActionsBar({
   onShare,
   publicShareUrl,
   onCopyShareLink,
+  readerLinks,
+  onCopyReaderLink,
   onCreateCourse,
   createCourseAction,
   canCreateCourse = true,
@@ -136,6 +158,44 @@ export function ActionsBar({
               {labels.shareCopyButton}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {readerLinks && readerLinks.length > 0 ? (
+        <div className="career-playbook-muted-card grid gap-3 p-3">
+          <p className="text-xs font-medium">{labels.readerLinksLabel}</p>
+          {readerLinks.map((link) => (
+            <div key={link.audience} className="grid gap-1">
+              <Label
+                htmlFor={`career-playbook-view-link-${link.audience}`}
+                className="text-xs font-medium"
+              >
+                {link.label}
+              </Label>
+              <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+                {link.description}
+              </p>
+              <div className="flex min-w-0 gap-2">
+                <Input
+                  id={`career-playbook-view-link-${link.audience}`}
+                  value={link.url}
+                  readOnly
+                  className="min-w-0 flex-1 font-mono text-xs"
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCopyReaderLink?.(link.url)}
+                  disabled={!onCopyReaderLink}
+                >
+                  <Copy className="mr-2 h-4 w-4" aria-hidden />
+                  {labels.shareCopyButton}
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 

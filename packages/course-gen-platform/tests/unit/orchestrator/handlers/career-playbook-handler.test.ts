@@ -82,6 +82,7 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
   // longer deep-equals what the regenerator receives.
   metric_ledger: [],
   cadence_ledger: [],
+  milestone_ledger: [],
   evidence_ledger: [],
   block_boundaries: {},
   content_language: 'ru',

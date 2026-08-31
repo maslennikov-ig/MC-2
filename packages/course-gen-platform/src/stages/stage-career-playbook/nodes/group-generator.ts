@@ -24,9 +24,11 @@ import {
   formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
   getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import { buildCareerPlaybookPriorBlocksDigest } from './prior-blocks-digest';
 import {
@@ -510,6 +512,9 @@ export async function generateCareerPlaybookGroup(
     // quarterly, and no single-block rewrite could reconcile them.
     cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
       getCareerPlaybookCadenceLedger(spec)
+    ),
+    milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+      getCareerPlaybookMilestoneLedger(spec)
     ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(spec)

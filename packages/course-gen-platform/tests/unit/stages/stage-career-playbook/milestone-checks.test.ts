@@ -1,0 +1,172 @@
+/**
+ * Ramp deadlines, the third fact to get a ledger.
+ *
+ * The two contradictions below are the ones run 2896e72f actually shipped, and
+ * the only reader who caught either was the LLM judge — once, late, and with no
+ * way to confirm it. Everything here is a pure function over stored markdown.
+ */
+
+import { describe, expect, it } from 'vitest';
+import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
+import { validateMilestoneConsistency } from '@/stages/stage-career-playbook/nodes/milestone-checks';
+import {
+  normalizeCareerPlaybookMilestone,
+  normalizeCareerPlaybookMilestoneLedger,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
+} from '@/stages/stage-career-playbook/nodes/quality-ledger';
+
+function blocks(
+  entries: Array<[CareerPlaybookBlockId, string]>
+): Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> {
+  return Object.fromEntries(
+    entries.map(([blockId, content]) => [
+      blockId,
+      { content, status: 'completed', judge_verdict: null } as CareerPlaybookBlockState,
+    ])
+  );
+}
+
+const forecastLedger = [
+  {
+    key: 'first_forecast',
+    label: 'Первый прогноз',
+    offset: 'week 2',
+    owner: 'Руководитель',
+    scope: 'новый сотрудник',
+  },
+];
+
+describe('normalizeCareerPlaybookMilestone', () => {
+  it('reads a deadline written either way round, in either language', () => {
+    expect(normalizeCareerPlaybookMilestone('Day 60')).toEqual({ canonical: 'day 60', days: 60 });
+    expect(normalizeCareerPlaybookMilestone('60 days')).toEqual({ canonical: 'day 60', days: 60 });
+    expect(normalizeCareerPlaybookMilestone('неделя 2')).toEqual({
+      canonical: 'week 2',
+      days: 14,
+    });
+    expect(normalizeCareerPlaybookMilestone('2 недели')).toEqual({ canonical: 'week 2', days: 14 });
+  });
+
+  it('reads an ordinal standing in for the number', () => {
+    expect(normalizeCareerPlaybookMilestone('within the first month')).toEqual({
+      canonical: 'month 1',
+      days: 30,
+    });
+    expect(normalizeCareerPlaybookMilestone('за первый квартал')).toEqual({
+      canonical: 'quarter 1',
+      days: 90,
+    });
+  });
+
+  // Days are the comparison unit precisely so that a guide mixing units for one
+  // commitment can still be checked: these two are the same promise.
+  it('makes mixed units comparable', () => {
+    expect(normalizeCareerPlaybookMilestone('Day 60')?.days).toBe(
+      normalizeCareerPlaybookMilestone('2 months')?.days
+    );
+  });
+
+  it('returns null for a phrase carrying no readable deadline', () => {
+    expect(normalizeCareerPlaybookMilestone('as soon as practical')).toBeNull();
+    expect(normalizeCareerPlaybookMilestone('')).toBeNull();
+  });
+});
+
+describe('normalizeCareerPlaybookMilestoneLedger', () => {
+  it('canonicalizes the key and the deadline, and keeps the first of a duplicate', () => {
+    const ledger = normalizeCareerPlaybookMilestoneLedger([
+      { key: 'First Forecast', label: 'Первый прогноз', offset: '2 недели', owner: '', scope: '' },
+      { key: 'first_forecast', label: 'Первый прогноз', offset: 'week 4', owner: '', scope: '' },
+    ]);
+
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].key).toBe('first_forecast');
+    expect(ledger[0].offset).toBe('week 2');
+  });
+
+  it('drops a row whose deadline nothing can read', () => {
+    expect(
+      normalizeCareerPlaybookMilestoneLedger([
+        { key: 'ramp', label: 'Ramp', offset: 'when ready', owner: '', scope: '' },
+      ])
+    ).toEqual([]);
+  });
+
+  it('renders an explicit notice rather than an empty table', () => {
+    expect(formatCareerPlaybookMilestoneLedgerForPrompt([])).toContain('none');
+    expect(formatCareerPlaybookMilestoneLedgerForPrompt(forecastLedger)).toContain('| week 2 |');
+  });
+});
+
+describe('validateMilestoneConsistency', () => {
+  // Run 2896e72f, mc2-i6l0i: the Role Canvas promised week 4 while the
+  // onboarding plan put the first forecast input at week 2.
+  it('names the deviating block and tells it not to touch the others', () => {
+    const issues = validateMilestoneConsistency(
+      blocks([
+        ['block_14', '| Первый прогноз отправлен в CRO | Неделя 2 |'],
+        ['block_24', '- К неделе 4: первый прогноз сдан без поздних правок.'],
+      ]),
+      { milestoneLedger: forecastLedger }
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_24');
+    expect(issues[0].category).toBe('contradiction');
+    expect(issues[0].description).toContain('week 4');
+    expect(issues[0].description).toContain('week 2');
+    expect(issues[0].suggestion).toContain('Change nothing in the other blocks');
+  });
+
+  it('accepts a block that states the same deadline in another unit', () => {
+    expect(
+      validateMilestoneConsistency(
+        blocks([['block_24', '- В первые 14 дней: первый прогноз сдан.']]),
+        { milestoneLedger: forecastLedger }
+      )
+    ).toEqual([]);
+  });
+
+  // The lesson the cadence check paid for: a checklist packs several
+  // commitments, each with its own deadline, and reading across a comma blames
+  // a sentence that is correct.
+  it('reads the deadline inside the commitment own list item', () => {
+    const issues = validateMilestoneConsistency(
+      blocks([
+        [
+          'block_14',
+          '- Онбординг: shadowing на неделе 4, первый прогноз на неделе 2, аттестация в месяце 3.',
+        ],
+      ]),
+      { milestoneLedger: forecastLedger }
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('ignores deadlines inside fenced diagrams', () => {
+    expect(
+      validateMilestoneConsistency(
+        blocks([['block_11', '```mermaid\ngraph TD\n  A["Первый прогноз: неделя 4"]\n```']]),
+        { milestoneLedger: forecastLedger }
+      )
+    ).toEqual([]);
+  });
+
+  // A playbook generated before the ledger existed must judge exactly as it did
+  // before: silence is the only honest answer without an authority.
+  it('says nothing when the ledger is empty', () => {
+    expect(
+      validateMilestoneConsistency(blocks([['block_24', '- К неделе 4: первый прогноз сдан.']]), {})
+    ).toEqual([]);
+  });
+
+  it('says nothing about a commitment the ledger does not govern', () => {
+    expect(
+      validateMilestoneConsistency(
+        blocks([['block_24', '- К неделе 6: аттестация по продукту пройдена.']]),
+        { milestoneLedger: forecastLedger }
+      )
+    ).toEqual([]);
+  });
+});

@@ -21,9 +21,11 @@ import {
   formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
   getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 
@@ -201,6 +203,9 @@ export function buildBlockRegeneratorPromptVariables(
     // is told which block is wrong, and needs to be told which rhythm is right.
     cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
       getCareerPlaybookCadenceLedger(input.roleProfileSpec)
+    ),
+    milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+      getCareerPlaybookMilestoneLedger(input.roleProfileSpec)
     ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(input.roleProfileSpec)
