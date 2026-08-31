@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CAREER_PLAYBOOK_BLOCK_CATALOG,
-  type CareerPlaybookQAData,
-} from '@megacampus/shared-types';
+import { CAREER_PLAYBOOK_BLOCK_CATALOG, type CareerPlaybookQAData } from '@megacampus/shared-types';
 import {
   applyCareerPlaybookLedgers,
   CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
@@ -234,13 +231,22 @@ describe('Career Playbook spec builder', () => {
     expect(parsedWithStrings.context.region).toBe('EMEA');
   });
 
-  it('builds exactly three role-specific web research queries', () => {
+  it('builds role-specific web research queries plus a primary-research lane', () => {
     const queries = buildCareerPlaybookResearchQueries(qaData);
 
-    expect(queries).toHaveLength(3);
-    expect(queries.map(query => query.category)).toEqual(['kpis', 'trends', 'onboarding']);
+    expect(queries).toHaveLength(4);
+    expect(queries.map(query => query.category)).toEqual([
+      'kpis',
+      'trends',
+      'onboarding',
+      'research',
+    ]);
     expect(queries[0].query).toContain('B2B Sales Manager');
     expect(queries[1].query).toContain('2026');
+    // The lane that gives a named analyst house somewhere to point (mc2-r1qen):
+    // only this one is restricted to the publishers the classifier calls research.
+    expect(queries[3].includeDomains).toContain('gartner.com');
+    expect(queries.slice(0, 3).every(query => query.includeDomains === undefined)).toBe(true);
   });
 
   it('builds spec prompt variables with client business context separated from web research', () => {
@@ -278,7 +284,7 @@ describe('Career Playbook spec builder', () => {
     expect(research.trends_insights).toEqual([]);
     expect(research.onboarding_insights).toEqual([]);
     expect(research.sources).toEqual([]);
-    expect(research.errors).toHaveLength(3);
+    expect(research.errors).toHaveLength(4);
   });
 
   it('retries spec generation with fallback model instructions when primary output fails schema validation', async () => {
@@ -475,14 +481,13 @@ describe('Career Playbook spec builder', () => {
     expect(normalizedB.block_boundaries.block_9.do_not_repeat).toEqual(exactEmployeePeers);
     expect(normalizedA.block_boundaries).toEqual(normalizedB.block_boundaries);
 
-    const employeeOnly = CAREER_PLAYBOOK_BLOCK_CATALOG.find(
-      block => block.blockId === 'block_9'
-    )!;
+    const employeeOnly = CAREER_PLAYBOOK_BLOCK_CATALOG.find(block => block.blockId === 'block_9')!;
     const candidateProfile = CAREER_PLAYBOOK_BLOCK_CATALOG.find(
       block => block.blockId === 'block_12'
     )!;
-    expect(employeeOnly.audiences.some(audience => candidateProfile.audiences.includes(audience)))
-      .toBe(false);
+    expect(
+      employeeOnly.audiences.some(audience => candidateProfile.audiences.includes(audience))
+    ).toBe(false);
     expect(normalizedA.block_boundaries.block_9.do_not_repeat).not.toContain('candidate profile');
   });
 

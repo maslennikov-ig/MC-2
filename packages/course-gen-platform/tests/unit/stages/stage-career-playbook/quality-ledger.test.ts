@@ -152,6 +152,50 @@ describe('prompt formatting', () => {
       'no precise external statistic may be stated'
     );
   });
+
+  // mc2-r1qen: the list labelled every source but never said what followed from
+  // the labels, so a block read "(vendor)" and still wrote "Gartner analysts
+  // cited in [S11] predict…". The consequence is now stated as a fact.
+  it('tells the block no research house may be named when every source is a vendor page', () => {
+    const rendered = formatCareerPlaybookEvidenceLedgerForPrompt([
+      {
+        id: 'S1',
+        url: 'https://janek.com/blog/ai-and-sales',
+        title: 'The impact of AI on sales professionals',
+        claim: 'AI changes prospecting',
+        retrieved_at: '2026-08-31',
+        source_kind: 'vendor',
+      },
+    ]);
+
+    expect(rendered).toContain('Primary research in this list: none');
+    expect(rendered).toContain('Gartner');
+    expect(rendered).toContain('analysts cited in [Sn]');
+  });
+
+  it('names the research entries a house may be attributed to when the run has them', () => {
+    const rendered = formatCareerPlaybookEvidenceLedgerForPrompt([
+      {
+        id: 'S1',
+        url: 'https://janek.com/blog/ai-and-sales',
+        title: 'Vendor post',
+        claim: 'AI changes prospecting',
+        retrieved_at: '2026-08-31',
+        source_kind: 'vendor',
+      },
+      {
+        id: 'S2',
+        url: 'https://www.gartner.com/en/sales/insights',
+        title: 'Gartner sales insights',
+        claim: 'Buyers favour self-serve evaluation',
+        retrieved_at: '2026-08-31',
+        source_kind: 'research',
+      },
+    ]);
+
+    expect(rendered).toContain('Primary research in this list: [S2]');
+    expect(rendered).not.toContain('Primary research in this list: none');
+  });
 });
 
 describe('buildCareerPlaybookPriorBlocksDigest', () => {

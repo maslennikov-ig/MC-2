@@ -740,6 +740,64 @@ describe('validateSourceAttribution', () => {
 
     expect(issues).toEqual([]);
   });
+
+  // mc2-r1qen. Run 88fc2368 regenerated block 9 twice and shipped the claim
+  // anyway: "cite the Gartner publication directly" asked for a source the run
+  // did not have. The remedy has to be one the block can actually carry out.
+  it('tells a block to drop the attribution when the run retrieved no research at all', () => {
+    const issues = validateSourceAttribution(
+      blocks({
+        block_9:
+          'Gartner analysts cited in [S9] predict that by 2026, 65% of B2B sales organizations will be data-driven.',
+      }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].suggestion).toContain('Drop the attribution');
+    expect(issues[0].suggestion).not.toContain('Cite the Gartner publication');
+  });
+
+  it('flags a named house with no citation when the run holds no research', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_9: 'Forrester predicts that hybrid selling becomes the default motion.' }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_9');
+    expect(issues[0].description).toContain('Forrester');
+  });
+
+  it('leaves an uncited house alone once the run holds a research source', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_9: 'Forrester predicts that hybrid selling becomes the default motion.' }),
+      context({
+        evidenceLedger: [
+          vendor,
+          {
+            ...vendor,
+            id: 'S10',
+            url: 'https://www.forrester.com/report',
+            source_kind: 'research',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  // A reading list names a house and asserts nothing. Flagging it would spend a
+  // paid regeneration on a sentence that is already correct.
+  it('leaves a bare mention alone — naming a house is not attributing a claim to it', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_22: 'Recommended reading: Harvard Business Review on coaching.' }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toEqual([]);
+  });
 });
 
 const PIPELINE_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
