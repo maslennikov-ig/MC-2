@@ -397,6 +397,132 @@ describe('Career Playbook block regenerator', () => {
     expect(pending[0].blockId).toBe('block_4');
   });
 
+  // Run 2896e72f ended with block_13 holding two criticals and zero regeneration
+  // attempts: the final full-document pass was the first to flag it, and by then
+  // unrelated group remediations stood at 19 of 8. Raising the per-block cap
+  // would not have helped a block that never had a turn.
+  describe('final-window reserve', () => {
+    const exhausted = {
+      verdict: {
+        pass: false,
+        score: 30,
+        issues: [
+          {
+            block_id: 'block_13',
+            severity: 'critical' as const,
+            description: 'x',
+            suggestion: 'y',
+          },
+          { block_id: 'block_4', severity: 'critical' as const, description: 'x', suggestion: 'y' },
+        ],
+        needs_regeneration: ['block_13', 'block_4'] as const,
+      },
+      blockIds: ['block_2', 'block_4', 'block_13'] as const,
+      maxAttempts: 2,
+      maxWindowAttempts: 8,
+    };
+
+    it('refuses everything when no block is listed for the reserve', () => {
+      expect(
+        selectPendingCareerPlaybookRegenerations({
+          ...exhausted,
+          verdict: {
+            ...exhausted.verdict,
+            needs_regeneration: [...exhausted.verdict.needs_regeneration],
+          },
+          blockIds: [...exhausted.blockIds],
+          attempts: { block_2: 19 },
+        })
+      ).toEqual([]);
+    });
+
+    it('grants a listed block at zero attempts a turn after the window is spent', () => {
+      const pending = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: {
+          ...exhausted.verdict,
+          needs_regeneration: [...exhausted.verdict.needs_regeneration],
+        },
+        blockIds: [...exhausted.blockIds],
+        attempts: { block_2: 19, block_4: 2 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+      });
+
+      // block_4 has spent its own attempts; the reserve is for a block that had none.
+      expect(pending.map(candidate => candidate.blockId)).toEqual(['block_13']);
+      expect(pending[0].issues[0].severity).toBe('critical');
+    });
+
+    // The reserve is counted, never derived from "attempts beyond the budget":
+    // the final window sums attempts across every block, so a run at 19 of 8 is
+    // 11 over budget having drawn nothing from the reserve at all.
+    it('never exceeds the reserve, counting what earlier passes already drew', () => {
+      const threeFlagged = {
+        pass: false,
+        score: 30,
+        issues: ['block_13', 'block_4', 'block_2'].map(blockId => ({
+          block_id: blockId as 'block_13',
+          severity: 'critical' as const,
+          description: 'x',
+          suggestion: 'y',
+        })),
+        needs_regeneration: ['block_13', 'block_4', 'block_2'],
+      };
+
+      const first = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+      });
+      expect(first.map(candidate => candidate.blockId)).toEqual(['block_13', 'block_4']);
+      expect(first.every(candidate => candidate.fromReserve)).toBe(true);
+
+      const afterTwoDraws = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+        reservedWindowAttemptsSpent: 2,
+      });
+      expect(afterTwoDraws).toHaveLength(1);
+
+      const exhaustedReserve = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+        reservedWindowAttemptsSpent: 3,
+      });
+      expect(exhaustedReserve).toEqual([]);
+    });
+
+    it('refuses a block with no critical against it', () => {
+      expect(
+        selectPendingCareerPlaybookRegenerations({
+          ...exhausted,
+          verdict: {
+            pass: false,
+            score: 30,
+            issues: [
+              { block_id: 'block_13', severity: 'warning', description: 'x', suggestion: 'y' },
+            ],
+            needs_regeneration: ['block_13'],
+          },
+          blockIds: [...exhausted.blockIds],
+          attempts: { block_2: 19 },
+          reservedWindowBlockIds: ['block_13'],
+        })
+      ).toEqual([]);
+    });
+  });
+
   it('regenerates a flagged batch, recording costs for successes and warnings for failures', async () => {
     const renderPrompt = vi
       .fn()

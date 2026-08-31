@@ -95,6 +95,8 @@ export interface CareerPlaybookPendingRegeneration {
   blockId: CareerPlaybookBlockId;
   issues: CareerPlaybookJudgeIssue[];
   attempts: number;
+  /** Drawn from the final-window reserve rather than the ordinary budget. */
+  fromReserve?: boolean;
 }
 
 function compactMarkdown(content: string): string {
@@ -313,7 +315,39 @@ export interface SelectCareerPlaybookRegenerationInput {
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
   maxAttempts?: number;
   maxWindowAttempts?: number;
+  /**
+   * Blocks allowed to draw on the final-window reserve once the ordinary window
+   * budget is spent. Empty or absent means the budget is the whole answer.
+   */
+  reservedWindowBlockIds?: readonly CareerPlaybookBlockId[];
+  /**
+   * Reserve attempts already granted in this run.
+   *
+   * Carried rather than derived. "Attempts beyond the window budget" looks like
+   * the same number and is not: the final window sums attempts across every
+   * block, so a run that spent 19 of 8 on group remediations is at 11 over
+   * budget having drawn nothing from the reserve at all.
+   */
+  reservedWindowAttemptsSpent?: number;
+  maxReservedWindowAttempts?: number;
 }
+
+/**
+ * Extra regenerations available at the final full-document window, beyond the
+ * ordinary window budget of 8.
+ *
+ * Run 2896e72f ended with block_13 carrying two criticals and zero regeneration
+ * attempts: the final pass was the first to flag it, and by then unrelated group
+ * remediations had spent 19 of 8. Its surviving defects are "found too late to
+ * fix", not "told one complaint at a time", so the answer is not a higher
+ * per-block cap — a block that already had two attempts does not need a third.
+ * It is a small reserve for a block that has had none.
+ *
+ * Bounded twice over: three across the whole run (the spend is derived from the
+ * attempts already made, so repeated final passes cannot each take three), and
+ * only for a block sitting at zero with a critical against it.
+ */
+export const CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS = 3;
 
 /**
  * Select every block the current judge verdict flags that can still be regenerated
@@ -334,11 +368,13 @@ export function selectPendingCareerPlaybookRegenerations(
     return [];
   }
 
-  const remainingWindow =
-    maxWindowAttempts -
-    countCareerPlaybookRegenerationAttemptsForBlocks(input.attempts, input.blockIds);
+  const spentWindow = countCareerPlaybookRegenerationAttemptsForBlocks(
+    input.attempts,
+    input.blockIds
+  );
+  const remainingWindow = maxWindowAttempts - spentWindow;
   if (remainingWindow <= 0) {
-    return [];
+    return selectReservedRegenerations(input, verdict);
   }
 
   const candidates = verdict.needs_regeneration
@@ -356,6 +392,47 @@ export function selectPendingCareerPlaybookRegenerations(
     issues: issuesForBlock(verdict, candidate.blockId),
     attempts: candidate.attempts,
   }));
+}
+
+/**
+ * The reserve, once the ordinary window budget is spent.
+ *
+ * Everything about it is deliberately narrow. Only a listed block qualifies —
+ * the caller decides that, and today only the final full-document judge lists
+ * any. Only a block at zero attempts, so this never becomes a third try at
+ * something two rewrites failed to fix. Only a block with a critical against it,
+ * because a warning was never going to regenerate anything anyway.
+ *
+ * The remaining reserve comes from `reservedWindowAttemptsSpent`, which the
+ * caller carries in state, so repeated final passes cannot each take three.
+ */
+function selectReservedRegenerations(
+  input: SelectCareerPlaybookRegenerationInput,
+  verdict: CareerPlaybookJudgeVerdict
+): CareerPlaybookPendingRegeneration[] {
+  const reserved = new Set(input.reservedWindowBlockIds ?? []);
+  if (reserved.size === 0) return [];
+
+  const maxReserve =
+    input.maxReservedWindowAttempts ?? CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS;
+  const remainingReserve = maxReserve - (input.reservedWindowAttemptsSpent ?? 0);
+  if (remainingReserve <= 0) return [];
+
+  const hasCritical = (blockId: CareerPlaybookBlockId): boolean =>
+    verdict.issues.some(issue => issue.block_id === blockId && issue.severity === 'critical');
+
+  return verdict.needs_regeneration
+    .filter(blockId => input.blockIds.includes(blockId))
+    .filter(blockId => reserved.has(blockId))
+    .filter(blockId => (input.attempts[blockId] ?? 0) === 0)
+    .filter(hasCritical)
+    .slice(0, remainingReserve)
+    .map(blockId => ({
+      blockId,
+      issues: issuesForBlock(verdict, blockId),
+      attempts: 0,
+      fromReserve: true,
+    }));
 }
 
 export function selectPendingCareerPlaybookRegeneration(
@@ -390,6 +467,8 @@ export function createBlockRegeneratorNode(
       verdict: state.lastJudgeVerdict,
       blockIds: state.lastJudgedBlockIds,
       attempts: state.blockRegenerationAttempts,
+      reservedWindowBlockIds: state.windowBudgetExemptBlockIds,
+      reservedWindowAttemptsSpent: state.finalWindowReserveSpent,
     });
 
     if (pendingBatch.length === 0) {
@@ -465,12 +544,20 @@ export function createBlockRegeneratorNode(
       );
     });
 
+    // Every reserve draw is counted, including one that failed: it consumed an
+    // attempt and a provider call, and a reserve that only counts successes
+    // would fund a retry loop the per-block cap was written to prevent.
+    const reserveDraws = pendingBatch.filter(pending => pending.fromReserve).length;
+
     return {
       ...(Object.keys(generatedBlocks).length > 0 ? { generatedBlocks } : {}),
       ...(Object.keys(blockRegenerationAttempts).length > 0 ? { blockRegenerationAttempts } : {}),
       ...(nodeCosts.length > 0 ? { nodeCosts } : {}),
       ...(warnings.length > 0 ? { warnings } : {}),
       ...(errors.length > 0 ? { errors } : {}),
+      ...(reserveDraws > 0
+        ? { finalWindowReserveSpent: (state.finalWindowReserveSpent ?? 0) + reserveDraws }
+        : {}),
       // Non-zero eligible batch: this pass attempted regeneration (success or failure),
       // so the window must be re-judged to gate the changed content.
       lastRegenerationBatchSize: pendingBatch.length,
