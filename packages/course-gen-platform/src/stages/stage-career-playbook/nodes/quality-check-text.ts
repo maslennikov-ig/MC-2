@@ -74,8 +74,15 @@ export function dedupeIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybook
  * The accepted cost is the mirror case: a modifier stated across a separator
  * ("the pipeline review, held monthly, ...") is no longer read. That direction
  * loses a finding; the other spends a paid regeneration on a block that is right.
+ *
+ * A sentence terminator separates at least as strongly as a comma. Run
+ * b7925b1d ended a paragraph "…by Day 60 you own one complete management and
+ * forecasting cycle. From Week 2 onward, you are in the seat", and because the
+ * full stop was not a boundary, the next sentence's "Week 2" sat closer to the
+ * anchor than the "Day 60" in its own clause. Block 18 was regenerated twice
+ * against a date it had stated correctly.
  */
-const ENUMERATION_SEPARATOR = /[,;()]|\s[–—-]\s/;
+const ENUMERATION_SEPARATOR = /[,;()]|[.!?]\s|\s[–—-]\s/;
 
 /** The list item containing `index`, as text plus its offset in the line. */
 export function enumerationSegmentAt(line: string, index: number): { text: string; start: number } {

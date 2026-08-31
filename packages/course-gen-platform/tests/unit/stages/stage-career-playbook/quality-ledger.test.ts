@@ -105,6 +105,35 @@ describe('buildCareerPlaybookEvidenceLedger', () => {
   it('returns nothing when research produced no findings', () => {
     expect(buildCareerPlaybookEvidenceLedger(research([]), '2026-08-11')).toEqual([]);
   });
+
+  // Run b7925b1d retrieved eight research findings and shipped twelve vendor
+  // blogs: the research lane runs last, so the cap cut every one of them and the
+  // run paid for a search whose result it discarded.
+  it('keeps research findings that fall past the cap behind the vendor lanes', () => {
+    const vendors = Array.from({ length: 16 }, (unused, index) => ({
+      category: 'kpis' as const,
+      title: `Vendor ${index}`,
+      url: `https://vendor${index}.example/blog/post`,
+      claim: `vendor claim ${index}`,
+    }));
+    const researchFindings = [
+      { category: 'research' as const, title: 'F', url: 'https://www.forrester.com/r', claim: 'f' },
+      { category: 'research' as const, title: 'M', url: 'https://www.mckinsey.com/r', claim: 'm' },
+    ];
+
+    const ledger = buildCareerPlaybookEvidenceLedger(
+      research([...vendors, ...researchFindings]),
+      '2026-08-11'
+    );
+
+    expect(
+      ledger.filter(entry => entry.source_kind === 'research').map(entry => entry.url)
+    ).toEqual(['https://www.forrester.com/r', 'https://www.mckinsey.com/r']);
+    expect(ledger).toHaveLength(12);
+    // The reserve is a floor, not a takeover: the role-specific lanes still fill
+    // the rest of the ledger.
+    expect(ledger.filter(entry => entry.source_kind !== 'research')).toHaveLength(10);
+  });
 });
 
 describe('reconcileMetricLedgerSourceRefs', () => {
