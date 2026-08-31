@@ -346,6 +346,25 @@ function looksLikeExternalClaim(line: string): boolean {
  * 95% weekly and 65% daily AI adoption, and a 28% response rate, all with the
  * phrase "research shows" and not one URL anywhere in the document.
  */
+/**
+ * Does this line name a ledger metric with the label's own words, in any order?
+ *
+ * Words shorter than four characters are dropped: "B2B", "win" and "of" carry no
+ * evidence that the sentence is about this role's metric rather than the market.
+ * A label left with no long word matches nothing, which is the safe direction.
+ */
+function lineNamesLedgerMetricLoosely(line: string, label: string): boolean {
+  const words = label
+    .split(/[\s/]+/)
+    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(word => word.length >= 4);
+  if (words.length === 0) return false;
+
+  return words.every(word =>
+    new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'iu').test(line)
+  );
+}
+
 export function validateUnsourcedStatistics(
   blocks: BlockMap,
   context: CareerPlaybookQualityCheckContext
@@ -363,6 +382,26 @@ export function validateUnsourcedStatistics(
       // A line stating one of this role's own ledger metrics is a target, not a
       // claim about the world, even when it mentions the market it operates in.
       if (context.metricLedger.some(metric => metricLabelPattern(metric.label).test(line))) {
+        continue;
+      }
+      // The label is rarely written out. Run `88fc2368` published "Forecast
+      // numbers are submitted by the role and judged on accuracy quarterly —
+      // treat accuracy below the published 80% target as a method failure, not a
+      // market failure": the ledger's own `Forecast accuracy` target, restated in
+      // prose. One incidental "market" was the only external signal, and the
+      // contiguous-label exemption cannot see a label split across a clause, so
+      // the guide was asked to cite a source for its own number. Block 18 was
+      // regenerated twice and shipped the critical.
+      //
+      // Scattered label words are a weaker signal than the written-out label, so
+      // they excuse only the weakest trigger: a line named as external by scope
+      // alone. An attribution ("research shows") or a share of an outside
+      // population still owes a citation however the line reads.
+      if (
+        !EXTERNAL_ATTRIBUTION.test(line) &&
+        !(POPULATION_SHARE.test(line) && EXTERNAL_POPULATION.test(line)) &&
+        context.metricLedger.some(metric => lineNamesLedgerMetricLoosely(line, metric.label))
+      ) {
         continue;
       }
 
@@ -924,17 +963,51 @@ const RECURRING_DUTIES: Array<{ pattern: RegExp; duty: string; requires?: RegExp
  * cadence word in the line attributed "daily" to the pipeline review. The
  * nearest cadence word wins instead.
  */
-/** Closest cadence word to any mention of the duty in this line. */
+/**
+ * Enumeration items inside one line.
+ *
+ * Nearest-wins is still wrong across a list. Run `88fc2368` published "(pipeline
+ * and forecast reviews, daily triage, coaching, forecast submission, CRM
+ * configuration)" — a continuity checklist where every item carries its own
+ * rhythm. "daily" belongs to triage, but it is the nearest cadence word to
+ * "forecast submission", so the guide was told it runs its forecast review
+ * daily against a weekly ledger. Block 26 was regenerated twice and shipped the
+ * critical anyway, because no rewrite of a correct sentence can satisfy it.
+ *
+ * The accepted cost is the mirror case: a cadence stated across a separator
+ * ("the pipeline review, held monthly, ...") is no longer read. That direction
+ * loses a finding; the other direction spends a paid regeneration on a block
+ * that is right.
+ */
+const ENUMERATION_SEPARATOR = /[,;()]|\s[–—-]\s/;
+
+/** Closest cadence word to any mention of the duty, within that mention's list item. */
 function nearestCadenceAcrossMentions(line: string, pattern: RegExp): string | null {
   const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
   let best: { name: string; distance: number } | null = null;
 
   for (const mention of line.matchAll(global)) {
-    const found = cadenceNearWithDistance(line, mention.index ?? 0);
+    const mentionIndex = mention.index ?? 0;
+    const segment = enumerationSegmentAt(line, mentionIndex);
+    const found = cadenceNearWithDistance(segment.text, mentionIndex - segment.start);
     if (found && (!best || found.distance < best.distance)) best = found;
   }
 
   return best?.name ?? null;
+}
+
+/** The list item containing `index`, as text plus its offset in the line. */
+function enumerationSegmentAt(line: string, index: number): { text: string; start: number } {
+  const separators = new RegExp(ENUMERATION_SEPARATOR.source, 'g');
+  let start = 0;
+
+  for (const match of line.matchAll(separators)) {
+    const at = match.index ?? 0;
+    if (at >= index) return { text: line.slice(start, at), start };
+    start = at + match[0].length;
+  }
+
+  return { text: line.slice(start), start };
 }
 
 function cadenceNearWithDistance(

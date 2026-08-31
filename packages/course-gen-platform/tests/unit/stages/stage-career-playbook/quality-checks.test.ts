@@ -648,6 +648,35 @@ describe('external-claim precision', () => {
     expect(issues).toEqual([]);
   });
 
+  // Run `88fc2368`, block 18: the ledger's own `Forecast accuracy` target,
+  // restated in prose across a clause. The only external signal was "market", in
+  // a phrase denying that the number is one. Two regenerations bought nothing —
+  // the sentence was already right.
+  it('does not ask the guide to cite a source for its own ledger target', () => {
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_18:
+          'Forecast numbers are submitted by the role and judged on accuracy quarterly — treat accuracy below the published 80% target as a method failure, not a market failure.',
+      }),
+      context({ metricLedger: [FORECAST_ACCURACY] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still asks for a source when the line attributes its figure to research', () => {
+    // Scattered label words excuse a scope word, never an attribution.
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_18:
+          'Research shows forecast submissions land within 4% of actuals when accuracy is inspected weekly.',
+      }),
+      context({ metricLedger: [FORECAST_ACCURACY] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['unsourced_claim']);
+  });
+
   it('accepts the marker form that carries the value before the verb', () => {
     const issues = validateExampleMarking(
       blocks({
@@ -719,6 +748,14 @@ const PIPELINE_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
   cadence: 'weekly',
   owner: 'Sales manager',
   scope: 'the whole team',
+};
+
+const FORECAST_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
+  key: 'forecast_review',
+  label: 'Forecast review',
+  cadence: 'weekly',
+  owner: 'Sales manager',
+  scope: 'forecast review with the CRO',
 };
 
 describe('validateCadenceConsistency', () => {
@@ -830,6 +867,37 @@ describe('validateCadenceConsistency', () => {
     );
 
     expect(issues).toEqual([]);
+  });
+
+  // Run `88fc2368`, block 26: a continuity checklist where every item carries its
+  // own rhythm. "daily" governs the triage it sits next to, not the forecast
+  // review two items away. Block 26 was regenerated twice and shipped the
+  // critical, because the sentence it was asked to repair was already correct.
+  it('does not attach a cadence across an enumeration boundary', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26:
+          'Confirm the continuity plan names a backup for every critical area (pipeline and forecast reviews, daily triage, coaching, forecast submission, CRM configuration).',
+      }),
+      context({ cadenceLedger: [FORECAST_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still reads the cadence that sits inside the duty’s own list item', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26:
+          'The calendar covers daily pipeline and lead triage; monthly forecast review, weekly rep one-on-ones.',
+      }),
+      context({ cadenceLedger: [FORECAST_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_26');
+    expect(issues[0].description).toContain('monthly');
+    expect(issues[0].description).toContain('weekly');
   });
 
   it('stays silent when a duty is mentioned in only one block', () => {
