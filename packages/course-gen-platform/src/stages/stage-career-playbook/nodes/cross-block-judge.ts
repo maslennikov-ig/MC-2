@@ -19,6 +19,7 @@ import type {
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 import {
+  CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   countCareerPlaybookRegenerationAttemptsForBlocks,
@@ -47,9 +48,11 @@ import {
   formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
   getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import { getCareerPlaybookBusinessContext } from './business-context';
 import { formatCareerPlaybookBlockAudiences } from './audience-scope';
@@ -392,14 +395,94 @@ export function downgradeUnconfirmedPlaceholderIssues(
   });
 }
 
+/**
+ * Categories where a deterministic check, not the model, is the authority.
+ *
+ * Each of these has a pure function over the block text that answers the same
+ * question — `validateRelativeDates` for a stale year, `validateExampleMarking`
+ * for an unmarked example, `validateCrossViewReference` for a reference the
+ * reader cannot follow, `validateMetricLedgerConsistency` for a threshold,
+ * `validateUnsourcedStatistics`/`validateSourceAttribution` for an attribution.
+ * When the check ran over a block and stayed silent, the judge's critical about
+ * that block in that category is not confirmed by anything.
+ *
+ * Deliberately absent: `contradiction` and `invented_number` (no deterministic
+ * check covers the general case — they are exactly what the LLM contour exists
+ * for), `format_minimum` (only three blocks have minimums) and `wrong_language`
+ * (the checker is scoped to whole-block language, the judge can see a single
+ * foreign sentence).
+ */
+const DETERMINISTICALLY_OWNED_CATEGORIES = new Set([
+  'stale_date',
+  'unmarked_example',
+  'unreadable_reference',
+  'metric_conflict',
+  'unsourced_claim',
+]);
+
+/**
+ * A judge critical in a deterministically-owned category that the deterministic
+ * pass did not also find is downgraded to a warning.
+ *
+ * Run 2896e72f filed a `stale_date` critical against block_25 whose own text
+ * read "…is otherwise compliant; no defect is established here", and the block
+ * went to regeneration anyway. That is the shape of mc2-1mr7r, which a prompt
+ * ruling reduced (25 -> 9 -> 7 -> 11 criticals over four runs) but could not
+ * remove, because the model writing the verdict is the thing being guarded.
+ *
+ * The rule is about authority, not about wording. Matching the prose of a
+ * self-refuting verdict is what mc2-1mr7r's own gate did, and one reworded
+ * sentence blinds it; here `validateRelativeDates` already skips block_25 as the
+ * footer — the one place an absolute date belongs — so the claim is unconfirmed
+ * on the merits without reading a single word of it.
+ *
+ * Two guards on the downgrade, both in the direction of keeping the finding:
+ *
+ * - Only a block the deterministic pass actually covered may be downgraded.
+ *   The checks run over `currentBlocks` while the judge also sees previously
+ *   generated groups, so "no deterministic issue here" and "no deterministic
+ *   check ran here" are different facts, and only the first one is evidence.
+ * - The downgrade is recorded in the description, so the rate stays measurable
+ *   from a stored verdict without a re-run.
+ */
+export function downgradeUnconfirmedDeterministicIssues(
+  issues: CareerPlaybookJudgeIssue[],
+  deterministic: CareerPlaybookJudgeVerdict,
+  coveredBlockIds: readonly CareerPlaybookBlockId[]
+): CareerPlaybookJudgeIssue[] {
+  const covered = new Set(coveredBlockIds);
+  const confirmed = new Set(
+    deterministic.issues
+      .filter(issue => issue.category)
+      .map(issue => `${issue.block_id}|${issue.category}`)
+  );
+
+  return issues.map(issue => {
+    if (issue.severity !== 'critical') return issue;
+    if (!issue.category || !DETERMINISTICALLY_OWNED_CATEGORIES.has(issue.category)) return issue;
+    if (!covered.has(issue.block_id)) return issue;
+    if (confirmed.has(`${issue.block_id}|${issue.category}`)) return issue;
+
+    return {
+      ...issue,
+      severity: 'warning' as const,
+      description: `${issue.description} — downgraded: the deterministic ${issue.category} check ran over ${issue.block_id} and found nothing, and it owns this question.`,
+    };
+  });
+}
+
 function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
   llm: CareerPlaybookJudgeVerdict,
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): CareerPlaybookJudgeVerdict {
-  const gatedLLMIssues = downgradeUnconfirmedPlaceholderIssues(
-    downgradeNonTaxonomyCriticalIssues(llm.issues),
-    generatedBlocks
+  const gatedLLMIssues = downgradeUnconfirmedDeterministicIssues(
+    downgradeUnconfirmedPlaceholderIssues(
+      downgradeNonTaxonomyCriticalIssues(llm.issues),
+      generatedBlocks
+    ),
+    deterministic,
+    Object.keys(generatedBlocks)
   );
   const regenerationEligibleBlockIds = uniqueBlockIds(
     gatedLLMIssues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
@@ -416,11 +499,46 @@ function mergeJudgeVerdicts(
   };
 }
 
+/**
+ * Which blocks may draw on the final-window reserve.
+ *
+ * Two populations, both of them "this block has not had its turn":
+ *
+ * - a block the full-document semantic gate flags, which is the last
+ *   correctness boundary the document passes through;
+ * - a block the final pass is the FIRST to flag. Run 2896e72f left block_13
+ *   holding two criticals with zero attempts, because by the time the
+ *   full-document pass reached it the window budget stood at 19 of 8. That is
+ *   not a block that failed to use its attempts.
+ *
+ * Empty for a group window. The reserve exists because the final pass sees the
+ * whole document for the first time; a group window has no such excuse.
+ */
+function selectWindowBudgetExemptBlockIds(params: {
+  isFinalWindow: boolean;
+  verdict: CareerPlaybookJudgeVerdict;
+  deterministicVerdict: CareerPlaybookJudgeVerdict;
+  windowBlockIds: CareerPlaybookBlockId[];
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+}): CareerPlaybookBlockId[] {
+  if (!params.isFinalWindow) return [];
+
+  const semanticRepetitionBlockIds = params.deterministicVerdict.issues
+    .filter(isCareerPlaybookSemanticRepetitionIssue)
+    .map(issue => issue.block_id);
+  const firstFlaggedHere = params.verdict.needs_regeneration.filter(
+    blockId => params.windowBlockIds.includes(blockId) && (params.attempts[blockId] ?? 0) === 0
+  );
+
+  return uniqueBlockIds([...semanticRepetitionBlockIds, ...firstFlaggedHere]);
+}
+
 function capRegenerationWhenBudgetExhausted(params: {
   verdict: CareerPlaybookJudgeVerdict;
   currentBlockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
   windowBudgetExemptBlockIds?: readonly CareerPlaybookBlockId[];
+  reserveSpent?: number;
 }): { verdict: CareerPlaybookJudgeVerdict; warnings: string[] } {
   const scopedNeedsRegeneration = params.verdict.needs_regeneration.filter(blockId =>
     params.currentBlockIds.includes(blockId)
@@ -446,9 +564,16 @@ function capRegenerationWhenBudgetExhausted(params: {
   if (cappedBlockIds.length === 0) {
     return { verdict: params.verdict, warnings: [] };
   }
+  // The reserve spend is named, not implied. Without it the next reader of this
+  // warning sees "19/8" again and concludes the block never had a chance, which
+  // is exactly the reading that cost run 2896e72f its diagnosis.
+  const reserveLabel =
+    windowBudgetExemptBlockIds.size > 0
+      ? `; final-window reserve ${params.reserveSpent ?? 0}/${CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS}`
+      : '';
   const budgetLabel = windowBudgetExhausted
-    ? `${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`
-    : `per-block ${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}/${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}; total ${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`;
+    ? `${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}${reserveLabel}`
+    : `per-block ${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}/${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}; total ${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}${reserveLabel}`;
 
   return {
     verdict: {
@@ -466,13 +591,16 @@ function capRegenerationWhenBudgetExhausted(params: {
 /**
  * Does the document still carry an unremediated semantic repetition?
  *
- * Asks the executor, not the verdict. The window-budget exemption above lives
- * only in this node's bookkeeping: `selectPendingCareerPlaybookRegenerations`
- * refuses every block once the window is spent, exempt or not, and
- * `routeAfterBlockRegeneration` sends an empty batch straight to END. So "the
- * block is still listed in needs_regeneration" and "something will actually
- * regenerate it" are different questions, and only the second one decides
- * whether the playbook completes with the repetition still in it.
+ * Asks the executor, not the verdict. Until 2026-08-31 the two disagreed: the
+ * window-budget exemption above lived only in this node's bookkeeping, while
+ * `selectPendingCareerPlaybookRegenerations` refused every block once the window
+ * was spent, exempt or not, and `routeAfterBlockRegeneration` sent an empty
+ * batch straight to END. The exemption therefore changed nothing for anybody,
+ * including the semantic repetitions it was written for. It now travels through
+ * `windowBudgetExemptBlockIds` in state and buys a bounded reserve — but the
+ * question is still asked of the executor, because "listed in
+ * needs_regeneration" and "something will actually regenerate it" remain
+ * different facts (the reserve is three, and a listed block may not get one).
  *
  * The answer is reported, not fatal. "We could not measure" and "we measured,
  * found one pair, and ran out of attempts" are different failures: the first
@@ -639,6 +767,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           metricLedger: getCareerPlaybookMetricLedger(state.roleProfileSpec),
           evidenceLedger: getCareerPlaybookEvidenceLedger(state.roleProfileSpec),
           cadenceLedger: getCareerPlaybookCadenceLedger(state.roleProfileSpec),
+          milestoneLedger: getCareerPlaybookMilestoneLedger(state.roleProfileSpec),
           generatedOn: state.roleProfileSpec.generated_on,
           businessContextMode: state.qaData
             ? getCareerPlaybookBusinessContext(state.qaData).mode
@@ -674,6 +803,8 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
     }
 
     let verdict = deterministicVerdict;
+    const isFinalWindow = options.currentBlockIds === undefined;
+    const attempts = state.blockRegenerationAttempts ?? {};
 
     if (options.useLLMJudge) {
       if (!state.roleProfileSpec) {
@@ -703,6 +834,9 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           ),
           cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
             getCareerPlaybookCadenceLedger(state.roleProfileSpec)
+          ),
+          milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+            getCareerPlaybookMilestoneLedger(state.roleProfileSpec)
           ),
           evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
             getCareerPlaybookEvidenceLedger(state.roleProfileSpec)
@@ -737,11 +871,11 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         // gate: the deterministic verdict returned here still carries its issues,
         // so the same question is asked on this path too.
         const degradedSemantic = buildSemanticGateOutcome({
-          isFinalWindow: options.currentBlockIds === undefined,
+          isFinalWindow,
           deterministicVerdict,
           routedVerdict: deterministicVerdict,
           windowBlockIds,
-          attempts: state.blockRegenerationAttempts ?? {},
+          attempts,
         });
 
         return {
@@ -749,6 +883,16 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           judgeVerdicts: [deterministicVerdict],
           lastJudgeVerdict: deterministicVerdict,
           lastJudgedBlockIds: windowBlockIds,
+          // The reserve is a property of the window, not of the LLM contour: a
+          // block the deterministic checks are the first to flag at the final
+          // pass has had no turn either.
+          windowBudgetExemptBlockIds: selectWindowBudgetExemptBlockIds({
+            isFinalWindow,
+            verdict: deterministicVerdict,
+            deterministicVerdict,
+            windowBlockIds,
+            attempts,
+          }),
           nodeCosts,
           warnings: [
             `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
@@ -764,27 +908,29 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
 
     // Cap/window-budget accounting always spans the full window so the per-block (2) and
     // per-window (8) regeneration caps are unchanged by delta scoping.
-    const semanticRepetitionBlockIds = uniqueBlockIds(
-      deterministicVerdict.issues
-        .filter(isCareerPlaybookSemanticRepetitionIssue)
-        .map(issue => issue.block_id)
-    );
+    const windowBudgetExemptBlockIds = selectWindowBudgetExemptBlockIds({
+      isFinalWindow,
+      verdict,
+      deterministicVerdict,
+      windowBlockIds,
+      attempts,
+    });
     const capped = capRegenerationWhenBudgetExhausted({
       verdict,
       currentBlockIds: windowBlockIds,
-      attempts: state.blockRegenerationAttempts ?? {},
+      attempts,
       // The full-document semantic gate is the final correctness boundary. A
       // block it flags may use its own remaining per-block attempts even when
       // unrelated group remediations already consumed the general window cap.
-      windowBudgetExemptBlockIds:
-        options.currentBlockIds === undefined ? semanticRepetitionBlockIds : undefined,
+      windowBudgetExemptBlockIds: isFinalWindow ? windowBudgetExemptBlockIds : undefined,
+      reserveSpent: state.finalWindowReserveSpent,
     });
     const semantic = buildSemanticGateOutcome({
-      isFinalWindow: options.currentBlockIds === undefined,
+      isFinalWindow,
       deterministicVerdict,
       routedVerdict: capped.verdict,
       windowBlockIds,
-      attempts: state.blockRegenerationAttempts ?? {},
+      attempts,
     });
     const warnings = [...capped.warnings, ...semantic.warnings];
 
@@ -795,6 +941,10 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       judgeVerdicts: [capped.verdict],
       lastJudgeVerdict: capped.verdict,
       lastJudgedBlockIds: windowBlockIds,
+      // Always written, including the empty list: a group window must clear what
+      // a previous final pass left, or a block would keep its reserve claim into
+      // a window that never granted one.
+      windowBudgetExemptBlockIds,
       nodeCosts,
       ...(warnings.length > 0 ? { warnings } : {}),
       ...(semantic.errors.length > 0 ? { errors: semantic.errors } : {}),

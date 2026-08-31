@@ -58,6 +58,9 @@ Metric ledger (single source of numeric truth):
 Cadence ledger (single source of recurring rhythm):
 {{cadence_ledger_md}}
 
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
@@ -99,6 +102,11 @@ Content language: {{content_language}}`,
     {
       name: 'cadence_ledger_md',
       description: 'Canonical recurring rhythms rendered as a markdown table',
+      required: true,
+    },
+    {
+      name: 'milestone_ledger_md',
+      description: 'Canonical ramp deadlines rendered as a markdown table',
       required: true,
     },
     {

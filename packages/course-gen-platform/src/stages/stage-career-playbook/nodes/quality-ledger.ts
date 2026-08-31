@@ -18,6 +18,10 @@
  * - `cadence_ledger` — the same treatment for recurring rhythms, added after the
  *   2026-08-30 run declared the pipeline review weekly in six blocks and
  *   quarterly in five. Numbers had an owner and agreed; rhythms had none.
+ * - `milestone_ledger` — and again for ramp deadlines, added after 2026-08-31,
+ *   when the Role Canvas promised the first forecast by week 4 over an
+ *   onboarding plan that put it at week 2. "How much" and "how often" had an
+ *   owner by then; "by when" was still each block's own opinion.
  *
  * Same division of labour as `spec-builder-canonical.ts`: ask the model, then
  * make the result conform. See docs/career-playbook/quality-contract.md.
@@ -27,6 +31,7 @@ import type {
   CareerPlaybookCadenceLedgerEntry,
   CareerPlaybookEvidenceEntry,
   CareerPlaybookMetricLedgerEntry,
+  CareerPlaybookMilestoneLedgerEntry,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
@@ -209,6 +214,142 @@ export function getCareerPlaybookCadenceLedger(
   spec: CareerPlaybookRoleProfileSpec | null | undefined
 ): CareerPlaybookCadenceLedgerEntry[] {
   return spec?.cadence_ledger ?? [];
+}
+
+/**
+ * The ramp vocabulary, in both output languages, with the length of each unit in
+ * days.
+ *
+ * One list, two readers, exactly as with rhythms: the milestone ledger
+ * normalizes onto it and `milestone-checks.ts` recognises a block's stated
+ * deadline with it. Days are the comparison unit because the guide legitimately
+ * mixes units for the same commitment — "Day 60" and "the first two months" are
+ * the same promise, and only a common unit can say so.
+ *
+ * The Russian side matches a stem PLUS its inflection — `недел\p{L}*` — rather
+ * than the stem alone. The trailing letters have to be consumed, not merely
+ * tolerated: the number is read from the text immediately around the match, so
+ * a pattern that stops at `недел` leaves "я 2" behind and finds no digit at all.
+ * No `\b` is asserted next to a Cyrillic letter, which is the trap that made
+ * every Russian example marker invisible.
+ */
+export const CAREER_PLAYBOOK_MILESTONE_UNITS: ReadonlyArray<readonly [RegExp, string, number]> = [
+  [/\b(?:days?)\b|день|дн\p{L}*/iu, 'day', 1],
+  [/\b(?:weeks?)\b|недел\p{L}*/iu, 'week', 7],
+  [/\b(?:months?)\b|месяц\p{L}*/iu, 'month', 30],
+  [/\b(?:quarters?)\b|квартал\p{L}*/iu, 'quarter', 90],
+];
+
+/** Ordinal words that stand in for the number 1..4 in a ramp phrase. */
+const MILESTONE_ORDINALS: ReadonlyArray<readonly [RegExp, number]> = [
+  [/\b(?:first|1st)\b|перв/i, 1],
+  [/\b(?:second|2nd)\b|втор/i, 2],
+  [/\b(?:third|3rd)\b|трет/i, 3],
+  [/\b(?:fourth|4th)\b|четв[её]рт/i, 4],
+];
+
+export interface CareerPlaybookMilestone {
+  /** Canonical wording, e.g. `week 2`. */
+  canonical: string;
+  /** Days from the start of the ramp, the only comparable form. */
+  days: number;
+}
+
+/**
+ * Read a ramp deadline written in any accepted wording, or null.
+ *
+ * Accepts a number on either side of the unit ("Day 30", "30 days", "день 30",
+ * "30 дней") and an ordinal in place of it ("the first month", "первый
+ * квартал"), because those are the forms the guide actually uses. Anything else
+ * returns null and the row is dropped: a deadline the checker cannot read is a
+ * deadline a block can "quote" while writing whatever it likes.
+ */
+export function normalizeCareerPlaybookMilestone(value: string): CareerPlaybookMilestone | null {
+  const text = collapseWhitespace(value);
+  if (!text) return null;
+
+  for (const [pattern, unit, dayLength] of CAREER_PLAYBOOK_MILESTONE_UNITS) {
+    const match = pattern.exec(text);
+    if (!match) continue;
+
+    const index = match.index;
+    const before = text.slice(Math.max(0, index - 24), index);
+    const after = text.slice(index + match[0].length, index + match[0].length + 12);
+    const digits = /(\d{1,3})\s*$/.exec(before)?.[1] ?? /^\s*(\d{1,3})/.exec(after)?.[1];
+
+    if (digits) {
+      const count = Number(digits);
+      if (count > 0) return { canonical: `${unit} ${count}`, days: count * dayLength };
+      continue;
+    }
+
+    const ordinal = MILESTONE_ORDINALS.find(([ordinalPattern]) => ordinalPattern.test(text));
+    if (ordinal) return { canonical: `${unit} ${ordinal[1]}`, days: ordinal[1] * dayLength };
+  }
+
+  return null;
+}
+
+/**
+ * Normalize a model-built milestone ledger: stable snake_case keys, one entry
+ * per commitment, and a deadline drawn from the ramp vocabulary.
+ *
+ * A row whose deadline is unreadable is dropped, for the same reason a rhythm
+ * outside the six words is: it cannot constrain a block.
+ */
+export function normalizeCareerPlaybookMilestoneLedger(
+  entries: readonly CareerPlaybookMilestoneLedgerEntry[] | undefined
+): CareerPlaybookMilestoneLedgerEntry[] {
+  if (!entries?.length) return [];
+
+  const byKey = new Map<string, CareerPlaybookMilestoneLedgerEntry>();
+
+  for (const entry of entries) {
+    const key = collapseWhitespace(entry.key)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const label = collapseWhitespace(entry.label);
+    const milestone = normalizeCareerPlaybookMilestone(entry.offset ?? '');
+
+    if (!key || !label || !milestone) continue;
+    // First occurrence wins, as in the other two ledgers: a later duplicate is
+    // the second answer that made the commitment unplannable in the first place.
+    if (byKey.has(key)) continue;
+
+    byKey.set(key, {
+      ...entry,
+      key,
+      label,
+      offset: milestone.canonical,
+      owner: collapseWhitespace(entry.owner ?? ''),
+      scope: collapseWhitespace(entry.scope ?? ''),
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+const MILESTONE_LEDGER_EMPTY = 'none — no ramp deadline was declared for this role';
+
+/** Render the milestone ledger as the markdown table the block prompts quote from. */
+export function formatCareerPlaybookMilestoneLedgerForPrompt(
+  milestones: readonly CareerPlaybookMilestoneLedgerEntry[]
+): string {
+  if (milestones.length === 0) return MILESTONE_LEDGER_EMPTY;
+
+  const rows = milestones.map(
+    entry => `| ${entry.label} | ${entry.offset} | ${entry.owner || '—'} | ${entry.scope || '—'} |`
+  );
+
+  return ['| Commitment | Due | Owner | Scope |', '| --- | --- | --- | --- |', ...rows].join('\n');
+}
+
+/** Convenience accessor used by prompt builders and deterministic checks alike. */
+export function getCareerPlaybookMilestoneLedger(
+  spec: CareerPlaybookRoleProfileSpec | null | undefined
+): CareerPlaybookMilestoneLedgerEntry[] {
+  return spec?.milestone_ledger ?? [];
 }
 
 /**

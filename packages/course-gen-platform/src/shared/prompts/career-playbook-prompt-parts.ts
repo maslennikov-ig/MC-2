@@ -87,6 +87,11 @@ export const groupContractVariables = [
     required: true,
   },
   {
+    name: 'milestone_ledger_md',
+    description: 'Canonical ramp deadlines rendered as a markdown table',
+    required: true,
+  },
+  {
     name: 'evidence_ledger_md',
     description: 'Citable sources rendered as a [Sn] list, or an explicit "none" notice',
     required: true,
@@ -138,6 +143,12 @@ RHYTHMS — the cadence ledger is the only source of recurring rhythm:
 - Reproduce the cadence of every commitment in the cadence ledger VERBATIM.
 - Never give a ledger commitment a different rhythm, in any block, table, or checklist. A pipeline review that is weekly in one block and quarterly in another leaves the reader unable to plan a week.
 - A recurring commitment absent from the ledger still holds ONE rhythm across the whole guide: use the rhythm the digest already published for it. When the digest publishes none, the rhythm you choose here becomes the guide's answer, so choose it once and keep it.
+
+DEADLINES — the milestone ledger is the only source of "by when":
+- Reproduce the due date of every ramp commitment in the milestone ledger VERBATIM, in the guide's own language ("Неделя 2", "Week 2").
+- Never give a ledger commitment a different deadline, in any block, table, checklist or summary. A first forecast due in week 2 in the onboarding plan and in week 4 on the one-page canvas is one promise with two answers, and the reader meets both on their first day.
+- A summary block restates these dates rather than setting them: when you summarise a commitment the ledger governs, carry its date across unchanged.
+- A ramp commitment absent from the ledger still holds ONE deadline across the whole guide: use the one the digest already published for it.
 
 EXTERNAL CLAIMS — no precise statistic without a source:
 - A precise statistic about the market, the industry, competitors, or AI impact is allowed ONLY with a [Sn] reference to an entry in the evidence ledger below.
@@ -198,6 +209,9 @@ Metric ledger (single source of numeric truth):
 
 Cadence ledger (single source of recurring rhythm):
 {{cadence_ledger_md}}
+
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
 
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}

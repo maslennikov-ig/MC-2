@@ -507,6 +507,13 @@
     "shareConfirmCancel": "Отмена",
     "shareConfirmAction": "Сделать публичной и скопировать ссылку",
     "shareLinkLabel": "Публичная ссылка",
+    "readerLinksLabel": "Ссылка для каждого читателя",
+    "readerLinkEmployee": "Сотруднику",
+    "readerLinkEmployeeHint": "Его собственный гайд: 20 блоков.",
+    "readerLinkManager": "Руководителю",
+    "readerLinkManagerHint": "Гайд сотрудника плюс управленческая часть: 26 блоков.",
+    "readerLinkHr": "HR",
+    "readerLinkHrHint": "Весь документ, включая фильтр отбора кандидатов: 27 блоков.",
     "shareCopyButton": "Скопировать",
     "sharePublishError": "Не удалось создать публичную ссылку",
     "coursePending": "Создание курса будет доступно после подключения серверного действия",
@@ -633,7 +640,10 @@
       "publicLink": "Публичная ссылка",
       "open": "Открыть",
       "openBuilder": "Зайти в конструктор",
-      "delete": "Удалить"
+      "delete": "Удалить",
+      "readerLinkEmployee": "Ссылка сотруднику",
+      "readerLinkManager": "Ссылка руководителю",
+      "readerLinkHr": "Ссылка HR"
     },
     "statusLabels": {
       "draft": "Черновик",

@@ -178,6 +178,19 @@ Critical requirements:
   does not fit one of those six words — a ledger row that cannot be quoted constrains nothing.
   Ten to fifteen entries is a healthy ledger for an operational role; err toward listing a rhythm the
   guide will need rather than leaving blocks to invent it.
+- When context.has_subordinates is true, the cadence ledger MUST also carry the rhythms of managing
+  people: the career conversation, the retention (stay) interview, the performance review, and the
+  1:1 with each report. A guide for a manager needs all four, so leaving them out does not remove
+  them from the document — it only means each block picks its own rhythm, which is how one run
+  published a quarterly career conversation and a quarterly stay interview that no ledger sanctioned.
+- Build milestone_ledger: one entry per ramp commitment with a due date — the first solo customer
+  call, the first forecast submitted, the first full owned cycle, the end of probation. Each entry
+  carries a snake_case key, a reader-facing label, the owner, the scope, and an offset written as a
+  unit and a number: "day 30", "week 2", "month 1", "quarter 2". This is the single source of "by
+  when" for all 26 blocks: a commitment may hold only one due date across the whole guide. Leave out
+  anything whose timing cannot be written that way — a deadline that cannot be quoted constrains
+  nothing. Five to ten entries is healthy; the onboarding plan and the one-page canvas both restate
+  these dates, and without a ledger they restate them differently.
 - Set provenance on every metric entry:
   * company_source — supported by the business context digest or source evidence pack
   * user_answer   — stated by the user in the Q&A
@@ -328,6 +341,9 @@ Metric ledger (single source of numeric truth):
 Cadence ledger (single source of recurring rhythm):
 {{cadence_ledger_md}}
 
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
@@ -352,6 +368,11 @@ Current group output:
       {
         name: 'cadence_ledger_md',
         description: 'Canonical recurring rhythms rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'milestone_ledger_md',
+        description: 'Canonical ramp deadlines rendered as a markdown table',
         required: true,
       },
       {
@@ -433,6 +454,9 @@ Metric ledger (single source of numeric truth):
 Cadence ledger (single source of recurring rhythm):
 {{cadence_ledger_md}}
 
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
@@ -448,6 +472,11 @@ Assembled Role Guide:
       {
         name: 'cadence_ledger_md',
         description: 'Canonical recurring rhythms rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'milestone_ledger_md',
+        description: 'Canonical ramp deadlines rendered as a markdown table',
         required: true,
       },
       {

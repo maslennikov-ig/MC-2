@@ -19,6 +19,7 @@ const previewCourseFromPlaybook = vi.fn()
 const createCourseFromPlaybook = vi.fn()
 const routerPush = vi.fn()
 const copyToClipboard = vi.hoisted(() => vi.fn())
+const fetchViewLinks = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -39,6 +40,8 @@ vi.mock('@/components/career-playbook/library/client-adapter', () => ({
     previewCourseFromPlaybook(...(args as [input: { playbookId: string }])),
   createCourseFromPlaybook: (...args: unknown[]) =>
     createCourseFromPlaybook(...(args as [input: Record<string, unknown>])),
+  fetchCareerPlaybookViewLinks: (...args: unknown[]) =>
+    fetchViewLinks(...(args as [playbookId: string])),
 }))
 
 vi.mock('@/lib/utils/clipboard', () => ({
@@ -187,6 +190,13 @@ const messages = {
       shareConfirmAction: 'Make public and copy link',
       shareLinkLabel: 'Public link',
       shareCopyButton: 'Copy',
+      readerLinksLabel: 'A link per reader',
+      readerLinkEmployee: 'For the employee',
+      readerLinkEmployeeHint: 'Their own guide: 20 blocks.',
+      readerLinkManager: 'For the manager',
+      readerLinkManagerHint: "The employee's guide plus the management part: 26 blocks.",
+      readerLinkHr: 'For HR',
+      readerLinkHrHint: 'The whole document, including the screening filter: 27 blocks.',
       sharePublishError: 'Could not create public link',
       coursePending: 'Course creation is unavailable until the backend action is connected',
       deletePending: 'Delete is unavailable until the backend action is connected',
@@ -380,6 +390,13 @@ const ruMessages = {
       shareConfirmAction: 'Сделать публичной и скопировать ссылку',
       shareLinkLabel: 'Публичная ссылка',
       shareCopyButton: 'Скопировать',
+      readerLinksLabel: 'Ссылка для каждого читателя',
+      readerLinkEmployee: 'Сотруднику',
+      readerLinkEmployeeHint: 'Его собственный гайд: 20 блоков.',
+      readerLinkManager: 'Руководителю',
+      readerLinkManagerHint: 'Гайд сотрудника плюс управленческая часть: 26 блоков.',
+      readerLinkHr: 'HR',
+      readerLinkHrHint: 'Весь документ, включая фильтр отбора кандидатов: 27 блоков.',
       sharePublishError: 'Не удалось создать публичную ссылку',
       statusLabels: {
         draft: 'Черновик',
@@ -487,6 +504,10 @@ describe('CareerPlaybookViewerPageClient', () => {
     useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
     setCareerPlaybookClientForTests(null)
     updateVisibility.mockReset()
+    fetchViewLinks.mockReset()
+    // Default: the server hands out no reader links, which is what a private or
+    // pre-procedure playbook returns. Tests that want the three set their own.
+    fetchViewLinks.mockResolvedValue(null)
     previewCourseFromPlaybook.mockReset()
     createCourseFromPlaybook.mockReset()
     routerPush.mockReset()
@@ -985,6 +1006,91 @@ describe('CareerPlaybookViewerPageClient', () => {
     expect(copyToClipboard).toHaveBeenLastCalledWith(
       'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales-a1b2c3'
     )
+  })
+
+  it('shows one labelled, copyable link per reader for a public playbook', async () => {
+    const user = userEvent.setup()
+    fetchViewLinks.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      isPublic: true,
+      links: [
+        { audience: 'employee', token: 't1', path: '/career-playbook/view/pb/t1' },
+        { audience: 'manager', token: 't2', path: '/career-playbook/view/pb/t2' },
+        { audience: 'hr', token: 't3', path: '/career-playbook/view/pb/t3' },
+      ],
+    })
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Head of Sales',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      visibility: 'public',
+      isPublic: true,
+      shareSlug: 'head-of-sales-a1b2c3',
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: { content: '# Head of Sales', status: 'generated', attempt: 0 },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'en' })
+
+    // The locale prefix is added here, not by the server: the path it returns
+    // would 404 without one.
+    const managerField = await screen.findByLabelText('For the manager')
+    expect(managerField).toHaveValue('http://localhost:3000/en/career-playbook/view/pb/t2')
+    expect(await screen.findByLabelText('For the employee')).toBeInTheDocument()
+    expect(await screen.findByLabelText('For HR')).toBeInTheDocument()
+
+    const copyButtons = await screen.findAllByRole('button', { name: 'Copy' })
+    await user.click(copyButtons[copyButtons.length - 2])
+    expect(copyToClipboard).toHaveBeenLastCalledWith(
+      'http://localhost:3000/en/career-playbook/view/pb/t2'
+    )
+  })
+
+  it('shows no reader links for a private playbook', async () => {
+    const getViewer = vi.fn<NonNullable<CareerPlaybookClient['getViewer']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000002001',
+      title: 'Head of Sales',
+      department: 'Sales',
+      level: 'lead',
+      contentLanguage: 'en',
+      status: 'completed',
+      visibility: 'private',
+      isPublic: false,
+      shareSlug: null,
+      organizationSlug: 'mega-campus',
+      ownerId: 'owner-user',
+      viewerPermissions: {
+        canEdit: true,
+        canManageVisibility: true,
+        canCreateCourse: true,
+        canDelete: true,
+      },
+      blocks: {
+        header: { content: '# Head of Sales', status: 'generated', attempt: 0 },
+      },
+    })
+    setCareerPlaybookClientForTests({ getViewer, submitAnswer: vi.fn() })
+
+    renderPage({ locale: 'en' })
+
+    expect(await screen.findByRole('button', { name: 'Share' })).toBeInTheDocument()
+    // Not merely absent from the DOM: never asked for. Every reader-scoped read
+    // passes the same public-and-completed gate, so the server would refuse.
+    expect(screen.queryByLabelText('For the manager')).not.toBeInTheDocument()
+    expect(fetchViewLinks).not.toHaveBeenCalled()
   })
 
   it('does not show a public link when publishing succeeds without a share slug', async () => {

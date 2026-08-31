@@ -112,6 +112,10 @@ export function scoreCareerPlaybook(
     metricLedger: spec?.metric_ledger ?? [],
     evidenceLedger: spec?.evidence_ledger ?? [],
     cadenceLedger: spec?.cadence_ledger ?? [],
+    // Empty for every playbook stored before 2026-08-31, which is why replaying
+    // this scorecard over them says nothing about ramp deadlines: the check has
+    // no authority to apply, and silence is the honest answer.
+    milestoneLedger: spec?.milestone_ledger ?? [],
     generatedOn: spec?.generated_on,
     businessContextMode: input.businessContextMode ?? spec?.business_context?.mode ?? 'universal',
     publishedAntiGoals: blocks.block_2?.content ? [blocks.block_2.content] : [],
