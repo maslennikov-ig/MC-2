@@ -85,8 +85,27 @@ describe('block 26: an implementation checklist names artefacts, not blocks', ()
     expect(wrap.promptTemplate).toContain('not "see Block 23"');
   });
 
-  it('applies the same rule to the calibrate-before-publishing list', () => {
-    expect(wrap.promptTemplate).toContain('identified by what the value is');
+  // Run 88fc2368 shipped two "Calibrate before publishing" headings in a row —
+  // the model's own list, then the table the application appends over it. The
+  // application owns that table because only it sees every marked value and
+  // every assumed threshold at once.
+  it('leaves the calibration table to the application instead of writing a second one', () => {
+    expect(wrap.promptTemplate).toContain(
+      'Do NOT write a "calibrate before publishing" list of your own'
+    );
+    expect(wrap.promptTemplate).not.toContain('which must list every');
+  });
+
+  // Block 26 of run 88fc2368 told the reader that 'every number in this guide
+  // comes from the published metric ledger and must not be changed during
+  // calibration' — while block 1 of the same guide told them six of the seven
+  // were assumptions to validate in the first quarter. Reproduce-verbatim is a
+  // rule for this document, not a rule for the company.
+  it('never lets the checklist forbid the company from changing an assumed target', () => {
+    expect(wrap.promptTemplate).toContain(
+      'Say nothing that forbids the company from changing a metric target'
+    );
+    expect(wrap.promptTemplate).toContain('must be confirmed against their own baseline data');
   });
 });
 

@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { CareerPlaybookBlockId, CareerPlaybookBlockState } from '@megacampus/shared-types';
+import type {
+  CareerPlaybookBlockId,
+  CareerPlaybookBlockState,
+  CareerPlaybookMetricLedgerEntry,
+} from '@megacampus/shared-types';
 import { findUnresolvedFillablePlaceholders } from '@/stages/stage-career-playbook/nodes/placeholder-detection';
 import {
   appendCareerPlaybookCalibrationTable,
@@ -25,6 +29,22 @@ function blocks(
       { content: content as string, status: 'generated' as const, attempt: 1 },
     ])
   );
+}
+
+function metric(
+  overrides: Partial<CareerPlaybookMetricLedgerEntry> & { label: string; target: string }
+): CareerPlaybookMetricLedgerEntry {
+  return {
+    key: overrides.label.toLowerCase().replace(/\s+/g, '_'),
+    unit: '%',
+    green: overrides.target,
+    yellow: '',
+    red: '',
+    review_period: 'quarter',
+    provenance: 'assumption',
+    source_ref: null,
+    ...overrides,
+  };
 }
 
 describe('collectCareerPlaybookCalibrationItems', () => {
@@ -162,6 +182,112 @@ describe('appendCareerPlaybookCalibrationTable', () => {
   it('adds nothing when the document carries no marked value', () => {
     const input = blocks({ block_26: '## 26. Implementation checklist\n\n- Align on KPI targets' });
     expect(appendCareerPlaybookCalibrationTable(input)).toBe(input);
+  });
+
+  // Run 88fc2368 wrote "**Calibrate before publishing — replace every value
+  // marked as an example**", and the pattern demanded the closing ** right after
+  // the heading. The reader met the heading twice: the model's four-item list,
+  // then this table.
+  it('replaces a bold model section that carries a subtitle inside the bold', () => {
+    const result = appendCareerPlaybookCalibrationTable(
+      blocks({
+        block_15: 'base $120,000 (example — replace).',
+        block_26: [
+          '## 26. Implementation checklist',
+          '',
+          '**Calibrate before publishing — replace every value marked as an example**',
+          '',
+          '- The peer buddy weekly time commitment (example — replace).',
+        ].join('\n'),
+      })
+    );
+
+    const content = result.block_26!.content;
+    expect(content.match(/Calibrate before publishing/g)).toHaveLength(1);
+    expect(content).not.toContain('peer buddy weekly time commitment');
+  });
+
+  // The continuity protocol marks every cell of its backup table, so a marker
+  // per cell put that one table into sixteen of run 88fc2368's twenty-nine rows.
+  // A table row is one instruction to whoever calibrates it.
+  it('gives a marked table row one line, not one line per marked cell', () => {
+    const items = collectCareerPlaybookCalibrationItems(
+      blocks({
+        block_23: [
+          '| Weekly reviews | Senior AE (example — replace) | Has shadowed two cycles (example — replace) |',
+          '| Daily triage | SDR team lead (example — replace) | Runs triage solo (example — replace) |',
+        ].join('\n'),
+      })
+    );
+
+    expect(items).toHaveLength(2);
+    expect(items[0].value).toBe('Senior AE; Has shadowed two cycles');
+  });
+
+  it('still lists two prose values written on one line', () => {
+    const items = collectCareerPlaybookCalibrationItems(
+      blocks({
+        block_15: 'base $120,000 (example — replace) and a $5,000 offsite (example — replace).',
+      })
+    );
+
+    expect(items).toHaveLength(2);
+    expect(items[0].value).toBe('base $120,000');
+    expect(items[1].value).toContain('$5,000 offsite');
+  });
+
+  it('lists a value repeated across rows of one section once', () => {
+    const items = collectCareerPlaybookCalibrationItems(
+      blocks({
+        block_23: [
+          '| Weekly reviews | Senior AE (example — replace) |',
+          '| Forecast submission | Senior AE (example — replace) |',
+        ].join('\n'),
+      })
+    );
+
+    expect(items).toHaveLength(1);
+  });
+
+  it('cuts a long value and its context on a word boundary', () => {
+    const long = `Playbook, qualification standard, and escalation map are current as of the last quarterly playbook and process audit — yes/no (example — replace).`;
+    const items = collectCareerPlaybookCalibrationItems(blocks({ block_23: `- ${long}` }));
+
+    expect(items).toHaveLength(1);
+    // The old fixed-offset slice opened this row with "…d escalation map": the
+    // kept tail must begin where a word begins, not inside one.
+    const keptTail = items[0].value.replace(/^…/, '');
+    expect(long).toContain(` ${keptTail.split(' ')[0]} `);
+    expect(items[0].value.startsWith('…')).toBe(true);
+    expect(items[0].context.endsWith('…')).toBe(true);
+    const keptHead = items[0].context.replace(/…$/, '');
+    expect(long).toContain(keptHead.slice(2));
+  });
+
+  // A metric value never carries the example marker — the ledger is the single
+  // source, and marking one would let blocks drift from it. So the checklist
+  // built from markers could never name a threshold: run 88fc2368 listed 29
+  // values and none of its six assumed numbers, while block 1 of the same guide
+  // told the reader those six needed validating in the first quarter.
+  it('lists an assumed metric threshold, which no marker can produce', () => {
+    const result = appendCareerPlaybookCalibrationTable(
+      blocks({
+        block_6: '## 6. KPI and metrics\n\n| Forecast accuracy | >=80% |',
+        block_26: '## 26. Implementation checklist\n\n- Align on KPI targets',
+      }),
+      {
+        metric_ledger: [
+          metric({ label: 'Forecast accuracy', target: '>=80% accuracy' }),
+          metric({ label: 'Revenue attainment', target: '100%', provenance: 'user_answer' }),
+        ],
+      } as never
+    );
+
+    const content = result.block_26!.content;
+    expect(content).toContain('| KPI and metrics | Forecast accuracy — >=80% accuracy |');
+    expect(content).toContain('assumed threshold, not company data');
+    // What the company already told us is not a value to calibrate.
+    expect(content).not.toContain('Revenue attainment');
   });
 
   it('replaces a bold model calibration section and stays idempotent', () => {

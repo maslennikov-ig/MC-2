@@ -670,9 +670,14 @@ Methodology:
 - Block 26: implementation checklist for the two readers this block has — the manager and HR — to operationalize the guide.
   This checklist walks the whole guide, and most of what it walks sits in blocks its readers were not given, so name each
   step by the artefact it produces, never by the block that holds it: "confirm the continuity plan names a backup for every
-  critical area", not "see Block 23". The same applies to the "calibrate before publishing" section, which must list every
-  value elsewhere in the guide carrying the example marker, identified by what the value is — "the on-target earnings
-  figure", "the CRM name" — so the reader knows exactly what to replace without being sent to a page they do not hold.
+  critical area", not "see Block 23".
+  Do NOT write a "calibrate before publishing" list of your own. The application appends that table, built from the
+  assembled document, because only it can see every marked value and every assumed threshold at once; a second list
+  written here would contradict it.
+  Say nothing that forbids the company from changing a metric target. Reproducing the ledger verbatim is a rule for THIS
+  document, not a rule for the reader: a threshold whose provenance is an assumption or a benchmark is our guess at the
+  company's number and must be confirmed against their own baseline data, exactly as the mission block already tells them.
+  Only a target the company itself gave us stands as published.
 - Use exactly these top-level headings:
 {{heading_block_18}}
 {{heading_block_22}}
