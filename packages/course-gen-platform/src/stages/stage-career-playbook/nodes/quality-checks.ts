@@ -980,14 +980,23 @@ function cadenceNearWithDistance(
 function findCadenceLedgerEntry(
   duty: (typeof RECURRING_DUTIES)[number],
   cadenceLedger: readonly CareerPlaybookCadenceLedgerEntry[]
-): CareerPlaybookCadenceLedgerEntry | null {
-  return (
-    cadenceLedger.find(entry => {
-      const subject = `${entry.label} ${entry.scope ?? ''}`;
-      if (!duty.pattern.test(subject)) return false;
-      return duty.requires ? duty.requires.test(subject) : true;
-    }) ?? null
-  );
+): CareerPlaybookCadenceLedgerEntry | null | 'ambiguous' {
+  const matches = cadenceLedger.filter(entry => {
+    const subject = `${entry.label} ${entry.scope ?? ''}`;
+    if (!duty.pattern.test(subject)) return false;
+    return duty.requires ? duty.requires.test(subject) : true;
+  });
+
+  // Two ledger rows governing one family is not a rhythm this check can decide.
+  // Run 4e355bf4 carried both "Performance review" (quarterly, per direct
+  // report) and "Team performance review" (weekly, whole team); first-match-wins
+  // took the team row and filed a critical against block_26 for writing
+  // "quarterly", which the ledger's own row says. A guess here costs a paid
+  // regeneration on a correct block, so an ambiguous ledger silences the family
+  // rather than falling through to consensus — the ledger is contested, not
+  // absent.
+  if (matches.length > 1) return 'ambiguous';
+  return matches[0] ?? null;
 }
 
 interface CadenceObservation {
@@ -1086,7 +1095,9 @@ export function validateCadenceConsistency(
     const observations = observed.get(duty.duty);
     if (!observations?.length) continue;
 
-    const ledgerEntry = findCadenceLedgerEntry(duty, cadenceLedger);
+    const ledgerMatch = findCadenceLedgerEntry(duty, cadenceLedger);
+    if (ledgerMatch === 'ambiguous') continue;
+    const ledgerEntry = ledgerMatch;
     const consensus = selectConsensusCadence(observations);
     const canonical = ledgerEntry?.cadence ?? consensus.cadence;
 

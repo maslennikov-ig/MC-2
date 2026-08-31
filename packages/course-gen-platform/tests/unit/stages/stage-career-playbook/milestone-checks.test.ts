@@ -144,6 +144,92 @@ describe('validateMilestoneConsistency', () => {
     expect(issues).toEqual([]);
   });
 
+  // Run 4e355bf4, block_18. Every date on this line is right, and the check
+  // filed five criticals against it: every ledger label begins with "First", so
+  // anchoring on the first long word started each search from five places and
+  // found a neighbour's date. The locating word is the rarest one now.
+  it('reads a whole ramp summarised on one line without blaming any of it', () => {
+    const line =
+      'The ramp is published in the onboarding plan, and each milestone has its own due point: first forecast submitted and first solo pipeline review in Week 2, first complete coaching cycle for each direct report and first documented playbook improvement by Day 30, first full owned operating cycle by Month 2, and first quarterly business review plus the end-of-probation assessment in Quarter 1.';
+
+    const issues = validateMilestoneConsistency(blocks([['block_18', line]]), {
+      milestoneLedger: [
+        {
+          key: 'first_forecast',
+          label: 'First forecast submitted',
+          offset: 'week 2',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_solo_review',
+          label: 'First solo pipeline review',
+          offset: 'week 2',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_coaching',
+          label: 'First complete coaching cycle',
+          offset: 'day 30',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_improvement',
+          label: 'First documented playbook improvement',
+          offset: 'day 30',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_cycle',
+          label: 'First full owned operating cycle',
+          offset: 'month 2',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_qbr',
+          label: 'First quarterly business review completed',
+          offset: 'quarter 1',
+          owner: '',
+          scope: '',
+        },
+      ],
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still names the one wrong date on a line that lists several', () => {
+    const line =
+      'Each milestone has its own due point: first forecast submitted in Week 2, first complete coaching cycle by Quarter 1.';
+
+    const issues = validateMilestoneConsistency(blocks([['block_18', line]]), {
+      milestoneLedger: [
+        {
+          key: 'first_forecast',
+          label: 'First forecast submitted',
+          offset: 'week 2',
+          owner: '',
+          scope: '',
+        },
+        {
+          key: 'first_coaching',
+          label: 'First complete coaching cycle',
+          offset: 'day 30',
+          owner: '',
+          scope: '',
+        },
+      ],
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('First complete coaching cycle');
+    expect(issues[0].description).toContain('day 30');
+  });
+
   it('ignores deadlines inside fenced diagrams', () => {
     expect(
       validateMilestoneConsistency(

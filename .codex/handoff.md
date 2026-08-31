@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-08-30. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-08-31. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons and stage summaries. Durable traps
 live in `.codex/repository-failure-modes.md`; this file says what still binds work.
@@ -137,6 +137,51 @@ rather than by replay: **one** "Calibrate before publishing" heading where the p
 two, and **nine** rows carrying "assumed threshold, not company data" where the previous table
 listed 29 values and no threshold at all. Evidence:
 `docs/career-playbook/2026-08-31-fourth-arm.md`.
+
+A **fifth arm**, `4e355bf4` (2026-08-31, on `d8edac3b0`), is the first run with a **milestone
+ledger** — the third canonical ledger, for ramp deadlines. Verified on the containers:
+`megacampus-api-dev`, `-worker-dev` and `-web-dev` all report
+`org.opencontainers.image.revision d8edac3b04ab3b40a0f43512bb753914f86886c1`. 26m12s, $0.117013,
+20 regenerations, 55 priced calls. The spec built **7 milestone rows** and 15 cadence rows.
+
+Judge criticals were 13, up from 11, and that number carries no signal: five runs of identical
+input have now spanned 25 / 9 / 7 / 11 / 13. What the run does answer is what only a run can.
+
+- **`mc2-i6l0i` closed by prevention, not by repair.** The canvas of `2896e72f` promised the first
+  forecast "by week 4" against an onboarding plan that set it at week 2. This run's canvas says
+  "first solo pipeline review in Week 2 ... submit the first evidence-backed forecast the same
+  week", which is what the ledger publishes, and the deterministic check finds **zero** milestone
+  contradictions in the finished document.
+- **The run found two defects in the checks it was validating**, both false positives that each
+  cost a paid regeneration, both fixed in `bd5f8e5` and both verified by replaying the same stored
+  document: contract criticals on `4e355bf4` fall **8 → 1**, and the survivor is a real
+  `metric_conflict`.
+  - Six of them came from the milestone check anchoring on the label's **first** long word. Every
+    ledger label begins with "First", so block_18's correct one-line ramp summary — every date
+    right — was searched from five places at once and blamed five times. The locating word is now
+    the label's rarest word in that line.
+  - One came from `findCadenceLedgerEntry` taking the first row that matches a duty family. The
+    ledger held both `Performance review` (quarterly, per report) and `Team performance review`
+    (weekly, whole team); block_26 wrote "quarterly", which its own row publishes, and was blamed
+    with the other row's rhythm. A contested family is now silent rather than guessing.
+- **The final-window reserve is live and correctly did nothing.** The warning now reads
+  `20/8; final-window reserve 0/3`: every block the final pass flagged had already spent attempts,
+  so no block was in the zero-attempt shape the reserve exists for. Before this change the same
+  situation printed only `19/8` and could not be told apart from a block that never had a turn.
+- **The unconfirmed-critical filter had one candidate and kept it.** The run's only critical in a
+  deterministically-owned category was block_3's `metric_conflict`, which the deterministic check
+  also found, so it stayed critical. The downgrade direction is still unexercised by a run; the two
+  downgrades in the row are the older placeholder filter.
+- **`category` now reaches the stored quality issue**, so a run's defect classes are readable from
+  `q_a_data->'quality_issues'` instead of `judge_verdict` on every block: 12 `contradiction`, 1
+  `metric_conflict`.
+
+The deterministic replay over the four earlier documents is unchanged by all of this — **8 / 3 / 1 /
+3**, measured today on `d8edac3b0`. That is not the `12 → 7 → 3 → 2` row above: those were measured
+before `3ff023abf` loosened the citation rule, which legitimately removed findings. The three new
+people-rhythm families contribute exactly **+1** across the four, isolated by toggling them off and
+re-measuring, and that one is real — block_15 of `2896e72f` gives the career conversation two
+rhythms.
 
 Three things the run did **not** fix. `mc2-i6l0i`: the canvas still contradicts the onboarding plan
 (Week 4 against Week 2) — the digest now carries the published milestones and the judge filed it as

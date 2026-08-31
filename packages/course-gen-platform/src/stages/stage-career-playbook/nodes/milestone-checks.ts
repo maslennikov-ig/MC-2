@@ -83,28 +83,50 @@ function milestoneNear(line: string, commitmentIndex: number): MilestoneMention 
   return best;
 }
 
+function wordPattern(word: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'giu');
+}
+
+/**
+ * The label word that best locates THIS commitment in THIS line.
+ *
+ * The rarest one, longest breaking a tie. Taking the first long word instead
+ * cost run 4e355bf4 five false criticals on one line: block_18 summarised the
+ * whole ramp as "first forecast submitted …, first solo pipeline review …, first
+ * quarterly business review …", and every ledger label there begins with
+ * "First". Anchored on "first", each commitment's search started from five
+ * places at once and found its neighbour's date. Anchored on "forecast" or
+ * "coaching", each starts where it belongs.
+ */
+function locatingWord(line: string, label: string): string | null {
+  const words = label
+    .split(/[\s/]+/)
+    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(word => word.length >= 4);
+  if (words.length === 0) return null;
+
+  let best: { word: string; count: number } | null = null;
+  for (const word of words) {
+    const count = [...line.matchAll(wordPattern(word))].length;
+    if (count === 0) continue;
+    if (!best || count < best.count || (count === best.count && word.length > best.word.length)) {
+      best = { word, count };
+    }
+  }
+
+  return best?.word ?? null;
+}
+
 /** Closest deadline to any mention of the commitment, within that mention's list item. */
 function nearestMilestoneAcrossMentions(
   line: string,
   label: string
 ): CareerPlaybookMilestone | null {
-  let best: MilestoneMention | null = null;
-
-  // The label's own words locate the commitment; `lineNamesLabelLoosely` has
-  // already decided the line is about it, so the first content word is enough to
-  // anchor the search inside the right list item.
-  const anchor = label
-    .split(/[\s/]+/)
-    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .find(word => word.length >= 4);
+  const anchor = locatingWord(line, label);
   if (!anchor) return null;
 
-  const anchorPattern = new RegExp(
-    `(?<![\\p{L}\\p{N}])${anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-    'giu'
-  );
-
-  for (const mention of line.matchAll(anchorPattern)) {
+  let best: MilestoneMention | null = null;
+  for (const mention of line.matchAll(wordPattern(anchor))) {
     const found = milestoneNear(line, mention.index ?? 0);
     if (found && (!best || found.distance < best.distance)) best = found;
   }

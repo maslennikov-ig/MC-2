@@ -791,6 +791,39 @@ describe('validateCadenceConsistency', () => {
   // Found by replaying 2896e72f: block_15 gave the career conversation two
   // rhythms, so the consensus leader and the accused were the same block, and
   // the message cited "the rest of the guide, led by block_15" against block_15.
+  // Run 4e355bf4 carried both "Performance review" (quarterly, per direct report)
+  // and "Team performance review" (weekly, the whole team). First-match-wins took
+  // the team row and filed a critical against block_26 for writing "quarterly",
+  // which its own governing row publishes. A guess costs a paid regeneration on a
+  // correct block, so a contested ledger silences the family.
+  it('says nothing when two ledger rows govern one duty family', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26: 'The performance review runs quarterly with each direct report.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'weekly_team_review',
+            label: 'Team performance review',
+            cadence: 'weekly',
+            owner: 'Sales manager',
+            scope: 'the whole team',
+          },
+          {
+            key: 'quarterly_performance_review',
+            label: 'Performance review',
+            cadence: 'quarterly',
+            owner: 'Sales manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
   it('says a block contradicts itself rather than citing it as its own authority', () => {
     const issues = validateCadenceConsistency(
       blocks({
