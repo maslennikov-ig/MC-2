@@ -129,6 +129,32 @@ cell (continuity 16 → 6); and both columns cut on a word boundary. Block 26 ha
 rule nobody wrote — "every number ... must not be changed during calibration" — and the prompt now
 forbids it. **The prompt half is unvalidated by generation and rides the next paid run.**
 
+A **fourth arm**, `2896e72f` (2026-08-31, on `88df445c3`), measures the batch above. Judge criticals
+went 25 → 9 → 7 → **11**, which is noise: four runs of identical input span that range, and the
+comparable row is the deterministic replay over the four stored documents, **12 → 7 → 3 → 2**.
+Repetition 1/471 and 0/1,092 at 0.85. Two delivered fixes are verified in the published document
+rather than by replay: **one** "Calibrate before publishing" heading where the previous run printed
+two, and **nine** rows carrying "assumed threshold, not company data" where the previous table
+listed 29 values and no threshold at all. Evidence:
+`docs/career-playbook/2026-08-31-fourth-arm.md`.
+
+Three things the run did **not** fix. `mc2-i6l0i`: the canvas still contradicts the onboarding plan
+(Week 4 against Week 2) — the digest now carries the published milestones and the judge filed it as
+a critical, where before nothing caught it, but visible is not fixed; the canvas should stop
+re-authoring what it summarizes. `mc2-3dw6j` (new): the judge again filed a critical whose own
+description ends "no defect is established here", the `mc2-1mr7r` shape a prompt alone cannot hold.
+And two blocks invented a cadence the ledger does not carry.
+
+**Reader views are delivered and enforced** (`mc2-ehao2`, `3ff023abf`). Owner ruling 2026-08-31:
+employee ⊂ manager ⊂ HR — 20, 26 and 27 blocks, with only `block_12` outside the manager's view.
+The link is the credential, because nothing in the platform knows which of the three a visitor is:
+`share.listViewLinks` (owner-only) issues one link per reader, `share.getViewByToken` resolves the
+audience from an HMAC over (playbook, audience) and serves that view **through assembly**, so it
+carries the diagrams, sources and calibration table. No column was added; sharing off still revokes
+all three. The citation rule moved with it and is now looser and correct — it asks who _receives_
+the target. `mc2-ga3nf` is the remaining half: the owner's share dialog still shows one public link
+instead of the three.
+
 Still open on this track: `mc2-i6l0i` (the Role Canvas, one of five blocks every reader gets, names
 career steps that are not in block 11 and a first forecast in month 1 against block 14's Day 60 —
 and the manager, who does not hold block 11, is told by block 15 to run a career conversation
