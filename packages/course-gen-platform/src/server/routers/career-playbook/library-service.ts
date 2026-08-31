@@ -11,6 +11,8 @@ import type { Context } from '../../trpc';
 import { logger } from '../../../shared/logger';
 import { renderCareerPlaybookPdf } from '../../../services/career-playbook-pdf';
 import { mapPlaybookRow, normalizeGeneratedBlocks } from './service-mappers';
+import { buildRoleGuideViewFromSpec } from '../../../stages/stage-career-playbook/nodes/final-assembler';
+import { buildCareerPlaybookViewLinks, resolveCareerPlaybookViewAudience } from './view-share';
 import { addJob, removeTerminalJobById } from '@/orchestrator/queue';
 import { joinCareerPlaybookFinalBlocks } from '@/stages/stage-career-playbook/nodes/final-assembler';
 
@@ -31,6 +33,8 @@ export type {
   CareerPlaybookImageRegenerateResponse,
   CareerPlaybookBlockMutationResponse,
   CareerPlaybookPdfExportResponse,
+  CareerPlaybookViewLinksResponse,
+  CareerPlaybookViewShareResponse,
 } from './library-access';
 import type {
   CareerPlaybookLibraryListResponse,
@@ -43,6 +47,8 @@ import type {
   CareerPlaybookImageRegenerateResponse,
   CareerPlaybookBlockMutationResponse,
   CareerPlaybookPdfExportResponse,
+  CareerPlaybookViewLinksResponse,
+  CareerPlaybookViewShareResponse,
 } from './library-access';
 
 // The permission model and row mapping live next door.
@@ -434,6 +440,81 @@ export async function regenerateCareerPlaybookImage(
     imageStatus: 'pending',
     imageUrl: null,
     imageErrorMessage: null,
+  };
+}
+
+/**
+ * Serve one reader their own view, decided by the link they were given.
+ *
+ * The same gate as the slug share — public, completed — because turning sharing
+ * off must revoke all three links at once. The view is assembled first, so it
+ * carries the diagrams, the sources section and the calibration table that
+ * final assembly appends; a view served straight from stored blocks would
+ * arrive without any of them.
+ */
+export async function getCareerPlaybookViewByToken(input: {
+  playbookId: string;
+  token: string;
+}): Promise<CareerPlaybookViewShareResponse> {
+  const audience = resolveCareerPlaybookViewAudience(input.playbookId, input.token);
+  if (!audience) throwPublicShareNotFound();
+
+  const supabase = getCareerPlaybookSupabase();
+  const { data, error } = await supabase
+    .from('career_playbooks')
+    .select('*')
+    .eq('id', input.playbookId)
+    .single();
+
+  if (error) {
+    if (isNotFoundDbError(error)) throwPublicShareNotFound(error);
+    throwOnDbError(error, 'Failed to load Career Playbook view share');
+  }
+  if (!data) throwPublicShareNotFound();
+
+  const mapped = mapPlaybookRow(data);
+  if (getVisibility(mapped) !== 'public' || mapped.status !== 'completed') {
+    throwPublicShareNotFound();
+  }
+
+  const generatedBlocks = normalizeGeneratedBlocks(mapped.generated_blocks);
+  if (Object.keys(generatedBlocks).length === 0) throwPublicShareNotFound();
+
+  const organizationSlug = await loadOrganizationSlug(mapped.organization_id);
+  const base = await mapRowToPublicShare(mapped, organizationSlug);
+
+  return {
+    ...base,
+    audience,
+    finalMarkdown: buildRoleGuideViewFromSpec(
+      {
+        generatedBlocks,
+        // A spec that no longer parses must not deny the reader their guide: it
+        // only feeds the appended sections, which degrade to nothing.
+        roleProfileSpec: CareerPlaybookRoleProfileSpecSchema.safeParse(mapped.role_profile_spec)
+          .data,
+      },
+      audience
+    ),
+  };
+}
+
+/**
+ * The three links the owner hands out. Owner-only: seeing the manager's link is
+ * seeing the manager's guide.
+ */
+export async function listCareerPlaybookViewLinks(
+  ctx: Context,
+  input: { playbookId: string }
+): Promise<CareerPlaybookViewLinksResponse> {
+  const user = requireUser(ctx);
+  const row = await loadManageablePlaybook(input.playbookId, user);
+  assertShareable(row);
+
+  return {
+    playbookId: row.id,
+    isPublic: getVisibility(mapPlaybookRow(row)) === 'public',
+    links: buildCareerPlaybookViewLinks(row.id),
   };
 }
 

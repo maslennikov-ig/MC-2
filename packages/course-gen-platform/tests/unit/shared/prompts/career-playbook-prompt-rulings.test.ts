@@ -109,6 +109,65 @@ describe('block 26: an implementation checklist names artefacts, not blocks', ()
   });
 });
 
+describe('a summary block may not invent what it summarizes', () => {
+  const wrap6 = prompt('career_playbook_group_6_wrap');
+  const group4 = prompt('career_playbook_group_4_growth');
+
+  // Run 88fc2368's Role Canvas — a block every reader receives — offered
+  // "director of sales / head of revenue" against a ladder publishing Head of
+  // Sales and VP of Sales, and a CRO-accepted forecast "within the first month"
+  // against an onboarding plan putting the first forecast on Day 60.
+  it('binds the canvas to published steps and milestones, not only to the ledger', () => {
+    expect(wrap6.promptTemplate).toContain(
+      'The same rule binds every name and every date it repeats'
+    );
+    expect(wrap6.promptTemplate).toContain('Career steps and ramp milestones already published');
+  });
+
+  // Block 11 is employee+HR; block 15 is manager+HR. The manager was told to run
+  // a quarterly career conversation "against the published ladder criteria" and
+  // never given the ladder.
+  it('makes block 15 carry the criteria its reader was not given', () => {
+    expect(group4.promptTemplate).toContain(
+      'This block is read by the manager and HR; the career ladder is not'
+    );
+    expect(group4.promptTemplate).toContain('hands them the task without the material');
+  });
+});
+
+describe('a disclosed chain is still a vendor page', () => {
+  // Block 9 of run 88fc2368: "Gartner analysts cited in [S11] predict that by
+  // 2026, 65% of B2B sales organizations will transition…" — S11 is janek.com.
+  // Block 19 of the same guide handled the identical figure honestly, so the
+  // model can do it; the rule did not cover the secondhand form.
+  it('closes the secondhand form the attribution rule left open', () => {
+    for (const entry of GROUP_PROMPTS) {
+      expect(entry.promptTemplate).toContain('Disclosing the chain does not lift that rule');
+      expect(entry.promptTemplate).toContain('drop the house name');
+    }
+  });
+});
+
+describe('block regenerator: one rewrite answers every finding', () => {
+  // Block 26 of run 638ed691 shipped five criticals after spending both of its
+  // attempts, because the regenerator was handed the first finding only.
+  const regenerator = prompt('career_playbook_block_regenerator');
+
+  it('asks for every finding to be fixed in the one rewrite', () => {
+    expect(regenerator.promptTemplate).toContain('fix EVERY judge issue listed below');
+    expect(regenerator.promptTemplate).toContain(
+      'Issues from judge — fix all of them in this one rewrite'
+    );
+    expect(regenerator.promptTemplate).not.toContain('fix the judge issue without repeating');
+  });
+
+  it('says what an unfixed finding costs, since the attempt is spent either way', () => {
+    expect(regenerator.promptTemplate).toContain(
+      'Leaving one of several findings unfixed spends an attempt and ships the defect'
+    );
+  });
+});
+
 describe('the writing rules never reach the reader', () => {
   // Three blocks explained the document's own construction to a person trying
   // to do a job. The prompt had phrased a rule through its consequence, and the

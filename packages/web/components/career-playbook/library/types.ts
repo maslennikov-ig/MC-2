@@ -156,3 +156,16 @@ export interface CareerPlaybookPublicShareResult {
   status: CareerPlaybookPublicShareStatus
   playbook: CareerPlaybookPublicSharePlaybook | null
 }
+
+/** One reader-scoped share link, as the server derives it. */
+export interface CareerPlaybookViewLink {
+  audience: 'employee' | 'manager' | 'hr'
+  token: string
+  path: string
+}
+
+export interface CareerPlaybookViewLinksResult {
+  playbookId: string
+  isPublic: boolean
+  links: CareerPlaybookViewLink[]
+}

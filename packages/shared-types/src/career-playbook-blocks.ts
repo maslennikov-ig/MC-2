@@ -247,3 +247,44 @@ export const CAREER_PLAYBOOK_BLOCK_CATALOG = [
     audiences: ['manager', 'hr'],
   },
 ] as const satisfies readonly CareerPlaybookBlockCatalogItem[];
+
+/**
+ * What each reader of a role guide is allowed to open, owner ruling 2026-08-31.
+ *
+ * The audiences on a block say who it is WRITTEN for. This says who may READ
+ * it, and the two are not the same question. The reading rule is a hierarchy:
+ * the employee sees only their own guide; the manager also sees everything the
+ * employee sees, because they run the conversations it describes; HR sees the
+ * whole document.
+ *
+ * Before this, "audience" answered both questions at once, which made the
+ * manager's view and the employee's view disjoint in six blocks — and left the
+ * manager holding a career conversation whose criteria live in a block only the
+ * employee and HR were given.
+ */
+export const CAREER_PLAYBOOK_VIEWER_AUDIENCES = {
+  employee: ['employee'],
+  manager: ['employee', 'manager'],
+  hr: ['employee', 'manager', 'hr'],
+} as const satisfies Record<CareerPlaybookAudience, readonly CareerPlaybookAudience[]>;
+
+/** Does this reader receive this block? */
+export function careerPlaybookViewerReceivesBlock(
+  viewer: CareerPlaybookAudience,
+  blockId: CareerPlaybookBlockId
+): boolean {
+  const visible: readonly CareerPlaybookAudience[] = CAREER_PLAYBOOK_VIEWER_AUDIENCES[viewer];
+  const block = CAREER_PLAYBOOK_BLOCK_CATALOG.find(entry => entry.blockId === blockId);
+  if (!block) return false;
+
+  return block.audiences.some(audience => visible.includes(audience));
+}
+
+/** Every reader who receives this block, in hierarchy order. */
+export function careerPlaybookBlockViewers(
+  blockId: CareerPlaybookBlockId
+): readonly CareerPlaybookAudience[] {
+  return (['employee', 'manager', 'hr'] as const).filter(viewer =>
+    careerPlaybookViewerReceivesBlock(viewer, blockId)
+  );
+}

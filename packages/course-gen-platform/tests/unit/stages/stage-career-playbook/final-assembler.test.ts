@@ -7,6 +7,7 @@ import type {
 import {
   assembleCareerPlaybookFinalMarkdown,
   buildRoleGuideView,
+  buildRoleGuideViewFromSpec,
   joinCareerPlaybookFinalBlocks,
   prepareCareerPlaybookFinalBlocksWithQuality,
 } from '@/stages/stage-career-playbook/nodes/final-assembler';
@@ -67,7 +68,13 @@ const ruRoleProfileSpec: CareerPlaybookRoleProfileSpec = {
 };
 
 describe('Career Playbook final assembler', () => {
-  it('builds each audience view in canonical order without changing the full document', () => {
+  // Owner ruling 2026-08-31: reading is a hierarchy, not three disjoint views.
+  // The employee sees only their own guide; the manager also sees everything the
+  // employee sees, because they run the conversations it describes; HR sees the
+  // whole document. Before this the manager and the employee were disjoint in
+  // six blocks, which left the manager holding a career conversation whose
+  // criteria live in a block only the employee and HR were given.
+  it('builds each reader view as a hierarchy without changing the full document', () => {
     const blocks = completeBlocks();
     const full = joinCareerPlaybookFinalBlocks(blocks);
     const employee = buildRoleGuideView(blocks, 'employee');
@@ -76,16 +83,42 @@ describe('Career Playbook final assembler', () => {
 
     expect(full.match(/^## /gm)).toHaveLength(27);
     expect(employee.match(/^## /gm)).toHaveLength(20);
-    expect(manager.match(/^## /gm)).toHaveLength(20);
-    expect(hr.match(/^## /gm)).toHaveLength(14);
+    expect(manager.match(/^## /gm)).toHaveLength(26);
+    expect(hr.match(/^## /gm)).toHaveLength(27);
     expect(employee.indexOf('## Header')).toBeLessThan(employee.indexOf('## 1. Block 1'));
-    expect(employee).toContain('## 22. Block 22');
-    expect(employee).not.toContain('## 12. Block 12');
-    expect(manager).toContain('## 26. Block 26');
-    expect(manager).not.toContain('## 22. Block 22');
+
+    // Only block_12 (HR-only) is outside the manager's view.
+    expect(manager).not.toContain('## 12. Block 12');
+    expect(manager).toContain('## 22. Block 22');
     expect(hr).toContain('## 12. Block 12');
-    expect(hr).not.toContain('## 20. Block 20');
+
+    // The employee still receives only what is written for them: no failure
+    // pre-mortem, no disengagement ladder, no screening filter.
+    expect(employee).not.toContain('## 12. Block 12');
+    expect(employee).not.toContain('## 17. Block 17');
+    expect(employee).not.toContain('## 21. Block 21');
+    expect(employee).not.toContain('## 23. Block 23');
+    expect(employee).not.toContain('## 26. Block 26');
+
+    // Every block an employee reads, a manager reads too.
+    for (const heading of employee.match(/^## .*$/gm) ?? []) {
+      expect(manager).toContain(heading);
+    }
+
     expect(joinCareerPlaybookFinalBlocks(blocks)).toBe(full);
+  });
+
+  // A view served from stored blocks arrives without the diagrams, the sources
+  // section and the calibration table, all of which assembly appends. That is
+  // the defect mc2-ehao2 warned would ship if a view were wired up naively.
+  it('serves a reader view through assembly, so it carries what assembly adds', () => {
+    const blocks = completeBlocks();
+    const raw = buildRoleGuideView(blocks, 'hr');
+    const served = buildRoleGuideViewFromSpec({ generatedBlocks: blocks }, 'hr');
+
+    expect(raw).not.toContain('```mermaid');
+    expect(served).toContain('```mermaid');
+    expect(served.match(/^## /gm)).toHaveLength(27);
   });
 
   it('assembles Header then blocks 1-26 and creates required Mermaid sections', () => {

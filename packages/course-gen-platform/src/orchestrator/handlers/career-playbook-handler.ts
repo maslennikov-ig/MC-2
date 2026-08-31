@@ -492,10 +492,12 @@ export class CareerPlaybookHandler {
         roleProfileSpec: jobData.roleProfileSpec,
         language: jobData.language,
         originalBlock: jobData.originalBlock,
-        issue: {
-          description: jobData.instruction,
-          suggestion: 'Apply the user instruction while preserving the block format contract.',
-        },
+        issues: [
+          {
+            description: jobData.instruction,
+            suggestion: 'Apply the user instruction while preserving the block format contract.',
+          },
+        ],
         userInstruction: jobData.instruction,
         otherBlocks: jobData.generatedBlocks,
       });

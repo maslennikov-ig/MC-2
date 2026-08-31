@@ -67,7 +67,17 @@ export interface RegenerateCareerPlaybookBlockInput {
   roleProfileSpec: CareerPlaybookRoleProfileSpec;
   language: string;
   originalBlock?: CareerPlaybookBlockState | null;
-  issue: Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>;
+  /**
+   * Every judge finding against this block, not the first one.
+   *
+   * A block gets two attempts. Told about one finding per attempt, a block the
+   * judge faulted three times could never come back clean however many
+   * regenerations it was given: run `638ed691` shipped **five** criticals on
+   * block 26 after spending both of its attempts, and run `d5137bc5` shipped
+   * two or three on each of six blocks. That reads as a cap set too low. It is
+   * not: the cap was never the binding constraint, the briefing was.
+   */
+  issues: readonly Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>[];
   userInstruction?: string | null;
   otherBlocks?: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
   now?: () => Date;
@@ -83,7 +93,7 @@ export interface RegenerateCareerPlaybookBlockResult {
 
 export interface CareerPlaybookPendingRegeneration {
   blockId: CareerPlaybookBlockId;
-  issue: CareerPlaybookJudgeIssue;
+  issues: CareerPlaybookJudgeIssue[];
   attempts: number;
 }
 
@@ -153,6 +163,22 @@ export function buildOtherBlocksBrief(
   return lines.length > 0 ? lines.join('\n') : 'none';
 }
 
+/**
+ * One finding per line, numbered so the two lists line up.
+ *
+ * A single finding stays a bare sentence: numbering one item would read as a
+ * list with an item missing.
+ */
+function formatRegenerationIssues(
+  issues: readonly Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>[],
+  pick: (issue: Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>) => string
+): string {
+  if (issues.length === 0) return 'none';
+  if (issues.length === 1) return pick(issues[0]);
+
+  return issues.map((issue, index) => `${index + 1}. ${pick(issue)}`).join('\n');
+}
+
 export function buildBlockRegeneratorPromptVariables(
   input: RegenerateCareerPlaybookBlockInput
 ): Record<string, string> {
@@ -160,8 +186,8 @@ export function buildBlockRegeneratorPromptVariables(
     block_id: input.blockId,
     block_name: getCareerPlaybookBlockName(input.blockId),
     original_content: input.originalBlock?.content.trim() || 'none',
-    issue_description: input.issue.description,
-    suggestion: input.issue.suggestion ?? 'none',
+    issue_description: formatRegenerationIssues(input.issues, issue => issue.description),
+    suggestion: formatRegenerationIssues(input.issues, issue => issue.suggestion ?? 'none'),
     user_instruction: input.userInstruction?.trim() || 'none',
     spec_json: JSON.stringify(input.roleProfileSpec, null, 2),
     // Without the ledgers a regeneration prompted by a metric conflict simply
@@ -253,18 +279,32 @@ export async function regenerateCareerPlaybookBlock(
   };
 }
 
-function issueForBlock(
+/**
+ * Every finding the verdict holds against this block, criticals first.
+ *
+ * Ordering matters when a block is faulted more than twice and still runs out
+ * of attempts: the attempt should be spent on what blocks publication, not on
+ * whichever finding the judge happened to write down first.
+ */
+function issuesForBlock(
   verdict: CareerPlaybookJudgeVerdict,
   blockId: CareerPlaybookBlockId
-): CareerPlaybookJudgeIssue {
-  return (
-    verdict.issues.find(issue => issue.block_id === blockId) ?? {
+): CareerPlaybookJudgeIssue[] {
+  const severityRank = { critical: 0, warning: 1, info: 2 } as const;
+  const issues = verdict.issues
+    .filter(issue => issue.block_id === blockId)
+    .sort((left, right) => severityRank[left.severity] - severityRank[right.severity]);
+
+  if (issues.length > 0) return issues;
+
+  return [
+    {
       block_id: blockId,
       severity: 'warning',
       description: `Regenerate ${blockId} based on the cross-block judge verdict.`,
       suggestion: 'Preserve the block contract and fix the judge finding.',
-    }
-  );
+    },
+  ];
 }
 
 export interface SelectCareerPlaybookRegenerationInput {
@@ -313,7 +353,7 @@ export function selectPendingCareerPlaybookRegenerations(
 
   return candidates.slice(0, remainingWindow).map(candidate => ({
     blockId: candidate.blockId,
-    issue: issueForBlock(verdict, candidate.blockId),
+    issues: issuesForBlock(verdict, candidate.blockId),
     attempts: candidate.attempts,
   }));
 }
@@ -379,7 +419,7 @@ export function createBlockRegeneratorNode(
             roleProfileSpec,
             language: state.language,
             originalBlock: state.generatedBlocks[pending.blockId],
-            issue: pending.issue,
+            issues: pending.issues,
             otherBlocks: otherBlocksSnapshot,
           },
           runtime

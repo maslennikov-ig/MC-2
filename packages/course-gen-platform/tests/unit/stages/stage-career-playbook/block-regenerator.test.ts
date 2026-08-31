@@ -5,6 +5,7 @@ import type {
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import {
+  buildBlockRegeneratorPromptVariables,
   buildOtherBlocksBrief,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
@@ -70,10 +71,12 @@ describe('Career Playbook block regenerator', () => {
         roleProfileSpec: spec,
         language: 'ru',
         originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 2),
-        issue: {
-          description: 'The KPI block repeats duties instead of measurable metrics.',
-          suggestion: 'Use concrete CRM metrics.',
-        },
+        issues: [
+          {
+            description: 'The KPI block repeats duties instead of measurable metrics.',
+            suggestion: 'Use concrete CRM metrics.',
+          },
+        ],
         userInstruction: 'Keep the traffic-light table.',
         otherBlocks: {
           block_3: generatedBlock('responsibility zones are already covered'),
@@ -162,10 +165,12 @@ describe('Career Playbook block regenerator', () => {
         roleProfileSpec: spec,
         language: 'en',
         originalBlock: generatedBlock('## 9. Human-AI collaboration\n\nOld text.'),
-        issue: {
-          description: 'The block repeats unrelated recruiting guidance.',
-          suggestion: 'Keep the rewrite specific to the employee reader.',
-        },
+        issues: [
+          {
+            description: 'The block repeats unrelated recruiting guidance.',
+            suggestion: 'Keep the rewrite specific to the employee reader.',
+          },
+        ],
         otherBlocks: {
           block_22: generatedBlock('## 22. Role README\n\nEmployee operating notes.'),
           block_12: generatedBlock('## 12. Candidate profile\n\nHR recruiting criteria.'),
@@ -218,10 +223,12 @@ describe('Career Playbook block regenerator', () => {
           roleProfileSpec: spec,
           language: 'ru',
           originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 2),
-          issue: {
-            description: 'The KPI block repeats duties instead of measurable metrics.',
-            suggestion: 'Use concrete CRM metrics.',
-          },
+          issues: [
+            {
+              description: 'The KPI block repeats duties instead of measurable metrics.',
+              suggestion: 'Use concrete CRM metrics.',
+            },
+          ],
         },
         { renderPrompt, invokeLLM }
       )
@@ -257,6 +264,87 @@ describe('Career Playbook block regenerator', () => {
 
     expect(pending?.blockId).toBe('block_6');
     expect(pending?.attempts).toBe(0);
+  });
+
+  // Run 638ed691 shipped FIVE criticals on block 26 after spending both of its
+  // attempts, and d5137bc5 shipped two or three on each of six blocks. Told one
+  // finding per attempt, a block faulted three times can never come back clean.
+  // The cap was never the binding constraint; the briefing was.
+  it('hands the regenerator every finding against the block, criticals first', () => {
+    const pending = selectPendingCareerPlaybookRegenerations({
+      verdict: {
+        pass: false,
+        score: 30,
+        issues: [
+          {
+            block_id: 'block_26',
+            severity: 'warning',
+            description: 'A quarterly career conversation is not in the cadence ledger.',
+            suggestion: 'Drop it or add it.',
+          },
+          {
+            block_id: 'block_26',
+            severity: 'critical',
+            description: 'block_26 states the forecast review as biweekly; the ledger says weekly.',
+            suggestion: 'Align to the ledger.',
+          },
+          { block_id: 'block_4', severity: 'critical', description: 'x', suggestion: 'y' },
+          {
+            block_id: 'block_26',
+            severity: 'critical',
+            description: 'block_26 states Team quota attainment as 90%; the ledger says 100%.',
+            suggestion: 'Align to the ledger.',
+          },
+        ],
+        needs_regeneration: ['block_26', 'block_4'],
+      },
+      blockIds: ['block_4', 'block_26'],
+      attempts: {},
+      maxAttempts: 2,
+      maxWindowAttempts: 8,
+    });
+
+    const block26 = pending.find(candidate => candidate.blockId === 'block_26');
+    expect(block26?.issues).toHaveLength(3);
+    expect(block26?.issues.map(issue => issue.severity)).toEqual([
+      'critical',
+      'critical',
+      'warning',
+    ]);
+  });
+
+  it('numbers the findings so a rewrite can answer all of them, and pairs the suggestions', () => {
+    const variables = buildBlockRegeneratorPromptVariables({
+      blockId: 'block_26',
+      roleProfileSpec: spec,
+      language: 'en',
+      originalBlock: {
+        content: '## 26. Implementation checklist',
+        status: 'generated',
+        attempt: 1,
+      },
+      issues: [
+        { description: 'The forecast review is biweekly here.', suggestion: 'Say weekly.' },
+        { description: 'Team quota attainment reads 90%.', suggestion: 'Say 100%.' },
+      ],
+    });
+
+    expect(variables.issue_description).toBe(
+      '1. The forecast review is biweekly here.\n2. Team quota attainment reads 90%.'
+    );
+    expect(variables.suggestion).toBe('1. Say weekly.\n2. Say 100%.');
+  });
+
+  it('leaves a single finding as a sentence rather than a one-item list', () => {
+    const variables = buildBlockRegeneratorPromptVariables({
+      blockId: 'block_26',
+      roleProfileSpec: spec,
+      language: 'en',
+      issues: [{ description: 'The forecast review is biweekly here.', suggestion: 'Say weekly.' }],
+    });
+
+    expect(variables.issue_description).toBe('The forecast review is biweekly here.');
+    expect(variables.suggestion).toBe('Say weekly.');
   });
 
   it('pins the regeneration cap constants that bound the judge<->regenerator loop', () => {
@@ -436,7 +524,7 @@ describe('Career Playbook block regenerator', () => {
         roleProfileSpec: spec,
         language: 'ru',
         originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 1),
-        issue: { description: 'The KPI block repeats duties.', suggestion: 'Use metrics.' },
+        issues: [{ description: 'The KPI block repeats duties.', suggestion: 'Use metrics.' }],
       },
       { renderPrompt, invokeLLM }
     );

@@ -6,7 +6,10 @@ import type {
   CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
-import { CAREER_PLAYBOOK_BLOCK_CATALOG } from '@megacampus/shared-types';
+import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  careerPlaybookViewerReceivesBlock,
+} from '@megacampus/shared-types';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 import { remediateCareerPlaybookMermaidBlocks } from './mermaid-quality';
 import { CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE } from './quality-ledger';
@@ -772,17 +775,43 @@ export function joinCareerPlaybookFinalBlocks(
     .join('\n\n');
 }
 
-/** Assemble one reader-specific view from the canonical generated block store. */
+/**
+ * Assemble one reader's view from the canonical generated block store.
+ *
+ * Membership follows the reading hierarchy, not the block's audience list: the
+ * employee sees only their own guide, the manager also sees the employee's, HR
+ * sees the whole document (owner, 2026-08-31).
+ *
+ * Takes raw stored blocks, so it produces a view WITHOUT the diagrams, sources
+ * section and calibration table that assembly adds. Anything a reader actually
+ * receives goes through {@link buildRoleGuideViewFromSpec}.
+ */
 export function buildRoleGuideView(
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
-  audience: CareerPlaybookAudience
+  viewer: CareerPlaybookAudience
 ): string {
   return CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block =>
-    (block.audiences as readonly CareerPlaybookAudience[]).includes(audience)
+    careerPlaybookViewerReceivesBlock(viewer, block.blockId)
   )
     .map(block => generatedBlocks[block.blockId]?.content.trim())
     .filter((content): content is string => Boolean(content))
     .join('\n\n');
+}
+
+/**
+ * The view a reader is actually served: assembled first, then filtered.
+ *
+ * `buildRoleGuideView` reads the stored blocks, which carry no diagrams, no
+ * sources section and no calibration table — those are appended during
+ * assembly. Serving a view straight from stored blocks would hand the reader a
+ * document missing all three, which is why `mc2-ehao2` says a view must not
+ * ship until it goes through assembly.
+ */
+export function buildRoleGuideViewFromSpec(
+  input: AssembleCareerPlaybookFinalMarkdownInput,
+  viewer: CareerPlaybookAudience
+): string {
+  return buildRoleGuideView(prepareCareerPlaybookFinalBlocks(input), viewer);
 }
 
 export function assembleCareerPlaybookFinalMarkdown(

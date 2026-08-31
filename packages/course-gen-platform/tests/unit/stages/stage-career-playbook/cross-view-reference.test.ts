@@ -19,38 +19,58 @@ function blocks(
 }
 
 describe('careerPlaybookBlockMayCite', () => {
-  // Subset, not intersection: a manager reads both block_26 and block_5, but the
-  // HR reader of block_26 does not get block_5, so the pointer is unfollowable.
-  it('refuses a target that only some of the source readers receive', () => {
-    expect(careerPlaybookBlockMayCite('block_26', 'block_5')).toBe(false);
-    expect(careerPlaybookBlockMayCite('block_12', 'block_5')).toBe(false);
+  // The question is who RECEIVES a block, and since the owner ruling of
+  // 2026-08-31 that is a hierarchy: employee ⊂ manager ⊂ HR. A pointer is
+  // unfollowable only when some reader of the source does not receive the
+  // target — which now means an employee-read block pointing outside the
+  // employee's guide.
+  it('refuses a target the employee reader of the source never receives', () => {
     expect(careerPlaybookBlockMayCite('block_24', 'block_23')).toBe(false);
+    expect(careerPlaybookBlockMayCite('block_1', 'block_12')).toBe(false);
+    expect(careerPlaybookBlockMayCite('block_9', 'block_21')).toBe(false);
+  });
+
+  // Before the ruling these three were refused, and block_26 could cite almost
+  // nothing: its HR reader was treated as missing every employee block.
+  it('allows what the hierarchy makes reachable', () => {
+    expect(careerPlaybookBlockMayCite('block_26', 'block_5')).toBe(true);
+    expect(careerPlaybookBlockMayCite('block_12', 'block_5')).toBe(true);
+    expect(careerPlaybookBlockMayCite('block_15', 'block_11')).toBe(true);
   });
 
   it('allows a target every reader of the source also receives', () => {
     expect(careerPlaybookBlockMayCite('block_16', 'block_5')).toBe(true);
     expect(careerPlaybookBlockMayCite('block_5', 'block_1')).toBe(true);
-    // A block read by everyone may only cite blocks read by everyone.
     expect(careerPlaybookBlockMayCite('block_24', 'block_1')).toBe(true);
   });
 
   it('is not symmetric', () => {
-    // block_9 is employee-only, block_1 is universal.
+    // block_23 is read by the manager and HR, who both also receive block_24;
+    // block_24 is read by the employee too, and no employee receives block_23.
+    expect(careerPlaybookBlockMayCite('block_23', 'block_24')).toBe(true);
+    expect(careerPlaybookBlockMayCite('block_24', 'block_23')).toBe(false);
+  });
+
+  // Everyone receives an employee block now, so pointing at one is always safe.
+  it('lets any block point at the employee guide', () => {
     expect(careerPlaybookBlockMayCite('block_9', 'block_1')).toBe(true);
-    expect(careerPlaybookBlockMayCite('block_1', 'block_9')).toBe(false);
+    expect(careerPlaybookBlockMayCite('block_1', 'block_9')).toBe(true);
+    expect(careerPlaybookBlockMayCite('block_21', 'block_9')).toBe(true);
   });
 });
 
 describe('validateCrossViewReference', () => {
   it('flags a pointer at a block the reader was never given', () => {
+    // block_1 is read by everyone; block_12 is HR-only, so its employee and
+    // manager readers cannot follow the pointer.
     const [issue] = validateCrossViewReference(
-      blocks([['block_8', 'Полномочия по инструментам описаны в Block 5.']]),
+      blocks([['block_1', 'Критерии отбора описаны в Block 12.']]),
       context
     );
 
     expect(issue.category).toBe('unreadable_reference');
-    expect(issue.block_id).toBe('block_8');
-    expect(issue.description).toContain('block_5');
+    expect(issue.block_id).toBe('block_1');
+    expect(issue.description).toContain('block_12');
   });
 
   it('accepts a pointer every reader can follow, and a self-reference', () => {
@@ -75,15 +95,17 @@ describe('validateCrossViewReference', () => {
   });
 
   it('reports one issue per block however many pointers it breaks', () => {
+    // block_24 is read by everyone, so every pointer outside the employee's
+    // guide breaks for its employee reader.
     const issues = validateCrossViewReference(
-      blocks([['block_26', 'См. Block 5, Block 2 и блок 22 для деталей.']]),
+      blocks([['block_24', 'См. Block 12, Block 21 и блок 23 для деталей.']]),
       context
     );
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].description).toContain('block_5');
-    expect(issues[0].description).toContain('block_2');
-    expect(issues[0].description).toContain('block_22');
+    expect(issues[0].description).toContain('block_12');
+    expect(issues[0].description).toContain('block_21');
+    expect(issues[0].description).toContain('block_23');
   });
 });
 
@@ -93,10 +115,14 @@ describe('the rule reaches both the generator and the regenerator', () => {
   // right, spends both attempts reproducing the defect.
   it('renders the citable list for a group generator prompt', () => {
     const rendered = formatCareerPlaybookCitableBlocks(['block_24', 'block_26']);
+    const lineFor = (blockId: string) =>
+      rendered.split('\n').find(line => line.startsWith(`- ${blockId} may reference:`)) ?? '';
 
-    expect(rendered).toContain('- block_24 may reference:');
-    expect(rendered).toContain('block_1 (Mission and key results)');
-    expect(rendered).not.toContain('block_23 (Continuity plan)');
+    expect(lineFor('block_24')).toContain('block_1 (Mission and key results)');
+    // block_24 is read by the employee, who never receives the continuity plan.
+    expect(lineFor('block_24')).not.toContain('block_23 (Continuity plan)');
+    // block_26 is read by the manager and HR, and both receive block_23.
+    expect(lineFor('block_26')).toContain('block_23 (Continuity plan)');
   });
 
   it('declares citable_blocks_md in every group prompt and in the regenerator', () => {

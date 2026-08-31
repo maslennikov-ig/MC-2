@@ -1,5 +1,7 @@
 import {
   CAREER_PLAYBOOK_BLOCK_CATALOG,
+  careerPlaybookBlockViewers,
+  careerPlaybookViewerReceivesBlock,
   type CareerPlaybookAudience,
   type CareerPlaybookBlockId,
 } from '@megacampus/shared-types';
@@ -27,25 +29,29 @@ export function careerPlaybookBlocksShareAudience(
 /**
  * May a block point its reader at another block?
  *
- * Only when every reader of the source also reads the target. A view is a
- * separately read document: "see Block 5" inside the HR view, which has no
- * Block 5, sends its reader to a page they were never given. Measured on the 14
+ * Only when every reader who RECEIVES the source also receives the target. A
+ * view is a separately read document: "see Block 5" inside a view that has no
+ * Block 5 sends its reader to a page they were never given. Measured on the 14
  * stored playbooks before this existed, 71% of the HR view's cross-references
  * were of exactly that kind, and 12% and 16% of the employee and manager views —
  * see docs/career-playbook/2026-08-30-role-guide-views-measurement.md.
  *
- * Note the direction: this is subset, not intersection. `block_26`
- * (manager+hr) may not cite `block_5` (employee+manager), because its HR reader
- * would not find it — even though a manager reads both.
+ * The question is about readers, not about audiences, and since the owner ruling
+ * of 2026-08-31 those differ: the reading rule is a hierarchy where the manager
+ * also receives the employee's blocks and HR receives everything. So `block_26`
+ * (manager+hr) may now cite `block_5` (employee+manager) — its two readers,
+ * manager and HR, both hold it — while `block_9` (employee-only) still may not
+ * cite `block_23`, which no employee receives.
  */
 export function careerPlaybookBlockMayCite(
   sourceBlockId: CareerPlaybookBlockId,
   targetBlockId: CareerPlaybookBlockId
 ): boolean {
-  const targetAudiences = getCareerPlaybookBlockAudiences(targetBlockId);
-  const sourceAudiences = getCareerPlaybookBlockAudiences(sourceBlockId);
-  if (sourceAudiences.length === 0 || targetAudiences.length === 0) return false;
-  return sourceAudiences.every(audience => targetAudiences.includes(audience));
+  const sourceViewers = careerPlaybookBlockViewers(sourceBlockId);
+  if (sourceViewers.length === 0) return false;
+  if (getCareerPlaybookBlockAudiences(targetBlockId).length === 0) return false;
+
+  return sourceViewers.every(viewer => careerPlaybookViewerReceivesBlock(viewer, targetBlockId));
 }
 
 /**

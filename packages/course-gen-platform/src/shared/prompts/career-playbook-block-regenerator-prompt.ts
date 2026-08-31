@@ -9,7 +9,8 @@ export const careerPlaybookBlockRegeneratorPrompt: HardcodedPrompt = {
   promptTemplate: `SYSTEM:
 Regenerate exactly one Career Playbook block: {{block_id}} ({{block_name}}).
 Regenerate a finished section for all and only the readers listed in Target block readers.
-Preserve the block format contract and fix the judge issue without repeating the other blocks listed below.
+Preserve the block format contract and fix EVERY judge issue listed below, without repeating the other blocks listed below.
+A block gets two attempts in total. Leaving one of several findings unfixed spends an attempt and ships the defect.
 Repetition across audience views that share no reader is allowed and irrelevant; those blocks are intentionally absent from the summary.
 - If the block already contains a Mermaid diagram, improve that existing diagram instead of appending a new one; add a diagram only when the block has none and its contract requires one.
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
@@ -18,10 +19,10 @@ Repetition across audience views that share no reader is allowed and irrelevant;
 Original block content:
 {{original_content}}
 
-Issue from judge:
+Issues from judge — fix all of them in this one rewrite:
 {{issue_description}}
 
-Suggestion:
+Suggestions, in the same order:
 {{suggestion}}
 
 User edit instruction:
@@ -29,9 +30,9 @@ User edit instruction:
 
 Return only markdown for this one block.
 
-- Numbers: reproduce every value from the metric ledger VERBATIM. If the issue is a metric conflict,
+- Numbers: reproduce every value from the metric ledger VERBATIM. If an issue is a metric conflict,
   align the block to the ledger — never invent a third value to split the difference.
-- Rhythms: reproduce the cadence of every commitment from the cadence ledger VERBATIM. If the issue
+- Rhythms: reproduce the cadence of every commitment from the cadence ledger VERBATIM. If an issue
   is a cadence conflict, this block is the one that must change; align it to the rhythm the issue
   names and leave every other block alone.
 - External statistics: allowed only with a [Sn] reference to the evidence ledger. Without a matching
@@ -74,8 +75,16 @@ Content language: {{content_language}}`,
     { name: 'block_id', description: 'Target block id', required: true },
     { name: 'block_name', description: 'Human-readable block name', required: true },
     { name: 'original_content', description: 'Original block markdown', required: true },
-    { name: 'issue_description', description: 'Judge issue description', required: true },
-    { name: 'suggestion', description: 'Judge suggestion or none', required: true },
+    {
+      name: 'issue_description',
+      description: 'Every judge finding against this block, numbered when there is more than one',
+      required: true,
+    },
+    {
+      name: 'suggestion',
+      description: 'Judge suggestions in the same order as the findings, or none',
+      required: true,
+    },
     {
       name: 'user_instruction',
       description: 'Optional user instruction or none',

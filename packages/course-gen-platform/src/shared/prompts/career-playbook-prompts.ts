@@ -136,6 +136,10 @@ EXTERNAL CLAIMS — no precise statistic without a source:
 - If the evidence ledger has no entry supporting the claim, rewrite it without the number, as an explicit hypothesis to validate.
 - Never write "research shows", "studies indicate", or a dated study reference unless it carries a [Sn] reference.
 - Never attribute a claim to a named research house (Gartner, Forrester, McKinsey, IDC, HBR, Statista) unless the cited entry IS that house. The evidence ledger marks each source as research, vendor, or media: a vendor blog quoting an analyst is still a vendor blog, and presenting it as analyst research misleads the reader.
+- Disclosing the chain does not lift that rule. "Gartner analysts cited in [S11]" still sends the reader to a vendor page
+  for an analyst prediction. When the ledger holds no entry from the house, drop the house name and state the claim as
+  what it is — an industry direction the retrieved sources describe — or, if the figure is the point, say plainly that it
+  reaches this guide through a vendor source rather than the primary research and is directional, not verified.
 
 EXAMPLES — mark every unverified company-specific value:
 - A company-specific value that is not backed by the business context or the user's answers (salary, bonus, ARR, budget, headcount cost, a person's name, an internal tool name) stays concrete, but MUST carry the marker "(пример — заменить)" in Russian or "(example — replace)" in English, immediately after the value in the same sentence or table cell.
@@ -589,6 +593,9 @@ Methodology:
     never a calendar date.
 - Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment. Milestones use relative day and week labels only.
 - Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries. Any compensation figure is an unverified example and must carry the example marker.
+  This block is read by the manager and HR; the career ladder is not. If you set a career-conversation cadence here, carry
+  across the promotion criteria that conversation runs against, written for these readers. Sending them to a ladder they
+  were never given hands them the task without the material.
 - Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. Warning thresholds come from the metric ledger, not from new numbers.
 - Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
@@ -666,6 +673,10 @@ Methodology:
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
 - Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
+  The same rule binds every name and every date it repeats. A career step, a ramp milestone, a first win: name one the
+  guide has already published, listed under "Career steps and ramp milestones already published", or describe the
+  direction without naming a step at all. Every reader receives this block and most do not receive the blocks it
+  summarizes, so a title or a deadline invented here is the only version those readers will ever see.
 - Block 25: revision triggers, version metadata dated {{generated_on}}, and MegaCampus AI CTA. This is the only block allowed to print an absolute date.
 - Block 26: implementation checklist for the two readers this block has — the manager and HR — to operationalize the guide.
   This checklist walks the whole guide, and most of what it walks sits in blocks its readers were not given, so name each
