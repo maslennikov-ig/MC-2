@@ -183,6 +183,19 @@ people-rhythm families contribute exactly **+1** across the four, isolated by to
 re-measuring, and that one is real — block_15 of `2896e72f` gives the career conversation two
 rhythms.
 
+Probing that run's reader links on dev found a defect that is **not** about reader links and is
+older than they are: **every public page of a guide with a red band returns HTTP 500**
+(`mc2-j8ms8`, fixed in `da92fc620`). `MarkdownRenderer` compiles with `compileMDX`, where `<` opens
+an element, and a red band is a ceiling written with `<` — run `4e355bf4` carries 54 of them
+(`red <2x`, `<65%`, `<80%`). The catalog share, the slug share and all three reader links were 500;
+the metric ledger has published a red band for every metric since it existed, so this has been true
+for every such guide all along. `escapeBareAngleBrackets` rewrites a `<` that cannot start a tag and
+leaves what can, including everything inside a fence or a code span.
+
+Worth carrying forward: **the live-smoke's `public-share` gate reported "rendered successfully" for
+a page that was a 500.** It checks a tRPC query, not an HTTP status, which is why five paid runs
+passed over this. Recorded in `mc2-j8ms8`.
+
 Three things the run did **not** fix. `mc2-i6l0i`: the canvas still contradicts the onboarding plan
 (Week 4 against Week 2) — the digest now carries the published milestones and the judge filed it as
 a critical, where before nothing caught it, but visible is not fixed; the canvas should stop
