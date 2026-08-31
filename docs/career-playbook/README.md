@@ -78,6 +78,15 @@ external web research. Company-specific mode may use the digest as client facts.
 Universal mode must not invent company details and should produce a benchmark
 guide with explicit adaptation notes.
 
+Web research runs four lanes: KPIs, trends, onboarding, and a primary-research
+lane restricted to the analyst, statistical and academic publishers listed in
+`stages/stage-career-playbook/research-domains.ts` — the same list the evidence
+classifier uses, so a source fetched as research is never later labelled a vendor
+blog. The evidence ledger then tells every block what its sources permit: when no
+retrieved source is research, no claim may be attributed to a named research
+house, and the deterministic attribution check asks for the attribution to be
+dropped rather than for a citation the run does not hold.
+
 ## Output Quality
 
 Final assembly also applies deterministic output cleanup: auto-added Mermaid

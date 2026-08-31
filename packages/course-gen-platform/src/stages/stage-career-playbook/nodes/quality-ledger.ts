@@ -35,6 +35,7 @@ import type {
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
+import { CAREER_PLAYBOOK_RESEARCH_DOMAIN_PATTERN } from '../research-domains';
 
 /** Longest claim kept per evidence entry; enough to identify it, short enough to stay cheap. */
 const MAX_CLAIM_LENGTH = 220;
@@ -358,9 +359,13 @@ export function getCareerPlaybookMilestoneLedger(
  * attached to the URL it came from, so a `[Sn]` marker in the guide always
  * resolves to a real source.
  */
-/** Domains whose content is peer-reviewed, statistical, or institutional. */
-const RESEARCH_DOMAIN =
-  /(?:^|\.)(?:gartner|forrester|mckinsey|bain|bcg|deloitte|pwc|kpmg|hbr|nber|oecd|statista|pewresearch|nature|springer|acm|ieee)\.|\.(?:edu|ac\.uk|gov)(?:$|\/)/i;
+/**
+ * Domains whose content is peer-reviewed, statistical, or institutional.
+ *
+ * Shared with the retrieval lane that searches them, so a source the search
+ * fetched as research is never classified here as a vendor blog.
+ */
+const RESEARCH_DOMAIN = CAREER_PLAYBOOK_RESEARCH_DOMAIN_PATTERN;
 
 /** News and trade media: reporting, not primary research, but not self-interested either. */
 const MEDIA_DOMAIN =
@@ -478,18 +483,49 @@ export function formatCareerPlaybookMetricLedgerForPrompt(
 const EVIDENCE_LEDGER_EMPTY =
   'none — no external source was retrieved for this run, so no precise external statistic may be stated';
 
+/**
+ * What this run's sources allow a block to attribute.
+ *
+ * Run 88fc2368 wrote "Gartner analysts cited in [S11] predict…" where S11 was a
+ * sales-training vendor's blog, and regenerating the block twice could not fix
+ * it: the prompt carried a rule ("do not name a research house without one of
+ * its sources") that the model had no way to check, because the list it was
+ * given labelled sources but never said what followed from the labels. This
+ * states the consequence as a fact about the data (mc2-r1qen).
+ */
+function formatAttributionRule(evidence: readonly CareerPlaybookEvidenceEntry[]): string {
+  const research = evidence.filter(entry => entry.source_kind === 'research');
+
+  if (research.length === 0) {
+    return (
+      'Primary research in this list: none. No claim here may be attributed to a research house ' +
+      '(Gartner, Forrester, McKinsey, IDC, Harvard Business Review and the like) — not even as ' +
+      '"analysts cited in [Sn]". State the point as what the cited source actually is, or state it ' +
+      'without an attribution.'
+    );
+  }
+
+  return `Primary research in this list: ${research
+    .map(entry => `[${entry.id}]`)
+    .join(
+      ', '
+    )}. A research house may be named only in a claim that cites one of those; every other source is not that house.`;
+}
+
 /** Render the evidence ledger as the citable list the block prompts reference. */
 export function formatCareerPlaybookEvidenceLedgerForPrompt(
   evidence: readonly CareerPlaybookEvidenceEntry[]
 ): string {
   if (evidence.length === 0) return EVIDENCE_LEDGER_EMPTY;
 
-  return evidence
-    .map(
+  return [
+    ...evidence.map(
       entry =>
         `- [${entry.id}] (${entry.source_kind ?? 'unknown'}) ${entry.title} — ${entry.url} — supports: ${entry.claim}`
-    )
-    .join('\n');
+    ),
+    '',
+    formatAttributionRule(evidence),
+  ].join('\n');
 }
 
 /** Convenience accessor used by prompt builders and deterministic checks alike. */

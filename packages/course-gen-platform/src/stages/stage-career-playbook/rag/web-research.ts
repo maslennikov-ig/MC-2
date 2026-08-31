@@ -1,11 +1,14 @@
 import type { CareerPlaybookQAData } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
+import { CAREER_PLAYBOOK_RESEARCH_DOMAINS } from '../research-domains';
 
-export type CareerPlaybookResearchCategory = 'kpis' | 'trends' | 'onboarding';
+export type CareerPlaybookResearchCategory = 'kpis' | 'trends' | 'onboarding' | 'research';
 
 export interface CareerPlaybookResearchQuery {
   category: CareerPlaybookResearchCategory;
   query: string;
+  /** Restrict the search to these hosts. Used by the primary-research lane. */
+  includeDomains?: readonly string[];
 }
 
 export interface CareerPlaybookSearchResult {
@@ -87,6 +90,17 @@ export function buildCareerPlaybookResearchQueries(
       category: 'onboarding',
       query: `"${roleTitle}" onboarding playbook career path best practices`,
     },
+    // The primary-research lane. The other three retrieve whatever ranks, and
+    // for run 88fc2368 that was three vendor blogs and nothing else — so when a
+    // block named Gartner it had nowhere honest to point, and two regenerations
+    // could not fix a sentence whose source did not exist (mc2-r1qen). This lane
+    // asks the analyst and academic publishers directly. It often returns
+    // nothing, which is a fact the ledger then states rather than hides.
+    {
+      category: 'research',
+      query: `${roleTitle} ${department} benchmarks research findings`,
+      includeDomains: CAREER_PLAYBOOK_RESEARCH_DOMAINS,
+    },
   ];
 }
 
@@ -115,7 +129,10 @@ function mergeResearchResult(
   const urls = results.map(result => result.url).filter(Boolean);
 
   if (category === 'kpis') research.kpis_insights.push(...insights);
-  if (category === 'trends') research.trends_insights.push(...insights);
+  // Analyst material is market context, which is where the trends lane already
+  // feeds. Giving it its own array would leave every existing consumer blind to
+  // the one lane most worth reading.
+  if (category === 'trends' || category === 'research') research.trends_insights.push(...insights);
   if (category === 'onboarding') research.onboarding_insights.push(...insights);
   research.sources.push(...urls);
 
@@ -191,6 +208,9 @@ export const tavilyCareerPlaybookWebSearchClient: CareerPlaybookWebSearchClient 
       search_depth: 'advanced',
       max_results: DEFAULT_MAX_RESULTS,
       include_answer: false,
+      ...(researchQuery.includeDomains?.length
+        ? { include_domains: [...researchQuery.includeDomains] }
+        : {}),
     }),
   });
 

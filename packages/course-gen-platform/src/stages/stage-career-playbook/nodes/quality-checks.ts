@@ -821,13 +821,32 @@ const RESEARCH_HOUSE =
   /\b(gartner|forrester|mckinsey|bain|bcg|boston consulting|deloitte|pwc|kpmg|idc|harvard business review|hbr|statista|nielsen|pew research)\b/i;
 
 /**
- * Flag a claim attributed to a named research house while citing something else.
+ * Words that turn a mention of a house into a claim carried by its authority.
+ *
+ * "Recommended reading: Harvard Business Review" names a house and asserts
+ * nothing; "Gartner predicts that…" borrows its authority. Only the second is
+ * an attribution, and only the second is worth a regeneration.
+ */
+const ATTRIBUTION_VERB =
+  /\b(predicts?|predicted|forecasts?|projects?|estimates?|reports?|finds?|found|shows?|suggests?|says?|according to|research|study|studies|survey|analysis|data)\b|прогнозиру|оценива|сообща|исследован|опрос|по данным|отчёт/i;
+
+/**
+ * Flag a claim that borrows a named research house's authority without one of
+ * its sources behind it.
  *
  * The v3 acceptance output wrote "Gartner's research suggests that 61% of B2B
  * buyers favour a rep-free experience [S9]" — but S9 is a vendor blog post, and
  * the figure appears nowhere in it. The number check caught the missing digits;
  * nothing caught the attribution itself, which is the more damaging half: a
  * reader who trusts "Gartner" is being told a marketing page is analyst research.
+ *
+ * Run 88fc2368 then showed the other half of the same defect. Its block 9 wrote
+ * "Gartner analysts cited in [S11] predict…", the block was regenerated twice,
+ * and it shipped the claim anyway — because no source in that run was research,
+ * so "cite the Gartner publication directly" asked for something that did not
+ * exist. The remedy now depends on what the run actually holds, and a house
+ * named with no citation at all is caught too when the run has no research to
+ * name it from (mc2-r1qen).
  */
 export function validateSourceAttribution(
   blocks: BlockMap,
@@ -836,6 +855,7 @@ export function validateSourceAttribution(
   if (context.evidenceLedger.length === 0) return [];
 
   const byId = new Map(context.evidenceLedger.map(entry => [entry.id, entry]));
+  const hasResearchSource = context.evidenceLedger.some(entry => entry.source_kind === 'research');
   const issues: CareerPlaybookJudgeIssue[] = [];
 
   for (const [blockId, blockState] of Object.entries(blocks)) {
@@ -847,9 +867,23 @@ export function validateSourceAttribution(
       if (!house) continue;
 
       const citations = line.match(/\[S\d+\]/g) ?? [];
-      // An unsourced house attribution is already caught as an unsourced claim
-      // when it carries a figure; here we only judge what it cites.
-      if (citations.length === 0) continue;
+
+      if (citations.length === 0) {
+        // With research in the run the house may be citable elsewhere, and an
+        // unsourced figure is already the unsourced-claim check's business.
+        // With none, naming a house is unsupportable however it is phrased.
+        if (hasResearchSource || !ATTRIBUTION_VERB.test(line)) continue;
+
+        issues.push(
+          issue(
+            blockId,
+            'unsourced_claim',
+            `${blockId} attributes a claim to ${house[0]}, and no source retrieved for this run is research: "${truncateLine(line)}".`,
+            `Drop the attribution and state the point without naming a research house. This run retrieved no ${house[0]} publication, so there is nothing to cite.`
+          )
+        );
+        break;
+      }
 
       const cited = citations
         .map(marker => byId.get(marker.slice(1, -1)))
@@ -871,7 +905,9 @@ export function validateSourceAttribution(
           blockId,
           'unsourced_claim',
           `${blockId} attributes a claim to ${house[0]} while citing ${citations.join(', ')}, which is not that house and is not research: "${truncateLine(line)}".`,
-          `Cite the ${house[0]} publication directly, or drop the attribution and present the point as what the cited source actually is.`
+          hasResearchSource
+            ? `Cite the ${house[0]} publication directly, or drop the attribution and present the point as what the cited source actually is.`
+            : `Drop the attribution and present the point as what ${citations.join(', ')} actually is. This run retrieved no research source, so no research house can be cited here.`
         )
       );
       break;

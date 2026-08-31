@@ -231,6 +231,10 @@ ${GROUP_OUTPUT_CONTRACT}
 
 Methodology:
 - Block 18: 5-8 FAQ items mixing employee questions and questions about the role.
+  Answer the question that was asked. Do not restate a schedule another block owns: when an answer
+  turns on the ramp, say what the reader should do and send them to the ramp block for the dates,
+  rather than repeating the milestones here. A date repeated here is a second copy of a fact the
+  ramp block publishes, and the copy is what drifts.
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
 - Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
