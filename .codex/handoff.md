@@ -98,10 +98,32 @@ the example-marker regex used `\b(?:пример|example)\b`, and `\b` is ASCII-
 flag, so **no Russian playbook's markers were ever visible** to the marking check or the calibration
 table. One shared source now serves both.
 
-Still open on this track: `mc2-1mr7r`'s remaining shape (4 cadence deviations survived the
-regeneration cap in `638ed691`), two `metric_conflict` criticals on "Team quota attainment", and
-`mc2-ehao2` (`buildRoleGuideView` has no caller). Both dev rows are kept as A/B baselines and are
-not cleaned up.
+A **third arm**, `88fc2368` (2026-08-31), ran the same role, language and wizard answers against
+`64ae37652` — verified on the containers, not on CI. It validates the 028 prompt batch and is the
+run `mc2-9d2ji` and `mc2-923ku` were waiting for; both are closed. Criticals 25 → 9 → **7**,
+regenerations 30 → 25 → **19**, wall clock 24m09s → 20m26s → **12m57s**, cost $0.104331 →
+$0.107929 → **$0.089506**. Semantic repetition 2/471 and 0/747 at 0.85: one real pair
+(`block_1` ↔ `block_6`, 0.8665) that the pipeline found, failed to repair in two attempts and
+recorded in `generation_warnings` — the degrade-never-abort behaviour, working. Evidence:
+`docs/career-playbook/2026-08-31-prompt-batch-validation.md` and
+`docs/career-playbook/2026-08-31-semantic-repetition-88fc2368.md`.
+
+The run also found that **two deterministic checks were billing a regeneration for a correct
+sentence** (`4ec3bf1f7`): `validateUnsourcedStatistics` demanded a citation for the ledger's own
+`Forecast accuracy` target because the sentence restated the label across a clause and contained
+the word "market"; `validateCadenceConsistency` read "daily" out of an enumeration where it
+governed the item beside the duty. Replayed over the stored blocks of all three runs, contract
+criticals fall 12 → 9, 7 → 3 and 3 → 1. Both tests proven red against the pre-change source.
+
+Still open on this track: `mc2-eksyp` (the 22.5-entry `do_not_repeat` list is measured, not
+settled — the product question needs a second arm), `mc2-s8xx6` and `mc2-tub8q` (their counts fell
+to 1 and 0 in `88fc2368`, but no code named them, so that is variance), and `mc2-ehao2`
+(`buildRoleGuideView` has no caller). All three dev rows are kept as A/B baselines and are not
+cleaned up.
+
+A paid run needs no browser and no owner click: `auth.admin.generateLink` + `verifyOtp` mints a
+real session from code, and step 1 of `docs/career-playbook/live-smoke-dev-run.md` is stale where
+it says otherwise.
 
 The previously current callout fix remains verified live and delivered to staging (`mc2-ctlar`,
 master `22401f40c`); its detailed proof stays in
@@ -302,13 +324,10 @@ report naming a branch again means something really was left behind.
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- `mc2-9d2ji` / `mc2-923ku` / `mc2-eksyp` — delivered in `c14e88c13`, each test proven red against
-  the pre-change source, CI and Deploy to Dev green, and no `prompt_templates` row shadows any of the
-  eight edited keys. All three stay open because a prompt edit is a generation change and none is
-  validated. They need ONE paid dev run against
-  `docs/career-playbook/2026-08-29-semantic-repetition-final.md` (471 pairs, 0 at 0.85, max 0.8316;
-  intra 375, 0, max 0.8096) on the same English smoke fixture. Blocked on the owner:
-  `docs/career-playbook/live-smoke-dev-run.md` step 1 needs a browser JWT nobody else can mint.
+- `mc2-9d2ji` / `mc2-923ku` — **closed 2026-08-31** by run `88fc2368`. No judge critical pairs two
+  blocks with no shared reader, and `block_12`, the HR-only block the audience filter had stripped
+  of 13 of its 26 constraint pairs, took zero regenerations. `mc2-eksyp` stays open: its question is
+  whether a 22.5-entry `do_not_repeat` list beats a short one, and one arm cannot answer it.
 - `mc2-de3vu` is **closed with the checkboxes unchanged** (owner, 2026-08-30). Widening a view was
   offered and declined: a whole section is too coarse a unit of access — the decision matrix holds
   both what HR needs and what it does not — and every extra reader flattens the voice the split
@@ -355,9 +374,11 @@ Next stage id: none selected. The accepted Role Guide stage is delivered; its ve
 in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md`. No schema migration, reindex,
 audience-checkbox change, secret/access mutation or force-push has occurred since.
 
-Recommended action: the one paid dev run that unblocks `mc2-9d2ji`, `mc2-923ku` and `mc2-eksyp` —
-it now also validates the digest changes above. Then `mc2-c0pdn`, which needs an owner decision
-before any view can ship.
+Recommended action: `mc2-ehao2` — `buildRoleGuideView` still has no caller, so the audience views
+this track spent two stages building reach no reader. It needs an owner decision on what ships to
+whom before any view can be wired up, and the view must go through
+`prepareCareerPlaybookFinalBlocks` or it will ship without diagrams, sources and the calibration
+table.
 
 ## Starter prompt for next orchestrator
 
