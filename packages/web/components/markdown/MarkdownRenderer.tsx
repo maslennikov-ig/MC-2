@@ -89,9 +89,13 @@ export async function MarkdownRenderer({
   // Untrusted: includes rehype-sanitize for XSS protection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
   const remarkPlugins = getRemarkPlugins(config) as any[]
-  const rehypePlugins = (
-    trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
-  ) as any[] // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
+  // The cast sits on its own line so the directive above it stays put: when the
+  // ternary and the cast shared a line, an edit two lines up let prettier reflow
+  // the group and drop the directive at the END of the line it was meant to
+  // precede — suppressing nothing, and `--max-warnings=0` failed the build.
+  const rehypeSource = trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
+  const rehypePlugins = rehypeSource as any[]
 
   // Build components map based on features
   const mdxComponents: Record<string, React.ComponentType<unknown>> = {}
