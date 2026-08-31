@@ -115,11 +115,29 @@ the word "market"; `validateCadenceConsistency` read "daily" out of an enumerati
 governed the item beside the duty. Replayed over the stored blocks of all three runs, contract
 criticals fall 12 → 9, 7 → 3 and 3 → 1. Both tests proven red against the pre-change source.
 
-Still open on this track: `mc2-eksyp` (the 22.5-entry `do_not_repeat` list is measured, not
-settled — the product question needs a second arm), `mc2-s8xx6` and `mc2-tub8q` (their counts fell
-to 1 and 0 in `88fc2368`, but no code named them, so that is variance), and `mc2-ehao2`
-(`buildRoleGuideView` has no caller). All three dev rows are kept as A/B baselines and are not
-cleaned up.
+Reading that run end to end — which the counters do not do — found four more, and two are fixed in
+`b28663b77`. **A metric target never carries the example marker**, deliberately: the ledger is the
+single source and a marked threshold would let blocks drift. The cost was that the publish
+checklist, built from markers, could never name a threshold — run `88fc2368` listed 29 values to
+calibrate and none of its six assumed numbers, while block 1 of the same guide told the reader
+those six needed validating in the first quarter. The table now reads
+`metric_ledger[].provenance`: `assumption` and `benchmark` lead it, asked to be _confirmed_;
+`user_answer` and `company_source` stay off. In the same change: the model's bold heading carries a
+subtitle, so the pattern that removes its duplicate list matched nothing and the reader met
+"Calibrate before publishing" twice; a marked table row is now one row instead of one per marked
+cell (continuity 16 → 6); and both columns cut on a word boundary. Block 26 had also published a
+rule nobody wrote — "every number ... must not be changed during calibration" — and the prompt now
+forbids it. **The prompt half is unvalidated by generation and rides the next paid run.**
+
+Still open on this track: `mc2-i6l0i` (the Role Canvas, one of five blocks every reader gets, names
+career steps that are not in block 11 and a first forecast in month 1 against block 14's Day 60 —
+and the manager, who does not hold block 11, is told by block 15 to run a career conversation
+against its criteria), `mc2-r1qen` (block 9 sends the reader to a vendor blog for a Gartner
+prediction, while block 19 of the same guide handles the identical figure honestly), `mc2-eksyp`
+(the 22.5-entry `do_not_repeat` list is measured, not settled — the product question needs a second
+arm), `mc2-s8xx6` and `mc2-tub8q` (their counts fell to 1 and 0 in `88fc2368`, but no code named
+them, so that is variance), and `mc2-ehao2` (`buildRoleGuideView` has no caller). All three dev rows
+are kept as A/B baselines and are not cleaned up.
 
 A paid run needs no browser and no owner click: `auth.admin.generateLink` + `verifyOtp` mints a
 real session from code, and step 1 of `docs/career-playbook/live-smoke-dev-run.md` is stale where
