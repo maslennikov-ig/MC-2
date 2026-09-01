@@ -27,6 +27,7 @@ import {
   validateExampleMarking,
   validateMetricLedgerConsistency,
   validateRelativeDates,
+  validateScriptSplice,
   validateSourceAttribution,
   validateUnsourcedStatistics,
   type CareerPlaybookQualityCheckContext,
@@ -1112,5 +1113,86 @@ describe('validateCadenceConsistency', () => {
     );
 
     expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * Every positive case here is a word a stored playbook actually shipped, and
+ * every negative case is a compound the same corpus uses routinely.
+ */
+describe('a word that changes alphabet in the middle', () => {
+  it.each([
+    ['провестиwelcome', '208746e3 block_26 — a space eaten between two words'],
+    ['Руковедityel', '7bd743bd block_2 — Latin spliced into «Руководитель»'],
+    ['ОКR', 'a573c83c block_3 — Cyrillic О and К wearing OKR’s face'],
+    ['НДA', '370c18c3 block_14 — Cyrillic НД with a Latin A'],
+    ['войc', '30996512 block_2 — a Latin c closing a Cyrillic word'],
+  ])('flags %s (%s)', word => {
+    const issues = validateScriptSplice(
+      blocks({ block_3: `Строка, в которой встречается ${word} и продолжается дальше.` }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe('critical');
+    expect(issues[0].category).toBe('wrong_language');
+    expect(issues[0].description).toContain(word);
+  });
+
+  // The hyphen is what makes these compounds, and every Russian guide in the
+  // corpus is full of them: 22 to 66 per document. Flagging one would make the
+  // check unusable in the language it exists for.
+  it('leaves the ordinary Russian technical compounds alone', () => {
+    const issues = validateScriptSplice(
+      blocks({
+        block_8:
+          'CRM-система и BI-инструменты обновляются в рамках quarterly-обзора; AI-ассистент готовит SDR-отчёты, IP-телефония пишет войс.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  // A Mermaid label carries its line break as a literal backslash-n, so the raw
+  // block reads `Директор по\nмаркетингу` as the word `nмаркетингу`. 30996512
+  // block_5 has exactly that, and it is not a defect.
+  it('does not read a Mermaid line break as a spliced word', () => {
+    const issues = validateScriptSplice(
+      blocks({
+        block_5: [
+          '### Карьерная карта',
+          '',
+          '```mermaid',
+          'flowchart LR',
+          '    HoC --> CMO["Директор по\\nмаркетингу"]',
+          '```',
+        ].join('\n'),
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('says nothing about a document written in one alphabet', () => {
+    const issues = validateScriptSplice(
+      blocks({ block_4: 'The weekly forecast review is owned by the CRO and runs on Monday.' }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('names every spliced word in the block, once each', () => {
+    const issues = validateScriptSplice(
+      blocks({ block_2: 'Руковедityel отвечает за войc и за войc в смежных командах.' }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('"Руковедityel"');
+    expect(issues[0].description).toContain('"войc"');
+    expect(issues[0].description.match(/войc/g)).toHaveLength(1);
   });
 });
