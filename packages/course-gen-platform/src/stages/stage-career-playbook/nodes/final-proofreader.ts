@@ -28,6 +28,7 @@ import type {
   CareerPlaybookBlockId,
   CareerPlaybookJudgeVerdict,
   CareerPlaybookNodeCost,
+  CareerPlaybookQualityIssue,
 } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
@@ -79,6 +80,40 @@ function proofreaderFailureCosts(error: unknown): CareerPlaybookNodeCost[] {
     return buildCareerPlaybookAbortedAttemptCosts('finalProofreader', error.abortedAttempts);
   }
   return [];
+}
+
+/**
+ * The pass's findings, in the shape the stored row keeps.
+ *
+ * `collectJudgeQualityIssues` in the handler builds `q_a_data.quality_issues` by
+ * walking `generatedBlocks` for a per-block `judge_verdict`. The proofreader
+ * reads the assembled document and hangs its verdict on no block, so until this
+ * existed its findings reached nothing: runs 422471a2 and 208746e3 (2026-09-01)
+ * paid for the pass and kept, between them, one line naming a block id. What it
+ * objected to — and whether the objection was right, which is the open question
+ * on the model behind it — was gone the moment the graph finished.
+ *
+ * `qualityIssues` is already merged into the stored list by
+ * `buildCareerPlaybookQualityIssues`, so the route exists; only the entry did
+ * not.
+ */
+export function buildProofreaderQualityIssues(
+  verdict: CareerPlaybookJudgeVerdict
+): CareerPlaybookQualityIssue[] {
+  return verdict.issues.map((issue, index) => ({
+    id: `final_proofreader:${issue.block_id}:${index}`,
+    source: 'final_proofreader' as const,
+    severity: issue.severity,
+    blockId: issue.block_id,
+    ...(issue.category ? { category: issue.category } : {}),
+    title:
+      issue.severity === 'critical'
+        ? 'Проблема качества документа'
+        : 'Замечание к качеству документа',
+    message: issue.description,
+    ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),
+    action: issue.severity === 'info' ? ('review' as const) : ('regenerate' as const),
+  }));
 }
 
 /** Keep only the regenerations this pass is allowed to request. */
@@ -155,6 +190,13 @@ export function createCareerPlaybookProofreaderNode(
         judgeVerdicts: [verdict],
         lastJudgeVerdict: verdict,
         lastJudgedBlockIds: verdict.needs_regeneration,
+        // The capped verdict drives regeneration; the parsed one is what the
+        // pass actually found. A finding dropped by the cap is exactly the one
+        // the stored row needs to keep, because nothing downstream will act on
+        // it.
+        ...(parsed.issues.length > 0
+          ? { qualityIssues: buildProofreaderQualityIssues(parsed) }
+          : {}),
         nodeCosts,
         ...(dropped.length > 0
           ? {

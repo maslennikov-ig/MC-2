@@ -102,6 +102,66 @@ describe('career playbook final proofreader', () => {
     expect(update.nodeCosts).toHaveLength(2);
   });
 
+  // mc2-nfyyo. Runs 422471a2 and 208746e3 (2026-09-01) paid for this pass and
+  // the stored row kept, between them, one line naming a block id. The handler
+  // builds q_a_data.quality_issues by walking generatedBlocks for a per-block
+  // judge_verdict, and a whole-document reader has no block to hang one on.
+  it('puts its findings where the stored row will keep them', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue(llmResult(VALID_VERDICT));
+
+    const update = await createCareerPlaybookProofreaderNode({ renderPrompt, invokeLLM })(
+      proofreaderState()
+    );
+
+    expect(update.qualityIssues).toEqual([
+      {
+        id: 'final_proofreader:block_10:0',
+        source: 'final_proofreader',
+        severity: 'critical',
+        blockId: 'block_10',
+        category: 'contradiction',
+        title: 'Проблема качества документа',
+        message: 'Ссылка на раздел 22 не совпадает с его названием.',
+        suggestion: 'Привести ссылку к фактическому названию раздела.',
+        action: 'regenerate',
+      },
+    ]);
+  });
+
+  // The cap decides what gets regenerated; it must not decide what gets
+  // recorded. A finding the cap drops is the one nothing downstream will act on,
+  // so it is the one the row most needs to keep.
+  it('records a finding the regeneration cap dropped', async () => {
+    const overCap = JSON.stringify({
+      pass: false,
+      score: 60,
+      issues: ['block_1', 'block_2', 'block_3', 'block_4'].map(blockId => ({
+        block_id: blockId,
+        severity: 'critical',
+        category: 'contradiction',
+        description: `${blockId} contradicts the ledger.`,
+        suggestion: 'Align it with the ledger.',
+      })),
+      needs_regeneration: ['block_1', 'block_2', 'block_3', 'block_4'],
+    });
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue(llmResult(overCap));
+
+    const update = await createCareerPlaybookProofreaderNode({ renderPrompt, invokeLLM })(
+      proofreaderState()
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_1', 'block_2', 'block_3']);
+    expect(update.warnings?.[0]).toContain('unaddressed blocks remain in the verdict: block_4');
+    expect(update.qualityIssues?.map(issue => issue.blockId)).toEqual([
+      'block_1',
+      'block_2',
+      'block_3',
+      'block_4',
+    ]);
+  });
+
   it('records both paid calls when the pass is skipped anyway', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
     const invokeLLM = vi.fn().mockResolvedValue(llmResult(RESPONSE_WITH_QUOTED_TITLE));

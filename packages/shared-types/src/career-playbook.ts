@@ -376,6 +376,12 @@ export type CareerPlaybookBlockId = z.infer<typeof CareerPlaybookBlockIdSchema>;
 
 export const CareerPlaybookQualityIssueSourceSchema = z.enum([
   'cross_block_judge',
+  // The whole-document pass. Two nodes produce a CareerPlaybookJudgeVerdict and
+  // only the judge's was ever stored, because the handler builds this list by
+  // walking `generatedBlocks` for a per-block `judge_verdict` and the
+  // proofreader has no block to hang one on. Its own source keeps the two
+  // contours separable in the stored row rather than folding one into the other.
+  'final_proofreader',
   'block_regenerator',
   'mermaid',
   'system',
