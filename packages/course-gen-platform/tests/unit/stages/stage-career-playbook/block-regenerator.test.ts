@@ -11,8 +11,8 @@ import {
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   createBlockRegeneratorNode,
   regenerateCareerPlaybookBlock,
-  selectPendingCareerPlaybookRegeneration,
   selectPendingCareerPlaybookRegenerations,
+  selectPendingCareerPlaybookRegenerationsForState,
 } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 
 const spec: CareerPlaybookRoleProfileSpec = {
@@ -236,7 +236,7 @@ describe('Career Playbook block regenerator', () => {
   });
 
   it('chooses the flagged block with the fewest attempts before repeating another block', () => {
-    const pending = selectPendingCareerPlaybookRegeneration({
+    const [pending] = selectPendingCareerPlaybookRegenerations({
       verdict: {
         pass: false,
         score: 45,
