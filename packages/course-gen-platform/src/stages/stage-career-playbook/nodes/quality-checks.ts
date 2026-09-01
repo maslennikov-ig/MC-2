@@ -33,7 +33,7 @@ import {
   stripFencedBlocks,
   truncateLine,
 } from './quality-check-text';
-import { validateMilestoneConsistency } from './milestone-checks';
+import { validateMilestoneConsistency, validateRampOwnership } from './milestone-checks';
 import {
   CAREER_PLAYBOOK_CADENCE_WORDS,
   CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE,
@@ -613,6 +613,7 @@ export function runCareerPlaybookContractChecks(
     ...validateSourceAttribution(blocks, context),
     ...validateCadenceConsistency(blocks, context),
     ...validateMilestoneConsistency(blocks, context),
+    ...validateRampOwnership(blocks, context),
     ...validateCrossViewReference(blocks, context),
   ];
 }

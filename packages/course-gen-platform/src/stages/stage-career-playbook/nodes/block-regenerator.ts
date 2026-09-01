@@ -440,10 +440,41 @@ function selectReservedRegenerations(
     }));
 }
 
-export function selectPendingCareerPlaybookRegeneration(
-  input: SelectCareerPlaybookRegenerationInput
-): CareerPlaybookPendingRegeneration | null {
-  return selectPendingCareerPlaybookRegenerations(input)[0] ?? null;
+/** The state fields a regeneration decision reads. */
+export type CareerPlaybookRegenerationState = Pick<
+  CareerPlaybookGraphStateType,
+  | 'lastJudgeVerdict'
+  | 'blockRegenerationAttempts'
+  | 'windowBudgetExemptBlockIds'
+  | 'finalWindowReserveSpent'
+>;
+
+/**
+ * The regeneration decision for one window, taken from graph state.
+ *
+ * One function because the routers and the regenerator must ask the same
+ * question, and a router asks it first. Until 2026-09-01 they asked different
+ * ones: `blockRegenerator` passed the reserve, both routers omitted it. A block
+ * whose only remaining path was the reserve therefore routed straight past the
+ * node that would have granted it, and the reserve could only ever be spent by
+ * a batch the ordinary budget had already opened.
+ *
+ * Run b7925b1d ended `11/8; final-window reserve 0/3` with block_15 holding two
+ * real criticals at zero attempts, while two of the spent attempts went to
+ * block_18 on a milestone critical that was false. The exemption was computed
+ * correctly and named in the warning; nothing ever asked for it.
+ */
+export function selectPendingCareerPlaybookRegenerationsForState(
+  state: CareerPlaybookRegenerationState,
+  blockIds: CareerPlaybookBlockId[]
+): CareerPlaybookPendingRegeneration[] {
+  return selectPendingCareerPlaybookRegenerations({
+    verdict: state.lastJudgeVerdict,
+    blockIds,
+    attempts: state.blockRegenerationAttempts,
+    reservedWindowBlockIds: state.windowBudgetExemptBlockIds,
+    reservedWindowAttemptsSpent: state.finalWindowReserveSpent,
+  });
 }
 
 export function countCareerPlaybookRegenerationAttemptsForBlocks(
@@ -468,13 +499,10 @@ export function createBlockRegeneratorNode(
     }
 
     const roleProfileSpec = state.roleProfileSpec;
-    const pendingBatch = selectPendingCareerPlaybookRegenerations({
-      verdict: state.lastJudgeVerdict,
-      blockIds: state.lastJudgedBlockIds,
-      attempts: state.blockRegenerationAttempts,
-      reservedWindowBlockIds: state.windowBudgetExemptBlockIds,
-      reservedWindowAttemptsSpent: state.finalWindowReserveSpent,
-    });
+    const pendingBatch = selectPendingCareerPlaybookRegenerationsForState(
+      state,
+      state.lastJudgedBlockIds
+    );
 
     if (pendingBatch.length === 0) {
       // Nothing eligible: every flagged block sits at its per-block/window cap, so this

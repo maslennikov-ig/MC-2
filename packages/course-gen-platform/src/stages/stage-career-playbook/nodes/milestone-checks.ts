@@ -183,3 +183,91 @@ export function validateMilestoneConsistency(
 
   return dedupeIssues(issues);
 }
+
+/**
+ * The block that publishes the ramp, and the block that keeps sending readers to
+ * it and then answering the question itself.
+ *
+ * Only the FAQ, because only the FAQ is measured. Run 4e355bf4 summarised the
+ * whole ramp there in one line; run b7925b1d, after the group prompt was told to
+ * point rather than repeat, opened block 18 with "the onboarding plan in Block 14
+ * owns those dates — this section tells you what to do, not when" and then
+ * answered its first question with Week 2, Day 30 and Day 60. Seven of its eight
+ * answers point at a block; the one that copies is the one whose question asks
+ * "when". The summary blocks (22, 24, 26) restate by design and no run has shown
+ * them drifting, so they stay out until one does.
+ */
+const RAMP_POINTER_BLOCK_IDS: readonly CareerPlaybookBlockId[] = ['block_18'];
+const RAMP_OWNER_BLOCK = 'Block 14';
+/** Enough labels to show the shape without turning the finding into the ramp again. */
+const RESTATED_LABELS_NAMED = 3;
+
+/**
+ * Flag the FAQ for republishing a ramp deadline the onboarding block owns.
+ *
+ * The complement of `validateMilestoneConsistency`, and it fires on exactly what
+ * that check passes: a date that AGREES with the ledger. Agreement is the whole
+ * problem. The ledger exists because a fact restated in two places drifts, and
+ * every restatement is correct right up until the run where it is not — at which
+ * point the reader has two schedules and no way to tell which is the guide's.
+ *
+ * Nothing here reads prose. A line qualifies only when it names a ledger
+ * commitment and states that commitment's own published deadline, decided by the
+ * same anchor logic as the consistency check — the logic that cost run 4e355bf4
+ * five false criticals before it learned to anchor on the rare word rather than
+ * the first one. One issue per block: the remedy is identical for every date in
+ * it, and two attempts is all a block gets.
+ */
+export function validateRampOwnership(
+  blocks: BlockMap,
+  context: MilestoneCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const ledger = context.milestoneLedger ?? [];
+  if (ledger.length === 0) return [];
+
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const blockId of RAMP_POINTER_BLOCK_IDS) {
+    const content = blocks[blockId]?.content;
+    if (!content) continue;
+
+    const restated: { label: string; offset: string }[] = [];
+    let firstLine: string | null = null;
+
+    for (const line of proseLines(content)) {
+      for (const entry of ledger) {
+        const canonical = normalizeCareerPlaybookMilestone(entry.offset);
+        if (!canonical) continue;
+        if (!lineNamesLabelLoosely(line, entry.label)) continue;
+
+        const stated = nearestMilestoneAcrossMentions(line, entry.label);
+        if (stated?.days !== canonical.days) continue;
+
+        restated.push({ label: entry.label, offset: canonical.canonical });
+        firstLine ??= line;
+      }
+    }
+
+    if (restated.length === 0 || !firstLine) continue;
+
+    const named = restated
+      .slice(0, RESTATED_LABELS_NAMED)
+      .map(entry => `"${entry.label}" (${entry.offset})`)
+      .join(', ');
+    const rest =
+      restated.length > RESTATED_LABELS_NAMED
+        ? ` and ${restated.length - RESTATED_LABELS_NAMED} more`
+        : '';
+
+    issues.push(
+      issue(
+        blockId,
+        'contradiction',
+        `${blockId} republishes the ramp deadline for ${named}${rest}, which ${RAMP_OWNER_BLOCK} owns: "${truncateLine(firstLine)}". The dates agree today; the copy is what drifts.`,
+        `Answer the question in ${blockId} without the dates — say what the reader does and send them to ${RAMP_OWNER_BLOCK} for when. Change nothing in ${RAMP_OWNER_BLOCK}: it publishes the ramp.`
+      )
+    );
+  }
+
+  return dedupeIssues(issues);
+}

@@ -11,8 +11,13 @@ import {
   createCareerPlaybookGraph,
   getCareerPlaybookGraphRecursionLimit,
   routeAfterBlockRegeneration,
+  routeAfterJudge,
+  routeAfterProofreader,
 } from '@/stages/stage-career-playbook/graph';
-import { CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS } from '@/stages/stage-career-playbook/nodes/block-regenerator';
+import {
+  CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS,
+  CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
+} from '@/stages/stage-career-playbook/nodes/block-regenerator';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
 import { getCareerPlaybookGroupSpec } from '@/stages/stage-career-playbook/nodes/group-generator';
 import type { CareerPlaybookGraphStateType } from '@/stages/stage-career-playbook/state';
@@ -1042,5 +1047,107 @@ describe('routeAfterBlockRegeneration', () => {
     );
 
     expect(next).toBe('finalAssembler');
+  });
+});
+
+describe('the route into the regenerator sees the final-window reserve', () => {
+  // Run b7925b1d (2026-08-31) ended with warning
+  // `11/8; final-window reserve 0/3`: the ordinary window budget was three over,
+  // the reserve was untouched, and block_15 shipped two real criticals having
+  // never had an attempt. The reserve was computed and offered; the route to the
+  // node that grants it was decided by a selector that did not know it existed.
+  const spentWindow = {
+    block_3: 1,
+    block_7: 1,
+    block_11: 1,
+    block_13: 2,
+    block_16: 2,
+    block_17: 2,
+    block_18: 2,
+  } as const;
+
+  function exhaustedFinalWindow(
+    overrides: Partial<CareerPlaybookGraphStateType> = {}
+  ): CareerPlaybookGraphStateType {
+    return {
+      lastJudgeVerdict: {
+        pass: false,
+        score: 60,
+        issues: [
+          {
+            block_id: 'block_15',
+            severity: 'critical',
+            description: 'Promotion timing stated as fact and unsupported by any ledger.',
+            suggestion: 'Remove the timings or mark them as illustrative examples.',
+          },
+        ],
+        needs_regeneration: ['block_15'],
+      },
+      lastJudgedBlockIds: [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      blockRegenerationAttempts: { ...spentWindow },
+      windowBudgetExemptBlockIds: ['block_15'],
+      finalWindowReserveSpent: 0,
+      ...overrides,
+    } as CareerPlaybookGraphStateType;
+  }
+
+  it('regenerates a final-window block whose only remaining path is the reserve', () => {
+    const next = routeAfterJudge(
+      [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      END
+    )(exhaustedFinalWindow());
+
+    expect(next).toBe('blockRegenerator');
+    expect(next).not.toBe(END);
+  });
+
+  it('ends once the reserve itself is spent', () => {
+    const next = routeAfterJudge(
+      [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      END
+    )(
+      exhaustedFinalWindow({
+        finalWindowReserveSpent: CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS,
+      })
+    );
+
+    expect(next).toBe(END);
+  });
+
+  it('ends when no block is exempt, so an exhausted window still stops', () => {
+    const next = routeAfterJudge(
+      [...CAREER_PLAYBOOK_FINAL_BLOCK_ORDER],
+      END
+    )(exhaustedFinalWindow({ windowBudgetExemptBlockIds: [] }));
+
+    expect(next).toBe(END);
+  });
+
+  it('grants no reserve to a group window, which never has an exempt block', () => {
+    const group1BlockIds = getCareerPlaybookGroupSpec('group_1_foundation').blocks.map(
+      block => block.blockId
+    );
+    const next = routeAfterJudge(
+      group1BlockIds,
+      'group2Generator'
+    )(
+      exhaustedFinalWindow({
+        lastJudgedBlockIds: group1BlockIds,
+        windowBudgetExemptBlockIds: [],
+      })
+    );
+
+    expect(next).toBe('group2Generator');
+  });
+
+  it('routes the proofreader pass by the same rule as the judge', () => {
+    expect(routeAfterProofreader(exhaustedFinalWindow())).toBe('blockRegenerator');
+    expect(
+      routeAfterProofreader(
+        exhaustedFinalWindow({
+          finalWindowReserveSpent: CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS,
+        })
+      )
+    ).toBe('finalJudge');
   });
 });
