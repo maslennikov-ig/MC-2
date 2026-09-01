@@ -335,18 +335,21 @@ export function buildCareerPlaybookTargetPriorDigest(
   const cadences = collectCadences(eligiblePriorBlocks, priorBlockIds);
   const stepsAndMilestones = collectStepsAndMilestones(eligiblePriorBlocks);
 
+  // The titles name what the list holds and nothing else. Each one used to
+  // carry the writing rule as well — "never restate an approval level in other
+  // words", "do not restate with a different value" — and the model wrote the
+  // rule down for the reader. Six leaks in three stored documents, five of them
+  // about restating a published fact, and one of them ("Do not restate these
+  // levels in different words anywhere else in this guide", d5137bc5 block_26)
+  // a near-verbatim echo. GROUP_OUTPUT_CONTRACT already states every one of
+  // those rules, under NUMBERS, RHYTHMS, DEADLINES and CONSISTENCY, where they
+  // sit among construction rules rather than beside reader-facing content.
   const sections: Array<[string, string[]]> = [
-    ['Anti-goals already published (a duty must never violate these):', antiGoals],
-    [
-      'Decision authority already published in Block 5 (cite it; never restate an approval level in other words):',
-      authority,
-    ],
-    ['Numeric commitments already published (do not restate with a different value):', commitments],
-    ['Cadences already promised (restate none of these with a different frequency):', cadences],
-    [
-      'Career steps and ramp milestones already published (name one of these or none; never invent another title or another deadline):',
-      stepsAndMilestones,
-    ],
+    ['Anti-goals already published, by block:', antiGoals],
+    ['Decision authority already published, by block:', authority],
+    ['Numeric commitments already published, by block:', commitments],
+    ['Cadences already promised, by block:', cadences],
+    ['Career steps and ramp milestones already published, by block:', stepsAndMilestones],
   ];
 
   const lines: string[] = [];

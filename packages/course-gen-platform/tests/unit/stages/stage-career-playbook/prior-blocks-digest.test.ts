@@ -5,6 +5,8 @@ import {
   buildCareerPlaybookPriorBlocksDigest,
   buildCareerPlaybookTargetPriorDigest,
 } from '@/stages/stage-career-playbook/nodes/prior-blocks-digest';
+import { validateContractLeakage } from '@/stages/stage-career-playbook/nodes/quality-checks';
+import type { CareerPlaybookQualityCheckContext } from '@/stages/stage-career-playbook/nodes/quality-checks';
 
 function block(content: string): CareerPlaybookBlockState {
   return {
@@ -299,5 +301,56 @@ describe('buildCareerPlaybookPriorBlocksDigest', () => {
     );
 
     expect(digest).not.toContain('Career steps and ramp milestones');
+  });
+
+  // mc2-o29g8. The digest sits in the prompt beside the content the model is
+  // about to write, and a title that carries a writing rule gets written down
+  // for the reader: six leaks across three stored documents, five of them about
+  // restating a published fact. The guard is the shipped check itself — if the
+  // digest would be a contract leak when it appears inside a block, the model
+  // has a leak available to copy.
+  it('carries nothing the contract-leak check would file against a block', () => {
+    const digest = buildCareerPlaybookTargetPriorDigest(
+      blocks([
+        ['block_2', '## 2. Anti-goals\n\n- Never change a comp plan retroactively.'],
+        [
+          'block_5',
+          `## 5. Decision authority
+
+| Decision | Who decides |
+| --- | --- |
+| Tool selection | Align with the CRO before executing |
+| Quota setting | Manager decision |`,
+        ],
+        [
+          'block_6',
+          `## 6. Metrics
+
+| Metric | Target | Review |
+| --- | --- | --- |
+| Forecast accuracy | >=90% | Monthly |`,
+        ],
+        [
+          'block_11',
+          `## 11. Career ladder
+
+| Step | Track | Promotion criterion |
+| --- | --- | --- |
+| Head of Sales | Management | Two consecutive green quarters |`,
+        ],
+      ]),
+      ['block_10'],
+      'block_10',
+      CAREER_PLAYBOOK_PRIOR_DIGEST_MAX_TOKENS
+    );
+
+    const asBlock: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> = {
+      block_10: block(digest),
+    };
+    const leaks = validateContractLeakage(asBlock, {} as CareerPlaybookQualityCheckContext).filter(
+      issue => issue.severity === 'critical'
+    );
+
+    expect(leaks).toEqual([]);
   });
 });

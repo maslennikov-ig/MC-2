@@ -171,8 +171,9 @@ DATES — today is {{generated_on}}:
 CONSISTENCY — do not contradict what is already published:
 - The digest below is split into subsections, each headed by the output blocks it applies to.
 - When writing block_N, use the subsection whose heading names block_N or covers every output block in this group; ignore any other subsection even though it is visible in the prompt.
-- Each subsection lists anti-goals, decision authority, numeric commitments, and cadences from every earlier block, regardless of reader: these four are consistency constraints on the single assembled document, not readership-scoped guidance.
+- Each subsection lists anti-goals, decision authority, numeric commitments, cadences, and career steps from every earlier block, regardless of reader: these are consistency constraints on the single assembled document, not readership-scoped guidance.
 - Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
+- A career step the digest already publishes keeps the title it was given: name one of the published steps, or none at all. A second title for the same step gives the reader two ladders and no way to tell which one they are on.
 
 REFERENCES — a reader must be able to follow every pointer you write:
 - Each block is delivered inside a reader-specific guide that contains only the blocks that reader needs. A pointer to a block outside that guide sends the reader to a page they do not have.
