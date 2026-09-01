@@ -511,6 +511,29 @@ the issue and in quality-contract §6.1), `mc2-afoz6` (P3, block 17's "три д
 (P2, blocked on `mc2-nfyyo`; the block_13 claim in its original delivery note is corrected there and
 in quality-contract §8bis.6 — the model misread a clock slot as a cadence).
 
+## BLOCKED: Jina account balance is exhausted (2026-09-01, `mc2-7lp0u`, P0)
+
+Career Playbook generation fails on dev and will fail on production. Two verification runs
+(`6c1e8966` en, `98ded079` ru) died at the first cross-block judge:
+
+    CareerPlaybookSemanticRepetitionProviderError: semantic repetition checks unavailable:
+    Insufficient account balance.
+
+Both rows are `failed` with 0 characters of markdown. The gate failing closed is deliberate
+(quality-contract §6.1), so this is the contract working.
+
+`JINA_API_KEY` hashes identically in `megacampus-worker` and `megacampus-worker-dev`, so this is one
+meter for both environments. Production has not hit it only because nothing has called Jina there
+recently. What stops at zero: Career Playbook (hard fail), Qdrant dense search — RAG for stages 4, 5
+and 6 — `QualityValidator` in stage 5, and `semantic-matching`.
+
+Cause is recorded honestly in the issue: sizing `mc2-de6fe` embedded the stored corpus five times,
+~2.5M tokens in fifteen minutes, between the last successful measurement and the refused run.
+
+**Owner action required:** top up at https://jina.ai/api-dashboard/key-manager. Then rerun the two
+verification runs — they are the only thing still owed for the four fixes delivered tonight, all of
+which have tests and none of which has been seen in a live document.
+
 ## Next recommended
 
 Next stage id: none selected. The accepted Role Guide stage is delivered; its verification record is
