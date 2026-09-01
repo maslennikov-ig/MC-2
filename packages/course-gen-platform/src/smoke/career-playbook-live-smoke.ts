@@ -9,6 +9,12 @@ import type {
   Language,
 } from '@megacampus/shared-types';
 import {
+  careerPlaybookFixedAnswerRecord,
+  LIVE_SMOKE_BUSINESS_CONTEXT,
+  SALES_MANAGER_B2B_FIXED_ANSWERS,
+  type CareerPlaybookLiveSmokeLanguage,
+} from './career-playbook-live-smoke-fixtures';
+import {
   validateCareerPlaybookSmokeEvidence,
   type CareerPlaybookSmokeEvidenceReport,
   type CareerPlaybookSmokePageEvidence,
@@ -28,8 +34,7 @@ export {
 export type { CareerPlaybookPublicPageTarget } from './career-playbook-public-pages';
 
 export type CareerPlaybookLiveSmokeMode = 'plan' | 'mutation-smoke';
-/** The two languages the smoke fixture is written in. */
-export type CareerPlaybookLiveSmokeLanguage = 'en' | 'ru';
+export type { CareerPlaybookLiveSmokeLanguage } from './career-playbook-live-smoke-fixtures';
 export type CareerPlaybookLiveSmokeTarget =
   | 'local'
   | 'development'
@@ -240,50 +245,6 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
  */
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
-/**
- * The same role in both languages, so a Russian run is comparable with the
- * English series rather than being a different subject as well as a different
- * language. Only the free-text answers are translated: `department`, `level`,
- * `team_size` and `company_stage` are enum-ish keys the spec builder reads.
- */
-const SALES_MANAGER_B2B_FIXED_ANSWERS: Record<
-  CareerPlaybookLiveSmokeLanguage,
-  CareerPlaybookFixedAnswer[]
-> = {
-  en: [
-    { question_key: 'position', value: 'Sales Manager B2B' },
-    { question_key: 'department', value: 'sales' },
-    { question_key: 'level', value: 'lead' },
-    { question_key: 'reporting', value: 'Reports to CRO. Leads SDR and AE team.' },
-    { question_key: 'team_size', value: '51-200' },
-    { question_key: 'company_stage', value: 'growth' },
-    { question_key: 'content_language', value: 'en' },
-  ],
-  ru: [
-    { question_key: 'position', value: 'Руководитель отдела продаж B2B' },
-    { question_key: 'department', value: 'sales' },
-    { question_key: 'level', value: 'lead' },
-    {
-      question_key: 'reporting',
-      value:
-        'Подчиняется коммерческому директору. Руководит командой SDR и менеджеров по продажам.',
-    },
-    { question_key: 'team_size', value: '51-200' },
-    { question_key: 'company_stage', value: 'growth' },
-    { question_key: 'content_language', value: 'ru' },
-  ],
-};
-
-const LIVE_SMOKE_BUSINESS_CONTEXT: CareerPlaybookAnswerSubmission = {
-  business_context: {
-    mode: 'universal',
-    status: 'skipped',
-    digest: null,
-    source_ids: [],
-    skip_reason: 'live_smoke_universal_business_context',
-  },
-};
-
 function hasValue(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -474,14 +435,6 @@ export function buildCareerPlaybookLiveSmokePlan(
     mutates: mode === 'mutation-smoke',
     checks,
   };
-}
-
-function fixedAnswerRecord(
-  language: CareerPlaybookLiveSmokeLanguage
-): Record<string, CareerPlaybookFixedAnswer> {
-  return Object.fromEntries(
-    SALES_MANAGER_B2B_FIXED_ANSWERS[language].map(answer => [answer.question_key, answer])
-  );
 }
 
 function followupAnswerFor(
@@ -701,7 +654,7 @@ export async function runCareerPlaybookLiveSmoke(
 
     const followups = await client.requestFollowups({
       playbookId,
-      fixedAnswers: fixedAnswerRecord(contentLanguage),
+      fixedAnswers: careerPlaybookFixedAnswerRecord(contentLanguage),
       followupAnswers: {},
       contentLanguage,
     });
