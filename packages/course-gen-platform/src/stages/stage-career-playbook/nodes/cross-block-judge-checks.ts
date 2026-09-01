@@ -1,3 +1,4 @@
+import { stripFencedBlocks } from './quality-check-text';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
@@ -62,8 +63,35 @@ function countMarkdownListItems(markdown: string): number {
   return markdown.split(/\r?\n/).filter(line => /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(line)).length;
 }
 
-function countStructuredItems(markdown: string): number {
-  return Math.max(countMarkdownTableBodyRows(markdown), countMarkdownListItems(markdown));
+/** Sub-headings inside a block: `### Failure mode 1`, `### Режим отказа 1`. */
+function countMarkdownSubheadings(markdown: string): number {
+  return stripFencedBlocks(markdown)
+    .split(/\r?\n/)
+    .filter(line => /^\s*#{3,6}\s+\S/.test(line)).length;
+}
+
+/**
+ * How many items of its own kind a block lists, however it lists them.
+ *
+ * A row, a bullet and a sub-heading are the three shapes these blocks use, and
+ * which one a block picks is a wording decision the prompt does not fix. Run
+ * db9d3ff9 — the first Russian run since the ledger family landed — wrote block
+ * 21's four failure modes as `### Режим отказа 1..4` with prose beneath, and a
+ * counter that knew only rows and bullets read 0. The block spent both its
+ * regeneration attempts on a minimum it already met, and the guide shipped the
+ * critical. Nothing about that is language-specific in principle; Russian merely
+ * happened to be the run where the model chose headings.
+ *
+ * Max rather than sum: the same items are often listed twice — a summary table
+ * and then a section each — and adding those together would let two shapes of
+ * two items pass a minimum of four.
+ */
+export function countStructuredItems(markdown: string): number {
+  return Math.max(
+    countMarkdownTableBodyRows(markdown),
+    countMarkdownListItems(markdown),
+    countMarkdownSubheadings(markdown)
+  );
 }
 
 function buildMinimumIssue(
@@ -75,8 +103,9 @@ function buildMinimumIssue(
   return {
     block_id: blockId,
     severity: 'critical',
+    category: 'format_minimum',
     description: `Expected ${blockId} to contain at least ${minimum} ${label}; found ${found}.`,
-    suggestion: `Add concrete rows until ${blockId} has at least ${minimum} ${label}.`,
+    suggestion: `Add concrete items until ${blockId} has at least ${minimum} ${label}; a table row, a bullet and a sub-heading all count.`,
   };
 }
 

@@ -28,6 +28,8 @@ export {
 export type { CareerPlaybookPublicPageTarget } from './career-playbook-public-pages';
 
 export type CareerPlaybookLiveSmokeMode = 'plan' | 'mutation-smoke';
+/** The two languages the smoke fixture is written in. */
+export type CareerPlaybookLiveSmokeLanguage = 'en' | 'ru';
 export type CareerPlaybookLiveSmokeTarget =
   | 'local'
   | 'development'
@@ -62,6 +64,12 @@ export interface CareerPlaybookLiveSmokeOptions {
   resumePlaybookId?: string;
   /** Origin of the Next.js app; derived from `trpcUrl` when absent. */
   webBaseUrl?: string;
+  /**
+   * Guide language for the fixture. Defaults to `en`, which every stored run
+   * since 2026-08-30 used; `ru` exists because nothing had measured Russian
+   * generation since 2026-08-22, three weeks of quality work earlier.
+   */
+  contentLanguage?: CareerPlaybookLiveSmokeLanguage;
 }
 
 export interface CareerPlaybookLiveSmokeCheck {
@@ -232,15 +240,39 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
  */
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
-const SALES_MANAGER_B2B_FIXED_ANSWERS: CareerPlaybookFixedAnswer[] = [
-  { question_key: 'position', value: 'Sales Manager B2B' },
-  { question_key: 'department', value: 'sales' },
-  { question_key: 'level', value: 'lead' },
-  { question_key: 'reporting', value: 'Reports to CRO. Leads SDR and AE team.' },
-  { question_key: 'team_size', value: '51-200' },
-  { question_key: 'company_stage', value: 'growth' },
-  { question_key: 'content_language', value: 'en' },
-];
+/**
+ * The same role in both languages, so a Russian run is comparable with the
+ * English series rather than being a different subject as well as a different
+ * language. Only the free-text answers are translated: `department`, `level`,
+ * `team_size` and `company_stage` are enum-ish keys the spec builder reads.
+ */
+const SALES_MANAGER_B2B_FIXED_ANSWERS: Record<
+  CareerPlaybookLiveSmokeLanguage,
+  CareerPlaybookFixedAnswer[]
+> = {
+  en: [
+    { question_key: 'position', value: 'Sales Manager B2B' },
+    { question_key: 'department', value: 'sales' },
+    { question_key: 'level', value: 'lead' },
+    { question_key: 'reporting', value: 'Reports to CRO. Leads SDR and AE team.' },
+    { question_key: 'team_size', value: '51-200' },
+    { question_key: 'company_stage', value: 'growth' },
+    { question_key: 'content_language', value: 'en' },
+  ],
+  ru: [
+    { question_key: 'position', value: 'Руководитель отдела продаж B2B' },
+    { question_key: 'department', value: 'sales' },
+    { question_key: 'level', value: 'lead' },
+    {
+      question_key: 'reporting',
+      value:
+        'Подчиняется коммерческому директору. Руководит командой SDR и менеджеров по продажам.',
+    },
+    { question_key: 'team_size', value: '51-200' },
+    { question_key: 'company_stage', value: 'growth' },
+    { question_key: 'content_language', value: 'ru' },
+  ],
+};
 
 const LIVE_SMOKE_BUSINESS_CONTEXT: CareerPlaybookAnswerSubmission = {
   business_context: {
@@ -444,9 +476,11 @@ export function buildCareerPlaybookLiveSmokePlan(
   };
 }
 
-function fixedAnswerRecord(): Record<string, CareerPlaybookFixedAnswer> {
+function fixedAnswerRecord(
+  language: CareerPlaybookLiveSmokeLanguage
+): Record<string, CareerPlaybookFixedAnswer> {
   return Object.fromEntries(
-    SALES_MANAGER_B2B_FIXED_ANSWERS.map(answer => [answer.question_key, answer])
+    SALES_MANAGER_B2B_FIXED_ANSWERS[language].map(answer => [answer.question_key, answer])
   );
 }
 
@@ -641,13 +675,14 @@ export async function runCareerPlaybookLiveSmoke(
   }
 
   const resumePlaybookId = options.resumePlaybookId?.trim();
+  const contentLanguage = options.contentLanguage ?? 'en';
   let playbookId = resumePlaybookId;
 
   if (!playbookId) {
-    const session = await client.startSession({ language: 'en' });
+    const session = await client.startSession({ language: contentLanguage });
     playbookId = session.playbookId;
 
-    for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS) {
+    for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS[contentLanguage]) {
       await client.submitAnswer({
         playbookId,
         phase: 'fixed',
@@ -666,9 +701,9 @@ export async function runCareerPlaybookLiveSmoke(
 
     const followups = await client.requestFollowups({
       playbookId,
-      fixedAnswers: fixedAnswerRecord(),
+      fixedAnswers: fixedAnswerRecord(contentLanguage),
       followupAnswers: {},
-      contentLanguage: 'en',
+      contentLanguage,
     });
 
     for (const question of followups.questions) {

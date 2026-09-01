@@ -3,6 +3,10 @@ import type {
   CareerPlaybookBlockState,
   CareerPlaybookPlaybookStatus,
 } from '@megacampus/shared-types';
+import {
+  countMermaidDiagrams,
+  countStructuredItems,
+} from '@/stages/stage-career-playbook/nodes/cross-block-judge-checks';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from '@/stages/stage-career-playbook/nodes/final-assembler';
 
 export type CareerPlaybookSmokeEvidenceStatus = 'pass' | 'fail' | 'skipped';
@@ -134,53 +138,6 @@ function validateGeneratedBlocks(
     status: 'pass',
     note: `All ${CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.length} required blocks are present.`,
   };
-}
-
-const TABLE_SEPARATOR_PATTERN = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
-
-function isTableLine(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed.startsWith('|') && trimmed.includes('|', 1);
-}
-
-function isNonEmptyTableRow(line: string): boolean {
-  return (
-    line
-      .split('|')
-      .map(cell => cell.trim())
-      .filter(Boolean).length > 0
-  );
-}
-
-function countMarkdownTableBodyRows(markdown: string): number {
-  const lines = markdown.split(/\r?\n/);
-  let total = 0;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!TABLE_SEPARATOR_PATTERN.test(lines[index])) continue;
-
-    let rowIndex = index + 1;
-    while (rowIndex < lines.length && isTableLine(lines[rowIndex])) {
-      if (!TABLE_SEPARATOR_PATTERN.test(lines[rowIndex]) && isNonEmptyTableRow(lines[rowIndex])) {
-        total += 1;
-      }
-      rowIndex += 1;
-    }
-  }
-
-  return total;
-}
-
-function countMarkdownListItems(markdown: string): number {
-  return markdown.split(/\r?\n/).filter(line => /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(line)).length;
-}
-
-function countStructuredItems(markdown: string): number {
-  return Math.max(countMarkdownTableBodyRows(markdown), countMarkdownListItems(markdown));
-}
-
-function countMermaidDiagrams(markdown: string): number {
-  return markdown.match(/```mermaid[\s\S]*?```/gi)?.length ?? 0;
 }
 
 function validateDeterministicContent(

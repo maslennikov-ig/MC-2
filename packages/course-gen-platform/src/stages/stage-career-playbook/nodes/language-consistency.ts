@@ -53,8 +53,33 @@ const ENGLISH_FUNCTION_WORDS = new Set([
   'your',
 ]);
 
+/**
+ * A cited source line: `- [S1] B2B Buying: How Top CSOs … — https://… (research)`.
+ *
+ * Its title belongs to the source, not to the guide, and a source published in
+ * English keeps its English title in a Russian document. The evidence ledger
+ * defines this shape, so it is recognised rather than guessed at.
+ */
+const EVIDENCE_REFERENCE_LINE = /^\s*(?:[-*+]|\d+[.)])?\s*\[S\d+\]/;
+
+/**
+ * The text the guide itself wrote, which is the only text a language rule can
+ * fairly judge.
+ *
+ * Fenced blocks and inline code were always excluded. Cited source lines are
+ * excluded from 2026-09-01: run db9d3ff9 filed a `wrong_language` critical
+ * against block 25 — a block written in Russian throughout — because the reading
+ * list at its foot carries the English titles of four English sources. Block 25
+ * spent a regeneration attempt on text it could not have translated without
+ * misquoting the source.
+ */
 function proseText(value: string): string {
-  return value.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
+  return value
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]+`/g, '')
+    .split(/\r?\n/)
+    .filter(line => !EVIDENCE_REFERENCE_LINE.test(line))
+    .join('\n');
 }
 
 function latinWords(value: string): string[] {

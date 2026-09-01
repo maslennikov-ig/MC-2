@@ -75,6 +75,15 @@ export function dedupeIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybook
  * ("the pipeline review, held monthly, ...") is no longer read. That direction
  * loses a finding; the other spends a paid regeneration on a block that is right.
  *
+ * A dash is NOT one of them, and treating it as one hid most of the ramp. In this
+ * corpus " — " attaches a value to its item rather than separating two items:
+ * block 14 writes every milestone as "Complete team and stakeholder orientation —
+ * **Week 1**", and each commitment was therefore cut from its own date. Measured
+ * over the three stored runs with a milestone ledger, dropping the dash raised the
+ * commitments the checks can see from 5/8 to 8/8 on b7925b1d (block_14 alone from
+ * 1 to 6) and from 7/7 to 7/7 with 30 sightings instead of 26 on 4e355bf4, and
+ * produced no new contradiction on any of them (mc2-nedcb).
+ *
  * A sentence terminator separates at least as strongly as a comma. Run
  * b7925b1d ended a paragraph "…by Day 60 you own one complete management and
  * forecasting cycle. From Week 2 onward, you are in the seat", and because the
@@ -82,7 +91,7 @@ export function dedupeIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybook
  * anchor than the "Day 60" in its own clause. Block 18 was regenerated twice
  * against a date it had stated correctly.
  */
-const ENUMERATION_SEPARATOR = /[,;()]|[.!?]\s|\s[–—-]\s/;
+const ENUMERATION_SEPARATOR = /[,;()]|[.!?]\s/;
 
 /** The list item containing `index`, as text plus its offset in the line. */
 export function enumerationSegmentAt(line: string, index: number): { text: string; start: number } {
@@ -99,24 +108,52 @@ export function enumerationSegmentAt(line: string, index: number): { text: strin
 }
 
 /**
- * Does this line name a ledger row with the label's own words, in any order?
+ * The words of a label that carry evidence, punctuation and all.
  *
  * Words shorter than four characters are dropped: "B2B", "win" and "of" carry no
  * evidence that the sentence is about this role's commitment rather than the
- * market. A label left with no long word matches nothing, which is the safe
- * direction. The match has no trailing boundary, so a Russian label survives
- * inflection — "прогноз" finds "прогноза".
+ * market. Length is measured on the letters, so a hyphen does not push a short
+ * word over the bar.
+ */
+export function labelWords(label: string): string[] {
+  return label.split(/[\s/]+/).filter(word => word.replace(/[^\p{L}\p{N}]/gu, '').length >= 4);
+}
+
+/**
+ * A label word as a pattern that tolerates the punctuation inside it.
+ *
+ * Stripping the punctuation instead — which this family did until 2026-09-01 —
+ * turns "evidence-based" into "evidencebased", a string no line contains, so the
+ * commitment "Submit the first evidence-based forecast" was invisible to every
+ * check that reads a ledger label. One hyphen in a label silently removed that
+ * row from the comparison, and a run whose only hyphenated commitment is the one
+ * a block got wrong shows no symptom at all (mc2-nx9lx).
+ *
+ * The runs are rejoined by an optional dash-or-space, so the pattern matches the
+ * hyphenated form, the spaced form and the closed-up form, and nothing else that
+ * the stripped version did not already match.
+ */
+export function labelWordPattern(word: string, flags = 'iu'): RegExp {
+  const runs = word
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .map(run => run.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  return new RegExp(`(?<![\\p{L}\\p{N}])${runs.join('[\\p{Pd}\\s]?')}`, flags);
+}
+
+/**
+ * Does this line name a ledger row with the label's own words, in any order?
+ *
+ * A label left with no long word matches nothing, which is the safe direction.
+ * The match has no trailing boundary, so a Russian label survives inflection —
+ * "прогноз" finds "прогноза".
  */
 export function lineNamesLabelLoosely(line: string, label: string): boolean {
-  const words = label
-    .split(/[\s/]+/)
-    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter(word => word.length >= 4);
+  const words = labelWords(label);
   if (words.length === 0) return false;
 
-  return words.every(word =>
-    new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'iu').test(line)
-  );
+  return words.every(word => labelWordPattern(word).test(line));
 }
 
 /** Publication order, so "which block said it first" is answerable. */
