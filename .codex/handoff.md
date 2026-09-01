@@ -470,6 +470,47 @@ and handler.
 thresholds calibrated on Latin script, each invisible until the previous was fixed. Weight by script,
 never lower the number.
 
+## Career Playbook verification runs, 2026-09-01 night
+
+Two paid dev runs, both `status: pass`, all evidence checks green, PDF and public pages included:
+
+| run        | lang |    cost | duration |      markdown | stored findings |
+| ---------- | ---- | ------: | -------: | ------------: | --------------: |
+| `422471a2` | en   | $0.0942 | 18.7 min | 106,311 chars |  8 (1 critical) |
+| `208746e3` | ru   | $0.1128 | 25.9 min | 102,742 chars | 19 (2 critical) |
+
+They were the first runs to exercise the ten changes shipped since `cc12dccc`/`db9d3ff9`, and they
+confirmed three of them directly: the proofreader's structured verdict survived a Russian document
+(4 calls, verdict parsed, no lost pass — `db9d3ff9`'s regression is gone); `ae0dbfb83`'s FAQ fix held
+(no `block_18` leak); the authority gate downgraded 13 of 19 Russian and 3 of 8 English findings
+correctly, and semantic repetition filed zero criticals in either language.
+
+Four defects found and delivered the same night, each with corpus evidence, each with a test that
+fails on the old behaviour:
+
+- `mc2-o29g8` (`c01cc4837`) — the `prior_blocks_digest` section titles carried writing rules inside
+  the data, and the model wrote them down for the reader. Six leaks in three stored documents; the
+  rules already existed in `GROUP_OUTPUT_CONTRACT`. The trigger is removed, not banned.
+- `mc2-hrz7n` (`0785fdf48`) — group 6 dictated `"refreshed within the last two quarters"` and the
+  judge filed a critical `invented_number` against a sentence the prompt required. 12 of 25 stored
+  playbooks carry the phrase; the ones that state it as a rule invent a policy.
+- `mc2-nfyyo` (`3b6ac446e`) — the whole-document proofreader's findings reached no stored row at
+  all, because `q_a_data.quality_issues` is built by walking `generatedBlocks` for a per-block
+  verdict. It now files under its own `final_proofreader` source. This unblocks `mc2-r2468`.
+- `mc2-mo5yk` (`b45b7eb2c`) — new `validateScriptSplice`: a word whose letters come from two
+  alphabets with no hyphen at the boundary. Five occurrences in five documents over three months,
+  zero false positives, four of them never filed by anything; two are homoglyphs invisible on the
+  page. Russian technical compounds (`CRM-данных`) are safe because the script changes at the hyphen.
+
+Also `308ff8f31`: `browserslist` pinned above the 2026-09-01 advisory. Not ours — a newly published
+GHSA pair failed Security Audit for everything on `develop`, including the deploy this track needed.
+
+Open and evidenced, not fixed: `mc2-de6fe` (P3, the paragraph-pair repetition check measures
+parallel structure, not repetition — full distribution and a measured-and-rejected candidate are in
+the issue and in quality-contract §6.1), `mc2-afoz6` (P3, block 17's "три дня подряд"), `mc2-r2468`
+(P2, blocked on `mc2-nfyyo`; the block_13 claim in its original delivery note is corrected there and
+in quality-contract §8bis.6 — the model misread a clock slot as a cadence).
+
 ## Next recommended
 
 Next stage id: none selected. The accepted Role Guide stage is delivered; its verification record is
