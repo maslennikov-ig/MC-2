@@ -91,20 +91,6 @@ export interface StructuredVerdictCall {
    * measured; the proofreader's reason is different and unconditional, below.
    */
   preferFallbackModelAboveTokens?: number;
-  /**
-   * Start on the fallback model, whatever the input size.
-   *
-   * A schema is not something every model can be asked for. The proofreader
-   * phase's primary is `z-ai/glm-5.3-flash`, and OpenRouter answers a schema
-   * request for it with `404 No endpoints found` — measured 2026-09-01, twice,
-   * before the retry net escalated to the fallback and succeeded. Left to the
-   * net, every proofreading pass would buy two doomed attempts and their
-   * backoff, about a minute, to reach a model the call site could have named.
-   *
-   * `selectAttemptModel` documents this as a call-site decision: information the
-   * retry net does not have.
-   */
-  preferFallbackModel?: boolean;
 }
 
 export class StructuredVerdictOutputError extends Error {
@@ -200,7 +186,6 @@ export async function invokeStructuredVerdictWithRepair(
     ...(call.preferFallbackModelAboveTokens !== undefined
       ? { preferFallbackModelAboveTokens: call.preferFallbackModelAboveTokens }
       : {}),
-    ...(call.preferFallbackModel ? { preferFallbackModel: true } : {}),
     structuredOutputSchema: CAREER_PLAYBOOK_STRUCTURED_VERDICT_SCHEMA,
     structuredOutputName: call.promptKey,
     structuredOutputMethod: 'jsonSchema' as const,
