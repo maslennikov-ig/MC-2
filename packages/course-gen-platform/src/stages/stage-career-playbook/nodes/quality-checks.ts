@@ -217,6 +217,33 @@ function metricLabelPattern(label: string): RegExp {
 }
 
 /**
+ * The part of the line that belongs to this metric.
+ *
+ * A line routinely carries several metrics with a number each — "CSAT <85%;
+ * First response time >30 мин; Average resolution time >48 ч" — and reading the
+ * numbers off the whole line hands each metric its neighbours'. Every
+ * metric_conflict surviving in the stored corpus on 2026-09-01 was that:
+ * block_21 of run 638ed691 was told it puts team quota attainment at 90%, on a
+ * line whose 90% belongs to planned coaching completion; block_3 of 4e355bf4 was
+ * told it puts team retention at 10%, where 10% is the weight of the
+ * responsibility zone in a heading. Both spent the regeneration cap on it.
+ *
+ * The same answer the ramp and rhythm families arrived at, using the same
+ * primitive: nearest-wins inside the enumeration item.
+ */
+function metricSegmentsIn(line: string, label: string): string {
+  const pattern = new RegExp(metricLabelPattern(label).source, 'gi');
+  const segments: string[] = [];
+
+  for (const match of line.matchAll(pattern)) {
+    const segment = enumerationSegmentAt(line, match.index ?? 0);
+    if (!segments.includes(segment.text)) segments.push(segment.text);
+  }
+
+  return segments.join(' ');
+}
+
+/**
  * Flag a line that names a ledger metric and attaches a number the ledger does
  * not sanction.
  *
@@ -244,11 +271,13 @@ export function validateMetricLedgerConsistency(
         const targetNumbers = numbersIn(metric.target);
         if (targetNumbers.size === 0) continue;
 
+        const claim = metricSegmentsIn(line, metric.label);
+
         // Compare like with like: a 25% responsibility weight beside "pipeline
         // coverage" is not a claim about coverage, so only numbers sharing a
         // unit with the target are candidates.
         const targetUnits = new Set([...targetNumbers].map(unitOf));
-        const candidates = [...numbersIn(line)].filter(value => targetUnits.has(unitOf(value)));
+        const candidates = [...numbersIn(claim)].filter(value => targetUnits.has(unitOf(value)));
         if (candidates.length === 0) continue;
 
         // The line quotes the committed value: nothing to flag.
@@ -261,7 +290,7 @@ export function validateMetricLedgerConsistency(
         // from a competing target — "coverage is at least 2x" uses the same
         // digits to mean the opposite of the red band "<2x".
         const bands = directedBandValues(metric);
-        if (candidates.every(value => citesBand(line, value, bands))) continue;
+        if (candidates.every(value => citesBand(claim, value, bands))) continue;
         // A line the author already marked as an illustration is not claiming a
         // competing target: "target variable 50% of base (example — replace)"
         // is about compensation, not about the metric named beside it.

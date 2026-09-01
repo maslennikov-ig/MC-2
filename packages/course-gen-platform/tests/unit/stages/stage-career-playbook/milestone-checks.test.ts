@@ -542,4 +542,18 @@ describe('the ramp block is readable in the form it is written', () => {
 
     expect(validateMilestoneConsistency(correct, { milestoneLedger: ledger })).toEqual([]);
   });
+
+  it('separates a list whose next item opens with a number', () => {
+    // The decimal-comma exemption ("Customer effort score >3,5") requires a digit
+    // on BOTH sides. Requiring only the one after it would join these two
+    // commitments and give the forecast the orientation's date.
+    const correct = blocks([
+      [
+        'block_14',
+        'Complete team and stakeholder orientation — Week 1, 2 days later submit the first evidence-based forecast in Week 2.',
+      ],
+    ]);
+
+    expect(validateMilestoneConsistency(correct, { milestoneLedger: ledger })).toEqual([]);
+  });
 });

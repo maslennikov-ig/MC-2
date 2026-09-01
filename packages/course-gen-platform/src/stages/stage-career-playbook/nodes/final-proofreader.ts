@@ -16,6 +16,12 @@
  * regeneration path unchanged.
  *
  * It exists now because the owner removed the latency budget: quality first.
+ *
+ * It asks for its verdict the way the judge does — as a schema the provider must
+ * satisfy — since 2026-09-01. Asking in prose worked for five English runs and
+ * then lost the Russian run's entire pass: three calls, three unparseable
+ * answers, three warnings nobody reads. `structured-verdict.ts` carries the
+ * character that broke it.
  */
 
 import type {
@@ -31,6 +37,10 @@ import {
   createCareerPlaybookRuntime,
   type CareerPlaybookRuntime,
 } from './runtime';
+import {
+  invokeStructuredVerdictWithRepair,
+  StructuredVerdictOutputError,
+} from './structured-verdict';
 import {
   formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
@@ -62,30 +72,13 @@ const PROOFREADER_MAX_TOKENS = 4_000;
  */
 export const CAREER_PLAYBOOK_MAX_PROOFREADER_REGENERATIONS = 3;
 
-function buildNodeCost(result: {
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  costUnknown?: boolean;
-  durationMs?: number;
-  attemptCount?: number;
-  generationId?: string;
-}): CareerPlaybookNodeCost {
-  return {
-    node: 'finalProofreader',
-    model: result.model,
-    input_tokens: result.inputTokens,
-    output_tokens: result.outputTokens,
-    cost_usd: result.costUsd,
-    ...(result.costUnknown ? { cost_unknown: true } : {}),
-    duration_ms: result.durationMs,
-    attempts: result.attemptCount,
-    // Carried so `settleCareerPlaybookNodeCosts` can replace the estimate above
-    // with what OpenRouter actually charged.
-    ...(result.generationId ? { generation_id: result.generationId } : {}),
-    outcome: 'succeeded',
-  };
+/** What a failed proofreading pass still owes the cost receipt. */
+function proofreaderFailureCosts(error: unknown): CareerPlaybookNodeCost[] {
+  if (error instanceof StructuredVerdictOutputError) return error.nodeCosts;
+  if (error instanceof CareerPlaybookLLMCallError) {
+    return buildCareerPlaybookAbortedAttemptCosts('finalProofreader', error.abortedAttempts);
+  }
+  return [];
 }
 
 /** Keep only the regenerations this pass is allowed to request. */
@@ -134,16 +127,20 @@ export function createCareerPlaybookProofreaderNode(
         content_language: state.language,
       });
 
-      const result = await runtime.invokeLLM(prompt, {
-        phaseName: PROOFREADER_PHASE,
-        promptKey: PROOFREADER_PROMPT_KEY,
-        node: 'finalProofreader',
-        language: state.language,
-        temperature: 0.2,
-        maxTokens: PROOFREADER_MAX_TOKENS,
-      });
-
-      const parsed = parseCareerPlaybookJudgeVerdict(result.content);
+      const { verdict: parsed, nodeCosts } = await invokeStructuredVerdictWithRepair(
+        runtime,
+        prompt,
+        {
+          phaseName: PROOFREADER_PHASE,
+          promptKey: PROOFREADER_PROMPT_KEY,
+          node: 'finalProofreader',
+          language: state.language,
+          maxTokens: PROOFREADER_MAX_TOKENS,
+          // The phase's primary model has no endpoint that serves a JSON schema.
+          preferFallbackModel: true,
+        },
+        parseCareerPlaybookJudgeVerdict
+      );
       const { verdict, dropped } = capProofreaderRegenerations(parsed);
 
       logger.info(
@@ -160,10 +157,7 @@ export function createCareerPlaybookProofreaderNode(
         judgeVerdicts: [verdict],
         lastJudgeVerdict: verdict,
         lastJudgedBlockIds: verdict.needs_regeneration,
-        nodeCosts: [
-          buildNodeCost(result),
-          ...buildCareerPlaybookAbortedAttemptCosts('finalProofreader', result.abortedAttempts),
-        ],
+        nodeCosts,
         ...(dropped.length > 0
           ? {
               warnings: [
@@ -180,10 +174,10 @@ export function createCareerPlaybookProofreaderNode(
         warnings: [
           `finalProofreader skipped: ${error instanceof Error ? error.message : String(error)}`,
         ],
-        nodeCosts:
-          error instanceof CareerPlaybookLLMCallError
-            ? buildCareerPlaybookAbortedAttemptCosts('finalProofreader', error.abortedAttempts)
-            : [],
+        // A skipped pass is still a paid one. `StructuredVerdictOutputError`
+        // carries the calls that answered; `CareerPlaybookLLMCallError` carries
+        // the attempts that never did.
+        nodeCosts: proofreaderFailureCosts(error),
         currentNode: 'finalProofreader',
       };
     }

@@ -14,7 +14,7 @@ import {
   selectDeltaReJudgeBlockIds,
   validateMermaidCoverage,
 } from '@/stages/stage-career-playbook/nodes/cross-block-judge';
-import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/cross-block-judge-structured';
+import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/structured-verdict';
 
 const { generateEmbeddingsMock } = vi.hoisted(() => ({
   generateEmbeddingsMock: vi.fn(),
@@ -658,6 +658,12 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 40,
         cost_usd: 0.004,
+        attempts: undefined,
+        duration_ms: undefined,
+        // The provider answered and billed. Recorded for every verdict call
+        // since 2026-09-01, so a call whose answer could not be parsed still
+        // reaches the receipt.
+        outcome: 'succeeded',
       },
     ]);
   });
@@ -864,6 +870,9 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 1,
         cost_usd: 0.001,
+        attempts: undefined,
+        duration_ms: undefined,
+        outcome: 'succeeded',
       },
       {
         node: 'crossBlockJudge',
@@ -871,6 +880,9 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 1,
         cost_usd: 0.001,
+        attempts: undefined,
+        duration_ms: undefined,
+        outcome: 'succeeded',
       },
     ]);
   });
