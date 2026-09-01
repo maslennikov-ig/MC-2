@@ -136,8 +136,6 @@ export function createCareerPlaybookProofreaderNode(
           node: 'finalProofreader',
           language: state.language,
           maxTokens: PROOFREADER_MAX_TOKENS,
-          // The phase's primary model has no endpoint that serves a JSON schema.
-          preferFallbackModel: true,
         },
         parseCareerPlaybookJudgeVerdict
       );

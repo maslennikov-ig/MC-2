@@ -80,10 +80,10 @@ describe('career playbook final proofreader', () => {
     expect(options.structuredOutputMethod).toBe('jsonSchema');
     expect(options.node).toBe('finalProofreader');
     expect(options.phaseName).toBe('stage_career_playbook_proofreader');
-    // The phase's primary model serves no JSON schema, so naming the fallback at
-    // the call site is what keeps every pass from buying two 404s and their
-    // backoff first.
-    expect(options.preferFallbackModel).toBe(true);
+    // On the phase's own configured model. Which endpoint of it can serve a
+    // schema is a routing question, answered in `pickCheapestUntriedEndpoint`
+    // from `supported_parameters` — not by moving this node to another model.
+    expect(options.preferFallbackModel).toBeUndefined();
   });
 
   it('repairs a response whose Russian quotation broke the JSON, instead of skipping the pass', async () => {

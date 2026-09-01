@@ -26,6 +26,7 @@ import {
   forgetModelEndpoints,
   listModelEndpoints,
   pickCheapestUntriedEndpoint,
+  STRUCTURED_OUTPUT_PARAMETER,
 } from '@/shared/llm/openrouter-endpoints';
 
 /** Two entries copied from the live response, order deliberately not by price. */
@@ -41,6 +42,7 @@ function payload() {
           // An object, not a number — see the test below.
           throughput_last_30m: { p50: 100, p75: 130, p90: 160, p99: 190 },
           uptime_last_30m: 99.9,
+          supported_parameters: ['temperature', 'response_format', 'structured_outputs'],
         },
         {
           tag: 'sail-research/fp4',
@@ -75,6 +77,21 @@ describe('reading the endpoint list', () => {
     expect(endpoints.map(endpoint => endpoint.tag)).toEqual(['sail-research/fp4', 'relace/fp4']);
     expect(endpoints[0].promptPricePerMillion).toBeCloseTo(0.065, 6);
     expect(endpoints[0].completionPricePerMillion).toBeCloseTo(0.18, 6);
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps what each endpoint will accept, which price does not imply', async () => {
+    vi.stubGlobal('fetch', respondWith(payload()));
+
+    const endpoints = await listModelEndpoints('deepseek/deepseek-v4-flash-0731');
+
+    expect(endpoints.find(item => item.tag === 'relace/fp4')?.supportedParameters).toContain(
+      'structured_outputs'
+    );
+    // Absent from the response is not "accepts everything".
+    expect(endpoints.find(item => item.tag === 'sail-research/fp4')?.supportedParameters).toEqual(
+      []
+    );
     vi.unstubAllGlobals();
   });
 
@@ -210,6 +227,63 @@ describe('choosing among endpoints', () => {
     expect(pickCheapestUntriedEndpoint(list, new Set(['a/fp4', 'c/fp4']), ceiling)).toBeUndefined();
     // Without a ceiling the same call has somewhere left to go.
     expect(pickCheapestUntriedEndpoint(list, new Set(['a/fp4', 'c/fp4']))?.tag).toBe('d/fp8');
+  });
+});
+
+/**
+ * Contract: cheapest among the endpoints that accept the request being made.
+ *
+ * The numbers below are the live `/endpoints` list for `z-ai/glm-5.3-flash` on
+ * 2026-09-01: 19 healthy endpoints, 12 of which accept a JSON schema, and the
+ * three cheapest — all at $0.075/M — among the seven that do not, with a fourth
+ * at the same price that does.
+ *
+ * A request an endpoint cannot serve does not fall back. OpenRouter answers
+ * `404 No endpoints found`, so pinning one costs a whole attempt to learn what
+ * the catalogue already published; the proofreader's two attempts died that way
+ * before the retry net gave up on the model entirely (mc2-w2lj4).
+ */
+describe('an endpoint that cannot take the request', () => {
+  const supporting = (tag: string, price: number, parameters: string[]) => ({
+    tag,
+    providerName: tag,
+    promptPricePerMillion: price,
+    completionPricePerMillion: price * 3,
+    status: 0,
+    throughputTokensPerSecond: 80,
+    supportedParameters: parameters,
+  });
+
+  const list = [
+    supporting('z-ai/fp8', 0.075, ['temperature', 'response_format']),
+    supporting('novita/fp8', 0.075, ['temperature', 'response_format']),
+    supporting('deepinfra/fp8', 0.075, ['temperature', 'response_format', 'structured_outputs']),
+    supporting('makora', 0.14, ['temperature', 'response_format', 'structured_outputs']),
+  ];
+
+  it('is still the cheapest choice when the call asks for nothing special', () => {
+    expect(pickCheapestUntriedEndpoint(list, new Set())?.tag).toBe('z-ai/fp8');
+  });
+
+  it('is passed over for one at the same price that serves a schema', () => {
+    expect(
+      pickCheapestUntriedEndpoint(list, new Set(), undefined, 'default', [
+        STRUCTURED_OUTPUT_PARAMETER,
+      ])?.tag
+    ).toBe('deepinfra/fp8');
+  });
+
+  it('leaves the call unpinned rather than pinning one that will 404', () => {
+    // Nothing left that takes a schema: no pin, and OpenRouter routes it.
+    expect(
+      pickCheapestUntriedEndpoint(
+        list,
+        new Set(['deepinfra/fp8', 'makora']),
+        undefined,
+        'default',
+        [STRUCTURED_OUTPUT_PARAMETER]
+      )
+    ).toBeUndefined();
   });
 });
 

@@ -442,11 +442,6 @@ report naming a branch again means something really was left behind.
   average 22.5 of 25 against the 028 plan's 13–19. Not a defect (the run measured 0/471), but the
   selectivity question needs a paid A/B. `mc2-zewto` — Stage 6 grouping costs 22.6pp of recall@5;
   the owner's trade, measured, not acted on.
-- `mc2-mhnah` — the proofreader phase's configured primary (`z-ai/glm-5.3-flash`) has no endpoint
-  that serves a JSON schema, so `final-proofreader.ts` names the fallback at the call site. Correct
-  and one line, but `llm_model_config.model_id` for `stage_career_playbook_proofreader` now describes
-  routing that never happens. The fix is a migration to a schema-capable primary; deferred because
-  that table is the shared dev+staging config and CI does not apply migrations.
 - `mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from a secret that does not exist.
   Not burning: the host carries 900 by some other means. It burns when `.env.production` is rewritten
   and the infra stack is recreated.
