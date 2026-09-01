@@ -440,15 +440,6 @@ function selectReservedRegenerations(
     }));
 }
 
-/** The state fields a regeneration decision reads. */
-export type CareerPlaybookRegenerationState = Pick<
-  CareerPlaybookGraphStateType,
-  | 'lastJudgeVerdict'
-  | 'blockRegenerationAttempts'
-  | 'windowBudgetExemptBlockIds'
-  | 'finalWindowReserveSpent'
->;
-
 /**
  * The regeneration decision for one window, taken from graph state.
  *
@@ -465,7 +456,7 @@ export type CareerPlaybookRegenerationState = Pick<
  * correctly and named in the warning; nothing ever asked for it.
  */
 export function selectPendingCareerPlaybookRegenerationsForState(
-  state: CareerPlaybookRegenerationState,
+  state: CareerPlaybookGraphStateType,
   blockIds: CareerPlaybookBlockId[]
 ): CareerPlaybookPendingRegeneration[] {
   return selectPendingCareerPlaybookRegenerations({

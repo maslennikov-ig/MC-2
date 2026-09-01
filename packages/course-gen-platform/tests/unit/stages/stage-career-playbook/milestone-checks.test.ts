@@ -344,6 +344,13 @@ describe('validateRampOwnership', () => {
     },
   ];
 
+  const rampBlock = `## 14. Онбординг
+
+- Week 1: complete team and stakeholder orientation.
+- Week 2: lead the first pipeline review and submit the first evidence-based forecast.
+- Day 30: complete the first documented coaching cycle.
+- Day 60: own one complete management and forecasting cycle.`;
+
   const faqAnswerThatCopies = `## 18. FAQ
 
 *Answers for the employee and the manager. Where an answer depends on ramp dates, the onboarding plan in Block 14 owns those dates — this section tells you what to do, not when.*
@@ -351,15 +358,42 @@ describe('validateRampOwnership', () => {
 **1. I'm new to the role. When do I start running the team rhythms myself?**
 You start with orientation and shadowing, then take the controls progressively. The onboarding plan in Block 14 sets the sequence and dates; what you should know now is that you lead your first pipeline review and submit your first evidence-based forecast in Week 2. By Day 30 you are expected to have completed your first documented coaching cycle, and by Day 60 you own one complete management and forecasting cycle.`;
 
-  it('flags the FAQ answer that republishes dates the ramp block owns', () => {
-    const issues = validateRampOwnership(blocks([['block_18', faqAnswerThatCopies]]), {
-      milestoneLedger: rampLedger,
-    });
+  it('flags the FAQ answer that republishes dates the ramp block publishes', () => {
+    const issues = validateRampOwnership(
+      blocks([
+        ['block_14', rampBlock],
+        ['block_18', faqAnswerThatCopies],
+      ]),
+      { milestoneLedger: rampLedger }
+    );
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ block_id: 'block_18', severity: 'critical' });
-    expect(issues[0].description).toContain('Block 14');
-    expect(issues[0].suggestion).toContain('Change nothing in Block 14');
+    // The owner is read off the document, never named in the check.
+    expect(issues[0].description).toContain('which block_14 publishes');
+    expect(issues[0].suggestion).toContain('Change nothing in block_14');
+  });
+
+  it('names the owner the document actually has, wherever the ramp lives', () => {
+    const issues = validateRampOwnership(
+      blocks([
+        ['block_26', rampBlock],
+        ['block_18', faqAnswerThatCopies],
+      ]),
+      { milestoneLedger: rampLedger }
+    );
+
+    expect(issues[0]?.description).toContain('which block_26 publishes');
+  });
+
+  it('says nothing when no other block publishes the ramp: nothing to point at', () => {
+    // The FAQ alone is not holding a copy of anything, and "send the reader to the
+    // owner" would name nowhere.
+    expect(
+      validateRampOwnership(blocks([['block_18', faqAnswerThatCopies]]), {
+        milestoneLedger: rampLedger,
+      })
+    ).toEqual([]);
   });
 
   it('says nothing when the FAQ answers the question and points at the ramp block', () => {
@@ -369,18 +403,19 @@ You start with orientation and shadowing, then take the controls progressively. 
 You start with orientation and shadowing, then take the controls progressively. You lead the pipeline review and submit an evidence-based forecast yourself, with your hiring manager beside you rather than in front of you; the onboarding plan in Block 14 sets the sequence and the dates.`;
 
     expect(
-      validateRampOwnership(blocks([['block_18', pointing]]), { milestoneLedger: rampLedger })
+      validateRampOwnership(
+        blocks([
+          ['block_14', rampBlock],
+          ['block_18', pointing],
+        ]),
+        { milestoneLedger: rampLedger }
+      )
     ).toEqual([]);
   });
 
   it('leaves the ramp block alone: publishing the ramp is its job', () => {
     expect(
-      validateRampOwnership(
-        blocks([
-          ['block_14', 'Lead the first pipeline review in Week 2. Coaching cycle by Day 30.'],
-        ]),
-        { milestoneLedger: rampLedger }
-      )
+      validateRampOwnership(blocks([['block_14', rampBlock]]), { milestoneLedger: rampLedger })
     ).toEqual([]);
   });
 
@@ -391,7 +426,13 @@ You start with orientation and shadowing, then take the controls progressively. 
 You lead the first pipeline review; your hiring manager co-runs it. Block 14 has the date.`;
 
     expect(
-      validateRampOwnership(blocks([['block_18', noDate]]), { milestoneLedger: rampLedger })
+      validateRampOwnership(
+        blocks([
+          ['block_14', rampBlock],
+          ['block_18', noDate],
+        ]),
+        { milestoneLedger: rampLedger }
+      )
     ).toEqual([]);
   });
 
@@ -406,7 +447,13 @@ You lead the first pipeline review; your hiring manager co-runs it. Block 14 has
 You lead the first pipeline review in Week 4.`;
 
     expect(
-      validateRampOwnership(blocks([['block_18', wrongDate]]), { milestoneLedger: rampLedger })
+      validateRampOwnership(
+        blocks([
+          ['block_14', rampBlock],
+          ['block_18', wrongDate],
+        ]),
+        { milestoneLedger: rampLedger }
+      )
     ).toEqual([]);
     expect(
       validateMilestoneConsistency(blocks([['block_18', wrongDate]]), {
