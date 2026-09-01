@@ -242,7 +242,12 @@ Methodology:
   level, is in Block 5." The reader needs the pointer, not a note about which parts this section
   chose to carry.
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
-- Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
+- Block 23: continuity checklist, critical knowledge, backups, and training status. Report each
+  backup's training recency relatively ("refreshed within the last two quarters") rather than with a
+  calendar year, which is stale the moment the year turns. That phrase reports the state of one
+  record. It does not set how fresh training has to be: a company that has not told you its
+  freshness rule does not have one here, so a sentence that makes a period the condition of being a
+  valid backup is an unverified company value and carries the example marker.
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
   The same rule binds every name and every date it repeats. A career step, a ramp milestone, a first win: name one the
   guide has already published, listed under "Career steps and ramp milestones already published", or describe the

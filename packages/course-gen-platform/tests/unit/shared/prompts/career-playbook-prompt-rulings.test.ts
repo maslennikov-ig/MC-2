@@ -117,6 +117,21 @@ describe('a summary block may not invent what it summarizes', () => {
   // "director of sales / head of revenue" against a ladder publishing Head of
   // Sales and VP of Sales, and a CRO-accepted forecast "within the first month"
   // against an onboarding plan putting the first forecast on Day 60.
+  // mc2-hrz7n. The prompt supplied "refreshed within the last two quarters" as
+  // the way to phrase one backup's training record, and the model promoted it to
+  // the company's freshness policy — "Каждый назначенный резерв актуален, если
+  // его обучение обновлено в течение последних двух кварталов" (208746e3, ru),
+  // which the judge then filed as a critical invented_number against a sentence
+  // the prompt had dictated. 12 of 25 stored playbooks carry the phrase; the
+  // ones that state it as a rule are the ones that invent a policy.
+  it('keeps the relative training phrase a record rather than a freshness rule', () => {
+    expect(wrap6.promptTemplate).toContain('That phrase reports the state of one');
+    expect(wrap6.promptTemplate).toContain('It does not set how fresh training has to be');
+    expect(wrap6.promptTemplate).toContain('carries the example marker');
+    // The constraint it was added for survives.
+    expect(wrap6.promptTemplate).toContain('rather than with a\n  calendar year');
+  });
+
   it('binds the canvas to published steps and milestones, not only to the ledger', () => {
     expect(wrap6.promptTemplate).toContain(
       'The same rule binds every name and every date it repeats'
