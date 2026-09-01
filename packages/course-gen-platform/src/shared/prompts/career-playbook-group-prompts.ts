@@ -238,6 +238,9 @@ Methodology:
   Where an answer still touches the ramp, name the step and send the reader to the ramp block for
   the date. A date repeated here is a second copy of a fact that block publishes, and the copy is
   what drifts.
+  Send the reader in the answer's own voice and stop there: "The full matrix, with every approval
+  level, is in Block 5." The reader needs the pointer, not a note about which parts this section
+  chose to carry.
 - Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
 - Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
 - Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
