@@ -358,7 +358,7 @@ describe('validateRampOwnership', () => {
 **1. I'm new to the role. When do I start running the team rhythms myself?**
 You start with orientation and shadowing, then take the controls progressively. The onboarding plan in Block 14 sets the sequence and dates; what you should know now is that you lead your first pipeline review and submit your first evidence-based forecast in Week 2. By Day 30 you are expected to have completed your first documented coaching cycle, and by Day 60 you own one complete management and forecasting cycle.`;
 
-  it('flags the FAQ answer that republishes dates the ramp block publishes', () => {
+  it('flags the FAQ answer that republishes dates the guide publishes elsewhere', () => {
     const issues = validateRampOwnership(
       blocks([
         ['block_14', rampBlock],
@@ -369,12 +369,15 @@ You start with orientation and shadowing, then take the controls progressively. 
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ block_id: 'block_18', severity: 'critical' });
-    // The owner is read off the document, never named in the check.
-    expect(issues[0].description).toContain('which block_14 publishes');
-    expect(issues[0].suggestion).toContain('Change nothing in block_14');
+    // No owner block is named: an earlier draft ranked candidates and elected
+    // block_4 over block_14 on run b7925b1d. The remedy is deletion, so it does
+    // not need an authority it cannot be sure of.
+    expect(issues[0].description).toContain('the guide publishes them elsewhere');
+    expect(issues[0].suggestion).toContain('Change no other block');
+    expect(issues[0].suggestion).not.toMatch(/block_(?!18\b)\d+/);
   });
 
-  it('names the owner the document actually has, wherever the ramp lives', () => {
+  it('fires wherever the ramp lives, without ranking the blocks that carry it', () => {
     const issues = validateRampOwnership(
       blocks([
         ['block_26', rampBlock],
@@ -383,12 +386,13 @@ You start with orientation and shadowing, then take the controls progressively. 
       { milestoneLedger: rampLedger }
     );
 
-    expect(issues[0]?.description).toContain('which block_26 publishes');
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_18');
   });
 
-  it('says nothing when no other block publishes the ramp: nothing to point at', () => {
-    // The FAQ alone is not holding a copy of anything, and "send the reader to the
-    // owner" would name nowhere.
+  it('says nothing when the FAQ is the only block carrying the ramp', () => {
+    // Then the dates are the only place the reader gets them, and deleting them
+    // loses the fact rather than the copy.
     expect(
       validateRampOwnership(blocks([['block_18', faqAnswerThatCopies]]), {
         milestoneLedger: rampLedger,
