@@ -26,7 +26,6 @@ import type {
   CareerPlaybookMilestoneLedgerEntry,
 } from '@megacampus/shared-types';
 import {
-  blockPosition,
   dedupeIssues,
   enumerationSegmentAt,
   issue,
@@ -228,36 +227,7 @@ function restatementsOf(
 }
 
 /**
- * Which block publishes the ramp, according to the document.
- *
- * Derived, never named — the same answer `validateCadenceConsistency` reaches for
- * a rhythm with no ledger row: the block carrying the most of them, earliest
- * catalogue position breaking a tie. In both stored runs that is block_14 by a
- * wide margin (9 against 4, 19 against 8), so the check can point at the owner
- * without a second constant that goes stale the day the ramp moves.
- *
- * The answering block is not a candidate. It could out-state the real publisher
- * on a bad run, and then the check would bless the copy and blame the original.
- */
-function rampOwnerBlockId(
-  restatements: readonly { blockId: CareerPlaybookBlockId }[]
-): CareerPlaybookBlockId | null {
-  const counts = new Map<CareerPlaybookBlockId, number>();
-  for (const entry of restatements) {
-    if (entry.blockId === RAMP_ANSWERING_BLOCK_ID) continue;
-    counts.set(entry.blockId, (counts.get(entry.blockId) ?? 0) + 1);
-  }
-
-  return (
-    [...counts.entries()].sort(
-      ([leftId, left], [rightId, right]) =>
-        right - left || blockPosition(leftId) - blockPosition(rightId)
-    )[0]?.[0] ?? null
-  );
-}
-
-/**
- * Flag the FAQ for republishing a ramp deadline another block owns.
+ * Flag the FAQ for republishing a ramp deadline the ledger owns.
  *
  * The complement of `validateMilestoneConsistency`, and it fires on exactly what
  * that check passes: a date that AGREES with the ledger. Agreement is the whole
@@ -271,10 +241,18 @@ function rampOwnerBlockId(
  * five false criticals before it learned to anchor on the rare word rather than
  * the first one.
  *
- * Silent when no other block publishes the ramp: then the FAQ is not holding a
- * copy of anything, and "send the reader to the owner" would name nowhere. One
- * issue, because the remedy is one remedy however many dates it covers, and two
- * attempts is all a block gets.
+ * The issue names no owner block, and an earlier draft that did was wrong. It
+ * ranked candidates the way `validateCadenceConsistency` ranks a rhythm — most
+ * statements win — and on run b7925b1d that elected block_4, the duties block,
+ * over block_14, which publishes the entire ramp. Not a tuning problem: the
+ * matcher reads 5 commitments in block_4 and 1 of 8 in block_14, because block_14
+ * publishes its ramp in tables and numbered lists this family reads badly
+ * (mc2-nedcb). A remedy that names an authority must be sure of it, and this one
+ * does not need to be — the fix is to delete the dates, not to move them.
+ *
+ * The one thing still asked of the document is whether the FAQ is alone in
+ * carrying the ramp. If it is, these dates are the only place the reader gets
+ * them and removing them loses the fact rather than the copy.
  */
 export function validateRampOwnership(
   blocks: BlockMap,
@@ -285,8 +263,8 @@ export function validateRampOwnership(
 
   const restatements = restatementsOf(blocks, ledger);
   const copied = restatements.filter(entry => entry.blockId === RAMP_ANSWERING_BLOCK_ID);
-  const ownerBlockId = rampOwnerBlockId(restatements);
-  if (copied.length === 0 || !ownerBlockId) return [];
+  const publishedElsewhere = restatements.some(entry => entry.blockId !== RAMP_ANSWERING_BLOCK_ID);
+  if (copied.length === 0 || !publishedElsewhere) return [];
 
   const named = copied.map(entry => `"${entry.label}" (${entry.offset})`).join(', ');
 
@@ -294,8 +272,8 @@ export function validateRampOwnership(
     issue(
       RAMP_ANSWERING_BLOCK_ID,
       'contradiction',
-      `${RAMP_ANSWERING_BLOCK_ID} republishes the ramp deadline for ${named}, which ${ownerBlockId} publishes: "${truncateLine(copied[0].line)}". The dates agree today; the copy is what drifts.`,
-      `Answer the question in ${RAMP_ANSWERING_BLOCK_ID} without the dates — say what the reader does and send them to ${ownerBlockId} for when. Change nothing in ${ownerBlockId}: it publishes the ramp.`
+      `${RAMP_ANSWERING_BLOCK_ID} republishes the ramp deadline for ${named}, and the guide publishes them elsewhere: "${truncateLine(copied[0].line)}". The dates agree today; the copy is what drifts.`,
+      `Answer the question in ${RAMP_ANSWERING_BLOCK_ID} without the dates: say what the reader does and leave the schedule to the block that publishes the ramp. Change no other block.`
     ),
   ];
 }
