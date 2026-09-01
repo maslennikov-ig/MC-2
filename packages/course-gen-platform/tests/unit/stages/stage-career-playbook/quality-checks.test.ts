@@ -606,13 +606,17 @@ describe('metric conflict precision', () => {
     expect(issues).toEqual([]);
   });
 
-  it('still flags a number that belongs to another quantity in the same row — a known cost', () => {
-    // The 20% describes deal size, not the win rate whose row it sits in, so this
-    // finding is noise. Narrowing the comparison to the naming cell or clause
-    // removed it — and also disabled detection on the standard KPI table shape,
-    // where the metric is in column 1 and its target in column 3. Losing the
-    // core detection is worse than one extra regeneration, so the row stays the
-    // unit of comparison and this residue is accepted deliberately.
+  it('does not read a number that belongs to another quantity in the same row', () => {
+    // The 20% describes deal size, not the win rate whose row it sits in. This
+    // was accepted as noise until 2026-09-01, when replaying the checks over the
+    // stored corpus showed the residue was the whole class: all five surviving
+    // metric_conflicts were a neighbour's number, and three of the blocks
+    // carrying one had spent the regeneration cap on it (mc2-tub8q).
+    //
+    // The earlier attempt narrowed to the naming CELL, which also disabled the
+    // standard KPI table shape — metric in column 1, target in column 3. The
+    // unit here is the enumeration item, which a table pipe does not end, so the
+    // row below still reads as one claim.
     const issues = validateMetricLedgerConsistency(
       blocks({
         block_6:
@@ -621,7 +625,45 @@ describe('metric conflict precision', () => {
       context({ metricLedger: [WIN_RATE] })
     );
 
+    expect(issues).toEqual([]);
+  });
+
+  it('still reads a KPI table row whose target sits three columns from its label', () => {
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_6: '| Win Rate | monthly | >=40% | Sales Manager |' }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
     expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+
+  it('does not split a Russian decimal into a competing threshold', () => {
+    // Run 7bd743bd wrote "Customer effort score >3,5" in a red-flag list. Reading
+    // the comma as a list separator left ">3", which reads as a target competing
+    // with the ledger's "<=2,5" — a critical against a block quoting the ledger.
+    const issues = validateMetricLedgerConsistency(
+      blocks({
+        block_17: '- **Метрики:** CSAT <85%; Customer effort score >3,5; Escalation rate >15%.',
+      }),
+      context({
+        metricLedger: [
+          {
+            key: 'customer_effort_score',
+            label: 'Customer effort score',
+            unit: 'баллы',
+            target: '<=2,5 из 5',
+            green: '<=2,5',
+            yellow: '2,6-3,5',
+            red: '>3,5',
+            review_period: 'month',
+            provenance: 'assumption',
+            source_ref: null,
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it('still flags a genuine competing target', () => {

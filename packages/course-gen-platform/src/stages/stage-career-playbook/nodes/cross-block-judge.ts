@@ -26,9 +26,10 @@ import {
   selectPendingCareerPlaybookRegenerations,
 } from './block-regenerator';
 import {
-  invokeStructuredJudgeWithRepair,
-  StructuredJudgeOutputError,
-} from './cross-block-judge-structured';
+  invokeStructuredVerdictWithRepair,
+  resolveJudgeFallbackTokenThreshold,
+  StructuredVerdictOutputError,
+} from './structured-verdict';
 import { validateCareerPlaybookMermaidSyntax } from './mermaid-quality';
 import { getTargetLanguageTextViolations } from './language-consistency';
 import { findUnresolvedFillablePlaceholders } from './placeholder-detection';
@@ -75,6 +76,9 @@ export {
 } from './cross-block-judge-checks';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
+const JUDGE_PHASE = 'stage_career_playbook_judge';
+/** The verdict is findings, not prose, so a modest ceiling is enough. */
+const JUDGE_MAX_TOKENS = 4_000;
 
 export interface RunDeterministicChecksInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
@@ -858,17 +862,27 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
             ) || 'none',
           current_group_content: joinBlockMarkdown(currentBlocks),
         });
-        const judgeResult = await invokeStructuredJudgeWithRepair(
+        const judgeResult = await invokeStructuredVerdictWithRepair(
           runtime,
           prompt,
-          state.language,
+          {
+            phaseName: JUDGE_PHASE,
+            promptKey: JUDGE_PROMPT_KEY,
+            node: 'crossBlockJudge',
+            language: state.language,
+            maxTokens: JUDGE_MAX_TOKENS,
+            // Route the large final-document judge onto the fallback model up front
+            // so it does not burn a primary-model timeout before the retry net
+            // escalates.
+            preferFallbackModelAboveTokens: resolveJudgeFallbackTokenThreshold(),
+          },
           parseCareerPlaybookJudgeVerdict
         );
         nodeCosts.push(...judgeResult.nodeCosts);
         const llmVerdict = judgeResult.verdict;
         verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict, currentBlocks);
       } catch (error) {
-        if (error instanceof StructuredJudgeOutputError) {
+        if (error instanceof StructuredVerdictOutputError) {
           nodeCosts.push(...error.nodeCosts);
         }
 

@@ -90,8 +90,16 @@ export function dedupeIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybook
  * full stop was not a boundary, the next sentence's "Week 2" sat closer to the
  * anchor than the "Day 60" in its own clause. Block 18 was regenerated twice
  * against a date it had stated correctly.
+ *
+ * A comma with a digit on BOTH sides is not a separator at all: it is a Russian
+ * decimal point. Run 7bd743bd wrote its red band as "Customer effort score
+ * >3,5", the comma cut the number in half, and the surviving ">3" read as a
+ * threshold competing with the ledger's "<=2,5". The same guard keeps an English
+ * thousands separator whole. Both sides have to be digits, or the exemption
+ * swallows an ordinary list: "orientation — Week 1, 2 days later submit the
+ * forecast" would hand the second commitment the first one's date.
  */
-const ENUMERATION_SEPARATOR = /[,;()]|[.!?]\s/;
+const ENUMERATION_SEPARATOR = /,(?!\d)|(?<!\d),|[;()]|[.!?]\s/;
 
 /** The list item containing `index`, as text plus its offset in the line. */
 export function enumerationSegmentAt(line: string, index: number): { text: string; start: number } {
