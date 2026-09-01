@@ -644,7 +644,81 @@ export function runCareerPlaybookContractChecks(
     ...validateMilestoneConsistency(blocks, context),
     ...validateRampOwnership(blocks, context),
     ...validateCrossViewReference(blocks, context),
+    ...validateScriptSplice(blocks, context),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 12. A word that changes alphabet in the middle
+// ---------------------------------------------------------------------------
+
+/**
+ * A letter of one script immediately followed by a letter of the other, inside
+ * one word.
+ *
+ * The hyphen is what makes a Russian technical compound: "CRM-данных",
+ * "AI-инструменты", "quarterly-обзора" are ordinary and appear in almost every
+ * Russian guide, and none of them trips this — the script changes at a hyphen,
+ * not between two letters. "Руковедityel" has no hyphen, and is not a word in
+ * either language.
+ */
+const SCRIPT_SPLICE = /[\p{Script=Cyrillic}][a-zA-Z]|[a-zA-Z][\p{Script=Cyrillic}]/u;
+
+/**
+ * Flag a word whose letters are drawn from two alphabets.
+ *
+ * Five occurrences across the 25 stored playbooks, one per affected document,
+ * spanning three months — and not one false positive:
+ *
+ *   208746e3  block_26  провестиwelcome   a space eaten between two words
+ *   7bd743bd  block_2   Руковедityel      Latin spliced into «Руководитель»
+ *   a573c83c  block_3   ОКR               Cyrillic О and К wearing OKR's face
+ *   370c18c3  block_14  НДA               Cyrillic НД with a Latin A
+ *   30996512  block_2   войc              Latin c closing a Cyrillic word
+ *
+ * Stripping fenced blocks first is not cosmetic. A Mermaid label carries its
+ * line break as a literal `\n`, and reading the raw block turns
+ * `Директор по\nмаркетингу` into the word `nмаркетингу` — a sixth finding that
+ * is nothing but the escape.
+ *
+ * The judge is a poor detector for this and the corpus says so: it filed a
+ * `style` warning about 208746e3 and named three other fragments in that run,
+ * never this one, and none of the four older documents was flagged at all. Two
+ * of the six are homoglyph splices that look correct on the page — a reader
+ * cannot see them, and neither can a model reading the page. What they break is
+ * everything that reads the characters: search, copy-paste, a screen reader.
+ *
+ * Critical rather than a style note, because there is nothing here to weigh: a
+ * word that changes alphabet mid-run is wrong, and one occurrence per affected
+ * document is a rounding error against the regeneration budget.
+ */
+export function validateScriptSplice(
+  blocks: BlockMap,
+  _context: CareerPlaybookQualityCheckContext
+): CareerPlaybookJudgeIssue[] {
+  const issues: CareerPlaybookJudgeIssue[] = [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    const spliced = new Set<string>();
+    for (const word of stripFencedBlocks(content).match(/[\p{L}]+/gu) ?? []) {
+      if (SCRIPT_SPLICE.test(word)) spliced.add(word);
+    }
+    if (spliced.size === 0) continue;
+
+    issues.push(
+      issue(
+        blockId,
+        'wrong_language',
+        `${blockId} contains ${spliced.size === 1 ? 'a word' : 'words'} written in two alphabets at once: ${[...spliced].map(word => `"${word}"`).join(', ')}.`,
+        'Rewrite each of these in one alphabet. A Latin letter standing in for its Cyrillic lookalike reads correctly and breaks search, copy-paste and screen readers; a technical compound keeps its hyphen ("CRM-данных").'
+      )
+    );
+  }
+
+  return issues;
 }
 
 // ---------------------------------------------------------------------------
