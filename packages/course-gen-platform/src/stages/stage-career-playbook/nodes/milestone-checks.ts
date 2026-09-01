@@ -26,6 +26,7 @@ import type {
   CareerPlaybookMilestoneLedgerEntry,
 } from '@megacampus/shared-types';
 import {
+  blockPosition,
   dedupeIssues,
   enumerationSegmentAt,
   issue,
@@ -185,25 +186,78 @@ export function validateMilestoneConsistency(
 }
 
 /**
- * The block that publishes the ramp, and the block that keeps sending readers to
- * it and then answering the question itself.
+ * The block whose job is answering, not scheduling.
  *
- * Only the FAQ, because only the FAQ is measured. Run 4e355bf4 summarised the
- * whole ramp there in one line; run b7925b1d, after the group prompt was told to
- * point rather than repeat, opened block 18 with "the onboarding plan in Block 14
- * owns those dates — this section tells you what to do, not when" and then
- * answered its first question with Week 2, Day 30 and Day 60. Seven of its eight
- * answers point at a block; the one that copies is the one whose question asks
- * "when". The summary blocks (22, 24, 26) restate by design and no run has shown
- * them drifting, so they stay out until one does.
+ * The one block id in this module, and it is the product decision itself: a FAQ
+ * points at the ramp instead of reprinting it. Measured over the two stored runs
+ * that have a milestone ledger, the alternatives are worse and not by a little.
+ * Flagging every block that restates a published date costs 4 and 6 blocks per
+ * run — blocks 22, 24 and 26 restate by design, and section 1ter says so.
+ * Flagging the ones that cite the ramp block and copy it anyway still costs 4 and
+ * 3. This costs exactly one per run, and it is the one in the issue.
  */
-const RAMP_POINTER_BLOCK_IDS: readonly CareerPlaybookBlockId[] = ['block_18'];
-const RAMP_OWNER_BLOCK = 'Block 14';
-/** Enough labels to show the shape without turning the finding into the ramp again. */
-const RESTATED_LABELS_NAMED = 3;
+const RAMP_ANSWERING_BLOCK_ID: CareerPlaybookBlockId = 'block_18';
+
+/** Every (block, commitment) pair where a block states that commitment's own published date. */
+function restatementsOf(
+  blocks: BlockMap,
+  ledger: readonly CareerPlaybookMilestoneLedgerEntry[]
+): { blockId: CareerPlaybookBlockId; label: string; offset: string; line: string }[] {
+  const found: { blockId: CareerPlaybookBlockId; label: string; offset: string; line: string }[] =
+    [];
+
+  for (const [blockId, blockState] of Object.entries(blocks)) {
+    const content = blockState?.content;
+    if (!content) continue;
+
+    for (const line of proseLines(content)) {
+      for (const entry of ledger) {
+        const canonical = normalizeCareerPlaybookMilestone(entry.offset);
+        if (!canonical) continue;
+        if (!lineNamesLabelLoosely(line, entry.label)) continue;
+
+        const stated = nearestMilestoneAcrossMentions(line, entry.label);
+        if (stated?.days !== canonical.days) continue;
+
+        found.push({ blockId, label: entry.label, offset: canonical.canonical, line });
+      }
+    }
+  }
+
+  return found;
+}
 
 /**
- * Flag the FAQ for republishing a ramp deadline the onboarding block owns.
+ * Which block publishes the ramp, according to the document.
+ *
+ * Derived, never named — the same answer `validateCadenceConsistency` reaches for
+ * a rhythm with no ledger row: the block carrying the most of them, earliest
+ * catalogue position breaking a tie. In both stored runs that is block_14 by a
+ * wide margin (9 against 4, 19 against 8), so the check can point at the owner
+ * without a second constant that goes stale the day the ramp moves.
+ *
+ * The answering block is not a candidate. It could out-state the real publisher
+ * on a bad run, and then the check would bless the copy and blame the original.
+ */
+function rampOwnerBlockId(
+  restatements: readonly { blockId: CareerPlaybookBlockId }[]
+): CareerPlaybookBlockId | null {
+  const counts = new Map<CareerPlaybookBlockId, number>();
+  for (const entry of restatements) {
+    if (entry.blockId === RAMP_ANSWERING_BLOCK_ID) continue;
+    counts.set(entry.blockId, (counts.get(entry.blockId) ?? 0) + 1);
+  }
+
+  return (
+    [...counts.entries()].sort(
+      ([leftId, left], [rightId, right]) =>
+        right - left || blockPosition(leftId) - blockPosition(rightId)
+    )[0]?.[0] ?? null
+  );
+}
+
+/**
+ * Flag the FAQ for republishing a ramp deadline another block owns.
  *
  * The complement of `validateMilestoneConsistency`, and it fires on exactly what
  * that check passes: a date that AGREES with the ledger. Agreement is the whole
@@ -215,8 +269,12 @@ const RESTATED_LABELS_NAMED = 3;
  * commitment and states that commitment's own published deadline, decided by the
  * same anchor logic as the consistency check — the logic that cost run 4e355bf4
  * five false criticals before it learned to anchor on the rare word rather than
- * the first one. One issue per block: the remedy is identical for every date in
- * it, and two attempts is all a block gets.
+ * the first one.
+ *
+ * Silent when no other block publishes the ramp: then the FAQ is not holding a
+ * copy of anything, and "send the reader to the owner" would name nowhere. One
+ * issue, because the remedy is one remedy however many dates it covers, and two
+ * attempts is all a block gets.
  */
 export function validateRampOwnership(
   blocks: BlockMap,
@@ -225,49 +283,19 @@ export function validateRampOwnership(
   const ledger = context.milestoneLedger ?? [];
   if (ledger.length === 0) return [];
 
-  const issues: CareerPlaybookJudgeIssue[] = [];
+  const restatements = restatementsOf(blocks, ledger);
+  const copied = restatements.filter(entry => entry.blockId === RAMP_ANSWERING_BLOCK_ID);
+  const ownerBlockId = rampOwnerBlockId(restatements);
+  if (copied.length === 0 || !ownerBlockId) return [];
 
-  for (const blockId of RAMP_POINTER_BLOCK_IDS) {
-    const content = blocks[blockId]?.content;
-    if (!content) continue;
+  const named = copied.map(entry => `"${entry.label}" (${entry.offset})`).join(', ');
 
-    const restated: { label: string; offset: string }[] = [];
-    let firstLine: string | null = null;
-
-    for (const line of proseLines(content)) {
-      for (const entry of ledger) {
-        const canonical = normalizeCareerPlaybookMilestone(entry.offset);
-        if (!canonical) continue;
-        if (!lineNamesLabelLoosely(line, entry.label)) continue;
-
-        const stated = nearestMilestoneAcrossMentions(line, entry.label);
-        if (stated?.days !== canonical.days) continue;
-
-        restated.push({ label: entry.label, offset: canonical.canonical });
-        firstLine ??= line;
-      }
-    }
-
-    if (restated.length === 0 || !firstLine) continue;
-
-    const named = restated
-      .slice(0, RESTATED_LABELS_NAMED)
-      .map(entry => `"${entry.label}" (${entry.offset})`)
-      .join(', ');
-    const rest =
-      restated.length > RESTATED_LABELS_NAMED
-        ? ` and ${restated.length - RESTATED_LABELS_NAMED} more`
-        : '';
-
-    issues.push(
-      issue(
-        blockId,
-        'contradiction',
-        `${blockId} republishes the ramp deadline for ${named}${rest}, which ${RAMP_OWNER_BLOCK} owns: "${truncateLine(firstLine)}". The dates agree today; the copy is what drifts.`,
-        `Answer the question in ${blockId} without the dates — say what the reader does and send them to ${RAMP_OWNER_BLOCK} for when. Change nothing in ${RAMP_OWNER_BLOCK}: it publishes the ramp.`
-      )
-    );
-  }
-
-  return dedupeIssues(issues);
+  return [
+    issue(
+      RAMP_ANSWERING_BLOCK_ID,
+      'contradiction',
+      `${RAMP_ANSWERING_BLOCK_ID} republishes the ramp deadline for ${named}, which ${ownerBlockId} publishes: "${truncateLine(copied[0].line)}". The dates agree today; the copy is what drifts.`,
+      `Answer the question in ${RAMP_ANSWERING_BLOCK_ID} without the dates — say what the reader does and send them to ${ownerBlockId} for when. Change nothing in ${ownerBlockId}: it publishes the ramp.`
+    ),
+  ];
 }
