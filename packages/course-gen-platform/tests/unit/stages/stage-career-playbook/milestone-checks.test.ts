@@ -466,3 +466,80 @@ You lead the first pipeline review in Week 4.`;
     ).not.toEqual([]);
   });
 });
+
+/**
+ * How block 14 actually writes the ramp.
+ *
+ * Every case below is a line from run b7925b1d's onboarding block, and until
+ * 2026-09-01 the checks read one of the eight commitments in it. The dash that
+ * attaches a milestone to its commitment was treated as an enumeration
+ * separator, so the commitment and its date landed in different segments
+ * (mc2-nedcb); a hyphen inside a label made that whole row unmatchable
+ * (mc2-nx9lx).
+ */
+describe('the ramp block is readable in the form it is written', () => {
+  const ledger = [
+    {
+      key: 'orientation',
+      label: 'Complete team and stakeholder orientation',
+      offset: 'week 1',
+      owner: 'Hiring manager',
+      scope: 'the new hire',
+    },
+    {
+      key: 'first_forecast',
+      label: 'Submit the first evidence-based forecast',
+      offset: 'week 2',
+      owner: 'Hiring manager',
+      scope: 'the new hire',
+    },
+  ];
+
+  it('reads a milestone attached to its commitment by a dash', () => {
+    const wrong = blocks([
+      [
+        'block_14',
+        '1. **Meet every stakeholder you depend on.** Complete team and stakeholder orientation — **Week 3**.',
+      ],
+    ]);
+
+    const issues = validateMilestoneConsistency(wrong, { milestoneLedger: ledger });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('week 3');
+    expect(issues[0].description).toContain('week 1');
+  });
+
+  it('reads a table row that carries the commitment and the due date in separate cells', () => {
+    const wrong = blocks([
+      [
+        'block_14',
+        '| Take the controls | Draft your first forecast and defend it with stage evidence | Submit the first evidence-based forecast — Week 4 |',
+      ],
+    ]);
+
+    expect(validateMilestoneConsistency(wrong, { milestoneLedger: ledger })).toHaveLength(1);
+  });
+
+  it('reads a label whose own word carries a hyphen', () => {
+    // "evidence-based" was stripped to "evidencebased", which matches no line at
+    // all, so this commitment was invisible however it was written.
+    const wrong = blocks([
+      ['block_18', 'You submit your first evidence-based forecast in Week 4.'],
+    ]);
+
+    expect(validateMilestoneConsistency(wrong, { milestoneLedger: ledger })).toHaveLength(1);
+  });
+
+  it('still refuses to read a deadline belonging to the neighbouring list item', () => {
+    // The guard the dash was mistaken for: a comma does separate two commitments.
+    const correct = blocks([
+      [
+        'block_14',
+        'Complete team and stakeholder orientation — Week 1, submit the first evidence-based forecast — Week 2.',
+      ],
+    ]);
+
+    expect(validateMilestoneConsistency(correct, { milestoneLedger: ledger })).toEqual([]);
+  });
+});

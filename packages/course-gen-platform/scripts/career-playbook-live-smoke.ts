@@ -9,6 +9,7 @@ import {
   type CareerPlaybookCleanupManifest,
   type CareerPlaybookCleanupScope,
   type CareerPlaybookLiveSmokeClient,
+  type CareerPlaybookLiveSmokeLanguage,
   type CareerPlaybookLiveSmokeMode,
   type CareerPlaybookLiveSmokeReport,
   type CareerPlaybookLiveSmokeTarget,
@@ -29,6 +30,7 @@ interface ParsedArgs {
   pollTimeoutMs?: number;
   pollIntervalMs?: number;
   resumePlaybookId?: string;
+  contentLanguage?: CareerPlaybookLiveSmokeLanguage;
   confirmLiveMutation: boolean;
   includeCourseBridge: boolean;
   noArtifact: boolean;
@@ -401,6 +403,7 @@ Options:
   --poll-timeout-ms <number>               Max wait time for generated artifacts (default: 2700000)
   --poll-interval-ms <number>              Poll interval while waiting (default: 5000)
   --resume-playbook-id <uuid>              Resume post-generation evidence capture for an existing playbook
+  --content-language <en|ru>               Fixture language for the generated guide (default: en)
   --confirm-live-mutation                  Required for mutation-smoke
   --include-course-bridge                  Also create the bridge course; requires cleanup coverage
   --no-artifact                            Skip writing the final_markdown + cost_breakdown artifact
@@ -448,6 +451,15 @@ function parseArgs(argv: string[]): ParsedArgs {
     const arg = argv[index];
 
     switch (arg) {
+      case '--content-language': {
+        const value = readValue(argv, index, '--content-language');
+        if (value !== 'en' && value !== 'ru') {
+          throw new Error('--content-language must be en or ru');
+        }
+        parsed.contentLanguage = value;
+        index += 1;
+        break;
+      }
       case '--mode': {
         const value = readValue(argv, index, arg);
         if (value !== 'plan' && value !== 'mutation-smoke') {
@@ -652,6 +664,7 @@ async function main(): Promise<void> {
       pollTimeoutMs: args.pollTimeoutMs,
       pollIntervalMs: args.pollIntervalMs,
       resumePlaybookId: args.resumePlaybookId,
+      contentLanguage: args.contentLanguage,
       confirmLiveMutation: args.confirmLiveMutation,
       includeCourseBridge: args.includeCourseBridge,
     },

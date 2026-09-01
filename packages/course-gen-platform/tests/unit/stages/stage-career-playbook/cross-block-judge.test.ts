@@ -1747,3 +1747,89 @@ flowchart LR
     });
   });
 });
+
+/**
+ * What the first Russian run since 2026-08-22 cost.
+ *
+ * Run db9d3ff9 (2026-09-01) shipped seven criticals against three in the English
+ * run beside it, and two of the seven were the checks misreading a correct
+ * document. Both fragments below are that run's own text.
+ */
+describe('a Russian guide is read by the same rules as an English one', () => {
+  it('counts failure modes written as sub-headings, not only as rows and bullets', async () => {
+    // Four failure modes, each a `###` section with prose under it, and not a
+    // bullet or a table row in sight. The counter read 0 and block_21 spent both
+    // its regeneration attempts on a minimum it already met.
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_21',
+          `## 21. Как люди обычно проваливаются на этой роли
+
+Режим: FMEA-подход — что идет не так, как это заметить рано, что сделать заранее.
+
+### Режим отказа 1: Воронка существует формально
+
+**Как проваливается:** стадии и суммы в CRM неактуальны.
+
+### Режим отказа 2: Прогноз на оптимизме
+
+**Как проваливается:** прогноз расходится с фактом.
+
+### Режим отказа 3: Руководитель — узкое место
+
+**Как проваливается:** планы пишет руководитель.
+
+### Режим отказа 4: Активность без конверсии
+
+**Как проваливается:** активность растет, конверсия падает.`,
+        ],
+      ]),
+    });
+
+    expect(verdict.issues.filter(issue => issue.description.includes('failure modes'))).toEqual([]);
+  });
+
+  it('does not read an English source title in a Russian guide as English prose', async () => {
+    // The reading list carries the titles of the sources it cites, and an English
+    // source keeps its English title. Block 25 was told it was in the wrong
+    // language and spent an attempt on text it could not translate without
+    // misquoting.
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_25',
+          `## 25. Когда пересматривать эту инструкцию
+
+**Версия:** 1.0 от 2026-09-01. Владелец документа — коммерческий директор.
+
+Плановая ревизия всей инструкции — раз в квартал.
+
+### Источники
+
+- [S1] B2B Buying: How Top CSOs and CMOs Optimize the Journey — https://www.gartner.com/en/sales/insights/b2b-buying-journey (research)
+- [S2] Use Science to Improve Sales Team Productivity — https://www.forrester.com/blogs/use-science-to-improve-sales-productivity (research)`,
+        ],
+      ]),
+      contentLanguage: 'ru',
+    });
+
+    expect(verdict.issues.filter(issue => issue.category === 'wrong_language')).toEqual([]);
+  });
+
+  it('still catches an English paragraph the guide itself wrote', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_25',
+          `## 25. Когда пересматривать эту инструкцию
+
+This guide should be reviewed every quarter, and the owner of the document is the commercial director who will initiate the update.`,
+        ],
+      ]),
+      contentLanguage: 'ru',
+    });
+
+    expect(verdict.issues.filter(issue => issue.category === 'wrong_language')).toHaveLength(1);
+  });
+});

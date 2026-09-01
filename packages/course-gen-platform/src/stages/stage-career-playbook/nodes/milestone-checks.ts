@@ -27,6 +27,8 @@ import type {
 } from '@megacampus/shared-types';
 import {
   dedupeIssues,
+  labelWordPattern,
+  labelWords,
   enumerationSegmentAt,
   issue,
   lineNamesLabelLoosely,
@@ -83,10 +85,6 @@ function milestoneNear(line: string, commitmentIndex: number): MilestoneMention 
   return best;
 }
 
-function wordPattern(word: string): RegExp {
-  return new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'giu');
-}
-
 /**
  * The label word that best locates THIS commitment in THIS line.
  *
@@ -99,15 +97,12 @@ function wordPattern(word: string): RegExp {
  * "coaching", each starts where it belongs.
  */
 function locatingWord(line: string, label: string): string | null {
-  const words = label
-    .split(/[\s/]+/)
-    .map(word => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter(word => word.length >= 4);
+  const words = labelWords(label);
   if (words.length === 0) return null;
 
   let best: { word: string; count: number } | null = null;
   for (const word of words) {
-    const count = [...line.matchAll(wordPattern(word))].length;
+    const count = [...line.matchAll(labelWordPattern(word, 'giu'))].length;
     if (count === 0) continue;
     if (!best || count < best.count || (count === best.count && word.length > best.word.length)) {
       best = { word, count };
@@ -126,7 +121,7 @@ function nearestMilestoneAcrossMentions(
   if (!anchor) return null;
 
   let best: MilestoneMention | null = null;
-  for (const mention of line.matchAll(wordPattern(anchor))) {
+  for (const mention of line.matchAll(labelWordPattern(anchor, 'giu'))) {
     const found = milestoneNear(line, mention.index ?? 0);
     if (found && (!best || found.distance < best.distance)) best = found;
   }

@@ -174,6 +174,11 @@ export function validateBlockLanguageConsistency(
     issues.push({
       block_id: blockId,
       severity: 'critical',
+      // Categorised so the class is countable from a stored row. Until
+      // 2026-09-01 this issue and the format minimums shipped with no category
+      // at all, and run db9d3ff9's two machinery defects were both recorded as
+      // `undefined` — visible only by reading their prose.
+      category: 'wrong_language',
       description: `${blockId} contains text that is not in the target content language (${contentLanguage}): ${violations.join('; ')}`,
       suggestion: `Rewrite ${blockId} so all user-facing text is in the target content language (${contentLanguage}).`,
     });
