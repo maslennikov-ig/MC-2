@@ -81,6 +81,25 @@ export const CareerPlaybookGraphState = Annotation.Root({
     reducer: (current, update) => ({ ...current, ...update }),
     default: () => ({}),
   }),
+  // Blocks the most recent judge pass allows to draw on the final-window reserve.
+  // It has to travel through state: the judge decides it, the regenerator spends
+  // it, and before this field existed the decision never left the judge's own
+  // bookkeeping — `selectPendingCareerPlaybookRegenerations` refused every block
+  // once the window was spent, exempt or not, so the exemption changed nothing.
+  // Replaced rather than merged, because it describes one pass and a block that
+  // has since used its attempt must not stay listed.
+  windowBudgetExemptBlockIds: Annotation<CareerPlaybookBlockId[]>({
+    reducer: (current, update) => update ?? current,
+    default: () => [],
+  }),
+  // Reserve attempts granted so far. Counted rather than derived: "attempts
+  // beyond the window budget" looks like the same number and is not, because the
+  // final window sums attempts across every block — run 2896e72f stood at 19 of
+  // 8 having drawn nothing from a reserve that did not yet exist.
+  finalWindowReserveSpent: Annotation<number>({
+    reducer: (current, update) => update ?? current,
+    default: () => 0,
+  }),
   // Size of the eligible batch the most recent blockRegenerator pass selected.
   // Zero means the pass regenerated nothing — every flagged block was already at its
   // per-block/window cap — so re-judging identical content would be redundant and the

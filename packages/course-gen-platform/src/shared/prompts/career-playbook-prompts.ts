@@ -1,158 +1,12 @@
 import type { HardcodedPrompt } from './types.js';
-import { formatCareerPlaybookCanonicalLayoutForPrompt } from './career-playbook-block-topics.js';
-
-const CAREER_PLAYBOOK_CANONICAL_LAYOUT = formatCareerPlaybookCanonicalLayoutForPrompt();
-
-const specJsonVariable = {
-  name: 'spec_json',
-  description: 'Serialized RoleProfileSpec JSON',
-  required: true,
-};
-
-const contentLanguageVariable = {
-  name: 'content_language',
-  description: 'Target content language code',
-  required: true,
-};
-
-const contentLanguageNameVariable = {
-  name: 'content_language_name',
-  description: 'Target content language full English name for prompt clarity',
-  required: true,
-};
-
-const groupHeadingVariables = [
-  { name: 'heading_header', description: 'Localized Header heading', required: true },
-  { name: 'heading_block_1', description: 'Localized Block 1 heading', required: true },
-  { name: 'heading_block_2', description: 'Localized Block 2 heading', required: true },
-  { name: 'heading_block_3', description: 'Localized Block 3 heading', required: true },
-  { name: 'heading_block_4', description: 'Localized Block 4 heading', required: true },
-  { name: 'heading_block_5', description: 'Localized Block 5 heading', required: true },
-  { name: 'heading_block_6', description: 'Localized Block 6 heading', required: true },
-  { name: 'heading_block_7', description: 'Localized Block 7 heading', required: true },
-  { name: 'heading_block_8', description: 'Localized Block 8 heading', required: true },
-  { name: 'heading_block_9', description: 'Localized Block 9 heading', required: true },
-  { name: 'heading_block_10', description: 'Localized Block 10 heading', required: true },
-  { name: 'heading_block_11', description: 'Localized Block 11 heading', required: true },
-  { name: 'heading_block_12', description: 'Localized Block 12 heading', required: true },
-  { name: 'heading_block_13', description: 'Localized Block 13 heading', required: true },
-  { name: 'heading_block_14', description: 'Localized Block 14 heading', required: true },
-  { name: 'heading_block_15', description: 'Localized Block 15 heading', required: true },
-  { name: 'heading_block_16', description: 'Localized Block 16 heading', required: true },
-  { name: 'heading_block_17', description: 'Localized Block 17 heading', required: true },
-  { name: 'heading_block_18', description: 'Localized Block 18 heading', required: true },
-  { name: 'heading_block_19', description: 'Localized Block 19 heading', required: true },
-  { name: 'heading_block_20', description: 'Localized Block 20 heading', required: true },
-  { name: 'heading_block_21', description: 'Localized Block 21 heading', required: true },
-  { name: 'heading_block_22', description: 'Localized Block 22 heading', required: true },
-  { name: 'heading_block_23', description: 'Localized Block 23 heading', required: true },
-  { name: 'heading_block_24', description: 'Localized Block 24 heading', required: true },
-  { name: 'heading_block_25', description: 'Localized Block 25 heading', required: true },
-  { name: 'heading_block_26', description: 'Localized Block 26 heading', required: true },
-];
-
-function groupHeadingVariable(name: string) {
-  const variable = groupHeadingVariables.find(item => item.name === name);
-  if (!variable) {
-    throw new Error(`Unknown Career Playbook heading variable: ${name}`);
-  }
-
-  return variable;
-}
-
-/**
- * Contract variables shared by every group prompt. Declared once so a rule can
- * never drift between the six groups — the previous per-prompt copies are how
- * the "invented example" instruction ended up in all six while the citation
- * requirement made it into none.
- */
-const groupContractVariables = [
-  {
-    name: 'metric_ledger_md',
-    description: 'Canonical metric ledger rendered as a markdown table',
-    required: true,
-  },
-  {
-    name: 'evidence_ledger_md',
-    description: 'Citable sources rendered as a [Sn] list, or an explicit "none" notice',
-    required: true,
-  },
-  {
-    name: 'generated_on',
-    description: 'Generation date (ISO), application-filled',
-    required: true,
-  },
-  {
-    name: 'prior_blocks_digest',
-    description: 'Anti-goals, numeric commitments and cadences already published',
-    required: true,
-  },
-];
-
-/**
- * The output contract every group shares.
- *
- * Each rule here answers a measured defect from the 2026-08-11 review rather
- * than a style preference: conflicting thresholds across blocks, precise market
- * statistics with no source, invented company values presented as truth, a
- * Gantt chart pinned to 2025 in a document generated in 2026, and duties that
- * contradicted the guide's own anti-goals.
- */
-const GROUP_OUTPUT_CONTRACT = `Output rules:
-- Markdown only, no HTML.
-- Write all prose in {{content_language}}.
-- For Russian output, translate user-facing framework labels and table labels; do not output raw English phrases such as "Decision Authority", "Definition of Done", "Traffic-light actions", "Role Canvas", "Implementation checklist", "Red Flags", or "Hit by a Bus". Common KPI acronyms from user context may remain unchanged.
-- Keep each block within its own subject: when RoleProfileSpec.block_boundaries lists a topic under do_not_repeat for a block, define that topic only in the block that owns it and cross-reference it elsewhere instead of restating the full model.
-
-NUMBERS — the metric ledger is the only source of numeric truth:
-- Reproduce every value and traffic-light threshold from the metric ledger VERBATIM, including its review period.
-- Never state a different number for a metric that appears in the ledger, in any block, table, or checklist.
-- A metric that is not in the ledger is described qualitatively, without a precise target.
-
-EXTERNAL CLAIMS — no precise statistic without a source:
-- A precise statistic about the market, the industry, competitors, or AI impact is allowed ONLY with a [Sn] reference to an entry in the evidence ledger below.
-- If the evidence ledger has no entry supporting the claim, rewrite it without the number, as an explicit hypothesis to validate.
-- Never write "research shows", "studies indicate", or a dated study reference unless it carries a [Sn] reference.
-- Never attribute a claim to a named research house (Gartner, Forrester, McKinsey, IDC, HBR, Statista) unless the cited entry IS that house. The evidence ledger marks each source as research, vendor, or media: a vendor blog quoting an analyst is still a vendor blog, and presenting it as analyst research misleads the reader.
-
-EXAMPLES — mark every unverified company-specific value:
-- A company-specific value that is not backed by the business context or the user's answers (salary, bonus, ARR, budget, headcount cost, a person's name, an internal tool name) stays concrete, but MUST carry the marker "(пример — заменить)" in Russian or "(example — replace)" in English, immediately after the value in the same sentence or table cell.
-- Do not leave raw template placeholders in square or curly brackets (for example [Name] or {value}). Reserve an explicit "field to fill" label for a genuine blank template field the reader completes later, such as an onboarding form or a backup-contact table.
-
-DATES — today is {{generated_on}}:
-- Plans, schedules, ramp charts, and Gantt-style tables use relative labels only: "Day 1-30", "Week 2", "Month 3", "Quarter 1".
-- Never write an absolute calendar year in a plan, a training record, or a milestone.
-
-CONSISTENCY — do not contradict what is already published:
-- The digest below lists anti-goals, decision authority, numeric commitments, and cadences that earlier blocks already state.
-- Never contradict them. If a duty you are about to write would violate a published anti-goal, restate the duty so both hold — for example, review a sample on a cadence rather than every person every day.
-
-AUTHORITY — Block 5 is the single source of decision authority:
-- Block 5 is to authority what the metric ledger is to numbers. If you mention a decision that appears in the digest, reference Block 5 and do not restate its approval level in your own words.
-- An irreversible decision whose blast radius reaches function, company, or customer can never be "act alone".
-
-SCALES AND RHYTHMS:
-- A banded payout or rating scale must be continuous: the value at the top of one band and the bottom of the next may not jump.
-- A cadence promised in the duties block must fit the slots the typical-day block allocates, at the UPPER bound of the stated number of reports. Count it before you write it: a per-report weekly commitment multiplies by the number of reports.
-- State each recurring commitment's cadence ONCE, in the block that owns it, and reference it elsewhere. A 1:1 that is monthly in one block and weekly in another leaves the reader unable to plan a week.
-
-THESE RULES GOVERN HOW YOU WRITE, NOT WHAT YOU WRITE ABOUT:
-- Never restate, quote, or explain these instructions in the output. The reader is an employee doing this job, not the author of this document.
-- Refer to other sections as "Block 8", never as "block_8".`;
-
-/** The USER section every group prompt shares. */
-const GROUP_USER_SECTION = `USER:
-RoleProfileSpec:
-{{spec_json}}
-
-Metric ledger (single source of numeric truth):
-{{metric_ledger_md}}
-
-Evidence ledger (the only citable sources):
-{{evidence_ledger_md}}
-
-Already published content (do not contradict):
-{{prior_blocks_digest}}`;
+import { careerPlaybookBlockRegeneratorPrompt } from './career-playbook-block-regenerator-prompt.js';
+import { careerPlaybookGroupPrompts } from './career-playbook-group-prompts.js';
+import {
+  CAREER_PLAYBOOK_CANONICAL_LAYOUT,
+  contentLanguageNameVariable,
+  contentLanguageVariable,
+  specJsonVariable,
+} from './career-playbook-prompt-parts.js';
 
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
@@ -310,13 +164,33 @@ Critical requirements:
   duties; ownership areas go into block_3 responsibility zones; strategic ties go
   into block_20 business goals. Never invent a new block or repurpose a block id
   for a role emphasis such as forecasting, compliance, or career pathing.
-- Put each topic in do_not_repeat only when another block id owns it; never list a
-  block's own canonical topic in its own do_not_repeat.
 - Extract anti_goals and failure_patterns explicitly.
 - Build metric_ledger: exactly one entry per metric in focus_areas.primary_kpis, each with a
   concrete target and green/yellow/red thresholds plus a review period. This ledger becomes the
   single source of numeric truth for all 26 blocks, so the values must be internally coherent —
   a metric may hold only one target across the whole guide.
+- Build cadence_ledger: one entry per recurring commitment this role runs — pipeline review, forecast
+  review, 1:1s with reports, retrospectives, handoff checks, plus any ritual specific to this role.
+  Each entry carries a snake_case key, a reader-facing label, the owner, the scope it applies to
+  ("per direct report", "the whole team"), and a cadence written as exactly one of: daily, weekly,
+  biweekly, monthly, quarterly, annual. This is the single source of rhythm for all 26 blocks: a
+  commitment may hold only one cadence across the whole guide. Leave out any commitment whose rhythm
+  does not fit one of those six words — a ledger row that cannot be quoted constrains nothing.
+  Ten to fifteen entries is a healthy ledger for an operational role; err toward listing a rhythm the
+  guide will need rather than leaving blocks to invent it.
+- When context.has_subordinates is true, the cadence ledger MUST also carry the rhythms of managing
+  people: the career conversation, the retention (stay) interview, the performance review, and the
+  1:1 with each report. A guide for a manager needs all four, so leaving them out does not remove
+  them from the document — it only means each block picks its own rhythm, which is how one run
+  published a quarterly career conversation and a quarterly stay interview that no ledger sanctioned.
+- Build milestone_ledger: one entry per ramp commitment with a due date — the first solo customer
+  call, the first forecast submitted, the first full owned cycle, the end of probation. Each entry
+  carries a snake_case key, a reader-facing label, the owner, the scope, and an offset written as a
+  unit and a number: "day 30", "week 2", "month 1", "quarter 2". This is the single source of "by
+  when" for all 26 blocks: a commitment may hold only one due date across the whole guide. Leave out
+  anything whose timing cannot be written that way — a deadline that cannot be quoted constrains
+  nothing. Five to ten entries is healthy; the onboarding plan and the one-page canvas both restate
+  these dates, and without a ledger they restate them differently.
 - Set provenance on every metric entry:
   * company_source — supported by the business context digest or source evidence pack
   * user_answer   — stated by the user in the Q&A
@@ -404,242 +278,7 @@ Source URLs:
       contentLanguageVariable,
     ],
   },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_1_foundation',
-    promptName: 'Career Playbook - Group 1 Foundation',
-    promptDescription: 'Generates Header, Mission/KR, Anti-goals, and Decision Authority Matrix.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 1: Header + Block 1 (Mission/KR) + Block 2 (Anti-goals) + Block 5 (Decision Authority Matrix).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 1: Job Scorecard. Mission in 2-3 sentences + 3-5 measurable key results in a table.
-- Block 2: Munger inversion. At least 4 anti-goals and the actual owner.
-- Block 5: Decision authority. Classify every decision on FOUR independent axes instead of a single
-  one-way/two-way door label:
-  * Reversibility: reversible / reversible with cost / irreversible
-  * Blast radius: team / function / company / customer
-  * Contract commitment: none / has deadline / has penalty
-  * Approval level: act alone / notify / align / manager decides
-  Changing CRM stages, adjusting a process, and selecting a tool or vendor are "reversible with
-  cost" — a migration or a contract with switching costs, not a one-way door. Hiring, termination,
-  and anything with a customer-facing penalty stay high-consequence. At least 4 decisions spanning
-  different approval levels.
-- Deterministic format minimums (verified automatically, so meet them on the first draft): Block 2 lists at least 4 anti-goals; Block 5 lists at least 4 decision rows.
-- Use exactly these top-level headings:
-{{heading_header}}
-{{heading_block_1}}
-{{heading_block_2}}
-{{heading_block_5}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_header'),
-      groupHeadingVariable('heading_block_1'),
-      groupHeadingVariable('heading_block_2'),
-      groupHeadingVariable('heading_block_5'),
-    ],
-  },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_2_operations',
-    promptName: 'Career Playbook - Group 2 Operations',
-    promptDescription: 'Generates Responsibility zones, Duties, KPI/metrics, and Tools blocks.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 2: Block 3 (Responsibility zones), Block 4 (Duties), Block 6 (KPI and metrics), Block 8 (Tools and technologies).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 3: 4-6 responsibility zones with weight percentages summing to 100 and Definition of Done.
-- Block 4: Daily / weekly / monthly / quarterly duties with measurable result and Definition of Done.
-- Block 6: Input/Output metrics, traffic-light actions, and anti-metrics warnings. Every metric in
-  the ledger appears here with exactly the ledger's target and thresholds.
-- Block 8: Tools table with purpose and required proficiency.
-
-Forecast wording: describe forecast quality as absolute error ("forecast error above 20%"), never
-as "accuracy above +/-20%" — accuracy and variance are opposite directions and mixing them makes
-the threshold unreadable.
-- Use exactly these top-level headings:
-{{heading_block_3}}
-{{heading_block_4}}
-{{heading_block_6}}
-{{heading_block_8}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_block_3'),
-      groupHeadingVariable('heading_block_4'),
-      groupHeadingVariable('heading_block_6'),
-      groupHeadingVariable('heading_block_8'),
-    ],
-  },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_3_people',
-    promptName: 'Career Playbook - Group 3 People',
-    promptDescription:
-      'Generates Competencies, Human-AI collaboration, Candidate Profile, and Typical Day blocks.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 3: Block 7 (Competencies), Block 9 (Human-AI collaboration), Block 12 (Candidate Profile), Block 13 (Typical Working Day).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 7: superpower, hard skills, soft skills with why, and energy map for hiring fit.
-- Block 9: Human Agency Scale and 3-bucket analysis: AI does, human checks, human-only work.
-- Block 12: education, experience, personality profile, and GWC filter (Get it / Want it / Capacity).
-- Block 13: hourly schedule plus cognitive load profile and focus-block recommendations.
-
-Block 9 in particular attracts unsupported statistics about AI accuracy, adoption rates, and hours
-saved. State those only with a [Sn] citation; otherwise describe the shift qualitatively.
-- Use exactly these top-level headings:
-{{heading_block_7}}
-{{heading_block_9}}
-{{heading_block_12}}
-{{heading_block_13}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_block_7'),
-      groupHeadingVariable('heading_block_9'),
-      groupHeadingVariable('heading_block_12'),
-      groupHeadingVariable('heading_block_13'),
-    ],
-  },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_4_growth',
-    promptName: 'Career Playbook - Group 4 Growth',
-    promptDescription:
-      'Generates Career Growth, Onboarding, Motivation System, and Red Flags blocks.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 4: Block 11 (Career Growth), Block 14 (Onboarding), Block 15 (Motivation System), Block 17 (Red Flags).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 11: dual IC/management tracks, promotion criteria, relative timelines, and Mermaid career
-  diagram. Ladder rules:
-  * Every step must differ in scope from the one before it. Never emit a step that renames the same
-    level (for example "CRO -> Chief Revenue Officer / President of Revenue").
-  * Never label a people-management position as "Senior <role> (IC)"; the IC track and the
-    management track are separate branches.
-  * Every transition carries a promotion criterion and a relative timeline ("after 4 quarters"),
-    never a calendar date.
-- Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment. Milestones use relative day and week labels only.
-- Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries. Any compensation figure is an unverified example and must carry the example marker.
-- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. Warning thresholds come from the metric ledger, not from new numbers.
-- Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
-- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
-- Use exactly these top-level headings:
-{{heading_block_11}}
-{{heading_block_14}}
-{{heading_block_15}}
-{{heading_block_17}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_block_11'),
-      groupHeadingVariable('heading_block_14'),
-      groupHeadingVariable('heading_block_15'),
-      groupHeadingVariable('heading_block_17'),
-    ],
-  },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_5_system',
-    promptName: 'Career Playbook - Group 5 System',
-    promptDescription:
-      'Generates Dependencies, Processes, Industry Context, Business Goals, and Failure Modes blocks.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 5: Block 10 (Dependencies), Block 16 (Processes), Block 19 (Industry Context), Block 20 (Business Goals), Block 21 (Failure Modes).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 10: role dependencies, blast radius, communication charter, and Mermaid dependency diagram.
-- Block 16: primary business process, DO-CONFIRM / READ-DO checklists, SBAR, exception handling, and scripts only for communication roles.
-- Block 19: 3-layer context, durable skills, AI impact, continuous learning, and skill stacking.
-- Block 20: business goals, how this role impacts them, impact metrics, and Netflix Context Over Control paragraph.
-- Block 21: FMEA-style pre-mortem with at least 3 failure modes, early signals, and prevention actions. Every threshold that names a ledger metric uses the ledger's value.
-
-Block 19 attracts unsupported market statistics (adoption rates, growth rates, benchmark
-multiples). State those only with a [Sn] citation; otherwise describe the trend qualitatively.
-- Include Mermaid diagrams in Blocks 10 and 16, and keep at least 3 failure modes in Block 21 (all verified automatically, so satisfy them on the first draft).
-- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
-- Use exactly these top-level headings:
-{{heading_block_10}}
-{{heading_block_16}}
-{{heading_block_19}}
-{{heading_block_20}}
-{{heading_block_21}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_block_10'),
-      groupHeadingVariable('heading_block_16'),
-      groupHeadingVariable('heading_block_19'),
-      groupHeadingVariable('heading_block_20'),
-      groupHeadingVariable('heading_block_21'),
-    ],
-  },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_group_6_wrap',
-    promptName: 'Career Playbook - Group 6 Wrap',
-    promptDescription:
-      'Generates FAQ, Working With Me README, Continuity Protocol, Role Canvas, Footer, and Implementation Checklist blocks.',
-    promptTemplate: `SYSTEM:
-Generate Role Guide group 6: Block 18 (FAQ), Block 22 (Working with me README), Block 23 (Continuity Protocol), Block 24 (Role Canvas), Block 25 (Footer and revision cadence), Block 26 (Implementation checklist).
-
-${GROUP_OUTPUT_CONTRACT}
-
-Methodology:
-- Block 18: 5-8 FAQ items mixing employee questions and questions about the role.
-- Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
-- Block 23: continuity checklist, critical knowledge, backups, and training status. Describe training recency relatively ("refreshed within the last two quarters"), never with a calendar year.
-- Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win. Every metric it repeats must match the ledger exactly — this block is a summary, so a divergence here contradicts the whole document at once.
-- Block 25: revision triggers, version metadata dated {{generated_on}}, and MegaCampus AI CTA. This is the only block allowed to print an absolute date.
-- Block 26: implementation checklist for manager, HR, and employee to operationalize the guide. It must include a "calibrate before publishing" section listing every value elsewhere in the guide that carries the example marker, so the reader knows exactly what to replace.
-- Use exactly these top-level headings:
-{{heading_block_18}}
-{{heading_block_22}}
-{{heading_block_23}}
-{{heading_block_24}}
-{{heading_block_25}}
-{{heading_block_26}}
-
-${GROUP_USER_SECTION}`,
-    variables: [
-      specJsonVariable,
-      contentLanguageVariable,
-      ...groupContractVariables,
-      groupHeadingVariable('heading_block_18'),
-      groupHeadingVariable('heading_block_22'),
-      groupHeadingVariable('heading_block_23'),
-      groupHeadingVariable('heading_block_24'),
-      groupHeadingVariable('heading_block_25'),
-      groupHeadingVariable('heading_block_26'),
-    ],
-  },
+  ...careerPlaybookGroupPrompts,
   {
     stage: 'stage_6',
     promptKey: 'career_playbook_cross_block_judge',
@@ -650,22 +289,25 @@ ${GROUP_USER_SECTION}`,
 Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
 
 Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-worthy) ONLY when it belongs to one of these categories:
-- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
+- "contradiction": the block contradicts RoleProfileSpec, OR contradicts another block, or repeats a topic that RoleProfileSpec.block_boundaries assigns to a different block. A repeated topic is critical ONLY when block_audiences_md shows the two blocks share at least one reader — the same material appearing in blocks with no shared reader is correct (the Role Guide's views are read separately) and must never be flagged. A duty that violates a stated anti-goal is a contradiction — for example an anti-goal against micromanaging individual activity next to a duty requiring a per-person daily review.
 - "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
-- "unresolved_placeholder": raw template placeholders remain (e.g. [дата], {fill}).
-- "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence.
+- "unresolved_placeholder": a raw template placeholder remains — a fill-in label inside square or curly brackets, such as [дата] or {fill}. The example marker "(пример — заменить)" / "(example — replace)" is NOT one, in any of its forms. This contract REQUIRES every unverified company-specific value to carry it, and permits a qualifier naming what to replace ("(example — replace with the company's actual CRM)"). Flagging the marker sends a block that followed the contract to be rewritten into one that breaks it.
+- "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence. How long a symptom must persist before it counts as a warning sign — "three days running", "two reviews in a row" — is NOT one of these. It qualifies an observation instead of setting a target, no ledger carries such a window, and the red-flag block cannot say when a flag is a flag without one. Flag it only where it is stated as a metric target or contradicts one.
 - "metric_conflict": a metric that appears in the metric ledger is stated with a different value or threshold. The ledger wins; the block is wrong.
 - "unsourced_claim": a precise external statistic (market, industry, competitor, AI impact) is stated without a [Sn] reference to the evidence ledger, or with a [Sn] that is not in the ledger.
 - "stale_date": an absolute calendar year appears outside block 25, or block 25's date is not the generation date.
-- "unmarked_example": an unverified company-specific value (salary, bonus, ARR, budget, person name, internal tool) appears without the example marker.
+- "unmarked_example": an unverified company-specific value (salary, bonus, ARR, budget, person name, internal tool) appears without the example marker. This is the only direction the marker rule runs: a missing marker is the defect, a present one never is.
 
 Everything else — tone, "too generic", "not actionable enough", "reads like HR jargon", phrasing, style preferences — is at most "warning" (or "info"), and is NEVER grounds for regeneration. Reason: the deterministic layer already blocks the hard failures reliably, so routing style opinions into regeneration only burns cycles without improving correctness; prefer author freedom over rigid style rules.
 
 Rules:
-- Every issue MUST include a "category" field. Use "style" for any non-critical stylistic or tone finding.
+- Report what you found, not what you checked. The list above defines what counts as critical; it is not a form with one row per category. Most categories will have nothing to report in a given group, and an empty "issues" list is the correct and expected answer for a group that holds together.
+- Never file an issue whose own description concludes that the check passed. If the honest description would read "no issue found", "this is not an error", or "they are already marked", then there is no issue and nothing goes in the list.
+- Each reported issue carries a "category" field; use "style" for a non-critical stylistic or tone finding.
 - Use severity "critical" ONLY for issues in the critical categories above; use "warning" or "info" for everything else.
 - List a block id in "needs_regeneration" only when it has a critical issue in one of the critical categories.
+- A cadence disagreement is repaired in ONE place: the block that departs from the cadence ledger. Name that block, not the block it disagrees with, and say which rhythm the ledger gives.
 - The deterministic layer already scans for metric conflicts, unsourced statistics, absolute dates, and unmarked examples by pattern. Spend your attention on what a pattern cannot see: a claim that contradicts another block in meaning rather than in digits, a duty that undermines a stated anti-goal, a threshold that is internally incoherent.
 
 Return only valid JSON:
@@ -690,8 +332,17 @@ Today is {{generated_on}}.
 RoleProfileSpec:
 {{spec_json}}
 
+Block audiences (who reads each block; use this to tell a same-view contradiction from allowed repetition between views):
+{{block_audiences_md}}
+
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
+
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
+
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
 
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
@@ -705,8 +356,23 @@ Current group output:
       { name: 'group_id', description: 'Current group or block ids under review', required: true },
       specJsonVariable,
       {
+        name: 'block_audiences_md',
+        description: 'Canonical readers for every block in the Role Guide',
+        required: true,
+      },
+      {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'cadence_ledger_md',
+        description: 'Canonical recurring rhythms rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'milestone_ledger_md',
+        description: 'Canonical ramp deadlines rendered as a markdown table',
         required: true,
       },
       {
@@ -759,6 +425,11 @@ Do not re-report what a pattern already catches reliably: missing citations, unm
 values, absolute calendar dates, and raw placeholders are covered elsewhere. Spend your attention on
 meaning.
 
+The section inventory below is extracted from this same document by a pattern, so it lists every
+section the document has. Read it before judging any claim about where something lives: a section it
+names IS in the document, however far from the reference it sits. Completeness is settled there, not
+by searching the body.
+
 Severity: use "critical" only for contradiction and metric_conflict. Grammar and wording are
 "style", which never triggers regeneration. Report at most 12 issues, most consequential first, and
 return an empty list when the document holds together.
@@ -785,16 +456,40 @@ Today is {{generated_on}}. Content language: {{content_language}}.
 Metric ledger (single source of numeric truth):
 {{metric_ledger_md}}
 
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
+
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
+
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
+
+Section inventory (every section this document contains, in order):
+{{document_outline}}
 
 Assembled Role Guide:
 {{full_document}}`,
     variables: [
       { name: 'full_document', description: 'The fully assembled Role Guide', required: true },
       {
+        name: 'document_outline',
+        description: "The assembled guide's own section headings, numbered in document order",
+        required: true,
+      },
+      {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'cadence_ledger_md',
+        description: 'Canonical recurring rhythms rendered as a markdown table',
+        required: true,
+      },
+      {
+        name: 'milestone_ledger_md',
+        description: 'Canonical ramp deadlines rendered as a markdown table',
         required: true,
       },
       {
@@ -810,89 +505,5 @@ Assembled Role Guide:
       contentLanguageVariable,
     ],
   },
-  {
-    stage: 'stage_6',
-    promptKey: 'career_playbook_block_regenerator',
-    promptName: 'Career Playbook - Block Regenerator',
-    promptDescription:
-      'Regenerates a single Career Playbook block from judge feedback and optional user instructions.',
-    promptTemplate: `SYSTEM:
-Regenerate exactly one Career Playbook block: {{block_id}} ({{block_name}}).
-Preserve the block format contract and fix the judge issue without repeating unrelated blocks.
-- If the block already contains a Mermaid diagram, improve that existing diagram instead of appending a new one; add a diagram only when the block has none and its contract requires one.
-- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
-- For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example; do not leave raw bracket placeholders like [Name] or {value}, and never rewrite a narrative name into a "field to fill" phrase inside a sentence. Reserve "field to fill" wording for genuine blank template fields the reader completes later.
-
-Original block content:
-{{original_content}}
-
-Issue from judge:
-{{issue_description}}
-
-Suggestion:
-{{suggestion}}
-
-User edit instruction:
-{{user_instruction}}
-
-Return only markdown for this one block.
-
-- Numbers: reproduce every value from the metric ledger VERBATIM. If the issue is a metric conflict,
-  align the block to the ledger — never invent a third value to split the difference.
-- External statistics: allowed only with a [Sn] reference to the evidence ledger. Without a matching
-  entry, rewrite without the precise number.
-- Unverified company-specific values (salary, bonus, ARR, budget, person name, internal tool) keep
-  the marker "(пример — заменить)" in Russian or "(example — replace)" in English.
-- Today is {{generated_on}}. Use relative labels ("Day 1-30", "Week 2") in plans; an absolute
-  calendar year is allowed only in block 25.
-
-USER:
-RoleProfileSpec:
-{{spec_json}}
-
-Metric ledger (single source of numeric truth):
-{{metric_ledger_md}}
-
-Evidence ledger (the only citable sources):
-{{evidence_ledger_md}}
-
-Other blocks summary:
-{{other_blocks_brief}}
-
-Content language: {{content_language}}`,
-    variables: [
-      { name: 'block_id', description: 'Target block id', required: true },
-      { name: 'block_name', description: 'Human-readable block name', required: true },
-      { name: 'original_content', description: 'Original block markdown', required: true },
-      { name: 'issue_description', description: 'Judge issue description', required: true },
-      { name: 'suggestion', description: 'Judge suggestion or none', required: true },
-      {
-        name: 'user_instruction',
-        description: 'Optional user instruction or none',
-        required: true,
-      },
-      specJsonVariable,
-      {
-        name: 'metric_ledger_md',
-        description: 'Canonical metric ledger rendered as a markdown table',
-        required: true,
-      },
-      {
-        name: 'evidence_ledger_md',
-        description: 'Citable sources rendered as a [Sn] list',
-        required: true,
-      },
-      {
-        name: 'generated_on',
-        description: 'Generation date (ISO), application-filled',
-        required: true,
-      },
-      {
-        name: 'other_blocks_brief',
-        description: 'Compact summary of other generated blocks',
-        required: true,
-      },
-      contentLanguageVariable,
-    ],
-  },
+  careerPlaybookBlockRegeneratorPrompt,
 ];

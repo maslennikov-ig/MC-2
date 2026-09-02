@@ -25,7 +25,7 @@ try {
 ```typescript
 import { getContextOverflowFallback } from '@/shared/llm';
 
-const fallback = getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru');
+const fallback = getContextOverflowFallback('openai/gpt-5.6-luna', 'ru');
 // fallback.modelId === 'google/gemini-2.5-flash-preview-09-2025'
 // fallback.maxContext === 1_000_000
 ```
@@ -40,7 +40,7 @@ const { result, modelUsed } = await executeWithContextFallback(
     const model = getModelForPhase(modelId, 0.3);
     return await model.invoke(messages);
   },
-  'qwen/qwen3-235b-a22b-2507',
+  'openai/gpt-5.6-luna',
   'ru'
 );
 ```
@@ -53,7 +53,7 @@ const { result, modelUsed } = await executeWithContextFallback(
 
 ```typescript
 export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
-  const model = getModelForPhase('openai/gpt-oss-20b', 0.3);
+  const model = getModelForPhase('deepseek/deepseek-v4-flash-0731', 0.3);
   const [systemMessage, humanMessage] = buildPrompt(input);
   const response = await model.invoke([systemMessage, humanMessage]);
   return parseResponse(response);
@@ -72,7 +72,7 @@ export async function runPhase1(input: Phase1Input): Promise<Phase1Output> {
       const [systemMessage, humanMessage] = buildPrompt(input);
       return await model.invoke([systemMessage, humanMessage]);
     },
-    'openai/gpt-oss-20b',
+    'deepseek/deepseek-v4-flash-0731',
     input.language === 'ru' ? 'ru' : 'en'
   );
 
@@ -199,7 +199,7 @@ export async function runPhaseWithManualFallback(
 
 For Russian (ru):
 
-1. Standard: `qwen/qwen3-235b-a22b-2507` (260K context)
+1. Standard: `openai/gpt-5.6-luna` (260K context)
 2. Extended primary: `google/gemini-2.5-flash-preview-09-2025` (1M context)
 3. Extended fallback: `qwen/qwen-plus-2025-07-28` (1M context)
 

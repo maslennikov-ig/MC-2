@@ -13,8 +13,14 @@
  * detection and normalization stay in lock-step and the detector matches real
  * fill-ins without false-positives:
  *  - fenced code (```) is skipped, so Mermaid nodes like `["node"]` never match
- *  - a bracketed label immediately followed by `(` is treated as a Markdown link
- *  - only known fill-in labels (name/number/date/url/company name/...) match
+ *  - `shouldTreatBracketAsFillableField` owns the bracket rule for both, and
+ *    since 2026-08-30 it recognises any bracket that is not markdown rather than
+ *    a list of six known labels. The list saw 11 of 158 bracketed tokens across
+ *    the stored playbooks; the rest shipped raw to readers.
+ *
+ * This module also decides how much a judge complaint about a placeholder is
+ * worth: `downgradeUnconfirmedPlaceholderIssues` demotes any the detector cannot
+ * confirm, so a blind spot here silently becomes a defect nobody reports.
  */
 
 import {
@@ -43,7 +49,8 @@ export function findUnresolvedFillablePlaceholders(content: string): string[] {
     while ((bracketMatch = bracketPattern.exec(line)) !== null) {
       const [full, label] = bracketMatch;
       const nextChar = line[bracketMatch.index + full.length];
-      if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
+      const previousChar = line[bracketMatch.index - 1];
+      if (!shouldTreatBracketAsFillableField(label, nextChar, previousChar)) {
         continue;
       }
       matches.push(full);

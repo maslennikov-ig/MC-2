@@ -1,3 +1,30 @@
+/**
+ * Career Playbook — one verdict call, asked of the provider as a schema
+ * @module stages/stage-career-playbook/nodes/structured-verdict
+ *
+ * Two nodes ask the model for the same thing: a `CareerPlaybookJudgeVerdict`.
+ * The cross-block judge asked for it as a JSON schema the provider must satisfy;
+ * the whole-document proofreader asked for it as prose and hoped, and on
+ * 2026-09-01 run db9d3ff9 that difference cost the Russian guide its entire
+ * proofreading pass — three calls, three parse failures, three paid responses
+ * nobody could read.
+ *
+ * The failure has nothing to do with Russian grammar and everything to do with
+ * what a Russian guide quotes. Replayed at HEAD, the model wrote
+ *
+ *     "description": "... не совпадает с названием раздела 22 — «"Как со мной
+ *     работать" (заполняется сотрудником)» ..."
+ *
+ * and those inner straight quotes end the JSON string four words early:
+ * `Expected ',' or '}' after property value`, the exact error the run recorded.
+ * The document's own block title carries them, so the model is quoting
+ * faithfully. Every repair strategy fails, because nothing downstream can tell a
+ * quote that closes a value from a quote inside one.
+ *
+ * A constrained decoder never emits it. That is the whole fix, and it was
+ * already here — it just belonged to one caller.
+ */
+
 import { z } from 'zod';
 import {
   CareerPlaybookBlockIdSchema,
@@ -6,9 +33,6 @@ import {
   type CareerPlaybookNodeCost,
 } from '@megacampus/shared-types';
 import { buildCareerPlaybookAbortedAttemptCosts, type CareerPlaybookRuntime } from './runtime';
-
-const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
-const JUDGE_PHASE = 'stage_career_playbook_judge';
 
 // Estimated-prompt-token threshold above which a judge call starts on the fallback
 // model instead of the primary. The final full-document judge (~31.5k tokens) used
@@ -46,35 +70,54 @@ const LLMStructuredJudgeIssueSchema = z.object({
   suggestion: z.string().min(1).nullable(),
 });
 
-const LLMStructuredJudgeVerdictSchema = z.object({
+/** The verdict shape both reviewing nodes ask the provider to satisfy. */
+export const CAREER_PLAYBOOK_STRUCTURED_VERDICT_SCHEMA = z.object({
   pass: z.boolean(),
   score: z.number().min(0).max(100),
   issues: z.array(LLMStructuredJudgeIssueSchema).max(50),
   needs_regeneration: z.array(CareerPlaybookBlockIdSchema).max(27),
 });
 
-export class StructuredJudgeOutputError extends Error {
+/** Which node is asking, and how its call is routed. */
+export interface StructuredVerdictCall {
+  phaseName: string;
+  promptKey: string;
+  node: string;
+  language: string;
+  maxTokens: number;
+  /**
+   * Route a call whose input exceeds this many estimated tokens to the fallback
+   * model up front. The judge sets it, to skip a primary-model timeout it has
+   * measured; the proofreader's reason is different and unconditional, below.
+   */
+  preferFallbackModelAboveTokens?: number;
+}
+
+export class StructuredVerdictOutputError extends Error {
   constructor(
     message: string,
     readonly nodeCosts: CareerPlaybookNodeCost[]
   ) {
     super(message);
-    this.name = 'StructuredJudgeOutputError';
+    this.name = 'StructuredVerdictOutputError';
   }
 }
 
-function buildNodeCost(result: {
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  costUnknown?: boolean;
-  durationMs?: number;
-  attemptCount?: number;
-  generationId?: string;
-}): CareerPlaybookNodeCost {
+function buildNodeCost(
+  node: string,
+  result: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    costUnknown?: boolean;
+    durationMs?: number;
+    attemptCount?: number;
+    generationId?: string;
+  }
+): CareerPlaybookNodeCost {
   return {
-    node: 'crossBlockJudge',
+    node,
     model: result.model,
     input_tokens: result.inputTokens,
     output_tokens: result.outputTokens,
@@ -85,10 +128,15 @@ function buildNodeCost(result: {
     // Carried so `settleCareerPlaybookNodeCosts` can replace the estimate above
     // with what OpenRouter actually charged.
     ...(result.generationId ? { generation_id: result.generationId } : {}),
+    // The provider answered and billed. Whether the answer parsed is a separate
+    // question, and one the receipt must not decide by omitting the row: run
+    // db9d3ff9 paid for three proofreader responses that appear nowhere in its
+    // cost breakdown, because the old catch recorded aborted attempts only.
+    outcome: 'succeeded' as const,
   };
 }
 
-function buildJudgeRepairPrompt(params: {
+function buildVerdictRepairPrompt(params: {
   originalPrompt: string;
   rawContent: string;
   errorMessage: string;
@@ -96,7 +144,7 @@ function buildJudgeRepairPrompt(params: {
   return `${params.originalPrompt}
 
 SYSTEM REPAIR:
-Previous cross-block judge response could not be parsed.
+Previous response could not be parsed.
 Error: ${params.errorMessage}
 
 Previous response:
@@ -119,34 +167,34 @@ Return only a valid JSON object matching this shape:
 }`;
 }
 
-export async function invokeStructuredJudgeWithRepair(
+export async function invokeStructuredVerdictWithRepair(
   runtime: CareerPlaybookRuntime,
   prompt: string,
-  language: string,
+  call: StructuredVerdictCall,
   parseVerdict: (rawContent: string) => CareerPlaybookJudgeVerdict
 ): Promise<{
   verdict: CareerPlaybookJudgeVerdict;
   nodeCosts: CareerPlaybookNodeCost[];
 }> {
   const baseOptions = {
-    phaseName: JUDGE_PHASE,
-    promptKey: JUDGE_PROMPT_KEY,
-    node: 'crossBlockJudge',
-    language,
+    phaseName: call.phaseName,
+    promptKey: call.promptKey,
+    node: call.node,
+    language: call.language,
     temperature: 0.2,
-    maxTokens: 4_000,
-    // Route the large final-document judge onto the fallback model up front so it
-    // does not burn a primary-model timeout before the retry net escalates.
-    preferFallbackModelAboveTokens: resolveJudgeFallbackTokenThreshold(),
-    structuredOutputSchema: LLMStructuredJudgeVerdictSchema,
-    structuredOutputName: 'career_playbook_cross_block_judge',
+    maxTokens: call.maxTokens,
+    ...(call.preferFallbackModelAboveTokens !== undefined
+      ? { preferFallbackModelAboveTokens: call.preferFallbackModelAboveTokens }
+      : {}),
+    structuredOutputSchema: CAREER_PLAYBOOK_STRUCTURED_VERDICT_SCHEMA,
+    structuredOutputName: call.promptKey,
     structuredOutputMethod: 'jsonSchema' as const,
     structuredOutputStrict: true,
   };
   const firstResult = await runtime.invokeLLM(prompt, baseOptions);
   const nodeCosts = [
-    buildNodeCost(firstResult),
-    ...buildCareerPlaybookAbortedAttemptCosts('crossBlockJudge', firstResult.abortedAttempts),
+    buildNodeCost(call.node, firstResult),
+    ...buildCareerPlaybookAbortedAttemptCosts(call.node, firstResult.abortedAttempts),
   ];
 
   try {
@@ -155,7 +203,7 @@ export async function invokeStructuredJudgeWithRepair(
       nodeCosts,
     };
   } catch (firstError) {
-    const repairPrompt = buildJudgeRepairPrompt({
+    const repairPrompt = buildVerdictRepairPrompt({
       originalPrompt: prompt,
       rawContent: firstResult.content,
       errorMessage: firstError instanceof Error ? firstError.message : String(firstError),
@@ -167,8 +215,8 @@ export async function invokeStructuredJudgeWithRepair(
       maxTokensMultiplier: 1.1,
     });
     nodeCosts.push(
-      buildNodeCost(repairResult),
-      ...buildCareerPlaybookAbortedAttemptCosts('crossBlockJudge', repairResult.abortedAttempts)
+      buildNodeCost(call.node, repairResult),
+      ...buildCareerPlaybookAbortedAttemptCosts(call.node, repairResult.abortedAttempts)
     );
 
     try {
@@ -177,7 +225,7 @@ export async function invokeStructuredJudgeWithRepair(
         nodeCosts,
       };
     } catch (repairError) {
-      throw new StructuredJudgeOutputError(
+      throw new StructuredVerdictOutputError(
         `initial parse failed (${firstError instanceof Error ? firstError.message : String(firstError)}); repair parse failed (${repairError instanceof Error ? repairError.message : String(repairError)})`,
         nodeCosts
       );

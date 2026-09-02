@@ -87,7 +87,7 @@ Classification results are stored in `file_catalog.summary_metadata`:
 
 ## Model Configuration
 
-- **Model**: `openai/gpt-oss-20b` (fast, cheap)
+- **Model**: whatever `llm_model_config` holds for `stage_3_classification` — `deepseek/deepseek-v4-flash-0731`, falling back to `openai/gpt-5.6-luna`, in the committed seed. This line said `openai/gpt-oss-20b` until 2026-08-29, a model neither ledger had ever charged a call to.
 - **Temperature**: 0.0 (deterministic output)
 - **Max Tokens**: 2048 (classification output)
 - **Input Budget**: 100,000 tokens (triggers tournament if exceeded)

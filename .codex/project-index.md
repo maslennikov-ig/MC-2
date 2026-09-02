@@ -62,6 +62,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Career Playbook public viewer UI: `packages/web/components/career-playbook/viewer/`.
 - Backend tRPC routers and services: `packages/course-gen-platform/src/server/routers/`.
 - Backend Career Playbook stage: `packages/course-gen-platform/src/stages/stage-career-playbook/`.
+- Career Playbook audience source of truth: `packages/shared-types/src/career-playbook-blocks.ts`; full and audience-view assembly: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/final-assembler.ts`.
+- Career Playbook semantic repetition gate and thresholds: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/semantic-repetition.ts` and `repetition-thresholds.ts`.
 - Backend Career Playbook department classifier: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/department-classifier.ts`.
 - Backend Career Playbook business-context helpers: `packages/course-gen-platform/src/stages/stage-career-playbook/nodes/business-context.ts`.
 - Backend Career Playbook business-context source processing: `packages/course-gen-platform/src/stages/stage-career-playbook/source-processing.ts`.
@@ -107,6 +109,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Career Playbook gated 10-run load harness: `pnpm --dir packages/course-gen-platform smoke:career-playbook:load --mode plan --target dev --count 10`.
 - Career Playbook ESCO role suggestion subset import: `scripts/career-playbook/import_esco_role_suggestions.py`.
 - Career Playbook Wikidata RU role suggestion subset import: `scripts/career-playbook/import_wikidata_role_suggestions.py`.
+- Career Playbook repetition measurement CLI: `packages/course-gen-platform/scripts/measure-playbook-repetition.ts`.
 - Artifact validation: `python3 scripts/orchestration/validate_artifact.py <artifact.md>`.
 - Graphify local graph refresh: `graphify update .` then `graphify cluster-only . --no-viz`.
 

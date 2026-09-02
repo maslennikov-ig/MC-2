@@ -597,8 +597,13 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // 20260828120000_a_timeout_that_fits_its_own_budget.sql — one UPDATE of
 // `llm_model_config` raising every configured timeout to fit its own token
 // budget. No `document_evidence` object is touched, so no new `after-*` digest.
+// Re-pinned 2026-09-01: 250 files, adding
+// 20260901160000_the_proofreader_is_a_verdict_not_prose.sql — one UPDATE of
+// `llm_model_config` moving the Career Playbook proofreader onto the model its
+// sibling judge runs. No `document_evidence` object is touched, so no new
+// `after-*` digest, and re-pinned in the same edit as the migration.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '97231b28cd9cedff0e8617a52673d86fb4ba94538de0d0d946643cf70343c0ee';
+  '871d0d5e4f008e1a9099152a7c7b6b792efec06914ab91be6c6d2c6f17e72f19';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

@@ -34,7 +34,9 @@ import {
 } from './runtime';
 import {
   buildCareerPlaybookEvidenceLedger,
+  normalizeCareerPlaybookCadenceLedger,
   normalizeCareerPlaybookMetricLedger,
+  normalizeCareerPlaybookMilestoneLedger,
   reconcileMetricLedgerSourceRefs,
 } from './quality-ledger';
 
@@ -120,6 +122,8 @@ Return ONLY valid JSON. It must be an object with this shape; replace placeholde
   "context": { "company_stage": "growth", "team_size": "51-200", "reports_to": "...", "has_subordinates": false, "subordinates_description": "...", "industry": "...", "region": "..." },
   "focus_areas": { "primary_kpis": ["..."], "key_tools": ["..."], "critical_competencies": ["..."], "anti_goals": ["..."], "failure_patterns": ["..."] },
   "metric_ledger": [{ "key": "pipeline_coverage", "label": "Pipeline coverage", "unit": "x", "target": ">=3x", "green": ">=3x", "yellow": "2-2.9x", "red": "<2x", "review_period": "quarter", "provenance": "assumption", "source_ref": null }],
+  "cadence_ledger": [{ "key": "pipeline_review", "label": "Pipeline review", "cadence": "weekly", "owner": "Sales manager", "scope": "the whole team" }],
+  "milestone_ledger": [{ "key": "first_forecast", "label": "First forecast submitted", "offset": "week 2", "owner": "Hiring manager", "scope": "the new hire" }],
   "research": { "kpis_insights": ["..."], "trends_insights": ["..."], "onboarding_insights": ["..."], "sources": ["..."] },
   "block_boundaries": { "block_1": { "primary_topics": ["..."], "do_not_repeat": ["..."] } },
   "content_language": "ru"
@@ -130,6 +134,8 @@ Allowed company_stage values: pre-pmf, growth, scale, mature.
 Allowed team_size values: 1-10, 11-50, 51-200, 201-1000, 1000+.
 Allowed metric_ledger[].provenance values: company_source, user_answer, benchmark, assumption — a single string, never an array.
 Every metric_ledger entry needs a non-empty "key", "label" and "target".
+Allowed cadence_ledger[].cadence values: daily, weekly, biweekly, monthly, quarterly, annual — one word, nothing else.
+Write milestone_ledger[].offset as a unit and a number: "day 30", "week 2", "month 1", "quarter 2". No calendar dates.
 Do not emit evidence_ledger or generated_on; the application fills both.
 Do not use arrays for block_boundaries. Do not use strings where an object is required.`;
 }
@@ -215,12 +221,80 @@ function sanitizeMetricLedgerCandidate(value: unknown): unknown[] {
   });
 }
 
+/**
+ * Same tolerance the metric ledger gets, for the same reason: a malformed row in
+ * an additive ledger must not fail the whole spec and buy a repair call. A row
+ * that cannot name a commitment and a rhythm is dropped here; `quality-ledger`
+ * then drops whatever rhythm it cannot place in the fixed vocabulary.
+ */
+function sanitizeCadenceLedgerCandidate(value: unknown): unknown[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap(entry => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+
+    const label = firstString(row.label, row.name, row.commitment, row.title, row.key);
+    const key = firstString(row.key, row.id, label);
+    const cadence = firstString(row.cadence, row.rhythm, row.frequency, row.period);
+    if (!label || !key || !cadence) return [];
+
+    return [
+      {
+        key,
+        label,
+        cadence,
+        owner: firstString(row.owner, row.responsible) ?? '',
+        scope: firstString(row.scope, row.applies_to) ?? '',
+      },
+    ];
+  });
+}
+
+/**
+ * Same tolerance again, for the third ledger. A row that cannot name a
+ * commitment and a due date is dropped here; `quality-ledger` then drops
+ * whatever date it cannot read as a day, week, month or quarter.
+ */
+function sanitizeMilestoneLedgerCandidate(value: unknown): unknown[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap(entry => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+
+    const label = firstString(
+      row.label,
+      row.name,
+      row.commitment,
+      row.milestone,
+      row.title,
+      row.key
+    );
+    const key = firstString(row.key, row.id, label);
+    const offset = firstString(row.offset, row.due, row.deadline, row.when, row.timing, row.by);
+    if (!label || !key || !offset) return [];
+
+    return [
+      {
+        key,
+        label,
+        offset,
+        owner: firstString(row.owner, row.responsible) ?? '',
+        scope: firstString(row.scope, row.applies_to) ?? '',
+      },
+    ];
+  });
+}
+
 function normalizeRoleProfileSpecCandidate(candidate: unknown): unknown {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
 
   const normalized = candidate as Record<string, unknown>;
 
   normalized.metric_ledger = sanitizeMetricLedgerCandidate(normalized.metric_ledger);
+  normalized.cadence_ledger = sanitizeCadenceLedgerCandidate(normalized.cadence_ledger);
+  normalized.milestone_ledger = sanitizeMilestoneLedgerCandidate(normalized.milestone_ledger);
   // Both are application-owned and overwritten later; accepting the model's
   // version only creates a chance for it to fail validation on data we discard.
   delete normalized.evidence_ledger;
@@ -325,6 +399,8 @@ export function applyCareerPlaybookLedgers(
   return {
     ...spec,
     metric_ledger: metricLedger,
+    cadence_ledger: normalizeCareerPlaybookCadenceLedger(spec.cadence_ledger),
+    milestone_ledger: normalizeCareerPlaybookMilestoneLedger(spec.milestone_ledger),
     evidence_ledger: evidenceLedger,
     generated_on: isoDate,
   };

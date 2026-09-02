@@ -295,6 +295,10 @@ function collectJudgeQualityIssues(
         source: 'cross_block_judge',
         severity: issue.severity,
         blockId: issue.block_id,
+        // The class, not just the text. Comparing two runs by defect class used
+        // to mean reading judge_verdict off every block, because the stored row
+        // dropped the one field that answers it.
+        ...(issue.category ? { category: issue.category } : {}),
         title: qualityIssueTitleForSeverity(issue.severity),
         message: issue.description,
         ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),
@@ -465,7 +469,14 @@ export class CareerPlaybookHandler {
     const errors = result.errors ?? [];
     if (errors.length > 0) {
       const message = errors.join('; ') || 'Career Playbook generation failed';
-      await this.throwAfterGenerationFailure(jobData, job, message, new Error(message));
+      // A graph that reached this line completed and billed every node it ran.
+      // `persistFailed` reads the spend off the error, so a bare `new Error`
+      // here throws the whole ledger away: on 2026-08-30 a run billed $0.08711
+      // across 55 calls and recorded $0.00018, the one pre-graph node.
+      const failure = Object.assign(new Error(message), {
+        nodeCosts: Array.isArray(result.nodeCosts) ? result.nodeCosts : [],
+      });
+      await this.throwAfterGenerationFailure(jobData, job, message, failure);
     }
 
     await this.persistCompleted(jobData, result);
@@ -485,10 +496,12 @@ export class CareerPlaybookHandler {
         roleProfileSpec: jobData.roleProfileSpec,
         language: jobData.language,
         originalBlock: jobData.originalBlock,
-        issue: {
-          description: jobData.instruction,
-          suggestion: 'Apply the user instruction while preserving the block format contract.',
-        },
+        issues: [
+          {
+            description: jobData.instruction,
+            suggestion: 'Apply the user instruction while preserving the block format contract.',
+          },
+        ],
         userInstruction: jobData.instruction,
         otherBlocks: jobData.generatedBlocks,
       });

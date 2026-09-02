@@ -130,3 +130,8 @@ export const visibilityInputSchema = playbookIdInputSchema.extend({
 export const publicShareInputSchema = z.object({
   shareSlug: z.string().min(3).max(120),
 });
+
+export const viewShareInputSchema = z.object({
+  playbookId: z.string().uuid(),
+  token: z.string().min(16).max(64),
+});

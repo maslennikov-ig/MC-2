@@ -143,7 +143,7 @@ export interface RepairMetrics {
  * @returns Cost in USD (rounded to 6 decimal places)
  *
  * @example
- * calculateCost('openai/gpt-oss-20b', 1000, 500)
+ * calculateCost('z-ai/glm-5.3-flash', 1000, 500)
  */
 function calculateCost(modelId: string, tokensInput: number, tokensOutput: number): number {
   // Was a local table that put deepseek-v4-flash at $1.00/$2.00 against a real
@@ -178,7 +178,7 @@ function calculateCost(modelId: string, tokensInput: number, tokensOutput: numbe
  * const result = await trackPhaseExecution(
  *   'stage_4_classification',
  *   courseId,
- *   'openai/gpt-oss-20b',
+ *   'z-ai/glm-5.3-flash',
  *   async () => {
  *     const output = await runPhase1(input);
  *     return {

@@ -27,7 +27,7 @@ vi.mock('@/shared/llm/langchain-models', async importOriginal => {
   return {
     ...actual,
     getModelForPhase: vi.fn().mockResolvedValue({
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       invoke: vi.fn().mockResolvedValue({
         content: JSON.stringify({
           is_sufficient: true,
@@ -127,7 +127,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
     it('returns is_sufficient: true when LLM says sufficient', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: JSON.stringify({
             is_sufficient: true,
@@ -148,7 +148,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
     it('returns no follow_up_questions when sufficient', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: JSON.stringify({
             is_sufficient: true,
@@ -173,7 +173,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
     it('returns is_sufficient: false with follow_up_questions when gaps exist', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: JSON.stringify({
             is_sufficient: false,
@@ -207,7 +207,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
     it('includes gaps array from LLM response', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: JSON.stringify({
             is_sufficient: false,
@@ -232,7 +232,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const { safeJSONParse } = await import('@megacampus/shared-utils');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: 'not valid JSON at all',
         }),
@@ -254,7 +254,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
       const { safeJSONParse } = await import('@megacampus/shared-utils');
       const { logTrace } = await import('@/shared/trace-logger');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: 'malformed JSON',
         }),
@@ -285,7 +285,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         invalid_field: 'value',
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidJSON,
         }),
@@ -324,7 +324,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         ],
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: invalidJSON,
         }),
@@ -371,7 +371,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         ],
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: responseJSON,
         }),
@@ -406,7 +406,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         ],
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: responseJSON,
         }),
@@ -443,7 +443,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         follow_up_questions: followUpQuestions,
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: responseJSON,
         }),
@@ -477,7 +477,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         follow_up_questions: followUpQuestions,
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: responseJSON,
         }),
@@ -533,7 +533,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
         follow_up_questions: followUpQuestions,
       });
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: responseJSON,
         }),
@@ -560,7 +560,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
       const { logTrace } = await import('@/shared/trace-logger');
       const mockModel = {
-        model: 'openai/gpt-oss-20b',
+        model: 'z-ai/glm-5.3-flash',
         invoke: vi.fn().mockResolvedValue({
           content: JSON.stringify({
             is_sufficient: true,

@@ -74,7 +74,7 @@ export interface PhaseModelConfig {
    *
    * Format: "provider/model-name" or "provider/model-name:variant"
    *
-   * @example 'openai/gpt-oss-20b'
+   * @example 'z-ai/glm-5.3-flash'
    * @example 'deepseek/deepseek-v4-flash'
    * @example 'anthropic/claude-opus-4.5'
    */
@@ -91,7 +91,7 @@ export interface PhaseModelConfig {
    * Null means no fallback (fail immediately on primary failure)
    *
    * @example 'deepseek/deepseek-v4-flash'
-   * @example 'qwen/qwen3-235b-a22b-2507'
+   * @example 'openai/gpt-5.6-luna'
    */
   fallback_model_id: string | null;
 

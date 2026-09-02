@@ -77,16 +77,19 @@ describe('model catalogue coverage', () => {
     // z-ai/glm-5.2 was 1.23x and ~deepseek/...-latest up to 1.8x too dear
     // (mc2-v1pn2, mc2-156kg).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      // Re-read 2026-08-26; it read $0.14/$0.28 the day before and $0.08/$0.18
-      // the day before that, and moved 2.33x within two hours on 2026-08-25.
-      'deepseek/deepseek-v4-flash-0731': [0.06, 0.12],
+      // The most movable rate here: $0.08/$0.18, then $0.14/$0.28, then
+      // $0.06/$0.12 on consecutive days to 2026-08-26, and 2.33x within two
+      // hours on 2026-08-25. Dates are deliberately absent from the line below,
+      // because the nightly sync rewrites the number and cannot rewrite a date
+      // beside it (mc2-rhyac).
+      'deepseek/deepseek-v4-flash-0731': [0.045, 0.09],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [1.19, 3.74],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
       'z-ai/glm-5.3-flash': [0.075, 0.25],
       'minimax/minimax-m3': [0.3, 1.2],
-      'google/gemini-3.7-flash': [0.375, 1.875],
+      'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
       'google/gemini-2.5-flash-image': [0.3, 2.5],
       // Read 2026-08-27 from `/api/v1/images/models/.../endpoints`, because
@@ -162,12 +165,14 @@ describe('model catalogue coverage', () => {
     expect(actualFlat).toEqual(verifiedFlatImagePrices);
   });
 
-  it('prices listed retired models at the OpenRouter rates last verified for each', () => {
-    // Dated per row rather than per test: these are re-read when something
-    // sends somebody to look, not on one day together, and a single date in the
-    // title claims a freshness the rows do not share.
+  it('prices the two entries kept outside the live routing set', () => {
+    // Two, and only for a mechanism rather than for history. Twenty entries left
+    // the catalogue on 2026-08-29: the stated reason for keeping them — "so old
+    // cost reports still resolve" — described a mechanism that does not exist,
+    // because the dollars are persisted at the call (`generation_trace.cost_usd`,
+    // `career_playbooks.cost_breakdown.nodeCosts[].cost_usd`) and no reporting
+    // path reads this catalogue (mc2-11jn5).
     const verifiedRates: Record<string, [input: number, output: number]> = {
-      'deepseek/deepseek-v3.1-terminus': [0.27, 1.0],
       // `deepseek/deepseek-v4-flash` matters more than a retired entry usually
       // would, because `normalizeModelId` prices every undated V4 Flash snapshot
       // from here (mc2-hc91g). Re-read 2026-08-26 at $0.088606/$0.177212: the
@@ -175,18 +180,8 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.07798, 0.15596],
+      'deepseek/deepseek-v4-flash': [0.08512, 0.17024],
       '~deepseek/deepseek-v4-flash-latest': [0.03, 0.1],
-      'deepseek/deepseek-v4-pro': [0.87, 1.74],
-      'google/gemini-2.5-flash': [0.3, 2.5],
-      'moonshotai/kimi-k2-thinking': [0.6, 2.5],
-      'openai/gpt-oss-20b': [0.03, 0.13],
-      'qwen/qwen3-235b-a22b-2507': [0.0875, 0.35],
-      'qwen/qwen-plus-2025-07-28': [0.26, 0.78],
-      'qwen/qwen3-max': [0.78, 3.9],
-      'qwen/qwen3.7-plus': [0.32, 1.28],
-      'z-ai/glm-4.6': [0.43, 1.75],
-      'z-ai/glm-5': [0.6, 1.92],
     };
 
     const actual = Object.fromEntries(
@@ -202,9 +197,11 @@ describe('model catalogue coverage', () => {
     );
 
     expect(actual).toEqual(verifiedRates);
-    expect(
-      getModelCapabilities('google/gemini-2.5-flash')?.combinedPricePerMillion
-    ).toBeUndefined();
+    // Split pricing throughout: a combined rate here would be quietly counted
+    // twice for whichever leg is dearer.
+    for (const modelId of Object.keys(verifiedRates)) {
+      expect(getModelCapabilities(modelId)?.combinedPricePerMillion, modelId).toBeUndefined();
+    }
   });
 
   it('prices every model the seed can route to', () => {

@@ -2,7 +2,11 @@ import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { PROVIDER_PRICE_CEILING_MULTIPLIER, isPriceCeilingRefusal } from '@/shared/llm/client';
 import { resolveProviderPriceCeiling } from '@/shared/llm/openrouter-catalogue';
 import type { OpenRouterProviderRouting } from '@/shared/llm/client-helpers';
-import { listModelEndpoints, pickCheapestUntriedEndpoint } from '@/shared/llm/openrouter-endpoints';
+import {
+  listModelEndpoints,
+  pickCheapestUntriedEndpoint,
+  STRUCTURED_OUTPUT_PARAMETER,
+} from '@/shared/llm/openrouter-endpoints';
 import { resolveServiceTier } from '@/shared/llm/service-tier';
 import { withGenerationIdCapture, type GenerationIdSlot } from '@/shared/llm/generation-id-capture';
 import {
@@ -332,7 +336,10 @@ export function createCareerPlaybookRuntime(
           priceCeiling,
           // The wizard's two phases answer a person; the six group phases and
           // the spec run after they have submitted (see service-tier.ts).
-          resolveServiceTier(options.phaseName)
+          resolveServiceTier(options.phaseName),
+          // A schema request is not something every endpoint of a model takes,
+          // and one that does not take it answers 404 rather than falling back.
+          options.structuredOutputSchema ? [STRUCTURED_OUTPUT_PARAMETER] : []
         );
         if (endpoint) triedEndpointTags.add(endpoint.tag);
 

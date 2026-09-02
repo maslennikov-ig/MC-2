@@ -81,6 +81,8 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
   // the parsed value always carries these; an older fixture without them no
   // longer deep-equals what the regenerator receives.
   metric_ledger: [],
+  cadence_ledger: [],
+  milestone_ledger: [],
   evidence_ledger: [],
   block_boundaries: {},
   content_language: 'ru',
@@ -1232,6 +1234,69 @@ flowchart TD
     );
   });
 
+  it('keeps what a completed-but-rejected graph spent', async () => {
+    // A graph that returns `errors` has already run and billed every node in it.
+    // The handler used to raise a bare `new Error(message)` here, and
+    // `persistFailed` reads the spend off the error, so the whole ledger went
+    // out with the document: run 1a4a9ccb on 2026-08-30 billed $0.08711 across
+    // 55 calls and recorded $0.00018 — the one node that ran before the graph.
+    const followupCost = {
+      node: 'followupGenerator',
+      model: 'mock-model',
+      input_tokens: 942,
+      output_tokens: 1547,
+      cost_usd: 0.00018137784,
+      generation_id: 'gen-followup-2',
+      billed_by_provider: true,
+    };
+    const judgeCost = {
+      node: 'crossBlockJudge',
+      model: 'mock-model',
+      input_tokens: 14007,
+      output_tokens: 993,
+      cost_usd: 0.0421,
+      generation_id: 'gen-judge-1',
+      billed_by_provider: true,
+    };
+    const existingQAData = { fixed: [], followups: [], freeform: [] };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      {
+        data: {
+          cost_breakdown: { nodeCosts: [followupCost], total_cost_usd: 0.00018137784 },
+        },
+        error: null,
+      },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: ['crossBlockJudge rejected the document'],
+        nodeCosts: [judgeCost],
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job({
+          ...baseJobData(),
+          operation: 'GENERATE_PLAYBOOK',
+          qaData: { fixed: [], followups: [], freeform: [] },
+        })
+      )
+    ).rejects.toThrow('crossBlockJudge rejected the document');
+
+    const persisted = builder.update.mock.calls
+      .map(call => call[0] as { cost_breakdown?: { nodeCosts: unknown[]; total_cost_usd: number } })
+      .find(payload => payload.cost_breakdown);
+
+    expect(persisted?.cost_breakdown?.nodeCosts).toEqual([followupCost, judgeCost]);
+    expect(persisted?.cost_breakdown?.total_cost_usd).toBeCloseTo(0.04228137784, 8);
+  });
+
   it('persists failed status and generation_error when graph throws on the final attempt', async () => {
     const builder = createBuilder([
       { data: { q_a_data: { fixed: [], followups: [], freeform: [] } }, error: null },
@@ -1269,6 +1334,66 @@ flowchart TD
           }),
         },
       })
+    );
+  });
+
+  it('persists semantic provider receipts when the fail-closed graph error reaches the handler', async () => {
+    const semanticCost = {
+      node: 'semanticRepetition',
+      model: 'jina-embeddings-v3',
+      input_tokens: 321,
+      output_tokens: 0,
+      cost_usd: 0.00001605,
+      attempts: 1,
+      outcome: 'succeeded' as const,
+      provider_name: 'jina',
+      billed_by_provider: false,
+    };
+    const existingQAData = { fixed: [], followups: [], freeform: [] };
+    const builder = createBuilder([
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { id: playbookId }, error: null },
+      { data: { q_a_data: existingQAData }, error: null },
+      { data: { cost_breakdown: null }, error: null },
+      { data: { id: playbookId }, error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+    const graphError = Object.assign(
+      new Error('semantic repetition checks unavailable: Jina quota exhausted'),
+      {
+        nodeCosts: [semanticCost],
+        warnings: ['semantic repetition checks unavailable: Jina quota exhausted'],
+      }
+    );
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockRejectedValue(graphError),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        job({
+          ...baseJobData(),
+          operation: 'GENERATE_PLAYBOOK',
+          qaData: { fixed: [], followups: [], freeform: [] },
+        })
+      )
+    ).rejects.toThrow('semantic repetition checks unavailable');
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        cost_breakdown: expect.objectContaining({
+          nodeCosts: [semanticCost],
+          total_cost_usd: semanticCost.cost_usd,
+        }),
+        q_a_data: expect.objectContaining({
+          generation_error: 'semantic repetition checks unavailable: Jina quota exhausted',
+          generation_progress: expect.objectContaining({ stage: 'failed', percent: 100 }),
+        }),
+      })
+    );
+    expect(builder.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'completed' })
     );
   });
 });

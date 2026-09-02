@@ -11,13 +11,18 @@
  * whenever a tariff does, and a test that has to be updated by the thing it
  * guards guards nothing.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   applyRateToCatalogue,
   applyRateToSnapshot,
   formatRate,
+  readPublishedChatEndpointPricing,
 } from '../../../scripts/check-model-catalog-drift';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const CATALOGUE = `export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   'vendor/first': {
@@ -92,5 +97,65 @@ describe('the nightly price sync, where it writes', () => {
     expect(formatRate(0.09999999999999999)).toBe('0.1');
     expect(formatRate(0.07798000000000001)).toBe('0.07798');
     expect(formatRate(30)).toBe('30');
+  });
+});
+
+/**
+ * The ids `GET /api/v1/models` does not list, read from their own pages.
+ *
+ * The Batch API variants are separately billed models and the list omits every
+ * one of them, so for two months the gate called them "delisted, or the id is
+ * misspelled" and skipped them: four catalogued entries whose only check was a
+ * number somebody had typed by hand (mc2-rhyac).
+ */
+describe('the nightly price sync, where the model list is silent', () => {
+  const answerWith = (body: unknown, ok = true): void => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(body) } as Response)
+    );
+  };
+
+  it('quotes the ordinary tariff, not the flex or priority one beside it', async () => {
+    // A model page carries every tier. `/flex` is half the ordinary rate and
+    // `/priority` nearly double it; catalogue the flex figure and
+    // `provider.max_price`, built at 1.5x, sits under the tariff the call
+    // actually runs at the first time flex has no capacity.
+    answerWith({
+      data: {
+        endpoints: [
+          { tag: 'google-vertex/global/priority', pricing: { prompt: '0.00000135' } },
+          {
+            tag: 'google-vertex/global',
+            pricing: { prompt: '0.00000075', completion: '0.00000375' },
+          },
+          { tag: 'google-vertex/global/flex', pricing: { prompt: '0.000000375' } },
+        ],
+      },
+    });
+
+    const published = await readPublishedChatEndpointPricing('google/gemini-3.7-flash:batch');
+
+    expect(published).toEqual({
+      kind: 'rates',
+      pricing: {
+        inputPricePerMillion: 0.75,
+        outputPricePerMillion: 3.75,
+        imageOutputPricePerMillion: null,
+      },
+    });
+  });
+
+  it('separates "nobody is serving it" from "no such model"', async () => {
+    // An alias answers 200 with an empty endpoint list, and so does a model
+    // whose only provider has withdrawn. Neither is a price fact, and reading
+    // either as "delisted" would retire a live id.
+    answerWith({ data: { endpoints: [] } });
+    expect(await readPublishedChatEndpointPricing('z-ai/glm-5.2:batch')).toEqual({
+      kind: 'unserved',
+    });
+
+    answerWith({}, false);
+    expect(await readPublishedChatEndpointPricing('vendor/absent')).toEqual({ kind: 'unknown' });
   });
 });

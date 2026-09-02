@@ -120,7 +120,7 @@ export type PhaseName =
  *   config_type: 'global',
  *   course_id: null,
  *   phase_name: 'stage_4_classification',
- *   model_id: 'openai/gpt-oss-20b',
+ *   model_id: 'z-ai/glm-5.3-flash',
  *   fallback_model_id: 'deepseek/deepseek-v4-flash',
  *   temperature: 0.7,
  *   max_tokens: 4096
@@ -162,7 +162,7 @@ export interface ModelConfig {
   /**
    * Primary OpenRouter model identifier
    *
-   * @example 'openai/gpt-oss-20b'
+   * @example 'z-ai/glm-5.3-flash'
    * @example 'deepseek/deepseek-v4-flash'
    * @example 'google/gemini-3.7-flash'
    */

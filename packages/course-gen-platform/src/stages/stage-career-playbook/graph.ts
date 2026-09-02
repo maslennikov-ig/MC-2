@@ -18,7 +18,7 @@ import { createCareerPlaybookProofreaderNode } from './nodes/final-proofreader';
 import {
   createBlockRegeneratorNode,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
-  selectPendingCareerPlaybookRegeneration,
+  selectPendingCareerPlaybookRegenerationsForState,
 } from './nodes/block-regenerator';
 import type {
   CareerPlaybookGraphStateType,
@@ -156,15 +156,18 @@ function hasSameBlockIdSet(left: CareerPlaybookBlockId[], right: CareerPlaybookB
   return left.length === right.length && left.every(blockId => right.includes(blockId));
 }
 
-function routeAfterJudge(blockIds: CareerPlaybookBlockId[], nextNode: string) {
+/**
+ * The router asks the regenerator's own question, reserve included.
+ *
+ * It must: a route decides whether `blockRegenerator` runs at all, so a
+ * narrower question here silently overrules the wider one there. See
+ * `selectPendingCareerPlaybookRegenerationsForState`.
+ */
+export function routeAfterJudge(blockIds: CareerPlaybookBlockId[], nextNode: string) {
   return function routeCareerPlaybookAfterJudge(state: CareerPlaybookGraphStateType) {
-    const pending = selectPendingCareerPlaybookRegeneration({
-      verdict: state.lastJudgeVerdict,
-      blockIds,
-      attempts: state.blockRegenerationAttempts,
-    });
+    const pending = selectPendingCareerPlaybookRegenerationsForState(state, blockIds);
 
-    return pending ? 'blockRegenerator' : nextNode;
+    return pending.length > 0 ? 'blockRegenerator' : nextNode;
   };
 }
 
@@ -208,13 +211,12 @@ export function routeAfterBlockRegeneration(state: CareerPlaybookGraphStateType)
  * additive quality, so a failure to produce a verdict simply advances.
  */
 export function routeAfterProofreader(state: CareerPlaybookGraphStateType) {
-  const pending = selectPendingCareerPlaybookRegeneration({
-    verdict: state.lastJudgeVerdict,
-    blockIds: CAREER_PLAYBOOK_FINAL_BLOCK_ORDER,
-    attempts: state.blockRegenerationAttempts,
-  });
+  const pending = selectPendingCareerPlaybookRegenerationsForState(
+    state,
+    CAREER_PLAYBOOK_FINAL_BLOCK_ORDER
+  );
 
-  return pending ? 'blockRegenerator' : 'finalJudge';
+  return pending.length > 0 ? 'blockRegenerator' : 'finalJudge';
 }
 
 function routeAfterSpecBuilder(state: CareerPlaybookGraphStateType) {

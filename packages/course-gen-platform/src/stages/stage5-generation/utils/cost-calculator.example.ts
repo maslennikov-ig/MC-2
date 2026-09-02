@@ -148,7 +148,7 @@ function example3_modelComparison() {
 
   // Compare different models
   const models = [
-    'openai/gpt-oss-20b',
+    'z-ai/glm-5.3-flash',
     'deepseek/deepseek-v4-flash',
     'google/gemini-3.7-flash',
     'qwen/qwen3-max',
@@ -167,7 +167,7 @@ function example3_modelComparison() {
     }
   });
 
-  console.log('\n💡 TIP: Use gpt-oss-20b for cost-effective section generation');
+  console.log('\n💡 TIP: Use deepseek-v4-flash-0731 for cost-effective section generation');
   console.log('💡 TIP: Use qwen3-max for high-quality metadata generation');
   console.log('💡 TIP: Use gemini-2.5-flash for fast, affordable validation\n');
 }

@@ -43,6 +43,7 @@ import {
 } from './components'
 import { parseCalloutFromChildren } from './utils/callout-parser'
 import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
+import { escapeBareAngleBrackets } from './utils/escape-bare-angle-brackets'
 import type { MarkdownRendererProps } from './types'
 
 /**
@@ -74,7 +75,11 @@ export async function MarkdownRenderer({
     return null
   }
 
-  const normalizedContent = normalizeMalformedMarkdownTables(content)
+  // MDX reads `<` as the start of an element, so a threshold written the way a
+  // person writes one — `red <2x`, `<65%` — aborts the compile and the page
+  // returns 500. Only this renderer needs it: the other two use react-markdown,
+  // which parses `<` as text.
+  const normalizedContent = escapeBareAngleBrackets(normalizeMalformedMarkdownTables(content))
 
   // Get merged preset configuration with feature overrides
   const config = getPresetConfig(preset, features)
@@ -84,10 +89,13 @@ export async function MarkdownRenderer({
   // Untrusted: includes rehype-sanitize for XSS protection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
   const remarkPlugins = getRemarkPlugins(config) as any[]
-  const rehypePlugins = (
-    trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
-  ) as // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
-  any[]
+  // The cast sits on its own line so the directive above it stays put: when the
+  // ternary and the cast shared a line, an edit two lines up let prettier reflow
+  // the group and drop the directive at the END of the line it was meant to
+  // precede — suppressing nothing, and `--max-warnings=0` failed the build.
+  const rehypeSource = trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
+  const rehypePlugins = rehypeSource as any[]
 
   // Build components map based on features
   const mdxComponents: Record<string, React.ComponentType<unknown>> = {}

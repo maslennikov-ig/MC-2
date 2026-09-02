@@ -1,11 +1,15 @@
-import type {
-  CareerPlaybookBlockId,
-  CareerPlaybookBlockState,
-  CareerPlaybookJudgeIssue,
-  CareerPlaybookJudgeVerdict,
-  CareerPlaybookNodeCost,
-  CareerPlaybookRoleProfileSpec,
+import {
+  type CareerPlaybookBlockId,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookJudgeIssue,
+  type CareerPlaybookJudgeVerdict,
+  type CareerPlaybookNodeCost,
+  type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import {
+  formatCareerPlaybookCitableBlocks,
+  getCareerPlaybookBlockAudiences,
+} from './audience-scope';
 import { CAREER_PLAYBOOK_FINAL_BLOCK_ORDER } from './final-assembler';
 import {
   buildCareerPlaybookAbortedAttemptCosts,
@@ -14,10 +18,14 @@ import {
   type CareerPlaybookRuntime,
 } from './runtime';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 
@@ -61,10 +69,19 @@ export interface RegenerateCareerPlaybookBlockInput {
   roleProfileSpec: CareerPlaybookRoleProfileSpec;
   language: string;
   originalBlock?: CareerPlaybookBlockState | null;
-  issue: Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>;
+  /**
+   * Every judge finding against this block, not the first one.
+   *
+   * A block gets two attempts. Told about one finding per attempt, a block the
+   * judge faulted three times could never come back clean however many
+   * regenerations it was given: run `638ed691` shipped **five** criticals on
+   * block 26 after spending both of its attempts, and run `d5137bc5` shipped
+   * two or three on each of six blocks. That reads as a cap set too low. It is
+   * not: the cap was never the binding constraint, the briefing was.
+   */
+  issues: readonly Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>[];
   userInstruction?: string | null;
   otherBlocks?: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
-  otherBlocksBrief?: string;
   now?: () => Date;
 }
 
@@ -78,8 +95,10 @@ export interface RegenerateCareerPlaybookBlockResult {
 
 export interface CareerPlaybookPendingRegeneration {
   blockId: CareerPlaybookBlockId;
-  issue: CareerPlaybookJudgeIssue;
+  issues: CareerPlaybookJudgeIssue[];
   attempts: number;
+  /** Drawn from the final-window reserve rather than the ordinary budget. */
+  fromReserve?: boolean;
 }
 
 function compactMarkdown(content: string): string {
@@ -130,8 +149,14 @@ export function buildOtherBlocksBrief(
   otherBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>> | undefined,
   targetBlockId: CareerPlaybookBlockId
 ): string {
+  const targetAudiences = getCareerPlaybookBlockAudiences(targetBlockId);
   const lines = CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.flatMap(blockId => {
     if (blockId === targetBlockId) return [];
+    if (
+      !getCareerPlaybookBlockAudiences(blockId).some(audience => targetAudiences.includes(audience))
+    ) {
+      return [];
+    }
 
     const content = otherBlocks?.[blockId]?.content;
     if (!content || content.trim().length === 0) return [];
@@ -142,6 +167,22 @@ export function buildOtherBlocksBrief(
   return lines.length > 0 ? lines.join('\n') : 'none';
 }
 
+/**
+ * One finding per line, numbered so the two lists line up.
+ *
+ * A single finding stays a bare sentence: numbering one item would read as a
+ * list with an item missing.
+ */
+function formatRegenerationIssues(
+  issues: readonly Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>[],
+  pick: (issue: Pick<CareerPlaybookJudgeIssue, 'description' | 'suggestion'>) => string
+): string {
+  if (issues.length === 0) return 'none';
+  if (issues.length === 1) return pick(issues[0]);
+
+  return issues.map((issue, index) => `${index + 1}. ${pick(issue)}`).join('\n');
+}
+
 export function buildBlockRegeneratorPromptVariables(
   input: RegenerateCareerPlaybookBlockInput
 ): Record<string, string> {
@@ -149,8 +190,8 @@ export function buildBlockRegeneratorPromptVariables(
     block_id: input.blockId,
     block_name: getCareerPlaybookBlockName(input.blockId),
     original_content: input.originalBlock?.content.trim() || 'none',
-    issue_description: input.issue.description,
-    suggestion: input.issue.suggestion ?? 'none',
+    issue_description: formatRegenerationIssues(input.issues, issue => issue.description),
+    suggestion: formatRegenerationIssues(input.issues, issue => issue.suggestion ?? 'none'),
     user_instruction: input.userInstruction?.trim() || 'none',
     spec_json: JSON.stringify(input.roleProfileSpec, null, 2),
     // Without the ledgers a regeneration prompted by a metric conflict simply
@@ -158,12 +199,24 @@ export function buildBlockRegeneratorPromptVariables(
     metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
       getCareerPlaybookMetricLedger(input.roleProfileSpec)
     ),
+    // Same reasoning for rhythms: a regeneration prompted by a cadence conflict
+    // is told which block is wrong, and needs to be told which rhythm is right.
+    cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+      getCareerPlaybookCadenceLedger(input.roleProfileSpec)
+    ),
+    milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+      getCareerPlaybookMilestoneLedger(input.roleProfileSpec)
+    ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(input.roleProfileSpec)
     ),
     generated_on: input.roleProfileSpec.generated_on ?? new Date().toISOString().slice(0, 10),
-    other_blocks_brief:
-      input.otherBlocksBrief ?? buildOtherBlocksBrief(input.otherBlocks, input.blockId),
+    block_audiences_md: `- ${input.blockId}: ${getCareerPlaybookBlockAudiences(input.blockId).join(', ')}`,
+    // A regeneration prompted by an unreadable reference is told the pointer is
+    // wrong; without this it is not told which pointers are right, and would
+    // spend both attempts reproducing the same defect.
+    citable_blocks_md: formatCareerPlaybookCitableBlocks([input.blockId]),
+    other_blocks_brief: buildOtherBlocksBrief(input.otherBlocks, input.blockId),
     content_language: input.language,
   };
 }
@@ -233,18 +286,32 @@ export async function regenerateCareerPlaybookBlock(
   };
 }
 
-function issueForBlock(
+/**
+ * Every finding the verdict holds against this block, criticals first.
+ *
+ * Ordering matters when a block is faulted more than twice and still runs out
+ * of attempts: the attempt should be spent on what blocks publication, not on
+ * whichever finding the judge happened to write down first.
+ */
+function issuesForBlock(
   verdict: CareerPlaybookJudgeVerdict,
   blockId: CareerPlaybookBlockId
-): CareerPlaybookJudgeIssue {
-  return (
-    verdict.issues.find(issue => issue.block_id === blockId) ?? {
+): CareerPlaybookJudgeIssue[] {
+  const severityRank = { critical: 0, warning: 1, info: 2 } as const;
+  const issues = verdict.issues
+    .filter(issue => issue.block_id === blockId)
+    .sort((left, right) => severityRank[left.severity] - severityRank[right.severity]);
+
+  if (issues.length > 0) return issues;
+
+  return [
+    {
       block_id: blockId,
       severity: 'warning',
       description: `Regenerate ${blockId} based on the cross-block judge verdict.`,
       suggestion: 'Preserve the block contract and fix the judge finding.',
-    }
-  );
+    },
+  ];
 }
 
 export interface SelectCareerPlaybookRegenerationInput {
@@ -253,7 +320,39 @@ export interface SelectCareerPlaybookRegenerationInput {
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
   maxAttempts?: number;
   maxWindowAttempts?: number;
+  /**
+   * Blocks allowed to draw on the final-window reserve once the ordinary window
+   * budget is spent. Empty or absent means the budget is the whole answer.
+   */
+  reservedWindowBlockIds?: readonly CareerPlaybookBlockId[];
+  /**
+   * Reserve attempts already granted in this run.
+   *
+   * Carried rather than derived. "Attempts beyond the window budget" looks like
+   * the same number and is not: the final window sums attempts across every
+   * block, so a run that spent 19 of 8 on group remediations is at 11 over
+   * budget having drawn nothing from the reserve at all.
+   */
+  reservedWindowAttemptsSpent?: number;
+  maxReservedWindowAttempts?: number;
 }
+
+/**
+ * Extra regenerations available at the final full-document window, beyond the
+ * ordinary window budget of 8.
+ *
+ * Run 2896e72f ended with block_13 carrying two criticals and zero regeneration
+ * attempts: the final pass was the first to flag it, and by then unrelated group
+ * remediations had spent 19 of 8. Its surviving defects are "found too late to
+ * fix", not "told one complaint at a time", so the answer is not a higher
+ * per-block cap — a block that already had two attempts does not need a third.
+ * It is a small reserve for a block that has had none.
+ *
+ * Bounded twice over: three across the whole run (the spend is derived from the
+ * attempts already made, so repeated final passes cannot each take three), and
+ * only for a block sitting at zero with a critical against it.
+ */
+export const CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS = 3;
 
 /**
  * Select every block the current judge verdict flags that can still be regenerated
@@ -274,11 +373,13 @@ export function selectPendingCareerPlaybookRegenerations(
     return [];
   }
 
-  const remainingWindow =
-    maxWindowAttempts -
-    countCareerPlaybookRegenerationAttemptsForBlocks(input.attempts, input.blockIds);
+  const spentWindow = countCareerPlaybookRegenerationAttemptsForBlocks(
+    input.attempts,
+    input.blockIds
+  );
+  const remainingWindow = maxWindowAttempts - spentWindow;
   if (remainingWindow <= 0) {
-    return [];
+    return selectReservedRegenerations(input, verdict);
   }
 
   const candidates = verdict.needs_regeneration
@@ -293,15 +394,78 @@ export function selectPendingCareerPlaybookRegenerations(
 
   return candidates.slice(0, remainingWindow).map(candidate => ({
     blockId: candidate.blockId,
-    issue: issueForBlock(verdict, candidate.blockId),
+    issues: issuesForBlock(verdict, candidate.blockId),
     attempts: candidate.attempts,
   }));
 }
 
-export function selectPendingCareerPlaybookRegeneration(
-  input: SelectCareerPlaybookRegenerationInput
-): CareerPlaybookPendingRegeneration | null {
-  return selectPendingCareerPlaybookRegenerations(input)[0] ?? null;
+/**
+ * The reserve, once the ordinary window budget is spent.
+ *
+ * Everything about it is deliberately narrow. Only a listed block qualifies —
+ * the caller decides that, and today only the final full-document judge lists
+ * any. Only a block at zero attempts, so this never becomes a third try at
+ * something two rewrites failed to fix. Only a block with a critical against it,
+ * because a warning was never going to regenerate anything anyway.
+ *
+ * The remaining reserve comes from `reservedWindowAttemptsSpent`, which the
+ * caller carries in state, so repeated final passes cannot each take three.
+ */
+function selectReservedRegenerations(
+  input: SelectCareerPlaybookRegenerationInput,
+  verdict: CareerPlaybookJudgeVerdict
+): CareerPlaybookPendingRegeneration[] {
+  const reserved = new Set(input.reservedWindowBlockIds ?? []);
+  if (reserved.size === 0) return [];
+
+  const maxReserve =
+    input.maxReservedWindowAttempts ?? CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS;
+  const remainingReserve = maxReserve - (input.reservedWindowAttemptsSpent ?? 0);
+  if (remainingReserve <= 0) return [];
+
+  const hasCritical = (blockId: CareerPlaybookBlockId): boolean =>
+    verdict.issues.some(issue => issue.block_id === blockId && issue.severity === 'critical');
+
+  return verdict.needs_regeneration
+    .filter(blockId => input.blockIds.includes(blockId))
+    .filter(blockId => reserved.has(blockId))
+    .filter(blockId => (input.attempts[blockId] ?? 0) === 0)
+    .filter(hasCritical)
+    .slice(0, remainingReserve)
+    .map(blockId => ({
+      blockId,
+      issues: issuesForBlock(verdict, blockId),
+      attempts: 0,
+      fromReserve: true,
+    }));
+}
+
+/**
+ * The regeneration decision for one window, taken from graph state.
+ *
+ * One function because the routers and the regenerator must ask the same
+ * question, and a router asks it first. Until 2026-09-01 they asked different
+ * ones: `blockRegenerator` passed the reserve, both routers omitted it. A block
+ * whose only remaining path was the reserve therefore routed straight past the
+ * node that would have granted it, and the reserve could only ever be spent by
+ * a batch the ordinary budget had already opened.
+ *
+ * Run b7925b1d ended `11/8; final-window reserve 0/3` with block_15 holding two
+ * real criticals at zero attempts, while two of the spent attempts went to
+ * block_18 on a milestone critical that was false. The exemption was computed
+ * correctly and named in the warning; nothing ever asked for it.
+ */
+export function selectPendingCareerPlaybookRegenerationsForState(
+  state: CareerPlaybookGraphStateType,
+  blockIds: CareerPlaybookBlockId[]
+): CareerPlaybookPendingRegeneration[] {
+  return selectPendingCareerPlaybookRegenerations({
+    verdict: state.lastJudgeVerdict,
+    blockIds,
+    attempts: state.blockRegenerationAttempts,
+    reservedWindowBlockIds: state.windowBudgetExemptBlockIds,
+    reservedWindowAttemptsSpent: state.finalWindowReserveSpent,
+  });
 }
 
 export function countCareerPlaybookRegenerationAttemptsForBlocks(
@@ -326,11 +490,10 @@ export function createBlockRegeneratorNode(
     }
 
     const roleProfileSpec = state.roleProfileSpec;
-    const pendingBatch = selectPendingCareerPlaybookRegenerations({
-      verdict: state.lastJudgeVerdict,
-      blockIds: state.lastJudgedBlockIds,
-      attempts: state.blockRegenerationAttempts,
-    });
+    const pendingBatch = selectPendingCareerPlaybookRegenerationsForState(
+      state,
+      state.lastJudgedBlockIds
+    );
 
     if (pendingBatch.length === 0) {
       // Nothing eligible: every flagged block sits at its per-block/window cap, so this
@@ -359,7 +522,7 @@ export function createBlockRegeneratorNode(
             roleProfileSpec,
             language: state.language,
             originalBlock: state.generatedBlocks[pending.blockId],
-            issue: pending.issue,
+            issues: pending.issues,
             otherBlocks: otherBlocksSnapshot,
           },
           runtime
@@ -405,12 +568,20 @@ export function createBlockRegeneratorNode(
       );
     });
 
+    // Every reserve draw is counted, including one that failed: it consumed an
+    // attempt and a provider call, and a reserve that only counts successes
+    // would fund a retry loop the per-block cap was written to prevent.
+    const reserveDraws = pendingBatch.filter(pending => pending.fromReserve).length;
+
     return {
       ...(Object.keys(generatedBlocks).length > 0 ? { generatedBlocks } : {}),
       ...(Object.keys(blockRegenerationAttempts).length > 0 ? { blockRegenerationAttempts } : {}),
       ...(nodeCosts.length > 0 ? { nodeCosts } : {}),
       ...(warnings.length > 0 ? { warnings } : {}),
       ...(errors.length > 0 ? { errors } : {}),
+      ...(reserveDraws > 0
+        ? { finalWindowReserveSpent: (state.finalWindowReserveSpent ?? 0) + reserveDraws }
+        : {}),
       // Non-zero eligible batch: this pass attempted regeneration (success or failure),
       // so the window must be re-judged to gate the changed content.
       lastRegenerationBatchSize: pendingBatch.length,

@@ -21,12 +21,20 @@ import {
 } from './runtime';
 import type { CareerPlaybookWebResearchResult } from '../rag/web-research';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import { buildCareerPlaybookPriorBlocksDigest } from './prior-blocks-digest';
+import {
+  formatCareerPlaybookBlockAudiences,
+  formatCareerPlaybookCitableBlocks,
+} from './audience-scope';
 
 export interface CareerPlaybookBlockSpec {
   blockId: CareerPlaybookBlockId;
@@ -499,10 +507,28 @@ export async function generateCareerPlaybookGroup(
     metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
       getCareerPlaybookMetricLedger(spec)
     ),
+    // Rhythms need a canonical home for the same reason numbers did: without
+    // one, six blocks called the pipeline review weekly and five called it
+    // quarterly, and no single-block rewrite could reconcile them.
+    cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+      getCareerPlaybookCadenceLedger(spec)
+    ),
+    milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+      getCareerPlaybookMilestoneLedger(spec)
+    ),
     evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
       getCareerPlaybookEvidenceLedger(spec)
     ),
     generated_on: spec.generated_on ?? new Date().toISOString().slice(0, 10),
+    block_audiences_md: formatCareerPlaybookBlockAudiences(
+      groupSpec.blocks.map(block => block.blockId)
+    ),
+    // Which other block each output block may send its reader to. The generator
+    // cannot derive it: it is told who reads its own blocks, not which blocks
+    // every one of those readers also holds.
+    citable_blocks_md: formatCareerPlaybookCitableBlocks(
+      groupSpec.blocks.map(block => block.blockId)
+    ),
     prior_blocks_digest: buildCareerPlaybookPriorBlocksDigest(
       input.generatedBlocks ?? {},
       groupSpec.blocks.map(block => block.blockId)

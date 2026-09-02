@@ -273,7 +273,7 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
       // =====================================================================
       // STEP 5: Verify Phase 4 Used 20B Model
       // =====================================================================
-      expect(validated.metadata.model_usage.phase_4).toBe('openai/gpt-oss-20b');
+      expect(validated.metadata.model_usage.phase_4).toBe('z-ai/glm-5.3-flash');
 
       console.log('✓ Phase 4 used 20B model (expected for <3 documents)');
 

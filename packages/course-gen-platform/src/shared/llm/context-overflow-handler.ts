@@ -14,7 +14,7 @@
  * // Automatic fallback on context overflow
  * const { result, modelUsed } = await executeWithContextFallback(
  *   async (modelId) => await someOperation(modelId),
- *   'qwen/qwen3-235b-a22b-2507',
+ *   'openai/gpt-5.6-luna',
  *   'ru'
  * );
  * // If context overflow occurs, automatically tries extended tier model

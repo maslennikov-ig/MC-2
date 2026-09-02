@@ -132,6 +132,8 @@ const roleProfileSpec = {
   // Quality-contract ledgers. The router parses the stored spec through the
   // schema, so the queued job always carries these defaults.
   metric_ledger: [],
+  cadence_ledger: [],
+  milestone_ledger: [],
   evidence_ledger: [],
   block_boundaries: {},
   content_language: 'en',

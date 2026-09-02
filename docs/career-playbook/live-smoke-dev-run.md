@@ -8,9 +8,23 @@ Runbook для эмпирической проверки shipped-фиксов (�
 ## Шаг 1. Получить bearer-токен (JWT)
 
 Приложение (Next.js/SSR) хранит сессию Supabase в cookie, а НЕ в Local Storage.
-Основной путь **без пароля** — вытащить `access_token` из cookie через консоль браузера.
 
-### Вариант A (основной, без пароля) — браузерная консоль
+### Вариант 0 (основной) — выпустить сессию из кода, без браузера
+
+Владелец не водит платные прогоны руками (2026-08-20). Сервисным ключом выпускается magic link,
+анонимным клиентом он гасится — получается настоящий `access_token`, потому что backend зовёт
+`supabase.auth.getUser(token)`, а локальный JWT-шорткат в `server/trpc.ts` работает только при
+`NODE_ENV === 'test'`. Механика полностью описана в `scripts/dev-run-micro-course.ts`
+(`mintAccessToken`): `admin.auth.admin.generateLink({type:'magiclink', email})` →
+`properties.hashed_token` → `anon.auth.verifyOtp({type:'magiclink', token_hash})`.
+
+`user_id` и `organization_id` для Шага 2 читаются из claims полученного токена; `refresh_token`
+берётся из той же сессии. Прогон `88fc2368` (2026-08-31) сделан именно так.
+
+Варианты ниже — ручной запасной путь. До 2026-08-31 этот документ называл браузерный токен
+единственным входом, и три готовых задачи ждали владельца неделю без причины.
+
+### Вариант A (запасной, без пароля) — браузерная консоль
 
 1. Залогиниться на https://dev.ai.megacampus.ru своим аккаунтом.
 2. DevTools (F12) → вкладка **Console**.
@@ -126,6 +140,11 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 - `--dir` задан абсолютным путём через `git rev-parse` — относительный путь ломается, если шелл не в корне репо.
 - Существующие playbook'и аккаунта не трогаются; курс не создаётся (нет `--include-course-bridge`).
 - Поллинг до 120 мин (совпадает с TTL-cap). `--json` даёт машинный отчёт со статусом `pass` / `warn` / `blocked` / `fail`.
+- После публикации раннер сам открывает публичные страницы — каталожную и по одной на каждого читателя —
+  и требует HTTP 200 (проверка `public-page-render`). Проверка `public-share` читает только tRPC-запрос,
+  и в прогоне 4e355bf4 она была зелёной, пока все публичные страницы гайда отдавали 500 (mc2-j8ms8).
+  Origin берётся из `CAREER_PLAYBOOK_SMOKE_TRPC_URL`; если Next.js живёт не там, где tRPC,
+  задай `--web-url` или `CAREER_PLAYBOOK_SMOKE_WEB_URL`. Токены читательских ссылок в отчёт не попадают.
 - Если задан `CAREER_PLAYBOOK_SMOKE_REFRESH_TOKEN`, раннер при первом HTTP 401 один раз обновляет
   Supabase-сессию и повторяет запрос. Новый access/refresh token остаётся только в памяти процесса.
 - **Cleanup ничего не удаляет — только описывает** (см. раздел «Cleanup-семантика» ниже).
@@ -172,6 +191,55 @@ pnpm --dir "$(git rev-parse --show-toplevel)/packages/course-gen-platform" smoke
 - длительность `< 120 мин` (TTL-cap `mc2-db696.62`/P1)
 
 На этих реальных данных переоценивается `mc2-db696.61` (нужен ли source-evidence override ~24–32k для генератора follow-up-вопросов).
+
+## Шаг 6. Приёмка Role Guide по адресатам и повторам
+
+Выполнить этот раздел после **единственного** разрешённого dev-run и до ручного удаления строки.
+Не запускать вторую генерацию для исправления evidence: если доказательства не сняты с первой,
+остановиться и зафиксировать, чего не хватает.
+
+1. Взять точный `playbookId` из JSON-артефакта раннера и прочитать по этому exact ID строку
+   `career_playbooks`. Не вставлять ID, токены, service key или пользовательский текст в этот
+   документ или вывод коммита.
+2. Убедиться, что строка завершилась как `completed`, и прочитать
+   `q_a_data->>'generation_error'` — это **JSON-поле внутри `q_a_data`**, а не колонка;
+   колонки `generation_error` в `career_playbooks` нет (единственная колонка со словом error —
+   `image_error_message`, и она про картинку). Дубль того же сообщения лежит в
+   `job_status.error_message` по `job_id = 'career-playbook-<playbookId>'`.
+
+   Значение должно не начинаться с `semantic repetition checks unavailable:`. Только этот случай
+   fail-closed: мы не смогли измерить документ, graph останавливается, handler ставит `failed`,
+   и такой прогон нельзя принимать или повторять второй платной генерацией.
+
+   Обратный случай — «измерили, нашли повтор, за две попытки не исправили» — прогон **не** роняет
+   с 2026-08-30. Playbook завершается, а претензия с косинусом, порогом и обоими блоками пары
+   пишется в `generation_warnings`. Проверять её там, а не по статусу.
+
+3. Проверить в `career_playbooks.cost_breakdown`, что есть хотя бы одна строка с
+   `node = "semanticRepetition"`, `provider_name = "jina"` и положительным `input_tokens`.
+   `generation_trace` для этой проверки не использовать: Career Playbook хранит расход здесь.
+4. Из `generated_blocks` собрать на лету и полностью прочитать четыре документа: `employee`,
+   `manager`, `hr` и `full`. Для первых трёх использовать канонические audiences блока; `full`
+   содержит все 27 stored ids. Не считать просмотр отдельных вкладок достаточным без чтения
+   каждого документа от начала до конца.
+5. До cleanup снять итоговый semantic-замер ровно по этому playbook и фиксированному порогу:
+
+```bash
+TMPDIR=/tmp pnpm --dir packages/course-gen-platform exec tsx scripts/measure-playbook-repetition.ts \
+  --mode evaluation \
+  --playbook-id '<exact-playbook-id из артефакта>' \
+  --threshold 0.85 \
+  --out 'docs/career-playbook/2026-08-29-semantic-repetition-final.md' \
+  --cache '.cache/career-playbook-repetition/jina-embeddings-v3.json'
+```
+
+Команда должна выбрать ровно одну строку по exact ID и завершиться ошибкой при отсутствии или
+неполном наборе блоков. В итоговый документ входят только агрегаты, блоки и similarity; секреты и
+customer prose не копируются.
+
+Только после сохранения чтения, cost evidence и итогового замера выполнить ручной cleanup по
+точному ID из `cleanupManifest`, затем read-only запросом подтвердить отсутствие именно этой
+строки. Не использовать широкий фильтр, список ID или UUID из старого прогона.
 
 ## Нагрузочный прогон: ровно 10 генераций
 

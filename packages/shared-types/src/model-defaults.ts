@@ -199,19 +199,6 @@ export const CHAT_STAGE6_PRIMARY_MODEL_ID = DEFAULT_MODEL_ID;
 /** Stage 6 chat fallback model — same as DEFAULT_FALLBACK_MODEL_ID */
 export const CHAT_STAGE6_FALLBACK_MODEL_ID = DEFAULT_FALLBACK_MODEL_ID;
 
-// ============================================================================
-// LEGACY
-// ============================================================================
-
-/**
- * Legacy model aliases mapped to current replacement IDs.
- * @deprecated These should not be used in new code
- */
-export const LEGACY_MODEL_IDS = {
-  OSS_20B: 'openai/gpt-oss-20b',
-  OSS_120B: DEFAULT_MODEL_ID,
-} as const;
-
 /**
  * Phase name for global default configuration in database
  */

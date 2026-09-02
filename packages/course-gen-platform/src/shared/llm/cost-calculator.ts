@@ -101,44 +101,6 @@ export const COST_THRESHOLDS = {
 } as const;
 
 // ============================================================================
-// CONTEXT VALIDATION
-// ============================================================================
-
-/**
- * Validates that Qwen 3 Max input stays in its base price tier.
- *
- * OpenRouter pricing tiers verified 2026-08-14:
- * - below 32K input tokens: $0.78/$3.90 per 1M tokens
- * - from 32K: $1.56/$7.80 per 1M tokens
- * - from 128K: $1.95/$9.75 per 1M tokens
- *
- * Usage patterns from RT-001:
- * Longer requests need tier-aware pricing before this retired model can safely
- * return to routing.
- *
- * @param inputTokens - Number of input tokens for Qwen 3 Max generation
- * @throws Error if input reaches the 32K higher-price tier
- *
- * @example
- * ```typescript
- * // Before generating with Qwen 3 Max
- * validateQwen3MaxContext(estimatedTokens);
- * const metadata = await llm.generate("qwen/qwen3-max", prompt);
- * ```
- */
-export function validateQwen3MaxContext(inputTokens: number): void {
-  const QWEN3_MAX_BASE_RATE_LIMIT = 31_999;
-
-  if (inputTokens > QWEN3_MAX_BASE_RATE_LIMIT) {
-    throw new Error(
-      `Qwen 3 Max input (${inputTokens.toLocaleString()} tokens) reaches the higher-price tier at 32,000 tokens. ` +
-        `The base MODEL_CATALOG rate no longer applies. ` +
-        `Consider splitting prompt or using Gemini 2.5 Flash for overflow.`
-    );
-  }
-}
-
-// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -197,7 +159,7 @@ export interface CostStatus {
  * For a model with a unified provider rate, uses combinedPricePerMillion.
  * For split-pricing models, uses input/output pricing with 50/50 assumption if not specified.
  *
- * @param modelName - OpenRouter model identifier (e.g., "qwen/qwen3-max")
+ * @param modelName - OpenRouter model identifier (e.g., "openai/gpt-5.6-luna")
  * @param totalTokens - Total tokens consumed in this phase
  * @param inputTokens - Input tokens (0 = assume 50/50 split for split-pricing models)
  * @returns Cost in USD
@@ -245,7 +207,7 @@ export function estimatePhaseCostUsd(
     return (totalTokens * pricing.combinedPricePerMillion) / 1_000_000;
   }
 
-  // Otherwise, split input/output (qwen3-max model)
+  // Otherwise, split input/output
   // If inputTokens not provided (0), assume 50/50 split
   const actualInputTokens = inputTokens > 0 ? inputTokens : Math.floor(totalTokens / 2);
   const outputTokens = totalTokens - actualInputTokens;
@@ -267,17 +229,13 @@ export function estimatePhaseCostUsd(
  *
  * @example
  * ```typescript
- * import { calculateGenerationCost, assessCostStatus, validateQwen3MaxContext } from '@/services/stage5/cost-calculator';
- *
- * // IMPORTANT: Validate Qwen 3 Max context before generation
- * const estimatedInputTokens = 45000;
- * validateQwen3MaxContext(estimatedInputTokens); // Throws at 32K
+ * import { calculateGenerationCost, assessCostStatus } from '@/services/stage5/cost-calculator';
  *
  * const metadata: GenerationMetadata = {
  *   model_used: {
- *     metadata: "qwen/qwen3-max",
+ *     metadata: "openai/gpt-5.6-luna",
  *     sections: "deepseek/deepseek-v4-flash",
- *     validation: "openai/gpt-oss-20b"
+ *     validation: "z-ai/glm-5.3-flash"
  *   },
  *   total_tokens: {
  *     metadata: 52000,  // ~45K input + ~7K output (SAFE, <128K)
@@ -464,15 +422,14 @@ export function hasUnifiedPricing(modelName: string): boolean {
  *
  * @example
  * ```typescript
- * // Estimate cost for Qwen 3 Max metadata generation
+ * // Estimate cost for metadata generation
  * const inputTokens = 45000;
  * const outputTokens = 7000;
  * const totalTokens = inputTokens + outputTokens;
  *
  * // Validate context limit before estimating
- * validateQwen3MaxContext(inputTokens); // Throws at 32K
  *
- * const estimatedCost = estimateCost("qwen/qwen3-max", totalTokens, inputTokens);
+ * const estimatedCost = estimateCost("openai/gpt-5.6-luna", totalTokens, inputTokens);
  * console.log(`Estimated cost: ${estimatedCost === undefined ? 'not measured' : formatCost(estimatedCost)}`);
  * // Expected: ~$0.096 (with new $1.20/$6.00 pricing)
  * ```
@@ -491,7 +448,7 @@ export function estimateCost(
  * Uses 4 chars ≈ 1 token heuristic (English text).
  * For accurate counts, use tiktoken or model-specific tokenizers.
  *
- * This utility is essential for validateQwen3MaxContext() pre-flight checks.
+ * Used to size a prompt before a call, and to sanity-check a budget after one.
  *
  * @param text - Text to estimate tokens for
  * @returns Estimated token count
@@ -500,7 +457,6 @@ export function estimateCost(
  * ```typescript
  * const prompt = buildMetadataPrompt(input);
  * const estimatedTokens = estimateTokenCount(prompt);
- * validateQwen3MaxContext(estimatedTokens); // Check before LLM call
  * ```
  */
 export function estimateTokenCount(text: string): number {

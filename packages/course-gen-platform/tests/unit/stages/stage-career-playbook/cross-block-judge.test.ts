@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
@@ -8,12 +8,42 @@ import {
   countMermaidDiagrams,
   createCrossBlockJudgeNode,
   isCareerPlaybookDeltaReJudgeEnabled,
+  downgradeUnconfirmedPlaceholderIssues,
   parseCareerPlaybookJudgeVerdict,
   runCareerPlaybookDeterministicChecks,
   selectDeltaReJudgeBlockIds,
   validateMermaidCoverage,
 } from '@/stages/stage-career-playbook/nodes/cross-block-judge';
-import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/cross-block-judge-structured';
+import { resolveJudgeFallbackTokenThreshold } from '@/stages/stage-career-playbook/nodes/structured-verdict';
+
+const { generateEmbeddingsMock } = vi.hoisted(() => ({
+  generateEmbeddingsMock: vi.fn(),
+}));
+
+vi.mock('@/shared/embeddings/jina-client', () => ({
+  generateEmbeddings: generateEmbeddingsMock,
+}));
+
+beforeEach(() => {
+  generateEmbeddingsMock.mockReset();
+  generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+    texts.map((_, index) =>
+      Array.from({ length: 768 }, (_unused, coordinate) => (index === coordinate ? 1 : 0))
+    )
+  );
+});
+
+function identicalEmbedding(): number[] {
+  return [1, ...Array.from({ length: 767 }, () => 0)];
+}
+
+function embeddingAtCosine(similarity: number): number[] {
+  return [
+    similarity,
+    Math.sqrt(1 - similarity * similarity),
+    ...Array.from({ length: 766 }, () => 0),
+  ];
+}
 
 function block(content: string): CareerPlaybookBlockState {
   return {
@@ -58,6 +88,383 @@ const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
 };
 
 describe('Career Playbook cross-block judge', () => {
+  it('routes a too-close shared-audience pair through the node regeneration verdict', async () => {
+    generateEmbeddingsMock.mockImplementation(
+      (
+        texts: string[],
+        _task: string,
+        _costContext: unknown,
+        onUsage?: (usage: {
+          model: string;
+          totalTokens: number;
+          documentCount: number;
+          durationMs: number;
+        }) => void
+      ) => {
+        onUsage?.({
+          model: 'jina-embeddings-v3',
+          totalTokens: 200,
+          documentCount: texts.length,
+          durationMs: 12,
+        });
+        return texts.map(() => identicalEmbedding());
+      }
+    );
+    const sharedAudienceBlocks = blocks([
+      [
+        'block_8',
+        `## 8. Tools
+
+${'The role uses a governed tool workflow with explicit review and measurable adoption. '.repeat(2)}`,
+      ],
+      [
+        'block_9',
+        `## 9. Human-AI collaboration
+
+${'The role uses a governed AI workflow with explicit review and measurable adoption. '.repeat(2)}`,
+      ],
+    ]);
+    const node = createCrossBlockJudgeNode({
+      useLLMJudge: false,
+    });
+
+    const update = await node({
+      playbookId: 'playbook-semantic-shared',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'en',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: sharedAudienceBlocks,
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'crossBlockJudge',
+    });
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_8', 'block_9']);
+    expect(update.lastJudgeVerdict?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          block_id: 'block_8',
+          category: 'contradiction',
+          severity: 'critical',
+          description: expect.stringContaining('block_9'),
+        }),
+        expect.objectContaining({
+          block_id: 'block_9',
+          category: 'contradiction',
+          severity: 'critical',
+          description: expect.stringContaining('block_8'),
+        }),
+      ])
+    );
+    expect(update.generatedBlocks?.block_8?.judge_verdict?.needs_regeneration).toEqual([
+      'block_8',
+      'block_9',
+    ]);
+    expect(update.nodeCosts).toEqual([
+      expect.objectContaining({
+        node: 'semanticRepetition',
+        model: 'jina-embeddings-v3',
+        input_tokens: 200,
+        output_tokens: 0,
+        cost_usd: 0.00001,
+        provider_name: 'jina',
+      }),
+    ]);
+  });
+
+  it('does not spend on semantic checks in bounded group judge windows', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const node = createCrossBlockJudgeNode({
+      currentBlockIds: ['block_8', 'block_9'],
+      useLLMJudge: false,
+    });
+
+    const update = await node({
+      playbookId: 'playbook-bounded-window',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'en',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([
+        ['block_8', '## 8. Tools\n\nA concise governed tools workflow.'],
+        ['block_9', '## 9. Human-AI collaboration\n\nA concise governed tools workflow.'],
+      ]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'group2Generator',
+    });
+
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(update.lastJudgeVerdict).toMatchObject({ pass: true, needs_regeneration: [] });
+  });
+
+  it('reuses unchanged hash-keyed embeddings on a final re-judge of the same playbook', async () => {
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+    const finalBlocks = blocks([
+      ['block_8', '## 8. Tools\n\nA concise governed tools workflow.'],
+      ['block_9', '## 9. Human-AI collaboration\n\nA distinct collaboration workflow.'],
+    ]);
+    const state = {
+      playbookId: 'playbook-cache-reuse',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'en',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: finalBlocks,
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'crossBlockJudge' as const,
+    };
+
+    await node(state);
+    await node(state);
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
+    expect(generateEmbeddingsMock.mock.calls[0][0]).toHaveLength(2);
+  });
+
+  it('does not reuse a semantic cache entry across different playbook ids', async () => {
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+    const finalBlocks = blocks([
+      ['block_8', '## 8. Tools\n\nA concise governed tools workflow.'],
+      ['block_9', '## 9. Human-AI collaboration\n\nA distinct collaboration workflow.'],
+    ]);
+    const state = {
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'en',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: finalBlocks,
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'crossBlockJudge' as const,
+    };
+
+    await node({ ...state, playbookId: 'playbook-cache-tenant-a' });
+    await node({ ...state, playbookId: 'playbook-cache-tenant-b' });
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(2);
+    expect(generateEmbeddingsMock.mock.calls[0][0]).toHaveLength(2);
+    expect(generateEmbeddingsMock.mock.calls[1][0]).toHaveLength(2);
+  });
+
+  it('never flags an identical pair when the blocks share no audience view', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_9',
+          `## 9. Human-AI collaboration
+
+${'This long paragraph describes a repeated workflow for the employee audience only. '.repeat(2)}`,
+        ],
+        [
+          'block_23',
+          `## 23. Continuity plan
+
+${'This long paragraph describes a repeated workflow for the manager audience only. '.repeat(2)}`,
+        ],
+      ]),
+    });
+
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(verdict.issues).toEqual([]);
+    expect(verdict.needs_regeneration).toEqual([]);
+    expect(verdict.pass).toBe(true);
+  });
+
+  it('uses the inclusive 0.85 baseline threshold for shared-audience pairs', async () => {
+    generateEmbeddingsMock.mockResolvedValue([identicalEmbedding(), embeddingAtCosine(0.85)]);
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_8', '## 8. Tools\n\nA concise governed tools workflow.'],
+        ['block_9', '## 9. Human-AI collaboration\n\nA distinct collaboration workflow.'],
+      ]),
+    });
+
+    expect(verdict.needs_regeneration).toEqual(['block_8', 'block_9']);
+    expect(verdict.issues[0].description).toContain('threshold 0.85');
+  });
+
+  it('flags too-close semantic paragraphs inside one block using the baseline paragraph unit', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const firstParagraph =
+      'The manager reviews the same readiness checklist, confirms every owner, and records the final handoff result. '.repeat(
+        2
+      );
+    const secondParagraph =
+      'The manager confirms every owner in the readiness checklist and records the final handoff result after review. '.repeat(
+        2
+      );
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_26', `## 26. Implementation checklist\n\n${firstParagraph}\n\n${secondParagraph}`],
+      ]),
+    });
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
+    // mc2-de6fe. The pair is still measured and still reported; it no longer
+    // sends the block back. Of the 24 within-block pairs above threshold on the
+    // stored corpus (28 playbooks, 13,469 pairs, 2026-09-02), one is genuinely
+    // the same material twice — the rest are a 60-day gate beside a 90-day
+    // gate, a manager's checklist beside an employee's, two career tracks in
+    // one table shape. A regeneration cannot fix those without breaking the
+    // parallel form the contract asks for.
+    expect(verdict.needs_regeneration).toEqual([]);
+    expect(verdict.issues).toContainEqual(
+      expect.objectContaining({
+        block_id: 'block_26',
+        category: 'contradiction',
+        severity: 'warning',
+        description: expect.stringContaining('paragraphs 1 and 2'),
+      })
+    );
+  });
+
+  // The two exemptions are decided from the text, so a shape a block publishes
+  // on purpose never reaches the embedding call at all.
+  it('does not compare two tables that share a header and carry different rows', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const managementTrack =
+      '| Step | Criterion | Typical time | | --- | --- | --- | | Head of Sales | You grew two first-line managers who hold their own forecast | 18-24 months |';
+    const expertTrack =
+      '| Step | Criterion | Typical time | | --- | --- | --- | | Principal seller | You own the largest multi-stakeholder accounts end to end | 12-18 months |';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_11', `## 11. Career growth\n\n${managementTrack}\n\n${expertTrack}`],
+      ]),
+    });
+
+    // block_11 owes a career-path diagram this fixture does not carry, so the
+    // assertion is on the repetition finding rather than on an empty verdict.
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(verdict.issues.filter(item => /repeat semantically/.test(item.description))).toEqual([]);
+  });
+
+  it('still compares two tables whose columns were renamed around the same content', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    // Verbatim shape of a03dfb46 block_9, the one true positive in the corpus:
+    // one AI-delegation taxonomy stated twice under renamed columns.
+    const firstTable =
+      '| Zone | What it covers | Owner | | --- | --- | --- | | AI does | Routine request handling, first-pass classification, draft replies | AI assistant |';
+    const secondTable =
+      '| Bucket | What lands there | Who answers | | --- | --- | --- | | AI does | Request classification, draft replies, first-pass tone analysis | AI assistant |';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_9', `## 9. How AI changes this role\n\n${firstTable}\n\n${secondTable}`],
+      ]),
+    });
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
+    expect(verdict.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_9', severity: 'warning' })
+    );
+  });
+
+  it('does not compare two paragraphs opening with the same label', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const firstGate =
+      'Stage completion criteria: at least two paid-campaign improvements are live and their impact is recorded.';
+    const secondGate =
+      'Stage completion criteria: one campaign is scaled with a recorded effect on customer acquisition cost.';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([['block_14', `## 14. Onboarding\n\n${firstGate}\n\n${secondGate}`]]),
+    });
+
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(verdict.issues).toEqual([]);
+  });
+
+  it('fails the final judge closed and carries paid receipts when Jina is exhausted', async () => {
+    generateEmbeddingsMock.mockImplementation(
+      (
+        texts: string[],
+        _task: string,
+        _costContext: unknown,
+        onUsage?: (usage: { model: string; totalTokens: number; documentCount: number }) => void
+      ) => {
+        onUsage?.({
+          model: 'jina-embeddings-v3',
+          totalTokens: 200,
+          documentCount: texts.length,
+        });
+        throw new Error('Jina unavailable after retries');
+      }
+    );
+    const node = createCrossBlockJudgeNode({
+      useLLMJudge: false,
+    });
+
+    const result = node({
+      playbookId: 'playbook-semantic-provider-failure',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      language: 'en',
+      qaData: { fixed: [], followups: [], freeform: [] },
+      roleProfileSpec,
+      webResearch: null,
+      generatedGroups: {},
+      generatedBlocks: blocks([
+        ['block_8', '## 8. Tools\n\nA concise tools summary.'],
+        ['block_9', '## 9. Human-AI collaboration\n\nA concise collaboration summary.'],
+      ]),
+      nodeCosts: [],
+      errors: [],
+      currentNode: 'crossBlockJudge',
+    });
+
+    await expect(result).rejects.toMatchObject({
+      name: 'CareerPlaybookSemanticRepetitionProviderError',
+      message: expect.stringContaining(
+        'semantic repetition checks unavailable: Jina unavailable after retries'
+      ),
+      warnings: [
+        expect.stringContaining(
+          'semantic repetition checks unavailable: Jina unavailable after retries'
+        ),
+      ],
+      nodeCosts: [
+        expect.objectContaining({
+          node: 'semanticRepetition',
+          input_tokens: 200,
+          provider_name: 'jina',
+        }),
+      ],
+    });
+  });
+
   it('flags Phase 3 minimum item failures for anti-goals, decisions, and failure modes', async () => {
     const verdict = await runCareerPlaybookDeterministicChecks({
       generatedBlocks: blocks([
@@ -321,6 +728,12 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 40,
         cost_usd: 0.004,
+        attempts: undefined,
+        duration_ms: undefined,
+        // The provider answered and billed. Recorded for every verdict call
+        // since 2026-09-01, so a call whose answer could not be parsed still
+        // reaches the receipt.
+        outcome: 'succeeded',
       },
     ]);
   });
@@ -527,6 +940,9 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 1,
         cost_usd: 0.001,
+        attempts: undefined,
+        duration_ms: undefined,
+        outcome: 'succeeded',
       },
       {
         node: 'crossBlockJudge',
@@ -534,6 +950,9 @@ flowchart LR
         input_tokens: 50,
         output_tokens: 1,
         cost_usd: 0.001,
+        attempts: undefined,
+        duration_ms: undefined,
+        outcome: 'succeeded',
       },
     ]);
   });
@@ -687,6 +1106,146 @@ flowchart LR
       currentNode: 'group2Generator' as const,
     };
   }
+
+  function semanticFinalJudgeState(attempts: Partial<Record<CareerPlaybookBlockId, number>>) {
+    const firstParagraph =
+      'The manager reviews the same readiness checklist, confirms every owner, and records the final handoff result. '.repeat(
+        2
+      );
+    const secondParagraph =
+      'The manager confirms every owner in the readiness checklist and records the final handoff result after review. '.repeat(
+        2
+      );
+
+    return {
+      ...baseJudgeState({
+        generatedBlocks: blocks([
+          ['block_8', '## 8. Tools\n\nDistinct tool categories.'],
+          ['block_11', `## 11. Career path\n\n${firstParagraph}\n\n${secondParagraph}`],
+        ]),
+        blockRegenerationAttempts: attempts,
+      }),
+      language: 'en',
+      roleProfileSpec: null,
+      currentNode: 'finalJudge' as const,
+    };
+  }
+
+  /**
+   * A repeat between two whole blocks in a shared audience view.
+   *
+   * These tests were written against a within-block paragraph repeat, which is
+   * a warning since mc2-de6fe and no longer reserves a regeneration. What they
+   * are actually about — that an unremediated repetition is reported instead of
+   * shipped in silence — belongs to the cross-block finding, which is still
+   * critical and has no evidence against it. Whole block contents start with
+   * `## `; `splitCareerPlaybookSemanticParagraphs` strips that heading, so the
+   * two units never collide in this mock.
+   */
+  function mockOneCrossBlockSemanticRepeat() {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map((text, index) =>
+        text.startsWith('## ')
+          ? identicalEmbedding()
+          : Array.from({ length: 768 }, (_unused, coordinate) => (coordinate === index + 1 ? 1 : 0))
+      )
+    );
+  }
+
+  it('keeps the flagged block eligible while the window still has budget', async () => {
+    mockOneCrossBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    const update = await node(semanticFinalJudgeState({ block_8: 7, block_11: 0 }));
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual(['block_11']);
+    expect(update.errors).toBeUndefined();
+  });
+
+  /**
+   * The window-budget exemption is bookkeeping inside the judge;
+   * `selectPendingCareerPlaybookRegenerations` refuses every block once the
+   * window is spent, and `routeAfterBlockRegeneration` sends the empty batch to
+   * END. Keeping the block in `needs_regeneration` therefore reserves nothing,
+   * and asserting `errors: undefined` here once pinned a fail-open: the playbook
+   * completed with an unremediated critical repetition, no error and no warning.
+   *
+   * Silence was the defect, not the missing throw. The gate now reports instead
+   * of discarding the document, so the assertion is on the warning and on the
+   * measurements inside it — a warning that names only a block id sent a real
+   * 2026-08-30 failure back for another paid run before it could be diagnosed.
+   */
+  it('reports with measurements when the exhausted window leaves nothing to regenerate the block', async () => {
+    mockOneCrossBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    const update = await node(semanticFinalJudgeState({ block_8: 8, block_11: 0 }));
+
+    expect(update.errors).toBeUndefined();
+    const warning = update.warnings?.find(entry =>
+      entry.includes('exhausted semantic repetition remediation')
+    );
+    expect(warning).toBeDefined();
+    expect(warning).toMatch(/for [^;]*block_11[^;]*;/);
+    expect(warning).toContain('cosine');
+    expect(warning).toContain('threshold');
+  });
+
+  /**
+   * The degraded-judge return sits above the semantic gate block, so a judge
+   * model that fails to produce a verdict used to take the deterministic gate
+   * down with it entirely: the repetition was found, nothing remediated it, and
+   * nothing said so. Both reports must survive this path — the degradation and
+   * the repetition are independent facts about the same run.
+   */
+  it('still reports the semantic gate when the LLM judge degrades', async () => {
+    mockOneCrossBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({
+      useLLMJudge: true,
+      runtime: {
+        renderPrompt: vi.fn().mockResolvedValue('rendered judge prompt'),
+        invokeLLM: vi.fn().mockResolvedValue({
+          content: '',
+          model: 'mock-judge-model',
+          inputTokens: 50,
+          outputTokens: 1,
+          costUsd: 0.001,
+        }),
+      },
+    });
+
+    const update = await node({
+      ...semanticFinalJudgeState({ block_8: 8, block_11: 0 }),
+      roleProfileSpec,
+    });
+
+    expect(update.warnings?.[0]).toContain('crossBlockJudge degraded to deterministic checks');
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings).toContainEqual(
+      expect.stringContaining('exhausted semantic repetition remediation')
+    );
+  });
+
+  it('reports the final semantic gate after the repeated block exhausts its cap', async () => {
+    mockOneCrossBlockSemanticRepeat();
+    const node = createCrossBlockJudgeNode({ useLLMJudge: false });
+
+    // Both blocks, because a cross-block repeat names both of them: while
+    // either still has an attempt left the pair is remediable and no exhaustion
+    // is reported.
+    const update = await node(
+      semanticFinalJudgeState({
+        block_8: 2,
+        block_11: 2,
+      })
+    );
+
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
+    expect(update.errors).toBeUndefined();
+    expect(update.warnings).toContainEqual(
+      expect.stringContaining('exhausted semantic repetition remediation')
+    );
+  });
 
   it('advances with a warning (not an error) when the judge window budget is exhausted', async () => {
     const renderPrompt = vi.fn().mockResolvedValue('rendered judge prompt');
@@ -1216,5 +1775,157 @@ flowchart LR
       expect(resolveJudgeFallbackTokenThreshold('-5')).toBe(28_000);
       expect(resolveJudgeFallbackTokenThreshold('')).toBe(28_000);
     });
+  });
+
+  // Verbatim from playbook d5137bc5 (2026-08-30). All eight of the run's
+  // unresolved_placeholder criticals pointed at the marker the contract requires
+  // an unverified company value to carry, and each one bought a regeneration
+  // that could only make a correct block worse.
+  describe('downgradeUnconfirmedPlaceholderIssues', () => {
+    const contractedMarker =
+      "| CRM (Salesforce, HubSpot) (example — replace with the company's actual CRM) | System of record |";
+
+    function placeholderIssue(blockId: string, description: string) {
+      return {
+        block_id: blockId,
+        severity: 'critical' as const,
+        category: 'unresolved_placeholder' as const,
+        description,
+        suggestion: 'Remove the placeholder.',
+      };
+    }
+
+    it('downgrades a placeholder critical the deterministic scan cannot confirm', () => {
+      const [issue] = downgradeUnconfirmedPlaceholderIssues(
+        [
+          placeholderIssue(
+            'block_8',
+            "Tool entries contain unresolved replacement instructions such as “example — replace with the company's actual CRM.”"
+          ),
+        ],
+        { block_8: { content: contractedMarker, status: 'generated', attempt: 1 } }
+      );
+
+      expect(issue.severity).toBe('warning');
+      expect(issue.description).toContain('contracted output rather than a placeholder');
+    });
+
+    it('leaves a critical alone when a real fill-in field is present', () => {
+      const [issue] = downgradeUnconfirmedPlaceholderIssues(
+        [placeholderIssue('block_23', 'The backup contact table is not filled in.')],
+        {
+          block_23: {
+            content: '| Backup contact | [name] | [date] |',
+            status: 'generated',
+            attempt: 1,
+          },
+        }
+      );
+
+      expect(issue.severity).toBe('critical');
+      expect(issue.description).not.toContain('downgraded');
+    });
+
+    it('touches nothing outside a placeholder critical', () => {
+      const issues = [
+        {
+          block_id: 'block_4',
+          severity: 'critical' as const,
+          category: 'contradiction' as const,
+          description: 'The pipeline review cadence disagrees.',
+          suggestion: 'Align it.',
+        },
+        placeholderIssue('block_8', 'Marker present.'),
+      ];
+      issues[1].severity = 'warning' as never;
+
+      expect(downgradeUnconfirmedPlaceholderIssues(issues, {})).toEqual(issues);
+    });
+  });
+});
+
+/**
+ * What the first Russian run since 2026-08-22 cost.
+ *
+ * Run db9d3ff9 (2026-09-01) shipped seven criticals against three in the English
+ * run beside it, and two of the seven were the checks misreading a correct
+ * document. Both fragments below are that run's own text.
+ */
+describe('a Russian guide is read by the same rules as an English one', () => {
+  it('counts failure modes written as sub-headings, not only as rows and bullets', async () => {
+    // Four failure modes, each a `###` section with prose under it, and not a
+    // bullet or a table row in sight. The counter read 0 and block_21 spent both
+    // its regeneration attempts on a minimum it already met.
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_21',
+          `## 21. Как люди обычно проваливаются на этой роли
+
+Режим: FMEA-подход — что идет не так, как это заметить рано, что сделать заранее.
+
+### Режим отказа 1: Воронка существует формально
+
+**Как проваливается:** стадии и суммы в CRM неактуальны.
+
+### Режим отказа 2: Прогноз на оптимизме
+
+**Как проваливается:** прогноз расходится с фактом.
+
+### Режим отказа 3: Руководитель — узкое место
+
+**Как проваливается:** планы пишет руководитель.
+
+### Режим отказа 4: Активность без конверсии
+
+**Как проваливается:** активность растет, конверсия падает.`,
+        ],
+      ]),
+    });
+
+    expect(verdict.issues.filter(issue => issue.description.includes('failure modes'))).toEqual([]);
+  });
+
+  it('does not read an English source title in a Russian guide as English prose', async () => {
+    // The reading list carries the titles of the sources it cites, and an English
+    // source keeps its English title. Block 25 was told it was in the wrong
+    // language and spent an attempt on text it could not translate without
+    // misquoting.
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_25',
+          `## 25. Когда пересматривать эту инструкцию
+
+**Версия:** 1.0 от 2026-09-01. Владелец документа — коммерческий директор.
+
+Плановая ревизия всей инструкции — раз в квартал.
+
+### Источники
+
+- [S1] B2B Buying: How Top CSOs and CMOs Optimize the Journey — https://www.gartner.com/en/sales/insights/b2b-buying-journey (research)
+- [S2] Use Science to Improve Sales Team Productivity — https://www.forrester.com/blogs/use-science-to-improve-sales-productivity (research)`,
+        ],
+      ]),
+      contentLanguage: 'ru',
+    });
+
+    expect(verdict.issues.filter(issue => issue.category === 'wrong_language')).toEqual([]);
+  });
+
+  it('still catches an English paragraph the guide itself wrote', async () => {
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        [
+          'block_25',
+          `## 25. Когда пересматривать эту инструкцию
+
+This guide should be reviewed every quarter, and the owner of the document is the commercial director who will initiate the update.`,
+        ],
+      ]),
+      contentLanguage: 'ru',
+    });
+
+    expect(verdict.issues.filter(issue => issue.category === 'wrong_language')).toHaveLength(1);
   });
 });

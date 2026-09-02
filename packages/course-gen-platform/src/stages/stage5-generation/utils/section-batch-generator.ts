@@ -2,9 +2,16 @@
  * Section Batch Generator - Tiered Model Routing for Lesson Generation
  *
  * Implements RT-001 Phase 3 tiered model routing strategy:
- * - Tier 1 (OSS 120B): 70-75% of sections, quality gate ≥0.75, escalate if fails
- * - Tier 2 (qwen3-max): 20-25% of sections, pre-route if complexity ≥0.75 OR criticality ≥0.80
- * - Tier 3 (Gemini 2.5 Flash): 5% overflow, trigger if context >108K tokens
+ * - Tier 1: 70-75% of sections, quality gate ≥0.75, escalate if fails
+ * - Tier 2: 20-25% of sections, pre-route if complexity ≥0.75 OR criticality ≥0.80
+ * - Tier 3: 5% overflow, trigger if context >108K tokens
+ *
+ * The tiers are the design; who fills them comes from `llm_model_config` at
+ * runtime. The model names RT-001 gave them — OSS 120B, qwen3-max, Gemini 2.5
+ * Flash — were removed from these comments on 2026-08-29 rather than corrected:
+ * two of the three had left the catalogue by then, never having been charged for
+ * a single call, and a stale name in a header reads as configuration
+ * (mc2-11jn5).
  *
  * Expands section-level structure from Analyze into 3-5 detailed lessons with exercises.
  *

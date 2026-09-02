@@ -40,8 +40,8 @@ export const SectionModelUsageSchema = z.object({
 export type SectionModelUsage = z.infer<typeof SectionModelUsageSchema>;
 
 export const ModelUsageSchema = z.object({
-  metadata: z.string().describe('Model used for metadata generation (e.g., qwen/qwen3-max)'),
-  sections: z.string().describe('Model used for section generation (e.g., openai/gpt-oss-20b)'),
+  metadata: z.string().describe('Model used for metadata generation (e.g., openai/gpt-5.6-luna)'),
+  sections: z.string().describe('Model used for section generation (e.g., z-ai/glm-5.3-flash)'),
   validation: z.string().optional().describe('Model used for validation (if applicable)'),
   sections_breakdown: z
     .array(SectionModelUsageSchema)

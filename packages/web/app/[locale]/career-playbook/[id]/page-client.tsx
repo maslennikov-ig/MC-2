@@ -12,12 +12,17 @@ import type {
 import { BlockEditor } from '@/components/career-playbook/viewer/BlockEditor'
 import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import {
+  fetchCareerPlaybookViewLinks,
   regenerateCareerPlaybookImage,
   updateCareerPlaybookVisibility,
 } from '@/components/career-playbook/library/client-adapter'
 import { buildCareerPlaybookLinkedCoursePath } from '@/components/career-playbook/library/linked-course-url'
 import { normalizeVisibilityUpdateResponse } from '@/components/career-playbook/library/normalizers'
-import { buildCareerPlaybookPublicUrl } from '@/components/career-playbook/library/public-url'
+import {
+  buildCareerPlaybookPublicUrl,
+  buildCareerPlaybookViewLinkUrl,
+} from '@/components/career-playbook/library/public-url'
+import type { ActionsBarReaderLink } from '@/components/career-playbook/viewer/ActionsBar'
 import { PlaybookViewer } from '@/components/career-playbook/viewer/PlaybookViewer'
 import { StreamingView } from '@/components/career-playbook/viewer/StreamingView'
 import Header from '@/components/layouts/header'
@@ -78,6 +83,21 @@ const VIEWER_BLOCK_TITLE_KEYS = {
   block_25: 'blocks.block_25',
   block_26: 'blocks.block_26',
 } as const satisfies Record<CareerPlaybookBlockId, `blocks.${string}`>
+
+// Who each link is for, in the owner's own language. The hint carries the block
+// count because that is the difference a reader actually receives, and an owner
+// choosing which link to send needs to see it.
+const READER_LINK_LABEL_KEYS = {
+  employee: 'readerLinkEmployee',
+  manager: 'readerLinkManager',
+  hr: 'readerLinkHr',
+} as const
+
+const READER_LINK_HINT_KEYS = {
+  employee: 'readerLinkEmployeeHint',
+  manager: 'readerLinkManagerHint',
+  hr: 'readerLinkHrHint',
+} as const
 
 const VIEWER_BLOCK_GROUP_KEYS = {
   group_1_foundation: 'blockGroups.group_1_foundation',
@@ -155,6 +175,7 @@ export default function CareerPlaybookViewerPageClient({
   const [isShareConfirmOpen, setIsShareConfirmOpen] = useState(false)
   const [isPublishingForShare, setIsPublishingForShare] = useState(false)
   const [publicShareUrl, setPublicShareUrl] = useState<string | null>(null)
+  const [readerLinks, setReaderLinks] = useState<ActionsBarReaderLink[]>([])
   const [readerMode, setReaderMode] = useState<ReaderMode>(() => {
     if (typeof window === 'undefined') return 'standard'
     return new URLSearchParams(window.location.search).get('mode') === 'reading'
@@ -202,6 +223,12 @@ export default function CareerPlaybookViewerPageClient({
       readingMode: t('readingMode'),
       exitReadingMode: t('exitReadingMode'),
       readingHint: t('readingHint'),
+      audienceTabsLabel: t('audienceTabsLabel'),
+      audienceFull: t('audienceFull'),
+      audienceEmployee: t('audienceEmployee'),
+      audienceManager: t('audienceManager'),
+      audienceHr: t('audienceHr'),
+      audienceEmpty: t('audienceEmpty'),
       inspectorLabel: t('inspectorLabel'),
       inspectorTitle: t('inspectorTitle'),
       inspectorStatusTitle: t('inspectorStatusTitle'),
@@ -234,6 +261,7 @@ export default function CareerPlaybookViewerPageClient({
         share: t('share'),
         shareLinkLabel: t('shareLinkLabel'),
         shareCopyButton: t('shareCopyButton'),
+        readerLinksLabel: t('readerLinksLabel'),
         createCourse: t('createCourse'),
         openCourse: t('openCourse'),
         delete: t('delete'),
@@ -319,6 +347,56 @@ export default function CareerPlaybookViewerPageClient({
     setIsShareConfirmOpen(false)
   }, [state.viewer?.playbookId])
 
+  const viewerPlaybookId = state.viewer?.playbookId
+  const viewerVisibility = state.viewer?.visibility
+  const canManageVisibility = state.viewer?.viewerPermissions?.canManageVisibility ?? false
+
+  /**
+   * Fetch the three reader links, and only when they exist.
+   *
+   * A private playbook has none: every reader-scoped read passes the same
+   * public-and-completed gate as the slug share, so the server would refuse
+   * them. Rendering a link that 404s is worse than rendering none — a reviewer
+   * refused exactly that once already. The procedure is owner-only server-side,
+   * so a viewer who cannot manage visibility never asks for it.
+   */
+  useEffect(() => {
+    if (!viewerPlaybookId || viewerVisibility !== 'public' || !canManageVisibility) {
+      setReaderLinks([])
+      return
+    }
+
+    let cancelled = false
+
+    void fetchCareerPlaybookViewLinks(viewerPlaybookId)
+      .then((result) => {
+        if (cancelled) return
+        if (!result?.isPublic) {
+          setReaderLinks([])
+          return
+        }
+
+        setReaderLinks(
+          result.links.map((link) => ({
+            audience: link.audience,
+            label: t(READER_LINK_LABEL_KEYS[link.audience]),
+            description: t(READER_LINK_HINT_KEYS[link.audience]),
+            url: buildCareerPlaybookViewLinkUrl(locale, link.path),
+          }))
+        )
+      })
+      // An older deployment without the procedure, or a transient failure: the
+      // single public link still works, so this stays silent rather than
+      // showing an error for an affordance the owner did not ask for.
+      .catch(() => {
+        if (!cancelled) setReaderLinks([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [viewerPlaybookId, viewerVisibility, canManageVisibility, locale, t])
+
   const hydrateViewerFromVisibilityResult = (
     currentViewer: CareerPlaybookViewerSnapshot,
     result: NonNullable<ReturnType<typeof normalizeVisibilityUpdateResponse>>
@@ -335,6 +413,11 @@ export default function CareerPlaybookViewerPageClient({
 
   const copyAndShowShareUrl = async (url: string) => {
     setPublicShareUrl(url)
+    const copied = await copyToClipboard(url)
+    setBackendPendingMessage(copied ? t('shareCopied') : t('shareCopyError'))
+  }
+
+  const copyReaderLink = async (url: string) => {
     const copied = await copyToClipboard(url)
     setBackendPendingMessage(copied ? t('shareCopied') : t('shareCopyError'))
   }
@@ -583,6 +666,8 @@ export default function CareerPlaybookViewerPageClient({
         onCopyShareLink={() => {
           if (publicShareUrl) void copyAndShowShareUrl(publicShareUrl)
         }}
+        readerLinks={readerLinks}
+        onCopyReaderLink={(url) => void copyReaderLink(url)}
         onCreateCourse={() => setBackendPendingMessage(t('coursePending'))}
         createCourseAction={
           canCreateCourse && !linkedCourseHref

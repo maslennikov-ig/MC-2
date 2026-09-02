@@ -81,6 +81,12 @@ describe('useCareerPlaybookStore viewer state', () => {
     expect(useCareerPlaybookStore.getState().viewerBlocks).toHaveLength(27)
     expect(useCareerPlaybookStore.getState().viewerBlocks[0]?.blockId).toBe('header')
     expect(useCareerPlaybookStore.getState().viewerBlocks.at(-1)?.blockId).toBe('block_26')
+    expect(useCareerPlaybookStore.getState().viewerBlocks[0]?.audiences).toEqual(
+      CAREER_PLAYBOOK_BLOCK_CATALOG[0]?.audiences
+    )
+    expect(useCareerPlaybookStore.getState().viewerBlocks[0]?.audiences).not.toBe(
+      CAREER_PLAYBOOK_BLOCK_CATALOG[0]?.audiences
+    )
     expect(useCareerPlaybookStore.getState().playbookId).toBe(
       '00000000-0000-4000-8000-000000000777'
     )

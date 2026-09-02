@@ -147,7 +147,7 @@ export const SYSTEM_PROMPT_RESERVE = 10_000;
  * @example
  * ```typescript
  * const allocation = allocateStage4Budget(documents, 'ru');
- * // allocation.modelSelection.modelId === 'qwen/qwen3-235b-a22b-2507'
+ * // allocation.modelSelection.modelId === 'openai/gpt-5.6-luna'
  * // allocation.documents[0].mode === 'full_text' (CORE)
  * ```
  */

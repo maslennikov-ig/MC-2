@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookCadenceLedgerEntry,
   CareerPlaybookEvidenceEntry,
   CareerPlaybookMetricLedgerEntry,
 } from '@megacampus/shared-types';
@@ -26,6 +27,7 @@ import {
   validateExampleMarking,
   validateMetricLedgerConsistency,
   validateRelativeDates,
+  validateScriptSplice,
   validateSourceAttribution,
   validateUnsourcedStatistics,
   type CareerPlaybookQualityCheckContext,
@@ -513,6 +515,63 @@ describe('validateContractLeakage', () => {
 
     expect(issues).toEqual([]);
   });
+
+  // All three verbatim from playbook d5137bc5 (2026-08-30). Each explains the
+  // document's own construction to a reader who is trying to do a job.
+  it.each([
+    ['block_26', 'Do not restate these levels in different words anywhere else in this guide.'],
+    [
+      'block_17',
+      'This section does not restate the full metric definitions — the table above carries the exact thresholds this block needs.',
+    ],
+    [
+      'block_13',
+      'There are two cadences here — do not merge them; this block does not redefine either one.',
+    ],
+  ])('flags the rule about writing that shipped to the reader in %s', (blockId, line) => {
+    const issues = validateContractLeakage(blocks({ [blockId]: line }), context());
+
+    const leak = issues.find(item => item.category === 'contradiction');
+    expect(leak).toBeDefined();
+    expect(leak?.block_id).toBe(blockId);
+    expect(leak?.severity).toBe('critical');
+  });
+
+  // mc2-encw8, verbatim from d50da4b1 (2026-09-02, en). The imperative form
+  // about what to write, anchored to a place in the document, for which
+  // validateContractLeakage returned 0.
+  it('flags an order about writing that points at this document', () => {
+    const issues = validateContractLeakage(
+      blocks({
+        block_17:
+          'Do not invent numeric escalation counts here; if the company later ratifies formal trigger rules, they belong in this section as confirmed values, not as defaults.',
+      }),
+      context()
+    );
+
+    const leak = issues.find(item => item.category === 'contradiction');
+    expect(leak?.block_id).toBe('block_17');
+    expect(leak?.severity).toBe('critical');
+  });
+
+  it.each([
+    ['in other words', 'The quota is 4M, in other words about 330K a month.'],
+    ['другими словами', 'Квота — 4 млн, другими словами около 330 тысяч в месяц.'],
+    ['a repeat that is about the work', 'Repeat the discovery call whenever the buyer changes.'],
+    // Both halves of the mc2-encw8 rule are required, because each alone is
+    // ordinary. The first is honest advice to an employee reporting upward; the
+    // second points at a section without ordering anything written.
+    [
+      'an imperative about numbers with no place attached',
+      'Never invent a number when the pipeline review asks for one — say you do not know.',
+    ],
+    [
+      'a pointer at a section with no order about writing',
+      'The exact thresholds are in this section, and they are reviewed quarterly.',
+    ],
+  ])('leaves ordinary prose alone: %s', (_label, line) => {
+    expect(validateContractLeakage(blocks({ block_18: line }), context())).toEqual([]);
+  });
 });
 
 describe('validateUnsourcedStatistics citation support', () => {
@@ -576,13 +635,17 @@ describe('metric conflict precision', () => {
     expect(issues).toEqual([]);
   });
 
-  it('still flags a number that belongs to another quantity in the same row — a known cost', () => {
-    // The 20% describes deal size, not the win rate whose row it sits in, so this
-    // finding is noise. Narrowing the comparison to the naming cell or clause
-    // removed it — and also disabled detection on the standard KPI table shape,
-    // where the metric is in column 1 and its target in column 3. Losing the
-    // core detection is worse than one extra regeneration, so the row stays the
-    // unit of comparison and this residue is accepted deliberately.
+  it('does not read a number that belongs to another quantity in the same row', () => {
+    // The 20% describes deal size, not the win rate whose row it sits in. This
+    // was accepted as noise until 2026-09-01, when replaying the checks over the
+    // stored corpus showed the residue was the whole class: all five surviving
+    // metric_conflicts were a neighbour's number, and three of the blocks
+    // carrying one had spent the regeneration cap on it (mc2-tub8q).
+    //
+    // The earlier attempt narrowed to the naming CELL, which also disabled the
+    // standard KPI table shape — metric in column 1, target in column 3. The
+    // unit here is the enumeration item, which a table pipe does not end, so the
+    // row below still reads as one claim.
     const issues = validateMetricLedgerConsistency(
       blocks({
         block_6:
@@ -591,7 +654,45 @@ describe('metric conflict precision', () => {
       context({ metricLedger: [WIN_RATE] })
     );
 
+    expect(issues).toEqual([]);
+  });
+
+  it('still reads a KPI table row whose target sits three columns from its label', () => {
+    const issues = validateMetricLedgerConsistency(
+      blocks({ block_6: '| Win Rate | monthly | >=40% | Sales Manager |' }),
+      context({ metricLedger: [WIN_RATE] })
+    );
+
     expect(issues.map(item => item.category)).toEqual(['metric_conflict']);
+  });
+
+  it('does not split a Russian decimal into a competing threshold', () => {
+    // Run 7bd743bd wrote "Customer effort score >3,5" in a red-flag list. Reading
+    // the comma as a list separator left ">3", which reads as a target competing
+    // with the ledger's "<=2,5" — a critical against a block quoting the ledger.
+    const issues = validateMetricLedgerConsistency(
+      blocks({
+        block_17: '- **Метрики:** CSAT <85%; Customer effort score >3,5; Escalation rate >15%.',
+      }),
+      context({
+        metricLedger: [
+          {
+            key: 'customer_effort_score',
+            label: 'Customer effort score',
+            unit: 'баллы',
+            target: '<=2,5 из 5',
+            green: '<=2,5',
+            yellow: '2,6-3,5',
+            red: '>3,5',
+            review_period: 'month',
+            provenance: 'assumption',
+            source_ref: null,
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it('still flags a genuine competing target', () => {
@@ -616,6 +717,35 @@ describe('external-claim precision', () => {
     );
 
     expect(issues).toEqual([]);
+  });
+
+  // Run `88fc2368`, block 18: the ledger's own `Forecast accuracy` target,
+  // restated in prose across a clause. The only external signal was "market", in
+  // a phrase denying that the number is one. Two regenerations bought nothing —
+  // the sentence was already right.
+  it('does not ask the guide to cite a source for its own ledger target', () => {
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_18:
+          'Forecast numbers are submitted by the role and judged on accuracy quarterly — treat accuracy below the published 80% target as a method failure, not a market failure.',
+      }),
+      context({ metricLedger: [FORECAST_ACCURACY] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still asks for a source when the line attributes its figure to research', () => {
+    // Scattered label words excuse a scope word, never an attribution.
+    const issues = validateUnsourcedStatistics(
+      blocks({
+        block_18:
+          'Research shows forecast submissions land within 4% of actuals when accuracy is inspected weekly.',
+      }),
+      context({ metricLedger: [FORECAST_ACCURACY] })
+    );
+
+    expect(issues.map(item => item.category)).toEqual(['unsourced_claim']);
   });
 
   it('accepts the marker form that carries the value before the verb', () => {
@@ -681,9 +811,188 @@ describe('validateSourceAttribution', () => {
 
     expect(issues).toEqual([]);
   });
+
+  // mc2-r1qen. Run 88fc2368 regenerated block 9 twice and shipped the claim
+  // anyway: "cite the Gartner publication directly" asked for a source the run
+  // did not have. The remedy has to be one the block can actually carry out.
+  it('tells a block to drop the attribution when the run retrieved no research at all', () => {
+    const issues = validateSourceAttribution(
+      blocks({
+        block_9:
+          'Gartner analysts cited in [S9] predict that by 2026, 65% of B2B sales organizations will be data-driven.',
+      }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].suggestion).toContain('Drop the attribution');
+    expect(issues[0].suggestion).not.toContain('Cite the Gartner publication');
+  });
+
+  it('flags a named house with no citation when the run holds no research', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_9: 'Forrester predicts that hybrid selling becomes the default motion.' }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_9');
+    expect(issues[0].description).toContain('Forrester');
+  });
+
+  it('leaves an uncited house alone once the run holds a research source', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_9: 'Forrester predicts that hybrid selling becomes the default motion.' }),
+      context({
+        evidenceLedger: [
+          vendor,
+          {
+            ...vendor,
+            id: 'S10',
+            url: 'https://www.forrester.com/report',
+            source_kind: 'research',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  // A reading list names a house and asserts nothing. Flagging it would spend a
+  // paid regeneration on a sentence that is already correct.
+  it('leaves a bare mention alone — naming a house is not attributing a claim to it', () => {
+    const issues = validateSourceAttribution(
+      blocks({ block_22: 'Recommended reading: Harvard Business Review on coaching.' }),
+      context({ evidenceLedger: [vendor] })
+    );
+
+    expect(issues).toEqual([]);
+  });
 });
 
+const PIPELINE_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
+  key: 'pipeline_review',
+  label: 'Pipeline review',
+  cadence: 'weekly',
+  owner: 'Sales manager',
+  scope: 'the whole team',
+};
+
+const FORECAST_REVIEW_CADENCE: CareerPlaybookCadenceLedgerEntry = {
+  key: 'forecast_review',
+  label: 'Forecast review',
+  cadence: 'weekly',
+  owner: 'Sales manager',
+  scope: 'forecast review with the CRO',
+};
+
 describe('validateCadenceConsistency', () => {
+  // mc2-tub8q / mc2-r1qen: the model published a quarterly career conversation
+  // and a quarterly stay interview in two blocks each, because the guide needs
+  // both and the ledger carried neither. The fix is a ledger row, not a ban —
+  // so the checker has to be able to see the family at all.
+  it('governs the rhythms of managing people once the ledger carries them', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15: 'Hold a quarterly career conversation with each report.',
+        block_17: 'A missed monthly career conversation is a red flag.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'career_conversation',
+            label: 'Career conversation',
+            cadence: 'monthly',
+            owner: 'Manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('career conversation');
+    expect(issues[0].description).toContain('monthly');
+  });
+
+  // Found by replaying 2896e72f: block_15 gave the career conversation two
+  // rhythms, so the consensus leader and the accused were the same block, and
+  // the message cited "the rest of the guide, led by block_15" against block_15.
+  // Run 4e355bf4 carried both "Performance review" (quarterly, per direct report)
+  // and "Team performance review" (weekly, the whole team). First-match-wins took
+  // the team row and filed a critical against block_26 for writing "quarterly",
+  // which its own governing row publishes. A guess costs a paid regeneration on a
+  // correct block, so a contested ledger silences the family.
+  it('says nothing when two ledger rows govern one duty family', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26: 'The performance review runs quarterly with each direct report.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'weekly_team_review',
+            label: 'Team performance review',
+            cadence: 'weekly',
+            owner: 'Sales manager',
+            scope: 'the whole team',
+          },
+          {
+            key: 'quarterly_performance_review',
+            label: 'Performance review',
+            cadence: 'quarterly',
+            owner: 'Sales manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('says a block contradicts itself rather than citing it as its own authority', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15:
+          'Hold a monthly career conversation with each report.\nThe quarterly career conversation is where growth is reviewed.',
+      }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('its own earlier statement in this same block');
+    expect(issues[0].description).not.toContain('led by block_15');
+    expect(issues[0].suggestion).toContain('the block currently gives it more than one rhythm');
+  });
+
+  it('reads a stay interview and a performance review as their own commitments', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_15: 'Stay interviews run quarterly; the performance review is annual.',
+        block_22: 'Stay-интервью проводятся ежемесячно.',
+      }),
+      context({
+        cadenceLedger: [
+          {
+            key: 'stay_interview',
+            label: 'Stay interview',
+            cadence: 'quarterly',
+            owner: 'Manager',
+            scope: 'per direct report',
+          },
+        ],
+      })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_22');
+    expect(issues[0].description).toContain('stay interview');
+  });
+
   it('flags the real weekly/monthly 1:1 contradiction across blocks', () => {
     const issues = validateCadenceConsistency(
       blocks({
@@ -697,6 +1006,88 @@ describe('validateCadenceConsistency', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].category).toBe('contradiction');
     expect(issues[0].description).toContain('one-to-one');
+    // Block 4 publishes the rhythm first, so block 15 is the deviation and the
+    // one that can repair it alone. The previous implementation sorted the block
+    // ids as strings, which put "block_4" after "block_15" and named the block
+    // that was right.
+    expect(issues[0].block_id).toBe('block_15');
+    expect(issues[0].description).toContain('monthly');
+  });
+
+  // The 2026-08-30 shape: eleven blocks, one disagreement, and a regeneration
+  // loop that could never converge because only one block was ever named.
+  it('names every block that departs from the ledger, not one of them', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'Own the weekly pipeline review for the whole team.',
+        block_4: '| **Weekly** | Pipeline review with the team |',
+        block_13: 'The quarterly pipeline review is where coverage gaps surface.',
+        block_14: 'Join the quarterly pipeline review from week 4.',
+        block_16: 'Step 3: the quarterly pipeline review.',
+      }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues.map(item => item.block_id).sort()).toEqual(['block_13', 'block_14', 'block_16']);
+    for (const item of issues) {
+      expect(item.description).toContain('weekly');
+      expect(item.description).toContain('the cadence ledger');
+      expect(item.suggestion).toContain('Change nothing in the other blocks');
+    }
+  });
+
+  it('flags a single block that departs from the ledger with nothing to disagree with', () => {
+    const issues = validateCadenceConsistency(
+      blocks({ block_16: 'Step 3: the quarterly pipeline review.' }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_16');
+    expect(issues[0].description).toContain('weekly');
+  });
+
+  // With no ledger row the guide's own consensus decides. Majority, not simply
+  // "whoever spoke first": one early slip must not send four correct blocks back.
+  it('does not rewrite four agreeing blocks because the earliest one slipped', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'The quarterly pipeline review closes the loop.',
+        block_13: 'Weekly pipeline review, Tuesday morning.',
+        block_14: 'Join the weekly pipeline review from week 2.',
+        block_16: 'Step 3: the weekly pipeline review.',
+        block_21: 'A missed weekly pipeline review is the first signal.',
+      }),
+      context()
+    );
+
+    expect(issues.map(item => item.block_id)).toEqual(['block_3']);
+    expect(issues[0].description).toContain('weekly');
+  });
+
+  it('breaks a tie in favour of the block that publishes first', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'The weekly pipeline review closes the loop.',
+        block_16: 'Step 3: the quarterly pipeline review.',
+      }),
+      context()
+    );
+
+    expect(issues.map(item => item.block_id)).toEqual(['block_16']);
+    expect(issues[0].description).toContain('weekly');
+  });
+
+  it('accepts a rhythm that matches the ledger in every block', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_3: 'Own the weekly pipeline review for the whole team.',
+        block_16: 'Step 3: the weekly pipeline review.',
+      }),
+      context({ cadenceLedger: [PIPELINE_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it('accepts one cadence stated in several blocks', () => {
@@ -712,6 +1103,37 @@ describe('validateCadenceConsistency', () => {
     expect(issues).toEqual([]);
   });
 
+  // Run `88fc2368`, block 26: a continuity checklist where every item carries its
+  // own rhythm. "daily" governs the triage it sits next to, not the forecast
+  // review two items away. Block 26 was regenerated twice and shipped the
+  // critical, because the sentence it was asked to repair was already correct.
+  it('does not attach a cadence across an enumeration boundary', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26:
+          'Confirm the continuity plan names a backup for every critical area (pipeline and forecast reviews, daily triage, coaching, forecast submission, CRM configuration).',
+      }),
+      context({ cadenceLedger: [FORECAST_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('still reads the cadence that sits inside the duty’s own list item', () => {
+    const issues = validateCadenceConsistency(
+      blocks({
+        block_26:
+          'The calendar covers daily pipeline and lead triage; monthly forecast review, weekly rep one-on-ones.',
+      }),
+      context({ cadenceLedger: [FORECAST_REVIEW_CADENCE] })
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].block_id).toBe('block_26');
+    expect(issues[0].description).toContain('monthly');
+    expect(issues[0].description).toContain('weekly');
+  });
+
   it('stays silent when a duty is mentioned in only one block', () => {
     const issues = validateCadenceConsistency(
       blocks({ block_4: '| **Quarterly** | Retrospective with the team |' }),
@@ -719,5 +1141,86 @@ describe('validateCadenceConsistency', () => {
     );
 
     expect(issues).toEqual([]);
+  });
+});
+
+/**
+ * Every positive case here is a word a stored playbook actually shipped, and
+ * every negative case is a compound the same corpus uses routinely.
+ */
+describe('a word that changes alphabet in the middle', () => {
+  it.each([
+    ['провестиwelcome', '208746e3 block_26 — a space eaten between two words'],
+    ['Руковедityel', '7bd743bd block_2 — Latin spliced into «Руководитель»'],
+    ['ОКR', 'a573c83c block_3 — Cyrillic О and К wearing OKR’s face'],
+    ['НДA', '370c18c3 block_14 — Cyrillic НД with a Latin A'],
+    ['войc', '30996512 block_2 — a Latin c closing a Cyrillic word'],
+  ])('flags %s (%s)', word => {
+    const issues = validateScriptSplice(
+      blocks({ block_3: `Строка, в которой встречается ${word} и продолжается дальше.` }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe('critical');
+    expect(issues[0].category).toBe('wrong_language');
+    expect(issues[0].description).toContain(word);
+  });
+
+  // The hyphen is what makes these compounds, and every Russian guide in the
+  // corpus is full of them: 22 to 66 per document. Flagging one would make the
+  // check unusable in the language it exists for.
+  it('leaves the ordinary Russian technical compounds alone', () => {
+    const issues = validateScriptSplice(
+      blocks({
+        block_8:
+          'CRM-система и BI-инструменты обновляются в рамках quarterly-обзора; AI-ассистент готовит SDR-отчёты, IP-телефония пишет войс.',
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  // A Mermaid label carries its line break as a literal backslash-n, so the raw
+  // block reads `Директор по\nмаркетингу` as the word `nмаркетингу`. 30996512
+  // block_5 has exactly that, and it is not a defect.
+  it('does not read a Mermaid line break as a spliced word', () => {
+    const issues = validateScriptSplice(
+      blocks({
+        block_5: [
+          '### Карьерная карта',
+          '',
+          '```mermaid',
+          'flowchart LR',
+          '    HoC --> CMO["Директор по\\nмаркетингу"]',
+          '```',
+        ].join('\n'),
+      }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('says nothing about a document written in one alphabet', () => {
+    const issues = validateScriptSplice(
+      blocks({ block_4: 'The weekly forecast review is owned by the CRO and runs on Monday.' }),
+      context()
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('names every spliced word in the block, once each', () => {
+    const issues = validateScriptSplice(
+      blocks({ block_2: 'Руковедityel отвечает за войc и за войc в смежных командах.' }),
+      context()
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].description).toContain('"Руковедityel"');
+    expect(issues[0].description).toContain('"войc"');
+    expect(issues[0].description.match(/войc/g)).toHaveLength(1);
   });
 });

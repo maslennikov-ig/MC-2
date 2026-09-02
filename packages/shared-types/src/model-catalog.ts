@@ -8,21 +8,31 @@
  * absent from every one of them, so their cost silently resolved to a $1/$3
  * default and reported a plausible wrong number.
  *
- * Prices are the current OpenRouter /models base per-token list prices at the
- * verification date below, not historical snapshots. Provider threshold
- * overrides are not representable by this flat catalogue and require a
- * model-specific routing guard (see Qwen 3 Max in cost-calculator.ts). A call is
- * priced once and the USD amount is persisted in generation_trace, so changing
- * this catalogue does not reprice old reports. Retired-but-still-listed models
- * stay current so re-enabling one cannot silently revive an obsolete tariff. A
- * `delisted` model has no current price; its last observed rate is retained only
- * as an explicitly marked fallback.
+ * Prices are the current OpenRouter base per-token list prices, not historical
+ * snapshots, and the nightly sync keeps them so. Provider threshold overrides
+ * are not representable by this flat table.
  *
- * Pricing verified against https://openrouter.ai/api/v1/models on 2026-08-14.
- * Keep it that way: a hand-typed price is indistinguishable from a correct one
- * until an invoice disagrees.
+ * **What belongs here is what can be called, not what once was.** Until
+ * 2026-08-29 the table held 36 entries against 10 the code could route to, on
+ * the stated grounds that a retired entry lets old cost reports still resolve.
+ * That mechanism does not exist: a call is priced once and the dollars are
+ * persisted — `generation_trace.cost_usd` for a course,
+ * `career_playbooks.cost_breakdown.nodeCosts[].cost_usd` for a playbook — and
+ * nothing outside the runtime paths reads this catalogue at all. Twenty entries
+ * went; what stayed is the live routing set, the Batch tariffs beside it, and
+ * `deepseek-v4-flash` with its `~latest` alias, which `normalizeModelId` needs
+ * to price every dated V4 Flash snapshot (mc2-11jn5).
  *
- * Refs mc2-a2j1x, mc2-0a47t
+ * The cost of that is worth stating: a model re-enabled without being added
+ * here first will have its calls recorded as unpriced rather than mispriced —
+ * `unpriced_models` on the breakdown, `undefined` from `estimateCost` — until
+ * the entry exists. Visible, not silent, which is the trade that was chosen.
+ *
+ * Keep the numbers honest: a hand-typed price is indistinguishable from a
+ * correct one until an invoice disagrees, which is why they are read nightly
+ * from the published list rather than typed (`check-model-catalog-drift.ts`).
+ *
+ * Refs mc2-a2j1x, mc2-0a47t, mc2-11jn5
  */
 
 /**
@@ -108,7 +118,19 @@ export interface ModelCapabilities {
    * Where both are present the flat price wins: it is what the provider charges.
    */
   imagePriceFlatUsd?: number;
-  /** No longer offered by OpenRouter; retained so old cost reports still resolve */
+  /**
+   * No longer offered by OpenRouter.
+   *
+   * It marks an entry the nightly price gate must not compare, because there is
+   * no published rate left to compare against — without it the gate named all
+   * five of them every night as "delisted, or the id is misspelled".
+   *
+   * No entry carries it today: on 2026-08-29 the five that did were deleted
+   * instead, because a delisted model is only worth keeping if some report
+   * actually needs its rate, and none of the five had ever been charged for
+   * (mc2-11jn5). Kept because the next delisting is a matter of time, and the
+   * gate already knows what to do with it.
+   */
   delisted?: true;
 }
 
@@ -183,9 +205,23 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     billedPerImage: true,
     imageOutputPricePerMillion: 30,
   },
+  /**
+   * The ordinary tariff, which is twice what this entry used to hold — and
+   * Google did not raise anything. The model publishes three tiers from each of
+   * two providers: `/flex` at $0.375/$1.875, the plain tag at $0.75/$3.75, and
+   * `/priority` at $1.35/$6.75. The entry had been filled from the flex row
+   * while `GET /api/v1/models` quotes the plain one, so the nightly sync read a
+   * permanent 2x drift it could never settle.
+   *
+   * The plain tier is the right one to freeze even though most phases request
+   * flex: `provider.max_price` is this figure times 1.5, and flex refuses rather
+   * than falling back, so the retry that follows runs at the ordinary tariff. At
+   * the flex rate that ceiling was $0.5625 — under the price of the call it was
+   * about to make (mc2-rhyac).
+   */
   'google/gemini-3.7-flash': {
-    inputPricePerMillion: 0.375,
-    outputPricePerMillion: 1.875,
+    inputPricePerMillion: 0.75,
+    outputPricePerMillion: 3.75,
     contextLength: 1048576,
     maxOutputTokens: 65536,
     supportsTemperature: true,
@@ -346,8 +382,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.06,
-    outputPricePerMillion: 0.12,
+    inputPricePerMillion: 0.045,
+    outputPricePerMillion: 0.09,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -380,32 +416,15 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
 
   // --- Retired from routing; kept so historical cost reports still resolve ---
-  'anthropic/claude-3.5-sonnet': {
-    inputPricePerMillion: 3,
-    outputPricePerMillion: 15,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'anthropic/claude-sonnet-4-20250514': {
-    inputPricePerMillion: 3,
-    outputPricePerMillion: 15,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'deepseek/deepseek-v3.1-terminus': {
-    inputPricePerMillion: 0.27,
-    outputPricePerMillion: 1.0,
-    contextLength: 163840,
-    maxOutputTokens: 32768,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
+  //
+  // Every entry below has been paid for at least once. Eleven others were
+  // removed on 2026-08-29 because they had not: five carried `delisted: true`
+  // with the words "retained so old cost reports still resolve", and there were
+  // no such reports to resolve. Checked against both ledgers, which is the part
+  // that is easy to get wrong — a playbook's spend is in
+  // `career_playbooks.cost_breakdown`, not in `generation_trace`, and
+  // `deepseek-v4-pro` reads as never-used in the second while holding 189 calls
+  // in the first (mc2-11jn5).
   /**
    * Re-read twice on 2026-08-21: $0.14/$0.28 was 1.7x over, and the $0.0826/
    * $0.1652 that replaced it was still 1.04x over. It matters more than a
@@ -421,170 +440,10 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.07798,
-    outputPricePerMillion: 0.15596,
+    inputPricePerMillion: 0.08512,
+    outputPricePerMillion: 0.17024,
     contextLength: 1048576,
     maxOutputTokens: 384000,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'deepseek/deepseek-v4-pro': {
-    // Re-read 2026-08-23: $0.396894/$0.793788, against $1.60/$3.20 here — 4.03x
-    // over, the largest gap the catalogue has held. Not on a live route, so it
-    // cost nothing; had it been, `provider.max_price` would have been built four
-    // times too high and bought nothing.
-    inputPricePerMillion: 0.87,
-    outputPricePerMillion: 1.74,
-    contextLength: 1048576,
-    maxOutputTokens: 393216,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'google/gemini-2.0-flash-001': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.4,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'google/gemini-2.5-flash': {
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 2.5,
-    contextLength: 1048576,
-    maxOutputTokens: 65535,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'google/gemini-2.5-flash-preview': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.4,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  /**
-   * Superseded by `google/gemini-3.7-flash` on 2026-08-14: same context window
-   * and output ceiling, less money. Kept so cost reports written while this was
-   * routed still resolve to a price.
-   */
-  'google/gemini-3-flash-preview': {
-    inputPricePerMillion: 0.5,
-    outputPricePerMillion: 3,
-    contextLength: 1048576,
-    maxOutputTokens: 65536,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'minimax/minimax-m2': {
-    inputPricePerMillion: 0.255,
-    outputPricePerMillion: 1.02,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'minimax/minimax-m2.1': {
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 1.2,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'moonshotai/kimi-k2-thinking': {
-    inputPricePerMillion: 0.6,
-    outputPricePerMillion: 2.5,
-    contextLength: 262144,
-    maxOutputTokens: 100352,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'openai/gpt-4-turbo': {
-    inputPricePerMillion: 10,
-    outputPricePerMillion: 30,
-    contextLength: 128000,
-    maxOutputTokens: 4096,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'openai/gpt-oss-20b': {
-    inputPricePerMillion: 0.03,
-    outputPricePerMillion: 0.13,
-    contextLength: 131072,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-    requiresReasoning: true,
-  },
-  'openrouter/kimi-k2-instruct': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.6,
-    contextLength: null,
-    maxOutputTokens: null,
-    supportsTemperature: true,
-    supportsReasoning: false,
-    delisted: true,
-  },
-  'qwen/qwen3-235b-a22b-2507': {
-    inputPricePerMillion: 0.0875,
-    outputPricePerMillion: 0.35,
-    contextLength: 262144,
-    maxOutputTokens: 16384,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  /**
-   * Reachable from the `MODELS` escalation registry in `model-selector.ts` and
-   * absent from every pricing table in the repo until 2026-08-26, so it priced
-   * at the pessimistic default and its ceiling was a guess (mc2-a6qxc).
-   *
-   * Read from the published list that day: $0.26/$0.78, 1M context, 32768
-   * output, `supported_parameters` carries `temperature` and no `reasoning`.
-   */
-  'qwen/qwen-plus-2025-07-28': {
-    inputPricePerMillion: 0.26,
-    outputPricePerMillion: 0.78,
-    contextLength: 1000000,
-    maxOutputTokens: 32768,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'qwen/qwen3-max': {
-    inputPricePerMillion: 0.78,
-    outputPricePerMillion: 3.9,
-    contextLength: 262144,
-    maxOutputTokens: 65536,
-    supportsTemperature: true,
-    supportsReasoning: false,
-  },
-  'qwen/qwen3.7-plus': {
-    inputPricePerMillion: 0.32,
-    outputPricePerMillion: 1.28,
-    contextLength: 1000000,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'z-ai/glm-4.6': {
-    inputPricePerMillion: 0.43,
-    outputPricePerMillion: 1.75,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
-    supportsTemperature: true,
-    supportsReasoning: true,
-  },
-  'z-ai/glm-5': {
-    inputPricePerMillion: 0.6,
-    outputPricePerMillion: 1.92,
-    contextLength: 204800,
-    maxOutputTokens: 131072,
     supportsTemperature: true,
     supportsReasoning: true,
   },

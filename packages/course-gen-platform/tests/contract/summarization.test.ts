@@ -90,7 +90,7 @@ async function insertTestFileWithSummary(
         output_tokens: 100,
         total_tokens: 600,
         estimated_cost_usd: 0.001,
-        model_used: 'openai/gpt-oss-20b',
+        model_used: 'z-ai/glm-5.3-flash',
         quality_score: 0.85,
         quality_check_passed: true,
         ...summaryMetadata,
@@ -141,7 +141,7 @@ describe('Contract: Summarization Router', () => {
 
     // Insert test files with different models and costs
     const fileId1 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       estimated_cost_usd: 0.001,
       input_tokens: 1000,
       output_tokens: 200,
@@ -199,7 +199,7 @@ describe('Contract: Summarization Router', () => {
       modelCosts.set(model, (modelCosts.get(model) || 0) + metadata.estimated_cost_usd);
     }
 
-    expect(modelCosts.get('openai/gpt-oss-20b')).toBeCloseTo(0.001, 4);
+    expect(modelCosts.get('z-ai/glm-5.3-flash')).toBeCloseTo(0.001, 4);
     expect(modelCosts.get('deepseek/deepseek-v4-flash')).toBeCloseTo(0.002, 4);
   });
 
@@ -471,7 +471,7 @@ describe('Contract: Summarization Router', () => {
           output_tokens: 150,
           total_tokens: 1150,
           estimated_cost_usd: 0.0015,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           quality_score: 0.9,
           quality_check_passed: true,
         } as SummaryMetadata,
@@ -497,7 +497,7 @@ describe('Contract: Summarization Router', () => {
     expect(retrievedFile.processing_method).toBe('hierarchical');
 
     const metadata = retrievedFile.summary_metadata as SummaryMetadata;
-    expect(metadata.model_used).toBe('openai/gpt-oss-20b');
+    expect(metadata.model_used).toBe('z-ai/glm-5.3-flash');
     expect(metadata.quality_score).toBe(0.9);
     expect(metadata.estimated_cost_usd).toBe(0.0015);
 
@@ -623,7 +623,7 @@ describe('Contract: Summarization Router', () => {
           output_tokens: 0,
           total_tokens: 50,
           estimated_cost_usd: 0.0001,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           quality_score: 1.0,
           quality_check_passed: true,
         } as SummaryMetadata,

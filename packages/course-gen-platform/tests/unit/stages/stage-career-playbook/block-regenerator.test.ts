@@ -5,13 +5,14 @@ import type {
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import {
+  buildBlockRegeneratorPromptVariables,
   buildOtherBlocksBrief,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   createBlockRegeneratorNode,
   regenerateCareerPlaybookBlock,
-  selectPendingCareerPlaybookRegeneration,
   selectPendingCareerPlaybookRegenerations,
+  selectPendingCareerPlaybookRegenerationsForState,
 } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 
 const spec: CareerPlaybookRoleProfileSpec = {
@@ -70,12 +71,16 @@ describe('Career Playbook block regenerator', () => {
         roleProfileSpec: spec,
         language: 'ru',
         originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 2),
-        issue: {
-          description: 'The KPI block repeats duties instead of measurable metrics.',
-          suggestion: 'Use concrete CRM metrics.',
-        },
+        issues: [
+          {
+            description: 'The KPI block repeats duties instead of measurable metrics.',
+            suggestion: 'Use concrete CRM metrics.',
+          },
+        ],
         userInstruction: 'Keep the traffic-light table.',
-        otherBlocksBrief: 'block_3: responsibility zones are already covered',
+        otherBlocks: {
+          block_3: generatedBlock('responsibility zones are already covered'),
+        },
         now: () => new Date('2026-05-13T10:15:30.000Z'),
       },
       { renderPrompt, invokeLLM }
@@ -91,6 +96,7 @@ describe('Career Playbook block regenerator', () => {
         suggestion: 'Use concrete CRM metrics.',
         user_instruction: 'Keep the traffic-light table.',
         other_blocks_brief: 'block_3: responsibility zones are already covered',
+        block_audiences_md: '- block_6: employee, manager',
         content_language: 'ru',
         spec_json: expect.stringContaining('B2B Sales Manager'),
       })
@@ -139,6 +145,59 @@ describe('Career Playbook block regenerator', () => {
     );
   });
 
+  it('regenerates for the target readers and briefs only audience-overlapping peers in canonical order', async () => {
+    const renderPrompt = vi
+      .fn()
+      .mockImplementation((_promptKey: string, variables: Record<string, string>) =>
+        Promise.resolve(JSON.stringify(variables))
+      );
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: '## 9. Human-AI collaboration\n\nUse the approved tools for routine work.',
+      model: 'mock-career-model',
+      inputTokens: 120,
+      outputTokens: 80,
+      costUsd: 0.02,
+    });
+
+    await regenerateCareerPlaybookBlock(
+      {
+        blockId: 'block_9',
+        roleProfileSpec: spec,
+        language: 'en',
+        originalBlock: generatedBlock('## 9. Human-AI collaboration\n\nOld text.'),
+        issues: [
+          {
+            description: 'The block repeats unrelated recruiting guidance.',
+            suggestion: 'Keep the rewrite specific to the employee reader.',
+          },
+        ],
+        otherBlocks: {
+          block_22: generatedBlock('## 22. Role README\n\nEmployee operating notes.'),
+          block_12: generatedBlock('## 12. Candidate profile\n\nHR recruiting criteria.'),
+          header: generatedBlock('## Header\n\nRole guide.'),
+          block_8: generatedBlock('## 8. Tools\n\nShared employee tool guidance.'),
+        },
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(renderPrompt).toHaveBeenCalledWith(
+      'career_playbook_block_regenerator',
+      expect.objectContaining({
+        block_audiences_md: '- block_9: employee',
+        other_blocks_brief:
+          'header: ## Header Role guide.\n' +
+          'block_8: ## 8. Tools Shared employee tool guidance.\n' +
+          'block_22: ## 22. Role README Employee operating notes.',
+      })
+    );
+    expect(renderPrompt.mock.calls[0]?.[1].other_blocks_brief).not.toContain('block_12');
+    expect(invokeLLM).toHaveBeenCalledWith(
+      expect.stringContaining('"block_audiences_md":"- block_9: employee"'),
+      expect.objectContaining({ promptKey: 'career_playbook_block_regenerator' })
+    );
+  });
+
   it.each([
     ['empty output', '   ', 'empty markdown'],
     ['wrong heading', '## 7. Competencies\n\nWrong block.', 'expected heading for block_6'],
@@ -164,10 +223,12 @@ describe('Career Playbook block regenerator', () => {
           roleProfileSpec: spec,
           language: 'ru',
           originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 2),
-          issue: {
-            description: 'The KPI block repeats duties instead of measurable metrics.',
-            suggestion: 'Use concrete CRM metrics.',
-          },
+          issues: [
+            {
+              description: 'The KPI block repeats duties instead of measurable metrics.',
+              suggestion: 'Use concrete CRM metrics.',
+            },
+          ],
         },
         { renderPrompt, invokeLLM }
       )
@@ -175,7 +236,7 @@ describe('Career Playbook block regenerator', () => {
   });
 
   it('chooses the flagged block with the fewest attempts before repeating another block', () => {
-    const pending = selectPendingCareerPlaybookRegeneration({
+    const [pending] = selectPendingCareerPlaybookRegenerations({
       verdict: {
         pass: false,
         score: 45,
@@ -203,6 +264,87 @@ describe('Career Playbook block regenerator', () => {
 
     expect(pending?.blockId).toBe('block_6');
     expect(pending?.attempts).toBe(0);
+  });
+
+  // Run 638ed691 shipped FIVE criticals on block 26 after spending both of its
+  // attempts, and d5137bc5 shipped two or three on each of six blocks. Told one
+  // finding per attempt, a block faulted three times can never come back clean.
+  // The cap was never the binding constraint; the briefing was.
+  it('hands the regenerator every finding against the block, criticals first', () => {
+    const pending = selectPendingCareerPlaybookRegenerations({
+      verdict: {
+        pass: false,
+        score: 30,
+        issues: [
+          {
+            block_id: 'block_26',
+            severity: 'warning',
+            description: 'A quarterly career conversation is not in the cadence ledger.',
+            suggestion: 'Drop it or add it.',
+          },
+          {
+            block_id: 'block_26',
+            severity: 'critical',
+            description: 'block_26 states the forecast review as biweekly; the ledger says weekly.',
+            suggestion: 'Align to the ledger.',
+          },
+          { block_id: 'block_4', severity: 'critical', description: 'x', suggestion: 'y' },
+          {
+            block_id: 'block_26',
+            severity: 'critical',
+            description: 'block_26 states Team quota attainment as 90%; the ledger says 100%.',
+            suggestion: 'Align to the ledger.',
+          },
+        ],
+        needs_regeneration: ['block_26', 'block_4'],
+      },
+      blockIds: ['block_4', 'block_26'],
+      attempts: {},
+      maxAttempts: 2,
+      maxWindowAttempts: 8,
+    });
+
+    const block26 = pending.find(candidate => candidate.blockId === 'block_26');
+    expect(block26?.issues).toHaveLength(3);
+    expect(block26?.issues.map(issue => issue.severity)).toEqual([
+      'critical',
+      'critical',
+      'warning',
+    ]);
+  });
+
+  it('numbers the findings so a rewrite can answer all of them, and pairs the suggestions', () => {
+    const variables = buildBlockRegeneratorPromptVariables({
+      blockId: 'block_26',
+      roleProfileSpec: spec,
+      language: 'en',
+      originalBlock: {
+        content: '## 26. Implementation checklist',
+        status: 'generated',
+        attempt: 1,
+      },
+      issues: [
+        { description: 'The forecast review is biweekly here.', suggestion: 'Say weekly.' },
+        { description: 'Team quota attainment reads 90%.', suggestion: 'Say 100%.' },
+      ],
+    });
+
+    expect(variables.issue_description).toBe(
+      '1. The forecast review is biweekly here.\n2. Team quota attainment reads 90%.'
+    );
+    expect(variables.suggestion).toBe('1. Say weekly.\n2. Say 100%.');
+  });
+
+  it('leaves a single finding as a sentence rather than a one-item list', () => {
+    const variables = buildBlockRegeneratorPromptVariables({
+      blockId: 'block_26',
+      roleProfileSpec: spec,
+      language: 'en',
+      issues: [{ description: 'The forecast review is biweekly here.', suggestion: 'Say weekly.' }],
+    });
+
+    expect(variables.issue_description).toBe('The forecast review is biweekly here.');
+    expect(variables.suggestion).toBe('Say weekly.');
   });
 
   it('pins the regeneration cap constants that bound the judge<->regenerator loop', () => {
@@ -253,6 +395,132 @@ describe('Career Playbook block regenerator', () => {
 
     expect(pending).toHaveLength(1);
     expect(pending[0].blockId).toBe('block_4');
+  });
+
+  // Run 2896e72f ended with block_13 holding two criticals and zero regeneration
+  // attempts: the final full-document pass was the first to flag it, and by then
+  // unrelated group remediations stood at 19 of 8. Raising the per-block cap
+  // would not have helped a block that never had a turn.
+  describe('final-window reserve', () => {
+    const exhausted = {
+      verdict: {
+        pass: false,
+        score: 30,
+        issues: [
+          {
+            block_id: 'block_13',
+            severity: 'critical' as const,
+            description: 'x',
+            suggestion: 'y',
+          },
+          { block_id: 'block_4', severity: 'critical' as const, description: 'x', suggestion: 'y' },
+        ],
+        needs_regeneration: ['block_13', 'block_4'] as const,
+      },
+      blockIds: ['block_2', 'block_4', 'block_13'] as const,
+      maxAttempts: 2,
+      maxWindowAttempts: 8,
+    };
+
+    it('refuses everything when no block is listed for the reserve', () => {
+      expect(
+        selectPendingCareerPlaybookRegenerations({
+          ...exhausted,
+          verdict: {
+            ...exhausted.verdict,
+            needs_regeneration: [...exhausted.verdict.needs_regeneration],
+          },
+          blockIds: [...exhausted.blockIds],
+          attempts: { block_2: 19 },
+        })
+      ).toEqual([]);
+    });
+
+    it('grants a listed block at zero attempts a turn after the window is spent', () => {
+      const pending = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: {
+          ...exhausted.verdict,
+          needs_regeneration: [...exhausted.verdict.needs_regeneration],
+        },
+        blockIds: [...exhausted.blockIds],
+        attempts: { block_2: 19, block_4: 2 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+      });
+
+      // block_4 has spent its own attempts; the reserve is for a block that had none.
+      expect(pending.map(candidate => candidate.blockId)).toEqual(['block_13']);
+      expect(pending[0].issues[0].severity).toBe('critical');
+    });
+
+    // The reserve is counted, never derived from "attempts beyond the budget":
+    // the final window sums attempts across every block, so a run at 19 of 8 is
+    // 11 over budget having drawn nothing from the reserve at all.
+    it('never exceeds the reserve, counting what earlier passes already drew', () => {
+      const threeFlagged = {
+        pass: false,
+        score: 30,
+        issues: ['block_13', 'block_4', 'block_2'].map(blockId => ({
+          block_id: blockId as 'block_13',
+          severity: 'critical' as const,
+          description: 'x',
+          suggestion: 'y',
+        })),
+        needs_regeneration: ['block_13', 'block_4', 'block_2'],
+      };
+
+      const first = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+      });
+      expect(first.map(candidate => candidate.blockId)).toEqual(['block_13', 'block_4']);
+      expect(first.every(candidate => candidate.fromReserve)).toBe(true);
+
+      const afterTwoDraws = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+        reservedWindowAttemptsSpent: 2,
+      });
+      expect(afterTwoDraws).toHaveLength(1);
+
+      const exhaustedReserve = selectPendingCareerPlaybookRegenerations({
+        ...exhausted,
+        verdict: threeFlagged,
+        blockIds: [...exhausted.blockIds],
+        // block_2 is in the window, so its attempts are what exhaust the budget.
+        attempts: { block_2: 19 },
+        reservedWindowBlockIds: ['block_13', 'block_4'],
+        reservedWindowAttemptsSpent: 3,
+      });
+      expect(exhaustedReserve).toEqual([]);
+    });
+
+    it('refuses a block with no critical against it', () => {
+      expect(
+        selectPendingCareerPlaybookRegenerations({
+          ...exhausted,
+          verdict: {
+            pass: false,
+            score: 30,
+            issues: [
+              { block_id: 'block_13', severity: 'warning', description: 'x', suggestion: 'y' },
+            ],
+            needs_regeneration: ['block_13'],
+          },
+          blockIds: [...exhausted.blockIds],
+          attempts: { block_2: 19 },
+          reservedWindowBlockIds: ['block_13'],
+        })
+      ).toEqual([]);
+    });
   });
 
   it('regenerates a flagged batch, recording costs for successes and warnings for failures', async () => {
@@ -382,7 +650,7 @@ describe('Career Playbook block regenerator', () => {
         roleProfileSpec: spec,
         language: 'ru',
         originalBlock: generatedBlock('## 6. KPI и метрики\n\nOld KPI text', 1),
-        issue: { description: 'The KPI block repeats duties.', suggestion: 'Use metrics.' },
+        issues: [{ description: 'The KPI block repeats duties.', suggestion: 'Use metrics.' }],
       },
       { renderPrompt, invokeLLM }
     );

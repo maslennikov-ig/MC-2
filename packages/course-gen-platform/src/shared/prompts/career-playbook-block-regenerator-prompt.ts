@@ -1,0 +1,143 @@
+import type { HardcodedPrompt } from './types.js';
+
+export const careerPlaybookBlockRegeneratorPrompt: HardcodedPrompt = {
+  stage: 'stage_6',
+  promptKey: 'career_playbook_block_regenerator',
+  promptName: 'Career Playbook - Block Regenerator',
+  promptDescription:
+    'Regenerates a single Career Playbook block from judge feedback and optional user instructions.',
+  promptTemplate: `SYSTEM:
+Regenerate exactly one Career Playbook block: {{block_id}} ({{block_name}}).
+Regenerate a finished section for all and only the readers listed in Target block readers.
+Preserve the block format contract and fix EVERY judge issue listed below, without repeating the other blocks listed below.
+A block gets two attempts in total. Leaving one of several findings unfixed spends an attempt and ships the defect.
+Repetition across audience views that share no reader is allowed and irrelevant; those blocks are intentionally absent from the summary.
+- If the block already contains a Mermaid diagram, improve that existing diagram instead of appending a new one; add a diagram only when the block has none and its contract requires one.
+- In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
+- For an illustrative name or value in narrative prose, use a realistic invented example and mark it as an example; do not leave raw bracket placeholders like [Name] or {value}, and never rewrite a narrative name into a "field to fill" phrase inside a sentence. Reserve "field to fill" wording for genuine blank template fields the reader completes later.
+
+Original block content:
+{{original_content}}
+
+Issues from judge — fix all of them in this one rewrite:
+{{issue_description}}
+
+Suggestions, in the same order:
+{{suggestion}}
+
+User edit instruction:
+{{user_instruction}}
+
+Return only markdown for this one block.
+
+- Numbers: reproduce every value from the metric ledger VERBATIM. If an issue is a metric conflict,
+  align the block to the ledger — never invent a third value to split the difference.
+- Rhythms: reproduce the cadence of every commitment from the cadence ledger VERBATIM. If an issue
+  is a cadence conflict, this block is the one that must change; align it to the rhythm the issue
+  names and leave every other block alone.
+- External statistics: allowed only with a [Sn] reference to the evidence ledger. Without a matching
+  entry, rewrite without the precise number.
+- Unverified company-specific values (salary, bonus, ARR, budget, person name, internal tool) keep
+  the marker "(пример — заменить)" in Russian or "(example — replace)" in English.
+- Today is {{generated_on}}. Use relative labels ("Day 1-30", "Week 2") in plans; an absolute
+  calendar year is allowed only in block 25.
+- References: this block is delivered inside a reader-specific guide. Name only the blocks listed
+  under "Blocks this one may reference" below, in any wording. When the content you need lives
+  elsewhere, carry across only the part this block needs — one threshold, one approval level, one
+  named owner — written for this block's readers. The framing may change; every number, threshold,
+  approval level, cadence and named party stays exactly as already published. If that part is
+  something these readers should not be handed, leave it out entirely.
+
+USER:
+RoleProfileSpec:
+{{spec_json}}
+
+Metric ledger (single source of numeric truth):
+{{metric_ledger_md}}
+
+Cadence ledger (single source of recurring rhythm):
+{{cadence_ledger_md}}
+
+Milestone ledger (single source of ramp deadlines):
+{{milestone_ledger_md}}
+
+Evidence ledger (the only citable sources):
+{{evidence_ledger_md}}
+
+Target block readers:
+{{block_audiences_md}}
+
+Blocks this one may reference:
+{{citable_blocks_md}}
+
+Other blocks in the same audience view(s):
+{{other_blocks_brief}}
+
+Content language: {{content_language}}`,
+  variables: [
+    { name: 'block_id', description: 'Target block id', required: true },
+    { name: 'block_name', description: 'Human-readable block name', required: true },
+    { name: 'original_content', description: 'Original block markdown', required: true },
+    {
+      name: 'issue_description',
+      description: 'Every judge finding against this block, numbered when there is more than one',
+      required: true,
+    },
+    {
+      name: 'suggestion',
+      description: 'Judge suggestions in the same order as the findings, or none',
+      required: true,
+    },
+    {
+      name: 'user_instruction',
+      description: 'Optional user instruction or none',
+      required: true,
+    },
+    { name: 'spec_json', description: 'Serialized RoleProfileSpec JSON', required: true },
+    {
+      name: 'metric_ledger_md',
+      description: 'Canonical metric ledger rendered as a markdown table',
+      required: true,
+    },
+    {
+      name: 'cadence_ledger_md',
+      description: 'Canonical recurring rhythms rendered as a markdown table',
+      required: true,
+    },
+    {
+      name: 'milestone_ledger_md',
+      description: 'Canonical ramp deadlines rendered as a markdown table',
+      required: true,
+    },
+    {
+      name: 'evidence_ledger_md',
+      description: 'Citable sources rendered as a [Sn] list',
+      required: true,
+    },
+    {
+      name: 'generated_on',
+      description: 'Generation date (ISO), application-filled',
+      required: true,
+    },
+    {
+      name: 'citable_blocks_md',
+      description: 'Blocks every reader of the target block also receives',
+      required: true,
+    },
+    {
+      name: 'block_audiences_md',
+      description: 'Canonical readers for the target block',
+      required: true,
+    },
+    {
+      name: 'other_blocks_brief',
+      description: 'Compact summary of generated blocks sharing a target reader',
+      required: true,
+    },
+    {
+      name: 'content_language',
+      description: 'Target content language code',
+      required: true,
+    },
+  ],
+};

@@ -37,8 +37,9 @@
  * call to the model. Anything smaller is written silently; anything at or beyond
  * it is also written, and then said out loud.
  *
- * Talks to `GET /api/v1/models`, which needs no key, and to
- * `/api/v1/images/models/.../endpoints` for ids the chat list does not carry.
+ * Talks to `GET /api/v1/models`, which needs no key, and for the ids that list
+ * omits — the Batch API variants and the image models — to
+ * `/api/v1/models/<id>/endpoints` and `/api/v1/images/models/<id>/endpoints`.
  *
  * Usage:
  *   pnpm -F course-gen-platform exec tsx scripts/check-model-catalog-drift.ts
@@ -129,6 +130,69 @@ export function readPublishedPricing(
     });
   }
   return published;
+}
+
+/**
+ * The published rates for an id the chat list does not carry, from its own page.
+ *
+ * `GET /api/v1/models` lists the base models only. The Batch API variants are
+ * real, separately billed models with their own ids — `google/gemini-3.7-flash:batch`
+ * bills $0.1875/$0.9375 against the base $0.75/$3.75 — and every one of them was
+ * reported here as "delisted, or the id is misspelled" and then skipped. Four
+ * catalogued models were therefore checked by nothing but the hand-written
+ * snapshot, which is the state this gate exists to end (mc2-rhyac).
+ *
+ * The rate taken is the cheapest endpoint carrying no tier suffix, because that
+ * is the tariff `/api/v1/models` quotes for the base models and the catalogue
+ * has to agree with itself. `/flex` is half of it and `/priority` nearly double;
+ * catalogue a flex rate and `provider.max_price`, built at 1.5x, sits under the
+ * ordinary tariff the first time flex has no capacity.
+ *
+ * Three answers, deliberately distinct: `unknown` — no such model; `unserved` —
+ * the model exists but no endpoint currently offers it, which is what an alias
+ * and a withdrawn provider both look like and is not a price fact; or the rates.
+ */
+export type PublishedChatRates =
+  | { kind: 'unknown' }
+  | { kind: 'unserved' }
+  | { kind: 'rates'; pricing: PublishedPricing };
+
+export async function readPublishedChatEndpointPricing(
+  modelId: string
+): Promise<PublishedChatRates> {
+  try {
+    const response = await fetch(`https://openrouter.ai/api/v1/models/${modelId}/endpoints`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) return { kind: 'unknown' };
+    const body = (await response.json()) as {
+      data?: { endpoints?: Array<{ tag?: string; pricing?: Record<string, unknown> }> };
+    };
+
+    const baseTier = (body.data?.endpoints ?? []).filter(
+      endpoint => !/\/(?:flex|priority)$/u.test(endpoint.tag ?? '')
+    );
+    if (baseTier.length === 0) return { kind: 'unserved' };
+
+    const cheapest = baseTier.reduce((best, endpoint) => {
+      const rate = perMillion(endpoint.pricing?.prompt);
+      const bestRate = perMillion(best.pricing?.prompt);
+      if (rate === null) return best;
+      if (bestRate === null) return endpoint;
+      return rate < bestRate ? endpoint : best;
+    });
+
+    return {
+      kind: 'rates',
+      pricing: {
+        inputPricePerMillion: perMillion(cheapest.pricing?.prompt),
+        outputPricePerMillion: perMillion(cheapest.pricing?.completion),
+        imageOutputPricePerMillion: perMillion(cheapest.pricing?.image_output),
+      },
+    };
+  } catch {
+    return { kind: 'unknown' };
+  }
 }
 
 /** What the image catalogue charges for one output image, and in what unit. */
@@ -386,35 +450,85 @@ async function main(): Promise<void> {
   }
 
   const published = readPublishedPricing(rows);
-  const { drift, absent } = findDrift(MODEL_CATALOG, published, modelIds);
 
-  // An id missing from `/api/v1/models` is not necessarily delisted. Image
-  // generation has its own catalogue of 48 at `/api/v1/images/models`, and only
-  // nine models appear in both; `sourceful/riverflow-v2.5-fast` draws every
-  // lesson banner and is absent from the chat list by design. Reporting it as
-  // "delisted, or misspelled" and moving on would leave a live-routed price
-  // unverified, which is the exact failure this gate was widened to stop
-  // (mc2-a6qxc).
+  // The catalogue already says which entries OpenRouter no longer offers, and
+  // for two months this gate did not read its own flag: all five `delisted`
+  // entries were reported nightly as "delisted, or the id is misspelled". A
+  // warning that fires every night on five entries nobody will ever act on is
+  // how a check teaches people to skip its output (mc2-rhyac). They are kept
+  // only so old cost reports still resolve, so their frozen rates are not
+  // compared and never rewritten — but a delisted id that starts being
+  // published again is a real change, and that is said out loud.
+  const retired = modelIds.filter(modelId => MODEL_CATALOG[modelId]?.delisted);
+  for (const modelId of retired) {
+    if (published.has(modelId)) {
+      console.warn(
+        `  marked delisted but published again: ${modelId} — drop the flag, or the ` +
+          `catalogue is holding a stale rate for a model that is back on sale`
+      );
+    }
+  }
+
+  const live = modelIds.filter(modelId => !MODEL_CATALOG[modelId]?.delisted);
+  const { drift, absent } = findDrift(MODEL_CATALOG, published, live);
+
+  // An id missing from `/api/v1/models` is not necessarily gone. That list
+  // carries the base models only: the Batch API variants have their own ids and
+  // their own tariffs, and image generation has a separate catalogue of 48 at
+  // `/api/v1/images/models` of which only nine appear in both.
+  // `sourceful/riverflow-v2.5-fast` draws every lesson banner and is absent from
+  // the chat list by design. Reporting any of them as "delisted, or misspelled"
+  // and moving on leaves a live-routed price unverified, which is the exact
+  // failure this gate was widened to stop (mc2-a6qxc, mc2-rhyac).
   const stillAbsent: string[] = [];
+  const unserved: string[] = [];
   for (const modelId of absent) {
     const entry = MODEL_CATALOG[modelId];
-    const live = await readPublishedImagePrice(modelId);
-    if (live === null) {
-      stillAbsent.push(modelId);
+
+    // The image catalogue first, and the order is not arbitrary: a model that
+    // draws pictures has a page in both, and they quote different pairs.
+    // `openai/gpt-image-2` reads $5 input / $30 output image on the images API —
+    // which is what the catalogue holds — and $8/$8 on its chat page, where
+    // `prompt` is the input *image* leg and `completion` is text. Asking the
+    // chat page first rewrote a correct entry with the wrong pair.
+    const image = await readPublishedImagePrice(modelId);
+    if (image !== null) {
+      const comparisons: Array<[string, number | undefined, number | undefined]> = [
+        ['imagePriceFlatUsd', entry?.imagePriceFlatUsd, image.flatUsd],
+        ['imageOutputPricePerMillion', entry?.imageOutputPricePerMillion, image.perMillionTokens],
+      ];
+
+      for (const [field, catalogued, publishedRate] of comparisons) {
+        if (catalogued == null || publishedRate == null) continue;
+        const ratio = publishedRate / catalogued;
+        if (Math.abs(ratio - 1) <= TOLERANCE) continue;
+        drift.push({ modelId, field, catalogued, published: publishedRate, ratio });
+      }
       continue;
     }
 
-    const comparisons: Array<[string, number | undefined, number | undefined]> = [
-      ['imagePriceFlatUsd', entry?.imagePriceFlatUsd, live.flatUsd],
-      ['imageOutputPricePerMillion', entry?.imageOutputPricePerMillion, live.perMillionTokens],
-    ];
-
-    for (const [field, catalogued, publishedRate] of comparisons) {
-      if (catalogued == null || publishedRate == null) continue;
-      const ratio = publishedRate / catalogued;
-      if (Math.abs(ratio - 1) <= TOLERANCE) continue;
-      drift.push({ modelId, field, catalogued, published: publishedRate, ratio });
+    const chat = await readPublishedChatEndpointPricing(modelId);
+    if (chat.kind === 'unserved') {
+      unserved.push(modelId);
+      continue;
     }
+    if (chat.kind === 'rates') {
+      const { drift: ownPage } = findDrift(MODEL_CATALOG, new Map([[modelId, chat.pricing]]), [
+        modelId,
+      ]);
+      drift.push(...ownPage);
+      continue;
+    }
+
+    stillAbsent.push(modelId);
+  }
+
+  for (const modelId of unserved) {
+    // Not "no such model": the page exists and quotes no endpoint. An alias
+    // answers exactly this way, and so does a model whose only provider has
+    // stopped serving it — which for a routable id means the call fails, not
+    // that it costs something else.
+    console.warn(`  published but no endpoint is serving it: ${modelId} — price unverified`);
   }
 
   for (const modelId of stillAbsent) {
@@ -424,12 +538,16 @@ async function main(): Promise<void> {
   }
 
   if (drift.length === 0) {
-    // Says what was compared, not what was asked for. `absent` never reached the
-    // published list and `uncatalogued` has no number to compare, so counting
-    // either as a match would report full coverage of a check that skipped them.
-    const compared = modelIds.length - absent.length - uncatalogued.length;
+    // Says what was compared, not what was asked for. Nothing here reached a
+    // published rate, so counting any of it as a match would report full
+    // coverage of a check that skipped it. The Batch and image ids that did get
+    // priced off their own pages are not subtracted — those were compared.
+    const compared =
+      modelIds.length - retired.length - unserved.length - stillAbsent.length - uncatalogued.length;
     const skipped = [
-      ...(absent.length > 0 ? [`${absent.length} not in the published list`] : []),
+      ...(retired.length > 0 ? [`${retired.length} delisted`] : []),
+      ...(unserved.length > 0 ? [`${unserved.length} with no endpoint serving them`] : []),
+      ...(stillAbsent.length > 0 ? [`${stillAbsent.length} not in the published list`] : []),
       ...(uncatalogued.length > 0 ? [`${uncatalogued.length} not in MODEL_CATALOG`] : []),
     ];
     console.log(

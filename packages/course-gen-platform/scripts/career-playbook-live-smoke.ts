@@ -9,6 +9,7 @@ import {
   type CareerPlaybookCleanupManifest,
   type CareerPlaybookCleanupScope,
   type CareerPlaybookLiveSmokeClient,
+  type CareerPlaybookLiveSmokeLanguage,
   type CareerPlaybookLiveSmokeMode,
   type CareerPlaybookLiveSmokeReport,
   type CareerPlaybookLiveSmokeTarget,
@@ -20,6 +21,7 @@ interface ParsedArgs {
   mode: CareerPlaybookLiveSmokeMode;
   targetEnvironment?: CareerPlaybookLiveSmokeTarget;
   trpcUrl?: string;
+  webBaseUrl?: string;
   expectedUserId?: string;
   expectedOrganizationId?: string;
   queueName?: string;
@@ -28,6 +30,7 @@ interface ParsedArgs {
   pollTimeoutMs?: number;
   pollIntervalMs?: number;
   resumePlaybookId?: string;
+  contentLanguage?: CareerPlaybookLiveSmokeLanguage;
   confirmLiveMutation: boolean;
   includeCourseBridge: boolean;
   noArtifact: boolean;
@@ -390,6 +393,7 @@ Options:
   --target <local|development|dev|staging|production|prod>
                                            Target environment label
   --trpc-url <url>                         Backend tRPC URL, for example https://api.example.com/trpc
+  --web-url <url>                          Next.js origin for the public page gate (default: tRPC origin)
   --expected-user-id <uuid>                Disposable user id expected in staging
   --expected-organization-id <uuid>        Disposable organization id expected in staging
   --queue <name>                           Dedicated BULLMQ_QUEUE_NAME used by API and worker
@@ -399,6 +403,7 @@ Options:
   --poll-timeout-ms <number>               Max wait time for generated artifacts (default: 2700000)
   --poll-interval-ms <number>              Poll interval while waiting (default: 5000)
   --resume-playbook-id <uuid>              Resume post-generation evidence capture for an existing playbook
+  --content-language <en|ru>               Fixture language for the generated guide (default: en)
   --confirm-live-mutation                  Required for mutation-smoke
   --include-course-bridge                  Also create the bridge course; requires cleanup coverage
   --no-artifact                            Skip writing the final_markdown + cost_breakdown artifact
@@ -446,6 +451,15 @@ function parseArgs(argv: string[]): ParsedArgs {
     const arg = argv[index];
 
     switch (arg) {
+      case '--content-language': {
+        const value = readValue(argv, index, '--content-language');
+        if (value !== 'en' && value !== 'ru') {
+          throw new Error('--content-language must be en or ru');
+        }
+        parsed.contentLanguage = value;
+        index += 1;
+        break;
+      }
       case '--mode': {
         const value = readValue(argv, index, arg);
         if (value !== 'plan' && value !== 'mutation-smoke') {
@@ -461,6 +475,10 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--trpc-url':
         parsed.trpcUrl = readValue(argv, index, arg);
+        index += 1;
+        break;
+      case '--web-url':
+        parsed.webBaseUrl = readValue(argv, index, arg);
         index += 1;
         break;
       case '--expected-user-id':
@@ -589,6 +607,10 @@ export function createTrpcLiveSmokeClient(
       withBearerTokenRefresh(tokenSource, () =>
         trpc.careerPlaybook.share.getPublicBySlug.query(input)
       ),
+    listViewLinks: input =>
+      withBearerTokenRefresh(tokenSource, () =>
+        trpc.careerPlaybook.share.listViewLinks.query(input)
+      ),
     createCourseFromPlaybook: input =>
       withBearerTokenRefresh(tokenSource, () =>
         trpc.careerPlaybook.courseBridge.createCourseFromPlaybook.mutate(input)
@@ -632,6 +654,7 @@ async function main(): Promise<void> {
         BULLMQ_QUEUE_NAME: args.queueName ?? process.env.BULLMQ_QUEUE_NAME,
       },
       trpcUrl,
+      webBaseUrl: args.webBaseUrl,
       token,
       expectedUserId: args.expectedUserId,
       expectedOrganizationId: args.expectedOrganizationId,
@@ -641,6 +664,7 @@ async function main(): Promise<void> {
       pollTimeoutMs: args.pollTimeoutMs,
       pollIntervalMs: args.pollIntervalMs,
       resumePlaybookId: args.resumePlaybookId,
+      contentLanguage: args.contentLanguage,
       confirmLiveMutation: args.confirmLiveMutation,
       includeCourseBridge: args.includeCourseBridge,
     },

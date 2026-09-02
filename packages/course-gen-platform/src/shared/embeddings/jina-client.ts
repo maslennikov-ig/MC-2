@@ -8,7 +8,7 @@
  * - 768-dimensional embeddings (matches Qdrant collection configuration)
  * - Task-specific embeddings: "retrieval.passage" (for indexing) and "retrieval.query" (for search)
  * - Rate limiting: 1500 requests per minute (40ms minimum between requests)
- * - Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s (max 3 retries)
+ * - Retry policy: full provider window for 429; exponential backoff for network/5xx
  * - Batch support: Up to 100 texts per request
  * - Russian language optimization
  * - Token usage tracking for cost monitoring
@@ -58,6 +58,15 @@ interface JinaEmbeddingResponse {
   };
 }
 
+/** Provider receipt exposed to callers that keep a non-course cost ledger. */
+export interface JinaEmbeddingUsage {
+  model: typeof JINA_EMBEDDING_MODEL;
+  totalTokens: number;
+  documentCount: number;
+}
+
+export type JinaEmbeddingUsageObserver = (usage: JinaEmbeddingUsage) => void;
+
 /**
  * Jina API error response structure
  */
@@ -79,12 +88,82 @@ export class JinaEmbeddingError extends Error {
     message: string,
     public readonly statusCode?: number,
     public readonly errorType?: string,
-    public readonly originalError?: unknown
+    public readonly originalError?: unknown,
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'JinaEmbeddingError';
     Object.setPrototypeOf(this, JinaEmbeddingError.prototype);
   }
+}
+
+const JINA_RATE_LIMIT_WINDOW_MS = 60_000;
+const JINA_MAX_RETRY_AFTER_MS = 5 * JINA_RATE_LIMIT_WINDOW_MS;
+
+/**
+ * How long one `generateEmbeddings`/`generateEmbedding` call may spend parked
+ * on 429s, summed over every batch and every retry inside it.
+ *
+ * The per-attempt wait is the provider's own Retry-After, which is right: a
+ * one-second retry inside a closed minute window just burns the attempt budget.
+ * But the retry budget is per batch, so a caller that sends several batches
+ * multiplies the worst case — a semantic gate sending 5 batches could hold a
+ * BullMQ lock for 75 minutes while the accepted paid run takes 15. Capping the
+ * total at one maximal Retry-After keeps a single honest provider instruction
+ * honoured and turns a silent stall into a fast, visible failure.
+ */
+export const JINA_RATE_LIMIT_WAIT_BUDGET_MS = JINA_MAX_RETRY_AFTER_MS;
+
+/** Wait allowance shared by every 429 inside one caller-level embeddings call. */
+class RateLimitWaitBudget {
+  private spentMs = 0;
+
+  constructor(private readonly totalMs: number) {}
+
+  /**
+   * Reserve a wait. Returns `undefined` when the provider's instruction no
+   * longer fits: waiting a clamped, shorter time would only retry into the same
+   * closed window, so the caller should fail instead.
+   */
+  claim(requestedMs: number): number | undefined {
+    if (requestedMs > this.totalMs - this.spentMs) return undefined;
+    this.spentMs += requestedMs;
+    return requestedMs;
+  }
+
+  get spent(): number {
+    return this.spentMs;
+  }
+
+  get total(): number {
+    return this.totalMs;
+  }
+}
+
+export interface JinaEmbeddingCallOptions {
+  /** Total 429 wait allowed across the whole call; defaults to {@link JINA_RATE_LIMIT_WAIT_BUDGET_MS}. */
+  rateLimitWaitBudgetMs?: number;
+}
+
+function createRateLimitWaitBudget(options?: JinaEmbeddingCallOptions): RateLimitWaitBudget {
+  const totalMs = options?.rateLimitWaitBudgetMs ?? JINA_RATE_LIMIT_WAIT_BUDGET_MS;
+  if (!Number.isFinite(totalMs) || totalMs < 0) {
+    throw new JinaEmbeddingError(
+      `Jina rate-limit wait budget must be a non-negative number of milliseconds, got ${totalMs}`,
+      undefined,
+      'INVALID_WAIT_BUDGET'
+    );
+  }
+  return new RateLimitWaitBudget(totalMs);
+}
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined;
+
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+
+  return Math.min(seconds * 1000, JINA_MAX_RETRY_AFTER_MS);
 }
 
 /**
@@ -373,7 +452,11 @@ export function resetJinaConcurrencyStats(): void {
  * @returns Result of the function
  * @throws {JinaEmbeddingError} If all retries are exhausted
  */
-async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function retryWithExponentialBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  waitBudget?: RateLimitWaitBudget
+): Promise<T> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -400,8 +483,39 @@ async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries =
         throw error;
       }
 
-      // Calculate backoff delay: 1s, 2s, 4s, 8s, 16s, 32s (max)
-      const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 32000);
+      // Jina meters tokens per minute. Retrying a 429 after one second burns the
+      // attempt budget inside the same closed provider window. Network and 5xx
+      // failures retain the existing exponential backoff and do not draw on the
+      // rate-limit budget — they are already bounded at 32s per attempt.
+      const isRateLimited = error instanceof JinaEmbeddingError && error.statusCode === 429;
+      let backoffDelay: number;
+
+      if (isRateLimited) {
+        const requestedDelay = error.retryAfterMs ?? JINA_RATE_LIMIT_WINDOW_MS;
+        const grantedDelay = waitBudget ? waitBudget.claim(requestedDelay) : requestedDelay;
+
+        if (grantedDelay === undefined) {
+          logger.warn(
+            {
+              attempt,
+              maxRetries,
+              requestedDelayMs: requestedDelay,
+              waitSpentMs: waitBudget?.spent,
+              waitBudgetMs: waitBudget?.total,
+            },
+            '[Jina] Rate-limit wait budget exhausted, failing instead of holding the caller open'
+          );
+          throw error;
+        }
+
+        backoffDelay = grantedDelay;
+        logger.warn(
+          { attempt, maxRetries, delayMs: backoffDelay, waitSpentMs: waitBudget?.spent },
+          '[Jina] Rate limit reached, waiting for the provider window before retrying'
+        );
+      } else {
+        backoffDelay = Math.min(1000 * Math.pow(2, attempt), 32000);
+      }
 
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
@@ -421,7 +535,8 @@ async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries =
  */
 async function makeJinaRequest(
   payload: JinaEmbeddingRequest,
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  onUsage?: JinaEmbeddingUsageObserver
 ): Promise<JinaEmbeddingResponse> {
   validateJinaConfig();
 
@@ -457,7 +572,13 @@ async function makeJinaRequest(
         errorMessage = response.statusText || errorMessage;
       }
 
-      throw new JinaEmbeddingError(errorMessage, response.status, errorType);
+      throw new JinaEmbeddingError(
+        errorMessage,
+        response.status,
+        errorType,
+        undefined,
+        parseRetryAfterMs(response.headers.get('retry-after'))
+      );
     }
 
     const data = (await response.json()) as JinaEmbeddingResponse;
@@ -499,6 +620,19 @@ async function makeJinaRequest(
       },
       costContext
     );
+
+    try {
+      onUsage?.({
+        model: JINA_EMBEDDING_MODEL,
+        totalTokens: tokensUsed,
+        documentCount: data.data.length,
+      });
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        '[Jina] Embedding usage observer failed'
+      );
+    }
 
     return data;
   } finally {
@@ -546,23 +680,29 @@ async function makeJinaRequest(
 export async function generateEmbedding(
   text: string,
   task: 'retrieval.passage' | 'retrieval.query',
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  options?: JinaEmbeddingCallOptions
 ): Promise<number[]> {
-  const embedding = await retryWithExponentialBackoff(async () => {
-    const response = await makeJinaRequest(
-      {
-        model: JINA_EMBEDDING_MODEL,
-        input: text,
-        task,
-        dimensions: 768,
-        normalized: false, // Qdrant handles normalization for Cosine similarity
-        truncate: true, // Auto-truncate texts >8192 tokens
-      },
-      costContext
-    );
+  const waitBudget = createRateLimitWaitBudget(options);
+  const embedding = await retryWithExponentialBackoff(
+    async () => {
+      const response = await makeJinaRequest(
+        {
+          model: JINA_EMBEDDING_MODEL,
+          input: text,
+          task,
+          dimensions: 768,
+          normalized: false, // Qdrant handles normalization for Cosine similarity
+          truncate: true, // Auto-truncate texts >8192 tokens
+        },
+        costContext
+      );
 
-    return response.data[0].embedding;
-  });
+      return response.data[0].embedding;
+    },
+    3,
+    waitBudget
+  );
 
   // Validate embedding dimensions
   if (embedding.length !== 768) {
@@ -621,7 +761,9 @@ export async function generateEmbedding(
 export async function generateEmbeddings(
   texts: string[],
   task: 'retrieval.passage' | 'retrieval.query',
-  costContext?: LlmCostContext
+  costContext?: LlmCostContext,
+  onUsage?: JinaEmbeddingUsageObserver,
+  options?: JinaEmbeddingCallOptions
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
@@ -630,26 +772,34 @@ export async function generateEmbeddings(
   // Jina API supports up to 100 texts per request for optimal performance
   const BATCH_SIZE = 100;
   const allEmbeddings: number[][] = [];
+  // One allowance for the whole call, so a multi-batch caller cannot multiply
+  // the worst-case 429 stall by its batch count.
+  const waitBudget = createRateLimitWaitBudget(options);
 
   // Process in batches
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE);
 
-    const batchEmbeddings = await retryWithExponentialBackoff(async () => {
-      const response = await makeJinaRequest(
-        {
-          model: JINA_EMBEDDING_MODEL,
-          input: batch,
-          task,
-          dimensions: 768,
-          normalized: false,
-          truncate: true,
-        },
-        costContext
-      );
+    const batchEmbeddings = await retryWithExponentialBackoff(
+      async () => {
+        const response = await makeJinaRequest(
+          {
+            model: JINA_EMBEDDING_MODEL,
+            input: batch,
+            task,
+            dimensions: 768,
+            normalized: false,
+            truncate: true,
+          },
+          costContext,
+          onUsage
+        );
 
-      return response.data.map(item => item.embedding);
-    });
+        return response.data.map(item => item.embedding);
+      },
+      3,
+      waitBudget
+    );
 
     // Validate batch embeddings
     for (const embedding of batchEmbeddings) {

@@ -23,10 +23,24 @@ import {
   getModelPricing,
   hasUnifiedPricing,
   estimateCost,
-  validateQwen3MaxContext,
 } from '@/shared/llm/cost-calculator';
 import { MODEL_CATALOG } from '@megacampus/shared-types';
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
+
+/**
+ * What a 50/50 token split costs at the catalogued rates.
+ *
+ * These cases assert the calculator's arithmetic — the split, the per-million
+ * division, the summing — and the rates they run on belong to `MODEL_CATALOG`.
+ * Typed out by hand they became a third copy of the same numbers, and the copy
+ * is not merely untidy: the nightly price sync rewrites the catalogue and its
+ * snapshot but cannot rewrite an expectation somebody typed, so every published
+ * price move turned this file red and the sync stopped before its commit step.
+ * It had therefore never delivered a single rate (mc2-rhyac, mc2-ts9i2).
+ */
+const halfSplitCost = (modelId: string, tokens: number): number =>
+  ((tokens / 2) * MODEL_CATALOG[modelId].inputPricePerMillion) / 1e6 +
+  ((tokens / 2) * MODEL_CATALOG[modelId].outputPricePerMillion) / 1e6;
 
 describe('Stage 5 Cost Calculator Service', () => {
   // ============================================================================
@@ -46,8 +60,8 @@ describe('Stage 5 Cost Calculator Service', () => {
   // against the published list.
   describe('OPENROUTER_PRICING configuration', () => {
     it.each([
-      'qwen/qwen3-max',
-      'openai/gpt-oss-20b',
+      'openai/gpt-5.6-luna',
+      'z-ai/glm-5.3-flash',
       'deepseek/deepseek-v4-flash',
       'google/gemini-3.7-flash',
     ])('projects %s straight from the catalogue', modelId => {
@@ -81,13 +95,6 @@ describe('Stage 5 Cost Calculator Service', () => {
     });
   });
 
-  describe('qwen3-max base-rate guard', () => {
-    it('allows the base tier and rejects the first token in the higher-price tier', () => {
-      expect(() => validateQwen3MaxContext(31_999)).not.toThrow();
-      expect(() => validateQwen3MaxContext(32_000)).toThrow(/32,000/u);
-    });
-  });
-
   // ============================================================================
   // COST THRESHOLDS VALIDATION
   // ============================================================================
@@ -112,10 +119,10 @@ describe('Stage 5 Cost Calculator Service', () => {
   // ============================================================================
 
   describe('calculateGenerationCost()', () => {
-    it('should calculate cost for typical generation with qwen3-max metadata + deepseek-v4-flash sections', () => {
+    it('should calculate cost for typical generation with luna metadata + deepseek-v4-flash sections', () => {
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
+          metadata: 'openai/gpt-5.6-luna',
           sections: 'deepseek/deepseek-v4-flash',
         },
         total_tokens: {
@@ -136,12 +143,8 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       // What this case holds is the 50/50 token split and the summing, not the
       // rates — those belong to the catalogue (see the projection cases above).
-      const half = (modelId: string, tokens: number): number =>
-        ((tokens / 2) * MODEL_CATALOG[modelId].inputPricePerMillion) / 1e6 +
-        ((tokens / 2) * MODEL_CATALOG[modelId].outputPricePerMillion) / 1e6;
-
-      const expectedMetadata = half('qwen/qwen3-max', 5000);
-      const expectedSections = half('deepseek/deepseek-v4-flash', 45000);
+      const expectedMetadata = halfSplitCost('openai/gpt-5.6-luna', 5000);
+      const expectedSections = halfSplitCost('deepseek/deepseek-v4-flash', 45000);
 
       expect(cost.metadata_cost_usd).toBeCloseTo(expectedMetadata, 6);
       expect(cost.sections_cost_usd).toBeCloseTo(expectedSections, 6);
@@ -158,7 +161,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost.token_breakdown.total_tokens).toBe(50000);
 
       // Model breakdown
-      expect(cost.model_breakdown.metadata_model).toBe('qwen/qwen3-max');
+      expect(cost.model_breakdown.metadata_model).toBe('openai/gpt-5.6-luna');
       expect(cost.model_breakdown.sections_model).toBe('deepseek/deepseek-v4-flash');
       expect(cost.model_breakdown.validation_model).toBe('none');
     });
@@ -166,8 +169,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should calculate cost with all phases (metadata + sections + validation)', () => {
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-20b',
+          metadata: 'openai/gpt-5.6-luna',
+          sections: 'z-ai/glm-5.3-flash',
           validation: 'google/gemini-3.7-flash',
         },
         total_tokens: {
@@ -190,17 +193,21 @@ describe('Stage 5 Cost Calculator Service', () => {
 
       const cost = calculateGenerationCost(metadata);
 
-      // Metadata cost (qwen3-max, 50/50): (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
-      expect(cost.metadata_cost_usd).toBeCloseTo(0.0234, 6);
+      // Each phase splits its own tokens 50/50 at its own model's rates, and the
+      // total is their sum — including the validation leg, which the two-phase
+      // case above never exercises.
+      const expectedMetadata = halfSplitCost('openai/gpt-5.6-luna', 10000);
+      const expectedSections = halfSplitCost('z-ai/glm-5.3-flash', 50000);
+      const expectedValidation = halfSplitCost('google/gemini-3.7-flash', 5000);
 
-      // Sections cost (gpt-oss-20b, 50/50): (25000/1M * 0.03) + (25000/1M * 0.13) = 0.004
-      expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
+      expect(cost.metadata_cost_usd).toBeCloseTo(expectedMetadata, 6);
+      expect(cost.sections_cost_usd).toBeCloseTo(expectedSections, 6);
+      expect(cost.validation_cost_usd).toBeCloseTo(expectedValidation, 6);
 
-      // Validation cost (gemini-3.7-flash, split, 50/50): (2500/1M * 0.375) + (2500/1M * 1.875) = 0.0009375 + 0.0046875 = 0.005625
-      expect(cost.validation_cost_usd).toBeCloseTo(0.005625, 6);
-
-      // Total cost: 0.0234 + 0.004 + 0.005625 = 0.033025
-      expect(cost.total_cost_usd).toBeCloseTo(0.033025, 6);
+      expect(cost.total_cost_usd).toBeCloseTo(
+        expectedMetadata + expectedSections + expectedValidation,
+        6
+      );
 
       // Model breakdown
       expect(cost.model_breakdown.validation_model).toBe('google/gemini-3.7-flash');
@@ -209,8 +216,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should handle zero tokens gracefully', () => {
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-20b',
+          metadata: 'openai/gpt-5.6-luna',
+          sections: 'z-ai/glm-5.3-flash',
         },
         total_tokens: {
           metadata: 0,
@@ -238,7 +245,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       const metadata: GenerationMetadata = {
         model_used: {
           metadata: 'unknown/model',
-          sections: 'openai/gpt-oss-20b',
+          sections: 'z-ai/glm-5.3-flash',
         },
         total_tokens: {
           metadata: 10000,
@@ -260,7 +267,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost.metadata_cost_usd).toBe(0);
 
       // Known model should calculate normally
-      expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
+      expect(cost.sections_cost_usd).toBeCloseTo(halfSplitCost('z-ai/glm-5.3-flash', 50000), 6);
 
       // And the total says so. Ten thousand tokens contributed nothing to it,
       // which without this field is indistinguishable from a course that really
@@ -271,8 +278,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('leaves the marker off when every phase model had a rate', () => {
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
-          sections: 'openai/gpt-oss-20b',
+          metadata: 'openai/gpt-5.6-luna',
+          sections: 'z-ai/glm-5.3-flash',
         },
         total_tokens: { metadata: 10000, sections: 50000, validation: 0, total: 60000 },
         cost_usd: 0,
@@ -385,11 +392,15 @@ describe('Stage 5 Cost Calculator Service', () => {
 
   describe('getModelPricing()', () => {
     it('should return pricing for known models', () => {
-      const pricing = getModelPricing('qwen/qwen3-max');
+      const pricing = getModelPricing('openai/gpt-5.6-luna');
 
       expect(pricing).not.toBeNull();
-      expect(pricing?.inputPricePerMillion).toBe(0.78);
-      expect(pricing?.outputPricePerMillion).toBe(3.9);
+      expect(pricing?.inputPricePerMillion).toBe(
+        MODEL_CATALOG['openai/gpt-5.6-luna'].inputPricePerMillion
+      );
+      expect(pricing?.outputPricePerMillion).toBe(
+        MODEL_CATALOG['openai/gpt-5.6-luna'].outputPricePerMillion
+      );
     });
 
     it('should return null for unknown models', () => {
@@ -401,8 +412,8 @@ describe('Stage 5 Cost Calculator Service', () => {
 
   describe('hasUnifiedPricing()', () => {
     it('should return false for models with split pricing', () => {
-      expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(false);
-      expect(hasUnifiedPricing('qwen/qwen3-max')).toBe(false);
+      expect(hasUnifiedPricing('z-ai/glm-5.3-flash')).toBe(false);
+      expect(hasUnifiedPricing('openai/gpt-5.6-luna')).toBe(false);
       expect(hasUnifiedPricing('deepseek/deepseek-v4-flash')).toBe(false);
     });
 
@@ -412,18 +423,19 @@ describe('Stage 5 Cost Calculator Service', () => {
   });
 
   describe('estimateCost()', () => {
-    it('should estimate cost for gpt-oss-20b split pricing', () => {
-      const cost = estimateCost('openai/gpt-oss-20b', 10000, 0);
+    it('should estimate cost for glm-5.3-flash split pricing', () => {
+      const cost = estimateCost('z-ai/glm-5.3-flash', 10000, 0);
 
-      // 50/50 split: (5000/1M * 0.03) + (5000/1M * 0.13) = 0.0008
-      expect(cost).toBeCloseTo(0.0008, 6);
+      // 50/50 split at whatever the catalogue charges for the two legs.
+      expect(cost).toBeCloseTo(halfSplitCost('z-ai/glm-5.3-flash', 10000), 6);
     });
 
     it('should estimate cost for split pricing model with 50/50 assumption', () => {
-      const cost = estimateCost('qwen/qwen3-max', 10000, 0);
+      const cost = estimateCost('openai/gpt-5.6-luna', 10000, 0);
 
-      // 50/50 split: (5000/1M * 0.78) + (5000/1M * 3.90) = 0.0234
-      expect(cost).toBeCloseTo(0.0234, 6);
+      // 50/50 split, with the dearer output leg counted at its own rate rather
+      // than blended into one figure.
+      expect(cost).toBeCloseTo(halfSplitCost('openai/gpt-5.6-luna', 10000), 6);
     });
 
     it('answers "not measured" for an unknown model rather than "free"', () => {
@@ -447,7 +459,7 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('still reports a genuine zero for zero tokens', () => {
       // The distinction the return type now carries: nothing to charge for is a
       // measurement, no rate to charge by is not.
-      expect(estimateCost('openai/gpt-oss-20b', 0, 0)).toBe(0);
+      expect(estimateCost('z-ai/glm-5.3-flash', 0, 0)).toBe(0);
     });
   });
 
@@ -458,11 +470,11 @@ describe('Stage 5 Cost Calculator Service', () => {
   describe('Real-world cost scenarios (RT-001)', () => {
     it('should achieve expected cost range for typical course generation', () => {
       // RT-001 expected: $0.53-0.63 per course
-      // Metadata: 5K tokens (qwen3-max)
+      // Metadata: 5K tokens
       // Sections: 45K tokens (deepseek-v4-flash)
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
+          metadata: 'openai/gpt-5.6-luna',
           sections: 'deepseek/deepseek-v4-flash',
         },
         total_tokens: {
@@ -491,7 +503,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Simulate higher token usage due to retries
       const metadata: GenerationMetadata = {
         model_used: {
-          metadata: 'qwen/qwen3-max',
+          metadata: 'openai/gpt-5.6-luna',
           sections: 'deepseek/deepseek-v4-flash',
           validation: 'google/gemini-3.7-flash',
         },

@@ -5,6 +5,7 @@ import { normalizeLibraryResponse } from './normalizers'
 import type {
   CareerPlaybookLibraryData,
   CareerPlaybookLibraryFilters,
+  CareerPlaybookViewLinksResult,
   CareerPlaybookVisibility,
   CreateCourseFromPlaybookInput,
   CreateCourseFromPlaybookResult,
@@ -35,6 +36,9 @@ type BrowserCareerPlaybookClient = {
     share?: {
       shareToggle?: {
         mutate: (input: { playbookId: string; isPublic: boolean }) => Promise<unknown>
+      }
+      listViewLinks?: {
+        query: (input: { playbookId: string }) => Promise<CareerPlaybookViewLinksResult>
       }
     }
     courseBridge?: {
@@ -115,6 +119,23 @@ export async function toggleCareerPlaybookShare(
   }
 
   return procedure.mutate({ playbookId, isPublic })
+}
+
+/**
+ * The three reader-scoped links for one playbook.
+ *
+ * Owner-only on the server: seeing the manager's link is seeing the manager's
+ * guide. Returns null when the deployment predates the procedure, so a library
+ * page never breaks on an older API.
+ */
+export async function fetchCareerPlaybookViewLinks(
+  playbookId: string
+): Promise<CareerPlaybookViewLinksResult | null> {
+  const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
+  const procedure = client.careerPlaybook?.share?.listViewLinks
+  if (!procedure) return null
+
+  return procedure.query({ playbookId })
 }
 
 export async function updateCareerPlaybookVisibility(

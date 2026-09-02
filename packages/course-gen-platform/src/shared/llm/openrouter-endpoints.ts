@@ -95,7 +95,19 @@ export interface ModelEndpoint {
   throughputTokensPerSecond: number | null;
   /** Which service tier this endpoint is, from its tag. */
   tier: EndpointTier;
+  /**
+   * What this endpoint accepts, verbatim from `supported_parameters`.
+   *
+   * Two endpoints of the same model, at the same price, do not necessarily take
+   * the same request. `z-ai/glm-5.3-flash` publishes 19 healthy endpoints of
+   * which 12 accept a JSON schema — and the three cheapest, all at $0.075/M, are
+   * among the seven that do not, while the fourth at the same price does.
+   */
+  supportedParameters: readonly string[];
 }
+
+/** `supported_parameters` entry for a provider-enforced JSON schema. */
+export const STRUCTURED_OUTPUT_PARAMETER = 'structured_outputs';
 
 /** The service tier an endpoint tag names, or `default` when it names none. */
 export function readEndpointTier(tag: string): EndpointTier {
@@ -179,6 +191,9 @@ function parseEndpoint(raw: unknown): ModelEndpoint | null {
     status: readNumber(record, 'status') ?? 0,
     throughputTokensPerSecond: readThroughput(record),
     tier: readEndpointTier(tag),
+    supportedParameters: Array.isArray(record.supported_parameters)
+      ? record.supported_parameters.filter((value): value is string => typeof value === 'string')
+      : [],
   };
 }
 
@@ -402,18 +417,31 @@ function cheapestFastEnough(group: readonly ModelEndpoint[]): ModelEndpoint | un
  * Cheapest is still the goal, but cheapest **among those that can finish** —
  * see {@link MIN_ENDPOINT_THROUGHPUT_TPS}. When nothing clears the floor the
  * cheapest eligible endpoint is returned anyway: a slow route beats no route.
+ *
+ * `requiredParameters` is the one filter with no fallback, and it is not a
+ * preference: an endpoint that does not accept a JSON schema answers a schema
+ * request with `404 No endpoints found`, so choosing it spends a whole attempt
+ * to learn what the catalogue already said. Measured 2026-09-01 on
+ * `z-ai/glm-5.3-flash`: pinned to `z-ai/fp8` at $0.075/M, two attempts 404'd
+ * before the retry net gave up on the model entirely — while `deepinfra/fp8`,
+ * the same $0.075/M, serves the schema. Cheapest still wins; it is now cheapest
+ * among the endpoints that can answer the question being asked.
  */
 export function pickCheapestUntriedEndpoint(
   endpoints: ModelEndpoint[],
   triedTags: ReadonlySet<string>,
   ceiling?: { prompt?: number; completion?: number },
-  allowedTier: ServiceTier = 'default'
+  allowedTier: ServiceTier = 'default',
+  requiredParameters: readonly string[] = []
 ): ModelEndpoint | undefined {
   const eligible = endpoints.filter(endpoint => {
     if (triedTags.has(endpoint.tag)) return false;
     if (endpoint.status < 0) return false;
     if (endpoint.tier === 'priority') return false;
     if (endpoint.tier === 'flex' && allowedTier !== 'flex') return false;
+    if (!requiredParameters.every(name => endpoint.supportedParameters.includes(name))) {
+      return false;
+    }
     if (ceiling?.prompt !== undefined && endpoint.promptPricePerMillion > ceiling.prompt) {
       return false;
     }

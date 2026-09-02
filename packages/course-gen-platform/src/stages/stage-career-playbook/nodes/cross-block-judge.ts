@@ -4,6 +4,7 @@ import {
   CareerPlaybookJudgeIssueSchema,
   CareerPlaybookJudgeVerdictSchema,
   isCareerPlaybookJudgeCriticalCategory,
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
   type CareerPlaybookJudgeIssue,
@@ -18,14 +19,17 @@ import type {
 } from '../state';
 import { createCareerPlaybookRuntime, type CareerPlaybookRuntime } from './runtime';
 import {
+  CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS,
   CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS,
   countCareerPlaybookRegenerationAttemptsForBlocks,
+  selectPendingCareerPlaybookRegenerations,
 } from './block-regenerator';
 import {
-  invokeStructuredJudgeWithRepair,
-  StructuredJudgeOutputError,
-} from './cross-block-judge-structured';
+  invokeStructuredVerdictWithRepair,
+  resolveJudgeFallbackTokenThreshold,
+  StructuredVerdictOutputError,
+} from './structured-verdict';
 import { validateCareerPlaybookMermaidSyntax } from './mermaid-quality';
 import { getTargetLanguageTextViolations } from './language-consistency';
 import { findUnresolvedFillablePlaceholders } from './placeholder-detection';
@@ -42,12 +46,23 @@ import {
   type CareerPlaybookQualityCheckContext,
 } from './quality-checks';
 import {
+  formatCareerPlaybookCadenceLedgerForPrompt,
   formatCareerPlaybookEvidenceLedgerForPrompt,
   formatCareerPlaybookMetricLedgerForPrompt,
+  formatCareerPlaybookMilestoneLedgerForPrompt,
+  getCareerPlaybookCadenceLedger,
   getCareerPlaybookEvidenceLedger,
   getCareerPlaybookMetricLedger,
+  getCareerPlaybookMilestoneLedger,
 } from './quality-ledger';
 import { getCareerPlaybookBusinessContext } from './business-context';
+import { formatCareerPlaybookBlockAudiences } from './audience-scope';
+import {
+  CareerPlaybookSemanticEmbeddingCache,
+  CareerPlaybookSemanticRepetitionProviderError,
+  evaluateCareerPlaybookSemanticRepetition,
+  isCareerPlaybookSemanticRepetitionIssue,
+} from './semantic-repetition';
 
 export {
   CAREER_PLAYBOOK_MERMAID_REQUIREMENTS,
@@ -61,6 +76,9 @@ export {
 } from './cross-block-judge-checks';
 
 const JUDGE_PROMPT_KEY = 'career_playbook_cross_block_judge';
+const JUDGE_PHASE = 'stage_career_playbook_judge';
+/** The verdict is findings, not prose, so a modest ceiling is enough. */
+const JUDGE_MAX_TOKENS = 4_000;
 
 export interface RunDeterministicChecksInput {
   generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>;
@@ -76,6 +94,11 @@ export interface RunDeterministicChecksInput {
    * specs carry no ledgers and must still judge cleanly.
    */
   contract?: CareerPlaybookQualityCheckContext;
+  /** Disable for bounded group windows; the full-document final judge must run this gate. */
+  semanticRepetition?: boolean;
+  onSemanticRepetitionCost?: (cost: CareerPlaybookNodeCost) => void;
+  semanticEmbeddingCache?: CareerPlaybookSemanticEmbeddingCache;
+  semanticEmbeddingCacheNamespace?: string;
 }
 
 export interface CreateCrossBlockJudgeNodeOptions {
@@ -155,6 +178,11 @@ export function validateBlockLanguageConsistency(
     issues.push({
       block_id: blockId,
       severity: 'critical',
+      // Categorised so the class is countable from a stored row. Until
+      // 2026-09-01 this issue and the format minimums shipped with no category
+      // at all, and run db9d3ff9's two machinery defects were both recorded as
+      // `undefined` — visible only by reading their prose.
+      category: 'wrong_language',
       description: `${blockId} contains text that is not in the target content language (${contentLanguage}): ${violations.join('; ')}`,
       suggestion: `Rewrite ${blockId} so all user-facing text is in the target content language (${contentLanguage}).`,
     });
@@ -204,8 +232,15 @@ function uniqueBlockIds(blockIds: CareerPlaybookBlockId[]): CareerPlaybookBlockI
 }
 
 function verdictFromIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybookJudgeVerdict {
+  // Criticals only, as on the LLM path, where `mergeJudgeVerdicts` derives the
+  // list from `severity === 'critical'`. The two disagreed: every deterministic
+  // warning went to regeneration too, which made `validateContractLeakage`'s own
+  // suggestion — "this is a warning rather than a regeneration trigger" —
+  // untrue of the code beneath it, and would have sent a block back for every
+  // parallel-structure paragraph pair the moment mc2-de6fe downgraded that
+  // finding.
   const needsRegeneration = uniqueBlockIds(
-    issues.filter(issue => issue.severity !== 'info').map(issue => issue.block_id)
+    issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
 
   return {
@@ -309,6 +344,16 @@ export async function runCareerPlaybookDeterministicChecks(
     issues.push(...runCareerPlaybookContractChecks(generatedBlocks, input.contract));
   }
 
+  if (input.semanticRepetition !== false) {
+    issues.push(
+      ...(await evaluateCareerPlaybookSemanticRepetition(generatedBlocks, {
+        onNodeCost: input.onSemanticRepetitionCost,
+        cache: input.semanticEmbeddingCache,
+        cacheNamespace: input.semanticEmbeddingCacheNamespace,
+      }))
+    );
+  }
+
   return verdictFromIssues(issues);
 }
 
@@ -336,11 +381,125 @@ function downgradeNonTaxonomyCriticalIssues(
   });
 }
 
+/**
+ * A judge `unresolved_placeholder` critical that the deterministic scan cannot
+ * confirm is downgraded to a warning.
+ *
+ * All eight of them in the 2026-08-30 run pointed at the contract's own example
+ * marker — "(example — replace with the company's actual CRM)" — which every
+ * unverified company-specific value is REQUIRED to carry. Two rules of the same
+ * contract pull opposite ways there, and the judge resolved it wrongly eight
+ * times; each one bought a regeneration that could only make a correct block
+ * worse. `validateFillablePlaceholderResolution` already owns this question and
+ * answers it from the text, so it decides.
+ */
+export function downgradeUnconfirmedPlaceholderIssues(
+  issues: CareerPlaybookJudgeIssue[],
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): CareerPlaybookJudgeIssue[] {
+  return issues.map(issue => {
+    if (issue.severity !== 'critical' || issue.category !== 'unresolved_placeholder') return issue;
+
+    const content = generatedBlocks[issue.block_id]?.content ?? '';
+    if (findUnresolvedFillablePlaceholders(content).length > 0) return issue;
+
+    return {
+      ...issue,
+      severity: 'warning' as const,
+      description: `${issue.description} — downgraded: the placeholder scan finds no fill-in field here, and the example marker is contracted output rather than a placeholder.`,
+    };
+  });
+}
+
+/**
+ * Categories where a deterministic check, not the model, is the authority.
+ *
+ * Each of these has a pure function over the block text that answers the same
+ * question — `validateRelativeDates` for a stale year, `validateExampleMarking`
+ * for an unmarked example, `validateCrossViewReference` for a reference the
+ * reader cannot follow, `validateMetricLedgerConsistency` for a threshold,
+ * `validateUnsourcedStatistics`/`validateSourceAttribution` for an attribution.
+ * When the check ran over a block and stayed silent, the judge's critical about
+ * that block in that category is not confirmed by anything.
+ *
+ * Deliberately absent: `contradiction` and `invented_number` (no deterministic
+ * check covers the general case — they are exactly what the LLM contour exists
+ * for), `format_minimum` (only three blocks have minimums) and `wrong_language`
+ * (the checker is scoped to whole-block language, the judge can see a single
+ * foreign sentence).
+ */
+const DETERMINISTICALLY_OWNED_CATEGORIES = new Set([
+  'stale_date',
+  'unmarked_example',
+  'unreadable_reference',
+  'metric_conflict',
+  'unsourced_claim',
+]);
+
+/**
+ * A judge critical in a deterministically-owned category that the deterministic
+ * pass did not also find is downgraded to a warning.
+ *
+ * Run 2896e72f filed a `stale_date` critical against block_25 whose own text
+ * read "…is otherwise compliant; no defect is established here", and the block
+ * went to regeneration anyway. That is the shape of mc2-1mr7r, which a prompt
+ * ruling reduced (25 -> 9 -> 7 -> 11 criticals over four runs) but could not
+ * remove, because the model writing the verdict is the thing being guarded.
+ *
+ * The rule is about authority, not about wording. Matching the prose of a
+ * self-refuting verdict is what mc2-1mr7r's own gate did, and one reworded
+ * sentence blinds it; here `validateRelativeDates` already skips block_25 as the
+ * footer — the one place an absolute date belongs — so the claim is unconfirmed
+ * on the merits without reading a single word of it.
+ *
+ * Two guards on the downgrade, both in the direction of keeping the finding:
+ *
+ * - Only a block the deterministic pass actually covered may be downgraded.
+ *   The checks run over `currentBlocks` while the judge also sees previously
+ *   generated groups, so "no deterministic issue here" and "no deterministic
+ *   check ran here" are different facts, and only the first one is evidence.
+ * - The downgrade is recorded in the description, so the rate stays measurable
+ *   from a stored verdict without a re-run.
+ */
+export function downgradeUnconfirmedDeterministicIssues(
+  issues: CareerPlaybookJudgeIssue[],
+  deterministic: CareerPlaybookJudgeVerdict,
+  coveredBlockIds: readonly CareerPlaybookBlockId[]
+): CareerPlaybookJudgeIssue[] {
+  const covered = new Set(coveredBlockIds);
+  const confirmed = new Set(
+    deterministic.issues
+      .filter(issue => issue.category)
+      .map(issue => `${issue.block_id}|${issue.category}`)
+  );
+
+  return issues.map(issue => {
+    if (issue.severity !== 'critical') return issue;
+    if (!issue.category || !DETERMINISTICALLY_OWNED_CATEGORIES.has(issue.category)) return issue;
+    if (!covered.has(issue.block_id)) return issue;
+    if (confirmed.has(`${issue.block_id}|${issue.category}`)) return issue;
+
+    return {
+      ...issue,
+      severity: 'warning' as const,
+      description: `${issue.description} — downgraded: the deterministic ${issue.category} check ran over ${issue.block_id} and found nothing, and it owns this question.`,
+    };
+  });
+}
+
 function mergeJudgeVerdicts(
   deterministic: CareerPlaybookJudgeVerdict,
-  llm: CareerPlaybookJudgeVerdict
+  llm: CareerPlaybookJudgeVerdict,
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
 ): CareerPlaybookJudgeVerdict {
-  const gatedLLMIssues = downgradeNonTaxonomyCriticalIssues(llm.issues);
+  const gatedLLMIssues = downgradeUnconfirmedDeterministicIssues(
+    downgradeUnconfirmedPlaceholderIssues(
+      downgradeNonTaxonomyCriticalIssues(llm.issues),
+      generatedBlocks
+    ),
+    deterministic,
+    Object.keys(generatedBlocks)
+  );
   const regenerationEligibleBlockIds = uniqueBlockIds(
     gatedLLMIssues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
@@ -356,10 +515,48 @@ function mergeJudgeVerdicts(
   };
 }
 
+/**
+ * Which blocks may draw on the final-window reserve.
+ *
+ * Two populations, both of them "this block has not had its turn":
+ *
+ * - a block the full-document semantic gate flags, which is the last
+ *   correctness boundary the document passes through;
+ * - a block the final pass is the FIRST to flag. Run 2896e72f left block_13
+ *   holding two criticals with zero attempts, because by the time the
+ *   full-document pass reached it the window budget stood at 19 of 8. That is
+ *   not a block that failed to use its attempts.
+ *
+ * Empty for a group window. The reserve exists because the final pass sees the
+ * whole document for the first time; a group window has no such excuse.
+ */
+function selectWindowBudgetExemptBlockIds(params: {
+  isFinalWindow: boolean;
+  verdict: CareerPlaybookJudgeVerdict;
+  deterministicVerdict: CareerPlaybookJudgeVerdict;
+  windowBlockIds: CareerPlaybookBlockId[];
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+}): CareerPlaybookBlockId[] {
+  if (!params.isFinalWindow) return [];
+
+  const semanticRepetitionBlockIds = params.deterministicVerdict.issues
+    .filter(
+      issue => issue.severity === 'critical' && isCareerPlaybookSemanticRepetitionIssue(issue)
+    )
+    .map(issue => issue.block_id);
+  const firstFlaggedHere = params.verdict.needs_regeneration.filter(
+    blockId => params.windowBlockIds.includes(blockId) && (params.attempts[blockId] ?? 0) === 0
+  );
+
+  return uniqueBlockIds([...semanticRepetitionBlockIds, ...firstFlaggedHere]);
+}
+
 function capRegenerationWhenBudgetExhausted(params: {
   verdict: CareerPlaybookJudgeVerdict;
   currentBlockIds: CareerPlaybookBlockId[];
   attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+  windowBudgetExemptBlockIds?: readonly CareerPlaybookBlockId[];
+  reserveSpent?: number;
 }): { verdict: CareerPlaybookJudgeVerdict; warnings: string[] } {
   const scopedNeedsRegeneration = params.verdict.needs_regeneration.filter(blockId =>
     params.currentBlockIds.includes(blockId)
@@ -375,26 +572,103 @@ function capRegenerationWhenBudgetExhausted(params: {
   );
   const windowBudgetExhausted =
     attemptCount >= CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS;
-  const perBlockBudgetExhausted = scopedNeedsRegeneration.every(
-    blockId => (params.attempts[blockId] ?? 0) >= CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS
+  const windowBudgetExemptBlockIds = new Set(params.windowBudgetExemptBlockIds ?? []);
+  const cappedBlockIds = scopedNeedsRegeneration.filter(
+    blockId =>
+      (params.attempts[blockId] ?? 0) >= CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS ||
+      (windowBudgetExhausted && !windowBudgetExemptBlockIds.has(blockId))
   );
 
-  if (!windowBudgetExhausted && !perBlockBudgetExhausted) {
+  if (cappedBlockIds.length === 0) {
     return { verdict: params.verdict, warnings: [] };
   }
+  // The reserve spend is named, not implied. Without it the next reader of this
+  // warning sees "19/8" again and concludes the block never had a chance, which
+  // is exactly the reading that cost run 2896e72f its diagnosis.
+  const reserveLabel =
+    windowBudgetExemptBlockIds.size > 0
+      ? `; final-window reserve ${params.reserveSpent ?? 0}/${CAREER_PLAYBOOK_FINAL_WINDOW_RESERVE_ATTEMPTS}`
+      : '';
   const budgetLabel = windowBudgetExhausted
-    ? `${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`
-    : `per-block ${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}/${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}; total ${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}`;
+    ? `${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}${reserveLabel}`
+    : `per-block ${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}/${CAREER_PLAYBOOK_MAX_BLOCK_REGENERATION_ATTEMPTS}; total ${attemptCount}/${CAREER_PLAYBOOK_MAX_JUDGE_WINDOW_REGENERATION_ATTEMPTS}${reserveLabel}`;
 
   return {
     verdict: {
       ...params.verdict,
       needs_regeneration: params.verdict.needs_regeneration.filter(
-        blockId => !params.currentBlockIds.includes(blockId)
+        blockId => !cappedBlockIds.includes(blockId)
       ),
     },
     warnings: [
       `crossBlockJudge advanced after max regeneration attempts (${budgetLabel}) for ${params.currentBlockIds.join(', ')}; unresolved issues remain in judge verdict.`,
+    ],
+  };
+}
+
+/**
+ * Does the document still carry an unremediated semantic repetition?
+ *
+ * Asks the executor, not the verdict. Until 2026-08-31 the two disagreed: the
+ * window-budget exemption above lived only in this node's bookkeeping, while
+ * `selectPendingCareerPlaybookRegenerations` refused every block once the window
+ * was spent, exempt or not, and `routeAfterBlockRegeneration` sent an empty
+ * batch straight to END. The exemption therefore changed nothing for anybody,
+ * including the semantic repetitions it was written for. It now travels through
+ * `windowBudgetExemptBlockIds` in state and buys a bounded reserve — but the
+ * question is still asked of the executor, because "listed in
+ * needs_regeneration" and "something will actually regenerate it" remain
+ * different facts (the reserve is three, and a listed block may not get one).
+ *
+ * The answer is reported, not fatal. "We could not measure" and "we measured,
+ * found one pair, and ran out of attempts" are different failures: the first
+ * leaves us blind to the document and stays fail-closed inside
+ * `CareerPlaybookSemanticRepetitionProviderError`; the second leaves us knowing
+ * exactly what is in it. On 2026-08-30 the second one discarded 27 finished
+ * blocks and $0.087 of billed generation over a single flagged pair, so it now
+ * completes the playbook and records the pair instead.
+ *
+ * The warning carries the measurements — both block ids, the cosine and the
+ * threshold all come from the issue description — because the same run proved
+ * a gate that names only a block id cannot be diagnosed without paying for
+ * another run. `for <ids>;` is load-bearing: `collectWarningQualityIssues`
+ * parses exactly that shape to attach the issue to its blocks.
+ */
+function buildSemanticGateOutcome(params: {
+  isFinalWindow: boolean;
+  deterministicVerdict: CareerPlaybookJudgeVerdict;
+  routedVerdict: CareerPlaybookJudgeVerdict;
+  windowBlockIds: CareerPlaybookBlockId[];
+  attempts: Partial<Record<CareerPlaybookBlockId, number>>;
+}): { errors: string[]; warnings: string[] } {
+  const none = { errors: [], warnings: [] };
+  if (!params.isFinalWindow) return none;
+
+  // Criticals only: the within-block paragraph finding is a warning since
+  // mc2-de6fe, and a warning that was never going to be regenerated must not
+  // report an exhausted remediation budget.
+  const semanticIssues = params.deterministicVerdict.issues.filter(
+    issue => issue.severity === 'critical' && isCareerPlaybookSemanticRepetitionIssue(issue)
+  );
+  const semanticRepetitionBlockIds = uniqueBlockIds(semanticIssues.map(issue => issue.block_id));
+  if (semanticRepetitionBlockIds.length === 0) return none;
+
+  const pending = selectPendingCareerPlaybookRegenerations({
+    verdict: params.routedVerdict,
+    blockIds: params.windowBlockIds,
+    attempts: params.attempts,
+  });
+  const willRemediate = pending.some(entry => semanticRepetitionBlockIds.includes(entry.blockId));
+  if (willRemediate) return none;
+
+  const measurements = [...new Set(semanticIssues.map(issue => issue.description))];
+
+  return {
+    errors: [],
+    warnings: [
+      `crossBlockJudge exhausted semantic repetition remediation for ${semanticRepetitionBlockIds.join(
+        ', '
+      )}; the playbook ships with the repetition recorded: ${measurements.join(' ')}`,
     ],
   };
 }
@@ -470,6 +744,9 @@ function attachVerdictToBlocks(
 
 export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOptions = {}) {
   const runtime = options.runtime ?? createCareerPlaybookRuntime();
+  const semanticEmbeddingCache = options.currentBlockIds
+    ? undefined
+    : new CareerPlaybookSemanticEmbeddingCache();
 
   return async function crossBlockJudgeNode(
     state: CareerPlaybookGraphStateType
@@ -510,6 +787,8 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       ? {
           metricLedger: getCareerPlaybookMetricLedger(state.roleProfileSpec),
           evidenceLedger: getCareerPlaybookEvidenceLedger(state.roleProfileSpec),
+          cadenceLedger: getCareerPlaybookCadenceLedger(state.roleProfileSpec),
+          milestoneLedger: getCareerPlaybookMilestoneLedger(state.roleProfileSpec),
           generatedOn: state.roleProfileSpec.generated_on,
           businessContextMode: state.qaData
             ? getCareerPlaybookBusinessContext(state.qaData).mode
@@ -520,14 +799,33 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         }
       : undefined;
 
-    const deterministicVerdict = await runCareerPlaybookDeterministicChecks({
+    const nodeCosts: CareerPlaybookNodeCost[] = [];
+    const deterministicInput: RunDeterministicChecksInput = {
       generatedBlocks: currentBlocks,
       contentLanguage: state.language,
       contract: contractContext,
-    });
+      semanticRepetition: options.currentBlockIds === undefined,
+      onSemanticRepetitionCost: cost => nodeCosts.push(cost),
+      semanticEmbeddingCache,
+      semanticEmbeddingCacheNamespace: state.playbookId,
+    };
+    let deterministicVerdict: CareerPlaybookJudgeVerdict;
+    try {
+      deterministicVerdict = await runCareerPlaybookDeterministicChecks(deterministicInput);
+    } catch (error) {
+      if (!(error instanceof CareerPlaybookSemanticRepetitionProviderError)) throw error;
+      const warning = `semantic repetition checks unavailable: ${error.message}`;
+      throw new CareerPlaybookSemanticRepetitionProviderError(
+        warning,
+        { cause: error },
+        nodeCosts,
+        [warning]
+      );
+    }
 
     let verdict = deterministicVerdict;
-    const nodeCosts: CareerPlaybookNodeCost[] = [];
+    const isFinalWindow = options.currentBlockIds === undefined;
+    const attempts = state.blockRegenerationAttempts ?? {};
 
     if (options.useLLMJudge) {
       if (!state.roleProfileSpec) {
@@ -535,6 +833,7 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           lastJudgeVerdict: deterministicVerdict,
           lastJudgedBlockIds: windowBlockIds,
+          nodeCosts,
           errors: ['crossBlockJudge failed: roleProfileSpec is missing'],
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
@@ -544,8 +843,21 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
         const prompt = await runtime.renderPrompt(JUDGE_PROMPT_KEY, {
           group_id: currentBlockIds.join(', '),
           spec_json: JSON.stringify(state.roleProfileSpec, null, 2),
+          // Every canonical block, not just this window: the judge compares the
+          // current group against previously generated groups too, so it needs
+          // the full block-to-reader map to tell a same-view contradiction from
+          // allowed repetition between views with no shared reader.
+          block_audiences_md: formatCareerPlaybookBlockAudiences(
+            CAREER_PLAYBOOK_BLOCK_CATALOG.map(block => block.blockId)
+          ),
           metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
             getCareerPlaybookMetricLedger(state.roleProfileSpec)
+          ),
+          cadence_ledger_md: formatCareerPlaybookCadenceLedgerForPrompt(
+            getCareerPlaybookCadenceLedger(state.roleProfileSpec)
+          ),
+          milestone_ledger_md: formatCareerPlaybookMilestoneLedgerForPrompt(
+            getCareerPlaybookMilestoneLedger(state.roleProfileSpec)
           ),
           evidence_ledger_md: formatCareerPlaybookEvidenceLedgerForPrompt(
             getCareerPlaybookEvidenceLedger(state.roleProfileSpec)
@@ -562,31 +874,64 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
             ) || 'none',
           current_group_content: joinBlockMarkdown(currentBlocks),
         });
-        const judgeResult = await invokeStructuredJudgeWithRepair(
+        const judgeResult = await invokeStructuredVerdictWithRepair(
           runtime,
           prompt,
-          state.language,
+          {
+            phaseName: JUDGE_PHASE,
+            promptKey: JUDGE_PROMPT_KEY,
+            node: 'crossBlockJudge',
+            language: state.language,
+            maxTokens: JUDGE_MAX_TOKENS,
+            // Route the large final-document judge onto the fallback model up front
+            // so it does not burn a primary-model timeout before the retry net
+            // escalates.
+            preferFallbackModelAboveTokens: resolveJudgeFallbackTokenThreshold(),
+          },
           parseCareerPlaybookJudgeVerdict
         );
         nodeCosts.push(...judgeResult.nodeCosts);
         const llmVerdict = judgeResult.verdict;
-        verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict);
+        verdict = mergeJudgeVerdicts(deterministicVerdict, llmVerdict, currentBlocks);
       } catch (error) {
-        if (error instanceof StructuredJudgeOutputError) {
+        if (error instanceof StructuredVerdictOutputError) {
           nodeCosts.push(...error.nodeCosts);
         }
+
+        // A degraded LLM judge must not also degrade the deterministic semantic
+        // gate: the deterministic verdict returned here still carries its issues,
+        // so the same question is asked on this path too.
+        const degradedSemantic = buildSemanticGateOutcome({
+          isFinalWindow,
+          deterministicVerdict,
+          routedVerdict: deterministicVerdict,
+          windowBlockIds,
+          attempts,
+        });
 
         return {
           generatedBlocks: attachVerdictToBlocks(currentBlocks, deterministicVerdict),
           judgeVerdicts: [deterministicVerdict],
           lastJudgeVerdict: deterministicVerdict,
           lastJudgedBlockIds: windowBlockIds,
+          // The reserve is a property of the window, not of the LLM contour: a
+          // block the deterministic checks are the first to flag at the final
+          // pass has had no turn either.
+          windowBudgetExemptBlockIds: selectWindowBudgetExemptBlockIds({
+            isFinalWindow,
+            verdict: deterministicVerdict,
+            deterministicVerdict,
+            windowBlockIds,
+            attempts,
+          }),
           nodeCosts,
           warnings: [
             `crossBlockJudge degraded to deterministic checks after LLM structured verdict failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
+            ...degradedSemantic.warnings,
           ],
+          ...(degradedSemantic.errors.length > 0 ? { errors: degradedSemantic.errors } : {}),
           currentNode: options.currentNode ?? 'crossBlockJudge',
         };
       }
@@ -594,11 +939,31 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
 
     // Cap/window-budget accounting always spans the full window so the per-block (2) and
     // per-window (8) regeneration caps are unchanged by delta scoping.
+    const windowBudgetExemptBlockIds = selectWindowBudgetExemptBlockIds({
+      isFinalWindow,
+      verdict,
+      deterministicVerdict,
+      windowBlockIds,
+      attempts,
+    });
     const capped = capRegenerationWhenBudgetExhausted({
       verdict,
       currentBlockIds: windowBlockIds,
-      attempts: state.blockRegenerationAttempts ?? {},
+      attempts,
+      // The full-document semantic gate is the final correctness boundary. A
+      // block it flags may use its own remaining per-block attempts even when
+      // unrelated group remediations already consumed the general window cap.
+      windowBudgetExemptBlockIds: isFinalWindow ? windowBudgetExemptBlockIds : undefined,
+      reserveSpent: state.finalWindowReserveSpent,
     });
+    const semantic = buildSemanticGateOutcome({
+      isFinalWindow,
+      deterministicVerdict,
+      routedVerdict: capped.verdict,
+      windowBlockIds,
+      attempts,
+    });
+    const warnings = [...capped.warnings, ...semantic.warnings];
 
     return {
       // Only the re-reviewed blocks receive the new verdict; accepted siblings retain the
@@ -607,8 +972,13 @@ export function createCrossBlockJudgeNode(options: CreateCrossBlockJudgeNodeOpti
       judgeVerdicts: [capped.verdict],
       lastJudgeVerdict: capped.verdict,
       lastJudgedBlockIds: windowBlockIds,
+      // Always written, including the empty list: a group window must clear what
+      // a previous final pass left, or a block would keep its reserve claim into
+      // a window that never granted one.
+      windowBudgetExemptBlockIds,
       nodeCosts,
-      ...(capped.warnings.length > 0 ? { warnings: capped.warnings } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(semantic.errors.length > 0 ? { errors: semantic.errors } : {}),
       currentNode: options.currentNode ?? 'crossBlockJudge',
     };
   };

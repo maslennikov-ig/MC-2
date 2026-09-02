@@ -9,12 +9,32 @@ import type {
   Language,
 } from '@megacampus/shared-types';
 import {
+  careerPlaybookFixedAnswerRecord,
+  LIVE_SMOKE_BUSINESS_CONTEXT,
+  SALES_MANAGER_B2B_FIXED_ANSWERS,
+  type CareerPlaybookLiveSmokeLanguage,
+} from './career-playbook-live-smoke-fixtures';
+import {
   validateCareerPlaybookSmokeEvidence,
   type CareerPlaybookSmokeEvidenceReport,
+  type CareerPlaybookSmokePageEvidence,
 } from './career-playbook-validation';
+import {
+  buildCareerPlaybookPublicPageTargets,
+  defaultPageFetcher,
+  fetchPublicPageEvidence,
+  resolveCareerPlaybookWebBaseUrl,
+} from './career-playbook-public-pages';
 import { getCareerPlaybookGenerationJobId } from '../server/routers/career-playbook/job-ids';
 
+export {
+  buildCareerPlaybookPublicPageTargets,
+  resolveCareerPlaybookWebBaseUrl,
+} from './career-playbook-public-pages';
+export type { CareerPlaybookPublicPageTarget } from './career-playbook-public-pages';
+
 export type CareerPlaybookLiveSmokeMode = 'plan' | 'mutation-smoke';
+export type { CareerPlaybookLiveSmokeLanguage } from './career-playbook-live-smoke-fixtures';
 export type CareerPlaybookLiveSmokeTarget =
   | 'local'
   | 'development'
@@ -47,6 +67,14 @@ export interface CareerPlaybookLiveSmokeOptions {
   pollIntervalMs?: number;
   includeCourseBridge?: boolean;
   resumePlaybookId?: string;
+  /** Origin of the Next.js app; derived from `trpcUrl` when absent. */
+  webBaseUrl?: string;
+  /**
+   * Guide language for the fixture. Defaults to `en`, which every stored run
+   * since 2026-08-30 used; `ru` exists because nothing had measured Russian
+   * generation since 2026-08-22, three weeks of quality work earlier.
+   */
+  contentLanguage?: CareerPlaybookLiveSmokeLanguage;
 }
 
 export interface CareerPlaybookLiveSmokeCheck {
@@ -108,6 +136,18 @@ export interface CareerPlaybookLiveSmokeLibraryDetail {
   completedAt?: string | null;
 }
 
+/** The subset of the public share response the page URLs are built from. */
+export interface CareerPlaybookLiveSmokePublicShare {
+  shareSlug?: string | null;
+  organizationSlug?: string | null;
+  language?: string | null;
+}
+
+export interface CareerPlaybookLiveSmokeViewLinks {
+  isPublic: boolean;
+  links: Array<{ audience: string; path: string }>;
+}
+
 export interface CareerPlaybookLiveSmokeClient {
   startSession: (input: { language: Language }) => Promise<CareerPlaybookLiveSmokeSessionResponse>;
   submitAnswer: (input: {
@@ -134,6 +174,9 @@ export interface CareerPlaybookLiveSmokeClient {
     isPublic: boolean;
   }) => Promise<{ shareSlug: string | null; isPublic: boolean }>;
   getPublicShare: (input: { shareSlug: string }) => Promise<unknown>;
+  listViewLinks: (input: {
+    playbookId: string;
+  }) => Promise<CareerPlaybookLiveSmokeViewLinks | null>;
   createCourseFromPlaybook: (input: {
     playbookId: string;
     includeWebResearch: boolean;
@@ -147,6 +190,8 @@ export interface CareerPlaybookLiveSmokeDependencies {
   client?: CareerPlaybookLiveSmokeClient;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
+  /** Injected so the page gate is testable without a network. */
+  fetchPage?: (url: string) => Promise<{ status: number }>;
 }
 
 export type CareerPlaybookCleanupItemType =
@@ -200,27 +245,7 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
  */
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
-const SALES_MANAGER_B2B_FIXED_ANSWERS: CareerPlaybookFixedAnswer[] = [
-  { question_key: 'position', value: 'Sales Manager B2B' },
-  { question_key: 'department', value: 'sales' },
-  { question_key: 'level', value: 'lead' },
-  { question_key: 'reporting', value: 'Reports to CRO. Leads SDR and AE team.' },
-  { question_key: 'team_size', value: '51-200' },
-  { question_key: 'company_stage', value: 'growth' },
-  { question_key: 'content_language', value: 'en' },
-];
-
-const LIVE_SMOKE_BUSINESS_CONTEXT: CareerPlaybookAnswerSubmission = {
-  business_context: {
-    mode: 'universal',
-    status: 'skipped',
-    digest: null,
-    source_ids: [],
-    skip_reason: 'live_smoke_universal_business_context',
-  },
-};
-
-function hasValue(value: string | undefined): value is string {
+function hasValue(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
@@ -412,12 +437,6 @@ export function buildCareerPlaybookLiveSmokePlan(
   };
 }
 
-function fixedAnswerRecord(): Record<string, CareerPlaybookFixedAnswer> {
-  return Object.fromEntries(
-    SALES_MANAGER_B2B_FIXED_ANSWERS.map(answer => [answer.question_key, answer])
-  );
-}
-
 function followupAnswerFor(
   question: CareerPlaybookFollowupQuestion
 ): CareerPlaybookAnswerSubmission {
@@ -454,6 +473,10 @@ function pdfStartsWithHeader(pdfBase64: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isPublicShareResponse(value: unknown): value is CareerPlaybookLiveSmokePublicShare {
+  return Boolean(value) && typeof value === 'object';
 }
 
 async function waitForCompletion(
@@ -605,13 +628,14 @@ export async function runCareerPlaybookLiveSmoke(
   }
 
   const resumePlaybookId = options.resumePlaybookId?.trim();
+  const contentLanguage = options.contentLanguage ?? 'en';
   let playbookId = resumePlaybookId;
 
   if (!playbookId) {
-    const session = await client.startSession({ language: 'en' });
+    const session = await client.startSession({ language: contentLanguage });
     playbookId = session.playbookId;
 
-    for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS) {
+    for (const fixedAnswer of SALES_MANAGER_B2B_FIXED_ANSWERS[contentLanguage]) {
       await client.submitAnswer({
         playbookId,
         phase: 'fixed',
@@ -630,9 +654,9 @@ export async function runCareerPlaybookLiveSmoke(
 
     const followups = await client.requestFollowups({
       playbookId,
-      fixedAnswers: fixedAnswerRecord(),
+      fixedAnswers: careerPlaybookFixedAnswerRecord(contentLanguage),
       followupAnswers: {},
-      contentLanguage: 'en',
+      contentLanguage,
     });
 
     for (const question of followups.questions) {
@@ -657,9 +681,31 @@ export async function runCareerPlaybookLiveSmoke(
       }
     : undefined;
   const share = await client.toggleShare({ playbookId, isPublic: true });
+  let publicShare: CareerPlaybookLiveSmokePublicShare | null = null;
   if (share.shareSlug) {
-    await client.getPublicShare({ shareSlug: share.shareSlug });
+    const response = await client.getPublicShare({ shareSlug: share.shareSlug });
+    publicShare = isPublicShareResponse(response) ? response : null;
   }
+
+  // The tRPC query above answers correctly for a guide whose every public page
+  // is a 500 (mc2-j8ms8). Fetch the pages themselves and record their status.
+  const webBaseUrl = resolveCareerPlaybookWebBaseUrl(options, env);
+  const viewLinks = share.shareSlug
+    ? await client.listViewLinks({ playbookId }).catch(() => null)
+    : null;
+  const pageTargets = webBaseUrl
+    ? buildCareerPlaybookPublicPageTargets({
+        baseUrl: webBaseUrl,
+        locale: publicShare?.language,
+        shareSlug: share.shareSlug,
+        organizationSlug: publicShare?.organizationSlug,
+        viewLinks: viewLinks?.links,
+      })
+    : [];
+  const sharePages: CareerPlaybookSmokePageEvidence[] = await fetchPublicPageEvidence(
+    pageTargets,
+    dependencies.fetchPage ?? defaultPageFetcher
+  );
 
   let courseId: string | undefined;
   let sourceDocumentIds: string[] = [];
@@ -694,6 +740,7 @@ export async function runCareerPlaybookLiveSmoke(
       isPublic: share.isPublic,
       shareSlug: share.shareSlug,
       publicFetchOk: Boolean(share.shareSlug),
+      pages: sharePages,
     },
     courseBridge: options.includeCourseBridge
       ? {

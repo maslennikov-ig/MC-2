@@ -80,7 +80,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
     };
@@ -152,7 +152,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
     };
@@ -164,7 +164,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     expect(result.summary_metadata.quality_check_passed).toBe(true);
     expect(result.summary_metadata.retry_attempts).toBe(2); // 2 retries before success
     expect(result.summary_metadata.retry_strategy_changes).toContain(
-      'model: gpt-oss-20b → deepseek/deepseek-v4-flash'
+      'model: glm-5.3-flash → deepseek/deepseek-v4-flash'
     );
 
     // Verify quality validator called 3 times (original + 2 retries)
@@ -204,7 +204,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
     };
@@ -260,7 +260,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
       no_summary_threshold_tokens: 3000,
@@ -336,7 +336,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
       no_summary_threshold_tokens: 3000,
@@ -362,7 +362,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
    *
    * Scenario:
    * - Retry #1: Strategy switch (skipped)
-   * - Retry #2: Model upgrade (gpt-oss-20b → deepseek-v4-flash)
+   * - Retry #2: Model upgrade (glm-5.3-flash → deepseek-v4-flash)
    * - Retry #3: Token budget increase (200K → 250K)
    * - Verify retry_strategy_changes includes token budget change
    *
@@ -430,7 +430,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
       language: 'en',
       topic: 'Test Topic',
       strategy: 'hierarchical',
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       quality_threshold: 0.75,
       max_output_tokens: 200000,
     };
@@ -440,7 +440,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     // Assertions
     expect(result.summary_metadata.retry_attempts).toBe(3);
     expect(result.summary_metadata.retry_strategy_changes).toContain(
-      'model: gpt-oss-20b → deepseek/deepseek-v4-flash'
+      'model: glm-5.3-flash → deepseek/deepseek-v4-flash'
     );
     expect(result.summary_metadata.retry_strategy_changes).toContain('max_tokens: 200K → 250K');
 

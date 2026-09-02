@@ -402,10 +402,10 @@ describe('model-config-service', () => {
 describe('model pricing health check (IMP-4)', () => {
   it('reports an unknown/deprecated model id as unpriced and a known catalog model as priced', () => {
     const result = checkPhaseModelPricingHealth({
-      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'openai/gpt-oss-20b' },
+      known_phase: { modelId: 'deepseek/deepseek-v4-flash', fallbackModelId: 'z-ai/glm-5.3-flash' },
       drifted_phase: {
         modelId: 'openai/gpt-oss-120b', // retired/deprecated id, no pricing entry
-        fallbackModelId: 'deepseek/deepseek-v4-pro',
+        fallbackModelId: 'openai/gpt-5.6-luna',
       },
     });
 
@@ -415,7 +415,7 @@ describe('model pricing health check (IMP-4)', () => {
     ]);
     // Distinct, sorted, and only the priced models are silently accepted.
     expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-flash');
-    expect(result.checkedModelIds).toContain('deepseek/deepseek-v4-pro');
+    expect(result.checkedModelIds).toContain('openai/gpt-5.6-luna');
     expect(result.missingPhases).toEqual([]);
   });
 
@@ -423,7 +423,7 @@ describe('model pricing health check (IMP-4)', () => {
     const result = checkPhaseModelPricingHealth({
       phase_a: {
         modelId: 'deepseek/deepseek-v4-flash',
-        fallbackModelId: 'deepseek/deepseek-v4-pro',
+        fallbackModelId: 'openai/gpt-5.6-luna',
       },
       phase_b: { modelId: EMERGENCY_FALLBACK_MODEL },
     });

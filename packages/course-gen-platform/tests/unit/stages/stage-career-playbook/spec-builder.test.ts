@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CareerPlaybookQAData } from '@megacampus/shared-types';
+import { CAREER_PLAYBOOK_BLOCK_CATALOG, type CareerPlaybookQAData } from '@megacampus/shared-types';
 import {
   applyCareerPlaybookLedgers,
   CAREER_PLAYBOOK_SPEC_MAX_TOKENS,
@@ -16,7 +16,9 @@ import { careerPlaybookPrompts } from '@/shared/prompts/career-playbook-prompts'
 import {
   CAREER_PLAYBOOK_CANONICAL_BLOCK_TOPICS,
   CAREER_PLAYBOOK_CANONICAL_BOUNDARY_BLOCKS,
+  type CareerPlaybookCanonicalBlockTopic,
 } from '@/shared/prompts/career-playbook-block-topics';
+import { canonicalBlockAliasesOverlap } from '@/stages/stage-career-playbook/nodes/spec-builder-canonical';
 
 const qaData: CareerPlaybookQAData = {
   fixed: [
@@ -229,13 +231,22 @@ describe('Career Playbook spec builder', () => {
     expect(parsedWithStrings.context.region).toBe('EMEA');
   });
 
-  it('builds exactly three role-specific web research queries', () => {
+  it('builds role-specific web research queries plus a primary-research lane', () => {
     const queries = buildCareerPlaybookResearchQueries(qaData);
 
-    expect(queries).toHaveLength(3);
-    expect(queries.map(query => query.category)).toEqual(['kpis', 'trends', 'onboarding']);
+    expect(queries).toHaveLength(4);
+    expect(queries.map(query => query.category)).toEqual([
+      'kpis',
+      'trends',
+      'onboarding',
+      'research',
+    ]);
     expect(queries[0].query).toContain('B2B Sales Manager');
     expect(queries[1].query).toContain('2026');
+    // The lane that gives a named analyst house somewhere to point (mc2-r1qen):
+    // only this one is restricted to the publishers the classifier calls research.
+    expect(queries[3].includeDomains).toContain('gartner.com');
+    expect(queries.slice(0, 3).every(query => query.includeDomains === undefined)).toBe(true);
   });
 
   it('builds spec prompt variables with client business context separated from web research', () => {
@@ -273,7 +284,7 @@ describe('Career Playbook spec builder', () => {
     expect(research.trends_insights).toEqual([]);
     expect(research.onboarding_insights).toEqual([]);
     expect(research.sources).toEqual([]);
-    expect(research.errors).toHaveLength(3);
+    expect(research.errors).toHaveLength(4);
   });
 
   it('retries spec generation with fallback model instructions when primary output fails schema validation', async () => {
@@ -405,15 +416,106 @@ describe('Career Playbook spec builder', () => {
     expect(spec.block_boundaries.block_11.primary_topics).toEqual(['career growth']);
     expect(spec.block_boundaries.block_23.primary_topics).toEqual(['continuity protocol']);
     expect(spec.block_boundaries.block_25.primary_topics[0]).toContain('MegaCampus');
-    // Foreign topic dropped and self-contradicting do_not_repeat stripped.
+    // Foreign topic is dropped and the canonical deterministic guard excludes self.
     expect(spec.block_boundaries.block_11.primary_topics).not.toContain(
       'Forecasting / Revenue Projections'
     );
-    expect(spec.block_boundaries.block_11.do_not_repeat).toEqual([]);
+    expect(spec.block_boundaries.block_11.do_not_repeat).not.toContain('career growth');
+    expect(spec.block_boundaries.block_11.do_not_repeat).toContain('candidate profile');
     // Every content block has a canonical boundary and no deviations remain.
     expect(Object.keys(spec.block_boundaries)).toHaveLength(26);
     expect(findCanonicalBlockTopicDeviations(spec)).toEqual([]);
     expect(changedBlockIds).toEqual(expect.arrayContaining(['block_11', 'block_23', 'block_25']));
+  });
+
+  it('derives an exact audience-scoped do_not_repeat list independent of model output', () => {
+    const modelAnswerA = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...canonicalRoleProfileSpec,
+        block_boundaries: {
+          ...canonicalBlockBoundaries(),
+          block_9: {
+            primary_topics: ['human-AI collaboration'],
+            do_not_repeat: ['candidate profile', 'failure modes'],
+          },
+        },
+      })
+    );
+    const modelAnswerB = parseRoleProfileSpecFromLLM(
+      JSON.stringify({
+        ...canonicalRoleProfileSpec,
+        block_boundaries: {
+          ...canonicalBlockBoundaries(),
+          block_9: {
+            primary_topics: ['human-AI collaboration'],
+            do_not_repeat: ['whatever the model happens to invent'],
+          },
+        },
+      })
+    );
+
+    const normalizedA = normalizeRoleProfileSpecToCanonicalBlockTopics(modelAnswerA).spec;
+    const normalizedB = normalizeRoleProfileSpecToCanonicalBlockTopics(modelAnswerB).spec;
+    const exactEmployeePeers = [
+      'mission and key results',
+      'anti-goals',
+      'responsibility zones',
+      'duties and cadence',
+      'decision authority matrix',
+      'KPI and metrics',
+      'tools and technologies',
+      'dependencies and collaboration',
+      'career growth',
+      'typical working day',
+      'onboarding plan',
+      'processes and workflows',
+      'FAQ',
+      'industry context',
+      'business goals alignment',
+      'working-with-me README',
+      'role canvas',
+      'footer, revision cadence, and MegaCampus CTA',
+    ];
+
+    expect(normalizedA.block_boundaries.block_9.do_not_repeat).toEqual(exactEmployeePeers);
+    expect(normalizedB.block_boundaries.block_9.do_not_repeat).toEqual(exactEmployeePeers);
+    expect(normalizedA.block_boundaries).toEqual(normalizedB.block_boundaries);
+
+    const employeeOnly = CAREER_PLAYBOOK_BLOCK_CATALOG.find(block => block.blockId === 'block_9')!;
+    const candidateProfile = CAREER_PLAYBOOK_BLOCK_CATALOG.find(
+      block => block.blockId === 'block_12'
+    )!;
+    expect(
+      employeeOnly.audiences.some(audience => candidateProfile.audiences.includes(audience))
+    ).toBe(false);
+    expect(normalizedA.block_boundaries.block_9.do_not_repeat).not.toContain('candidate profile');
+  });
+
+  it('treats a normalized alias intersection as overlap for do_not_repeat routing', () => {
+    const left: CareerPlaybookCanonicalBlockTopic = {
+      blockId: 'block_1',
+      title: 'Left',
+      primaryTopic: 'left topic',
+      aliases: ['Shared Alias!'],
+      hasBoundaries: true,
+    };
+    const overlapping: CareerPlaybookCanonicalBlockTopic = {
+      blockId: 'block_2',
+      title: 'Overlapping',
+      primaryTopic: 'overlapping topic',
+      aliases: ['shared alias'],
+      hasBoundaries: true,
+    };
+    const distinct: CareerPlaybookCanonicalBlockTopic = {
+      blockId: 'block_3',
+      title: 'Distinct',
+      primaryTopic: 'distinct topic',
+      aliases: ['different alias'],
+      hasBoundaries: true,
+    };
+
+    expect(canonicalBlockAliasesOverlap(left, overlapping)).toBe(true);
+    expect(canonicalBlockAliasesOverlap(left, distinct)).toBe(false);
   });
 
   it('preserves role-specific wording that still belongs to the block', () => {

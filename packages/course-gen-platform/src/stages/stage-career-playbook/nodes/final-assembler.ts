@@ -1,11 +1,18 @@
 import type {
+  CareerPlaybookAudience,
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookMetricLedgerEntry,
   CareerPlaybookQualityIssue,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
+import {
+  CAREER_PLAYBOOK_BLOCK_CATALOG,
+  careerPlaybookViewerReceivesBlock,
+} from '@megacampus/shared-types';
 import type { CareerPlaybookGraphStateType, CareerPlaybookGraphStateUpdate } from '../state';
 import { remediateCareerPlaybookMermaidBlocks } from './mermaid-quality';
+import { CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE } from './quality-ledger';
 
 export const CAREER_PLAYBOOK_FINAL_BLOCK_ORDER: CareerPlaybookBlockId[] = [
   'header',
@@ -217,16 +224,43 @@ function formatFillableField(rawLabel: string, language: string): string {
   return language === 'ru' ? `поле для заполнения: ${label}` : `field to fill: ${label}`;
 }
 
-export function shouldTreatBracketAsFillableField(label: string): boolean {
-  const normalized = label.trim().toLocaleLowerCase('ru');
-  return (
-    /^(имя|name)$/.test(normalized) ||
-    /^(число|number|value)$/.test(normalized) ||
-    /^(дата|date|dd\.mm\.yyyy|дд\.мм\.гггг)(?:\b|$)/.test(normalized) ||
-    /^(url|ссылка|link)(?:\b|$)/.test(normalized) ||
-    /^название(?: компании)?$/.test(normalized) ||
-    /^company name$/.test(normalized)
-  );
+/** An evidence citation, `[S3]`. */
+const EVIDENCE_CITATION = /^S\d+$/;
+/** A markdown task box, `[ ]` or `[x]`. */
+const TASK_BOX = /^[ xX]$/;
+
+/**
+ * Is a bracketed token a fill-in field rather than markdown syntax?
+ *
+ * This was a whitelist of six labels — name, number, date, url, title, company
+ * name — chosen to avoid false positives. Measured on all 19 stored playbooks it
+ * matched **11 of 158** bracketed tokens, and 13 of those playbooks shipped at
+ * least one raw placeholder to a reader: `[Заполняется]`, `[Enter date]`,
+ * `[поле для заполнения]`, `[ФИО, должность]`, `[краткое описание]`,
+ * `[research: onboarding insights]` — that last one a prompt variable name the
+ * model echoed into an onboarding table, twice.
+ *
+ * So the test is inverted. A bracket in reader-facing prose is a fill-in field
+ * unless it is markdown: an inline or reference link, an evidence citation, or a
+ * task box. Across those 19 playbooks the inverted rule produced no false
+ * positive at all, which is the evidence the whitelist never had.
+ *
+ * The caller supplies the surrounding characters, because a link is only
+ * recognisable from them: `[text](url)` and `[text][ref]` by what follows, and
+ * the `[ref]` half of a reference link by what precedes it.
+ */
+export function shouldTreatBracketAsFillableField(
+  label: string,
+  nextChar?: string,
+  previousChar?: string
+): boolean {
+  if (nextChar === '(' || nextChar === '[') return false;
+  if (previousChar === ']') return false;
+
+  const normalized = label.trim();
+  if (normalized.length === 0) return false;
+
+  return !EVIDENCE_CITATION.test(normalized) && !TASK_BOX.test(normalized);
 }
 
 export function shouldTreatBraceAsFillableField(label: string): boolean {
@@ -253,8 +287,9 @@ function normalizeFillablePlaceholders(content: string, language: string): strin
       const withBrackets = line.replace(
         /\[([^\]\n]{2,80})\]/g,
         (match: string, label: string, offset: number) => {
-          const nextChar = line[offset + match.length];
-          if (nextChar === '(' || !shouldTreatBracketAsFillableField(label)) {
+          if (
+            !shouldTreatBracketAsFillableField(label, line[offset + match.length], line[offset - 1])
+          ) {
             return match;
           }
 
@@ -409,22 +444,64 @@ const CALIBRATION_HEADING = {
 } as const;
 
 const CALIBRATION_INTRO = {
-  en: 'Every value below carries the example marker and must be replaced with real company data before this guide is published.',
-  ru: 'Каждое значение ниже помечено как пример и должно быть заменено реальными данными компании до публикации.',
+  en: 'Every value below is either marked as an example or rests on an assumed threshold. Replace or confirm each against real company data before this guide is published.',
+  ru: 'Каждое значение ниже либо помечено как пример, либо опирается на предполагаемый порог. До публикации замените или подтвердите каждое по реальным данным компании.',
+} as const;
+
+/**
+ * Why an assumed metric target is on the list, said to the person calibrating.
+ *
+ * The wording is deliberately not "replace": a threshold the company already
+ * runs at needs confirming, not changing. Only its provenance is in question.
+ */
+const CALIBRATION_ASSUMED_METRIC = {
+  en: 'assumed threshold, not company data — confirm against your own baseline before publishing',
+  ru: 'предполагаемый порог, не данные компании — подтвердите по своим базовым данным до публикации',
 } as const;
 
 const CALIBRATION_COLUMNS = {
-  en: '| Block | Value to replace | Context |',
-  ru: '| Блок | Значение к замене | Контекст |',
+  en: '| Section | Value to replace | Context |',
+  ru: '| Раздел | Значение к замене | Контекст |',
 } as const;
 
-/** Marker forms the guide may use, matching the deterministic check. */
-const EXAMPLE_MARKER_GLOBAL = /\([^)]*\b(?:пример|example)\b[^)]*(?:заменит[ьи]|replace)[^)]*\)/gi;
+/** Marker forms the guide may use, from the one source the deterministic check reads. */
+const EXAMPLE_MARKER_GLOBAL = new RegExp(CAREER_PLAYBOOK_EXAMPLE_MARKER_SOURCE, 'gi');
+
+/**
+ * The scorecard's home, used as the Section label for a metric row.
+ *
+ * A threshold appears in eight blocks; the one the reader edits it in is the
+ * scorecard. Naming it by its own heading keeps the row inside the citation
+ * rule, exactly as every other row is named.
+ */
+const METRIC_LEDGER_HOME_BLOCK: CareerPlaybookBlockId = 'block_6';
 
 export interface CareerPlaybookCalibrationItem {
   blockId: CareerPlaybookBlockId;
   value: string;
   context: string;
+}
+
+/**
+ * Cut to `limit` characters on a word boundary, marking the side that was cut.
+ *
+ * Run `88fc2368` published rows opening mid-word — "…d escalation map are
+ * current as of the last quarterly playbook" — because both columns sliced at a
+ * fixed offset. A calibration row is read by a manager deciding what to replace;
+ * a fragment starting inside a word costs them a lookup.
+ */
+function truncateOnWord(text: string, limit: number, side: 'start' | 'end'): string {
+  if (text.length <= limit) return text;
+
+  if (side === 'end') {
+    const head = text.slice(0, limit);
+    const cut = head.lastIndexOf(' ');
+    return `${(cut > limit / 2 ? head.slice(0, cut) : head).trimEnd()}…`;
+  }
+
+  const tail = text.slice(-limit);
+  const cut = tail.indexOf(' ');
+  return `…${(cut >= 0 && cut < limit / 2 ? tail.slice(cut + 1) : tail).trimStart()}`;
 }
 
 /** Strip table pipes and emphasis so a captured fragment reads as plain text. */
@@ -483,24 +560,118 @@ export function collectCareerPlaybookCalibrationItems(
       const line = rawLine.trim();
       if (!line) continue;
 
-      for (const match of line.matchAll(EXAMPLE_MARKER_GLOBAL)) {
-        const value = valueBeforeMarker(line, match.index ?? 0);
-        if (!value) continue;
+      const values = [...line.matchAll(EXAMPLE_MARKER_GLOBAL)]
+        .map(match => valueBeforeMarker(line, match.index ?? 0))
+        .filter(Boolean);
+      if (values.length === 0) continue;
 
+      const context = truncateOnWord(toPlainFragment(line), 120, 'end');
+
+      // In a table the row is the unit of calibration; in prose the value is.
+      // The continuity protocol marks every cell it owns, so a row per marker
+      // put that one table into sixteen of run `88fc2368`'s twenty-nine rows —
+      // "Backup", "Handover state", "Senior AE", "not yet run one solo" — each
+      // asking for the same edit. A prose line, by contrast, carries genuinely
+      // separate values: "base $120,000 ... and a $5,000 offsite".
+      if (line.startsWith('|')) {
         items.push({
           blockId,
-          value: value.length > 90 ? `…${value.slice(-89)}` : value,
-          context: toPlainFragment(line).slice(0, 120),
+          value: truncateOnWord([...new Set(values)].join('; '), 90, 'start'),
+          context,
         });
+        continue;
+      }
+
+      for (const value of values) {
+        items.push({ blockId, value: truncateOnWord(value, 90, 'start'), context });
       }
     }
   }
 
-  return items;
+  return dedupeCalibrationItems(items);
 }
 
-function blockLabel(blockId: CareerPlaybookBlockId): string {
-  return blockId === 'header' ? 'Header' : `Block ${blockId.replace('block_', '')}`;
+/**
+ * One row per value to calibrate, not one per marker occurrence.
+ *
+ * A table cell whose every column is marked yields a marker per cell, so run
+ * `88fc2368` listed the continuity protocol's backup table sixteen times — as
+ * "Backup", "Handover state", "Senior AE", "not yet run one solo" — out of
+ * twenty-nine rows. Same block and same value is the same instruction to the
+ * person calibrating, however many markers produced it.
+ */
+function dedupeCalibrationItems(
+  items: readonly CareerPlaybookCalibrationItem[]
+): CareerPlaybookCalibrationItem[] {
+  const seen = new Set<string>();
+
+  return items.filter(item => {
+    const key = `${item.blockId}::${item.value.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * The rows the example marker structurally cannot produce: metric targets the
+ * model assumed rather than read from the company.
+ *
+ * A metric value never carries the marker, and that is deliberate — the ledger
+ * is the single source, and a marked threshold would let blocks drift from it.
+ * The cost was that the checklist built from markers could never name a
+ * threshold. Run `88fc2368` listed twenty-nine values to calibrate — peer-buddy
+ * hours, backup names, a salary benchmark — and none of the six assumed numbers
+ * the role is actually judged against, while block 1 of the same guide told the
+ * reader those six needed validating within the first quarter.
+ *
+ * `user_answer` and `company_source` rows stay off the list: those the company
+ * already gave us.
+ */
+export function collectCareerPlaybookAssumedMetricItems(
+  metricLedger: readonly CareerPlaybookMetricLedgerEntry[],
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  language: 'en' | 'ru'
+): CareerPlaybookCalibrationItem[] {
+  return metricLedger
+    .filter(metric => metric.provenance === 'assumption' || metric.provenance === 'benchmark')
+    .map(metric => ({
+      blockId: METRIC_LEDGER_HOME_BLOCK,
+      value: truncateOnWord(
+        `${metric.label} — ${metric.target}${metric.unit && !metric.target.includes(metric.unit) ? ` ${metric.unit}` : ''}`,
+        90,
+        'start'
+      ),
+      context: CALIBRATION_ASSUMED_METRIC[language],
+    }))
+    .filter(item => Boolean(sectionLabel(item.blockId, generatedBlocks)));
+}
+
+/**
+ * Name a calibration row's home by its section title, never as "Block N".
+ *
+ * This table is application-built and appended into block 26, which the manager
+ * and HR read — and it scans every block, most of which neither of them holds.
+ * Labelling the rows "Block 8", "Block 11", "Block 23" therefore wrote 27
+ * unfollowable pointers into the 2026-08-30 run, more than the whole rest of the
+ * guide produced, and no amount of prompt work or regeneration could remove
+ * them: they are re-appended at every assembly. The title says what kind of
+ * value it is, which is what someone calibrating the guide actually needs, and
+ * sends nobody to a page they were not given.
+ *
+ * Read from the block's own heading so it is the guide's real, localized wording
+ * rather than a second English copy of it; the leading number goes with it,
+ * because a number is the pointer this exists to avoid.
+ */
+function sectionLabel(
+  blockId: CareerPlaybookBlockId,
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>
+): string {
+  const heading = generatedBlocks[blockId]?.content?.match(/^##[ \t]+(.+)$/m)?.[1];
+  const title = heading?.replace(/^\s*\d{1,2}\s*[.)]\s*/, '').trim();
+  if (title) return title;
+
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.find(block => block.blockId === blockId)?.title ?? blockId;
 }
 
 /**
@@ -516,26 +687,46 @@ export function appendCareerPlaybookCalibrationTable(
   const checklist = generatedBlocks.block_26;
   if (!checklist) return generatedBlocks;
 
-  const items = collectCareerPlaybookCalibrationItems(generatedBlocks);
+  const language = resolveContentLanguage(roleProfileSpec);
+  const items = [
+    // Assumed thresholds first: they are the values the reader is judged on.
+    ...collectCareerPlaybookAssumedMetricItems(
+      roleProfileSpec?.metric_ledger ?? [],
+      generatedBlocks,
+      language
+    ),
+    ...collectCareerPlaybookCalibrationItems(generatedBlocks),
+  ];
   if (items.length === 0) return generatedBlocks;
 
-  const language = resolveContentLanguage(roleProfileSpec);
   const heading = CALIBRATION_HEADING[language];
 
   // Drop a model-written section with the same purpose so the document does not
   // carry two lists that disagree, bounded by the next third-level heading or the
   // end of the block. Built with String.raw because a template literal silently
   // turns [\s\S] into [sS], which quietly removed only the heading line.
-  const modelSection = new RegExp(
-    String.raw`^###[ \t]+(?:` +
-      `${escapeRegExp(CALIBRATION_HEADING.en)}|${escapeRegExp(CALIBRATION_HEADING.ru)}` +
-      String.raw`)[^\n]*\n(?:(?!^###[ \t])[\s\S])*`,
+  // The heading is a prefix, not the whole line. Run `88fc2368` wrote
+  // "**Calibrate before publishing — replace every value marked as an example**",
+  // and a pattern that demanded the closing `**` right after the heading text
+  // matched nothing — so the reader met two "Calibrate before publishing"
+  // headings in a row, the model's list and this table.
+  const localizedHeadings = `${escapeRegExp(CALIBRATION_HEADING.en)}|${escapeRegExp(CALIBRATION_HEADING.ru)}`;
+  const boldModelSection = new RegExp(
+    String.raw`^\*\*[ \t]*(?:${localizedHeadings})[^\n]*\*\*[^\n]*\n` +
+      String.raw`(?:(?!^(?:#{1,6}[ \t]+|\*\*[^*\n]+\*\*[ \t]*$))[\s\S])*`,
     'im'
   );
-  const withoutModelSection = checklist.content.replace(modelSection, '').trim();
+  const markdownModelSection = new RegExp(
+    String.raw`^###[ \t]+(?:${localizedHeadings})[^\n]*\n(?:(?!^###[ \t])[\s\S])*`,
+    'im'
+  );
+  const withoutModelSection = checklist.content
+    .replace(boldModelSection, '')
+    .replace(markdownModelSection, '')
+    .trim();
 
   const rows = items.map(
-    item => `| ${blockLabel(item.blockId)} | ${item.value} | ${item.context} |`
+    item => `| ${sectionLabel(item.blockId, generatedBlocks)} | ${item.value} | ${item.context} |`
   );
 
   return {
@@ -582,6 +773,45 @@ export function joinCareerPlaybookFinalBlocks(
   return CAREER_PLAYBOOK_FINAL_BLOCK_ORDER.map(blockId => generatedBlocks[blockId]?.content.trim())
     .filter((content): content is string => Boolean(content))
     .join('\n\n');
+}
+
+/**
+ * Assemble one reader's view from the canonical generated block store.
+ *
+ * Membership follows the reading hierarchy, not the block's audience list: the
+ * employee sees only their own guide, the manager also sees the employee's, HR
+ * sees the whole document (owner, 2026-08-31).
+ *
+ * Takes raw stored blocks, so it produces a view WITHOUT the diagrams, sources
+ * section and calibration table that assembly adds. Anything a reader actually
+ * receives goes through {@link buildRoleGuideViewFromSpec}.
+ */
+export function buildRoleGuideView(
+  generatedBlocks: Partial<Record<CareerPlaybookBlockId, CareerPlaybookBlockState>>,
+  viewer: CareerPlaybookAudience
+): string {
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.filter(block =>
+    careerPlaybookViewerReceivesBlock(viewer, block.blockId)
+  )
+    .map(block => generatedBlocks[block.blockId]?.content.trim())
+    .filter((content): content is string => Boolean(content))
+    .join('\n\n');
+}
+
+/**
+ * The view a reader is actually served: assembled first, then filtered.
+ *
+ * `buildRoleGuideView` reads the stored blocks, which carry no diagrams, no
+ * sources section and no calibration table — those are appended during
+ * assembly. Serving a view straight from stored blocks would hand the reader a
+ * document missing all three, which is why `mc2-ehao2` says a view must not
+ * ship until it goes through assembly.
+ */
+export function buildRoleGuideViewFromSpec(
+  input: AssembleCareerPlaybookFinalMarkdownInput,
+  viewer: CareerPlaybookAudience
+): string {
+  return buildRoleGuideView(prepareCareerPlaybookFinalBlocks(input), viewer);
 }
 
 export function assembleCareerPlaybookFinalMarkdown(

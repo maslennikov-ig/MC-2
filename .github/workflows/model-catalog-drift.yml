@@ -83,10 +83,30 @@ jobs:
       # The snapshot beside the catalogue is rewritten too, so this proves the
       # pair still agree before anything is pushed. A sync that leaves the tree
       # red is worse than one that never ran.
+      #
+      # The placeholders are the same ones `pnpm test:unit` runs under in the
+      # main pipeline, and they are not optional: `tests/setup-unit.ts` throws
+      # on a missing `SUPABASE_URL` before a single test is collected. Without
+      # them this step failed on 2026-08-28 — the only night the write mode ever
+      # ran — and the commit below is gated on this step, so the job had applied
+      # the new rates, thrown them away with the runner, and reported failure.
+      # Two months of nightly syncs delivered nothing (mc2-rhyac).
       - name: Prove the catalogue and its snapshot still agree
         if: steps.drift.outputs.status == '0'
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_KEY: test-service-key
+          SUPABASE_ANON_KEY: test-anon-key
+          OPENROUTER_API_KEY: test-openrouter-key
         run: |
+          # All three, not just the catalogue's own package: both test files
+          # reach `shared/logger`, which imports `@megacampus/shared-logger` from
+          # its build output. A workspace package with no `dist` fails to resolve
+          # before a test is collected, and it never showed locally because the
+          # `dist` is already there.
           pnpm -F shared-types build
+          pnpm -F shared-logger build
+          pnpm -F shared-utils build
           pnpm -F course-gen-platform exec vitest run --config vitest.config.unit.ts \
             tests/unit/model-catalog-coverage.test.ts \
             tests/unit/stages/stage5-generation/cost-calculator.test.ts
@@ -128,6 +148,30 @@ jobs:
             'Порог — 1.5x, столько же, во сколько раз потолок `max_price` строится от цены. За ним замороженная цена начинает отбивать вызовы.' \
             '' \
             '```' "$moves" '```' \
+            '' \
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg c "$TELEGRAM_CHAT_ID" --arg t "$text" \
+                  '{chat_id:$c, text:$t, parse_mode:"Markdown"}')" >/dev/null
+
+      # A sync that stops before its commit step delivers nothing, and until
+      # 2026-08-29 it said so only in a run list nobody reads: the write mode
+      # ran once, failed on a missing test variable, and the catalogue kept the
+      # rates it had. The point of a job that fixes something by itself is that
+      # nobody watches it, so its silence has to be the loud thing.
+      - name: Say so in Telegram when the sync itself failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          text=$(printf '%s\n' \
+            '*Ночная сверка цен не доехала*' \
+            '' \
+            'Задание упало до того, как записать новые цены в `develop`. Каталог остался с прежними значениями — это не авария, но чем дольше так, тем выше шанс, что замороженный потолок `max_price` начнёт отбивать вызовы.' \
             '' \
             "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
           curl -sS --fail-with-body -X POST \

@@ -17,7 +17,7 @@ vi.mock('@/shared/llm/langchain-models', async importOriginal => {
   return {
     ...actual,
     getModelForPhase: vi.fn().mockResolvedValue({
-      model: 'openai/gpt-oss-20b',
+      model: 'z-ai/glm-5.3-flash',
       invoke: vi.fn().mockResolvedValue({
         content: JSON.stringify({
           course_category: {
@@ -97,7 +97,7 @@ vi.mock('@/shared/regeneration', () => ({
           metadata: {
             layerUsed: 'pass-through',
             retryCount: 0,
-            modelsUsed: ['openai/gpt-oss-20b'],
+            modelsUsed: ['z-ai/glm-5.3-flash'],
           },
         });
       }),
@@ -181,7 +181,7 @@ describe('Phase 1 Classification Service', () => {
       expect(result.topic_analysis.domain_keywords.length).toBeLessThanOrEqual(15);
 
       // Validate metadata
-      expect(result.phase_metadata.model_used).toBe('openai/gpt-oss-20b');
+      expect(result.phase_metadata.model_used).toBe('z-ai/glm-5.3-flash');
       expect(result.phase_metadata.duration_ms).toBeGreaterThanOrEqual(0);
       expect(result.phase_metadata.retry_count).toBe(0);
     });
@@ -264,7 +264,7 @@ describe('Phase 1 Classification Service', () => {
         },
         phase_metadata: {
           duration_ms: 5000,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           tokens: { input: 1000, output: 500, total: 1500 },
           quality_score: 0.0,
           retry_count: 0,

@@ -29,7 +29,11 @@ vi.mock('@/src/i18n/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 
+const fetchViewLinks = vi.hoisted(() => vi.fn())
+
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
+  fetchCareerPlaybookViewLinks: (...args: unknown[]) =>
+    fetchViewLinks(...(args as [playbookId: string])),
   previewCourseFromPlaybook: (...args: unknown[]) =>
     previewCourseFromPlaybook(...(args as [input: { playbookId: string }])),
   createCourseFromPlaybook: (...args: unknown[]) =>
@@ -122,6 +126,9 @@ const messages = {
         readonlyBadge: 'Read-only',
         share: 'Share',
         copyPublicLink: 'Copy public link',
+        readerLinkEmployee: "Employee's link",
+        readerLinkManager: "Manager's link",
+        readerLinkHr: 'HR link',
         publicLinkCopied: 'Public link copied',
         publicLinkCopyError: 'Could not copy public link',
         makePrivate: 'Make private',
@@ -193,6 +200,29 @@ const messages = {
   },
 }
 
+/** A completed, public, owner-managed card — the only state that has links. */
+function publicItem() {
+  return {
+    id: 'pb-1',
+    title: 'Head of Sales',
+    department: 'sales',
+    level: 'lead',
+    status: 'completed' as const,
+    createdAt: '2026-05-14T10:00:00.000Z',
+    isPublic: true,
+    visibility: 'public' as const,
+    shareSlug: 'head-of-sales',
+    organizationSlug: 'mega-campus',
+    ownerId: 'owner-user',
+    viewerPermissions: {
+      canEdit: true,
+      canManageVisibility: true,
+      canCreateCourse: true,
+      canDelete: true,
+    },
+  }
+}
+
 function renderPage({
   filters = {
     search: undefined,
@@ -224,6 +254,8 @@ describe('CareerPlaybookLibraryPageClient', () => {
     updateVisibility.mockReset()
     copyToClipboard.mockReset()
     copyToClipboard.mockResolvedValue(true)
+    fetchViewLinks.mockReset()
+    fetchViewLinks.mockResolvedValue(null)
     mockSearchParams.forEach((_, key) => mockSearchParams.delete(key))
   })
 
@@ -587,11 +619,58 @@ describe('CareerPlaybookLibraryPageClient', () => {
       '/en/career-playbooks/mega-campus/head-of-sales'
     )
 
+    // The share control is a menu now, because a public playbook has four links
+    // and not one: the catalog link plus a link per reader. The catalog link is
+    // the first item, so the old one-click copy costs one extra click.
     await user.click(screen.getByRole('button', { name: 'Copy public link' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy public link' }))
     expect(copyToClipboard).toHaveBeenCalledWith(
       'http://localhost:3000/en/career-playbooks/mega-campus/head-of-sales'
     )
     expect(screen.getByText('Public link copied')).toBeInTheDocument()
+  })
+
+  it('offers a copyable link per reader once the server returns them', async () => {
+    fetchViewLinks.mockResolvedValue({
+      playbookId: 'pb-1',
+      isPublic: true,
+      links: [
+        { audience: 'employee', token: 't1', path: '/career-playbook/view/pb-1/t1' },
+        { audience: 'manager', token: 't2', path: '/career-playbook/view/pb-1/t2' },
+        { audience: 'hr', token: 't3', path: '/career-playbook/view/pb-1/t3' },
+      ],
+    })
+    const user = userEvent.setup()
+    renderPage({
+      initialData: {
+        items: [publicItem()],
+        nextCursor: null,
+        totalCount: 1,
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Copy public link' }))
+    await user.click(await screen.findByRole('menuitem', { name: "Manager's link" }))
+
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      'http://localhost:3000/en/career-playbook/view/pb-1/t2'
+    )
+  })
+
+  it('offers only the catalog link when the server hands out no reader links', async () => {
+    const user = userEvent.setup()
+    renderPage({
+      initialData: {
+        items: [publicItem()],
+        nextCursor: null,
+        totalCount: 1,
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Copy public link' }))
+    // A private or pre-procedure playbook: the menu shows one row rather than
+    // three that would open a page the server refuses.
+    expect(await screen.findAllByRole('menuitem')).toHaveLength(1)
   })
 
   it('uses server-provided department and level facets for catalog filters', () => {

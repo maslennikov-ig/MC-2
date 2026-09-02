@@ -38,7 +38,7 @@ describe('Phase 2: Scope Analysis', () => {
     },
     phase_metadata: {
       duration_ms: 5000,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 1000, output: 500, total: 1500 },
       quality_score: 0.92,
       retry_count: 0,
@@ -74,7 +74,7 @@ describe('Phase 2: Scope Analysis', () => {
         },
         phase_metadata: {
           duration_ms: 8000,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           tokens: { input: 1500, output: 800, total: 2300 },
           quality_score: 0.88,
           retry_count: 0,
@@ -121,7 +121,7 @@ describe('Phase 2: Scope Analysis', () => {
         },
         phase_metadata: {
           duration_ms: 5000,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           tokens: { input: 1000, output: 400, total: 1400 },
           quality_score: 0.85,
           retry_count: 0,
@@ -213,7 +213,7 @@ describe('Phase 2: Scope Analysis', () => {
         },
         phase_metadata: {
           duration_ms: 6000,
-          model_used: 'openai/gpt-oss-20b',
+          model_used: 'z-ai/glm-5.3-flash',
           tokens: { input: 1200, output: 500, total: 1700 },
           quality_score: 0.8,
           retry_count: 0,
@@ -255,7 +255,7 @@ describe('Phase 2: Scope Analysis', () => {
           },
           phase_metadata: {
             duration_ms: 7000,
-            model_used: 'openai/gpt-oss-20b',
+            model_used: 'z-ai/glm-5.3-flash',
             tokens: { input: 1300, output: 600, total: 1900 },
             quality_score: 0.85,
             retry_count: 0,
@@ -269,7 +269,7 @@ describe('Phase 2: Scope Analysis', () => {
 
   describe('Model configuration', () => {
     it('should use 20B model for Phase 2 (cost-effective)', () => {
-      const expectedModelId = 'openai/gpt-oss-20b';
+      const expectedModelId = 'z-ai/glm-5.3-flash';
 
       const mockOutput: Phase2Output = {
         recommended_structure: {

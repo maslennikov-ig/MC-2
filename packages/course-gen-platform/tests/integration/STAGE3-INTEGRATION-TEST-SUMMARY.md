@@ -213,7 +213,7 @@ const message = course.generation_progress.message || course.generation_progress
 
 4. **OpenRouter API Key** (optional, can mock)
    - `OPENROUTER_API_KEY` in `.env`
-   - Tests use model: `openai/gpt-oss-20b`
+   - Tests use model: `z-ai/glm-5.3-flash`
 
 ### Running Tests
 

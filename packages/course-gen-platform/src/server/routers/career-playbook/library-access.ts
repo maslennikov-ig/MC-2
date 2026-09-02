@@ -22,6 +22,7 @@ import {
   getUserVisibleCareerPlaybookWarnings,
 } from '@megacampus/shared-types';
 import type {
+  CareerPlaybookAudience,
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
   CareerPlaybookImageStatus,
@@ -116,6 +117,17 @@ export interface CareerPlaybookLibraryDetailResponse extends CareerPlaybookLibra
 export interface CareerPlaybookPublicShareResponse extends CareerPlaybookLibraryItem {
   finalMarkdown: string;
   qualityWarnings: string[];
+}
+
+/** One reader's guide, decided by the link they were given, not by the client. */
+export interface CareerPlaybookViewShareResponse extends CareerPlaybookPublicShareResponse {
+  audience: CareerPlaybookAudience;
+}
+
+export interface CareerPlaybookViewLinksResponse {
+  playbookId: string;
+  isPublic: boolean;
+  links: Array<{ audience: CareerPlaybookAudience; token: string; path: string }>;
 }
 
 export interface CareerPlaybookDeleteResponse {

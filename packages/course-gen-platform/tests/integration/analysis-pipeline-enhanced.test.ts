@@ -79,7 +79,7 @@ function getMockPhase1Output(): Phase1Output {
     },
     phase_metadata: {
       duration_ms: 5200,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 1200, output: 800, total: 2000 },
       quality_score: 0.88,
       retry_count: 0,
@@ -181,14 +181,14 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
     },
     phase_metadata: {
       duration_ms: 8500,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 2500, output: 1800, total: 4300 },
       quality_score: 0.85,
       retry_count: 0,
       repair_metadata: {
         layer_used: 'none',
         repair_attempts: 0,
-        models_tried: ['openai/gpt-oss-20b'],
+        models_tried: ['z-ai/glm-5.3-flash'],
       },
     },
   };
@@ -264,7 +264,7 @@ function getMockPhase4OutputWithGuidance(): Phase4Output {
     },
     phase_metadata: {
       duration_ms: 6800,
-      model_used: 'openai/gpt-oss-20b',
+      model_used: 'z-ai/glm-5.3-flash',
       tokens: { input: 1800, output: 1200, total: 3000 },
       quality_score: 0.87,
       retry_count: 0,

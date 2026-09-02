@@ -249,6 +249,11 @@ export async function settleCareerPlaybookNodeCosts(
           cost_unknown: false,
           billed_by_provider: true,
           ...(fact.providerName ? { provider_name: fact.providerName } : {}),
+          // The receipt is the only place that answers "did this call get the
+          // flex discount". The lookup is already happening; not keeping the
+          // answer is what made a fully flex-served run look like one that had
+          // never asked for the tier.
+          ...(fact.serviceTier ? { service_tier: fact.serviceTier } : {}),
         };
       } catch {
         return cost;
