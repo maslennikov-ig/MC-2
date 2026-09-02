@@ -24,6 +24,11 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 
 // Mock jinaConcurrencyLimiter BEFORE any imports
 vi.mock('@/shared/embeddings/jina-client', () => ({
+  // The reranker shares the embedding client's 100 RPM budget and awaits a
+  // slot before every call, so the mock has to grant one.
+  jinaRateLimiter: {
+    waitForSlot: vi.fn().mockResolvedValue(undefined),
+  },
   jinaConcurrencyLimiter: {
     acquire: vi.fn().mockResolvedValue(undefined),
     release: vi.fn(),
@@ -59,6 +64,7 @@ vi.mock('@/shared/logger', () => ({
 
 // Import mockFetch from setup-unit.ts (global mock)
 import { mockFetch } from '../setup-unit';
+import { jinaRateLimiter } from '@/shared/embeddings/jina-client';
 
 // Dynamic import after mocking to ensure mock is in place
 let rerankDocuments: typeof import('../../src/shared/jina/reranker-client').rerankDocuments;
@@ -910,7 +916,10 @@ describe('Jina Reranker Client - Unit Tests', () => {
   // ==========================================================================
 
   describe('Rate Limiting', () => {
-    it('should respect rate limit (40ms minimum between requests)', async () => {
+    // The 40ms spacing belongs to the shared `jinaRateLimiter`, which is
+    // distributed and mocked here, so wall-clock timing measures the mock. What
+    // the reranker owns is asking for a slot before every call it makes.
+    it('should wait for a rate-limit slot before each request', async () => {
       // Given: Two consecutive requests
       const query = 'test';
       const documents = ['doc1'];
@@ -918,13 +927,11 @@ describe('Jina Reranker Client - Unit Tests', () => {
       mockFetch.mockResolvedValue(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Making two requests back-to-back
-      const start = Date.now();
       await rerankDocuments(query, documents);
       await rerankDocuments(query, documents);
-      const elapsed = Date.now() - start;
 
-      // Then: Should take at least 40ms between requests
-      expect(elapsed).toBeGreaterThanOrEqual(40);
+      // Then: Each one claimed a slot from the shared limiter
+      expect(vi.mocked(jinaRateLimiter.waitForSlot)).toHaveBeenCalledTimes(2);
     });
 
     it('should include timeout in fetch request', async () => {

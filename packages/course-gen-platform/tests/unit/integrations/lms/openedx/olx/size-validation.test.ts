@@ -110,39 +110,68 @@ function createMinimalOLXStructure(): OLXStructure {
 }
 
 /**
- * Helper: Create large OLX structure with specified total size
+ * Helper: Create large OLX structure with an exact total size
  *
- * Creates a structure by duplicating HTML content until target size is reached.
+ * Adds ~1KB HTML components until one more would overshoot, then sizes a final
+ * component so `calculatePackageSize` returns exactly `targetSizeBytes`.
+ *
+ * Every component costs more than its content: it also writes a `htmlRefs`
+ * entry and a line inside `vert_1`. Counting content alone put each structure
+ * ~6% over its target, which is why the at-the-limit and exact-size cases
+ * disagreed with their own names.
  */
 function createLargeOLXStructure(targetSizeBytes: number): OLXStructure {
   const structure = createMinimalOLXStructure();
 
-  // Create large HTML content to reach target size
-  // Each HTML component adds ~1KB, so we calculate how many we need
-  const largeContent = '<html><![CDATA[<p>' + 'X'.repeat(1000) + '</p>]]></html>\n';
-  const contentSize = Buffer.byteLength(largeContent, 'utf-8');
+  const contentPrefix = '<html><![CDATA[<p>';
+  const contentSuffix = '</p>]]></html>\n';
+  const shellSize = Buffer.byteLength(contentPrefix + contentSuffix, 'utf-8');
 
-  // Calculate current size
-  const currentSize = calculatePackageSize(structure);
+  const verticalRefs: string[] = [];
+  let total = calculatePackageSize(structure);
 
-  // Calculate how many additional HTML components we need
-  const additionalSize = targetSizeBytes - currentSize;
-  const additionalComponents = Math.ceil(additionalSize / contentSize);
+  /** Bytes a component costs beyond its own content. */
+  const refSize = (urlName: string) =>
+    Buffer.byteLength(`<html url_name="${urlName}" />\n`, 'utf-8') +
+    Buffer.byteLength(`  <html url_name="${urlName}" />\n`, 'utf-8');
 
-  // Add HTML components to reach target size
-  for (let i = 2; i <= additionalComponents + 1; i++) {
-    const urlName = `html_${i}`;
+  const addComponent = (urlName: string, content: string) => {
     structure.htmlRefs.set(urlName, `<html url_name="${urlName}" />\n`);
-    structure.htmlContent.set(urlName, largeContent);
+    structure.htmlContent.set(urlName, content);
+    verticalRefs.push(`  <html url_name="${urlName}" />`);
+  };
 
-    // Add to first vertical
-    const firstVert = structure.verticals.get('vert_1')!;
-    const updatedVert = firstVert.replace(
-      '</vertical>',
-      `  <html url_name="${urlName}" />\n</vertical>`
-    );
-    structure.verticals.set('vert_1', updatedVert);
+  const fullContent = contentPrefix + 'X'.repeat(1000) + contentSuffix;
+  const fullContentSize = Buffer.byteLength(fullContent, 'utf-8');
+
+  let index = 2;
+  for (;;) {
+    const urlName = `html_${index}`;
+    const cost = fullContentSize + refSize(urlName);
+    if (total + cost > targetSizeBytes) break;
+    addComponent(urlName, fullContent);
+    total += cost;
+    index++;
   }
+
+  // Top up to the target exactly, when the remainder can hold a component.
+  const urlName = `html_${index}`;
+  const remainder = targetSizeBytes - total;
+  const minimumCost = shellSize + refSize(urlName);
+  if (remainder >= minimumCost) {
+    addComponent(urlName, contentPrefix + 'X'.repeat(remainder - minimumCost) + contentSuffix);
+    total += remainder;
+  }
+
+  // Splice every ref into the vertical in one pass. Rewriting the vertical on
+  // each iteration re-copied a string that grows with the package, which is
+  // quadratic: the 150MB cases spent hundreds of GB on string copies and never
+  // finished.
+  const firstVert = structure.verticals.get('vert_1')!;
+  structure.verticals.set(
+    'vert_1',
+    firstVert.replace('</vertical>', `${verticalRefs.join('\n')}\n</vertical>`)
+  );
 
   return structure;
 }
