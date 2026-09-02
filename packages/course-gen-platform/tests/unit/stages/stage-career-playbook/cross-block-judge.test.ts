@@ -326,15 +326,85 @@ ${'This long paragraph describes a repeated workflow for the manager audience on
     });
 
     expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
-    expect(verdict.needs_regeneration).toEqual(['block_26']);
+    // mc2-de6fe. The pair is still measured and still reported; it no longer
+    // sends the block back. Of the 24 within-block pairs above threshold on the
+    // stored corpus (28 playbooks, 13,469 pairs, 2026-09-02), one is genuinely
+    // the same material twice — the rest are a 60-day gate beside a 90-day
+    // gate, a manager's checklist beside an employee's, two career tracks in
+    // one table shape. A regeneration cannot fix those without breaking the
+    // parallel form the contract asks for.
+    expect(verdict.needs_regeneration).toEqual([]);
     expect(verdict.issues).toContainEqual(
       expect.objectContaining({
         block_id: 'block_26',
         category: 'contradiction',
-        severity: 'critical',
+        severity: 'warning',
         description: expect.stringContaining('paragraphs 1 and 2'),
       })
     );
+  });
+
+  // The two exemptions are decided from the text, so a shape a block publishes
+  // on purpose never reaches the embedding call at all.
+  it('does not compare two tables that share a header and carry different rows', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const managementTrack =
+      '| Step | Criterion | Typical time | | --- | --- | --- | | Head of Sales | You grew two first-line managers who hold their own forecast | 18-24 months |';
+    const expertTrack =
+      '| Step | Criterion | Typical time | | --- | --- | --- | | Principal seller | You own the largest multi-stakeholder accounts end to end | 12-18 months |';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_11', `## 11. Career growth\n\n${managementTrack}\n\n${expertTrack}`],
+      ]),
+    });
+
+    // block_11 owes a career-path diagram this fixture does not carry, so the
+    // assertion is on the repetition finding rather than on an empty verdict.
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(verdict.issues.filter(item => /repeat semantically/.test(item.description))).toEqual([]);
+  });
+
+  it('still compares two tables whose columns were renamed around the same content', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    // Verbatim shape of a03dfb46 block_9, the one true positive in the corpus:
+    // one AI-delegation taxonomy stated twice under renamed columns.
+    const firstTable =
+      '| Zone | What it covers | Owner | | --- | --- | --- | | AI does | Routine request handling, first-pass classification, draft replies | AI assistant |';
+    const secondTable =
+      '| Bucket | What lands there | Who answers | | --- | --- | --- | | AI does | Request classification, draft replies, first-pass tone analysis | AI assistant |';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([
+        ['block_9', `## 9. How AI changes this role\n\n${firstTable}\n\n${secondTable}`],
+      ]),
+    });
+
+    expect(generateEmbeddingsMock).toHaveBeenCalledTimes(1);
+    expect(verdict.issues).toContainEqual(
+      expect.objectContaining({ block_id: 'block_9', severity: 'warning' })
+    );
+  });
+
+  it('does not compare two paragraphs opening with the same label', async () => {
+    generateEmbeddingsMock.mockImplementation((texts: string[]) =>
+      texts.map(() => identicalEmbedding())
+    );
+    const firstGate =
+      'Stage completion criteria: at least two paid-campaign improvements are live and their impact is recorded.';
+    const secondGate =
+      'Stage completion criteria: one campaign is scaled with a recorded effect on customer acquisition cost.';
+
+    const verdict = await runCareerPlaybookDeterministicChecks({
+      generatedBlocks: blocks([['block_14', `## 14. Onboarding\n\n${firstGate}\n\n${secondGate}`]]),
+    });
+
+    expect(generateEmbeddingsMock).not.toHaveBeenCalled();
+    expect(verdict.issues).toEqual([]);
   });
 
   it('fails the final judge closed and carries paid receipts when Jina is exhausted', async () => {
@@ -1061,10 +1131,21 @@ flowchart LR
     };
   }
 
-  function mockOneWithinBlockSemanticRepeat() {
+  /**
+   * A repeat between two whole blocks in a shared audience view.
+   *
+   * These tests were written against a within-block paragraph repeat, which is
+   * a warning since mc2-de6fe and no longer reserves a regeneration. What they
+   * are actually about — that an unremediated repetition is reported instead of
+   * shipped in silence — belongs to the cross-block finding, which is still
+   * critical and has no evidence against it. Whole block contents start with
+   * `## `; `splitCareerPlaybookSemanticParagraphs` strips that heading, so the
+   * two units never collide in this mock.
+   */
+  function mockOneCrossBlockSemanticRepeat() {
     generateEmbeddingsMock.mockImplementation((texts: string[]) =>
       texts.map((text, index) =>
-        text.startsWith('The manager')
+        text.startsWith('## ')
           ? identicalEmbedding()
           : Array.from({ length: 768 }, (_unused, coordinate) => (coordinate === index + 1 ? 1 : 0))
       )
@@ -1072,7 +1153,7 @@ flowchart LR
   }
 
   it('keeps the flagged block eligible while the window still has budget', async () => {
-    mockOneWithinBlockSemanticRepeat();
+    mockOneCrossBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
     const update = await node(semanticFinalJudgeState({ block_8: 7, block_11: 0 }));
@@ -1095,7 +1176,7 @@ flowchart LR
    * 2026-08-30 failure back for another paid run before it could be diagnosed.
    */
   it('reports with measurements when the exhausted window leaves nothing to regenerate the block', async () => {
-    mockOneWithinBlockSemanticRepeat();
+    mockOneCrossBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
     const update = await node(semanticFinalJudgeState({ block_8: 8, block_11: 0 }));
@@ -1118,7 +1199,7 @@ flowchart LR
    * the repetition are independent facts about the same run.
    */
   it('still reports the semantic gate when the LLM judge degrades', async () => {
-    mockOneWithinBlockSemanticRepeat();
+    mockOneCrossBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({
       useLLMJudge: true,
       runtime: {
@@ -1146,12 +1227,15 @@ flowchart LR
   });
 
   it('reports the final semantic gate after the repeated block exhausts its cap', async () => {
-    mockOneWithinBlockSemanticRepeat();
+    mockOneCrossBlockSemanticRepeat();
     const node = createCrossBlockJudgeNode({ useLLMJudge: false });
 
+    // Both blocks, because a cross-block repeat names both of them: while
+    // either still has an attempt left the pair is remediable and no exhaustion
+    // is reported.
     const update = await node(
       semanticFinalJudgeState({
-        block_8: 0,
+        block_8: 2,
         block_11: 2,
       })
     );

@@ -57,6 +57,44 @@ import { parseCareerPlaybookJudgeVerdict } from './cross-block-judge';
 export const PROOFREADER_PROMPT_KEY = 'career_playbook_final_proofreader';
 export const PROOFREADER_PHASE = 'stage_career_playbook_proofreader';
 
+/** A fenced code block, whose `##` lines are diagram syntax rather than headings. */
+const FENCED_BLOCK = /^```[^\n]*\n[\s\S]*?^```[ \t]*$/gm;
+
+/** A top-level section heading in the assembled guide. */
+const SECTION_HEADING = /^##[ \t]+(.+?)[ \t]*$/gm;
+
+/**
+ * The document's own section inventory, derived from the assembled markdown.
+ *
+ * The pass invents missing sections. Measured 2026-09-02 across all three runs
+ * of that day, in both languages, against documents whose headings are provably
+ * complete — 27 headings, sections 1..26 consecutive, every one of them present:
+ *
+ * - `cfa66ada` (ru) filed six findings, one of them critical, saying the guide
+ *   "does not include a section on typical working day" and four siblings; the
+ *   critical also says the guide "jumps from section 4 to section 5", which is
+ *   not a gap and reads as a model losing count rather than reading.
+ * - `609b5a60` (en) filed "the guide jumps from Block 9 to Block 18", "Block 16
+ *   is not present", "Block 14 is not present" — as `info`, so cheap, but the
+ *   same failure.
+ * - `d50da4b1` (en) filed its own variant as a critical.
+ *
+ * The trigger is structural, not linguistic: blocks 5 and 26 carry a calibration
+ * table that names other sections by title, and checking those names means
+ * recalling headings from 25-35k tokens of context. The model guesses and is
+ * wrong. So it is given the answer instead — computed by a pattern over the same
+ * string the prompt already carries, which cannot disagree with it.
+ *
+ * @param markdown - the assembled guide
+ * @returns one heading per line, numbered in document order
+ */
+export function buildCareerPlaybookDocumentOutline(markdown: string): string {
+  const prose = markdown.replace(FENCED_BLOCK, '');
+  const headings = [...prose.matchAll(SECTION_HEADING)].map(match => match[1].trim());
+
+  return headings.map((heading, index) => `${index + 1}. ${heading}`).join('\n');
+}
+
 /**
  * Output budget. The pass reports findings, not prose, so a modest ceiling is
  * enough; the input is what is large.
@@ -112,8 +150,41 @@ export function buildProofreaderQualityIssues(
         : 'Замечание к качеству документа',
     message: issue.description,
     ...(issue.suggestion ? { suggestion: issue.suggestion } : {}),
-    action: issue.severity === 'info' ? ('review' as const) : ('regenerate' as const),
+    // Only a critical drives regeneration anywhere else in this pipeline, and
+    // only a critical drives it here — `deriveProofreaderRegenerations` is the
+    // enforcement. Labelling a warning `regenerate` in the stored row promised
+    // an action nothing takes: across the three runs of 2026-09-02 it marked 10,
+    // 11 and 6 blocks against 8, 7 and 2 blocks with an actual critical.
+    action: issue.severity === 'critical' ? ('regenerate' as const) : ('review' as const),
   }));
+}
+
+/**
+ * Regenerations this pass may request: the blocks it filed a critical against.
+ *
+ * `needs_regeneration` is a second list the model writes freehand, and nothing
+ * required it to agree with the findings above it. `mergeJudgeVerdicts` derives
+ * the equivalent list for the cross-block judge from that judge's own gated
+ * criticals; this pass trusted the model's list unread.
+ *
+ * The two disagree in practice. Replaying the node four times on one byte-
+ * identical document (2026-09-02, cfa66ada) returned `[]`, `[block_5, block_13,
+ * block_9]`, `[block_13]` and `[block_13]` while the findings behind them
+ * differed as much again — including a `block_5` entry whose only support was
+ * the invented structural gap this module's outline exists to remove.
+ *
+ * Intersecting keeps the pass's authority exactly where its evidence is, and it
+ * cannot silently widen: a block with a critical and no place in the model's
+ * list stays out, because the model may have judged it unfixable by regeneration.
+ */
+export function deriveProofreaderRegenerations(
+  verdict: CareerPlaybookJudgeVerdict
+): CareerPlaybookBlockId[] {
+  const critical = new Set(
+    verdict.issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
+  );
+
+  return verdict.needs_regeneration.filter(blockId => critical.has(blockId));
 }
 
 /** Keep only the regenerations this pass is allowed to request. */
@@ -146,6 +217,7 @@ export function createCareerPlaybookProofreaderNode(
     try {
       const prompt = await runtime.renderPrompt(PROOFREADER_PROMPT_KEY, {
         full_document: document,
+        document_outline: buildCareerPlaybookDocumentOutline(document),
         metric_ledger_md: formatCareerPlaybookMetricLedgerForPrompt(
           getCareerPlaybookMetricLedger(state.roleProfileSpec)
         ),
@@ -174,7 +246,14 @@ export function createCareerPlaybookProofreaderNode(
         },
         parseCareerPlaybookJudgeVerdict
       );
-      const { verdict, dropped } = capProofreaderRegenerations(parsed);
+      const supported: CareerPlaybookJudgeVerdict = {
+        ...parsed,
+        needs_regeneration: deriveProofreaderRegenerations(parsed),
+      };
+      const unsupported = parsed.needs_regeneration.filter(
+        blockId => !supported.needs_regeneration.includes(blockId)
+      );
+      const { verdict, dropped } = capProofreaderRegenerations(supported);
 
       logger.info(
         {
@@ -182,6 +261,10 @@ export function createCareerPlaybookProofreaderNode(
           criticals: verdict.issues.filter(item => item.severity === 'critical').length,
           needsRegeneration: verdict.needs_regeneration,
           dropped,
+          // A block the model asked to regenerate without filing a critical
+          // against it. Logged rather than silent: the rate is how this gate's
+          // effect is measured on a later run.
+          unsupported,
         },
         'Career Playbook whole-document proofreading pass completed'
       );

@@ -293,7 +293,7 @@ Assign severity by CATEGORY, not by taste. An issue is "critical" (regeneration-
 - "format_minimum": a hard format minimum is missing — anti-goals < 4, decision matrix < 4 rows, failure modes < 3, or a block that must contain a Mermaid diagram has none. The deterministic layer already enforces which blocks require a diagram, so only flag an entirely absent one; never ask for an extra, renamed, or duplicate diagram when the block already has one.
 - "wrong_language": user-facing text is not in the target content language.
 - "unresolved_placeholder": a raw template placeholder remains — a fill-in label inside square or curly brackets, such as [дата] or {fill}. The example marker "(пример — заменить)" / "(example — replace)" is NOT one, in any of its forms. This contract REQUIRES every unverified company-specific value to carry it, and permits a qualifier naming what to replace ("(example — replace with the company's actual CRM)"). Flagging the marker sends a block that followed the contract to be rewritten into one that breaks it.
-- "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence.
+- "invented_number": a company-specific number, quota, budget, or deadline is stated as fact with no support from RoleProfileSpec, Q&A, business context, or source evidence. How long a symptom must persist before it counts as a warning sign — "three days running", "two reviews in a row" — is NOT one of these. It qualifies an observation instead of setting a target, no ledger carries such a window, and the red-flag block cannot say when a flag is a flag without one. Flag it only where it is stated as a metric target or contradicts one.
 - "metric_conflict": a metric that appears in the metric ledger is stated with a different value or threshold. The ledger wins; the block is wrong.
 - "unsourced_claim": a precise external statistic (market, industry, competitor, AI impact) is stated without a [Sn] reference to the evidence ledger, or with a [Sn] that is not in the ledger.
 - "stale_date": an absolute calendar year appears outside block 25, or block 25's date is not the generation date.
@@ -425,6 +425,11 @@ Do not re-report what a pattern already catches reliably: missing citations, unm
 values, absolute calendar dates, and raw placeholders are covered elsewhere. Spend your attention on
 meaning.
 
+The section inventory below is extracted from this same document by a pattern, so it lists every
+section the document has. Read it before judging any claim about where something lives: a section it
+names IS in the document, however far from the reference it sits. Completeness is settled there, not
+by searching the body.
+
 Severity: use "critical" only for contradiction and metric_conflict. Grammar and wording are
 "style", which never triggers regeneration. Report at most 12 issues, most consequential first, and
 return an empty list when the document holds together.
@@ -460,10 +465,18 @@ Milestone ledger (single source of ramp deadlines):
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
+Section inventory (every section this document contains, in order):
+{{document_outline}}
+
 Assembled Role Guide:
 {{full_document}}`,
     variables: [
       { name: 'full_document', description: 'The fully assembled Role Guide', required: true },
+      {
+        name: 'document_outline',
+        description: "The assembled guide's own section headings, numbered in document order",
+        required: true,
+      },
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',

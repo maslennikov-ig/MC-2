@@ -139,11 +139,96 @@ function collectBlockPairs(blocks: readonly SemanticBlock[]): SemanticBlockPair[
   return pairs;
 }
 
+/** A markdown separator cell, `---` or `:--:`. */
+const SEPARATOR_CELL = /^:?-{2,}:?$/;
+
+/** Cells of a paragraph that is a markdown table, in reading order. */
+function tableCells(paragraph: string): string[] {
+  const cells = paragraph
+    .split('|')
+    .map(cell => cell.trim())
+    .filter(Boolean);
+  return cells.length >= 4 && cells.some(cell => SEPARATOR_CELL.test(cell)) ? cells : [];
+}
+
+/** Column names of a table paragraph, or null when it is not a table. */
+function tableHeader(paragraph: string): string | null {
+  const cells = tableCells(paragraph);
+  const separator = cells.findIndex(cell => SEPARATOR_CELL.test(cell));
+  if (separator <= 0) return null;
+  return cells.slice(0, separator).join('|').toLowerCase();
+}
+
+/** Data cells of a table paragraph, separator row excluded. */
+function tableBodyCells(paragraph: string): Set<string> {
+  const cells = tableCells(paragraph);
+  const separator = cells.findIndex(cell => SEPARATOR_CELL.test(cell));
+  if (separator < 0) return new Set();
+  return new Set(
+    cells
+      .slice(separator)
+      .filter(cell => !SEPARATOR_CELL.test(cell))
+      .map(cell => cell.toLowerCase())
+  );
+}
+
+function overlap(left: Set<string>, right: Set<string>): number {
+  if (left.size === 0 || right.size === 0) return 0;
+  let shared = 0;
+  for (const cell of left) if (right.has(cell)) shared += 1;
+  return shared / (left.size + right.size - shared);
+}
+
+/** A label a paragraph opens with, such as `**Ранние сигналы:**`. */
+function leadingLabel(paragraph: string): string {
+  const match = paragraph.match(/^([^:|]{8,90}:)/);
+  return match ? match[1].trim().toLowerCase() : '';
+}
+
+/**
+ * Whether two paragraphs are the same shape rather than the same content.
+ *
+ * A cosine over a whole paragraph measures its frame as much as its meaning, and
+ * inside one block the frame is uniform on purpose: a career ladder publishes a
+ * management track and an expert track as two tables with one header, a 30-60-90
+ * plan publishes three gates as three checklists under one label. Nothing the
+ * model can rewrite will separate them, which is why regeneration never cleared
+ * this class — the shared frame is the part it is supposed to keep.
+ *
+ * Measured over the stored corpus 2026-09-02 (28 completed playbooks, 13,469
+ * within-block paragraph pairs, one embedding pass): 24 pairs cross the 0.85
+ * threshold, and reading all 24 by hand leaves exactly one that is genuinely the
+ * same material twice — a03dfb46 block_9, which states one AI-delegation
+ * taxonomy in two tables whose columns are renamed. Different headers, so this
+ * exemption does not reach it, and it is still reported.
+ *
+ * The two shapes below clear 9 of the 24, including all three criticals this
+ * check has ever filed (cc12dccc block_11, db9d3ff9 block_11, db9d3ff9
+ * block_21). Both are decided from the text, so neither costs a call:
+ *
+ * - two tables with identical columns whose data rows are mostly different;
+ * - two paragraphs opening with the same label.
+ *
+ * The rejected alternative is on record in mc2-de6fe: normalizing markdown out
+ * before embedding moves the count 22 -> 15 but redistributes rather than
+ * separates, pushing survivors higher (1acebc5b block_4 0.8748 -> 0.9365).
+ */
+function isParallelStructure(left: string, right: string): boolean {
+  const header = tableHeader(left);
+  if (header && header === tableHeader(right)) {
+    return overlap(tableBodyCells(left), tableBodyCells(right)) < 0.5;
+  }
+
+  const label = leadingLabel(left);
+  return label !== '' && label === leadingLabel(right);
+}
+
 function collectParagraphPairs(blocks: readonly SemanticBlock[]): SemanticParagraphPair[] {
   const pairs: SemanticParagraphPair[] = [];
   for (const block of blocks) {
     for (let left = 0; left < block.paragraphs.length; left += 1) {
       for (let right = left + 1; right < block.paragraphs.length; right += 1) {
+        if (isParallelStructure(block.paragraphs[left], block.paragraphs[right])) continue;
         pairs.push({ block, leftIndex: left, rightIndex: right });
       }
     }
@@ -174,16 +259,36 @@ function buildCrossBlockIssues(
   ];
 }
 
+/**
+ * A within-block paragraph repetition is reported, not regenerated.
+ *
+ * `isParallelStructure` removes the two shapes that can be decided from the
+ * text. What it cannot decide is the rest of the same problem: of the 24 pairs
+ * above threshold on the stored corpus, 15 survive both exemptions and 14 of
+ * those are still parallel structure — a 60-day gate beside a 90-day gate, a
+ * manager's checklist beside an employee's, weekly duties beside monthly ones.
+ * They differ by a period, an ordinal or a reader, which is exactly the
+ * distinction a whole-paragraph cosine averages away.
+ *
+ * Regenerating a block on a signal that is wrong fourteen times in fifteen buys
+ * fourteen rewrites of correct text per real defect, and the model cannot
+ * satisfy the finding anyway without breaking the parallel form the contract
+ * asks for. So the pair stays visible as a warning and stops driving a
+ * regeneration.
+ *
+ * The cross-block check keeps `critical`: comparing two whole blocks in a shared
+ * audience view is a different measurement, and no evidence puts it wrong.
+ */
 function buildParagraphIssue(
   pair: SemanticParagraphPair,
   similarity: number
 ): CareerPlaybookJudgeIssue {
   return {
     block_id: pair.block.blockId,
-    severity: 'critical',
+    severity: 'warning',
     category: 'contradiction',
     description: `${pair.block.blockId} paragraphs ${pair.leftIndex + 1} and ${pair.rightIndex + 1} repeat semantically equivalent material (cosine ${similarity.toFixed(4)}, threshold ${CAREER_PLAYBOOK_SEMANTIC_REPETITION_THRESHOLD}).`,
-    suggestion: `Merge or remove the repeated paragraph inside ${pair.block.blockId}.`,
+    suggestion: `Merge or remove the repeated paragraph inside ${pair.block.blockId}, unless the two are parallel items — two gates, two tracks, two readers — that share a shape on purpose.`,
   };
 }
 

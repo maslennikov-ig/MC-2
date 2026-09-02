@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCareerPlaybookProofreaderNode } from '@/stages/stage-career-playbook/nodes/final-proofreader';
+import {
+  buildCareerPlaybookDocumentOutline,
+  createCareerPlaybookProofreaderNode,
+  deriveProofreaderRegenerations,
+} from '@/stages/stage-career-playbook/nodes/final-proofreader';
 import type { CareerPlaybookGraphStateType } from '@/stages/stage-career-playbook/state';
 
 /**
@@ -160,6 +164,105 @@ describe('career playbook final proofreader', () => {
       'block_3',
       'block_4',
     ]);
+  });
+
+  // mc2-jqvf4. The pass reported sections missing from documents that provably
+  // contain them, in both languages, on all three runs of 2026-09-02. It is
+  // given the inventory rather than asked to recall it.
+  it('hands the reader the section inventory it kept guessing at', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue(llmResult(VALID_VERDICT));
+
+    await createCareerPlaybookProofreaderNode({ renderPrompt, invokeLLM })({
+      ...proofreaderState(),
+      finalMarkdown: '# Guide\n\n## Header\n\ntext\n\n## 1. Mission\n\ntext\n\n## 2. Anti-goals\n',
+    } as CareerPlaybookGraphStateType);
+
+    expect(renderPrompt.mock.calls[0][1].document_outline).toBe(
+      '1. Header\n2. 1. Mission\n3. 2. Anti-goals'
+    );
+  });
+
+  it('reads headings out of the document and not out of its diagrams', () => {
+    const markdown = [
+      '## 1. Role canvas',
+      '',
+      '```mermaid',
+      'graph TD',
+      '## not a heading',
+      '```',
+      '',
+      '## 2. Continuity',
+      '',
+      '### 2.1 A subsection is not a section',
+    ].join('\n');
+
+    expect(buildCareerPlaybookDocumentOutline(markdown)).toBe(
+      '1. 1. Role canvas\n2. 2. Continuity'
+    );
+  });
+
+  it('returns an empty inventory for a document with no headings, rather than throwing', () => {
+    expect(buildCareerPlaybookDocumentOutline('just prose, no headings at all')).toBe('');
+  });
+
+  // The model writes `needs_regeneration` freehand, and nothing made it agree
+  // with the findings above it. `mergeJudgeVerdicts` already derives the judge's
+  // equivalent list from that judge's own criticals.
+  it('regenerates only the blocks it filed a critical against', () => {
+    const verdict = {
+      pass: false,
+      score: 55,
+      issues: [
+        { block_id: 'block_5', severity: 'critical', category: 'contradiction', description: 'x' },
+        { block_id: 'block_9', severity: 'warning', category: 'contradiction', description: 'y' },
+      ],
+      needs_regeneration: ['block_5', 'block_9', 'block_13'],
+    } as never;
+
+    expect(deriveProofreaderRegenerations(verdict)).toEqual(['block_5']);
+  });
+
+  // The intersection may not widen the list either: a block with a critical the
+  // model deliberately left out of `needs_regeneration` stays out, because the
+  // model may have judged it unfixable by regeneration.
+  it('never adds a block the model chose not to send back', () => {
+    const verdict = {
+      pass: false,
+      score: 55,
+      issues: [
+        { block_id: 'block_5', severity: 'critical', category: 'contradiction', description: 'x' },
+        { block_id: 'block_7', severity: 'critical', category: 'contradiction', description: 'y' },
+      ],
+      needs_regeneration: ['block_5'],
+    } as never;
+
+    expect(deriveProofreaderRegenerations(verdict)).toEqual(['block_5']);
+  });
+
+  it('does not promise a regeneration for a finding that cannot drive one', async () => {
+    const mixed = JSON.stringify({
+      pass: false,
+      score: 70,
+      issues: [
+        {
+          block_id: 'block_5',
+          severity: 'warning',
+          category: 'contradiction',
+          description: 'The guide does not include a typical working day section.',
+        },
+      ],
+      needs_regeneration: ['block_5'],
+    });
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue(llmResult(mixed));
+
+    const update = await createCareerPlaybookProofreaderNode({ renderPrompt, invokeLLM })(
+      proofreaderState()
+    );
+
+    expect(update.qualityIssues?.[0]?.action).toBe('review');
+    expect(update.lastJudgeVerdict?.needs_regeneration).toEqual([]);
   });
 
   it('records both paid calls when the pass is skipped anyway', async () => {
