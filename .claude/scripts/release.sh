@@ -1046,6 +1046,39 @@ EOF
 
 # === RELEASE NOTES UPDATE ===
 
+# The document title names the document, never one release inside it.
+#
+# An older generator wrote a versioned title, and the check below is a prefix
+# match, so `# Release Notes - v0.26.29` kept satisfying "the header is present"
+# release after release. By 2026-09-02 that 2025-12-26 title stood over 198
+# release sections, in a file `/push` hands to whoever writes the announcement.
+# Nothing failed; the front page was simply nine months out of date.
+normalise_release_notes_header() {
+    local file="$1"
+
+    [ -f "$file" ] || return 0
+    # Only a title of this family is ours to rewrite; anything else is left alone
+    # for the "old format" branch below to restructure.
+    head -n 1 "$file" | grep -q '^# Release Notes' || return 0
+    head -n 1 "$file" | grep -q '^# Release Notes$' && return 0
+
+    local first_release_line
+    first_release_line="$(grep -n '^## v' "$file" | safe_first | cut -d: -f1)"
+    [ -n "$first_release_line" ] || return 0
+
+    local temp_normalised
+    temp_normalised="$(mktemp)"
+    {
+        echo "# Release Notes"
+        echo ""
+        echo "User-facing release notes for all versions."
+        echo ""
+        tail -n +"$first_release_line" "$file"
+    } >"$temp_normalised"
+    mv "$temp_normalised" "$file"
+    log_info "Normalised the RELEASE_NOTES.md title (it named a single old version)"
+}
+
 update_release_notes() {
     local version="$1"
     local date="$2"
@@ -1058,6 +1091,9 @@ update_release_notes() {
     if [ -f "$release_notes_file" ]; then
         create_backup "$release_notes_file"
     fi
+
+    # Runs after the backup so a rollback undoes it with everything else.
+    normalise_release_notes_header "$release_notes_file"
 
     # Track for rollback
     MODIFIED_FILES+=("$release_notes_file")
