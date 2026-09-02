@@ -937,7 +937,8 @@ jobs:
           ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token
           ALERTMANAGER_TELEGRAM_CHAT_ID_FILE=/opt/megacampus/secrets/alertmanager_telegram_chat_id
           QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics
-          QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}
+          # QDRANT_METRICS_GID is deliberately NOT written here. It is host-derived, and the
+          # "Resolve host-derived environment values" step below is its only writer.
           DOCUMENT_EVIDENCE_ENABLED=true
           DOCUMENT_EVIDENCE_MODE=active
           DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100
@@ -986,12 +987,6 @@ jobs:
           ENVEOF
           chmod 600 ${{ env.DEPLOY_PATH }}/.env.production"
 
-      # mc2-c2p8z, the same drift class: QDRANT_METRICS_GID was written from a repository secret
-      # that was never configured, so this step silently replaced a working value with an empty one
-      # and docker compose refused with "required variable QDRANT_METRICS_GID is missing a value".
-      # It is not a secret at all — it is the numeric id of the host's dedicated metrics group, so
-      # it is read from the host that owns it and cannot drift from the group it names. Fails closed
-      # if the group is absent, rather than writing an empty value over a good one again.
       # A typo here is invisible everywhere else. `resolveChunkingStrategy` warns
       # and falls back to `legacy_markdown` on an unrecognised value, so
       # `docling-hybrid` or `Docling_Hybrid` produces a GREEN deploy that
@@ -1030,13 +1025,37 @@ jobs:
           esac
           echo "Docling PDF heading hierarchy: $DOCLING_MCP_PDF_HEADING_HIERARCHY"
 
+      # mc2-c2p8z and mc2-cva3o are one drift class. QDRANT_METRICS_GID used to be written into the
+      # heredoc above from `secrets.QDRANT_METRICS_GID`, a secret this repository has never had, so
+      # the substitution produced an EMPTY string and an ordinary deploy overwrote a working value
+      # with nothing. Compose does not treat that as "use a default": `${QDRANT_METRICS_GID:?...}`
+      # appears in three services in docker-compose.infra.yml and three more in
+      # docker-compose.production.yml, so an empty value refuses the whole file with "required
+      # variable QDRANT_METRICS_GID is missing a value". That is how the 2026-08-28 dev deploy died.
+      #
+      # It is not a secret at all: it is the numeric group id of the metrics directory the workers
+      # have to write into. So it is read from THAT DIRECTORY — the thing it must match — rather
+      # than from a group looked up by name, which can drift from the directory it is supposed to
+      # describe without anything saying so. Same mechanism as the `.env.dev` block below.
+      #
+      # Fails closed on every face: a missing directory, a non-numeric id, or the root group aborts
+      # the deploy. Group 0 matters because `group_add: 0` would hand the container the root group
+      # instead of the dedicated one, which is a green deploy that quietly widened a privilege.
+      #
+      # This step is now the ONLY writer of the key. `.env.blue` and `.env.green` are copies of this
+      # file made by `write_color_env`, so they inherit whatever is resolved here, and
+      # `scripts/ci/check_color_env_contract.mjs` counts the key from this step rather than from the
+      # heredoc.
       - name: Resolve host-derived environment values
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             'set -eu
-             gid="$(getent group megacampus-metrics | cut -d: -f3)"
-             case "$gid" in ""|*[!0-9]*) echo "::error::host group megacampus-metrics is missing or not numeric"; exit 1 ;; esac
+             dir=/var/lib/megacampus/qdrant-metrics
+             test -d "$dir" || { echo "::error::$dir does not exist on the host; QDRANT_METRICS_GID cannot be resolved"; exit 1; }
+             gid="$(stat -c %g "$dir")"
+             case "$gid" in ""|*[!0-9]*) echo "::error::group id of $dir is not numeric: $gid"; exit 1 ;; esac
+             [ "$gid" -ne 0 ] || { echo "::error::$dir is owned by the root group; it must be setgid to the dedicated metrics group"; exit 1; }
              file="${{ env.DEPLOY_PATH }}/.env.production"
              if grep -q "^QDRANT_METRICS_GID=" "$file"; then
                sed -i "s/^QDRANT_METRICS_GID=.*/QDRANT_METRICS_GID=$gid/" "$file"
@@ -1044,7 +1063,7 @@ jobs:
                printf "QDRANT_METRICS_GID=%s\n" "$gid" >> "$file"
              fi
              grep -q "^QDRANT_METRICS_GID=$gid$" "$file" || { echo "::error::failed to set QDRANT_METRICS_GID"; exit 1; }
-             echo "QDRANT_METRICS_GID resolved from host group megacampus-metrics: $gid"'
+             echo "QDRANT_METRICS_GID resolved from the group owning $dir: $gid"'
 
       # The secrets directory is 0711, not 0700: traversable but not listable. 0700 root locks out
       # every non-root consumer that legitimately owns a file in there — on 2026-07-30 this step ran

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   colorOverlayKeys,
   envAssignmentKeys,
+  hostResolvedKeys,
   missingRequiredByEnvironment,
   requiredComposeVariables,
 } from './check_color_env_contract.mjs';
@@ -43,6 +44,25 @@ require_immutable_ref() {
 `),
   ['API_IMAGE', 'COLOR'],
   'colour-specific keys must come from the real generator contract'
+);
+
+assert.deepEqual(
+  hostResolvedKeys(`
+     gid="$(stat -c %g "$dir")"
+     if grep -q "^QDRANT_METRICS_GID=" "$file"; then
+       sed -i "s/^QDRANT_METRICS_GID=.*/QDRANT_METRICS_GID=$gid/" "$file"
+     else
+       printf "QDRANT_METRICS_GID=%s\\n" "$gid" >> "$file"
+     fi
+`),
+  ['QDRANT_METRICS_GID'],
+  'a host-derived key must be credited to the step that appends it, not to the heredoc'
+);
+
+assert.throws(
+  () => hostResolvedKeys('echo "QDRANT_METRICS_GID is mentioned but never written"'),
+  /writes no environment keys/,
+  'mentioning a key without appending it must not count as guaranteeing it'
 );
 
 assert.deepEqual(

@@ -42,6 +42,21 @@ export function colorOverlayKeys(deployScript) {
   return [...keys].sort();
 }
 
+// Keys that are NOT in the `.env.production` heredoc because they are read off the deploy host,
+// appended by the "Resolve host-derived environment values" step. That step verifies its own write
+// and exits non-zero otherwise, so a key it appends is as guaranteed as one written literally —
+// but `envAssignmentKeys` cannot see it, since inside the step the key appears only as a grep
+// pattern and a printf format. Read the printf writers, the same contract `colorOverlayKeys` uses.
+export function hostResolvedKeys(resolveStepRun) {
+  const keys = new Set();
+  const pattern = /printf\s+"([A-Z][A-Z0-9_]*)=%s\\n"/g;
+
+  for (const match of resolveStepRun.matchAll(pattern)) keys.add(match[1]);
+
+  if (keys.size === 0) throw new Error('host-derived value resolver writes no environment keys');
+  return [...keys].sort();
+}
+
 export function missingRequiredByEnvironment(requiredKeys, environments) {
   const missing = new Map();
 
@@ -66,6 +81,11 @@ export function repositoryColorEnvContract(repoRoot = rootDir) {
     step => step?.name === 'Create .env.production'
   )?.run;
   if (!createProductionEnv) throw new Error('Create .env.production workflow step was not found');
+  const resolveHostValues = workflow?.jobs?.deploy?.steps?.find(
+    step => step?.name === 'Resolve host-derived environment values'
+  )?.run;
+  if (!resolveHostValues)
+    throw new Error('Resolve host-derived environment values workflow step was not found');
 
   const composeTexts = ['docker-compose.app.yml', 'docker-compose.production.yml'].map(path =>
     readFileSync(resolve(repoRoot, path), 'utf8')
@@ -76,7 +96,11 @@ export function repositoryColorEnvContract(repoRoot = rootDir) {
     throw new Error('production Compose files declare no ${VAR:?} keys');
 
   const generatedKeys = [
-    ...new Set([...envAssignmentKeys(createProductionEnv), ...colorOverlayKeys(deployScript)]),
+    ...new Set([
+      ...envAssignmentKeys(createProductionEnv),
+      ...hostResolvedKeys(resolveHostValues),
+      ...colorOverlayKeys(deployScript),
+    ]),
   ].sort();
   const environments = new Map([
     ['.env.blue', generatedKeys],
