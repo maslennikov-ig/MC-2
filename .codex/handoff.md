@@ -505,11 +505,42 @@ fails on the old behaviour:
 Also `308ff8f31`: `browserslist` pinned above the 2026-09-01 advisory. Not ours — a newly published
 GHSA pair failed Security Audit for everything on `develop`, including the deploy this track needed.
 
+**All four are now verified in live documents and closed.** Three runs on 2026-09-02 after the key
+replacement, $0.373081 together: `609b5a60` (en), `cfa66ada` (ru), `d50da4b1` (en); the first
+reports `status: pass` with PDF export and all four public pages at HTTP 200.
+
+| fix         | before                                   | in all three runs                 |
+| ----------- | ---------------------------------------- | --------------------------------- |
+| `mc2-o29g8` | 6 leaks / 3 documents / 5 blocks         | `validateContractLeakage` = **0** |
+| `mc2-hrz7n` | both of `208746e3`'s criticals were this | **0** issues mention the phrase   |
+| `mc2-nfyyo` | 0 proofreader findings stored, ever      | **42 / 26 / 12** stored           |
+| `mc2-mo5yk` | 5 corruptions / 5 documents / 3 months   | `validateScriptSplice` = **0**    |
+
 Open and evidenced, not fixed: `mc2-de6fe` (P3, the paragraph-pair repetition check measures
 parallel structure, not repetition — full distribution and a measured-and-rejected candidate are in
 the issue and in quality-contract §6.1), `mc2-afoz6` (P3, block 17's "три дня подряд"), `mc2-r2468`
-(P2, blocked on `mc2-nfyyo`; the block_13 claim in its original delivery note is corrected there and
-in quality-contract §8bis.6 — the model misread a clock slot as a cadence).
+(P2, no longer blocked; the block_13 claim in its original delivery note is corrected there and in
+quality-contract §8bis.6 — the model misread a clock slot as a cadence).
+
+### Three things the verification runs found
+
+- **`mc2-jqvf4` (P1) exists only because `mc2-nfyyo` shipped.** The first Russian run's proofreader
+  filed a critical saying sections 6–20 are absent from a document that carries all 26 in order.
+  15 of that run's 26 findings grew from the false premise, all tagged `block_5`; the English run of
+  the same day has a healthy spread and no such finding. It matters because
+  `buildProofreaderQualityIssues` marks everything above `info` `action: 'regenerate'`, so a false
+  premise spends a regeneration budget of three.
+- **Critical counts are not a measurement at n=1** (`mc2-x15bk`). Replaying `finalProofreader` four
+  times on a byte-identical input gave **1, 5, 12 and 7** criticals and four different
+  `needs_regeneration` lists; three English runs of one fixture gave judge criticals **1, 5, 11**.
+  The four closures above rest on deterministic checks instead, which is why they are trustworthy —
+  and why the run-count tables earlier in this file should not be read as measurements. Replaying
+  one node costs ~$0.002 against ~$0.10 for a run, so the cheap instrument already exists.
+- **`mc2-encw8` (P3): the leak detector knows one grammatical mood.** `d50da4b1` block 17 shipped
+  "Do not invent numeric escalation counts here… they belong in this section", and
+  `validateContractLeakage` returned 0 — `AUTHOR_INSTRUCTION` covers the declarative self-description
+  and not the imperative. Measured before proposing anything: **1 line in 28 playbooks**, too rare to
+  justify widening a detector whose false positive is an honest warning to a reader.
 
 ## Jina key replaced (2026-09-02, `mc2-7lp0u` closed)
 
