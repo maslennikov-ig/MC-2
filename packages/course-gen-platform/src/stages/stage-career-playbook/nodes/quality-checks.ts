@@ -867,6 +867,45 @@ const AUTHOR_INSTRUCTION = new RegExp(
 );
 
 /**
+ * An order about what to write, in the imperative.
+ *
+ * Alone this matches honest advice — "never invent a number when you report
+ * upward" is exactly what a red-flag block should say to an employee — so it is
+ * never a finding by itself.
+ */
+const WRITING_IMPERATIVE =
+  /\b(?:do not|don't|never)\s+(?:\w+\s+){0,3}(?:invent|include|add|write|put|list|mention|state)\b|не\s+(?:выдумывай|придумывай|добавляй|включай|пиши|указывай)/i;
+
+/**
+ * A pointer at a place in this document.
+ *
+ * This is the half that makes the sentence the author's business: an employee
+ * has no "here" to put text in, and no section to decide what belongs to.
+ */
+const DOCUMENT_DEIXIS =
+  /\b(?:here|in this (?:section|block|guide|table|list|checklist)|belongs? in this|this section)\b|этот раздел|в этом разделе|в этом блоке|здесь/i;
+
+/**
+ * An instruction to the author written in the imperative and anchored to a place
+ * in the document — the shape `AUTHOR_INSTRUCTION` cannot express.
+ *
+ * Run d50da4b1 (2026-09-02, en) shipped this to a reader in block 17: "Do not
+ * invent numeric escalation counts here; if the company later ratifies formal
+ * trigger rules, they belong in this section as confirmed values, not as
+ * defaults." `validateContractLeakage` returned 0 for that document. The phrase
+ * is not in any prompt — the model wrote it in the genre of the `do not invent`
+ * family it was trained on by the universal-mode rules.
+ *
+ * Both halves are required in one line, because the price of a false positive is
+ * a critical filed against honest advice. Measured on the stored corpus before
+ * shipping: 28 completed playbooks, 1 matching line, in the one document this
+ * was found in, and none of the other 27 produce a match.
+ */
+function isAuthoringDirective(line: string): boolean {
+  return WRITING_IMPERATIVE.test(line) && DOCUMENT_DEIXIS.test(line);
+}
+
+/**
  * Flag generation-contract instructions that surfaced as reader guidance.
  *
  * The rules added in v2 are about how to write; the 2026-08-11 guide printed one
@@ -899,13 +938,22 @@ export function validateContractLeakage(
     }
 
     for (const line of proseLines(content)) {
-      if (!AUTHOR_INSTRUCTION.test(line)) continue;
+      const matched = line.match(AUTHOR_INSTRUCTION);
+      if (!matched && !isAuthoringDirective(line)) continue;
+
+      // Name the phrase, not just the line. `truncateLine` cuts at 160
+      // characters from the start, and these sentences run long: four of the
+      // seven findings on the stored corpus quote a line whose trigger sits
+      // past the cut, so the finding reads as a false positive until someone
+      // fetches the block and greps it. Verifying two of them cost a
+      // measurement cycle on 2026-09-02.
+      const evidence = matched ? ` The phrase is "${matched[0]}".` : '';
 
       issues.push(
         issue(
           blockId,
           'contradiction',
-          `${blockId} prints an instruction addressed to the document's author rather than its reader: "${truncateLine(line)}".`,
+          `${blockId} prints an instruction addressed to the document's author rather than its reader: "${truncateLine(line)}".${evidence}`,
           'Apply the writing rule silently. The reader is an employee doing this job, not the author of this guide.'
         )
       );

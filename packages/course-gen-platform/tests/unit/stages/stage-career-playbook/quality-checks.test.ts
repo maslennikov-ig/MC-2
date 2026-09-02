@@ -537,10 +537,38 @@ describe('validateContractLeakage', () => {
     expect(leak?.severity).toBe('critical');
   });
 
+  // mc2-encw8, verbatim from d50da4b1 (2026-09-02, en). The imperative form
+  // about what to write, anchored to a place in the document, for which
+  // validateContractLeakage returned 0.
+  it('flags an order about writing that points at this document', () => {
+    const issues = validateContractLeakage(
+      blocks({
+        block_17:
+          'Do not invent numeric escalation counts here; if the company later ratifies formal trigger rules, they belong in this section as confirmed values, not as defaults.',
+      }),
+      context()
+    );
+
+    const leak = issues.find(item => item.category === 'contradiction');
+    expect(leak?.block_id).toBe('block_17');
+    expect(leak?.severity).toBe('critical');
+  });
+
   it.each([
     ['in other words', 'The quota is 4M, in other words about 330K a month.'],
     ['другими словами', 'Квота — 4 млн, другими словами около 330 тысяч в месяц.'],
     ['a repeat that is about the work', 'Repeat the discovery call whenever the buyer changes.'],
+    // Both halves of the mc2-encw8 rule are required, because each alone is
+    // ordinary. The first is honest advice to an employee reporting upward; the
+    // second points at a section without ordering anything written.
+    [
+      'an imperative about numbers with no place attached',
+      'Never invent a number when the pipeline review asks for one — say you do not know.',
+    ],
+    [
+      'a pointer at a section with no order about writing',
+      'The exact thresholds are in this section, and they are reviewed quarterly.',
+    ],
   ])('leaves ordinary prose alone: %s', (_label, line) => {
     expect(validateContractLeakage(blocks({ block_18: line }), context())).toEqual([]);
   });
