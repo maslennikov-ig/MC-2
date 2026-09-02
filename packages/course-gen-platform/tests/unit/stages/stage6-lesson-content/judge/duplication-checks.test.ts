@@ -191,6 +191,74 @@ Run incident drills quarterly and track MTTR trends to verify reliability gains.
     }
   });
 
+  it('should not flag enumerated sibling headers as duplicates', () => {
+    const content = `## Упражнения
+
+### Упражнение 1
+Составьте карту текущего процесса продаж для своей команды и отметьте на ней шаги,
+которые сегодня выполняются вручную.
+
+### Упражнение 2
+Разберите три последние закрытые сделки и выпишите причины, по которым каждая из них
+задержалась дольше запланированного срока.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.duplicatePairs).toHaveLength(0);
+    expect(result.passed).toBe(true);
+  });
+
+  it('should not flag enumerated sibling headers in other languages or wordings', () => {
+    const content = `## Practice
+
+### Exercise 1
+Map the current sales process for your own team and mark every manual step.
+
+### Exercise 2
+Review the last three closed deals and write down what delayed each of them.
+
+### Метод 1
+Первый способ разбора: восстановить хронологию сделки по записям в CRM.
+
+### Метод 2
+Второй способ разбора: сравнить ожидаемые и фактические сроки на каждом этапе.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.duplicatePairs).toHaveLength(0);
+    expect(result.passed).toBe(true);
+  });
+
+  it('should still detect a genuinely repeated enumerated header', () => {
+    const content = `## Упражнения
+
+### Упражнение 1
+Составьте карту текущего процесса продаж для своей команды.
+
+### Упражнение 1
+Составьте карту текущего процесса продаж для своей команды.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.duplicatePairs.length).toBeGreaterThan(0);
+    expect(result.duplicatePairs[0].similarity).toBe(1.0);
+    expect(result.failure?.severity).toBe('critical');
+  });
+
+  it('should still detect near-duplicate headers that differ by more than an ordinal', () => {
+    const content = `## Тестирование на пилотном клиенте 1
+Опишите, как выбрать пилотную группу и какие сделки в неё включить.
+
+## Тестирование на пилотном клиенте, шаг 2
+Опишите, как снимать метрики пилота и когда останавливать эксперимент.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.duplicatePairs.length).toBeGreaterThan(0);
+  });
+
   it('should detect exact duplicate headers with severity critical (B4)', () => {
     const content = `## Data Pipeline Setup
 Outline the data pipeline architecture and ingestion plan.
