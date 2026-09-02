@@ -232,8 +232,15 @@ function uniqueBlockIds(blockIds: CareerPlaybookBlockId[]): CareerPlaybookBlockI
 }
 
 function verdictFromIssues(issues: CareerPlaybookJudgeIssue[]): CareerPlaybookJudgeVerdict {
+  // Criticals only, as on the LLM path, where `mergeJudgeVerdicts` derives the
+  // list from `severity === 'critical'`. The two disagreed: every deterministic
+  // warning went to regeneration too, which made `validateContractLeakage`'s own
+  // suggestion — "this is a warning rather than a regeneration trigger" —
+  // untrue of the code beneath it, and would have sent a block back for every
+  // parallel-structure paragraph pair the moment mc2-de6fe downgraded that
+  // finding.
   const needsRegeneration = uniqueBlockIds(
-    issues.filter(issue => issue.severity !== 'info').map(issue => issue.block_id)
+    issues.filter(issue => issue.severity === 'critical').map(issue => issue.block_id)
   );
 
   return {
@@ -533,7 +540,9 @@ function selectWindowBudgetExemptBlockIds(params: {
   if (!params.isFinalWindow) return [];
 
   const semanticRepetitionBlockIds = params.deterministicVerdict.issues
-    .filter(isCareerPlaybookSemanticRepetitionIssue)
+    .filter(
+      issue => issue.severity === 'critical' && isCareerPlaybookSemanticRepetitionIssue(issue)
+    )
     .map(issue => issue.block_id);
   const firstFlaggedHere = params.verdict.needs_regeneration.filter(
     blockId => params.windowBlockIds.includes(blockId) && (params.attempts[blockId] ?? 0) === 0
@@ -635,8 +644,11 @@ function buildSemanticGateOutcome(params: {
   const none = { errors: [], warnings: [] };
   if (!params.isFinalWindow) return none;
 
+  // Criticals only: the within-block paragraph finding is a warning since
+  // mc2-de6fe, and a warning that was never going to be regenerated must not
+  // report an exhausted remediation budget.
   const semanticIssues = params.deterministicVerdict.issues.filter(
-    isCareerPlaybookSemanticRepetitionIssue
+    issue => issue.severity === 'critical' && isCareerPlaybookSemanticRepetitionIssue(issue)
   );
   const semanticRepetitionBlockIds = uniqueBlockIds(semanticIssues.map(issue => issue.block_id));
   if (semanticRepetitionBlockIds.length === 0) return none;
