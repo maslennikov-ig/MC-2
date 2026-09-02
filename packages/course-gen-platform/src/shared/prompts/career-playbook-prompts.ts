@@ -425,6 +425,11 @@ Do not re-report what a pattern already catches reliably: missing citations, unm
 values, absolute calendar dates, and raw placeholders are covered elsewhere. Spend your attention on
 meaning.
 
+The section inventory below is extracted from this same document by a pattern, so it lists every
+section the document has. Read it before judging any claim about where something lives: a section it
+names IS in the document, however far from the reference it sits. Completeness is settled there, not
+by searching the body.
+
 Severity: use "critical" only for contradiction and metric_conflict. Grammar and wording are
 "style", which never triggers regeneration. Report at most 12 issues, most consequential first, and
 return an empty list when the document holds together.
@@ -460,10 +465,18 @@ Milestone ledger (single source of ramp deadlines):
 Evidence ledger (the only citable sources):
 {{evidence_ledger_md}}
 
+Section inventory (every section this document contains, in order):
+{{document_outline}}
+
 Assembled Role Guide:
 {{full_document}}`,
     variables: [
       { name: 'full_document', description: 'The fully assembled Role Guide', required: true },
+      {
+        name: 'document_outline',
+        description: "The assembled guide's own section headings, numbered in document order",
+        required: true,
+      },
       {
         name: 'metric_ledger_md',
         description: 'Canonical metric ledger rendered as a markdown table',
