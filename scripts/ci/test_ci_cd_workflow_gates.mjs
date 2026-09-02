@@ -12,7 +12,8 @@ const requireFromBackend = createRequire(
 const yaml = requireFromBackend('js-yaml');
 
 const workflowPath = resolve(rootDir, '.github/workflows/ci-cd.yml');
-const workflow = yaml.load(readFileSync(workflowPath, 'utf8'));
+const workflowText = readFileSync(workflowPath, 'utf8');
+const workflow = yaml.load(workflowText);
 const rootManifest = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
 const workspace = yaml.load(readFileSync(resolve(rootDir, 'pnpm-workspace.yaml'), 'utf8'));
 const jobs = workflow?.jobs ?? {};
@@ -166,7 +167,6 @@ for (const requiredLine of [
   'ALERTMANAGER_TELEGRAM_BOT_TOKEN_FILE=/opt/megacampus/secrets/alertmanager_telegram_bot_token',
   'ALERTMANAGER_TELEGRAM_CHAT_ID_FILE=/opt/megacampus/secrets/alertmanager_telegram_chat_id',
   'QDRANT_METRICS_TEXTFILE_HOST_DIR=/var/lib/megacampus/qdrant-metrics',
-  'QDRANT_METRICS_GID=${{ secrets.QDRANT_METRICS_GID }}',
   'DOCUMENT_EVIDENCE_ENABLED=true',
   'DOCUMENT_EVIDENCE_MODE=active',
   'DOCUMENT_EVIDENCE_STAGE5_COHORT_PERCENT=100',
@@ -176,6 +176,42 @@ for (const requiredLine of [
     `staging production env must include ${requiredLine}`
   );
 }
+// mc2-cva3o. QDRANT_METRICS_GID is host-derived, not a secret, and `secrets.QDRANT_METRICS_GID`
+// has never existed in this repository — so writing it from a secret substituted an EMPTY string
+// and every `${QDRANT_METRICS_GID:?...}` service refused to start. Assert the absence, because the
+// line looked correct for as long as nobody checked the secret list against it. Matched as the
+// SUBSTITUTION, not as the name: the comments that explain this defect say the name on purpose,
+// and a check that cannot tell an explanation from the thing it explains fails on its own docs.
+assert(
+  !/\$\{\{\s*secrets\.QDRANT_METRICS_GID/.test(workflowText),
+  'QDRANT_METRICS_GID must never be read from a repository secret; it is derived from the host'
+);
+assert(
+  !createProductionEnv.includes('QDRANT_METRICS_GID='),
+  'QDRANT_METRICS_GID must not be assigned in the .env.production heredoc; one host-derived writer only'
+);
+const resolveHostValues = stagingDeploy?.steps?.find(
+  step => step?.name === 'Resolve host-derived environment values'
+)?.run;
+assert(resolveHostValues, 'staging deploy must resolve host-derived environment values');
+assert(
+  /stat -c %g/.test(resolveHostValues) &&
+    resolveHostValues.includes('/var/lib/megacampus/qdrant-metrics'),
+  'QDRANT_METRICS_GID must be read from the group of the metrics directory it has to match'
+);
+// Fail-closed is the whole point: an absent directory or an unusable id must stop the deploy
+// rather than append nothing and let Compose refuse later, or append 0 and widen a privilege.
+for (const failClosedGuard of ['test -d "$dir"', '*[!0-9]*', '[ "$gid" -ne 0 ]']) {
+  assert(
+    resolveHostValues.includes(failClosedGuard),
+    `host-derived value resolution must fail closed on ${failClosedGuard}`
+  );
+}
+assert(
+  /grep -q "\^QDRANT_METRICS_GID=\$gid\$" "\$file" \|\|/.test(resolveHostValues),
+  'the resolver must verify its own write before the deploy continues'
+);
+
 assert(createQdrantSecrets, 'staging deploy must materialize Qdrant secret files');
 for (const sharedSecret of [
   'QDRANT_API_KEY',
