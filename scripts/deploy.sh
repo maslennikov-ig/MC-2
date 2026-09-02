@@ -8,6 +8,13 @@ set -euo pipefail
 ENVIRONMENT="${1:-production}"
 TAG="${2:-latest}"
 COMPOSE_FILE="docker-compose.production.yml"
+ENV_FILE=".env.production"
+# mc2-cva3o. Compose interpolates `${VAR}` from the shell environment and the project `.env` only
+# — NEVER from a service's `env_file:`, which is read later and just for the container. So every
+# invocation has to carry `--env-file`, or the `${QDRANT_METRICS_GID:?...}` and
+# `${WEB_IMAGE:?...}` forms in docker-compose.production.yml refuse the whole file. Typed out per
+# call it was present on exactly one of ten; as one prefix it cannot go missing on the next one.
+COMPOSE="docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE}"
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,8 +64,8 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
 fi
 
 # Check if environment file exists
-if [ ! -f ".env.production" ]; then
-    error_exit "Environment file .env.production not found!"
+if [ ! -f "${ENV_FILE}" ]; then
+    error_exit "Environment file ${ENV_FILE} not found!"
 fi
 
 # Create backup directory
@@ -92,8 +99,8 @@ backup_state() {
     log_step "Creating backup of current state..."
 
     # Save current container IDs and images
-    docker compose -f "${COMPOSE_FILE}" ps -q > "${BACKUP_DIR}/containers_${TIMESTAMP}.txt" || true
-    docker compose -f "${COMPOSE_FILE}" images > "${BACKUP_DIR}/images_${TIMESTAMP}.txt" || true
+    $COMPOSE ps -q > "${BACKUP_DIR}/containers_${TIMESTAMP}.txt" || true
+    $COMPOSE images > "${BACKUP_DIR}/images_${TIMESTAMP}.txt" || true
 
     log_info "Backup created: ${BACKUP_DIR}/*_${TIMESTAMP}.txt"
 }
@@ -128,33 +135,32 @@ fi
 
 # Pull application images. Docling images are resolved separately by the rollout gate.
 log_step "Pulling latest Docker images..."
-docker compose -f "${COMPOSE_FILE}" pull redis web api || error_exit "Failed to pull images"
-docling_prepare_rollout .env.production || error_exit "Docling rollout gate failed"
+$COMPOSE pull redis web api || error_exit "Failed to pull images"
+docling_prepare_rollout "${ENV_FILE}" || error_exit "Docling rollout gate failed"
 if [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ]; then
-    docker compose -f "${COMPOSE_FILE}" --env-file .env.production \
-        up -d "${DOCLING_ROLLOUT_SERVICES[@]}" \
+    $COMPOSE up -d "${DOCLING_ROLLOUT_SERVICES[@]}" \
         || error_exit "Failed to start Docling v3 stack"
 fi
 if ! docling_check_facade || \
     { [ "${#DOCLING_ROLLOUT_SERVICES[@]}" -gt 0 ] && ! docling_check_required_tools; }; then
-    docling_rollback_rollout .env.production "${COMPOSE_FILE}" \
+    docling_rollback_rollout "${ENV_FILE}" "${COMPOSE_FILE}" \
         || error_exit "Docling MCP health failed and rollback failed"
     error_exit "Docling MCP health failed; MCP 1.x was restored and Docling Serve stopped"
 fi
 
 # Check if any services are running
-if docker compose -f "${COMPOSE_FILE}" ps --quiet | grep -q .; then
+if $COMPOSE ps --quiet | grep -q .; then
     log_step "Services are running, performing update..."
 
     # Update infrastructure services first (if needed)
     log_step "Updating infrastructure services..."
-    docker compose -f "${COMPOSE_FILE}" up -d --no-deps redis
+    $COMPOSE up -d --no-deps redis
 
     sleep 5
 
     # Update API service (recreate with new image)
     log_step "Updating API service..."
-    docker compose -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate api
+    $COMPOSE up -d --no-deps --force-recreate api
     sleep 15
 
     if check_health "API" "http://localhost:4000/health"; then
@@ -166,11 +172,11 @@ if docker compose -f "${COMPOSE_FILE}" ps --quiet | grep -q .; then
 
     # Update worker
     log_step "Updating worker service..."
-    docker compose -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate worker
+    $COMPOSE up -d --no-deps --force-recreate worker
 
     # Update web service
     log_step "Updating web service..."
-    docker compose -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate web
+    $COMPOSE up -d --no-deps --force-recreate web
     sleep 15
 
     if check_health "Web" "http://localhost:3000/api/health"; then
@@ -181,7 +187,7 @@ if docker compose -f "${COMPOSE_FILE}" ps --quiet | grep -q .; then
     fi
 else
     log_step "No services running, performing fresh start..."
-    docker compose -f "${COMPOSE_FILE}" up -d
+    $COMPOSE up -d
     sleep 20
 
     # Check health of all services
@@ -200,7 +206,7 @@ docker image prune -f
 
 # Show final status
 log_step "Deployment status:"
-docker compose -f "${COMPOSE_FILE}" ps
+$COMPOSE ps
 
 log_info "Deployment to ${ENVIRONMENT} completed successfully!"
 log_info "Web: http://localhost:3000"

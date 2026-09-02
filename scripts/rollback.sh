@@ -6,6 +6,12 @@ set -euo pipefail
 
 # Configuration
 COMPOSE_FILE="docker-compose.production.yml"
+ENV_FILE=".env.production"
+# mc2-cva3o. Compose interpolates `${VAR}` from the shell environment and the project `.env`
+# only — never from a service's `env_file:`. Without `--env-file` the `${QDRANT_METRICS_GID:?}`
+# and `${WEB_IMAGE:?}` forms in docker-compose.production.yml refuse the file, so a rollback
+# would fail for a reason that has nothing to do with the release it is trying to undo.
+COMPOSE="docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE}"
 BACKUP_DIR="./backups"
 
 # Colors for output
@@ -103,7 +109,7 @@ cat "${LATEST_BACKUP}"
 
 # Stop current containers
 log_step "Stopping current containers..."
-docker compose -f "${COMPOSE_FILE}" down
+$COMPOSE down
 
 # Rollback strategy: use locally cached images
 # We don't try to pull during rollback as GITHUB_TOKEN may not be available
@@ -113,7 +119,7 @@ log_warn "Using locally cached images (not pulling from registry)"
 # Try to start services with existing local images
 # If images don't exist locally, this will fail and that's expected
 # Note: docker compose up by default uses cached images if available
-docker compose -f "${COMPOSE_FILE}" up -d --pull never || {
+$COMPOSE up -d --pull never || {
     log_error "Failed to start services with local images"
     log_error "Manual intervention required: docker compose up -d"
     exit 1
@@ -139,7 +145,7 @@ fi
 
 # Show final status
 log_step "Rollback status:"
-docker compose -f "${COMPOSE_FILE}" ps
+$COMPOSE ps
 
 if [ "$ROLLBACK_SUCCESS" = true ]; then
     log_info "Rollback completed successfully!"
