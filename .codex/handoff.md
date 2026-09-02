@@ -573,17 +573,65 @@ though the value is in `.env.dev`. The working form is the one `scripts/deploy_d
 `--env-file "$BASE_PATH/.env.dev"`; production additionally needs `API_IMAGE` and `WEB_IMAGE` passed
 explicitly.
 
+## Six open defects closed (2026-09-02, `0ab834bd3`)
+
+Every Career Playbook issue outside the epic is now closed. `mc2-db696` is the only open one left,
+and what remains before it can close is a release, not a fix.
+
+| issue       | what it was                                      | what shipped                                                                                    |
+| ----------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `mc2-jqvf4` | the proofreader invents missing sections         | it is handed a pattern-derived section inventory; regenerations are capped to its own criticals |
+| `mc2-r2468` | deepseek vs glm for the proofreader              | dissolved by the measurement below — the model stays                                            |
+| `mc2-x15bk` | a critical count is not a measurement            | 32 arms recorded in quality-contract §6.2 with a floor of eight arms per side                   |
+| `mc2-afoz6` | block 17 sets a threshold it promised not to set | the ledger owns thresholds, the block owns observation windows; written on both sides           |
+| `mc2-de6fe` | semantic repetition catches parallel structure   | two text-decidable exemptions, and the within-block finding drops to `warning`                  |
+| `mc2-encw8` | the leak detector knows one grammatical mood     | the imperative form, requiring both halves in one line                                          |
+
+**Three things the work found that the issues did not say.**
+
+`mc2-jqvf4` is not a Russian defect and not intermittent between runs — the invented-section claim
+appears in **all three** runs of 2026-09-02, in both languages. And it cannot be measured by replay
+in either direction: 0 of 16 arms reproduced it before the change, 0 of 16 after, because a replay
+reads `final_markdown` — the text after the final regenerations — while the live node saw the
+assembly before them. The change rests on the mechanism, and this is stated that way in the contract
+and in the commit rather than dressed up as a measured win.
+
+`mc2-de6fe` has a number the issue never had: the within-block check has filed **six** criticals in
+the life of this track, all six are read in the closure note, and **not one** is repetition. The one
+real repeat in the corpus (`a03dfb46` block_9) has never been filed.
+
+`verdictFromIssues` sent everything that was not `info` to regeneration, warnings included. That made
+`validateContractLeakage`'s own suggestion — "this is a warning rather than a regeneration trigger" —
+untrue of the code beneath it, and it would have silently voided the `mc2-de6fe` downgrade. Both
+paths now regenerate on `critical` only.
+
+**Verified on a live run, not only in tests.** The running dev worker was probed for the compiled
+symbols first (`buildCareerPlaybookDocumentOutline`, `isParallelStructure`, `isAuthoringDirective`
+all present in `dist/`), because a green Deploy job has lied before. Then `dc504385` (ru,
+2026-09-02, `status: pass`, 27 blocks, PDF 505,921 bytes, all four public pages HTTP 200,
+**$0.11128** against the $0.60 ceiling):
+
+| fix         | on `dc504385`                                                                                                                                                              |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mc2-jqvf4` | zero claims that a section is absent; `action=regenerate` equals the critical count exactly (18 = 18), where the three runs before it were 10, 11 and 6 against 8, 7 and 2 |
+| `mc2-encw8` | `validateContractLeakage` = 0                                                                                                                                              |
+| `mc2-de6fe` | zero semantic-repetition findings                                                                                                                                          |
+| `mc2-afoz6` | 3 `invented_number` criticals, every one about a promotion policy in quarters and none about an observation window — the carve-out did not over-generalize                 |
+
+The 35 proofreader findings on that run are three passes of 12, the prompt's own cap, so about six
+criticals per pass — inside the 3-12 range §6.2 measures. Read it that way; a raw total across
+passes is the exact mistake `mc2-x15bk` exists to stop.
+
 ## Next recommended
 
 Next stage id: none selected. The accepted Role Guide stage is delivered; its verification record is
 in `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md`. No schema migration, reindex,
 audience-checkbox change, secret/access mutation or force-push has occurred since.
 
-Recommended action: `mc2-ehao2` — `buildRoleGuideView` still has no caller, so the audience views
-this track spent two stages building reach no reader. It needs an owner decision on what ships to
-whom before any view can be wired up, and the view must go through
-`prepareCareerPlaybookFinalBlocks` or it will ship without diagrams, sources and the calibration
-table.
+Recommended action: **a release to `master`**. `origin/master` is at `22401f40c`, dated 2026-08-28,
+and does not carry the audience-view delivery `3ff023abf` or any of this week's fixes. Everything
+the epic promised is built and verified on `develop`; production does not have it. Closing
+`mc2-db696` before that release would record "finished" for something no user can reach.
 
 ## Starter prompt for next orchestrator
 
