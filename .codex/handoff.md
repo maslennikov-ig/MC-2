@@ -12,11 +12,27 @@ Accepted stage id: `mc2-1786710715922-25-db11a6c5`
 
 The Role Guide stage is accepted; its verification record is
 `.codex/stages/mc2-1786710715922-25-db11a6c5/summary.md`. Epic Career Playbook `mc2-db696` is
-**closed (2026-09-02)**, and the release it was waiting for is done: `master` is at `7ba758427`, and
-production runs that revision — read from `org.opencontainers.image.revision` on
-`megacampus-api-green` and `megacampus-worker`, not from a green CI run. `develop` equals
-`origin/develop`, `master` contains every commit of `develop`, and `check_stranded_commits.py`
-reports nothing left behind. Every Career Playbook issue outside the epic is closed.
+**closed (2026-09-02)**, and the tails left after it were closed the same day under
+`docs/plans/melodic-leaping-octopus.md`.
+
+**The release loop is alive again.** It had been dead since 2026-04-10: five months of production
+deploys with no tag, no `CHANGELOG.md` entry and no name for what was running. Tag **`v0.31.41`**
+now stands on `42ec67070`, `master` is at **`39d0cf719`**, and production runs that revision — read
+from `org.opencontainers.image.revision` on `megacampus-api-blue`, `megacampus-worker`,
+`megacampus-worker-stage6` and `megacampus-worker-stage7`, not from a green CI run. The active
+colour is now **blue** (`deploy_state`: `status=accepted`, `previous_color=green`).
+`megacampus-web-blue` carries `7ba758427` and that is correct, not drift: `packages/web` has zero
+changed files between the two revisions, so `Build Docker - web` never ran and the label records
+the commit its image was built from.
+
+`develop` equals `origin/develop`, `master` contains every commit of `develop`, and
+`check_stranded_commits.py` reports nothing left behind. `AGENTS.md` now states that `/push` runs
+before `/deploy`, so the loop cannot die the same way twice.
+
+Two defects in the release script itself surfaced only because the gap was long, and both are
+fixed: `git tag -m` refused a 4665-line message with "Argument list too long" _after_ the release
+commit was already made (now `-F` through a file), and a fifth of the changelog was merge commits
+and `bd sync` (now filtered — 406 and 280 dropped over this range, nothing else).
 
 What the finished track still binds:
 
@@ -222,9 +238,18 @@ report naming a branch again means something really was left behind.
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- `mc2-cva3o` — the production deploy writes `QDRANT_METRICS_GID` from a secret that does not exist.
-  Not burning: the host carries 900 by some other means. It burns when `.env.production` is rewritten
-  and the infra stack is recreated.
+- `mc2-o7tfu` — **waiting on a clock, not on work.** The nightly `Model Catalogue Price Sync` runs
+  from `master` because that is the default branch, and the fix only reached `master` at 11:13 UTC
+  on 2026-09-02. Today's 07:59 UTC failure ran on `22401f40c`, which does not contain it. The first
+  scheduled run on fixed code is **2026-09-03 03:20 UTC**; close on a success or on a delivered
+  failure notification, since the notification was part of the same fix.
+- `mc2-xfr6t` — 18 lessons of 340 carry a duplicated block. This is **data, not code**: the
+  mechanism died with `1fc3eb1d2` on 2026-02-14. Regenerating them costs paid Stage 6 runs on long
+  lessons, so it is the owner's call; leaving them is defensible.
+- `mc2-hsfaj` — `scripts/deploy.sh` and `scripts/rollback.sh` cannot run at all: `WEB_IMAGE` and
+  `API_IMAGE` live only in the colour env files and `.env.production` has neither. CI never copies
+  them to the host, so nothing burns; the risk is someone reaching for `deploy.sh` in an incident.
+  Deleting both is probably the right answer.
 - `mc2-vlskb` — docling-mcp 3.1.0 still drops `service_timeout`/`service_max_retries`, and its image
   is **neither published nor deployed**: that is the manual `build-docling-images.yml` workflow and a
   recorded `image@sha256`, a production mutation of its own.
@@ -239,29 +264,29 @@ report naming a branch again means something really was left behind.
 
 ## Next recommended
 
-Next stage id: none selected. The active plan is `docs/plans/melodic-leaping-octopus.md`
-(2026-09-02), which closes the tails left after the Career Playbook epic in four streams. A and C are
-parallel; E is strictly last.
+Next stage id: none selected. `docs/plans/melodic-leaping-octopus.md` (2026-09-02) is **done except
+stream B**, which is waiting on a clock. Streams A, C and E were delivered and accepted on the day.
 
-Recommended action: **work stream A to completion, then C, then E.**
+Recommended action: **read one scheduled run after 03:20 UTC on 2026-09-03, then take the two owner
+decisions below.**
 
-- **A — process and tracker housekeeping** (`chore/audit-housekeeping-2026-09`). This file is A1.
-  Remaining: close `mc2-uv7n7` (owner 2026-09-02: the UI Redesign epic is not current; a future
-  redesign starts from the Stitch screens as new work), reconcile GitHub Issues with Beads (35 open
-  against 21 — one issue at a time, with text, no bulk closes), and settle `mc2-pmrmf.1` and its
-  blocked parent `mc2-pmrmf`.
-- **C — three P2 bugs**, one branch each: `mc2-kkimo` (seven files excluded from
-  `vitest.config.unit.ts`, ~250 cases), `mc2-cva3o` (read the gid with `stat` as dev already does,
-  create no secret), `mc2-hpful` (find where a lesson block is duplicated during assembly before
-  proposing a near-duplicate detector; ceiling $2).
-- **B — `mc2-o7tfu`**, no branch needed if the 2026-09-03 03:20 UTC `Model Catalogue Price Sync` run
-  on `master` is green.
-- **E — the release loop**, dead since April: `package.json` is 0.31.41 with no tag, the last tag is
-  `v0.31.40`, `CHANGELOG.md` ends at 2026-04-10. `/push patch` on `develop`, then `/deploy`, then one
-  line in `AGENTS.md` so the loop cannot die again.
+1. **After 2026-09-03 03:20 UTC, read one run** — `gh run list --workflow "Model Catalogue Price
+Sync" --limit 3`. Green or a delivered failure notification closes `mc2-o7tfu`. A red run with
+   the same "Missing required Supabase environment variables" would mean the placeholders at lines
+   96–99 of `model-catalog-drift.yml` do not cover the path after all; that would be new
+   information, not a repeat.
+2. **Two owner decisions, both filed with their evidence**, neither blocking: `mc2-xfr6t` (18 old
+   lessons — regenerate at the cost of paid runs, or leave) and `mc2-hsfaj` (delete the two legacy
+   deploy scripts, or teach them the colour env file).
+3. Then pick any ready Beads goal; nothing from this plan blocks the queue.
+
+The tracker now agrees with GitHub: 21 open issues on both sides, plus ten REF documents that are
+open on purpose and carry a comment saying so, so the next audit does not count them as a tail
+again.
 
 No schema migration, reindex, audience-checkbox change, secret/access mutation or force-push has
-occurred since the accepted stage.
+occurred since the accepted stage. One production deploy did occur — `39d0cf719`, under the owner's
+standing authorization for a green pipeline.
 
 ## Starter prompt for next orchestrator
 
