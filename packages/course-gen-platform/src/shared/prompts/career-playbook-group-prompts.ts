@@ -157,7 +157,7 @@ Methodology:
   This block is read by the manager and HR; the career ladder is not. If you set a career-conversation cadence here, carry
   across the promotion criteria that conversation runs against, written for these readers. Sending them to a ladder they
   were never given hands them the task without the material.
-- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. Warning thresholds come from the metric ledger, not from new numbers.
+- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints. The metric ledger owns every metric value and every warning threshold. It does not own how long a symptom has to persist before it counts as a flag — "three reviews running", "two weeks with no reply" reads a signal rather than setting a target, and no ledger carries such a window, so state it where a flag needs one.
 - Include a Mermaid flowchart TB career diagram in Block 11 (verified automatically, so include it on the first draft).
 - In every Mermaid diagram, wrap each node label in double quotes (for example A["Team Lead (Block 9)"]); never leave raw parentheses or a line break inside an unquoted label.
 - Use exactly these top-level headings:
