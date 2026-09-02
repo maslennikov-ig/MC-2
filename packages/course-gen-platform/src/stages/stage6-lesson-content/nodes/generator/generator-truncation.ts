@@ -130,10 +130,46 @@ export function mergeContinuationContent(existingContent: string, continuationRa
     }
   }
 
-  const appendPart = continuation.slice(overlap).trimStart();
+  const appendPart = dropRepeatedHeading(existingContent, continuation.slice(overlap).trimStart());
   if (appendPart.length === 0) {
     return existingContent;
   }
 
   return `${existingContent.trimEnd()}\n\n${appendPart}`;
+}
+
+const HEADING_LINE_PATTERN = /^#{1,6}\s+\S/;
+
+function normalizeHeadingLine(line: string): string {
+  return line.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Drop the heading a continuation repeats from the seam.
+ *
+ * When generation is cut off right after a heading, the continuation restates that heading
+ * and the document ends up with it twice ("## Заключение\n\n## Заключение"). The heading
+ * line is far shorter than the 40-char overlap floor, so the overlap scan never sees it.
+ *
+ * Only a heading that is the very last line of the existing content is dropped: if the
+ * document already carries body text under that heading, a second copy is a real duplicate
+ * and belongs in the judge's report, not in this seam repair.
+ */
+function dropRepeatedHeading(existingContent: string, appendPart: string): string {
+  if (appendPart.length === 0) {
+    return appendPart;
+  }
+
+  const existingLines = existingContent.trimEnd().split('\n');
+  const lastLine = existingLines[existingLines.length - 1] ?? '';
+  if (!HEADING_LINE_PATTERN.test(lastLine.trim())) {
+    return appendPart;
+  }
+
+  const appendLines = appendPart.split('\n');
+  if (normalizeHeadingLine(appendLines[0]) !== normalizeHeadingLine(lastLine)) {
+    return appendPart;
+  }
+
+  return appendLines.slice(1).join('\n').trim();
 }

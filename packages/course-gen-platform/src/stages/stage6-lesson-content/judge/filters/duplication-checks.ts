@@ -76,6 +76,11 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
         });
         continue;
       }
+      // Headers that differ only by their position in a numbered series
+      // ("Упражнение 1" / "Упражнение 2", similarity 0.917) are siblings, not duplicates.
+      if (isEnumeratedSiblingPair(headers[i], headers[j])) {
+        continue;
+      }
       const similarity = calculateSimilarity(headers[i], headers[j]);
       if (similarity > 0.8) {
         duplicatePairs.push({
@@ -387,6 +392,33 @@ function buildNgramSet(tokens: string[], n: number): Set<string> {
   }
 
   return set;
+}
+
+/**
+ * Trailing ordinal of a numbered series: " 1", " №2", " 3.", " 4)".
+ * A whitespace boundary is required so figures inside a title ("Правило 80/20") stay put.
+ */
+const TRAILING_ORDINAL_PATTERN = /\s+(?:№|#)?\s*\d+\s*[.):]?\s*$/u;
+
+function stripTrailingOrdinal(title: string): string {
+  return title.replace(TRAILING_ORDINAL_PATTERN, '').trim();
+}
+
+/**
+ * Two headers of one numbered series ("Упражнение 1" / "Упражнение 2").
+ *
+ * Identical headers are caught by the exact-match pre-check before this runs, so a pair
+ * that is equal only after the ordinal is removed is a series, not a repetition.
+ */
+function isEnumeratedSiblingPair(title1: string, title2: string): boolean {
+  const base1 = stripTrailingOrdinal(title1);
+  const base2 = stripTrailingOrdinal(title2);
+
+  if (base1.length === 0 || base2.length === 0) {
+    return false;
+  }
+
+  return base1.toLowerCase() === base2.toLowerCase();
 }
 
 /**

@@ -35,16 +35,12 @@ export default mergeConfig(
       // makes otherwise sub-30s tests time out from contention.
       maxWorkers: 4,
       dangerouslyIgnoreUnhandledErrors: false,
-      exclude: [
-        '**/node_modules/**',
-        '**/poller.test.ts',
-        '**/patcher.test.ts',
-        '**/verifier.test.ts',
-        '**/qwen3-section-generation.test.ts',
-        '**/size-validation.test.ts',
-        '**/jina-reranker-client.test.ts',
-        '**/metadata-generator.test.ts',
-      ],
+      // Every entry here must name a reason. Seven test files (~250 cases) once
+      // sat in this list unexplained: they were findable by search and read as
+      // coverage while never running. All seven were resolved on 2026-09-02
+      // (mc2-kkimo) — six returned to the run, one deleted — so nothing but
+      // `node_modules` is excluded now.
+      exclude: ['**/node_modules/**'],
       coverage: {
         include: ['src/**/*.ts'],
         exclude: ['**/*.d.ts', '**/node_modules/**', 'src/build/**', 'src/types/**'],

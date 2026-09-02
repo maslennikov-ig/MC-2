@@ -14,6 +14,9 @@
   - `/push-dev` is the normal dev delivery path
   - `/push` is the release/version flow
   - `/deploy` is the staging deploy flow
+  - `/push` runs **before** `/deploy`: every production release carries a tag. Skipping it is how the
+    release loop died between 2026-04-10 (`v0.31.40`) and 2026-09-02 — five months of production
+    deploys with no tag, no `CHANGELOG.md` entry, and no way to name what is running.
 
 ## Canonical Verification
 

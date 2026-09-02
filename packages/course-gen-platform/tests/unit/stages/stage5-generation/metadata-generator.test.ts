@@ -7,7 +7,7 @@
  * 3. generate() with different styles (FR-028)
  * 4. extractLanguage() - Language extraction priority (FR-027)
  * 5. validateMetadataQuality() - Quality metrics calculation (RT-001)
- * 6. UnifiedRegenerator integration with Layers 1-2 (RT-005)
+ * 6. UnifiedRegenerator integration with all five layers (RT-005)
  *
  * @module tests/unit/stage5/metadata-generator.test
  */
@@ -16,37 +16,72 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MetadataGenerator } from '@/stages/stage5-generation/utils/metadata-generator';
 import { DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 import type { GenerationJobInput } from '@megacampus/shared-types/generation-job';
-import type { CourseStructure } from '@megacampus/shared-types/generation-result';
+import type { CourseMetadataWithoutInjectedFields } from '@megacampus/shared-types/generation-result';
 import { ChatOpenAI } from '@langchain/openai';
 import * as stylePromptsModule from '@megacampus/shared-types/style-prompts';
 import * as regenerationModule from '@/shared/regeneration';
-import { createFullAnalysisResult } from '../../../../fixtures/analysis-result-fixture';
+import * as langchainModels from '@/shared/llm/langchain-models';
+import { createFullAnalysisResult } from '../../../fixtures/analysis-result-fixture';
 
 // Mock dependencies
 vi.mock('@langchain/openai', () => ({
   ChatOpenAI: vi.fn(),
 }));
-vi.mock('@megacampus/shared-types/style-prompts');
+// Only `getStylePrompt` is mocked here. A bare automock of this module also
+// replaces `CourseStyleSchema`, which `generation-job.ts` composes into a Zod
+// object at import time — the whole shared-types barrel then fails to load.
+vi.mock('@megacampus/shared-types/style-prompts', async importOriginal => ({
+  ...(await importOriginal<typeof stylePromptsModule>()),
+  getStylePrompt: vi.fn(),
+}));
 vi.mock('@/shared/regeneration', () => ({
   UnifiedRegenerator: vi.fn(),
 }));
-vi.mock('@/shared/logger', () => ({
-  logger: {
+// Metadata routing goes through `getModelForPhase('stage_5_metadata')`, which
+// reads `llm_model_config`. Only that lookup is replaced; `getTextContent` and
+// the cost-recording helper stay real.
+vi.mock('@/shared/llm/langchain-models', async importOriginal => ({
+  ...(await importOriginal<typeof langchainModels>()),
+  getModelForPhase: vi.fn(),
+}));
+// `metadata-generator.ts` imports the logger as a default export, so the mock
+// has to supply `default` as well as the named `logger`.
+vi.mock('@/shared/logger', () => {
+  const mockLogger = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}));
+  };
+  return { default: mockLogger, logger: mockLogger };
+});
+
+/** Stand-in for whatever `llm_model_config` currently seats at `stage_5_metadata`. */
+const ROUTED_MODEL_ID = 'test/routed-metadata-model';
 
 describe('MetadataGenerator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENROUTER_API_KEY = 'test-api-key';
+
+    // The generator hands back whatever id `getModelForPhase` resolved. The
+    // sentinel proves the pass-through without pinning a catalogue entry that
+    // moves whenever `llm_model_config` changes.
+    vi.mocked(langchainModels.getModelForPhase).mockImplementation(async () => {
+      const routed = new (ChatOpenAI as unknown as new () => Record<string, unknown>)();
+      routed.model = ROUTED_MODEL_ID;
+      return routed as never;
+    });
   });
 
   it('should throw error when OPENROUTER_API_KEY is missing', async () => {
     delete process.env.OPENROUTER_API_KEY;
+
+    // The key is checked where the generator builds its own model, which it
+    // only does when the phase lookup yields nothing.
+    vi.mocked(langchainModels.getModelForPhase).mockRejectedValue(
+      new Error('no phase config in test')
+    );
 
     const mockJobInput: GenerationJobInput = {
       course_id: 'course-error',
@@ -61,12 +96,12 @@ describe('MetadataGenerator', () => {
 
     const generator = new MetadataGenerator();
     await expect(generator.generate(mockJobInput)).rejects.toThrow(
-      'OPENROUTER_API_KEY environment variable is required'
+      'OpenRouter API key not configured'
     );
   });
 
   it('should generate metadata from full Analyze results (FR-001)', async () => {
-    const mockMetadata: Partial<CourseStructure> = {
+    const mockMetadata: CourseMetadataWithoutInjectedFields = {
       course_title: 'Machine Learning Basics',
       course_description:
         'A comprehensive introduction to machine learning covering supervised and unsupervised techniques',
@@ -77,9 +112,9 @@ describe('MetadataGenerator', () => {
       difficulty_level: 'intermediate',
       prerequisites: ['Python basics', 'Linear algebra'],
       learning_outcomes: [
-        'Design effective supervised classification algorithms',
-        'Assess model performance using various metrics',
-        'Demonstrate classification techniques on real-world problems',
+        { text: 'Design effective supervised classification algorithms' },
+        { text: 'Assess model performance using various metrics' },
+        { text: 'Demonstrate classification techniques on real-world problems' },
       ],
       course_tags: [
         'machine-learning',
@@ -133,12 +168,12 @@ describe('MetadataGenerator', () => {
 
     expect(result).toBeDefined();
     expect(result.metadata.course_title).toBe('Machine Learning Basics');
-    expect(result.modelUsed).toBe(DEFAULT_FALLBACK_MODEL_ID);
+    expect(result.modelUsed).toBe(ROUTED_MODEL_ID);
     expect(result.quality.completeness).toBeGreaterThan(0.8);
   });
 
   it('should generate metadata from title-only input (FR-003)', async () => {
-    const mockMetadata: Partial<CourseStructure> = {
+    const mockMetadata: CourseMetadataWithoutInjectedFields = {
       course_title: 'Introduction to Quantum Computing',
       course_description:
         'Explore quantum computing fundamentals including qubits, superposition, entanglement, and quantum algorithms',
@@ -149,9 +184,9 @@ describe('MetadataGenerator', () => {
       difficulty_level: 'advanced',
       prerequisites: ['Linear algebra'],
       learning_outcomes: [
-        'Explain quantum superposition and entanglement principles',
-        'Execute basic quantum algorithms using quantum gates',
-        'Examine quantum circuit complexity and performance',
+        { text: 'Explain quantum superposition and entanglement principles' },
+        { text: 'Execute basic quantum algorithms using quantum gates' },
+        { text: 'Examine quantum circuit complexity and performance' },
       ],
       course_tags: ['quantum-computing', 'qubits', 'algorithms', 'quantum-gates', 'physics'],
     };
@@ -198,11 +233,13 @@ describe('MetadataGenerator', () => {
 
     expect(result).toBeDefined();
     expect(result.metadata.course_title).toBe('Introduction to Quantum Computing');
-    expect(result.modelUsed).toBe(DEFAULT_FALLBACK_MODEL_ID); // FR-003: qwen3-max for title-only
+    // FR-003 once claimed a separate title-only model. Metadata now has one
+    // seat for every language and every input shape.
+    expect(result.modelUsed).toBe(ROUTED_MODEL_ID);
   });
 
   it('should use correct style prompts (FR-028)', async () => {
-    const mockMetadata: Partial<CourseStructure> = {
+    const mockMetadata: CourseMetadataWithoutInjectedFields = {
       course_title: 'Test Course Title',
       course_description:
         'Comprehensive course description covering all key topics and learning objectives for beginners',
@@ -213,9 +250,9 @@ describe('MetadataGenerator', () => {
       difficulty_level: 'beginner',
       prerequisites: [],
       learning_outcomes: [
-        'Explain fundamental concepts and principles',
-        'Demonstrate basic techniques on simple problems',
-        'Identify key components and relationships',
+        { text: 'Explain fundamental concepts and principles' },
+        { text: 'Demonstrate basic techniques on simple problems' },
+        { text: 'Identify key components and relationships' },
       ],
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
@@ -264,7 +301,7 @@ describe('MetadataGenerator', () => {
   });
 
   it('should extract language from frontend_parameters (FR-027)', async () => {
-    const mockMetadata: Partial<CourseStructure> = {
+    const mockMetadata: CourseMetadataWithoutInjectedFields = {
       course_title: 'Curso de Prueba',
       course_description:
         'Descripción completa del curso cubriendo todos los temas principales y objetivos de aprendizaje',
@@ -275,9 +312,9 @@ describe('MetadataGenerator', () => {
       difficulty_level: 'beginner',
       prerequisites: [],
       learning_outcomes: [
-        'Explicar conceptos básicos y fundamentales',
-        'Demostrar técnicas básicas en problemas simples',
-        'Identificar componentes clave y relaciones',
+        { text: 'Explicar conceptos básicos y fundamentales' },
+        { text: 'Demostrar técnicas básicas en problemas simples' },
+        { text: 'Identificar componentes clave y relaciones' },
       ],
       course_tags: ['test', 'fundamentales', 'principiantes', 'basico', 'introduccion'],
     };
@@ -327,8 +364,8 @@ describe('MetadataGenerator', () => {
     expect(mockInvoke).toHaveBeenCalledWith(expect.stringContaining('Target Language**: es'));
   });
 
-  it('should configure UnifiedRegenerator with Layers 1-2 (RT-005)', async () => {
-    const mockMetadata: Partial<CourseStructure> = {
+  it('should configure UnifiedRegenerator with all five layers (RT-005)', async () => {
+    const mockMetadata: CourseMetadataWithoutInjectedFields = {
       course_title: 'Test Course Title',
       course_description:
         'Comprehensive description of the test course covering fundamental concepts and practical applications',
@@ -339,9 +376,9 @@ describe('MetadataGenerator', () => {
       difficulty_level: 'beginner',
       prerequisites: [],
       learning_outcomes: [
-        'Explain fundamental testing concepts and principles',
-        'Demonstrate basic testing techniques on real scenarios',
-        'Identify common testing patterns and anti-patterns',
+        { text: 'Explain fundamental testing concepts and principles' },
+        { text: 'Demonstrate basic testing techniques on real scenarios' },
+        { text: 'Identify common testing patterns and anti-patterns' },
       ],
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
@@ -387,11 +424,17 @@ describe('MetadataGenerator', () => {
 
     expect(regenerationModule.UnifiedRegenerator).toHaveBeenCalledWith(
       expect.objectContaining({
-        enabledLayers: ['auto-repair', 'critique-revise'],
-        maxRetries: 2,
+        enabledLayers: [
+          'auto-repair',
+          'critique-revise',
+          'partial-regen',
+          'model-escalation',
+          'emergency',
+        ],
+        maxRetries: 3,
         stage: 'generation',
         courseId: 'course-regen',
-        phaseId: 'metadata_generator',
+        phaseId: 'metadata_generation',
       })
     );
   });

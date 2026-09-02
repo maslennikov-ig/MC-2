@@ -261,11 +261,12 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(OpenEdXImportError);
+      // One poll run, asserted twice: the status is stubbed with `...Once`, so
+      // a second call would find the mock empty and poll until it timed out.
+      const failed = pollImportStatus(mockClient, taskId);
 
-      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
-        `Course import failed: ${errorMessage}`
-      );
+      await expect(failed).rejects.toThrow(OpenEdXImportError);
+      await expect(failed).rejects.toThrow(`Course import failed: ${errorMessage}`);
     });
 
     it('should use message field if error_message is null on FAILURE', async () => {
@@ -316,19 +317,17 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient, taskId, {
-          intervalMs: 10,
-          maxAttempts,
-        })
-      ).rejects.toThrow(LMSTimeoutError);
+      // Polling once and asserting twice; two runs would double the attempt
+      // count the assertion below pins.
+      const timedOut = pollImportStatus(mockClient, taskId, {
+        intervalMs: 10,
+        maxAttempts,
+      });
 
-      await expect(
-        pollImportStatus(mockClient, taskId, {
-          intervalMs: 10,
-          maxAttempts,
-        })
-      ).rejects.toThrow(`Import status polling timed out after ${maxAttempts} attempts`);
+      await expect(timedOut).rejects.toThrow(LMSTimeoutError);
+      await expect(timedOut).rejects.toThrow(
+        `Import status polling timed out after ${maxAttempts} attempts`
+      );
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(maxAttempts);
     });

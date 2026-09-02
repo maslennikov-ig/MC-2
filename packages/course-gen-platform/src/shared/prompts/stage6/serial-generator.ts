@@ -137,6 +137,15 @@ Write the content for section "{{sectionTitle}}".
 CRITICAL INSTRUCTIONS:
 1. DO NOT repeat the lesson title or introduction
 2. Create a SMOOTH TRANSITION from the previous context
+2a. **<previous_context> IS ALREADY WRITTEN — NEVER REPRODUCE IT.** It is the tail of the
+   lesson as it already stands, given to you only so your first sentence connects to it.
+   Do NOT retell, rewrite, rephrase, summarize or repeat any part of it, not even in your
+   own words, and do NOT restate its conclusions. Read it, then continue past it: write
+   only your own section "{{sectionTitle}}" and nothing else.
+2b. STAY INSIDE YOUR SECTION when writing after the previous context: cover the key_points
+   listed above and nothing beyond them. Topics belonging to other sections are theirs to
+   cover, and the lesson has its own separate closing section — do NOT write a conclusion
+   or summary for the lesson as a whole.
 3. **VALIDATE reference material relevance BEFORE using** (see rag_validation above)
 3a. Source-ground exact metrics/dates/deadlines before writing them. Unsupported numeric examples must be explicitly hypothetical.
 4. Apply depth guidance: {{depthGuidance}}

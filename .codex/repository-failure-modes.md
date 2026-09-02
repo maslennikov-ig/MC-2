@@ -336,6 +336,117 @@ matters is the one the user receives. Related: a grouped Qdrant query returns po
 never produced — 124 of 475 accepted results at Stage 6 — so "hybrid with RRF" was describing three
 quarters of the answer.
 
+**`\b` is an ASCII word boundary, so a Russian pattern matches nothing and reports zero.** Without
+the `u` flag, `\b(?:пример|example)\b` cannot fire on Cyrillic, and the failure is silent in exactly
+the wrong direction: the check returns "clean". Two independent checks were dark this way for the
+whole life of the Russian track — the cadence regex, whose section had therefore been empty in every
+RU playbook, and both copies of the example-marker regex, which meant no Russian document's markers
+were ever visible to the marking check or the calibration table. A regex over user text is a claim
+about a script; test it against the non-Latin language before trusting a zero.
+
+**A near-empty result is the shape a broken check takes, so read zeroes as suspects.** Every case in
+the entry above was found by asking why a counter was zero, never by a failing test. When a check
+that should find something finds nothing across an entire language, that is the finding.
+
+**MDX compiles `<` as the start of a tag, and a smoke gate that checks a query has not checked a
+page.** `MarkdownRenderer` uses `compileMDX`, and a red band is a ceiling written with `<` — one run
+carried 54 of them (`red <2x`, `<65%`). Every public page of such a guide returned **HTTP 500**:
+catalog share, slug share and all three reader links. Because the metric ledger has published a red
+band for every metric since it existed, this had been true for every such guide all along, and five
+paid runs passed over it — the live-smoke `public-share` gate reported "rendered successfully"
+because it queries tRPC rather than requesting the URL and reading a status. `escapeBareAngleBrackets`
+rewrites a `<` that cannot start a tag and leaves what can, fences and code spans included. A gate
+for a page must fetch the page.
+
+**A locating word has to be the rarest word in the line, and a contested family must stay silent.**
+Two false positives, each billing a paid regeneration. A milestone check anchored on the label's
+**first** long word, and every ledger label begins with "First", so one correct one-line ramp summary
+was searched from five places at once and blamed five times. Separately, `findCadenceLedgerEntry`
+took the first row matching a duty family, and the ledger held both `Performance review` (quarterly)
+and `Team performance review` (weekly); the block wrote what its own row publishes and was blamed
+with the other row's rhythm. Anchor on the rarest token, and when two ledger rows could both own a
+line, report nothing rather than guess.
+
+**`block_15` sorts before `block_4`.** A disagreement resolver ordered block ids as strings to find
+the earliest, picked the wrong block, and sent the block that was right to be rewritten. An id with a
+numeric suffix needs a numeric comparison every time it is ordered.
+
+**An absent field reads as a measurement.** No cost row named a service tier, so 64 of 64 rows with
+nothing there were read as "flex is off" — for a run in which every call had in fact been served by
+`openai/flex`, which `GET /api/v1/generation` said plainly. Before reporting an absence, find the
+positive record: a field nothing writes is silence, not evidence. `settleCareerPlaybookNodeCosts`
+now keeps `service_tier` from the receipt it was already fetching.
+
+**A check can attack exactly what the contract requires.** Eight `unresolved_placeholder` criticals
+in one run all pointed at the example marker the prompt mandates, and satisfying any of them would
+have turned a correct block into a different defect. The fix is a filter, not a prompt: demote any
+critical the deterministic detector cannot confirm in the block's own text. Corollary from the same
+family — a critical whose own description says the check passed is a prompt-shaped defect a prompt
+alone cannot hold, and the run counts it all the same.
+
+**A prompt that explains a rule through its consequence gets the explanation published, and a rule
+written inside the data gets written down for the reader.** Reader text carried five rule-leak
+sentences until the rationale was removed and replaced with a per-sentence test. Separately, the
+`prior_blocks_digest` section titles carried writing rules inside the data, and the model copied them
+out — six leaks in three stored documents, for rules that already existed in the output contract.
+Remove the trigger rather than banning the output.
+
+**Part of the document is written by our own code, and no prompt reaches it.** 27 of one run's 28
+unreachable references came from `appendCareerPlaybookCalibrationTable` — application-built, appended
+after generation, labelling rows "Block 8"/"Block 11". The block was regenerated twice and the table
+was re-appended each time. Before writing a prompt fix for something in the output, establish which
+side of the seam produced it.
+
+**A fused RRF score is not on a different scale from a dense cosine one.** Fused scores reach 1.0000
+against dense bests of 0.45–0.65. The standing advice not to compare them was right; its stated
+reason was wrong, which is worth knowing before someone re-derives a threshold from it.
+
+**A counter can name what was planned rather than what was issued.** `[Lesson RAG] Retrieval
+complete` logs `queriesExecuted: queries.length`. Count the provider rows in `generation_trace`
+instead. Its sibling: a per-query retrieval rate does not describe a ten-query lesson, because the
+per-query limit is a function of the query count — a one-query harness measuring 29.97 candidates is
+6 in a real lesson.
+
+**A count from one run is not a measurement of a stochastic node.** Replaying one proofreader on a
+**byte-identical** input gave 1, 5, 12 and 7 criticals and four different regeneration lists; three
+runs of one English fixture gave 1, 5 and 11. Five runs of identical input spanned 25/9/7/11/13.
+Every closure that rests on such a number is resting on noise. Replaying a single node costs ~$0.002
+against ~$0.10 for a full run, so the cheap instrument already exists; the contract now requires a
+floor of eight arms per side, and deterministic replay over stored documents is the comparable row.
+
+**A replay does not see what the live node saw.** A defect that appears in every live run reproduced
+in **0 of 16** replay arms before the change and 0 of 16 after, in both directions, because a replay
+reads `final_markdown` — the text after the final regenerations — while the live node was handed the
+assembly from before them. When replay cannot reproduce a live defect, check what each one is fed
+before concluding the defect is intermittent, and say plainly that the fix rests on the mechanism
+rather than dressing it up as a measured win.
+
+**A whole-document producer has no per-block row to file under.** The final proofreader's findings
+reached no stored row at all, for months, because `q_a_data.quality_issues` is built by walking
+`generatedBlocks` for a per-block verdict. Anything that judges the document as a whole needs its own
+source key, or its output is computed, paid for and discarded.
+
+**A severity is only downgraded when every consumer of it agrees.** `verdictFromIssues` sent
+everything above `info` to regeneration, warnings included, which made a check's own suggestion —
+"this is a warning rather than a regeneration trigger" — untrue of the code beneath it, and would
+have silently voided a deliberate `critical` → `warning` downgrade. Before changing a severity, grep
+every consumer of it; a deterministic path and its LLM sibling routing on different thresholds is the
+same defect wearing two hats.
+
+**`env_file` is not compose interpolation.** A variable that is demonstrably in `.env.dev` still
+fails `${VAR:?}` in a hand-written `docker compose … up`, because `env_file` populates the
+container's environment while `${VAR}` in the compose file is resolved from the invoking shell and
+the project `.env`. The working form is the one `scripts/deploy_dev.sh:151` uses, `--env-file
+"$BASE_PATH/.env.dev"`; production additionally needs `API_IMAGE` and `WEB_IMAGE` passed explicitly.
+
+**One provider key serves dev and production, so exhausting it from dev is a production outage.** The
+Jina key ran out on 2026-09-02: it stopped Career Playbook on dev and would have stopped production
+the moment a course ran, because embedding and rerank rates are read with the same credential from
+both. A corpus-wide "read-only" measurement is a paid write against that balance. Replacing the key
+means every place the value is read — the local `.env`, the GitHub Actions secret every deploy writes
+from, `/opt/megacampus/.env.{dev,blue,green,production}`, and each running container — and the proof
+is a 200 from `/v1/embeddings` at 768 dims through our own code, not a config diff.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant** and holds **12 points** across one course (2026-08-27).
@@ -346,6 +457,13 @@ quarters of the answer.
   write — verified, `403 Forbidden` on an empty alias change. A write against a collection that
   does not exist answers 404 instead, because Qdrant resolves the collection first; that 404
   reads like "the key can write" and does not mean it.
+- A Stage 6 probe's lesson length follows `estimated_duration_minutes` from `course_structure` — 5
+  minutes for course `8baaa75e` against the 15 an older baseline used — so every per-lesson counter
+  moves with it. Read the value before comparing two runs.
+- Rotating a credential in a running production container is safe when the container is recreated on
+  **the digest it is already running** (`sha256:20e1372e15bd…`, read from the container, not from a
+  tag): the credential changes and nothing else does. Verify the queues are idle first, and check
+  `RestartCount` is 0 afterwards.
 - Production workers take their environment from `/opt/megacampus/.env.<active_color>` — read
   `active_color` first. `.env.production` is the compose default and is not what runs. A variable
   that must survive a deploy goes into **both** `.env.green` and `.env.blue`.

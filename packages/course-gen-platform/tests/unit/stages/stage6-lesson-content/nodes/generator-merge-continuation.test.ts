@@ -144,6 +144,65 @@ describe('mergeContinuationContent', () => {
     });
   });
 
+  describe('repeated heading at the seam', () => {
+    // Real artifact: lesson 2.3 of course a3d1dd7c ended on '## Заключение' and the
+    // continuation opened with the same heading. 13 chars is below the 40-char overlap
+    // floor, so the seam kept both copies.
+    it('should drop a heading the continuation repeats from the end of existing content', () => {
+      const existing = [
+        '## Правила оформления папок с логотипом',
+        '',
+        'Логотип хранится в отдельной папке с исходниками и экспортами.',
+        '',
+        '## Заключение',
+      ].join('\n');
+      const continuation = '## Заключение\n\nМы разобрали правила хранения и экспорта логотипа.';
+
+      const result = mergeContinuationContent(existing, continuation);
+
+      expect(result).not.toMatch(/## Заключение[\s\S]*## Заключение/);
+      expect(result).toContain('Мы разобрали правила хранения и экспорта логотипа.');
+      expect(result).toContain('## Заключение');
+    });
+
+    it('should drop the repeated heading regardless of inner whitespace differences', () => {
+      const existing = 'Текст урока, который оборвался.\n\n##   Заключение';
+      const continuation = '## Заключение\n\nИтоговый абзац урока.';
+
+      const result = mergeContinuationContent(existing, continuation);
+
+      expect(result).not.toMatch(/Заключение[\s\S]*Заключение/);
+      expect(result).toContain('Итоговый абзац урока.');
+    });
+
+    it('should return existing content when the continuation is only the repeated heading', () => {
+      const existing = 'Текст урока, который оборвался.\n\n## Заключение';
+
+      expect(mergeContinuationContent(existing, '## Заключение')).toBe(existing);
+    });
+
+    it('should keep a heading the continuation opens with when existing does not end on it', () => {
+      const existing = 'Текст урока.\n\n## Заключение\n\nПервый абзац заключения.';
+      const continuation = '## Упражнения\n\nСоставьте карту процесса.';
+
+      const result = mergeContinuationContent(existing, continuation);
+
+      expect(result).toContain('## Упражнения');
+      expect(result).toContain('Составьте карту процесса.');
+    });
+
+    it('should keep a repeated heading when existing content continues past it', () => {
+      // The model restated a heading it had already written *and* filled in — that is a
+      // real duplicate for the judge to see, not a seam artifact.
+      const existing = 'Текст урока.\n\n## Заключение\n\nПервый абзац заключения.';
+      const continuation = '## Заключение\n\nВторой абзац заключения.';
+
+      const result = mergeContinuationContent(existing, continuation);
+
+      expect(result).toMatch(/## Заключение[\s\S]*## Заключение/);
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle empty existing content with non-empty continuation', () => {
       const result = mergeContinuationContent('', 'New content.');

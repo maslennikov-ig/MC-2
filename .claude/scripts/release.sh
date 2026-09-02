@@ -545,17 +545,24 @@ parse_commits() {
     log_info "Analyzing commits since ${LAST_TAG:-start}..."
     echo ""
 
-    # Get all commits with hash
+    # Get all commits with hash.
+    #
+    # `--no-merges` and the `bd sync` filter are not cosmetic. A merge commit
+    # says which branch landed, never what changed, and the tracker's own sync
+    # commits say nothing at all. In the 2026-09-02 release they were 168 and
+    # 784 lines of a 4665-line entry — a fifth of the changelog restating
+    # delivery mechanics to a reader who wants to know what the release does.
+    # The commits they hide are all in the range on their own merits.
     while IFS= read -r line; do
         if [ -n "$line" ]; then
             ALL_COMMITS+=("$line")
         fi
     done < <(
         if [ "$COMMITS_RANGE" = "__ALL_COMMITS__" ]; then
-            git log --format="%h %s" HEAD
+            git log --no-merges --format="%h %s" HEAD
         else
-            git log --format="%h %s" $COMMITS_RANGE
-        fi
+            git log --no-merges --format="%h %s" $COMMITS_RANGE
+        fi | grep -viE '^[0-9a-f]+ (chore(\([^)]*\))?: )?bd sync\b'
     )
 
     # Parse and categorize each commit
@@ -1263,14 +1270,25 @@ Co-Authored-By: Claude <noreply@anthropic.com>" || {
         exit 1
     fi
 
-    local tag_message="Release v$NEW_VERSION
+    # The message goes through a file, not through argv. A release that covers a
+    # long gap carries a long changelog: the 2026-09-02 release spanned 4624
+    # commits and its entry was 4665 lines, which `git tag -m` refused outright
+    # with "Argument list too long" — after the release commit was already made,
+    # so the run died half-finished and had to roll itself back.
+    local tag_message_file
+    tag_message_file="$(mktemp -t release-tag-message.XXXXXX)"
+    {
+        echo "Release v$NEW_VERSION"
+        echo ""
+        generate_changelog_entry "$NEW_VERSION" "$DATE"
+    } >"$tag_message_file"
 
-$(generate_changelog_entry "$NEW_VERSION" "$DATE")"
-
-    git tag -a "v$NEW_VERSION" -m "$tag_message" || {
+    git tag -a "v$NEW_VERSION" -F "$tag_message_file" || {
+        rm -f "$tag_message_file"
         log_error "Failed to create tag"
         exit 1
     }
+    rm -f "$tag_message_file"
     CREATED_TAG="v$NEW_VERSION"
     log_success "Tag v$NEW_VERSION created"
 
