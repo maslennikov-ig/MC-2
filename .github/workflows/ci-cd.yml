@@ -1042,6 +1042,10 @@ jobs:
       # the deploy. Group 0 matters because `group_add: 0` would hand the container the root group
       # instead of the dedicated one, which is a green deploy that quietly widened a privilege.
       #
+      # Measured on the production host on 2026-09-02: `stat -c %g` on that directory returns 900,
+      # the same number `.env.production` already carried by hand. So this reads the value that was
+      # in use rather than changing it — and it now has a source, which the hand-written one did not.
+      #
       # This step is now the ONLY writer of the key. `.env.blue` and `.env.green` are copies of this
       # file made by `write_color_env`, so they inherit whatever is resolved here, and
       # `scripts/ci/check_color_env_contract.mjs` counts the key from this step rather than from the
