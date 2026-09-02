@@ -511,28 +511,36 @@ the issue and in quality-contract §6.1), `mc2-afoz6` (P3, block 17's "три д
 (P2, blocked on `mc2-nfyyo`; the block_13 claim in its original delivery note is corrected there and
 in quality-contract §8bis.6 — the model misread a clock slot as a cadence).
 
-## BLOCKED: Jina account balance is exhausted (2026-09-01, `mc2-7lp0u`, P0)
+## Jina key replaced (2026-09-02, `mc2-7lp0u` closed)
 
-Career Playbook generation fails on dev and will fail on production. Two verification runs
-(`6c1e8966` en, `98ded079` ru) died at the first cross-block judge:
+The exhausted key (sha256 `6fb2b6c3`) stopped Career Playbook on dev and would have stopped
+production; the cause was mine and is recorded in the issue. The owner supplied a replacement
+(sha256 `ea419b01`) on 2026-09-02 and it is installed in every place the value is read:
 
-    CareerPlaybookSemanticRepetitionProviderError: semantic repetition checks unavailable:
-    Insufficient account balance.
+| where                                                     | how                                           |
+| --------------------------------------------------------- | --------------------------------------------- |
+| `packages/course-gen-platform/.env`                       | local dev                                     |
+| GitHub Actions secret `JINA_API_KEY`                      | the source every deploy writes from           |
+| `/opt/megacampus/.env.{dev,blue,green,production}`        | backed up as `.bak-jinakey-<stamp>`           |
+| `megacampus-{api,worker,worker-stage6,worker-stage7}-dev` | recreated                                     |
+| `megacampus-worker`, `-stage6`, `-stage7` (production)    | recreated on the image digest already running |
 
-Both rows are `failed` with 0 characters of markdown. The gate failing closed is deliberate
-(quality-contract §6.1), so this is the contract working.
+Production workers were pinned to `sha256:20e1372e15bd…`, the digest they were already on, so the
+recreation changed the credential and nothing else; the queues were verified idle immediately
+before. `megacampus-api-blue` and `megacampus-web-blue` deliberately still hold the old key: they
+have no embedding or rerank call site — every one is in stages 2, 5 and 6, worker-side — and the
+API's only use is the startup `healthCheck()`. They pick it up at the next production deploy.
 
-`JINA_API_KEY` hashes identically in `megacampus-worker` and `megacampus-worker-dev`, so this is one
-meter for both environments. Production has not hit it only because nothing has called Jina there
-recently. What stops at zero: Career Playbook (hard fail), Qdrant dense search — RAG for stages 4, 5
-and 6 — `QualityValidator` in stage 5, and `semantic-matching`.
+Evidence, not assumption: `/v1/embeddings` 200 at 768 dims (matching the Qdrant collections),
+`/v1/rerank` 200, `healthCheck()` true and `generateQueryEmbedding()` 768 dims through our own code,
+and `megacampus-api-dev` logging a real 321-token embedding call at startup with no balance error.
+All seven recreated containers came up with `RestartCount` 0.
 
-Cause is recorded honestly in the issue: sizing `mc2-de6fe` embedded the stored corpus five times,
-~2.5M tokens in fifteen minutes, between the last successful measurement and the refused run.
-
-**Owner action required:** top up at https://jina.ai/api-dashboard/key-manager. Then rerun the two
-verification runs — they are the only thing still owed for the four fixes delivered tonight, all of
-which have tests and none of which has been seen in a live document.
+**An operator trap found while doing this** is recorded on `mc2-cva3o`: `env_file` does not feed
+compose interpolation, so a hand-written `docker compose … up` fails on `QDRANT_METRICS_GID` even
+though the value is in `.env.dev`. The working form is the one `scripts/deploy_dev.sh:151` uses,
+`--env-file "$BASE_PATH/.env.dev"`; production additionally needs `API_IMAGE` and `WEB_IMAGE` passed
+explicitly.
 
 ## Next recommended
 
