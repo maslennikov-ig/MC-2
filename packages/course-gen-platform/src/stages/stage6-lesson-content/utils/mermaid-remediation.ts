@@ -11,8 +11,6 @@
 // ============================================================================
 
 const MERMAID_EDGE_PATTERN = /-->|-\.->|==>|---|~~~/;
-const MERMAID_TYPE_PATTERN =
-  /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitgraph|C4Context|C4Container|C4Component|C4Deployment|sankey-beta|xychart-beta|block-beta|packet-beta)\b/i;
 const MERMAID_CONTROL_LINE_PATTERN =
   /^\s*(?:%%\{.*\}%%|classDef\b|class\b|style\b|linkStyle\b|click\b)/i;
 
@@ -22,12 +20,6 @@ const MERMAID_CONTROL_LINE_PATTERN =
 
 export function wrapMermaidBlock(code: string): string {
   return `\`\`\`mermaid\n${code}\n\`\`\``;
-}
-
-export function extractDiagramType(code: string): string {
-  const firstLine = code.split('\n').find(line => line.trim().length > 0) ?? '';
-  const typeMatch = firstLine.match(MERMAID_TYPE_PATTERN);
-  return typeMatch ? typeMatch[1] : 'diagram';
 }
 
 function normalizeSingleArrows(line: string): string {
@@ -126,46 +118,4 @@ export function splitMermaidDiagramIntoTwo(
   const secondDiagram = [header, ...sharedNodeLines, ...secondEdges].join('\n').trim();
 
   return { firstDiagram, secondDiagram };
-}
-
-function extractFallbackSteps(brokenDiagram: string): string[] {
-  const lines = brokenDiagram
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
-
-  const edgeSteps: string[] = [];
-
-  for (const line of lines) {
-    const edgeMatch = line.match(
-      /^([A-Za-z0-9_]+)\s*(?:-->|-\.->|==>|---|~~~|->>)\s*(?:\|[^|]*\|\s*)?([A-Za-z0-9_]+)/
-    );
-    if (edgeMatch) {
-      edgeSteps.push(`${edgeMatch[1]} -> ${edgeMatch[2]}`);
-    }
-  }
-
-  if (edgeSteps.length > 0) {
-    return edgeSteps.slice(0, 6);
-  }
-
-  const textualSteps = lines
-    .slice(1)
-    .map(line => line.replace(/[#*`]/g, '').trim())
-    .filter(line => line.length > 0)
-    .slice(0, 4);
-
-  return textualSteps.length > 0 ? textualSteps : ['No stable flow summary could be extracted.'];
-}
-
-export function generateStructuredFallbackText(brokenDiagram: string): string {
-  const diagramType = extractDiagramType(brokenDiagram);
-  const summarySteps = extractFallbackSteps(brokenDiagram);
-
-  return [
-    '**Diagram unavailable (auto-remediated)**',
-    `The original Mermaid ${diagramType} diagram could not be rendered reliably and was converted to a text summary.`,
-    'Key flow:',
-    ...summarySteps.map((step, index) => `${index + 1}. ${step}`),
-  ].join('\n');
 }

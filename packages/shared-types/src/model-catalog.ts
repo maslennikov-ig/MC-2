@@ -317,15 +317,18 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     supportsReasoning: true,
   },
   /**
-   * Read live 2026-08-26, the day the model was published (mc2-r8shw).
+   * Read live 2026-08-26, the day the model was published (mc2-r8shw), and
+   * re-read 2026-09-03.
    *
-   * Two endpoints only — `z-ai` at exactly this rate and `novita` at twice it —
-   * so unlike `glm-5.2` above there is no wide provider spread to hedge
-   * against, and equally little to reroute to if z-ai goes down. No `:batch`
-   * sibling exists.
+   * On publication day it had **two** endpoints — `z-ai` at exactly this rate
+   * and `novita` at twice it — which is why the note below says "both". A week
+   * later it serves **23**, four of them (GMICloud, Novita, DeepInfra, Z.AI) at
+   * exactly this rate; novita is no longer the dear one. A young model's
+   * provider count is a fact with a shelf life of days, so read it live rather
+   * than from here. No `:batch` sibling exists.
    *
    * `requiresReasoning` here is not inherited from the family, it is measured:
-   * both endpoints answer `400 Reasoning is mandatory for this endpoint and
+   * the endpoints answer `400 Reasoning is mandatory for this endpoint and
    * cannot be disabled`. That costs real tokens — 791 of them on a prompt whose
    * answer was three sentences — and the rate still comes out ahead of luna's
    * $0.20/$1.20 per call.
