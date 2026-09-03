@@ -241,12 +241,15 @@ than against its own description. Four went away — two closed by the owner as 
 to do, one because its premise does not exist, one because the fix it asked for was dead code.
 **Five remain, and each says what would end it.**
 
-- `mc2-vlskb` — the timeout wrapper stays until docling-mcp passes `service_timeout` and
-  `service_max_retries` through. **The reopen condition in the issue was wrong**: it said "a release
-  above 3.0.0", and 3.1.0, 3.1.1 and 3.2.0 have all shipped without it — `v3.2.0/remote.py:44-46`
-  still builds the client from `url` and `api_key` alone. Watch `remote.py`, not the version number.
-  Only the timeout half of `runtime.py` can go: the rest holds three OCR options out of the upstream
-  cache key, and `DOCLING_MCP_PDF_HEADING_HIERARCHY=true` is live in production.
+- `mc2-vlskb` — the timeout wrapper stays until docling-mcp passes the two settings through, and
+  **upstream now knows**: reported 2026-09-03 as `docling-project/docling-mcp#134` with the patch.
+  Nobody had asked before — zero issues named either setting, Discussions are disabled — so waiting
+  was waiting for nothing. **Watch that issue, not the version number**: 3.1.0, 3.1.1 and 3.2.0 all
+  shipped without it. No workaround exists to find: `DoclingServiceClient` takes `job_timeout` and
+  `http_retries` as constructor arguments only, so the dropped call is the single entry point. Only
+  the timeout half of `runtime.py` can ever go — the rest holds three OCR options out of the
+  upstream cache key, and `DOCLING_MCP_PDF_HEADING_HIERARCHY=true` is live. A refusal on #134 is an
+  answer too: then rewrite the docstring that promises removal.
 - `mc2-sv89s` — Jina spend from `quality-validator.ts` and `semantic-matching.ts` is not attributed
   to a course; neither file mentions `courseId`, and nine call sites pass two arguments where the
   signature takes a third. **The obvious query lies**: "Jina rows with no `course_id`" returns zero,
