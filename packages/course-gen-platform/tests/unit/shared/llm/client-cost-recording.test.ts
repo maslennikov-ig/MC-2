@@ -84,12 +84,21 @@ describe('LLMClient cost recording', () => {
       modelUsed: 'z-ai/glm-5.2',
       tokensUsed: 300_000,
     });
-    // glm-5.2 is $1.19 in and $3.74 out per million: 0.238 + 0.374.
-    // Re-read from /api/v1/models on 2026-08-25. It has moved twice now — 1.23x
-    // too dear in the other direction on 2026-08-21 (mc2-156kg), then 0.81x too
-    // cheap by today. A published rate is a moving number, which is what
-    // scripts/check-model-catalog-drift.ts exists to notice.
-    expect(entry.costUsd).toBeCloseTo(0.612, 10);
+    // 200k in + 100k out, charged at whatever the catalogue currently holds.
+    //
+    // The rate is read, not retyped. This one has moved three times: 1.23x too
+    // dear on 2026-08-21 (mc2-156kg), 0.81x too cheap by 2026-08-25, and back
+    // again when the nightly sync rewrote it on 2026-09-03. A published rate is
+    // somebody else's number, and freezing it here turns every one of those
+    // moves into a red suite for a fact this test is not about.
+    const { getModelCapabilities } = await import('@megacampus/shared-types');
+    const glm = getModelCapabilities('z-ai/glm-5.2');
+    if (!glm) throw new Error('z-ai/glm-5.2 is not in MODEL_CATALOG');
+    const fromCatalogue =
+      (200_000 / 1_000_000) * glm.inputPricePerMillion +
+      (100_000 / 1_000_000) * glm.outputPricePerMillion;
+
+    expect(entry.costUsd).toBeCloseTo(fromCatalogue, 10);
   });
 
   it('prices a pinned attempt from the endpoint that will serve it', async () => {

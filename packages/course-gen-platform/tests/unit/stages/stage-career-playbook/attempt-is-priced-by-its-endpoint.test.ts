@@ -18,6 +18,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { getModelCapabilities } from '@megacampus/shared-types';
+
 import { settleSuccessfulAttempt } from '@/stages/stage-career-playbook/nodes/runtime-attempt';
 import type { CareerPlaybookLLMCallOptions } from '@/stages/stage-career-playbook/nodes/runtime';
 
@@ -55,9 +57,20 @@ describe('a settled Career Playbook attempt', () => {
   });
 
   it('falls back to the catalogue when nothing was pinned', () => {
-    // glm-5.2 is catalogued at 1.19 + 3.74. Without a pin we do not know who
-    // will serve it, so the mainstream rate stands and waits for the receipt.
-    expect(settle({}).costUsd).toBeCloseTo(4.93, 10);
+    // Without a pin we do not know who will serve it, so the mainstream rate
+    // stands and waits for the receipt.
+    //
+    // Read from the catalogue rather than retyped: the nightly sync rewrites
+    // that rate whenever the provider moves it, and a frozen number here would
+    // fail on a price change this test is not about. The guard below keeps it
+    // from passing for the wrong reason.
+    const glm = getModelCapabilities('z-ai/glm-5.2');
+    if (!glm) throw new Error('z-ai/glm-5.2 is not in MODEL_CATALOG');
+
+    expect(settle({}).costUsd).toBeCloseTo(
+      glm.inputPricePerMillion + glm.outputPricePerMillion,
+      10
+    );
   });
 
   it('does not quietly agree with the catalogue', () => {
