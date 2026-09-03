@@ -236,40 +236,38 @@ report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- **NotebookLM and the February video pipeline are closed, not deferred** (owner, 2026-09-03). Both
-  had been carried as parked work; the owner decided each returns as new work when it is wanted
-  rather than being held open. Epic `mc2-6ye5z` and its five tasks are closed with the state
-  recorded: the handlers for `nlm_slide_deck`, `nlm_report` and `nlm_data_table` are in `develop`
-  from `dbe094e21` (2026-08-23), the bridge is on `notebooklm-py` 0.8.0, and the last NLM generation
-  in the database is **2026-04-15**. `mc2-hqfc3` is closed and its branch deleted, local tip
-  `770e49a0e` and remote tip `241c077f6` — the remote was five commits ahead, so restore from that
-  one. Its allowlist entry is gone with it.
-- `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
-  `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
-  `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
-- `mc2-o7tfu` — **waiting on a clock, not on work.** The nightly `Model Catalogue Price Sync` runs
-  from `master` because that is the default branch, and the fix only reached `master` at 11:13 UTC
-  on 2026-09-02. Today's 07:59 UTC failure ran on `22401f40c`, which does not contain it. The first
-  scheduled run on fixed code is **2026-09-03 03:20 UTC**; close on a success or on a delivered
-  failure notification, since the notification was part of the same fix.
-- `mc2-xfr6t` — 18 lessons of 340 carry a duplicated block. This is **data, not code**: the
-  mechanism died with `1fc3eb1d2` on 2026-02-14. Regenerating them costs paid Stage 6 runs on long
-  lessons, so it is the owner's call; leaving them is defensible.
-- `mc2-hsfaj` — `scripts/deploy.sh` and `scripts/rollback.sh` cannot run at all: `WEB_IMAGE` and
-  `API_IMAGE` live only in the colour env files and `.env.production` has neither. CI never copies
-  them to the host, so nothing burns; the risk is someone reaching for `deploy.sh` in an incident.
-  Deleting both is probably the right answer.
-- `mc2-vlskb` — docling-mcp 3.1.0 still drops `service_timeout`/`service_max_retries`, and its image
-  is **neither published nor deployed**: that is the manual `build-docling-images.yml` workflow and a
-  recorded `image@sha256`, a production mutation of its own.
-- `mc2-zxzgf` — the Mermaid fallback text is English, and 123 old lessons still show it.
-- `mc2-8m90f` — Q12 post-window evidence-coverage ledgers for the six recovered `file_catalog` ids.
-- `mc2-g4fdf` — Batch API beyond Stage 6 (flex-priced batch, shared coordinator, Stage 7 first).
-- `mc2-z08mv` — revisit `z-ai/glm-5.3` when it has more than one provider. `mc2-vjbb` (blocked) —
-  calibrate `TIER1_SCORE_THRESHOLD` from production data.
-- `mc2-x72bq` — owner-gated, listed under Safety boundary.
-- The REF issues (`mc2-eiqn8` plus the ten `deferred` ones) are reference documents, intentionally
-  open, and are not a backlog tail.
+The 2026-09-03 backlog audit checked every remaining item against the code and the database rather
+than against its own description. Four went away — two closed by the owner as work nobody intended
+to do, one because its premise does not exist, one because the fix it asked for was dead code.
+**Five remain, and each says what would end it.**
+
+- `mc2-vlskb` — the timeout wrapper stays until docling-mcp passes `service_timeout` and
+  `service_max_retries` through. **The reopen condition in the issue was wrong**: it said "a release
+  above 3.0.0", and 3.1.0, 3.1.1 and 3.2.0 have all shipped without it — `v3.2.0/remote.py:44-46`
+  still builds the client from `url` and `api_key` alone. Watch `remote.py`, not the version number.
+  Only the timeout half of `runtime.py` can go: the rest holds three OCR options out of the upstream
+  cache key, and `DOCLING_MCP_PDF_HEADING_HIERARCHY=true` is live in production.
+- `mc2-sv89s` — Jina spend from `quality-validator.ts` and `semantic-matching.ts` is not attributed
+  to a course; neither file mentions `courseId`, and nine call sites pass two arguments where the
+  signature takes a third. **The obvious query lies**: "Jina rows with no `course_id`" returns zero,
+  because `recordJinaCallCost` writes no row at all without a context. The missing row is the defect.
+- `mc2-z08mv` — `z-ai/glm-5.3` now serves **25 endpoints, not one**, so the redundancy argument is
+  gone and only price is left. The cheapest healthy endpoint is still ~2.1x what glm-5.2 actually
+  costs against a ~1.3x bar. Compare against what is paid, not against the catalogue: glm-5.2 has
+  itself dropped to $0.4875/$1.56 at the cheap end.
+- `mc2-zxzgf` — **code done, data left.** The English Mermaid fallback was dead code and is deleted;
+  what remains is 123 lessons holding a version with the marker, **105 of them visible now** across
+  11 courses. The newest affected version is 2026-03-31. Clearing them is paid regeneration, the
+  same shape as `mc2-xfr6t`, which the owner declined.
+- `mc2-x72bq` — owner-gated, listed under Safety boundary. `mc2-vjbb` (blocked) — calibrate
+  `TIER1_SCORE_THRESHOLD` from production data.
+
+Closed by the audit, recorded here so they are not re-derived: `mc2-g4fdf` (a flex-priced batch is
+not a thing — flex and batch are one 50% cut reached two ways, proven by three paid probes and again
+on gemini), `mc2-8m90f` (the mechanism is proven by seven accepted runs; the six ids need a Stage 4
+pass over courses untouched since March, two of them disposable test courses), `mc2-xfr6t` and
+`mc2-hsfaj`. `mc2-eiqn8` moved to `deferred` with the other REF documents — **eleven** of them now,
+intentionally open, and not a backlog tail.
 
 ## Next recommended
 
