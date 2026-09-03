@@ -1,6 +1,6 @@
 # Orchestrator Handoff
 
-Updated: 2026-09-02. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-09-03. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
@@ -15,24 +15,31 @@ The Role Guide stage is accepted; its verification record is
 **closed (2026-09-02)**, and the tails left after it were closed the same day under
 `docs/plans/melodic-leaping-octopus.md`.
 
-**The release loop is alive again.** It had been dead since 2026-04-10: five months of production
-deploys with no tag, no `CHANGELOG.md` entry and no name for what was running. Tag **`v0.31.41`**
-now stands on `42ec67070`, `master` is at **`39d0cf719`**, and production runs that revision — read
-from `org.opencontainers.image.revision` on `megacampus-api-blue`, `megacampus-worker`,
-`megacampus-worker-stage6` and `megacampus-worker-stage7`, not from a green CI run. The active
-colour is now **blue** (`deploy_state`: `status=accepted`, `previous_color=green`).
-`megacampus-web-blue` carries `7ba758427` and that is correct, not drift: `packages/web` has zero
-changed files between the two revisions, so `Build Docker - web` never ran and the label records
-the commit its image was built from.
+**The release loop is alive again**, and has now run twice. It had been dead since 2026-04-10: five
+months of production deploys with no tag, no `CHANGELOG.md` entry and no name for what was running.
+Tag **`v0.31.42`** stands on `68027572b`, `master` is at **`9e4119344`**, and production runs that
+revision — read from `org.opencontainers.image.revision` on `megacampus-api-green`,
+`megacampus-web-green`, `megacampus-worker`, `megacampus-worker-stage6` and
+`megacampus-worker-stage7`, not from a green CI run. The active colour is **green**
+(`deploy_state`: `status=accepted`, `previous_color=blue`).
 
 `develop` equals `origin/develop`, `master` contains every commit of `develop`, and
 `check_stranded_commits.py` reports nothing left behind. `AGENTS.md` now states that `/push` runs
 before `/deploy`, so the loop cannot die the same way twice.
 
-Two defects in the release script itself surfaced only because the gap was long, and both are
-fixed: `git tag -m` refused a 4665-line message with "Argument list too long" _after_ the release
-commit was already made (now `-F` through a file), and a fifth of the changelog was merge commits
-and `bd sync` (now filtered — 406 and 280 dropped over this range, nothing else).
+Three defects in the release script itself surfaced only because the gap was long, and all are
+fixed and now proven on a second release: `git tag -m` refused a 4665-line message with "Argument
+list too long" _after_ the release commit was already made (now `-F` through a file); a fifth of the
+changelog was merge commits and `bd sync` (now filtered); and `RELEASE_NOTES.md` had been titled
+`# Release Notes - v0.26.29` over 198 releases, because the generator's header check is a prefix
+match a versioned title satisfies.
+
+**The nightly price sync works** (`mc2-o7tfu` closed 2026-09-03). Its first successful scheduled run
+since April applied live rates on 2026-09-03. It also found that
+`google/gemini-3.7-flash:batch` was catalogued at a quarter of base — the 50% batch discount applied
+twice — and that batch pricing and flex pricing are one cut reached two ways, never stacked. Its
+verification step now runs the whole unit suite: two named files let a price move leave `develop`
+red, and no test pins a catalogue rate any more.
 
 What the finished track still binds:
 
@@ -202,8 +209,8 @@ script, never lower the number.
 Answered: `mc2-jz6y0.13.6` (pull-based off-host snapshots), `mc2-lrav0` (no backfill of dev Qdrant),
 `mc2-db696.61` (`career_playbook_sources` has never held a row), `mc2-v6fqp` (ru and en stay the test
 languages; Spanish and Chinese are proven). `mc2-dgw4u` — Stage 7 audio stays on its own OpenAI
-account, **paused, not settled**. `mc2-hqfc3` video stays parked; the job-description rework stays
-parked. Migrations approved when necessary, useful and current, one at a time.
+account, **paused, not settled**. The February video pipeline is closed and its branch deleted
+(`mc2-hqfc3`, owner 2026-09-03); the job-description rework stays parked. Migrations approved when necessary, useful and current, one at a time.
 
 2026-08-28: lesson **length is not a criterion**, meaning surviving is; model arithmetic slips are
 accepted noise and get no deterministic check. 2026-08-30 (`mc2-de3vu`, closed with the checkboxes
@@ -221,20 +228,22 @@ active plan when necessary, and `RAG_SHADOW_RETRIEVAL_RATE` in production.
 Outside it, needing a fresh decision each time: reindex, force-push, secrets or access changes, any
 other production mutation, and any migration the plan does not name.
 
-Do not touch `mc2-x72bq`, `mc2-vlskb`, `mc2-hqfc3` or `mc2-8m90f`; see §9 of the active spec for
-exact reopen gates. `mc2-gxese` (Helixa, two branches and their worktrees) is parked by the owner
+Do not touch `mc2-x72bq`, `mc2-vlskb` or `mc2-8m90f`; see §9 of the active spec for exact reopen
+gates. (`mc2-hqfc3` was on this list until the owner closed it on 2026-09-03.) `mc2-gxese` (Helixa, two branches and their worktrees) is parked by the owner
 until the Helixa side is ready. Before claiming delivery, run
 `scripts/orchestration/check_stranded_commits.py`. `/push-dev` deletes the branch it delivered, so a
 report naming a branch again means something really was left behind.
 
 ## Explicit defers
 
-- **NotebookLM live acceptance, deferred by the owner on 2026-09-02.** Epic `mc2-6ye5z` and five of
-  its tasks — `mc2-6ye5z.4`, `.5`, `.8`, `mc2-p99f1`, `mc2-rmbwo` — stay **open on purpose**. The
-  code is written and tested: handlers for `nlm_slide_deck`, `nlm_report` and `nlm_data_table` landed
-  2026-08-23 in `dbe094e21`, and the tunnel and cookies were restored 2026-08-28. What is missing is
-  a live run of the nine types, and the last NLM generation in the database is **2026-04-15**. Do not
-  order generations and do not close these tasks without a new owner request.
+- **NotebookLM and the February video pipeline are closed, not deferred** (owner, 2026-09-03). Both
+  had been carried as parked work; the owner decided each returns as new work when it is wanted
+  rather than being held open. Epic `mc2-6ye5z` and its five tasks are closed with the state
+  recorded: the handlers for `nlm_slide_deck`, `nlm_report` and `nlm_data_table` are in `develop`
+  from `dbe094e21` (2026-08-23), the bridge is on `notebooklm-py` 0.8.0, and the last NLM generation
+  in the database is **2026-04-15**. `mc2-hqfc3` is closed and its branch deleted, local tip
+  `770e49a0e` and remote tip `241c077f6` — the remote was five commits ahead, so restore from that
+  one. Its allowlist entry is gone with it.
 - `mc2-sv89s` — Jina spend from the two quality gates (`quality-validator.ts`,
   `semantic-matching.ts`) prices itself but is not attributed to a course; neither module mentions
   `courseId`. Both are named in `no-anonymous-spend.test.ts` under `RETRIEVAL_DEFERRED`.
@@ -258,7 +267,7 @@ report naming a branch again means something really was left behind.
 - `mc2-g4fdf` — Batch API beyond Stage 6 (flex-priced batch, shared coordinator, Stage 7 first).
 - `mc2-z08mv` — revisit `z-ai/glm-5.3` when it has more than one provider. `mc2-vjbb` (blocked) —
   calibrate `TIER1_SCORE_THRESHOLD` from production data.
-- `mc2-x72bq`, `mc2-hqfc3` — owner-gated, listed under Safety boundary.
+- `mc2-x72bq` — owner-gated, listed under Safety boundary.
 - The REF issues (`mc2-eiqn8` plus the ten `deferred` ones) are reference documents, intentionally
   open, and are not a backlog tail.
 
