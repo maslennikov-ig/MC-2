@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.42] - 2026-09-03
+
+### Fixed
+
+- **cost**: a price move must not turn three tests red, and the sync must notice (07dd3e41f)
+- **security**: the fast-uri pin had aged into the advisory it was meant to avoid (60039c998)
+- **cost**: the gemini batch rate had the 50% discount applied twice (94751da80)
+- **release**: the release notes title named one old version, not the document (a5e41c2b5)
+
+### Other
+
+- **beads**: journal for the mc2-o7tfu closure (cca77ae83)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (6cf4a5f36)
+- **beads**: journal for the mc2-hsfaj closure (83d7560b7)
+- **beads**: journal for the closures of mc2-mlv7w, mc2-xfr6t and mc2-hpful (984d67e91)
+- **deploy**: delete the two rolling deploy scripts nothing could run (5c6c67dd9)
+- **closeout**: the audit tails are closed and the release loop is alive again (26bcc9c91)
+
 ## [0.31.41] - 2026-09-02
 
 ### Security
