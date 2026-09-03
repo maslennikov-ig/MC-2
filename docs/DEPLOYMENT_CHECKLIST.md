@@ -21,7 +21,7 @@
 
 - [x] `.github/workflows/ci.yml` - Updated to use master branch
 - [x] `.github/workflows/deploy.yml` - Updated to use master branch
-- [x] `scripts/deploy.sh` - Updated for dynamic branch detection
+- [x] `scripts/deploy_blue_green.sh` - Blue/Green deploy (replaced the rolling `scripts/deploy.sh`, deleted 2026-09-02, `mc2-hsfaj`)
 - [x] `docs/DEPLOYMENT.md` - Created comprehensive guide
 - [x] `docs/DEPLOYMENT_CHECKLIST.md` - This checklist
 
@@ -59,7 +59,7 @@ git branch     # Should show * master
 
 # Verify deploy files
 ls -la /opt/megacampus/docker-compose.production.yml
-ls -la /opt/megacampus/scripts/deploy.sh
+ls -la /opt/megacampus/scripts/deploy_blue_green.sh
 ls -la /opt/megacampus/nginx-docling-proxy.conf
 
 # Verify docker-compose uses new images
@@ -120,12 +120,8 @@ docker ps
    ssh megacampus-prod
    cd /opt/megacampus
 
-   # Set GitHub token (get from: gh auth token)
-   export GITHUB_TOKEN=<your-token>
-   export GITHUB_ACTOR=maslennikov-ig
-
-   # Run deployment
-   bash scripts/deploy.sh production latest
+   # Run deployment (Blue/Green; the commit must be the full 40-character sha)
+   bash scripts/deploy_blue_green.sh production <40-character-release-commit>
    ```
 
 3. **Monitor deployment**:
@@ -185,9 +181,8 @@ GitHub Actions will automatically rollback on failure.
 ### Manual Rollback
 
 ```bash
-ssh megacampus-prod
-cd /opt/megacampus
-bash scripts/rollback.sh
+ssh megacampus-prod \
+  "bash /opt/megacampus/scripts/rollback_blue_green.sh production '<failed-40-character-release-commit>'"
 ```
 
 ### Emergency Rollback to Old Images
