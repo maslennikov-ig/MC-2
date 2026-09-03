@@ -54,11 +54,15 @@ set -e
   || fail "contention error exposed child-command arguments"
 [ ! -e "$CONTENDER_MARKER" ] || fail "contending command ran without the lock"
 
+# Every entrypoint that can touch the host must refuse a held lock. `scripts/deploy.sh` and
+# `scripts/rollback.sh` were on this list until 2026-09-02, when they were deleted (mc2-hsfaj):
+# they read `.env.production`, which has never carried `WEB_IMAGE` or `API_IMAGE`, so they could
+# not have completed a deploy even with the lock free. Add a new entrypoint here the moment it
+# learns to take the lock, not after an incident proves it never did.
 for entrypoint in \
   "$ROOT_DIR/scripts/deploy_blue_green.sh production latest" \
   "$ROOT_DIR/scripts/deploy_dev.sh" \
-  "$ROOT_DIR/scripts/rollback_blue_green.sh production 0000000000000000000000000000000000000000" \
-  "$ROOT_DIR/scripts/deploy.sh production latest"; do
+  "$ROOT_DIR/scripts/rollback_blue_green.sh production 0000000000000000000000000000000000000000"; do
   read -r -a argv <<< "$entrypoint"
   set +e
   entrypoint_output="$({

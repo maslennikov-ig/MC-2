@@ -230,8 +230,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
   /** Async Batch API tariff; never substitute this ID into the synchronous endpoint. */
   'google/gemini-3.7-flash:batch': {
-    inputPricePerMillion: 0.1875,
-    outputPricePerMillion: 0.9375,
+    inputPricePerMillion: 0.375,
+    outputPricePerMillion: 1.875,
     contextLength: 1048576,
     maxOutputTokens: 65536,
     supportsTemperature: false,
@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 1.19,
-    outputPricePerMillion: 3.74,
+    inputPricePerMillion: 0.966,
+    outputPricePerMillion: 3.036,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -382,8 +382,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.045,
-    outputPricePerMillion: 0.09,
+    inputPricePerMillion: 0.065,
+    outputPricePerMillion: 0.18,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -407,8 +407,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.03,
-    outputPricePerMillion: 0.1,
+    inputPricePerMillion: 0.05,
+    outputPricePerMillion: 0.16,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -440,8 +440,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.08512,
-    outputPricePerMillion: 0.17024,
+    inputPricePerMillion: 0.088606,
+    outputPricePerMillion: 0.177212,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,

@@ -107,9 +107,22 @@ jobs:
           pnpm -F shared-types build
           pnpm -F shared-logger build
           pnpm -F shared-utils build
-          pnpm -F course-gen-platform exec vitest run --config vitest.config.unit.ts \
-            tests/unit/model-catalog-coverage.test.ts \
-            tests/unit/stages/stage5-generation/cost-calculator.test.ts
+          # The whole unit suite, not a named pair.
+          #
+          # It used to run `model-catalog-coverage` and `cost-calculator` only,
+          # and on 2026-09-03 that let the very thing this step exists to stop
+          # through: the sync moved `z-ai/glm-5.2` from 1.19/3.74 to 0.966/3.036,
+          # both named files agreed, and three other tests that had retyped the
+          # old rate went red on `develop` after the commit landed. A list of
+          # price-sensitive files is itself a thing that goes stale; the suite is
+          # not. Those three now read the rate from the catalogue instead of
+          # pinning it, so this is the second line of defence rather than the
+          # first — but the first one is a convention, and conventions are what
+          # this job keeps catching.
+          #
+          # It costs about seven minutes on a job that runs once a night and
+          # whose entire purpose is to not leave the tree red.
+          pnpm -F course-gen-platform test:unit
 
       - name: Commit the new rates
         if: steps.drift.outputs.status == '0'

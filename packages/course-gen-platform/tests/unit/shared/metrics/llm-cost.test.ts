@@ -52,15 +52,26 @@ describe('recordLlmCallCost', () => {
   it('charges input and output at their own rates', async () => {
     const { calculateLlmCostUsd } = await import('@/shared/metrics/llm-cost');
 
-    // glm-5.2 is $1.19 in and $3.74 out per million (re-read 2026-08-25):
-    // judging reads a lesson and writes little, so the two rates are not
-    // interchangeable.
+    // Judging reads a lesson and writes little, so the two rates are not
+    // interchangeable — that, not either figure, is what this asserts.
+    //
+    // The catalogue rate is read, never retyped. The nightly price sync rewrites
+    // MODEL_CATALOG whenever a provider moves a tariff — `z-ai/glm-5.2` went
+    // 0.966 -> 1.19 on 2026-08-25 and back to 0.966 on 2026-09-03 — and a frozen
+    // number here turns each of those into a red suite for a price that is
+    // somebody else's to set. This test owns the arithmetic, not the tariff.
+    const { getModelCapabilities } = await import('@megacampus/shared-types');
+    const glm = getModelCapabilities('z-ai/glm-5.2');
+    if (!glm) throw new Error('z-ai/glm-5.2 is not in MODEL_CATALOG');
+
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 1_000_000, outputTokens: 0 })
-    ).toBeCloseTo(1.19, 10);
+    ).toBeCloseTo(glm.inputPricePerMillion, 10);
     expect(
       calculateLlmCostUsd({ model: 'z-ai/glm-5.2', inputTokens: 0, outputTokens: 1_000_000 })
-    ).toBeCloseTo(3.74, 10);
+    ).toBeCloseTo(glm.outputPricePerMillion, 10);
+    // The guard against the two assertions above passing for the wrong reason.
+    expect(glm.outputPricePerMillion).not.toBeCloseTo(glm.inputPricePerMillion, 6);
   });
 
   it('reports a call it cannot attribute instead of dropping it silently', async () => {

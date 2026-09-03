@@ -199,17 +199,18 @@ ssh claude-deploy@95.81.98.230
 cd /opt/megacampus
 
 # Run deployment script
-bash scripts/deploy.sh production latest
+bash scripts/deploy_blue_green.sh production <40-character-release-commit>
 ```
 
 The deployment script will:
 
-- Backup current state
-- Pull latest code from git
-- Pull latest Docker images
-- Perform rolling update
-- Run health checks
-- Rollback on failure
+- Take the host operation lock, refusing to start if another operation holds it
+- Pull the images for that exact commit
+- Bring up the inactive colour and health-check it before any traffic moves
+- Switch nginx, then recreate the main and Stage 6 workers coherently
+
+> `scripts/deploy.sh` was deleted on 2026-09-02 (`mc2-hsfaj`): it read `.env.production`, which
+> carries neither `WEB_IMAGE` nor `API_IMAGE`, so it could not have completed a deploy.
 
 ## Rollback Procedure
 
@@ -229,15 +230,20 @@ ssh claude-deploy@95.81.98.230
 cd /opt/megacampus
 
 # Run rollback script
-bash scripts/rollback.sh
+bash scripts/rollback_blue_green.sh production <failed-40-character-release-commit>
 ```
 
 The rollback script will:
 
-- Find latest backup
-- Stop current containers
-- Start previous version
+- Require a matching switched/accepted `deploy_state` for that commit
+- Bring the previous colour back from its immutable images
+- Recreate the main and Stage 6 workers coherently before nginx moves
 - Verify health checks
+
+It rolls back the release, not the database, the evidence store or the Qdrant alias.
+
+> `scripts/rollback.sh` was deleted on 2026-09-02 (`mc2-hsfaj`) for the same reason as its deploy
+> counterpart.
 
 ## Monitoring Deployment
 

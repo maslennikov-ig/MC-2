@@ -1,6 +1,21 @@
-# Release Notes - v0.26.29
+# Release Notes
 
-_Released on 2025-12-26_
+User-facing release notes for all versions.
+
+## v0.31.42
+
+_Released on 2026-09-03_
+
+### 🐛 Bug Fixes
+
+- **cost**: A price move must not turn three tests red, and the sync must notice
+- **Security**: The fast-uri pin had aged into the advisory it was meant to avoid
+- **cost**: The gemini batch rate had the 50% discount applied twice
+- **release**: The release notes title named one old version, not the document
+
+---
+
+_This release was automatically generated from 10 commits._
 
 ## v0.31.41
 
