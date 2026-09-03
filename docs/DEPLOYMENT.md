@@ -66,26 +66,33 @@ ssh megacampus-prod
 cd /opt/megacampus
 
 # Run deployment script
-GITHUB_TOKEN=<token> GITHUB_ACTOR=<username> bash scripts/deploy.sh production latest
+bash scripts/deploy_blue_green.sh production <40-character-release-commit>
 ```
 
 The deploy script will:
 
-- Pull latest code from git
-- Pull latest Docker images
-- Perform rolling update (zero downtime)
-- Run health checks
-- Create backups
+- Pull the images for that exact commit
+- Bring up the inactive colour and health-check it
+- Switch nginx only after the new colour answers
+- Recreate the main and Stage 6 workers coherently with it
+
+> `scripts/deploy.sh` and `scripts/rollback.sh` were deleted on 2026-09-02 (`mc2-hsfaj`). They read
+> `.env.production`, which carries neither `WEB_IMAGE` nor `API_IMAGE` — those live only in
+> `.env.blue` and `.env.green` — so they could not have completed a deploy. CI never copied them to
+> the host either. Stale copies dated 2026-03-05 may still sit in `/opt/megacampus/scripts/`; do not
+> run them.
 
 ### 3. Rollback
 
 If deployment fails, automatic rollback is triggered. For manual rollback:
 
 ```bash
-ssh megacampus-prod
-cd /opt/megacampus
-bash scripts/rollback.sh
+ssh megacampus-prod \
+  "bash /opt/megacampus/scripts/rollback_blue_green.sh production '<failed-40-character-release-commit>'"
 ```
+
+Rollback needs the matching switched/accepted `deploy_state`, the immutable colour images, and a
+coherent worker recreation before nginx moves. It is not a database, evidence, or Qdrant rollback.
 
 ## GitHub Actions Configuration
 
