@@ -43,8 +43,21 @@ describe('model catalogue coverage', () => {
     // and for gemini; it is not for the other two — `z-ai/glm-5.2:batch` is
     // dearer than its synchronous form, and `minimax/minimax-m3:batch` costs
     // exactly the same as it (mc2-hc91g).
+    //
+    // Re-read again 2026-09-03 against the live endpoint pages, because the
+    // nightly sync disagreed on gemini and the sync was right. The rule above is
+    // correct and the number beside it broke the rule: base is $0.75/$3.75, half
+    // is $0.375/$1.875, and the entry held $0.1875/$0.9375 — a quarter. The
+    // halving had been applied twice. `google/gemini-3.7-flash:batch` serves one
+    // endpoint at $0.375/$1.875, the same figure as the base model's `/flex`
+    // tier, because the batch discount and the flex discount are one 50% cut
+    // reached two ways; they never stack, so a quarter is not a tariff anyone
+    // offers. Nothing had ever called it — no `:batch` id appears in
+    // `generation_trace` — so this cost nothing yet. It would have: `max_price`
+    // is built at 1.5x the catalogued rate, and 1.5 x 0.1875 = 0.28 sits under
+    // the real 0.375, which is a hard refusal of every call, not a cheaper route.
     const verifiedBatchRates: Record<string, [input: number, output: number, context: number]> = {
-      'google/gemini-3.7-flash:batch': [0.1875, 0.9375, 1_048_576],
+      'google/gemini-3.7-flash:batch': [0.375, 1.875, 1_048_576],
       'minimax/minimax-m3:batch': [0.3, 1.2, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
       'z-ai/glm-5.2:batch': [1.4, 4.4, 512_000],

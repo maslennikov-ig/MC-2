@@ -230,8 +230,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
   },
   /** Async Batch API tariff; never substitute this ID into the synchronous endpoint. */
   'google/gemini-3.7-flash:batch': {
-    inputPricePerMillion: 0.1875,
-    outputPricePerMillion: 0.9375,
+    inputPricePerMillion: 0.375,
+    outputPricePerMillion: 1.875,
     contextLength: 1048576,
     maxOutputTokens: 65536,
     supportsTemperature: false,
