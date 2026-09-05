@@ -60,6 +60,185 @@ function validateLanguage(lang: string | null): Language {
 }
 
 /**
+ * File extensions treated as media when they appear behind an `<a href>`.
+ *
+ * `<img>`, `<video>` and `<source>` always point at a resource, so their `src`
+ * needs no extension check. A link, by contrast, is usually navigation, and only
+ * a link to a file belongs in the asset list.
+ */
+const MEDIA_FILE_EXTENSIONS = new Set([
+  // images
+  'apng',
+  'avif',
+  'bmp',
+  'gif',
+  'ico',
+  'jpeg',
+  'jpg',
+  'png',
+  'svg',
+  'tif',
+  'tiff',
+  'webp',
+  // video
+  'avi',
+  'm4v',
+  'mkv',
+  'mov',
+  'mp4',
+  'mpeg',
+  'mpg',
+  'ogv',
+  'webm',
+  // audio
+  'aac',
+  'flac',
+  'm4a',
+  'mp3',
+  'oga',
+  'ogg',
+  'opus',
+  'wav',
+  // documents and bundles shipped alongside a lesson
+  'csv',
+  'doc',
+  'docx',
+  'epub',
+  'odp',
+  'ods',
+  'odt',
+  'pdf',
+  'ppt',
+  'pptx',
+  'rtf',
+  'xls',
+  'xlsx',
+  'zip',
+]);
+
+/**
+ * Decode the handful of HTML entities that legitimately appear inside a URL
+ * attribute. `&amp;` is by far the common one, since a query string written as
+ * `?a=1&b=2` must be escaped in HTML.
+ *
+ * `&amp;` is decoded last so that `&amp;quot;` does not collapse into a quote.
+ */
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&(?:quot|#34|#x22);/gi, '"')
+    .replace(/&(?:apos|#39|#x27);/gi, "'")
+    .replace(/&(?:lt|#60|#x3c);/gi, '<')
+    .replace(/&(?:gt|#62|#x3e);/gi, '>')
+    .replace(/&(?:amp|#38|#x26);/gi, '&');
+}
+
+/**
+ * Read a single attribute out of a raw tag body.
+ *
+ * The leading `(?:^|\s)` boundary is what keeps `srcset` and `data-src` from
+ * being mistaken for `src`.
+ */
+function readAttribute(attributes: string, name: 'src' | 'href'): string | null {
+  const pattern = new RegExp(
+    `(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'\`=<>]+))`,
+    'i'
+  );
+  const match = pattern.exec(attributes);
+  if (!match) {
+    return null;
+  }
+  return match[1] ?? match[2] ?? match[3] ?? null;
+}
+
+/**
+ * Return the URL unchanged if it is an absolute http(s) URL, otherwise null.
+ *
+ * The filter is not cosmetic. `UnitInputSchema.assets` is
+ * `z.array(z.string().url())`, so a relative path such as `/static/logo.png`
+ * would not survive contract validation, and `new URL()` also accepts `data:`
+ * and `mailto:` which have no business in a static asset list. Relative and
+ * inline references stay where they are, inside the lesson HTML.
+ */
+function toAbsoluteHttpUrl(raw: string): string | null {
+  const value = decodeHtmlEntities(raw).trim();
+  if (!value) {
+    return null;
+  }
+  try {
+    const protocol = new URL(value).protocol;
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return null;
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the URL path ends in a recognised media file extension. */
+function hasMediaExtension(url: string): boolean {
+  const path = url.split(/[?#]/)[0];
+  const lastSegment = path.slice(path.lastIndexOf('/') + 1);
+  const dot = lastSegment.lastIndexOf('.');
+  if (dot <= 0) {
+    return false;
+  }
+  return MEDIA_FILE_EXTENSIONS.has(lastSegment.slice(dot + 1).toLowerCase());
+}
+
+/**
+ * Extract static asset URLs referenced by a lesson's HTML content.
+ *
+ * Scans `<img src>`, `<video src>`, `<source src>` and `<a href>` (media files
+ * only), decodes HTML entities, keeps absolute http(s) URLs, and deduplicates
+ * while preserving document order.
+ *
+ * @param html - Lesson HTML content (may be null or empty)
+ * @returns Deduplicated asset URLs in the order they appear
+ *
+ * @example
+ * ```typescript
+ * extractAssetUrls('<img src="https://cdn.example.com/a.png">');
+ * // ['https://cdn.example.com/a.png']
+ * ```
+ */
+export function extractAssetUrls(html: string | null | undefined): string[] {
+  if (!html) {
+    return [];
+  }
+
+  const assets: string[] = [];
+  const seen = new Set<string>();
+  const tagPattern = /<(img|video|source|a)\b([^>]*)>/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = tagPattern.exec(html)) !== null) {
+    const tagName = match[1].toLowerCase();
+    const raw = readAttribute(match[2], tagName === 'a' ? 'href' : 'src');
+    if (raw === null) {
+      continue;
+    }
+
+    const url = toAbsoluteHttpUrl(raw);
+    if (!url) {
+      continue;
+    }
+
+    if (tagName === 'a' && !hasMediaExtension(url)) {
+      continue;
+    }
+
+    if (seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+    assets.push(url);
+  }
+
+  return assets;
+}
+
+/**
  * Database course row with joined organization
  */
 type CourseWithOrg = Database['public']['Tables']['courses']['Row'] & {
@@ -256,7 +435,7 @@ export async function mapCourseToInput(
             id: generateId(lesson.title, `unit${section.order_index}_${lesson.order_index}`),
             title: lesson.title,
             content: lesson.content || '<p>Content pending generation</p>',
-            assets: [], // TODO: Extract asset URLs from HTML content if needed
+            assets: extractAssetUrls(lesson.content),
           };
 
           return {
@@ -292,6 +471,15 @@ export async function mapCourseToInput(
       totalSections: chapters.reduce((sum, ch) => sum + ch.sections.length, 0),
       totalUnits: chapters.reduce(
         (sum, ch) => sum + ch.sections.reduce((s, sec) => s + sec.units.length, 0),
+        0
+      ),
+      totalAssets: chapters.reduce(
+        (sum, ch) =>
+          sum +
+          ch.sections.reduce(
+            (s, sec) => s + sec.units.reduce((u, unit) => u + unit.assets.length, 0),
+            0
+          ),
         0
       ),
     },

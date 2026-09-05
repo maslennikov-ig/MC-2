@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
 import { courseSizeSchema } from './course-size';
+import { GenerationJobInputSchema } from './generation-job';
 import {
   CareerPlaybookBlockIdSchema,
   CareerPlaybookBlockStateSchema,
@@ -208,18 +209,28 @@ export type StructureAnalysisJobData = z.infer<typeof StructureAnalysisJobDataSc
 // ============================================================================
 
 /**
- * Structure generation job - generate course outline from analysis
+ * Structure generation job - generate course outline from analysis (Stage 5)
+ *
+ * The payload IS `GenerationJobInput`. Producers (`generate.router.ts`,
+ * `auto-approval/helpers.ts`) enqueue that object verbatim and the Stage 5
+ * worker validates it with `GenerationJobInputSchema`, so the payload half of
+ * this schema is merged in from there rather than restated by hand.
+ *
+ * Merging is the point. The previous hand-written version declared `analysisId`
+ * and `preferences`: fields no producer has ever sent and no consumer has ever
+ * read. A restated schema drifts silently; a merged one cannot.
+ *
+ * Known gap, deliberately left alone here: the camelCase `BaseJobDataSchema`
+ * envelope (`organizationId`, `courseId`, `userId`, `createdAt`) is declared
+ * required, as it was before, but Stage 5 producers do not actually send it -
+ * they enqueue the snake_case payload only. That is why `getJobCourseId()`
+ * carries a `course_id` fallback. Making the envelope optional here is the
+ * honest description, but it changes the `JobData` union that every queue and
+ * error-handling helper reads, so it belongs in its own change.
  */
 export const StructureGenerationJobDataSchema = BaseJobDataSchema.extend({
   jobType: z.literal(JobType.STRUCTURE_GENERATION),
-  analysisId: z.string().uuid(),
-  preferences: z
-    .object({
-      sectionsCount: z.number().int().min(1).max(20).optional(),
-      lessonsPerSection: z.number().int().min(1).max(10).optional(),
-    })
-    .optional(),
-});
+}).merge(GenerationJobInputSchema);
 
 export type StructureGenerationJobData = z.infer<typeof StructureGenerationJobDataSchema>;
 

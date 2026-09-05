@@ -125,7 +125,21 @@ export const exportLessons = protectedProcedure
   // This runs before verifyCourseAccess but the security impact is minimal:
   // - Invalid courseIds still count toward rate limit, but only for that user
   // - Other users are unaffected (separate rate limit buckets)
-  // TODO: Consider course-scoped rate limiting if export abuse becomes an issue
+  //
+  // Decision (2026-09-05, replacing an open marker left in February 2026): keep the limit per-user;
+  // do not add a course-scoped one. Two reasons.
+  //
+  // 1. A course bucket is a shared bucket. Courses belong to an organization and are
+  //    exported by several people, so one heavy exporter would lock out their colleagues.
+  //    That turns a self-inflicted limit into a denial of service against innocent users,
+  //    which is worse than the abuse it would prevent.
+  // 2. `createRateLimiter` keys off `identifierFn(ctx, path)`, which never sees the
+  //    procedure input. tRPC middleware runs before `.input()` parses, so `courseId`
+  //    is simply not available at that point. Reaching it would mean widening the shared
+  //    middleware signature for every caller in the server.
+  //
+  // Export is a read-only query over content the caller is already authorized to read,
+  // so the per-user ceiling of 10/minute is the right shape for the risk.
   .use(createRateLimiter({ requests: 10, window: 60 }))
   .input(exportLessonsInputSchema)
   .query(async ({ ctx, input }) => {
