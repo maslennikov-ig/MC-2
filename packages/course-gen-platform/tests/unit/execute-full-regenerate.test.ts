@@ -131,9 +131,21 @@ describe('executeFullRegenerate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default happy-path mocks
+    // Default happy-path mocks.
+    // buildStage5JobInput returns the snake_case GenerationJobInput shape; the
+    // fixture used to use camelCase keys the real helper never produces, which
+    // hid the fact that no BullMQ envelope was being attached.
     mockBuildStage5JobInput.mockResolvedValue({
-      jobInput: { courseId: 'course-123', userId: 'user-456' },
+      jobInput: {
+        course_id: 'course-123',
+        organization_id: 'org-789',
+        user_id: 'user-456',
+        analysis_result: null,
+        frontend_parameters: { course_title: 'Test course', language: 'ru' },
+        vectorized_documents: false,
+        document_summaries: [],
+      },
+      organizationId: 'org-789',
     });
     mockAddJob.mockResolvedValue({ id: 'job-001' });
     mockRemoveJobsByCourseId.mockResolvedValue(undefined);
@@ -179,10 +191,22 @@ describe('executeFullRegenerate', () => {
       'user-456',
       'req-abc'
     );
-    expect(mockAddJob).toHaveBeenCalledWith(JobType.STRUCTURE_GENERATION, {
-      courseId: 'course-123',
-      userId: 'user-456',
-    });
+    // The payload is forwarded verbatim and the camelCase BullMQ envelope is
+    // attached on top, so a permanently failed job can be traced to its owner.
+    expect(mockAddJob).toHaveBeenCalledWith(
+      JobType.STRUCTURE_GENERATION,
+      expect.objectContaining({
+        course_id: 'course-123',
+        organization_id: 'org-789',
+        user_id: 'user-456',
+        jobType: JobType.STRUCTURE_GENERATION,
+        courseId: 'course-123',
+        organizationId: 'org-789',
+        userId: 'user-456',
+        locale: 'ru',
+        createdAt: expect.any(String),
+      })
+    );
   });
 
   it('should persist assistant message with correct params', async () => {

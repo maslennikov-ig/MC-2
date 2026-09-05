@@ -7,19 +7,22 @@
  * while the two producers (generate.router.ts and auto-approval/helpers.ts)
  * enqueue a GenerationJobInput and the Stage 5 worker reads that. The schema is
  * now derived from GenerationJobInputSchema. These tests pin the derivation, so
- * a future hand-edit that reintroduces drift fails here.
+ * a future hand-edit that reintroduces drift fails here, and they pin the
+ * envelope that buildStructureGenerationJobData attaches at enqueue time.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
+  buildStructureGenerationJobData,
   StructureGenerationJobDataSchema,
   JobType,
+  type GenerationJobInput,
   type StructureGenerationJobData,
 } from '@megacampus/shared-types';
 import { GenerationJobInputSchema } from '@megacampus/shared-types/generation-job';
 
-/** The payload shape both producers actually enqueue, title-only variant. */
-const QUEUED_PAYLOAD = {
+/** The payload every Stage 5 producer builds, title-only variant. */
+const QUEUED_PAYLOAD: GenerationJobInput = {
   course_id: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
   organization_id: '550e8400-e29b-41d4-a716-446655440000',
   user_id: '9c858901-8a57-4791-81fe-4c455b099bc9',
@@ -110,27 +113,64 @@ describe('StructureGenerationJobDataSchema', () => {
     });
   });
 
-  describe('the envelope half (known gap)', () => {
-    // Producers enqueue QUEUED_PAYLOAD verbatim: no camelCase envelope is
-    // attached anywhere between generate.router.ts and queue.add(). The schema
-    // still declares that envelope required, exactly as it did before, because
-    // relaxing it changes the JobData union that every queue and error-handling
-    // helper reads. This test states the gap rather than hiding it, so the
-    // follow-up change has a failing assertion to flip.
-    it('does not yet accept the bare payload that producers actually enqueue', () => {
-      const result = StructureGenerationJobDataSchema.safeParse(QUEUED_PAYLOAD);
+  describe('the envelope half', () => {
+    // This block used to pin the gap: producers enqueued QUEUED_PAYLOAD verbatim
+    // and the five camelCase envelope fields were simply absent, which is how a
+    // permanently failed Stage 5 job reached the error-log row with no
+    // organization. buildStructureGenerationJobData now attaches them at enqueue
+    // time, so the assertions are inverted.
+    it('is filled in by buildStructureGenerationJobData', () => {
+      const jobData = buildStructureGenerationJobData(QUEUED_PAYLOAD);
 
-      expect(result.success).toBe(false);
+      const present = ENVELOPE_KEYS.filter(key => jobData[key as keyof typeof jobData] != null);
+      expect(present.sort()).toEqual([...ENVELOPE_KEYS].sort());
     });
 
-    it('reports the missing envelope fields and nothing from the payload', () => {
-      const result = StructureGenerationJobDataSchema.safeParse(QUEUED_PAYLOAD);
+    it('copies the identifiers straight from the snake_case payload', () => {
+      const jobData = buildStructureGenerationJobData(QUEUED_PAYLOAD);
 
-      expect(result.success).toBe(false);
-      if (result.success) return;
+      expect(jobData.organizationId).toBe(QUEUED_PAYLOAD.organization_id);
+      expect(jobData.courseId).toBe(QUEUED_PAYLOAD.course_id);
+      expect(jobData.userId).toBe(QUEUED_PAYLOAD.user_id);
+      expect(jobData.jobType).toBe(JobType.STRUCTURE_GENERATION);
+    });
 
-      const missing = result.error.issues.map(issue => issue.path.join('.')).sort();
-      expect(missing).toEqual(['courseId', 'createdAt', 'jobType', 'organizationId', 'userId']);
+    it('stamps a parseable ISO createdAt', () => {
+      const jobData = buildStructureGenerationJobData(QUEUED_PAYLOAD);
+
+      expect(Number.isNaN(Date.parse(jobData.createdAt))).toBe(false);
+    });
+
+    it('produces something the schema accepts with no help', () => {
+      const result = StructureGenerationJobDataSchema.safeParse(
+        buildStructureGenerationJobData(QUEUED_PAYLOAD)
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('leaves every payload field untouched', () => {
+      const jobData = buildStructureGenerationJobData(QUEUED_PAYLOAD);
+
+      for (const key of Object.keys(GenerationJobInputSchema.shape)) {
+        expect(jobData[key as keyof typeof jobData]).toEqual(
+          QUEUED_PAYLOAD[key as keyof typeof QUEUED_PAYLOAD]
+        );
+      }
+    });
+
+    it('maps locale from the course language, defaulting to ru', () => {
+      const english = buildStructureGenerationJobData({
+        ...QUEUED_PAYLOAD,
+        frontend_parameters: { ...QUEUED_PAYLOAD.frontend_parameters, language: 'en' },
+      });
+      const spanish = buildStructureGenerationJobData({
+        ...QUEUED_PAYLOAD,
+        frontend_parameters: { ...QUEUED_PAYLOAD.frontend_parameters, language: 'es' },
+      });
+
+      expect(english.locale).toBe('en');
+      expect(spanish.locale).toBe('ru');
     });
   });
 
