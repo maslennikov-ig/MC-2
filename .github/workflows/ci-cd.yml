@@ -946,6 +946,17 @@ jobs:
           TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          # GitHub Environment-scoped secrets keep production and development
+          # bridge tuples independent. Missing opt-ins stay fail-closed.
+          HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}
+          HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}
+          HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}
+          HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}
+          HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
+          HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
+          HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
           CORS_ORIGIN=https://ai.megacampus.ru
@@ -1368,6 +1379,17 @@ jobs:
           TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          # The development GitHub Environment owns a separate Helixa tuple and
+          # HMAC. Missing opt-ins keep generation disabled and the sender stopped.
+          HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}
+          HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}
+          HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}
+          HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}
+          HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
+          HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
+          HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru

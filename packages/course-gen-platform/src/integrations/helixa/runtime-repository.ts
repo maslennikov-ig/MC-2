@@ -375,7 +375,11 @@ export function readKnowledgeSyncRuntimeConfig(
     bindingId,
     organizationId,
     destinationBindingId,
-    environment: environment.APP_ENV ?? environment.NODE_ENV ?? 'development',
+    environment:
+      environment.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT ??
+      environment.APP_ENV ??
+      environment.NODE_ENV ??
+      'development',
     externalProjectId: environment.HELIXA_DESTINATION_PROJECT_ID ?? null,
   };
 }
