@@ -135,6 +135,9 @@ const rollbackCommand = jobs.rollback?.steps?.find(step => step?.name === 'Execu
 const copyDevDeploymentFiles = jobs['deploy-dev']?.steps?.find(
   step => step?.name === 'Copy deployment files'
 )?.run;
+const createDevEnv = jobs['deploy-dev']?.steps?.find(
+  step => step?.name === 'Create .env.dev'
+)?.run;
 
 assert(copyDeploymentFiles, 'staging deploy must copy deployment files');
 for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
@@ -174,6 +177,42 @@ for (const requiredLine of [
   assert(
     createProductionEnv.includes(requiredLine),
     `staging production env must include ${requiredLine}`
+  );
+}
+
+// J149 Helixa bridge settings are written into full-file environment writers.
+// Both deploy jobs use GitHub Environment-scoped secrets, so the same secret key
+// resolves independently in `production` and `development` without a second
+// prefix convention or a repository-level shared HMAC.
+assert(createDevEnv, 'development deploy must create .env.dev');
+assert(
+  stagingDeploy?.environment?.name === 'production' &&
+    jobs['deploy-dev']?.environment?.name === 'development',
+  'Helixa bridge secret references must resolve in distinct GitHub Environments'
+);
+const helixaRequiredSecretLines = [
+  'HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}',
+  'HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}',
+  'HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}',
+  'HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}',
+];
+const helixaSafeDefaultLines = [
+  "HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}",
+  "HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}",
+];
+for (const [writerName, writer] of [
+  ['.env.production', createProductionEnv],
+  ['.env.dev', createDevEnv],
+]) {
+  for (const requiredLine of [...helixaRequiredSecretLines, ...helixaSafeDefaultLines]) {
+    assert(writer.includes(requiredLine), `${writerName} must persist ${requiredLine}`);
+  }
+  assert(
+    !writer.includes('HELIXA_DESTINATION_PROJECT_ID='),
+    `${writerName} must omit HELIXA_DESTINATION_PROJECT_ID when the Helixa binding has null external project scope`
   );
 }
 // mc2-cva3o. QDRANT_METRICS_GID is host-derived, not a secret, and `secrets.QDRANT_METRICS_GID`
