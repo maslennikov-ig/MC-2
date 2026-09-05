@@ -284,7 +284,12 @@ export async function dispatchHelixaGenerationCommand(input: {
           outboxEventId: reconciliation.outboxEventId,
         });
         if (!completed) throw new Error('MegaCampus generation lease lost during reconciliation');
-        return nativeCompleted(completed);
+        // `accepted`, not `native_completed`. Helixa's dispatch schema has three states and
+        // this is not one of them, and its worker does the right thing with `accepted`: it
+        // polls lookup and waits for the signed import, which is exactly the state a
+        // reclaimed reservation over a finished native object is in. `native_completed`
+        // stays a lookup-only answer, where Helixa's schema does accept it.
+        return accepted(completed);
       }
       if (reconciliation === 'uncertain') {
         const recorded = await input.repository.actionRequired({

@@ -146,18 +146,23 @@ this repository: nothing here starts a career playbook from a Helixa command yet
 terminal `action_required` on the ledger rather than leaving a reservation that would
 never move. Wiring it is the remaining inbound work.
 
-### Result-shape divergence
+### One shape that had to move
 
-One shape does not fit Helixa's schema. `dispatchHelixaGenerationCommand` can return
-`state: 'native_completed'` from its reconciliation branch, reached when a reservation is
-reclaimed with `claim_generation > 1` and the native object turns out to be finished.
-`MegaCampusGenerationDispatchResultV1Schema` on the Helixa side accepts only `accepted`,
-`conflict` and `action_required`, so that answer would fail to parse and the worker would
-record `megacampus_generation_outcome_uncertain`. The route does not rewrite it: the
-divergence is in the library, on a branch no test reaches, and papering over it here
-would hide which side is wrong. Either the library should answer `accepted` for a
-completed reclaim, or Helixa's dispatch schema should gain the state its lookup schema
-already has.
+`dispatchHelixaGenerationCommand` used to answer `state: 'native_completed'` from its
+reconciliation branch, reached when a reservation is reclaimed with `claim_generation > 1`
+and the native object turns out to be finished. Helixa's dispatch schema accepts only
+`accepted`, `conflict` and `action_required`, so that answer would not parse and the
+worker would record `megacampus_generation_outcome_uncertain`.
+
+The transport does not rewrite shapes, so the library changed instead: that branch now
+answers `accepted`, which is also the truer description. The command has been accepted and
+the object exists; what is still outstanding is the signed import, and `accepted` is
+exactly the state on which Helixa's worker polls lookup and waits for it.
+`native_completed` remains a lookup answer, where Helixa's schema does accept it.
+
+The test suite parses every dispatch and lookup result with a transcribed copy of Helixa's
+two schemas, held in `tests/unit/integrations/helixa/fixtures/helixa-result-schemas.ts`,
+so a shape that stops fitting fails here rather than in Helixa.
 
 Authorization is not a bearer token. It is a database-resident service principal:
 the binding row names `generation_service_principal_user_id`, and

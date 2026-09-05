@@ -21,6 +21,8 @@ import {
 } from '@/integrations/helixa/generation-commands';
 import { canonicalGenerationJsonV1 } from '@/integrations/helixa/generation-canonical-json';
 
+import { HelixaDispatchResultSchema } from './fixtures/helixa-result-schemas';
+
 const jobCommand = {
   schemaVersion: 'helixa.megacampus-generation-command.v1',
   operation: 'CREATE_JOB_INSTRUCTION',
@@ -892,9 +894,14 @@ describe('server-only Helixa generation commands', () => {
       markScheduled: vi.fn(),
       actionRequired,
       lookup: vi.fn(),
+      // `reconcile_completed_helixa_generation_command` sets
+      // `accepted_at = COALESCE(command.accepted_at, NOW())`, so the row it returns always
+      // carries one. The fake has to say the same thing, or it would licence a result with
+      // a null `acceptedAt` that Helixa's schema rejects.
       reconcileCompleted: vi.fn(async input => ({
         ...row,
         status: 'native_completed',
+        acceptedAt: '2026-08-23T10:20:00.000Z',
         claimGeneration: 2,
         leaseToken: null,
         nativeCompletedAt: input.nativeCompletedAt,
@@ -924,10 +931,16 @@ describe('server-only Helixa generation commands', () => {
     await expect(dispatch()).rejects.toThrow(/response lost/i);
     expect(actionRequired).not.toHaveBeenCalled();
     const result = await dispatch();
+    // A reclaimed reservation whose native object turns out to be finished answers
+    // `accepted`, not `native_completed`. Helixa's dispatch schema has three states and
+    // `native_completed` is not one of them; on `accepted` its worker polls lookup and
+    // waits for the signed import, which is what this command is actually waiting for.
     expect(result).toMatchObject({
-      state: 'native_completed',
-      outboxEventId: 'mc2:ROLE_GUIDE:event',
+      state: 'accepted',
+      object: { kind: 'ROLE_GUIDE', id: '33333333-3333-4333-8333-333333333333' },
     });
+    expect(result).not.toHaveProperty('outboxEventId');
+    expect(() => HelixaDispatchResultSchema.parse(result)).not.toThrow();
     expect(schedule).toHaveBeenCalledTimes(1);
   });
 });
