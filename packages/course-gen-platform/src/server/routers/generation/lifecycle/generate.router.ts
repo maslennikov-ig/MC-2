@@ -14,8 +14,8 @@ import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import { addJob } from '../../../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
-import type { Database, JobData } from '@megacampus/shared-types';
+import { buildStructureGenerationJobData, JobType } from '@megacampus/shared-types';
+import type { Database, GenerationJobInput } from '@megacampus/shared-types';
 import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { TIER_PRIORITY } from '../_shared/constants';
 import type { CourseSettings } from '../_shared/types';
@@ -217,10 +217,16 @@ export const generateRouter = {
         // The cast stays because Supabase widens the column types (difficulty is `string`,
         // settings is `Json`) below what the Zod-inferred literal unions accept. The shape is
         // right; only the static types are looser. Stage 5 revalidates on the way out.
+        // buildStructureGenerationJobData attaches the camelCase BullMQ envelope, without
+        // which a permanently failed job logs an error row with no organization.
         const priority = TIER_PRIORITY[tier] || 1;
         const jobType = JobType.STRUCTURE_GENERATION;
 
-        const job = await addJob(jobType, jobInput as unknown as JobData, { priority });
+        const job = await addJob(
+          jobType,
+          buildStructureGenerationJobData(jobInput as unknown as GenerationJobInput),
+          { priority }
+        );
         const jobId = job.id as string;
 
         logger.info(

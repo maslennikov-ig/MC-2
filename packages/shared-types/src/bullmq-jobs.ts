@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
 import { courseSizeSchema } from './course-size';
-import { GenerationJobInputSchema } from './generation-job';
+import { GenerationJobInputSchema, type GenerationJobInput } from './generation-job';
 import {
   CareerPlaybookBlockIdSchema,
   CareerPlaybookBlockStateSchema,
@@ -220,19 +220,56 @@ export type StructureAnalysisJobData = z.infer<typeof StructureAnalysisJobDataSc
  * and `preferences`: fields no producer has ever sent and no consumer has ever
  * read. A restated schema drifts silently; a merged one cannot.
  *
- * Known gap, deliberately left alone here: the camelCase `BaseJobDataSchema`
- * envelope (`organizationId`, `courseId`, `userId`, `createdAt`) is declared
- * required, as it was before, but Stage 5 producers do not actually send it -
- * they enqueue the snake_case payload only. That is why `getJobCourseId()`
- * carries a `course_id` fallback. Making the envelope optional here is the
- * honest description, but it changes the `JobData` union that every queue and
- * error-handling helper reads, so it belongs in its own change.
+ * The camelCase `BaseJobDataSchema` envelope (`organizationId`, `courseId`,
+ * `userId`, `createdAt`, `locale`) is required, and producers now really send
+ * it: every Stage 5 enqueue goes through `buildStructureGenerationJobData()`
+ * below. Until 2026-09-05 they did not, so a permanently failed Stage 5 job
+ * reached the error-log row with `organization_id: undefined`.
  */
 export const StructureGenerationJobDataSchema = BaseJobDataSchema.extend({
   jobType: z.literal(JobType.STRUCTURE_GENERATION),
 }).merge(GenerationJobInputSchema);
 
 export type StructureGenerationJobData = z.infer<typeof StructureGenerationJobDataSchema>;
+
+/**
+ * Build a complete STRUCTURE_GENERATION job payload from a `GenerationJobInput`.
+ *
+ * This is the only place the snake_case payload is mapped onto the camelCase
+ * BullMQ envelope. Five call sites enqueue Stage 5 jobs (`generate.router.ts`,
+ * `auto-approval/helpers.ts`, `chat-intent-flow.ts`, `restart-stage.router.ts`
+ * and `status-helpers.ts`); before this existed, all five cast their payload to
+ * `JobData` and shipped it with no envelope at all.
+ *
+ * The consequence was invisible until a job failed. `handleJobFailure()` reads
+ * `jobData.organizationId` and hands it to `logPermanentFailure()`, whose
+ * `organization_id` is a required column, so Stage 5 failures - the ones most
+ * worth keeping - wrote a row with no organization.
+ *
+ * The payload is spread first so the envelope always wins on a key collision.
+ *
+ * @param input - The Stage 5 generation input, as the worker will read it
+ * @returns The same payload plus the envelope every queue helper expects
+ */
+export function buildStructureGenerationJobData(
+  input: GenerationJobInput
+): StructureGenerationJobData {
+  return {
+    ...input,
+    jobType: JobType.STRUCTURE_GENERATION,
+    organizationId: input.organization_id,
+    courseId: input.course_id,
+    userId: input.user_id,
+    createdAt: new Date().toISOString(),
+    // BaseJobDataSchema.locale is a two-value UI locale, not the full course
+    // language set, so anything that is not English maps to the 'ru' default.
+    // Optional chaining is deliberate: three of the five call sites receive the
+    // payload as Record<string, unknown> from buildStage5JobInput(), and a
+    // mapping helper must not turn a malformed payload into a thrown enqueue.
+    locale: input.frontend_parameters?.language === 'en' ? 'en' : 'ru',
+  };
+}
+
 
 // ============================================================================
 // Text Generation Job Schema (Stage 4+)
