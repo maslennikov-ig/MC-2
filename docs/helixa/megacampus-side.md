@@ -486,3 +486,62 @@ says outright.
   Supabase project (verified 2026-08-16 by comparing `SUPABASE_URL` digests across
   `megacampus-api-dev`, `megacampus-api-blue` and both workers). Applying these migrations
   once applies them everywhere at once; there is no later production step and no rehearsal.
+
+## 9. Provisioning on the MegaCampus side (go-live recipe)
+
+Applied state on 2026-09-05: all eight `*_helixa_*` migrations are in the shared database,
+the code is on `develop` and in production, and both directions are **data-gated off**:
+no binding row exists, `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` is unset and
+`HELIXA_MEGACAMPUS_GENERATION_MODE` is unset (`disabled`). Turning the bridge on is the
+sequence below, in this order, once the three joint values in
+`docs/helixa/handoff-for-helixa.md` §4 have been agreed with Helixa.
+
+1. **Service principal.** Create a non-interactive user the inbound commands act as. It must
+   exist in `auth.users` and `users`, carry `raw_app_meta_data->>'kind' = 'service_principal'`
+   and `raw_app_meta_data->>'interactive_login_allowed' = 'false'`, and be an `owner`, `admin`
+   or `instructor` member of the organization (`organization_members`). Use
+   `auth.admin.createUser` with `app_metadata` set and a random unusable password; never a
+   person's account. `reserve_helixa_generation_command` re-checks every one of these on each
+   dispatch.
+2. **Binding row.** One per `(organization, environment)`:
+
+   ```sql
+   INSERT INTO helixa_knowledge_sync_bindings (
+     binding_id, organization_id, environment, destination_binding_id, enabled,
+     generation_service_principal_user_id,
+     job_instruction_creation_enabled, course_from_job_instruction_creation_enabled,
+     course_creation_enabled, source_helixa_organization_id, source_helixa_project_id
+   ) VALUES (
+     '<binding id agreed with Helixa>', '<organization uuid>', 'production',
+     '<destination binding id agreed with Helixa>', false,
+     '<service principal uuid>', true, true,
+     false, NULL, NULL
+   );
+   ```
+
+   `enabled = false` at insert time: the row exists, the triggers still see nothing enabled.
+   `course_creation_enabled` is the older plain course-create ledger and stays off unless
+   Helixa asks for it; its check constraint then requires both `source_helixa_*` ids.
+
+3. **Secrets and ids** into the worker and API env files
+   (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):
+   `HELIXA_EXTERNAL_SYSTEM_ID`, `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY` (mint with
+   `openssl rand -hex 32`, hand the same bytes to Helixa out of band),
+   `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`, `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`,
+   `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`, `HELIXA_DESTINATION_BINDING_ID`, optionally
+   `HELIXA_DESTINATION_PROJECT_ID`. Redeploy the API and the worker so they read them.
+4. **Inbound first, on dev.** Set `HELIXA_MEGACAMPUS_GENERATION_MODE=live` on the dev API and
+   flip the dev binding to `enabled = true`. Have Helixa dispatch one `CREATE_JOB_INSTRUCTION`
+   against `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect
+   202, then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned
+   by the service principal. Watch `helixa_generation_commands` and the worker log.
+5. **Outbound second, on dev.** Set `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=true` on the dev
+   worker. The completed playbook from step 4 must produce one `helixa_knowledge_sync_outbox`
+   row that reaches `delivered`, and Helixa's receiver must answer 202 with `originCommand`
+   correlated. Any `action_required` row is read before anything is retried
+   (`reset_helixa_knowledge_sync_intent`).
+6. **Production**, same two steps, same order, with the production binding and ids.
+
+Rollback at any step: `enabled = false` on the binding row silences every trigger and both
+ledgers immediately; unsetting the two mode variables stops the timer and the route on the next
+request. Nothing needs to be dropped to stop.
