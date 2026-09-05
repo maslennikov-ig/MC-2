@@ -318,8 +318,8 @@ says outright.
 
 ## 8. Open risks before applying anything
 
-- **One database serves dev and staging.** Applying there changes staging behaviour
-  at the same moment, with no separate gate.
+- **One database serves dev, staging and production.** Applying it changes all three at
+  the same moment, with no separate gate.
 - **The triggers ignore the feature flag.** Once applied they are live. Safety comes
   from empty tables, so the first `helixa_knowledge_sync_bindings` insert is the
   real go-live event, not the migration and not the environment variable.
@@ -331,6 +331,7 @@ says outright.
   default.** The PostgreSQL 17 suites skip unless `HELIXA_REAL_PG17` is set, which
   is exactly why the `digest` defect survived review. Run them against a real
   instance before connecting anything to the inbound path.
-- **Production is a separate database.** Nothing here has run against it. The same
-  `pgcrypto`-in-`extensions` layout should hold, since both are Supabase projects,
-  but confirm before applying rather than after.
+- **Production is the same database.** Dev, staging and production containers all read one
+  Supabase project (verified 2026-08-16 by comparing `SUPABASE_URL` digests across
+  `megacampus-api-dev`, `megacampus-api-blue` and both workers). Applying these migrations
+  once applies them everywhere at once; there is no later production step and no rehearsal.
