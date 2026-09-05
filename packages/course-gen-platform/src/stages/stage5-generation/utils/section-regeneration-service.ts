@@ -56,8 +56,16 @@ export interface RegenerationHistoryEntry {
   tier: string;
   /** Tokens consumed during regeneration */
   tokens_used: number;
-  /** Cost in USD (calculated from tokens + model pricing) */
-  cost_usd: number;
+  /**
+   * What the regeneration's LLM calls were recorded as costing, in USD.
+   *
+   * The figure `recordLlmCallCost` wrote to `generation_trace` at the call,
+   * read back rather than recomputed here — one paid call, one priced row.
+   * Absent when no call reported a price, because a hardcoded `0` is what this
+   * field used to be and it made a real cost and an unknown one look identical
+   * (mc2-sdjy8.2).
+   */
+  cost_usd?: number;
 }
 
 interface ExtendedGenerationMetadata extends GenerationMetadata {
@@ -430,9 +438,19 @@ export class SectionRegenerationService {
       metadata.regeneration_history = [];
     }
 
-    // Calculate cost (TODO: implement proper cost calculation from tokens + model pricing)
-    // For now, use a placeholder value
-    const costUsd = 0;
+    // The price of this regeneration was already made where the call was made:
+    // the generator builds its model through `createCostRecordingModelAsync`
+    // with this course id and a `stage_5_*` phase, so every call wrote its own
+    // priced `generation_trace` row. This reads that recorded figure back
+    // instead of pricing the call a second time.
+    const costUsd = result.costUsd;
+
+    if (costUsd === undefined) {
+      logger.warn(
+        { courseId, sectionNumber, modelUsed: result.modelUsed },
+        'Section regeneration recorded no price; its history entry carries no cost'
+      );
+    }
 
     // Add regeneration entry
     const regenerationEntry: RegenerationHistoryEntry = {
@@ -441,7 +459,7 @@ export class SectionRegenerationService {
       model_used: result.modelUsed,
       tier: result.tier,
       tokens_used: result.tokensUsed,
-      cost_usd: costUsd,
+      ...(costUsd === undefined ? {} : { cost_usd: costUsd }),
     };
 
     metadata.regeneration_history.push(regenerationEntry);
