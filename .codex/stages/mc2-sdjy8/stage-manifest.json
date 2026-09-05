@@ -1,0 +1,107 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-sdjy8",
+  "goal_id": "mc2-sdjy8",
+  "epic_id": "mc2-sdjy8",
+  "profile_at_creation": "balanced-v2.20",
+  "status": "in_progress",
+  "sequence": 1,
+  "orchestration_level": "release",
+  "acceptance_boundary_id": "debt-closeout-2026-09-05",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "price-sync-workflow",
+      "cost-accounting",
+      "lms-integration",
+      "dependencies",
+      "docling-upstream",
+      "helixa-bridge"
+    ],
+    "risk_models": [
+      "silent-nightly-job",
+      "unpriced-spend",
+      "database-triggers-on-live-tables",
+      "external-pr"
+    ],
+    "test_environments": [
+      "local-vitest",
+      "local-typecheck",
+      "github-actions",
+      "shared-dev-staging-supabase",
+      "production-supabase"
+    ],
+    "rollback_boundary": "revert-develop-commits-helixa-migrations-carry-recorded-rollback-sql",
+    "acceptance_proofs": [
+      "price-sync-run-green",
+      "no-anonymous-spend-green",
+      "audit-zero",
+      "upstream-pr-url",
+      "helixa-trigger-review",
+      "develop-ancestry-and-stranded-commit-check",
+      "release-tag-and-production-revision"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-sdjy8",
+    "source_digest": "10b06007e3bb7db85188f6ab4d01b729bb8f0f30765893196e0826805d882399",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "The nightly price sync completes green on a real GitHub run after the fix (Chromium installed; a cancelled run also notifies Telegram).",
+        "text_digest": "2d462f02fea78d698bd6a2080d5bfce6a9b41eafa5c18c9156a967cfc6f91103"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Section regeneration prices its LLM call at the call; regeneration_history.cost_usd is the recorded cost, never a placeholder 0.",
+        "text_digest": "44c0fa1149b4dabab6eaeff178ad1dcb920a46c493bbdb9f2bf4546b44e6299a"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "The seven February TODO markers are gone from src: each implemented or replaced by a recorded decision.",
+        "text_digest": "dedb5ea806fd1632069a4bf13cae5229612319befb1d5716db815b546677652d"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "pnpm audit --prod reports zero advisories.",
+        "text_digest": "b2b34c12ba11755db61b648b94e3b8eeb87f8ff0162660a09875b13637684514"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Jina spend in quality-validator.ts and semantic-matching.ts is attributed to a course; RETRIEVAL_DEFERRED is empty and no-anonymous-spend is green.",
+        "text_digest": "12e6431a72ca1406f110fa03c28be68f7ba66b8c5f1ead986aee57a0d2090e56"
+      },
+      {
+        "criterion_id": "AC-6",
+        "text": "An upstream PR to docling-project/docling-mcp for issue #134 is open and its URL is recorded on mc2-vlskb.",
+        "text_digest": "ba3652795c936f3842f727d2ea4c592096d724722e8734eb687e072d46717b20"
+      },
+      {
+        "criterion_id": "AC-7",
+        "text": "The Helixa branch is delivered to develop with the six triggers reviewed, its migrations applied to the shared dev/staging database and to production, and a Helixa-side handoff prompt written to a Markdown file.",
+        "text_digest": "9d069e3b6c2a6641d782f0f3f8833506b1c7d6b76326a5e10cc52e0f94efc6c3"
+      },
+      {
+        "criterion_id": "AC-8",
+        "text": "pnpm type-check and pnpm test:unit are green on develop; a release is tagged and deployed to production.",
+        "text_digest": "ba7cf832fef2ecfa54d5d9476fa09ad31c82a61d7f4bc7890472b53678193f3d"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-sdjy8/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "10b06007e3bb7db85188f6ab4d01b729bb8f0f30765893196e0826805d882399",
+  "scope_ledger": "none",
+  "stream_artifacts": []
+}
