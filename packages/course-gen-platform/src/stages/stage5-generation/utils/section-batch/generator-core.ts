@@ -15,6 +15,7 @@ import { ModelTier, SectionBatchResult } from './types';
 import { MODELS } from './constants';
 import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
 import { estimateTokens } from './utils';
+import { SectionCallCostCollector } from './call-cost-collector';
 
 /** How long a section batch is allowed to take. */
 const SECTION_BATCH_TIMEOUT_MS = 300_000;
@@ -47,8 +48,16 @@ const PHASE_BY_TIER: Record<ModelTier['tier'], string> = {
  * inside the factory, because two provider facts decide whether the numbers the
  * configuration carries are the numbers the request carries: GPT-5.6 ignores
  * `temperature`, and OpenRouter bills reasoning tokens against `max_tokens`.
+ *
+ * `onCostRecorded` is the read-back of that recording. The price is still made
+ * once, at the call; this only carries the recorded figure out to a caller that
+ * has to report it.
  */
-async function createModel(tier: ModelTier, courseId?: string): Promise<ChatOpenAI> {
+async function createModel(
+  tier: ModelTier,
+  courseId?: string,
+  onCostRecorded?: (costUsd: number | undefined) => void
+): Promise<ChatOpenAI> {
   return createCostRecordingModelAsync(
     tier.model,
     tier.temperature,
@@ -56,7 +65,8 @@ async function createModel(tier: ModelTier, courseId?: string): Promise<ChatOpen
     PHASE_BY_TIER[tier.tier],
     courseId,
     tier.reasoning,
-    SECTION_BATCH_TIMEOUT_MS
+    SECTION_BATCH_TIMEOUT_MS,
+    onCostRecorded
   );
 }
 
@@ -315,6 +325,9 @@ export async function generateWithRetry(
   const maxAttempts = 2;
   let retryCount = 0;
   let currentModelTier = modelTier;
+  // One collector for the whole attempt, so an escalated tier, a retry, and the
+  // UnifiedRegenerator's own calls all land in the figure this batch reports.
+  const costCollector = new SectionCallCostCollector();
 
   while (retryCount < maxAttempts) {
     try {
@@ -328,7 +341,7 @@ export async function generateWithRetry(
         previousSectionsDigest
       );
 
-      const model = await createModel(currentModelTier, input.course_id);
+      const model = await createModel(currentModelTier, input.course_id, costCollector.record);
       const response = await model.invoke(prompt);
 
       let rawContent: string;
@@ -397,12 +410,18 @@ export async function generateWithRetry(
         tokensSaved: regenerationMetrics.tokensSaved,
       });
 
+      // The cost callbacks are queued, not awaited, by @langchain/core, so the
+      // total is only readable once that queue has drained — see
+      // `SectionCallCostCollector`.
+      const costUsd = await costCollector.settle();
+
       return {
         sections,
         modelUsed: currentModelTier.model,
         tier: currentModelTier.tier,
         tokensUsed: estimateTokens(prompt, rawContent),
         retryCount,
+        ...(costUsd === undefined ? {} : { costUsd }),
         regenerationMetrics,
       };
     } catch (error) {

@@ -30,6 +30,15 @@ export interface SectionBatchResult {
   tier: string;
   tokensUsed: number;
   retryCount: number;
+  /**
+   * What this batch's LLM calls were recorded as costing, in USD.
+   *
+   * The figure `recordLlmCallCost` wrote to `generation_trace` for each call,
+   * added up — not a second price computed here. Absent when no call reported
+   * one, so "cost nothing" and "nobody knows" stay different facts; the section
+   * regeneration history used to write a hardcoded `0` for both (mc2-sdjy8.2).
+   */
+  costUsd?: number;
   /** Regeneration metrics from UnifiedRegenerator (RT-005) */
   regenerationMetrics?: {
     layerUsed: string;
@@ -54,6 +63,15 @@ export interface SectionBatchResultV2 {
   tier: string;
   tokensUsed: number;
   retryCount: number;
+  /**
+   * What this batch's LLM calls were recorded as costing, in USD.
+   *
+   * The figure `recordLlmCallCost` wrote to `generation_trace` for each call,
+   * added up — not a second price computed here. Absent when no call reported
+   * one, so "cost nothing" and "nobody knows" stay different facts; the section
+   * regeneration history used to write a hardcoded `0` for both (mc2-sdjy8.2).
+   */
+  costUsd?: number;
   /** Regeneration metrics from UnifiedRegenerator (RT-005) */
   regenerationMetrics?: {
     layerUsed: string;

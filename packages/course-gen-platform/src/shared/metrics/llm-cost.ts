@@ -392,17 +392,25 @@ export async function recordImageCallCost(
  * Never throws and never blocks the caller: accounting must not be able to fail
  * a generation. A call made without a course context is logged at debug with
  * the model, so the remaining holes are visible instead of silent.
+ *
+ * Returns the price it put on the row, so a caller that has to report what a
+ * call cost reads back the recorded number instead of computing a second one.
+ * `undefined` means no price was recorded — no course context, a model the
+ * catalogue does not know, or a write that failed — and is not the same fact as
+ * a recorded zero (mc2-y452l). The figure is the one written at the call;
+ * `settleTraceCostFromProvider` may replace it on the row about ten seconds
+ * later, and a caller holding this number is holding the estimate.
  */
 export async function recordLlmCallCost(
   usage: LlmCallUsage,
   context?: LlmCostContext
-): Promise<void> {
+): Promise<number | undefined> {
   if (!context) {
     logger.debug(
       { model: usage.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
       '[Cost] LLM call without a course context; its cost is not attributed'
     );
-    return;
+    return undefined;
   }
 
   const costUsd = calculateLlmCostUsd(usage);
@@ -427,6 +435,7 @@ export async function recordLlmCallCost(
     );
   }
 
+  let recorded = false;
   try {
     const traceId = await logTrace({
       courseId: context.courseId,
@@ -479,6 +488,7 @@ export async function recordLlmCallCost(
     });
 
     settleTraceCostFromProvider(traceId, usage.generationId, usage.model);
+    recorded = true;
   } catch (error) {
     logger.warn(
       { error: error instanceof Error ? error.message : String(error), model: usage.model },
@@ -487,6 +497,11 @@ export async function recordLlmCallCost(
   }
 
   refreshCourseTotalAfterEdit(context);
+
+  // A recorded cost is a row. A write that failed put no price anywhere, so it
+  // reports none rather than handing back a number nothing can be reconciled
+  // against.
+  return recorded ? costUsd : undefined;
 }
 
 /**
