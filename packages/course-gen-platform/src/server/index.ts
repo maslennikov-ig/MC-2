@@ -70,6 +70,10 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from './app-router';
 import { createContext } from './trpc';
 import { setupBullBoardUI, createMetricsRouter } from '../orchestrator/ui';
+import {
+  createHelixaGenerationRouter,
+  HELIXA_GENERATION_BASE_PATH,
+} from './routes/helixa-generation';
 import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
 import { warmupEmbeddingCache } from '../shared/validation/semantic-matching';
@@ -254,10 +258,13 @@ app.use(
 // If a future non-tRPC route requires body parsing, scope it to that route's path:
 //   app.use('/my-route', express.json({ limit: '100mb' }));
 
-// Guard: warn if a non-tRPC route receives a request body without a body parser
+// Guard: warn if a non-tRPC route receives a request body without a body parser.
+// The Helixa generation route is exempt: it mounts its own route-scoped raw parser,
+// which it needs because the request is authenticated by an HMAC over the exact bytes.
 app.use((req: Request, _res: Response, next: NextFunction) => {
   if (
     !req.path.startsWith('/trpc') &&
+    !req.path.startsWith(HELIXA_GENERATION_BASE_PATH) &&
     req.method !== 'GET' &&
     req.method !== 'HEAD' &&
     req.headers['content-type']
@@ -480,6 +487,22 @@ try {
  * - GET /metrics - Job metrics (counts, rates, durations)
  * - GET /health - Queue health status
  */
+/**
+ * Helixa generation commands (inbound)
+ *
+ * POST /api/integrations/helixa/generation/dispatch
+ * POST /api/integrations/helixa/generation/lookup
+ *
+ * Authenticated by an HMAC-SHA256 over the raw body, not by a session. Refuses with
+ * 503 until HELIXA_MEGACAMPUS_GENERATION_MODE is `fake` or `live`.
+ */
+try {
+  app.use(createHelixaGenerationRouter());
+  logger.info({ basePath: HELIXA_GENERATION_BASE_PATH }, 'Helixa generation router mounted');
+} catch (error) {
+  logger.error({ err: error }, 'Failed to setup Helixa generation router');
+}
+
 try {
   const metricsRouter = createMetricsRouter();
   app.use(metricsRouter);
