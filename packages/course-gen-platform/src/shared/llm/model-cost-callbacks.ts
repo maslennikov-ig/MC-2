@@ -75,11 +75,19 @@ function generationIdOf(output: LLMResult): string | undefined {
  *
  * Without a course id there is nothing to attribute the cost to, and nothing is
  * returned.
+ *
+ * `onCostRecorded` is how a caller learns what its own calls cost without
+ * pricing them a second time: it is handed exactly the figure
+ * `recordLlmCallCost` wrote to the row, `undefined` when no price was recorded.
+ * It fires from the background callback queue, so a caller that needs the
+ * number before it returns has to drain that queue first — see
+ * `SectionCallCostCollector`.
  */
 export function costRecordingCallbacks(
   modelId: string,
   phase: string,
-  courseId?: string
+  courseId?: string,
+  onCostRecorded?: (costUsd: number | undefined) => void
 ): Callbacks | undefined {
   const stage = stageOfPhase(phase);
   if (!courseId || !stage) return undefined;
@@ -112,7 +120,7 @@ export function costRecordingCallbacks(
         // estimate stays at the default tariff and `settleTraceCostFromProvider`
         // replaces it with the real charge, and the real tier, about ten seconds
         // later.
-        await recordLlmCallCost(
+        const recordedCostUsd = await recordLlmCallCost(
           {
             model: modelId,
             inputTokens: usage.promptTokens ?? 0,
@@ -122,6 +130,8 @@ export function costRecordingCallbacks(
           },
           { courseId, stage, phase }
         );
+
+        onCostRecorded?.(recordedCostUsd);
       },
     },
   ];

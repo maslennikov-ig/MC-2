@@ -424,6 +424,36 @@ describe('OpenEdXAdapter', () => {
     });
   });
 
+  describe('getCourseStatus', () => {
+    // The method used to return { exists: false, published: false } without
+    // contacting the LMS, which is indistinguishable from a real "not found".
+    // It now refuses instead of inventing an answer.
+    const courseId = '3f8e1cd4-0c6e-43cf-8264-57c470a6c102';
+
+    it('should reject with an LMSIntegrationError', async () => {
+      await expect(adapter.getCourseStatus(courseId)).rejects.toBeInstanceOf(LMSIntegrationError);
+    });
+
+    it('should carry a typed error code and the course id', async () => {
+      try {
+        await adapter.getCourseStatus(courseId);
+        expect.unreachable('getCourseStatus should not resolve');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LMSIntegrationError);
+        const lmsError = error as LMSIntegrationError;
+        expect(lmsError.code).toBe('IMPORT_ERROR');
+        expect(lmsError.lmsType).toBe('openedx');
+        expect(lmsError.message).toContain('not supported');
+      }
+    });
+
+    it('should never report a course as absent without asking the LMS', async () => {
+      const result = await adapter.getCourseStatus(courseId).catch(() => 'rejected' as const);
+
+      expect(result).toBe('rejected');
+    });
+  });
+
   describe('type getter', () => {
     it('should return "openedx"', () => {
       expect(adapter.type).toBe('openedx');

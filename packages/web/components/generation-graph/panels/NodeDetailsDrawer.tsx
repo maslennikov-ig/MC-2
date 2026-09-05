@@ -116,6 +116,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             <ModuleDashboard
               data={dashboard.moduleDashboardData}
               courseId={courseInfo.id}
+              modelTier={uiTier}
               isLoading={dashboard.isLoadingModuleDashboard}
               error={dashboard.moduleDashboardError}
               onExportAll={() => void handlers.handleExportAll()}

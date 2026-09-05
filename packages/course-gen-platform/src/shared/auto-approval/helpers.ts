@@ -12,6 +12,7 @@ import { addJob } from '../../orchestrator/queue';
 import { enqueueStage6Lesson } from '../../stages/stage6-lesson-content/enqueue';
 import {
   JobType,
+  buildStructureGenerationJobData,
   type JobData,
   type GenerationJobInput,
   type LessonSpecificationV2,
@@ -341,9 +342,9 @@ export async function queueStage5Job(
     document_summaries: documentSummaries,
   };
 
-  // Note: Stage 5 handler expects GenerationJobInput which is not part of JobData union
-  // This is a known architectural mismatch - using type assertion with explicit typing
-  await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData, {
+  // buildStructureGenerationJobData attaches the camelCase BullMQ envelope on top of the
+  // snake_case payload the Stage 5 handler reads, so no cast is needed here any more.
+  await addJob(JobType.STRUCTURE_GENERATION, buildStructureGenerationJobData(jobInput), {
     priority,
     jobId: idempotentJobId,
   });

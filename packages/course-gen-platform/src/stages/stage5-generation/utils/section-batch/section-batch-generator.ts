@@ -166,6 +166,7 @@ export class SectionBatchGenerator {
       tier: sectionResult.tier,
       tokensUsed: sectionResult.tokensUsed,
       retryCount: sectionResult.retryCount,
+      ...(sectionResult.costUsd === undefined ? {} : { costUsd: sectionResult.costUsd }),
       regenerationMetrics: sectionResult.regenerationMetrics,
     };
   }

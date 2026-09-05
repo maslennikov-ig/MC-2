@@ -1,6 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, GenerationMetadata, JobData } from '@megacampus/shared-types';
-import { deriveStage5StructuralQualityState, JobType } from '@megacampus/shared-types';
+import type {
+  Database,
+  GenerationJobInput,
+  GenerationMetadata,
+  JobData,
+} from '@megacampus/shared-types';
+import {
+  buildStructureGenerationJobData,
+  deriveStage5StructuralQualityState,
+  JobType,
+} from '@megacampus/shared-types';
 import { TRPCError } from '@trpc/server';
 import { addJob } from '../../../orchestrator/queue';
 import { logger } from '../../../shared/logger/index.js';
@@ -425,7 +434,11 @@ async function handleStage4Approval(
     document_summaries: documentSummaries,
   };
 
-  await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData, { priority });
+  await addJob(
+    JobType.STRUCTURE_GENERATION,
+    buildStructureGenerationJobData(jobInput as unknown as GenerationJobInput),
+    { priority }
+  );
   return { success: true, nextStage: 5 };
 }
 

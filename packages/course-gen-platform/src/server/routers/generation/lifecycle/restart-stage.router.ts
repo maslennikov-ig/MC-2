@@ -14,8 +14,8 @@ import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
-import type { JobData } from '@megacampus/shared-types';
+import { buildStructureGenerationJobData, JobType } from '@megacampus/shared-types';
+import type { GenerationJobInput, JobData } from '@megacampus/shared-types';
 import type { RestartStageRPCResult } from '../_shared/types';
 import { buildStage5JobInput } from '../_shared/helpers';
 import { deleteVectorsForDocument } from '../../../../shared/qdrant/lifecycle';
@@ -200,7 +200,10 @@ export const restartStageRouter = {
         } else if (stageNumber === 5) {
           // Stage 5: Structure Generation - use shared helper
           const { jobInput } = await buildStage5JobInput(supabase, courseId, userId, requestId);
-          const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
+          const job = await addJob(
+            JobType.STRUCTURE_GENERATION,
+            buildStructureGenerationJobData(jobInput as unknown as GenerationJobInput)
+          );
           jobId = job.id;
         }
         // Stage 6: Triggered automatically when Stage 5 completes

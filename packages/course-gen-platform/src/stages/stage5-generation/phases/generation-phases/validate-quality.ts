@@ -1,5 +1,6 @@
 import type { GenerationState } from '../../utils/generation-state.js';
 import type { QualityValidator } from '../../../../shared/validation/quality-validator.js';
+import type { LlmCostContext } from '../../../../shared/metrics/llm-cost.js';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import pino from 'pino';
 import { logTrace } from '../../../../shared/trace-logger.js';
@@ -84,6 +85,14 @@ export async function validateQualityPhase(
     // Note: contextual_language is a pedagogical context object, not a language code
     const language = state.input.frontend_parameters.language || 'en';
 
+    // Every similarity below is a paid Jina embedding: two for the metadata and
+    // two per section. They belong on the course being generated.
+    const costContext: LlmCostContext = {
+      courseId,
+      stage: 'stage_5',
+      phase: 'validate_quality',
+    };
+
     // 1. Validate metadata similarity (if analysis_result provided)
     let metadataSimilarity: number | undefined;
     const metadataTokens = 0;
@@ -95,7 +104,8 @@ export async function validateQualityPhase(
       const metadataResult = await qualityValidator.validateMetadata(
         inputRequirements,
         state.metadata,
-        language
+        language,
+        costContext
       );
 
       metadataSimilarity = metadataResult.score;
@@ -125,7 +135,8 @@ export async function validateQualityPhase(
     const sectionResults = await qualityValidator.validateSections(
       expectedTopics,
       state.sections,
-      language
+      language,
+      costContext
     );
 
     const sectionsSimilarity = sectionResults.map(result => result.score);
