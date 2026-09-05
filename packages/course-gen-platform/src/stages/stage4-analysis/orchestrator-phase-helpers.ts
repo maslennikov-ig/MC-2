@@ -435,7 +435,9 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
     try {
       const overlapResult = await detectSectionBreakdownOverlap(
         phase2Output.recommended_structure.sections_breakdown,
-        input.language
+        input.language,
+        // One batch embedding per overlap attempt, and this loop retries.
+        { courseId, stage: 'stage_4', phase: 'phase2_scope_overlap' }
       );
 
       if (overlapResult.hasOverlap) {
