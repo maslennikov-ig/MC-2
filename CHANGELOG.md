@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.44] - 2026-09-05
+
+### Added
+
+- **helixa**: schedule a career playbook from a CREATE_JOB_INSTRUCTION command (c5f2d79c8)
+- **helixa**: give the inbound generation commands an HTTP transport (3e4e34a61)
+- **helixa**: add a live generation mode next to disabled and fake (4011d1138)
+- **helixa**: add durable generation commands (e7355cd80)
+- **helixa**: compose durable course commands (8efbad6e1)
+- **helixa**: add durable fake course commands (90dc856c8)
+- **helixa**: schedule opt-in knowledge delivery (330656dbc)
+- **helixa**: add durable knowledge sync exporter (8e9349581)
+
+### Changed
+
+- **helixa**: format the bridge, and split the file that formatting broke (70e86d2db)
+
+### Fixed
+
+- **deps**: pin @xmldom/xmldom to 0.8.15, the last 0.8 mammoth can parse with (6352368c9)
+- **helixa**: the scheduled course job goes to the queue this deployment reads (e82a878c8)
+- **helixa**: a reclaimed reservation answers accepted, not native_completed (86b1a5b95)
+- **helixa**: let the triggers reach digest, and their own tables (0514c3c03)
+- **stage5**: attach the BullMQ envelope so failed jobs keep their organization (f2118ffc6)
+- **stage5**: price section regeneration from the recorded cost, not a zero (04f6192f9)
+- **cost**: the quality gates charge the course they are gating (76e90c484)
+- **cost**: the nightly price sync installs the browser its own suite needs, and says so when cancelled (3072436b8)
+- **helixa**: re-pin the migration manifest for the five new files (e39316763)
+- **helixa**: send the bytes the signature was computed over, and pass lint (d15db0f8a)
+- **helixa**: observe scheduled dispatch replays (abaf6f4a2)
+- **helixa**: feed role guides into course analysis (d8ebac07e)
+- **helixa**: harden native generation transactions (463334263)
+- **helixa**: recover stale course command leases (bd5757169)
+- **helixa**: serialize course command replay (9a61b165b)
+- **helixa**: disambiguate course command RPCs (7765467f1)
+- **helixa**: align course command bounds (1d5fce7b9)
+- **helixa**: qualify outbox claim counters (2f8e7b55c)
+- **helixa**: harden knowledge sync delivery (e9c4b2061)
+
+### Other
+
+- update docs (43d17757e)
+- **beads**: record the mc2-sdjy8 interaction log (be3ee7c85)
+- **orchestration**: open stage mc2-sdjy8 (debt closeout 2026-09-05) (2ba5b2019)
+- **helixa**: the go-live recipe for the MegaCampus side (d2ba52aa1)
+- **helixa**: the handoff prompt for the Helixa side of the bridge (26fdff5b3)
+- **nginx**: route /api/integrations/helixa/ to the API for the Helixa generation transport (09b098c74)
+- **helixa**: the inbound half has a transport now, and one shape that will not parse (2f5805611)
+- **helixa**: the trigger section names the one shared database too (d9fa27204)
+- **helixa**: the database is one project for dev, staging and production (a3a4d0227)
+- **orchestration**: drop the helixa entries from the stranded allowlist (edb132b6e)
+- **helixa**: review the database side and write down the contract (d0b42544b)
+- **debt**: resolve six TODO markers left open since February 2026 (c268b1002)
+- **beads**: record the mc2-hnv22 interaction log (122deea6b)
+- **helixa**: normalize exporter files (e5fb81b8a)
+
 ## [0.31.43] - 2026-09-05
 
 ### Fixed
