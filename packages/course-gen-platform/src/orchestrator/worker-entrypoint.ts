@@ -43,6 +43,7 @@ import {
 import { TIMEOUTS } from '../shared/constants/timeouts';
 import { refreshReadinessHeartbeat } from './worker-readiness';
 import { recordWorkerStart } from './worker-start-marker';
+import { startKnowledgeSyncDeliveryScheduler } from '../integrations/helixa/service';
 
 // Validate environment
 validateEnvironment();
@@ -185,6 +186,7 @@ startMemoryMonitoring();
 // Track active worker for graceful shutdown
 let activeGeneralWorker: Awaited<ReturnType<typeof startWorker>> | null = null;
 let activeStage6Worker: ReturnType<typeof createStage6Worker> | null = null;
+let activeKnowledgeSyncDeliveryScheduler: { stop(): void } | null = null;
 let isShuttingDownWorker = false;
 
 /**
@@ -193,6 +195,8 @@ let isShuttingDownWorker = false;
 function performCommonCleanup(): void {
   stopMemoryMonitoring();
   stopReadinessHeartbeat();
+  activeKnowledgeSyncDeliveryScheduler?.stop();
+  activeKnowledgeSyncDeliveryScheduler = null;
   const bunker = getModelConfigBunker();
   if (bunker.isInitialized()) {
     bunker.shutdown();
@@ -345,6 +349,15 @@ async function main() {
 
     // Store reference for graceful shutdown (handled by handleWorkerShutdown)
     activeGeneralWorker = await startWorker(concurrency);
+
+    // This opt-in timer is isolated from BullMQ and is never attached to the
+    // dedicated Stage 6/7 workers. Its runtime configuration is validated by
+    // the integration before it can start.
+    activeKnowledgeSyncDeliveryScheduler = startKnowledgeSyncDeliveryScheduler({
+      onCounters: counters => {
+        logger.info({ counters }, 'Helixa knowledge-sync delivery batch completed');
+      },
+    });
 
     // Start readiness heartbeat to keep Redis TTL fresh
     // This allows API server to detect if worker crashes

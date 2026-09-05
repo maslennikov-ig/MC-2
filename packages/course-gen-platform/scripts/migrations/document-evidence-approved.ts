@@ -602,8 +602,20 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `llm_model_config` moving the Career Playbook proofreader onto the model its
 // sibling judge runs. No `document_evidence` object is touched, so no new
 // `after-*` digest, and re-pinned in the same edit as the migration.
+// Re-pinned 2026-09-05 for the Helixa AIOS bridge (mc2-gxese, mc2-sdjy8.6): 255 files,
+// adding 20260822235900_helixa_knowledge_sync_outbox.sql,
+// 20260823060000_helixa_course_creation_commands.sql,
+// 20260823120000_helixa_generation_commands.sql,
+// 20260823130000_helixa_generation_native_transactions.sql and
+// 20260823140000_helixa_generation_course_source.sql. They create their own tables and
+// `helixa_*`-prefixed functions and touch no function inside the security manifest, which
+// covers only the 2026-07-11 document-evidence chain, so no new `after-*` digest is needed.
+// What they DO add is six triggers on three live tables — `courses` (2), `career_playbooks`
+// (3) and `file_catalog` (1). Those are outside this guard's reach; they are data-gated on
+// `helixa_knowledge_sync_bindings` / `course_job_instruction_native_sources` being non-empty
+// and are reviewed in docs/helixa/megacampus-side.md. Re-pinning here is not a review of them.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '871d0d5e4f008e1a9099152a7c7b6b792efec06914ab91be6c6d2c6f17e72f19';
+  '7f0cec797741f80c6d329f71449c0cae64810d9bf67d45715c45ecfaabd9a916';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
