@@ -172,6 +172,18 @@ describe('Helixa bridge provisioning', () => {
     expect(store.writes).toEqual([]);
   });
 
+  it('keeps provisioning replay limited to a disabled binding', async () => {
+    const store = new MemoryStore();
+    await provisionHelixaBridge(store, input, 'apply');
+    store.bindings[0].enabled = true;
+    store.writes = [];
+
+    await expect(provisionHelixaBridge(store, input, 'apply')).rejects.toThrow(
+      'Helixa bridge binding conflict'
+    );
+    expect(store.writes).toEqual([]);
+  });
+
   it('fails closed when the existing identity has a different permission tuple', async () => {
     const store = new MemoryStore();
     await provisionHelixaBridge(store, input, 'apply');

@@ -554,6 +554,12 @@ sequence below, in this order, once the three joint values in
    principal for an explicit plan instead of attempting unsafe deletion through the
    binding's restrictive foreign keys.
 
+   Save the returned `principalId` for the activation check:
+
+   ```bash
+   export MC2_HELIXA_SERVICE_PRINCIPAL_USER_ID='<principalId from provision output>'
+   ```
+
 3. **Secrets and ids** into the worker and API env files
    (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):
    `HELIXA_EXTERNAL_SYSTEM_ID`, `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY` (mint with
@@ -561,11 +567,28 @@ sequence below, in this order, once the three joint values in
    `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`, `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`,
    `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`, `HELIXA_DESTINATION_BINDING_ID`, optionally
    `HELIXA_DESTINATION_PROJECT_ID`. Redeploy the API and the worker so they read them.
-4. **Inbound first, on dev.** Set `HELIXA_MEGACAMPUS_GENERATION_MODE=live` on the dev API and
-   flip the dev binding to `enabled = true`. Have Helixa dispatch one `CREATE_JOB_INSTRUCTION`
-   against `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect
-   202, then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned
-   by the service principal. Watch `helixa_generation_commands` and the worker log.
+4. **Inbound first, on dev.** Set `HELIXA_MEGACAMPUS_GENERATION_MODE=live` on the dev API.
+   Plan the binding activation, review the safe JSON result, then apply that exact action:
+
+   ```bash
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/binding-activation.ts plan activate
+
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/binding-activation.ts apply activate
+   ```
+
+   The operator requires the same organization, binding, environment, destination and
+   both source ids as provisioning, plus the exact `principalId`. Activation also requires
+   all three operation capabilities to remain enabled. The write is conditional on every
+   column read from the binding, and an exact readback must show `enabled = true`. A repeated
+   activation performs no write. The provisioner deliberately continues to reject an
+   enabled binding; activation replay belongs to this separate operator.
+
+   Have Helixa dispatch one `CREATE_JOB_INSTRUCTION` against
+   `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect 202,
+   then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned by
+   the service principal. Watch `helixa_generation_commands` and the worker log.
 5. **Outbound second, on dev.** Set `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=true` on the dev
    worker. The completed playbook from step 4 must produce one `helixa_knowledge_sync_outbox`
    row that reaches `delivered`, and Helixa's receiver must answer 202 with `originCommand`
@@ -573,9 +596,19 @@ sequence below, in this order, once the three joint values in
    (`reset_helixa_knowledge_sync_intent`).
 6. **Production**, same two steps, same order, with the production binding and ids.
 
-Rollback at any step: `enabled = false` on the binding row silences every trigger and both
-ledgers immediately; unsetting the two mode variables stops the timer and the route on the next
-request. Nothing needs to be dropped to stop.
+Rollback at any step uses the same guarded operator rather than a broad SQL update:
+
+```bash
+pnpm --filter @megacampus/course-gen-platform exec \
+  tsx scripts/helixa/binding-activation.ts plan deactivate
+
+pnpm --filter @megacampus/course-gen-platform exec \
+  tsx scripts/helixa/binding-activation.ts apply deactivate
+```
+
+The exact readback must show `enabled = false`; repeated deactivation performs no write.
+This silences every trigger and both ledgers immediately. Unsetting the two mode variables
+stops the timer and the route on the next request. Nothing needs to be dropped to stop.
 
 ## 10. J149 activation checkpoint (2026-09-05)
 

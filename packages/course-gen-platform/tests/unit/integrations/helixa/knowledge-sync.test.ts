@@ -529,6 +529,28 @@ describe('delivery and durable intent', () => {
     });
     expect(() => readKnowledgeSyncRuntimeConfig({})).toThrow(/incomplete/i);
   });
+  it('uses the dedicated Helixa binding environment before shared process fallbacks', () => {
+    const required = {
+      HELIXA_KNOWLEDGE_SYNC_ENDPOINT: 'https://helixa.test',
+      HELIXA_KNOWLEDGE_SYNC_HMAC_KEY: 'runtime-only',
+      HELIXA_EXTERNAL_SYSTEM_ID: 'system-1',
+      HELIXA_KNOWLEDGE_SYNC_BINDING_ID: 'binding-1',
+      HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID: organizationId,
+      HELIXA_DESTINATION_BINDING_ID: 'destination-1',
+    };
+    expect(
+      readKnowledgeSyncRuntimeConfig({
+        ...required,
+        HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT: 'acceptance',
+        APP_ENV: 'shared-app-environment',
+        NODE_ENV: 'production',
+      }).environment
+    ).toBe('acceptance');
+    expect(
+      readKnowledgeSyncRuntimeConfig({ ...required, APP_ENV: 'staging', NODE_ENV: 'production' })
+        .environment
+    ).toBe('staging');
+  });
   it('claims only the invoking organization/environment/destination binding', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: [], error: null });
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
