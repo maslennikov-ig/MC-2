@@ -185,6 +185,7 @@ jobs:
           bash scripts/ci/test_detect_deploy_changes.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
           bash scripts/ci/test_host_operation_lock.sh
+          bash scripts/ci/test_dev_nginx_deploy.sh
           bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
           bash scripts/ci/test_course_gen_types_rebuild.sh
