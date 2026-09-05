@@ -3,6 +3,7 @@ import {
   parseHelixaGenerationLookupQuery,
   generationCommandHash,
   type HelixaGenerationCommand,
+  type HelixaGenerationMode,
 } from './generation-command-schema';
 import type {
   HelixaGenerationBindingAuthority,
@@ -187,7 +188,7 @@ function actionRequiredResult(row: HelixaGenerationRow) {
 async function observeScheduledDispatchReplay(input: {
   bindingLocator: { bindingId: string };
   commandId: string;
-  mode: 'disabled' | 'fake';
+  mode: HelixaGenerationMode;
   authority: HelixaGenerationBindingAuthority;
   repository: HelixaGenerationRepository;
   nativePort: HelixaGenerationNativePort;
@@ -202,12 +203,12 @@ async function observeScheduledDispatchReplay(input: {
 export async function dispatchHelixaGenerationCommand(input: {
   bindingLocator: { bindingId: string };
   command: unknown;
-  mode: 'disabled' | 'fake';
+  mode: HelixaGenerationMode;
   authority: HelixaGenerationBindingAuthority;
   repository: HelixaGenerationRepository;
   nativePort: HelixaGenerationNativePort;
 }) {
-  if (input.mode !== 'fake') throw new Error('MegaCampus generation is disabled');
+  if (input.mode === 'disabled') throw new Error('MegaCampus generation is disabled');
   const command = parseHelixaGenerationCommand(input.command);
   const binding = await input.authority.resolve(input.bindingLocator.bindingId);
   assertBinding(binding, command);
@@ -326,12 +327,12 @@ export async function dispatchHelixaGenerationCommand(input: {
 export async function lookupHelixaGenerationCommand(input: {
   bindingLocator: { bindingId: string };
   query: unknown;
-  mode: 'disabled' | 'fake';
+  mode: HelixaGenerationMode;
   authority: HelixaGenerationBindingAuthority;
   repository: HelixaGenerationRepository;
   nativePort: HelixaGenerationNativePort;
 }) {
-  if (input.mode !== 'fake') throw new Error('MegaCampus generation is disabled');
+  if (input.mode === 'disabled') throw new Error('MegaCampus generation is disabled');
   const query = parseHelixaGenerationLookupQuery(input.query);
   const binding = await input.authority.resolve(input.bindingLocator.bindingId);
   assertPrincipalBinding(binding);
@@ -383,12 +384,12 @@ export async function lookupHelixaGenerationCommand(input: {
 export async function observeHelixaScheduledGenerationCommand(input: {
   bindingLocator: { bindingId: string };
   commandId: string;
-  mode: 'disabled' | 'fake';
+  mode: HelixaGenerationMode;
   authority: HelixaGenerationBindingAuthority;
   repository: HelixaGenerationRepository;
   nativePort: HelixaGenerationNativePort;
 }): Promise<'not_found' | 'busy' | 'scheduled' | 'native_completed' | 'action_required'> {
-  if (input.mode !== 'fake') throw new Error('MegaCampus generation is disabled');
+  if (input.mode === 'disabled') throw new Error('MegaCampus generation is disabled');
   const binding = await input.authority.resolve(input.bindingLocator.bindingId);
   assertPrincipalBinding(binding);
   if (binding.bindingId !== input.bindingLocator.bindingId)

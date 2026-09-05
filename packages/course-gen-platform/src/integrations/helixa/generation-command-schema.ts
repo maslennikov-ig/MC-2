@@ -155,11 +155,20 @@ export function generationCommandHash(command: HelixaGenerationCommand): string 
   return sha256(canonicalGenerationJsonV1(command));
 }
 
+/**
+ * `disabled` refuses every command. `fake` runs the whole command protocol against a
+ * repository that never touches MegaCampus generation, so a caller can exercise the
+ * transport end to end. `live` runs it against the PostgreSQL ledger and schedules real
+ * work. Absent and empty both mean `disabled`; anything else is a configuration error.
+ */
+export type HelixaGenerationMode = 'disabled' | 'fake' | 'live';
+
 export function readHelixaGenerationMode(
   environment: NodeJS.ProcessEnv = process.env
-): 'disabled' | 'fake' {
+): HelixaGenerationMode {
   const value = environment.HELIXA_MEGACAMPUS_GENERATION_MODE;
   if (value == null || value === '' || value === 'disabled') return 'disabled';
   if (value === 'fake') return 'fake';
+  if (value === 'live') return 'live';
   throw new Error('Invalid Helixa generation mode');
 }
