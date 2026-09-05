@@ -576,3 +576,37 @@ sequence below, in this order, once the three joint values in
 Rollback at any step: `enabled = false` on the binding row silences every trigger and both
 ledgers immediately; unsetting the two mode variables stops the timer and the route on the next
 request. Nothing needs to be dropped to stop.
+
+## 10. J149 activation checkpoint (2026-09-05)
+
+The shared database now has the two additional J149 migrations. They were applied
+through the existing project-scoped Supabase MCP under the host-operation lock,
+in repository order, and independently checked through a TLS-verified read-only
+catalog/history connection:
+
+| Migration | Applied history version | SQL SHA-256 |
+| --- | --- | --- |
+| `helixa_create_course_generation` | `20260905162359` | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
+| `helixa_observation_binding_scope` | `20260905162619` | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
+
+The verified repository watermark is
+`20260905160000_helixa_observation_binding_scope.sql`; there are no missing,
+historically missing, or stale-allowlist entries. The direct-course constraints,
+scheduler signature and service-role-only execution grants are installed. The
+observer has only the four-argument binding-scoped signature; the old overload
+is absent.
+
+At this checkpoint, bindings, generation commands, sync outbox and legacy course
+commands each contain zero rows, the active application color is green, and the
+four Helixa runtime configuration keys inspected remain absent. Applying the SQL
+has not activated generation. The new provisioner creates a disabled binding;
+only an enabled binding participates in the completion triggers. The earlier
+incident discussion describes the pre-fix state and must not be used as a claim
+that these J149 changes have already passed live product acceptance.
+
+The owner selected Default Organization
+`9b98a7d5-27ea-4441-81dc-de79d488e5db` for both isolated acceptance and production.
+Separate source Helixa organizations, bindings and HMAC materials keep those
+contours distinct. Provisioning, application rollout and the three actual paid
+generation flows remain pending. A rollback preserves migration history and
+native objects: keep the bridge disabled or apply a reviewed forward correction.
