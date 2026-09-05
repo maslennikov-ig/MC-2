@@ -331,7 +331,7 @@ describe('server-only Helixa generation commands', () => {
       principal: { kind: 'service_principal' },
     });
     const repository = createPostgresHelixaGenerationRepository(client);
-    await repository.reserve({
+    const reservation = await repository.reserve({
       binding: resolved!,
       command: parseHelixaGenerationCommand(jobCommand),
       commandHash: generationCommandHash(parseHelixaGenerationCommand(jobCommand)),
@@ -343,6 +343,7 @@ describe('server-only Helixa generation commands', () => {
       p_command_kind: 'CREATE_JOB_INSTRUCTION',
       p_command_payload: jobCommand,
     });
+    expect(reservation).toMatchObject({ mutationOwner: true, newlyReserved: true });
     expect(rpc.mock.calls[1]?.[1]).not.toHaveProperty('p_user_id');
     expect(rpc.mock.calls[1]?.[1]).not.toHaveProperty('p_organization_id');
   });
@@ -460,6 +461,7 @@ describe('server-only Helixa generation commands', () => {
     const observer = createPostgresHelixaNativeObserver({ rpc });
     await expect(
       reconciler({
+        bindingId: binding.bindingId,
         objectKind: 'COURSE',
         objectId: '44444444-4444-4444-8444-444444444444',
         organizationId: binding.organizationId,
@@ -467,6 +469,7 @@ describe('server-only Helixa generation commands', () => {
     ).resolves.toBe('uncertain');
     await expect(
       observer({
+        bindingId: binding.bindingId,
         objectKind: 'COURSE',
         objectId: '44444444-4444-4444-8444-444444444444',
         organizationId: binding.organizationId,
@@ -476,6 +479,16 @@ describe('server-only Helixa generation commands', () => {
       nativeCompletedAt: '2026-08-23T10:30:00.000Z',
       outboxEventId: 'mc2:COURSE:event',
     });
+    expect(rpc).toHaveBeenNthCalledWith(
+      1,
+      'observe_helixa_native_generation',
+      expect.objectContaining({ p_binding_id: binding.bindingId })
+    );
+    expect(rpc).toHaveBeenNthCalledWith(
+      2,
+      'observe_helixa_native_generation',
+      expect.objectContaining({ p_binding_id: binding.bindingId })
+    );
   });
 
   it.each([
@@ -1015,7 +1028,12 @@ describe('server-only Helixa generation commands', () => {
     const repository = {
       reserve: vi
         .fn()
-        .mockResolvedValueOnce({ kind: 'reserved', row, mutationOwner: true })
+        .mockResolvedValueOnce({
+          kind: 'reserved',
+          row,
+          mutationOwner: true,
+          newlyReserved: true,
+        })
         .mockResolvedValueOnce({
           kind: 'reserved',
           row: {
@@ -1025,6 +1043,7 @@ describe('server-only Helixa generation commands', () => {
             leaseToken: '77777777-7777-4777-8777-777777777777',
           },
           mutationOwner: true,
+          newlyReserved: false,
         }),
       renew: vi.fn(async () => true),
       markScheduled: vi.fn(),

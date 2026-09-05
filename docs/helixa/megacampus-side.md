@@ -342,7 +342,10 @@ trigger adds the update half and a clearer message.
 
 ## 5. Defects fixed
 
-All in `20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`.
+The trigger fixes landed in
+`20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`; the exact-binding
+observer correction is the forward migration
+`20260905160000_helixa_observation_binding_scope.sql`.
 
 1. **`digest` could not resolve.** Four functions now declare
    `SET search_path = public, extensions` and call `extensions.digest(...)`
@@ -350,19 +353,18 @@ All in `20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`.
 2. **`file_catalog` guard had no definer rights.** `prevent_helixa_native_source_file_mutation`
    and `validate_course_job_instruction_native_source` are now `SECURITY DEFINER`,
    as is `validate_course_job_instruction_source` for the same reason.
-3. **Three per-write lookups had no index.** Added on
+3. **Three live-table lookups had no index.** Added on
    `helixa_knowledge_sync_bindings(organization_id) WHERE enabled`,
    `helixa_generation_commands(organization_id, object_kind, object_id)`, and
    `helixa_knowledge_sync_outbox(organization_id, object_kind, object_id, completed_at)`.
-   None of the existing unique constraints could serve these: each leads with
-   `binding_id`, and none of these three call sites has one.
-4. **`observe_helixa_native_generation` ignored the organization it was given.** It
-   matched an outbox row on object and timestamp alone, so with more than one
-   binding it could return another binding's event id, which
-   `complete_observed_helixa_generation_command` then rejects as an unavailable
-   proof. Now filtered by organization. The signature is deliberately unchanged;
-   adding a parameter would leave two same-named functions and make the PostgREST
-   `rpc()` call unresolvable.
+   The later binding-scoped observer can use the existing binding-leading unique
+   constraint; the two trigger lookups still require their organization-leading indexes.
+4. **`observe_helixa_native_generation` ignored part of its proof scope.** The first
+   correction filtered by organization, but two bindings in the same organization
+   still produced competing event ids. The forward migration
+   `20260905160000_helixa_observation_binding_scope.sql` drops the old signature,
+   adds `p_binding_id`, and filters by both binding and organization. Dropping the
+   three-argument function first keeps one unambiguous PostgREST `rpc()` target.
 
 ## 6. Rollback
 
@@ -405,6 +407,7 @@ DROP FUNCTION IF EXISTS mark_helixa_generation_native_completed();
 DROP FUNCTION IF EXISTS enqueue_helixa_course_knowledge_sync();
 DROP FUNCTION IF EXISTS enqueue_helixa_role_guide_knowledge_sync();
 DROP FUNCTION IF EXISTS observe_helixa_native_generation(UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS observe_helixa_native_generation(TEXT, UUID, TEXT, UUID);
 DROP FUNCTION IF EXISTS schedule_helixa_course_from_role_guide(TEXT, TEXT, UUID, UUID, UUID, JSONB, JSONB, UUID, INTEGER);
 DROP FUNCTION IF EXISTS helixa_role_guide_content_v1(TEXT, JSONB, JSONB);
 DROP FUNCTION IF EXISTS helixa_canonical_json_v1(JSONB);
@@ -546,7 +549,10 @@ sequence below, in this order, once the three joint values in
    destination, source id or permission mismatch is a conflict and is not updated. A newly
    inserted binding always has `enabled = false`, all three operation capabilities set to
    `true`, and both `source_helixa_*` values populated. The command neither reads nor stores
-   `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`.
+   `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`. If a write response is lost, the operator first reads
+   the exact tuple back. A complete match is success; an uncertain state retains the
+   principal for an explicit plan instead of attempting unsafe deletion through the
+   binding's restrictive foreign keys.
 
 3. **Secrets and ids** into the worker and API env files
    (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):

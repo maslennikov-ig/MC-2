@@ -122,6 +122,7 @@ async function start(options: {
   hmacKey?: string;
   externalSystemId?: string;
   resolve?: HelixaGenerationBindingAuthority['resolve'];
+  schedule?: HelixaGenerationNativePort['schedule'];
 }): Promise<Harness> {
   const repository = createInMemoryHelixaGenerationRepository();
   const app = express();
@@ -136,7 +137,10 @@ async function start(options: {
         mode,
         authority: authority(options.resolve),
         repository,
-        nativePort: nativePort(),
+        nativePort: {
+          ...nativePort(),
+          ...(options.schedule ? { schedule: options.schedule } : {}),
+        },
       }),
     })
   );
@@ -416,6 +420,38 @@ describe('Helixa generation route: the protocol', () => {
     expect(two.state).toBe('accepted');
     if (one.state === 'accepted' && two.state === 'accepted')
       expect(two.object.id).toBe(one.object.id);
+  });
+
+  it('gives only the atomic reservation owner 202 under simultaneous first dispatches', async () => {
+    const schedule = vi.fn((input: Parameters<HelixaGenerationNativePort['schedule']>[0]) =>
+      Promise.resolve({ objectId: input.objectId })
+    );
+    let releaseAuthority = () => {};
+    const authorityGate = new Promise<void>(resolve => {
+      releaseAuthority = resolve;
+    });
+    let authorityCount = 0;
+    const resolve = async () => {
+      authorityCount += 1;
+      if (authorityCount === 2) releaseAuthority();
+      await authorityGate;
+      return resolvedBinding();
+    };
+    const harness = await start({ schedule, resolve });
+
+    const results = await Promise.all([
+      call(harness, HELIXA_GENERATION_DISPATCH_PATH, { body: dispatchBody }),
+      call(harness, HELIXA_GENERATION_DISPATCH_PATH, { body: dispatchBody }),
+    ]);
+
+    expect(results.map(result => result.status).sort()).toEqual([200, 202]);
+    const parsed = results.map(result => HelixaDispatchResultSchema.parse(result.body));
+    expect(parsed[0].state).toBe('accepted');
+    expect(parsed[1].state).toBe('accepted');
+    if (parsed[0].state === 'accepted' && parsed[1].state === 'accepted') {
+      expect(parsed[0].object.id).toBe(parsed[1].object.id);
+    }
+    expect(schedule).toHaveBeenCalledTimes(1);
   });
 
   it('answers a conflicting replay with 409', async () => {

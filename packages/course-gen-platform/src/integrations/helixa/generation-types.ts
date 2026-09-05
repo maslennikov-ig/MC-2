@@ -74,7 +74,13 @@ export interface HelixaGenerationRepository {
     commandHash: string;
     objectKind: HelixaGenerationObjectKind;
   }): Promise<
-    { kind: 'conflict' } | { kind: 'reserved'; row: HelixaGenerationRow; mutationOwner: boolean }
+    | { kind: 'conflict' }
+    | {
+        kind: 'reserved';
+        row: HelixaGenerationRow;
+        mutationOwner: boolean;
+        newlyReserved: boolean;
+      }
   >;
   renew(input: {
     bindingId: string;
@@ -249,6 +255,7 @@ export interface HelixaGenerationNativeDependencies {
     includeBusinessContextSources: false;
   }): Promise<void>;
   reconcile(input: {
+    bindingId: string;
     objectKind: HelixaGenerationObjectKind;
     objectId: string;
     organizationId: string;
@@ -258,6 +265,7 @@ export interface HelixaGenerationNativeDependencies {
     | { kind: 'completed'; nativeCompletedAt: string; outboxEventId: string }
   >;
   observe?(input: {
+    bindingId: string;
     objectKind: HelixaGenerationObjectKind;
     objectId: string;
     organizationId: string;

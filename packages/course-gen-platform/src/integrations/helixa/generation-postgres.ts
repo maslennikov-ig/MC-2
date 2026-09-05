@@ -79,6 +79,7 @@ export function createPostgresHelixaNativeObserver(
 ): NonNullable<HelixaGenerationNativeDependencies['observe']> {
   return async input => {
     const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_binding_id: input.bindingId,
       p_organization_id: input.organizationId,
       p_object_kind: input.objectKind,
       p_object_id: input.objectId,
@@ -104,6 +105,7 @@ export function createPostgresHelixaNativeReconciler(
 ): HelixaGenerationNativeDependencies['reconcile'] {
   return async input => {
     const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_binding_id: input.bindingId,
       p_organization_id: input.organizationId,
       p_object_kind: input.objectKind,
       p_object_id: input.objectId,
@@ -239,10 +241,12 @@ export function createPostgresHelixaGenerationRepository(
         throw new Error('Failed to reserve MegaCampus generation command');
       const row = result.data[0];
       if (row.conflict) return { kind: 'conflict' };
+      const mutationOwner = row.mutation_owner === true;
       return {
         kind: 'reserved',
         row: mapCommandRow(row, input.binding.bindingId),
-        mutationOwner: row.mutation_owner === true,
+        mutationOwner,
+        newlyReserved: mutationOwner && row.claim_generation === 1 && row.accepted_at === null,
       };
     },
     renew(input) {

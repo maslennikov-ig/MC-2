@@ -30,6 +30,7 @@ class MemoryStore implements BridgeProvisioningStore {
   memberships: BridgeMembershipRow[] = [];
   bindings: BridgeBindingRow[] = [];
   writes: string[] = [];
+  loseBindingResponse = false;
 
   findOrganization(organizationId: string) {
     return Promise.resolve(
@@ -101,6 +102,7 @@ class MemoryStore implements BridgeProvisioningStore {
   insertBinding(row: BridgeBindingRow) {
     this.writes.push('insert-binding');
     this.bindings.push(row);
+    if (this.loseBindingResponse) return Promise.reject(new Error('binding response lost'));
     return Promise.resolve();
   }
 
@@ -180,5 +182,17 @@ describe('Helixa bridge provisioning', () => {
       'service principal identity conflict'
     );
     expect(store.writes).toEqual([]);
+  });
+
+  it('treats a lost insert response as success after exact readback', async () => {
+    const store = new MemoryStore();
+    store.loseBindingResponse = true;
+
+    const result = await provisionHelixaBridge(store, input, 'apply');
+
+    expect(result.counts).toEqual({ planned: 4, applied: 4 });
+    expect(store.bindings).toHaveLength(1);
+    expect(store.bindings[0].enabled).toBe(false);
+    expect(store.writes).not.toContain('delete-created-principal');
   });
 });

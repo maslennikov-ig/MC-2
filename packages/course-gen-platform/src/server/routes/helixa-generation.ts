@@ -31,7 +31,7 @@ import {
   createPostgresHelixaGenerationRepository,
   createPostgresHelixaNativeObserver,
   createPostgresHelixaNativeReconciler,
-  dispatchHelixaGenerationCommand,
+  dispatchHelixaGenerationCommandWithAdmission,
   lookupHelixaGenerationCommand,
   readHelixaGenerationMode,
   type GenerationRpcClient,
@@ -264,13 +264,7 @@ export function createHelixaGenerationRouter(options: HelixaGenerationRouterOpti
       return;
     }
     const bindingLocatorValue = { bindingId: envelope.data.binding.bindingId };
-    // Taken before the dispatch mutates anything: a command the ledger already knows is a
-    // replay and answers 200, a command it does not is newly reserved and answers 202.
-    const priorCommandId = readCommandId(envelope.data.command);
-    const prior = priorCommandId
-      ? await resolved.repository.lookup(bindingLocatorValue.bindingId, priorCommandId)
-      : null;
-    const result = await dispatchHelixaGenerationCommand({
+    const admission = await dispatchHelixaGenerationCommandWithAdmission({
       bindingLocator: bindingLocatorValue,
       command: envelope.data.command,
       mode: resolved.mode,
@@ -278,11 +272,11 @@ export function createHelixaGenerationRouter(options: HelixaGenerationRouterOpti
       repository: resolved.repository,
       nativePort: resolved.nativePort,
     });
-    if (result.state === 'conflict') {
-      response.status(409).json(result);
+    if (admission.result.state === 'conflict') {
+      response.status(409).json(admission.result);
       return;
     }
-    response.status(result.state === 'accepted' && !prior ? 202 : 200).json(result);
+    response.status(admission.newlyReserved ? 202 : 200).json(admission.result);
   }
 
   async function runLookup(
@@ -328,11 +322,4 @@ export function createHelixaGenerationRouter(options: HelixaGenerationRouterOpti
   );
 
   return router;
-}
-
-/** Only used to decide 202 versus 200; a malformed command is rejected by the library. */
-function readCommandId(command: unknown): string | null {
-  if (typeof command !== 'object' || command === null) return null;
-  const value = (command as { commandId?: unknown }).commandId;
-  return typeof value === 'string' && value.length > 0 ? value : null;
 }

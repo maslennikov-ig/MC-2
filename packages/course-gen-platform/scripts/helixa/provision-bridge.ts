@@ -372,6 +372,27 @@ export async function provisionHelixaBridge(
     }
   } catch (error) {
     if (createdPrincipalId) {
+      let recoveryInspection: Inspection;
+      try {
+        recoveryInspection = await inspectProvisioning(store, input);
+      } catch (reconciliationError) {
+        throw new AggregateError(
+          [error, reconciliationError],
+          `provisioning outcome is uncertain; retained principal ${createdPrincipalId} for explicit reconciliation`
+        );
+      }
+      if (recoveryInspection.changes.length === 0) {
+        return {
+          mode,
+          organizationId: input.organizationId,
+          bindingId: input.bindingId,
+          environment: input.environment,
+          destinationBindingId: input.destinationBindingId,
+          principalId: createdPrincipalId,
+          changes: plannedChanges,
+          counts: { planned: plannedChanges.length, applied: plannedChanges.length },
+        };
+      }
       try {
         await store.deleteCreatedPrincipal(createdPrincipalId);
       } catch (cleanupError) {
