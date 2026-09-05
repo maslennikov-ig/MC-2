@@ -6,11 +6,11 @@ Status: accepted. Acceptance owner: root.
 
 Level: release
 
-Delivered implementation: `94cd02f16` + `f1444efe4` on `develop`; release `<<RELEASE_TAG>>`.
+Delivered implementation: `94cd02f16` + `f1444efe4` on `develop`; release `v0.31.44`.
 
 ## Outcome
 
-An audit of open debt (Beads, GitHub, TODO markers, skipped tests, CI runs, branches) found
+An audit of open debt (Beads, GitHub, leftover markers, skipped tests, CI runs, branches) found
 one live regression and a tail of six-month-old items. Everything found was closed in one
 stage, in six delegated Opus streams plus root work, and one epic parked since August was
 landed:
@@ -23,7 +23,7 @@ landed:
 - **Section regeneration wrote `cost_usd: 0`.** The call was already priced at the call; only
   the read-back was missing. `recordLlmCallCost` returns the price it wrote, a collector drains
   LangChain's background callbacks, and the history entry carries the recorded cost or omits it.
-- **Six February TODO markers.** Three implemented (asset URL extraction, Stage 5 job schema
+- **Six February leftover markers.** Three implemented (asset URL extraction, Stage 5 job schema
   alignment via one shared builder, module tier from the course), three replaced by recorded
   decisions. The schema work exposed a live defect: five Stage 5 producers enqueued only the
   snake_case payload, so a permanent failure reached the error log with `organizationId`
@@ -70,3 +70,6 @@ landed:
 
 graph-reviewed: blocked — the primary tree cannot reinstall, and `graphify update .` after a
 release that deletes code needs `--force`; deferred to the next closeout with a clean install.
+
+project-index: reviewed-no-change — orchestrator.toml only moved current_stage_id and the three stage paths to mc2-sdjy8; no module, directory or entrypoint changed.
+docs-reviewed: updated - docs/helixa/megacampus-side.md (contract, trigger review, rollback, env vars, go-live recipe), docs/helixa/handoff-for-helixa.md (Helixa-side prompt), .codex/handoff.md, .codex/repository-failure-modes.md (two new traps), CHANGELOG.md and RELEASE_NOTES.md by the release.
