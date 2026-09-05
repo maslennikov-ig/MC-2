@@ -665,14 +665,44 @@ the manifest checksum and recovery probe, and recreate/switch the alias as a
 separate action. Never restore over the active alias. A failed drill leaves the
 stable alias untouched and keeps evidence for triage.
 
+### Recovery probe lifecycle
+
+`/opt/megacampus/recovery/probe.json` is **measured, never hand-written**. It pins a dense
+vector plus the exact `point_id`, `document_id`, `chunk_id` and content of the top result for a
+dense query, a Russian BM25 query, an English BM25 query and a two-rank hybrid Formula query,
+scoped to one real course. `deploy/qdrant/generate-recovery-probe.py` asks the live collection
+those questions and records the answers:
+
+```bash
+python3 /opt/megacampus/deploy/qdrant/generate-recovery-probe.py \
+  --url http://127.0.0.1:6335 --out "$HOME/probe.json.new"
+sudo cp -p /opt/megacampus/recovery/probe.json "/opt/megacampus/recovery/probe.json.bak-$(date -u +%Y%m%d)"
+sudo install -o root -g root -m 0400 "$HOME/probe.json.new" /opt/megacampus/recovery/probe.json
+rm "$HOME/probe.json.new"
+sudo systemctl start megacampus-qdrant-restore-drill.service
+```
+
+`127.0.0.1:6335` is the production listener; `6333` on the host is the dev instance.
+
+Any change that rewrites the chosen course's vectors invalidates the probe: a reindex, a
+deduplication, an alias cutover to a rebuilt collection, or reprocessing one of its documents.
+After such a change regenerate the probe and run the drill by hand; do not wait for the monthly
+timer. The drill now asks the live collection the probe's questions **before** restoring anything
+and fails with `Recovery probe is stale against the live collection …` when they no longer hold,
+so a stale probe costs one failed run and a `QdrantRestoreDrillFailed` alert, not a misreported
+backup. On 2026-09-01 the monthly drill failed exactly this way: the 2026-08-12 deduplication had
+halved the collection and removed the pinned `parent_*` point, and nobody had regenerated the
+probe because this document did not say to.
+
 ## systemd installation and verification
 
 The units in `deploy/systemd/` require systemd **247 or newer** because they use
 `LoadCredential`; the reference manuals consulted for hardening are systemd 257. Host Node, pnpm, and repository source are not runtime prerequisites.
 Before installation, verify systemd and Docker Compose, complete the exact
-identity/directory preflight, place the reviewed credential/probe files, and
-confirm `.env.production` contains a valid operator digest identifier without
-printing the file.
+identity/directory preflight, place the reviewed credential files, generate the
+recovery probe with `deploy/qdrant/generate-recovery-probe.py` (see Recovery
+probe lifecycle above), and confirm `.env.production` contains a valid operator
+digest identifier without printing the file.
 
 Install the reviewed wrapper and units without editing their commands:
 
@@ -738,7 +768,15 @@ share a nonblocking `flock`; a collision must fail visibly, not overlap.
   Qdrant volume snapshot; do not delete the last known-good snapshot. This
   alert proves only the source-local four-hour schedule.
 - `QdrantRestoreDrillStale`: inspect the monthly drill evidence and cleanup
-  state before retrying.
+  state before retrying. The rule fires 35 days after the last success, so a
+  failed monthly run reaches it about four days later; `QdrantRestoreDrillFailed`
+  is the alert that names the run itself.
+- `QdrantRestoreDrillFailed`: read the newest file under
+  `/var/lib/megacampus-qdrant-recovery/restore-evidence/`. `probe_source_check:
+"stale"`, or an `identity/content mismatch in fields: …` whose list omits
+  `content`, means the collection changed under the probe: regenerate it per
+  Recovery probe lifecycle and rerun the drill. Any other error is about the
+  snapshot, the transport, or cleanup, and the backup itself is suspect.
 - `QdrantOffHostSnapshotStale`: check the restricted SSH path, the newest
   owner-only generation on `helixa-new`, its 10 GiB free-space floor, and the
   backup service journal. A local production snapshot does not satisfy it.

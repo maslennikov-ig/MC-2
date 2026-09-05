@@ -169,6 +169,128 @@ function assertScopedPoints(
   }
 }
 
+type ProbeQueryPoints = Awaited<ReturnType<RestoreClient['query']>>['points'];
+
+interface ObservedProbeIdentities {
+  dense: ProbeQueryPoints;
+  russian: ProbeQueryPoints;
+  english: ProbeQueryPoints;
+  formula: ProbeQueryPoints;
+}
+
+/**
+ * Ask a collection (through an alias) the four ranking questions the probe pins: dense top,
+ * RU BM25 top, EN BM25 top, and the two-rank hybrid Formula order. The same questions are asked
+ * of the live collection before a restore and of the recovered copy after it, so a probe that
+ * no longer describes the live data is reported as stale instead of as a broken backup.
+ */
+async function queryProbeIdentities(
+  client: Pick<QdrantClient, 'query'>,
+  alias: string,
+  probe: RecoveryProbe
+): Promise<ObservedProbeIdentities> {
+  const dense = await client.query(alias, {
+    query: probe.dense_vector,
+    using: 'dense',
+    filter: scopedFilter(probe),
+    limit: 3,
+    with_payload: true,
+  });
+  const russian = await client.query(alias, {
+    query: createBm25Document(probe.ru_query),
+    using: 'sparse',
+    filter: scopedFilter(probe),
+    limit: 3,
+    with_payload: true,
+  });
+  const english = await client.query(alias, {
+    query: createBm25Document(probe.en_query),
+    using: 'sparse',
+    filter: scopedFilter(probe),
+    limit: 3,
+    with_payload: true,
+  });
+  const searchOptions: ResolvedSearchOptions = {
+    limit: 2,
+    score_threshold: 0,
+    collection_name: alias,
+    enable_hybrid: true,
+    include_payload: true,
+    filters: {
+      organization_id: probe.organization_id,
+      course_id: probe.course_id,
+    },
+    enable_priority_boost: true,
+    priority_boost_factor: 0.4,
+    group_by_document: false,
+    group_size: 2,
+  };
+  const formula = await client.query(alias, {
+    prefetch: {
+      prefetch: buildHybridPrefetch(probe.formula_query, probe.dense_vector, searchOptions),
+      query: { rrf: {} },
+      limit: 6,
+    },
+    query: buildPriorityFormula(0.4),
+    limit: 2,
+    with_payload: true,
+  });
+  return {
+    dense: dense.points,
+    russian: russian.points,
+    english: english.points,
+    formula: formula.points,
+  };
+}
+
+function assertProbeExpectations(observed: ObservedProbeIdentities, probe: RecoveryProbe): void {
+  assertScopedPoints('Dense', observed.dense, probe);
+  assertExactPoint('Dense', observed.dense[0], probe.expected_dense);
+  assertScopedPoints('RU BM25', observed.russian, probe);
+  assertExactPoint('RU BM25', observed.russian[0], probe.expected_ru_bm25);
+  assertScopedPoints('EN BM25', observed.english, probe);
+  assertExactPoint('EN BM25', observed.english[0], probe.expected_en_bm25);
+  assertScopedPoints('Formula', observed.formula, probe);
+  probe.expected_formula_order.forEach((expected, index) => {
+    assertExactPoint(`Formula rank ${index + 1}`, observed.formula[index], expected);
+  });
+  if (
+    observed.formula.length < 2 ||
+    observed.formula[0].payload?.document_priority !== 'CORE' ||
+    observed.formula[1].payload?.document_priority !== 'SUPPLEMENTARY' ||
+    observed.formula[0].score <= observed.formula[1].score
+  ) {
+    throw new Error('Formula recovery probe did not preserve CORE priority ordering');
+  }
+}
+
+export const PROBE_REGENERATION_HINT =
+  'regenerate it with deploy/qdrant/generate-recovery-probe.py and rerun the drill';
+
+/**
+ * The probe pins exact point identities, so any rewrite of the chosen course's vectors
+ * (reindex, deduplication, alias cutover) invalidates it. On 2026-09-01 the monthly drill failed
+ * on `RU BM25 top identity/content mismatch in fields: point_id, chunk_id` four weeks after a
+ * deduplication halved the collection: the backup was fine, the expectation was not. Asking the
+ * live collection first turns that into a message that names the actual repair.
+ */
+export async function verifyProbeAgainstSource(options: {
+  client: Pick<QdrantClient, 'query'>;
+  stableAlias: string;
+  probe: RecoveryProbe;
+}): Promise<void> {
+  requireProbe(options.probe);
+  const observed = await queryProbeIdentities(options.client, options.stableAlias, options.probe);
+  try {
+    assertProbeExpectations(observed, options.probe);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Recovery probe is stale against the live collection ${options.stableAlias}: ${detail}; ${PROBE_REGENERATION_HINT}`
+    );
+  }
+}
+
 export async function verifyRecoveredCollection(options: {
   client: Pick<QdrantClient, 'getCollection' | 'query'>;
   physicalCollection: string;
@@ -191,77 +313,10 @@ export async function verifyRecoveredCollection(options: {
     );
   }
 
-  const dense = await options.client.query(options.drillAlias, {
-    query: options.probe.dense_vector,
-    using: 'dense',
-    filter: scopedFilter(options.probe),
-    limit: 3,
-    with_payload: true,
-  });
-  assertScopedPoints('Dense', dense.points, options.probe);
-  assertExactPoint('Dense', dense.points[0], options.probe.expected_dense);
-
-  const russian = await options.client.query(options.drillAlias, {
-    query: createBm25Document(options.probe.ru_query),
-    using: 'sparse',
-    filter: scopedFilter(options.probe),
-    limit: 3,
-    with_payload: true,
-  });
-  assertScopedPoints('RU BM25', russian.points, options.probe);
-  assertExactPoint('RU BM25', russian.points[0], options.probe.expected_ru_bm25);
-
-  const english = await options.client.query(options.drillAlias, {
-    query: createBm25Document(options.probe.en_query),
-    using: 'sparse',
-    filter: scopedFilter(options.probe),
-    limit: 3,
-    with_payload: true,
-  });
-  assertScopedPoints('EN BM25', english.points, options.probe);
-  assertExactPoint('EN BM25', english.points[0], options.probe.expected_en_bm25);
-
-  const searchOptions: ResolvedSearchOptions = {
-    limit: 2,
-    score_threshold: 0,
-    collection_name: options.drillAlias,
-    enable_hybrid: true,
-    include_payload: true,
-    filters: {
-      organization_id: options.probe.organization_id,
-      course_id: options.probe.course_id,
-    },
-    enable_priority_boost: true,
-    priority_boost_factor: 0.4,
-    group_by_document: false,
-    group_size: 2,
-  };
-  const formula = await options.client.query(options.drillAlias, {
-    prefetch: {
-      prefetch: buildHybridPrefetch(
-        options.probe.formula_query,
-        options.probe.dense_vector,
-        searchOptions
-      ),
-      query: { rrf: {} },
-      limit: 6,
-    },
-    query: buildPriorityFormula(0.4),
-    limit: 2,
-    with_payload: true,
-  });
-  assertScopedPoints('Formula', formula.points, options.probe);
-  options.probe.expected_formula_order.forEach((expected, index) => {
-    assertExactPoint(`Formula rank ${index + 1}`, formula.points[index], expected);
-  });
-  if (
-    formula.points.length < 2 ||
-    formula.points[0].payload?.document_priority !== 'CORE' ||
-    formula.points[1].payload?.document_priority !== 'SUPPLEMENTARY' ||
-    formula.points[0].score <= formula.points[1].score
-  ) {
-    throw new Error('Formula recovery probe did not preserve CORE priority ordering');
-  }
+  assertProbeExpectations(
+    await queryProbeIdentities(options.client, options.drillAlias, options.probe),
+    options.probe
+  );
 
   const mismatched = await options.client.query(options.drillAlias, {
     query: createBm25Document(options.probe.ru_query),
@@ -376,8 +431,11 @@ export interface RestoreDrillOptions {
   lockPath: string;
   now?: Date;
   verifyRecovered?: typeof verifyRecoveredCollection;
+  verifyProbeSource?: typeof verifyProbeAgainstSource;
   lockAlreadyHeld?: boolean;
 }
+
+export type ProbeSourceCheck = 'pass' | 'stale' | 'not-run';
 
 export interface RestoreDrillResult {
   evidencePath: string;
@@ -406,6 +464,7 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
   let aliasOwned = false;
   let collectionOwned = false;
   let checks: RecoveryChecks | undefined;
+  let probeSourceCheck: ProbeSourceCheck = 'not-run';
   let operationError: unknown;
   const cleanupFailures: string[] = [];
   const cleanup = { alias: 'not-created', collection: 'not-created' };
@@ -423,6 +482,17 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
 
     const initialAliases = (await options.client.getAliases()).aliases;
     stableBefore = resolvePhysicalCollection(initialAliases, options.stableAlias);
+    // Ask the live collection before restoring anything: a probe that the source itself no
+    // longer satisfies cannot prove a restore, and the throwaway restore would only report a
+    // misleading "mismatch" for the backup. Nothing is created before this point, so a stale
+    // probe leaves no cleanup work.
+    probeSourceCheck = 'stale';
+    await (options.verifyProbeSource ?? verifyProbeAgainstSource)({
+      client: options.client,
+      stableAlias: options.stableAlias,
+      probe: options.probe,
+    });
+    probeSourceCheck = 'pass';
     if (initialAliases.some(alias => alias.alias_name === drillAlias)) {
       throw new Error('Generated drill alias already exists');
     }
@@ -550,6 +620,7 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Res
     stable_alias_after: stableAfter,
     transport: 'authenticated_http',
     priority: 'snapshot',
+    probe_source_check: probeSourceCheck,
     checks: checks ?? null,
     cleanup,
     ...(operationError === undefined ? {} : { error: redact(operationError, [options.apiKey]) }),

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.43] - 2026-09-05
+
+### Fixed
+
+- **qdrant**: the restore drill asks the live collection before blaming the backup (1f28f2401)
+
+### Other
+
+- **docling**: report the dropped timeout settings upstream instead of waiting (f69bf61be)
+- **tracker**: the backlog audit leaves five items, each saying what would end it (525ffde7f)
+- **stage6**: delete the mermaid fallback nobody calls, and a catalogue note that aged (cb972e660)
+- **tracker**: close the two parked tracks instead of carrying them (bdd8ba6fb)
+
 ## [0.31.42] - 2026-09-03
 
 ### Fixed

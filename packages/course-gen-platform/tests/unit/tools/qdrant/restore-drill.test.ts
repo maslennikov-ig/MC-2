@@ -7,6 +7,7 @@ import {
 } from '../../../../tools/qdrant/snapshot-recovery.js';
 import {
   runRestoreDrill,
+  verifyProbeAgainstSource,
   verifyRecoveredCollection,
   type RecoveryProbe,
 } from '../../../../tools/qdrant/restore-drill.js';
@@ -69,6 +70,8 @@ const PROBE: RecoveryProbe = {
     },
   ],
 };
+
+const passProbeSource = () => Promise.resolve();
 
 async function createSharedMetricsDirectory(root: string): Promise<string> {
   const directory = join(root, 'qdrant-metrics');
@@ -281,6 +284,7 @@ describe('Qdrant restore drill', () => {
       apiKey: 'local-test-key',
       transportBaseUrl: 'http://127.0.0.1:6333',
       stableAlias: 'course_embeddings',
+      verifyProbeSource: passProbeSource,
       targetCollection: 'qdrant_restore_drill_20260711_nonce',
       drillAlias: 'qdrant_restore_drill_alias_20260711_nonce',
       evidenceDirectory: join(directory, 'evidence'),
@@ -310,6 +314,7 @@ describe('Qdrant restore drill', () => {
     expect(client.deleteCollection).toHaveBeenCalledWith('qdrant_restore_drill_20260711_nonce');
     expect(JSON.parse(await readFile(result.evidencePath, 'utf8'))).toMatchObject({
       status: 'passed',
+      probe_source_check: 'pass',
       stable_alias_before: 'course_embeddings_v7',
       stable_alias_after: 'course_embeddings_v7',
       cleanup: { alias: 'deleted', collection: 'deleted' },
@@ -321,6 +326,124 @@ describe('Qdrant restore drill', () => {
     expect((await stat(metricsPath)).mode & 0o777).toBe(0o644);
     expect((await stat(join(directory, 'metrics-state.json'))).mode & 0o777).toBe(0o600);
     expect((await stat(result.evidencePath)).mode & 0o777).toBe(0o600);
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('names a stale probe when the live collection no longer returns the pinned identities', async () => {
+    // 2026-09-01: deduplication had removed parent_324_1842772967 four weeks earlier; the
+    // same-text child took its rank and the drill reported the backup as broken.
+    const client = {
+      query: vi.fn((_alias: string, request: Record<string, unknown>) => {
+        const serialized = JSON.stringify(request);
+        if (serialized.includes('"using":"dense"')) {
+          return Promise.resolve({
+            points: [
+              recoveryPoint('dense-point', 'dense-document', 'dense-chunk', 'dense exact content'),
+            ],
+          });
+        }
+        if (serialized.includes('спектроскопия')) {
+          return Promise.resolve({
+            points: [
+              recoveryPoint('ru-child-point', 'ru-document', 'ru-child-chunk', 'ru exact content'),
+            ],
+          });
+        }
+        return Promise.resolve({
+          points: [recoveryPoint('en-point', 'en-document', 'en-chunk', 'en exact content')],
+        });
+      }),
+    };
+
+    let staleError: unknown;
+    try {
+      await verifyProbeAgainstSource({
+        client: client as never,
+        stableAlias: 'course_embeddings',
+        probe: PROBE,
+      });
+    } catch (error) {
+      staleError = error;
+    }
+    expect(staleError).toBeInstanceOf(Error);
+    const message = (staleError as Error).message;
+    expect(message).toMatch(/stale against the live collection course_embeddings/u);
+    expect(message).toMatch(
+      /RU BM25 top identity\/content mismatch in fields: point_id, chunk_id/u
+    );
+    expect(message).toContain('generate-recovery-probe.py');
+    expect(message).not.toContain('ru exact content');
+    expect(message).not.toContain('ru-child-point');
+    expect(client.query.mock.calls.every(([alias]) => alias === 'course_embeddings')).toBe(true);
+  });
+
+  it('fails before any restore when the probe is stale, and records that in evidence', async () => {
+    const directory = await mkdtemp(join('/tmp', 'mc2-qdrant-restore-stale-probe-'));
+    const metricsDirectory = await createSharedMetricsDirectory(directory);
+    const client = {
+      getAliases: vi.fn(() =>
+        Promise.resolve({
+          aliases: [{ alias_name: 'course_embeddings', collection_name: 'course_embeddings_v7' }],
+        })
+      ),
+      getCollections: vi.fn(() =>
+        Promise.resolve({ collections: [{ name: 'course_embeddings_v7' }] })
+      ),
+      query: vi.fn(() =>
+        Promise.resolve({
+          points: [
+            recoveryPoint('other-point', 'other-document', 'other-chunk', 'dense exact content'),
+          ],
+        })
+      ),
+      recoverSnapshot: vi.fn(),
+      updateCollectionAliases: vi.fn(),
+      deleteCollection: vi.fn(),
+    };
+    const verifyRecovered = vi.fn();
+
+    await expect(
+      runRestoreDrill({
+        client: client as never,
+        manifest: MANIFEST,
+        probe: PROBE,
+        apiKey: 'local-test-key',
+        transportBaseUrl: 'http://127.0.0.1:6333',
+        stableAlias: 'course_embeddings',
+        targetCollection: 'qdrant_restore_drill_stale_probe',
+        drillAlias: 'qdrant_restore_drill_alias_stale_probe',
+        evidenceDirectory: join(directory, 'evidence'),
+        metricStatePath: join(directory, 'metrics-state.json'),
+        metricsPath: join(metricsDirectory, 'megacampus_qdrant_recovery.prom'),
+        lockPath: join(directory, 'recovery.lock'),
+        now: new Date('2026-09-01T00:24:28.000Z'),
+        verifyRecovered,
+      })
+    ).rejects.toThrow(/restore drill failed/iu);
+
+    expect(client.recoverSnapshot).not.toHaveBeenCalled();
+    expect(client.updateCollectionAliases).not.toHaveBeenCalled();
+    expect(client.deleteCollection).not.toHaveBeenCalled();
+    expect(verifyRecovered).not.toHaveBeenCalled();
+    const evidenceFiles = await readdir(join(directory, 'evidence'));
+    const evidence = JSON.parse(
+      await readFile(join(directory, 'evidence', evidenceFiles[0]), 'utf8')
+    ) as {
+      status: string;
+      probe_source_check: string;
+      error: string;
+      cleanup: { alias: string; collection: string };
+      stable_alias_after: string;
+    };
+    expect(evidence.status).toBe('failed');
+    expect(evidence.probe_source_check).toBe('stale');
+    expect(evidence.error).toMatch(/stale against the live collection/u);
+    expect(evidence.error).toContain('generate-recovery-probe.py');
+    expect(evidence.cleanup).toEqual({ alias: 'not-created', collection: 'not-created' });
+    expect(evidence.stable_alias_after).toBe('course_embeddings_v7');
+    expect(
+      await readFile(join(metricsDirectory, 'megacampus_qdrant_recovery.prom'), 'utf8')
+    ).toContain('megacampus_qdrant_restore_drill_failures_total 1');
     await rm(directory, { recursive: true, force: true });
   });
 
@@ -353,6 +476,7 @@ describe('Qdrant restore drill', () => {
         apiKey: 'secret-value',
         transportBaseUrl: 'http://127.0.0.1:6333',
         stableAlias: 'course_embeddings',
+        verifyProbeSource: passProbeSource,
         targetCollection: 'qdrant_restore_drill_owned',
         drillAlias: 'qdrant_restore_drill_alias_owned',
         evidenceDirectory: join(directory, 'evidence'),
@@ -434,6 +558,7 @@ describe('Qdrant restore drill', () => {
           apiKey: 'local-test-key',
           transportBaseUrl: 'http://127.0.0.1:6333',
           stableAlias,
+          verifyProbeSource: passProbeSource,
           targetCollection: target,
           drillAlias,
           evidenceDirectory: join(directory, 'evidence'),
@@ -517,6 +642,7 @@ describe('Qdrant restore drill', () => {
         apiKey: 'local-test-key',
         transportBaseUrl: 'http://127.0.0.1:6333',
         stableAlias: 'course_embeddings',
+        verifyProbeSource: passProbeSource,
         targetCollection: target,
         drillAlias,
         evidenceDirectory: join(directory, 'evidence'),
@@ -569,6 +695,7 @@ describe('Qdrant restore drill', () => {
           apiKey: 'local-test-key',
           transportBaseUrl: 'http://127.0.0.1:6333',
           stableAlias: 'course_embeddings',
+          verifyProbeSource: passProbeSource,
           targetCollection: 'qdrant_restore_drill_shared_dir',
           drillAlias: 'qdrant_restore_drill_alias_shared_dir',
           evidenceDirectory: join(directory, 'evidence'),

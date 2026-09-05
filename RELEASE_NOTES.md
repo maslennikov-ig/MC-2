@@ -2,6 +2,18 @@
 
 User-facing release notes for all versions.
 
+## v0.31.43
+
+_Released on 2026-09-05_
+
+### 🐛 Bug Fixes
+
+- **qdrant**: The restore drill asks the live collection before blaming the backup
+
+---
+
+_This release was automatically generated from 5 commits._
+
 ## v0.31.42
 
 _Released on 2026-09-03_
