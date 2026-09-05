@@ -176,6 +176,14 @@ export function buildProviderParams(
 export interface ModelCostContext {
   phase: string;
   courseId?: string;
+  /**
+   * Told what each of this model's calls was recorded as costing.
+   *
+   * The price stays where it is made: this hands back the figure
+   * `recordLlmCallCost` already wrote, so a caller that has to report a cost
+   * reads it rather than computing a second one.
+   */
+  onCostRecorded?: (costUsd: number | undefined) => void;
 }
 
 /**
@@ -216,7 +224,12 @@ export function createOpenRouterModel(
   }
 
   const callbacks = costContext
-    ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
+    ? costRecordingCallbacks(
+        modelId,
+        costContext.phase,
+        costContext.courseId,
+        costContext.onCostRecorded
+      )
     : undefined;
 
   return new ChatOpenAI({
@@ -272,7 +285,8 @@ export async function createCostRecordingModelAsync(
   phase: string,
   courseId?: string,
   reasoning?: LangchainReasoningRequest,
-  timeoutMs?: number
+  timeoutMs?: number,
+  onCostRecorded?: (costUsd: number | undefined) => void
 ): Promise<ChatOpenAI> {
   return createOpenRouterModelAsync(
     modelId,
@@ -284,6 +298,7 @@ export async function createCostRecordingModelAsync(
     {
       phase,
       ...(courseId ? { courseId } : {}),
+      ...(onCostRecorded ? { onCostRecorded } : {}),
     }
   );
 }
@@ -321,7 +336,12 @@ export async function createOpenRouterModelAsync(
   }
 
   const callbacks = costContext
-    ? costRecordingCallbacks(modelId, costContext.phase, costContext.courseId)
+    ? costRecordingCallbacks(
+        modelId,
+        costContext.phase,
+        costContext.courseId,
+        costContext.onCostRecorded
+      )
     : undefined;
 
   return new ChatOpenAI({

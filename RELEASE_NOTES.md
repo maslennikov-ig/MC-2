@@ -2,6 +2,51 @@
 
 User-facing release notes for all versions.
 
+## v0.31.44
+
+_Released on 2026-09-05_
+
+### ✨ New Features
+
+- **helixa**: Schedule a career playbook from a CREATE_JOB_INSTRUCTION command
+- **helixa**: Give the inbound generation commands an HTTP transport
+- **helixa**: Add a live generation mode next to disabled and fake
+- **helixa**: Add durable generation commands
+- **helixa**: Compose durable course commands
+- **helixa**: Add durable fake course commands
+- **helixa**: Schedule opt-in knowledge delivery
+- **helixa**: Add durable knowledge sync exporter
+
+### 🔧 Improvements
+
+- **helixa**: Format the bridge, and split the file that formatting broke
+
+### 🐛 Bug Fixes
+
+- **deps**: Pin @xmldom/xmldom to 0.8.15, the last 0.8 mammoth can parse with
+- **helixa**: The scheduled course job goes to the queue this deployment reads
+- **helixa**: A reclaimed reservation answers accepted, not native_completed
+- **helixa**: Let the triggers reach digest, and their own tables
+- **stage5**: Attach the BullMQ envelope so failed jobs keep their organization
+- **stage5**: Price section regeneration from the recorded cost, not a zero
+- **cost**: The quality gates charge the course they are gating
+- **cost**: The nightly price sync installs the browser its own suite needs, and says so when cancelled
+- **helixa**: Re-pin the migration manifest for the five new files
+- **helixa**: Send the bytes the signature was computed over, and pass lint
+- **helixa**: Observe scheduled dispatch replays
+- **helixa**: Feed role guides into course analysis
+- **helixa**: Harden native generation transactions
+- **helixa**: Recover stale course command leases
+- **helixa**: Serialize course command replay
+- **helixa**: Disambiguate course command RPCs
+- **helixa**: Align course command bounds
+- **helixa**: Qualify outbox claim counters
+- **helixa**: Harden knowledge sync delivery
+
+---
+
+_This release was automatically generated from 42 commits._
+
 ## v0.31.43
 
 _Released on 2026-09-05_

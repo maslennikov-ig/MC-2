@@ -264,29 +264,47 @@ export class OpenEdXAdapter extends LMSAdapter<OpenEdXConfig> {
   }
 
   /**
-   * Get course status in Open edX LMS
+   * Get course status in Open edX LMS - not supported by this adapter.
    *
-   * Note: Open edX Import API does not provide a direct course status endpoint.
-   * This implementation returns basic existence information based on course key format.
-   * For full course status, use Open edX Course API (not implemented yet).
+   * Decision (2026-09-05, replacing an open marker left in February 2026): fail loudly instead
+   * of implementing this against the Open edX Courses API.
+   *
+   * The Courses API (`GET /api/courses/v1/courses/{course_key}`) could answer
+   * most of `LmsCourseStatus`, but it is keyed by an Open edX course key such
+   * as `course-v1:Org+Course+Run`. This method's contract takes a MegaCampus
+   * course UUID, and the adapter holds no database handle, so it cannot resolve
+   * one into the other. The published key is built from the ASCII course id and
+   * the run, both of which live in `course_structure` and `lms_import_jobs`,
+   * not in the adapter's configuration. `enrollmentCount` and `lastModified`
+   * are not in that response at all; they need the Enrollment API and Studio.
+   *
+   * Returning `{ exists: false, published: false }`, as the placeholder did,
+   * was the harmful part: a caller cannot distinguish "the LMS says this course
+   * is absent" from "nobody asked the LMS". Throwing keeps that ambiguity out
+   * of the data. There is no caller today, so nothing regresses.
+   *
+   * To implement later: add `getCourseDetail(courseKey)` to `OpenEdXClient`,
+   * change this signature to take the `lmsCourseId` that `publishCourse()`
+   * already returns, and map `hidden` to `published`.
    *
    * @param courseId - MegaCampus course ID
-   * @returns Course status (existence only for now)
+   * @throws {LMSIntegrationError} Always, with code `IMPORT_ERROR`
    */
-  // eslint-disable-next-line @typescript-eslint/require-await -- Placeholder for future API call
+  // eslint-disable-next-line @typescript-eslint/require-await -- Signature is fixed by LMSAdapter
   async getCourseStatus(courseId: string): Promise<LmsCourseStatus> {
-    lmsLogger.debug({ courseId }, 'Getting course status (placeholder implementation)');
+    lmsLogger.warn(
+      { courseId, instanceId: this.config.instanceId },
+      'Course status lookup is not supported by the Open edX adapter'
+    );
 
-    // Placeholder implementation
-    // TODO: Implement using Open edX Course API when available
-    return {
-      exists: false,
-      published: false,
-      lastModified: undefined,
-      enrollmentCount: undefined,
-      lmsUrl: undefined,
-      studioUrl: undefined,
-    };
+    throw new LMSIntegrationError(
+      'Open edX course status lookup is not supported. The Courses API is keyed by an ' +
+        'Open edX course key, which this adapter cannot derive from a MegaCampus course ID.',
+      'IMPORT_ERROR',
+      'openedx',
+      undefined,
+      { courseId, operation: 'getCourseStatus' }
+    );
   }
 
   /**

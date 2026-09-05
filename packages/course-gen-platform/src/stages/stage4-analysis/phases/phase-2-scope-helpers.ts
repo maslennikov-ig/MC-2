@@ -471,6 +471,7 @@ import {
   OVERLAP_THRESHOLDS,
   type CrossSectionOverlapResult,
 } from '@/shared/validation/quality-validator';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 
 /**
  * Overlap detection result for Phase 2 sections_breakdown.
@@ -499,6 +500,7 @@ export interface SectionOverlapResult {
  *
  * @param sections - sections_breakdown from Phase 2 output
  * @param language - course language (for threshold adjustment)
+ * @param costContext - course to charge the batch embedding to
  * @returns Overlap detection result with pairs exceeding threshold
  */
 export async function detectSectionBreakdownOverlap(
@@ -507,7 +509,8 @@ export async function detectSectionBreakdownOverlap(
     key_topics?: string[];
     learning_objectives?: string[];
   }>,
-  language: string = 'en'
+  language: string = 'en',
+  costContext?: LlmCostContext
 ): Promise<SectionOverlapResult> {
   if (sections.length < 2) {
     return { hasOverlap: false, overlappingPairs: [], threshold: OVERLAP_THRESHOLDS.stage4 };
@@ -530,7 +533,8 @@ export async function detectSectionBreakdownOverlap(
     texts,
     labels,
     language,
-    OVERLAP_THRESHOLDS.stage4
+    OVERLAP_THRESHOLDS.stage4,
+    costContext
   );
 
   // Map to Stage 4-specific result format

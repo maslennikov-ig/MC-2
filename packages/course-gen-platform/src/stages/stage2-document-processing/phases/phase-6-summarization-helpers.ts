@@ -229,7 +229,20 @@ export async function executeSummarizationAttempt(
   const qualityCheck: QualityCheckResult = await validateSummaryQuality(
     extractedText,
     chunkingResult.summary,
-    { threshold: effectiveQualityThreshold }
+    {
+      threshold: effectiveQualityThreshold,
+      // Two embeddings per summarisation attempt, and a retry pays for them
+      // again: the same course the summarisation above is charged to.
+      ...(options?.courseId
+        ? {
+            costContext: {
+              courseId: options.courseId,
+              stage: 'stage_2' as const,
+              phase: 'stage_2_summarization_quality',
+            },
+          }
+        : {}),
+    }
   );
 
   logger.info(

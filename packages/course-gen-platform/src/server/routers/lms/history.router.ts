@@ -216,10 +216,24 @@ export const historyRouter = router({
         );
 
         // Step 2: Apply filters based on input
-        // TODO: Consider using RLS (Row Level Security) policies to handle
-        // authorization at database level, reducing round-trips.
-        // Current pattern: 1) verify ownership, 2) filter jobs
-        // Optimized pattern: Single query with RLS policy check
+        //
+        // Decision (2026-09-05, replacing an open marker left in February 2026): keep the explicit
+        // ownership checks below; do not delegate them to RLS.
+        //
+        // `lms_import_jobs` does have RLS enabled with an `lms_import_jobs_access`
+        // policy (migration 20241211_create_lms_integration_tables.sql). It is
+        // unreachable here: this procedure queries through `getSupabaseAdmin()`, the
+        // service-role client, and the service role bypasses row-level security by
+        // design. Deleting the manual filtering would not hand authorization to the
+        // database, it would remove authorization entirely and expose every
+        // organization's import history to any authenticated caller.
+        //
+        // Switching to a user-scoped client to make RLS apply is a larger change than
+        // it looks: the policy grants access by course ownership only, so the
+        // organization-admin path (the `organization_id` branch below) would return
+        // nothing, and the shared `throwOnSupabaseError` mapping would turn a policy
+        // denial into an empty list rather than a 403. The extra round-trip buys a
+        // clear FORBIDDEN and an explicit NOT_FOUND, which the UI depends on.
         if (course_id) {
           // Step 1: Verify course ownership
           const { data: course, error: courseError } = await supabase

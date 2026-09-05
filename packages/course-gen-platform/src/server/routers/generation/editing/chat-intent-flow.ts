@@ -11,8 +11,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { TRPCError } from '@trpc/server';
-import { JobType } from '@megacampus/shared-types';
-import type { JobData } from '@megacampus/shared-types';
+import { buildStructureGenerationJobData, JobType } from '@megacampus/shared-types';
+import type { GenerationJobInput } from '@megacampus/shared-types';
 import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
 import { buildStage5JobInput } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
@@ -92,7 +92,10 @@ export async function executeFullRegenerate(params: FullRegenerateParams): Promi
 
     // Build and enqueue Stage 5 job
     const { jobInput } = await buildStage5JobInput(supabaseAdmin, courseId, userId, requestId);
-    const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
+    const job = await addJob(
+      JobType.STRUCTURE_GENERATION,
+      buildStructureGenerationJobData(jobInput as unknown as GenerationJobInput)
+    );
 
     const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
 

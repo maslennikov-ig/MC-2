@@ -14,8 +14,8 @@ import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import { addJob } from '../../../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
-import type { Database, JobData } from '@megacampus/shared-types';
+import { buildStructureGenerationJobData, JobType } from '@megacampus/shared-types';
+import type { Database, GenerationJobInput } from '@megacampus/shared-types';
 import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { TIER_PRIORITY } from '../_shared/constants';
 import type { CourseSettings } from '../_shared/types';
@@ -184,7 +184,8 @@ export const generateRouter = {
         // broad types (Json, string) that don't match strict Zod-inferred literal unions
         // (e.g., 'beginner'|'intermediate'|'advanced' for difficulty).
         // BullMQ serializes as JSON — the Stage 5 worker validates with GenerationJobInputSchema.
-        // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
+        // StructureGenerationJobDataSchema is now derived from GenerationJobInputSchema in
+        // bullmq-jobs.ts, so the queued shape and the declared shape cannot drift apart.
         const jobInput = {
           course_id: courseId,
           organization_id: course.organization_id,
@@ -213,12 +214,19 @@ export const generateRouter = {
         };
 
         // Create BullMQ job
-        // Note: GenerationJobInput uses snake_case fields while JobData union uses camelCase.
-        // BullMQ serializes as JSON — the Stage 5 worker reads GenerationJobInput fields directly.
+        // The cast stays because Supabase widens the column types (difficulty is `string`,
+        // settings is `Json`) below what the Zod-inferred literal unions accept. The shape is
+        // right; only the static types are looser. Stage 5 revalidates on the way out.
+        // buildStructureGenerationJobData attaches the camelCase BullMQ envelope, without
+        // which a permanently failed job logs an error row with no organization.
         const priority = TIER_PRIORITY[tier] || 1;
         const jobType = JobType.STRUCTURE_GENERATION;
 
-        const job = await addJob(jobType, jobInput as unknown as JobData, { priority });
+        const job = await addJob(
+          jobType,
+          buildStructureGenerationJobData(jobInput as unknown as GenerationJobInput),
+          { priority }
+        );
         const jobId = job.id as string;
 
         logger.info(

@@ -42,6 +42,12 @@ function DashboardErrorFallback({
 interface ModuleDashboardProps {
   data: ReviewAwareModuleDashboardData | null
   courseId: string
+  /**
+   * Subscription tier of the course's organization, used to name the generation
+   * model in the Control Tower. Comes from `courseInfo.tier` via the drawer, the
+   * same source the lesson inspector already uses. Falls back to 'standard'.
+   */
+  modelTier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
   isLoading?: boolean
   error?: Error | null
   onExportAll?: () => void
@@ -65,6 +71,7 @@ interface ModuleDashboardProps {
 export function ModuleDashboard({
   data,
   courseId,
+  modelTier = 'standard',
   isLoading = false,
   error = null,
   onExportAll,
@@ -181,7 +188,7 @@ export function ModuleDashboard({
           moduleTitle={`${data.title}`}
           moduleId={data.moduleId}
           stats={controlTowerStats}
-          modelTier="standard" // TODO: Get from course settings or user subscription
+          modelTier={modelTier}
           onRegenerateAll={handleRetryFailed}
           onExportAll={handleExportAll}
         />

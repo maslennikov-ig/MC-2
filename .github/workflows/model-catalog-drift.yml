@@ -48,7 +48,11 @@ jobs:
   drift:
     name: Apply the published rates to MODEL_CATALOG
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The unit suite alone takes ~5 minutes on this runner, plus install, three
+    # workspace builds and a Chromium download. At 10 the 2026-09-04 run was
+    # cancelled mid-suite and, because a cancelled job is not a failed one,
+    # said nothing.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
         with:
@@ -91,6 +95,16 @@ jobs:
       # ran — and the commit below is gated on this step, so the job had applied
       # the new rates, thrown them away with the runner, and reported failure.
       # Two months of nightly syncs delivered nothing (mc2-rhyac).
+      # The whole unit suite includes `career-playbook-pdf.test.ts`, which
+      # renders through Playwright's Chromium. The main pipeline installs it
+      # (`ci-cd.yml`); this job did not, and on 2026-09-05 — the first night
+      # after the step started running the whole suite — four tests died on
+      # `browserType.launch: Executable doesn't exist` and the rates were thrown
+      # away with the runner again.
+      - name: Install Playwright Chromium
+        if: steps.drift.outputs.status == '0'
+        run: pnpm --filter @megacampus/course-gen-platform exec playwright install --with-deps chromium
+
       - name: Prove the catalogue and its snapshot still agree
         if: steps.drift.outputs.status == '0'
         env:
@@ -174,8 +188,10 @@ jobs:
       # ran once, failed on a missing test variable, and the catalogue kept the
       # rates it had. The point of a job that fixes something by itself is that
       # nobody watches it, so its silence has to be the loud thing.
+      # `failure()` is false for a job GitHub cancelled on `timeout-minutes`,
+      # which is how the 2026-09-04 run delivered nothing and said nothing.
       - name: Say so in Telegram when the sync itself failed
-        if: failure()
+        if: failure() || cancelled()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -184,7 +200,7 @@ jobs:
           text=$(printf '%s\n' \
             '*Ночная сверка цен не доехала*' \
             '' \
-            'Задание упало до того, как записать новые цены в `develop`. Каталог остался с прежними значениями — это не авария, но чем дольше так, тем выше шанс, что замороженный потолок `max_price` начнёт отбивать вызовы.' \
+            'Задание упало или было отменено по таймауту до того, как записать новые цены в `develop`. Каталог остался с прежними значениями — это не авария, но чем дольше так, тем выше шанс, что замороженный потолок `max_price` начнёт отбивать вызовы.' \
             '' \
             "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
           curl -sS --fail-with-body -X POST \
