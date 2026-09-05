@@ -131,6 +131,19 @@ describe('Helixa migration contract', () => {
     expect(definition.body).toMatch(/GENERATION_TARGET_QUEUE_REQUIRED/u);
   });
 
+  it('schedules CREATE_COURSE under its ledger fence and direct-course permission', () => {
+    const definition = lastDefinitionOf('schedule_helixa_course');
+    expect(definition.body).toMatch(/c\.command_kind = 'CREATE_COURSE'/u);
+    expect(definition.body).toMatch(/c\.lease_token = p_lease_token/u);
+    expect(definition.body).toMatch(/c\.claim_generation = p_claim_generation/u);
+    expect(definition.body).toMatch(/binding\.course_creation_enabled/u);
+    expect(definition.body).toMatch(
+      /command\.command_payload->'selectedSources' <> p_selected_sources/u
+    );
+    expect(definition.body).toMatch(/jsonb_build_object\('priority', 0\), p_target_queue/u);
+    expect(definition.body).toMatch(/'structure_analysis'/u);
+  });
+
   it('replaces the course scheduler rather than overloading it', () => {
     const sql = readFileSync(
       join(MIGRATIONS_DIR, '20260905140000_helixa_course_schedule_target_queue.sql'),
@@ -173,8 +186,8 @@ describe('Helixa migration contract', () => {
       .join('\n');
     // The enqueue pair reads bindings by organization on every courses and
     // career_playbooks write; the two markers and the proof capture read
-    // generation commands the same way. None of the UNIQUE constraints can serve
-    // them, because every one of those leads with `binding_id`.
+    // generation commands the same way. Their UNIQUE constraints lead with
+    // `binding_id`, which these trigger paths do not have.
     expect(sql).toMatch(
       /CREATE INDEX IF NOT EXISTS idx_helixa_knowledge_sync_bindings_organization_enabled[\s\S]*?helixa_knowledge_sync_bindings\(organization_id\)/u
     );
@@ -183,10 +196,26 @@ describe('Helixa migration contract', () => {
     );
   });
 
-  it('scopes the native-generation observation to the organization it is given', () => {
+  it('scopes native-generation proof lookup to the exact binding and organization', () => {
     const definition = lastDefinitionOf('observe_helixa_native_generation');
-    // Without this the outbox match is object + timestamp only, so a second
-    // binding returns a foreign event id that complete_observed_… then refuses.
+    expect(definition.header).toMatch(/p_binding_id TEXT/u);
+    expect(definition.body).toMatch(/outbox\.binding_id = p_binding_id/u);
     expect(definition.body).toMatch(/outbox\.organization_id = p_organization_id/u);
+  });
+
+  it('replaces the old observer signature and grants only the binding-scoped RPC', () => {
+    const sql = readFileSync(
+      join(MIGRATIONS_DIR, '20260905160000_helixa_observation_binding_scope.sql'),
+      'utf8'
+    );
+    expect(sql).toMatch(
+      /DROP FUNCTION IF EXISTS observe_helixa_native_generation\(UUID, TEXT, UUID\)/u
+    );
+    expect(sql).toMatch(
+      /REVOKE ALL ON FUNCTION observe_helixa_native_generation\(TEXT, UUID, TEXT, UUID\)[\s\S]*FROM PUBLIC, anon, authenticated/u
+    );
+    expect(sql).toMatch(
+      /GRANT EXECUTE ON FUNCTION observe_helixa_native_generation\(TEXT, UUID, TEXT, UUID\)[\s\S]*TO service_role/u
+    );
   });
 });

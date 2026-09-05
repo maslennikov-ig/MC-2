@@ -65,7 +65,7 @@ interface RoleGuideSourceRow {
 export interface GenerationOriginRow {
   binding_id: string;
   command_id: string;
-  command_kind: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE_FROM_JOB_INSTRUCTION';
+  command_kind: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE_FROM_JOB_INSTRUCTION' | 'CREATE_COURSE';
   proposal_id: string;
   approved_revision: number;
   proposal_payload_hash: string;
@@ -101,17 +101,22 @@ function generationOrigin(
 ): GenerationOriginCommandV1 | undefined {
   if (row == null) return undefined;
   const expectedOperation =
-    expected.kind === 'COURSE' ? 'CREATE_COURSE_FROM_JOB_INSTRUCTION' : 'CREATE_JOB_INSTRUCTION';
-  const validNamespace =
-    row.command_kind === 'CREATE_JOB_INSTRUCTION'
-      ? /^megacampus_generation_command:create_job_instruction:v1:[a-f0-9]{64}$/u
-      : /^megacampus_generation_command:create_course_from_job_instruction:v1:[a-f0-9]{64}$/u;
+    expected.kind === 'COURSE'
+      ? ['CREATE_COURSE_FROM_JOB_INSTRUCTION', 'CREATE_COURSE']
+      : ['CREATE_JOB_INSTRUCTION'];
+  const validNamespace = {
+    CREATE_JOB_INSTRUCTION:
+      /^megacampus_generation_command:create_job_instruction:v1:[a-f0-9]{64}$/u,
+    CREATE_COURSE_FROM_JOB_INSTRUCTION:
+      /^megacampus_generation_command:create_course_from_job_instruction:v1:[a-f0-9]{64}$/u,
+    CREATE_COURSE: /^megacampus_generation_command:create_course:v1:[a-f0-9]{64}$/u,
+  }[row.command_kind];
   if (
     row.status !== 'native_completed' ||
     row.object_kind !== expected.kind ||
     row.object_id !== expected.id ||
     row.organization_id !== expected.organizationId ||
-    row.command_kind !== expectedOperation ||
+    !expectedOperation.includes(row.command_kind) ||
     !validNamespace.test(row.command_id) ||
     row.proposal_id.trim().length === 0 ||
     row.proposal_id.length > 300 ||
@@ -136,6 +141,10 @@ function courseFromRoleGuideRelation(
   originRow: GenerationOriginRow | null | undefined,
   course: CompletedCourseRow
 ): CourseFromRoleGuideRelation | undefined {
+  if (originRow?.command_kind === 'CREATE_COURSE') {
+    if (row != null) throw new KnowledgeSyncPreparationError('provenance', false);
+    return undefined;
+  }
   if (row == null && originRow == null) return undefined;
   if (
     row == null ||

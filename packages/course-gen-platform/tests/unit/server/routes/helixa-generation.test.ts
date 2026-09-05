@@ -46,6 +46,27 @@ const jobCommand = {
   ],
 } as const;
 
+const directCourseCommand = {
+  schemaVersion: 'helixa.megacampus-generation-command.v1',
+  operation: 'CREATE_COURSE',
+  commandId: `megacampus_generation_command:create_course:v1:${'2'.repeat(64)}`,
+  proposalId: 'proposal-direct',
+  approvedRevision: 1,
+  payloadHash: '3'.repeat(64),
+  course: {
+    title: 'Direct onboarding',
+    courseDescription: 'A course created from an approved Helixa proposal.',
+    targetAudience: 'New managers',
+    learningOutcomes: ['Apply the operating policy'],
+    language: 'en',
+    courseSize: 'mini',
+    style: 'practical',
+  },
+  selectedSources: [
+    { documentId: 'document-a', sourceRevisionHash: 'a'.repeat(64), citationId: 'citation-a' },
+  ],
+} as const;
+
 const lookupQuery = {
   schemaVersion: 'helixa.megacampus-generation-lookup.v1',
   commandId: jobCommand.commandId,
@@ -61,6 +82,7 @@ function resolvedBinding(bindingId = BINDING_ID) {
     servicePrincipalUserId: '99999999-9999-4999-8999-999999999999',
     jobInstructionCreationEnabled: true,
     courseFromJobInstructionCreationEnabled: true,
+    courseCreationEnabled: true,
     principal: {
       existsInAuth: true,
       existsInPublic: true,
@@ -100,6 +122,7 @@ async function start(options: {
   hmacKey?: string;
   externalSystemId?: string;
   resolve?: HelixaGenerationBindingAuthority['resolve'];
+  schedule?: HelixaGenerationNativePort['schedule'];
 }): Promise<Harness> {
   const repository = createInMemoryHelixaGenerationRepository();
   const app = express();
@@ -114,7 +137,10 @@ async function start(options: {
         mode,
         authority: authority(options.resolve),
         repository,
-        nativePort: nativePort(),
+        nativePort: {
+          ...nativePort(),
+          ...(options.schedule ? { schedule: options.schedule } : {}),
+        },
       }),
     })
   );
@@ -350,6 +376,38 @@ describe('Helixa generation route: the protocol', () => {
     if (parsed.state === 'accepted') expect(parsed.object.kind).toBe('ROLE_GUIDE');
   });
 
+  it('dispatches CREATE_COURSE over the signed HTTP contract', async () => {
+    const harness = await start({});
+    const result = await call(harness, HELIXA_GENERATION_DISPATCH_PATH, {
+      body: { binding: { bindingId: BINDING_ID }, command: directCourseCommand },
+    });
+    expect(result.status).toBe(202);
+    const parsed = HelixaDispatchResultSchema.parse(result.body);
+    expect(parsed).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseCommand.commandId,
+      payloadHash: directCourseCommand.payloadHash,
+      state: 'accepted',
+      object: { kind: 'COURSE' },
+    });
+    const lookup = await call(harness, HELIXA_GENERATION_LOOKUP_PATH, {
+      body: {
+        binding: { bindingId: BINDING_ID },
+        query: {
+          schemaVersion: 'helixa.megacampus-generation-lookup.v1',
+          commandId: directCourseCommand.commandId,
+          payloadHash: directCourseCommand.payloadHash,
+        },
+      },
+    });
+    expect(lookup.status).toBe(200);
+    expect(HelixaLookupResultSchema.parse(lookup.body)).toMatchObject({
+      operation: 'CREATE_COURSE',
+      state: 'scheduled',
+      object: { kind: 'COURSE' },
+    });
+  });
+
   it('answers a replayed dispatch with 200 and the same object', async () => {
     const harness = await start({});
     const first = await call(harness, HELIXA_GENERATION_DISPATCH_PATH, { body: dispatchBody });
@@ -362,6 +420,38 @@ describe('Helixa generation route: the protocol', () => {
     expect(two.state).toBe('accepted');
     if (one.state === 'accepted' && two.state === 'accepted')
       expect(two.object.id).toBe(one.object.id);
+  });
+
+  it('gives only the atomic reservation owner 202 under simultaneous first dispatches', async () => {
+    const schedule = vi.fn((input: Parameters<HelixaGenerationNativePort['schedule']>[0]) =>
+      Promise.resolve({ objectId: input.objectId })
+    );
+    let releaseAuthority = () => {};
+    const authorityGate = new Promise<void>(resolve => {
+      releaseAuthority = resolve;
+    });
+    let authorityCount = 0;
+    const resolve = async () => {
+      authorityCount += 1;
+      if (authorityCount === 2) releaseAuthority();
+      await authorityGate;
+      return resolvedBinding();
+    };
+    const harness = await start({ schedule, resolve });
+
+    const results = await Promise.all([
+      call(harness, HELIXA_GENERATION_DISPATCH_PATH, { body: dispatchBody }),
+      call(harness, HELIXA_GENERATION_DISPATCH_PATH, { body: dispatchBody }),
+    ]);
+
+    expect(results.map(result => result.status).sort()).toEqual([200, 202]);
+    const parsed = results.map(result => HelixaDispatchResultSchema.parse(result.body));
+    expect(parsed[0].state).toBe('accepted');
+    expect(parsed[1].state).toBe('accepted');
+    if (parsed[0].state === 'accepted' && parsed[1].state === 'accepted') {
+      expect(parsed[0].object.id).toBe(parsed[1].object.id);
+    }
+    expect(schedule).toHaveBeenCalledTimes(1);
   });
 
   it('answers a conflicting replay with 409', async () => {

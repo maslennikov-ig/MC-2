@@ -85,16 +85,18 @@ not `native_completed`; your worker then polls lookup, sees `native_completed`, 
 the signed import through the knowledge-sync package. That is the flow your worker already
 implements, so nothing on your side changes.
 
-Both operations run end to end on the MegaCampus side: `CREATE_COURSE_FROM_JOB_INSTRUCTION`
+Three operations run end to end on the MegaCampus side: `CREATE_COURSE_FROM_JOB_INSTRUCTION`
 schedules a course from an existing role guide; `CREATE_JOB_INSTRUCTION` creates and
 generates a role guide (Career Playbook) from the command's `jobInstruction` fields
-(`roleTitle`, `businessGoal`, `context`, `language: ru|en`) and `selectedSources`.
+(`roleTitle`, `businessGoal`, `context`, `language: ru|en`) and `selectedSources`; and
+`CREATE_COURSE` creates a course from the same `course` fields plus canonical
+`selectedSources`, with no `sourceJobInstruction`.
 Completion is never pushed by the command path itself: the command row moves to
 `native_completed`, and the ordinary knowledge-sync package carries the result back with
 `originCommand`.
 
 **Idempotency and identity.** `commandId` must match
-`^megacampus_generation_command:(create_job_instruction|create_course_from_job_instruction):v1:[a-f0-9]{64}$`.
+`^megacampus_generation_command:(create_job_instruction|create_course_from_job_instruction|create_course):v1:[a-f0-9]{64}$`.
 Re-dispatching the same `commandId` with a different `payloadHash` is a `conflict`; an exact
 replay is a no-op. Reservations carry a two-minute lease with a `claim_generation` fence.
 

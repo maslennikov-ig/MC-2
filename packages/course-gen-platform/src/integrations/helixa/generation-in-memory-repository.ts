@@ -23,7 +23,12 @@ export function createInMemoryHelixaGenerationRepository(
       const existing = rows.get(key(input.binding.bindingId, input.command.commandId));
       if (existing) {
         if (existing.commandHash !== input.commandHash) return { kind: 'conflict' };
-        return { kind: 'reserved', row: { ...existing }, mutationOwner: false };
+        return {
+          kind: 'reserved',
+          row: { ...existing },
+          mutationOwner: false,
+          newlyReserved: false,
+        };
       }
       const timestamp = now().toISOString();
       const row: HelixaGenerationRow = {
@@ -43,7 +48,7 @@ export function createInMemoryHelixaGenerationRepository(
         leaseToken: randomUUID(),
       };
       rows.set(key(row.bindingId, row.commandId), row);
-      return { kind: 'reserved', row: { ...row }, mutationOwner: true };
+      return { kind: 'reserved', row: { ...row }, mutationOwner: true, newlyReserved: true };
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async renew(input) {

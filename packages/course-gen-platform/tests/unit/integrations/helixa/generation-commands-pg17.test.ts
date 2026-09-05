@@ -70,9 +70,17 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       CREATE TABLE courses(id uuid PRIMARY KEY, title text NOT NULL DEFAULT 'fixture', slug text NOT NULL DEFAULT 'fixture', user_id uuid NOT NULL REFERENCES users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL DEFAULT 'draft', course_description text, target_audience text, learning_outcomes text, language text, course_size text, style text, generation_mode text, settings jsonb, has_files boolean, created_at timestamptz, updated_at timestamptz, generation_status text, generation_completed_at timestamptz);
       CREATE TABLE file_catalog(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL REFERENCES organizations(id), course_id uuid REFERENCES courses(id), filename text NOT NULL, original_name text, file_type text NOT NULL, file_size bigint NOT NULL CHECK(file_size > 0), storage_path text NOT NULL, hash text NOT NULL, mime_type text NOT NULL, vector_status vector_status NOT NULL DEFAULT 'pending', markdown_content text, processed_content text, processing_method text, summary_metadata jsonb, priority text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
       CREATE TABLE helixa_knowledge_sync_bindings(binding_id text PRIMARY KEY, organization_id uuid NOT NULL REFERENCES organizations(id), environment text NOT NULL, destination_binding_id text NOT NULL, enabled boolean NOT NULL DEFAULT true, UNIQUE(binding_id,organization_id,environment,destination_binding_id));
-      CREATE TABLE helixa_knowledge_sync_outbox(binding_id text NOT NULL, event_id text NOT NULL, object_kind text NOT NULL, object_id uuid NOT NULL, completed_at timestamptz NOT NULL);
+      CREATE TABLE helixa_knowledge_sync_outbox(binding_id text NOT NULL, organization_id uuid NOT NULL REFERENCES organizations(id), event_id text NOT NULL, object_kind text NOT NULL, object_id uuid NOT NULL, completed_at timestamptz NOT NULL);
       CREATE TABLE job_outbox(outbox_id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entity_id uuid NOT NULL REFERENCES courses(id), queue_name text NOT NULL, job_data jsonb NOT NULL, job_options jsonb NOT NULL, target_queue text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
     `);
+    const courseCreationMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260823060000_helixa_course_creation_commands.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(courseCreationMigration);
     const migration = await readFile(
       new URL(
         '../../../../supabase/migrations/20260823120000_helixa_generation_commands.sql',
@@ -97,6 +105,22 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       'utf8'
     );
     await pool.query(sourceMigration);
+    const directCourseMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260905150000_helixa_create_course_generation.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(directCourseMigration);
+    const observationBindingMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260905160000_helixa_observation_binding_scope.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(observationBindingMigration);
   }, 120_000);
 
   afterAll(async () => {
@@ -122,7 +146,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       [ORGANIZATION_ID, PRINCIPAL_ID]
     );
     await pool.query(
-      `INSERT INTO helixa_knowledge_sync_bindings(binding_id,organization_id,environment,destination_binding_id,generation_service_principal_user_id,job_instruction_creation_enabled,course_from_job_instruction_creation_enabled) VALUES ('binding-a',$1,'test','destination-a',$2,true,true)`,
+      `INSERT INTO helixa_knowledge_sync_bindings(binding_id,organization_id,environment,destination_binding_id,generation_service_principal_user_id,job_instruction_creation_enabled,course_from_job_instruction_creation_enabled,course_creation_enabled,source_helixa_organization_id,source_helixa_project_id) VALUES ('binding-a',$1,'test','destination-a',$2,true,true,true,'helixa-org','helixa-project')`,
       [ORGANIZATION_ID, PRINCIPAL_ID]
     );
   });
@@ -156,6 +180,82 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     expect(left.rows[0].object_id).toBe(right.rows[0].object_id);
     const conflict = await reserve(undefined, 'd'.repeat(64));
     expect(conflict.rows[0].conflict).toBe(true);
+  });
+
+  it('creates a native no-file course and addresses its job to the selected queue', async () => {
+    const commandId = `megacampus_generation_command:create_course:v1:${'2'.repeat(64)}`;
+    const course = {
+      title: 'Direct onboarding',
+      courseDescription: 'A course created from an approved Helixa proposal.',
+      targetAudience: 'New managers',
+      learningOutcomes: ['Apply the operating policy'],
+      language: 'en',
+      courseSize: 'mini',
+      style: 'practical',
+    };
+    const selectedSources = [
+      { documentId: 'document-a', sourceRevisionHash: 'a'.repeat(64), citationId: 'citation-a' },
+    ];
+    const commandPayload = {
+      schemaVersion: 'helixa.megacampus-generation-command.v1',
+      operation: 'CREATE_COURSE',
+      commandId,
+      proposalId: 'proposal-direct',
+      approvedRevision: 1,
+      payloadHash: '3'.repeat(64),
+      course,
+      selectedSources,
+    };
+    const reserved = (
+      await pool.query(
+        `SELECT * FROM reserve_helixa_generation_command($1,$2,'CREATE_COURSE','proposal-direct',1,$3,$4,$5,'COURSE')`,
+        ['binding-a', commandId, '3'.repeat(64), '4'.repeat(64), commandPayload]
+      )
+    ).rows[0];
+    const scheduled = await pool.query(
+      `SELECT schedule_helixa_course($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) value`,
+      [
+        'binding-a',
+        commandId,
+        reserved.object_id,
+        ORGANIZATION_ID,
+        PRINCIPAL_ID,
+        course,
+        // node-postgres serializes JavaScript arrays as PostgreSQL arrays. This RPC
+        // argument is JSONB, so the direct-driver proof must send JSON text just as
+        // PostgREST does for the production RPC boundary.
+        JSON.stringify(selectedSources),
+        reserved.lease_token,
+        reserved.claim_generation,
+        'course-generation-test',
+      ]
+    );
+    expect(scheduled.rows[0].value).toBe(true);
+    expect(
+      (await pool.query('SELECT * FROM courses WHERE id=$1', [reserved.object_id])).rows[0]
+    ).toMatchObject({
+      title: course.title,
+      has_files: false,
+      settings: { includeWebResearch: false, includeBusinessContextSources: false },
+    });
+    expect(
+      (await pool.query('SELECT * FROM job_outbox WHERE entity_id=$1', [reserved.object_id]))
+        .rows[0]
+    ).toMatchObject({
+      queue_name: 'structure_analysis',
+      target_queue: 'course-generation-test',
+      job_data: expect.objectContaining({
+        jobType: 'structure_analysis',
+        courseId: reserved.object_id,
+      }),
+    });
+    expect(
+      (
+        await pool.query('SELECT count(*)::int count FROM file_catalog WHERE course_id=$1', [
+          reserved.object_id,
+        ])
+      ).rows[0].count
+    ).toBe(0);
   });
 
   it('fences stale owners and permits one expired-lease takeover', async () => {
@@ -200,8 +300,8 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     const completedAt = '2026-08-23T10:20:00.000Z';
     const eventId = 'mc2:ROLE_GUIDE:fixture';
     await pool.query(
-      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a',$1,'ROLE_GUIDE',$2,$3)`,
-      [eventId, initial.object_id, completedAt]
+      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a',$1,$2,'ROLE_GUIDE',$3,$4)`,
+      [ORGANIZATION_ID, eventId, initial.object_id, completedAt]
     );
     const reconciled = await pool.query(
       `SELECT * FROM reconcile_completed_helixa_generation_command($1,$2,$3,$4,$5,$6,$7)`,
@@ -687,10 +787,10 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     );
     expect(
       (
-        await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [
-          ORGANIZATION_ID,
-          failedCourseId,
-        ])
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, failedCourseId]
+        )
       ).rows[0].outcome
     ).toBe('failed');
 
@@ -702,22 +802,30 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     );
     expect(
       (
-        await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [
-          ORGANIZATION_ID,
-          completedCourseId,
-        ])
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, completedCourseId]
+        )
       ).rows[0].outcome
     ).toBe('succeeded_awaiting_signed_import');
     await pool.query(
-      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a','mc2:COURSE:observed','COURSE',$1,$2)`,
-      [completedCourseId, completedAt]
+      `INSERT INTO helixa_knowledge_sync_bindings(binding_id,organization_id,environment,destination_binding_id) VALUES ('binding-b',$1,'test','destination-b')`,
+      [ORGANIZATION_ID]
+    );
+    await pool.query(
+      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-b',$1,'aaa:foreign-binding','COURSE',$2,$3)`,
+      [ORGANIZATION_ID, completedCourseId, completedAt]
+    );
+    await pool.query(
+      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a',$1,'mc2:COURSE:observed','COURSE',$2,$3)`,
+      [ORGANIZATION_ID, completedCourseId, completedAt]
     );
     expect(
       (
-        await pool.query(`SELECT * FROM observe_helixa_native_generation($1,'COURSE',$2)`, [
-          ORGANIZATION_ID,
-          completedCourseId,
-        ])
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, completedCourseId]
+        )
       ).rows[0]
     ).toMatchObject({ outcome: 'completed', outbox_event_id: 'mc2:COURSE:observed' });
   });
@@ -739,8 +847,8 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     ).rows[0];
     const completedAt = '2026-08-23T10:50:00.000Z';
     await pool.query(
-      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a','mc2:wrong-kind','COURSE',$1,$2)`,
-      [initial.object_id, completedAt]
+      `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a',$1,'mc2:wrong-kind','COURSE',$2,$3)`,
+      [ORGANIZATION_ID, initial.object_id, completedAt]
     );
     await expect(
       pool.query(`SELECT complete_observed_helixa_generation_command($1,$2,$3,$4,$5,$6,$7)`, [

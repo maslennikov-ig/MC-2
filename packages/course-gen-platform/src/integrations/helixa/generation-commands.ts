@@ -96,6 +96,7 @@ export function createHelixaGenerationNativePort(
   return {
     reconcile(input) {
       return dependencies.reconcile({
+        bindingId: input.binding.bindingId,
         objectKind: input.objectKind,
         objectId: input.objectId,
         organizationId: input.binding.organizationId,
@@ -104,6 +105,7 @@ export function createHelixaGenerationNativePort(
     observe(input) {
       return (
         dependencies.observe?.({
+          bindingId: input.binding.bindingId,
           objectKind: input.objectKind,
           objectId: input.objectId,
           organizationId: input.binding.organizationId,
@@ -133,6 +135,27 @@ export function createHelixaGenerationNativePort(
             claimGeneration: input.claimGeneration,
             originBindingId: input.binding.bindingId,
             originCommandId: input.command.commandId,
+          });
+        } catch (error) {
+          throw asPreMutationError(error);
+        }
+        return { objectId: input.objectId };
+      }
+
+      if (input.command.operation === 'CREATE_COURSE') {
+        try {
+          await dependencies.scheduleCourse({
+            courseId: input.objectId,
+            organizationId: input.binding.organizationId,
+            userId: input.servicePrincipalUserId,
+            leaseToken: input.leaseToken,
+            claimGeneration: input.claimGeneration,
+            course: input.command.course,
+            selectedSources: input.command.selectedSources,
+            originBindingId: input.binding.bindingId,
+            originCommandId: input.command.commandId,
+            includeWebResearch: false,
+            includeBusinessContextSources: false,
           });
         } catch (error) {
           throw asPreMutationError(error);
@@ -171,7 +194,9 @@ function assertBinding(
   const enabled =
     command.operation === 'CREATE_JOB_INSTRUCTION'
       ? binding.jobInstructionCreationEnabled
-      : binding.courseFromJobInstructionCreationEnabled;
+      : command.operation === 'CREATE_COURSE'
+        ? binding.courseCreationEnabled
+        : binding.courseFromJobInstructionCreationEnabled;
   if (!enabled) throw new Error('MegaCampus generation binding unavailable');
 }
 
@@ -244,7 +269,11 @@ async function observeScheduledDispatchReplay(input: {
   return accepted(row);
 }
 
-export async function dispatchHelixaGenerationCommand(input: {
+function withAdmission<T>(result: T, newlyReserved: boolean) {
+  return { result, newlyReserved };
+}
+
+export async function dispatchHelixaGenerationCommandWithAdmission(input: {
   bindingLocator: { bindingId: string };
   command: unknown;
   mode: HelixaGenerationMode;
@@ -266,40 +295,56 @@ export async function dispatchHelixaGenerationCommand(input: {
     objectKind,
   });
   if (reservation.kind === 'conflict')
-    return {
-      schemaVersion: 'helixa.megacampus-generation-result.v1' as const,
-      operation: command.operation,
-      commandId: command.commandId,
-      payloadHash: command.payloadHash,
-      state: 'conflict' as const,
-      error: { code: 'megacampus_generation_command_conflict' as const, retryable: false as const },
-    };
+    return withAdmission(
+      {
+        schemaVersion: 'helixa.megacampus-generation-result.v1' as const,
+        operation: command.operation,
+        commandId: command.commandId,
+        payloadHash: command.payloadHash,
+        state: 'conflict' as const,
+        error: {
+          code: 'megacampus_generation_command_conflict' as const,
+          retryable: false as const,
+        },
+      },
+      false
+    );
+  const newlyReserved = reservation.newlyReserved;
   if (reservation.row.status === 'scheduled')
-    return observeScheduledDispatchReplay({
-      bindingLocator: input.bindingLocator,
-      commandId: command.commandId,
-      mode: input.mode,
-      authority: input.authority,
-      repository: input.repository,
-      nativePort: input.nativePort,
-    });
-  if (reservation.row.status === 'native_completed') return accepted(reservation.row);
-  if (reservation.row.status === 'action_required') return actionRequiredResult(reservation.row);
+    return withAdmission(
+      await observeScheduledDispatchReplay({
+        bindingLocator: input.bindingLocator,
+        commandId: command.commandId,
+        mode: input.mode,
+        authority: input.authority,
+        repository: input.repository,
+        nativePort: input.nativePort,
+      }),
+      newlyReserved
+    );
+  if (reservation.row.status === 'native_completed')
+    return withAdmission(accepted(reservation.row), newlyReserved);
+  if (reservation.row.status === 'action_required')
+    return withAdmission(actionRequiredResult(reservation.row), newlyReserved);
   if (!reservation.mutationOwner) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1));
       const replay = await input.repository.lookup(binding.bindingId, command.commandId);
       if (replay?.status === 'scheduled')
-        return observeScheduledDispatchReplay({
-          bindingLocator: input.bindingLocator,
-          commandId: command.commandId,
-          mode: input.mode,
-          authority: input.authority,
-          repository: input.repository,
-          nativePort: input.nativePort,
-        });
-      if (replay?.status === 'native_completed') return accepted(replay);
-      if (replay?.status === 'action_required') return actionRequiredResult(replay);
+        return withAdmission(
+          await observeScheduledDispatchReplay({
+            bindingLocator: input.bindingLocator,
+            commandId: command.commandId,
+            mode: input.mode,
+            authority: input.authority,
+            repository: input.repository,
+            nativePort: input.nativePort,
+          }),
+          false
+        );
+      if (replay?.status === 'native_completed') return withAdmission(accepted(replay), false);
+      if (replay?.status === 'action_required')
+        return withAdmission(actionRequiredResult(replay), false);
     }
     throw new Error('MegaCampus generation is still reserving');
   }
@@ -333,7 +378,7 @@ export async function dispatchHelixaGenerationCommand(input: {
         // polls lookup and waits for the signed import, which is exactly the state a
         // reclaimed reservation over a finished native object is in. `native_completed`
         // stays a lookup-only answer, where Helixa's schema does accept it.
-        return accepted(completed);
+        return withAdmission(accepted(completed), newlyReserved);
       }
       if (reconciliation === 'uncertain') {
         const recorded = await input.repository.actionRequired({
@@ -356,7 +401,9 @@ export async function dispatchHelixaGenerationCommand(input: {
       claimGeneration: row.claimGeneration,
       ...(command.operation === 'CREATE_JOB_INSTRUCTION'
         ? { jobInstruction: command.jobInstruction, selectedSources: command.selectedSources }
-        : { course: command.course, sourceJobInstruction: command.sourceJobInstruction }),
+        : command.operation === 'CREATE_COURSE'
+          ? { course: command.course, selectedSources: command.selectedSources }
+          : { course: command.course, sourceJobInstruction: command.sourceJobInstruction }),
       includeWebResearch: false,
       includeBusinessContextSources: false,
     });
@@ -364,13 +411,19 @@ export async function dispatchHelixaGenerationCommand(input: {
       throw new Error('Native generation returned a different object ID');
     const scheduled = await input.repository.markScheduled(fence);
     if (!scheduled) throw new Error('MegaCampus generation lease lost while scheduling');
-    return accepted(scheduled);
+    return withAdmission(accepted(scheduled), newlyReserved);
   } catch (error) {
     if (error instanceof HelixaGenerationPreMutationError) {
       await input.repository.actionRequired({ ...fence, safeErrorCode: error.safeErrorCode });
     }
     throw error;
   }
+}
+
+export async function dispatchHelixaGenerationCommand(
+  input: Parameters<typeof dispatchHelixaGenerationCommandWithAdmission>[0]
+) {
+  return (await dispatchHelixaGenerationCommandWithAdmission(input)).result;
 }
 
 export async function lookupHelixaGenerationCommand(input: {

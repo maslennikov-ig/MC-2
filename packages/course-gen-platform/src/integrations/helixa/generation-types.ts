@@ -19,6 +19,7 @@ export interface ResolvedHelixaGenerationBinding {
   servicePrincipalUserId: string;
   jobInstructionCreationEnabled: boolean;
   courseFromJobInstructionCreationEnabled: boolean;
+  courseCreationEnabled: boolean;
   principal: {
     existsInAuth: boolean;
     existsInPublic: boolean;
@@ -73,7 +74,13 @@ export interface HelixaGenerationRepository {
     commandHash: string;
     objectKind: HelixaGenerationObjectKind;
   }): Promise<
-    { kind: 'conflict' } | { kind: 'reserved'; row: HelixaGenerationRow; mutationOwner: boolean }
+    | { kind: 'conflict' }
+    | {
+        kind: 'reserved';
+        row: HelixaGenerationRow;
+        mutationOwner: boolean;
+        newlyReserved: boolean;
+      }
   >;
   renew(input: {
     bindingId: string;
@@ -161,11 +168,11 @@ export interface HelixaGenerationNativePort {
     >['jobInstruction'];
     selectedSources?: Extract<
       HelixaGenerationCommand,
-      { operation: 'CREATE_JOB_INSTRUCTION' }
+      { operation: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE' }
     >['selectedSources'];
     course?: Extract<
       HelixaGenerationCommand,
-      { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }
+      { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' | 'CREATE_COURSE' }
     >['course'];
     sourceJobInstruction?: Extract<
       HelixaGenerationCommand,
@@ -231,7 +238,24 @@ export interface HelixaGenerationNativeDependencies {
     includeWebResearch: false;
     includeBusinessContextSources: false;
   }): Promise<void>;
+  scheduleCourse(input: {
+    courseId: string;
+    organizationId: string;
+    userId: string;
+    leaseToken: string;
+    claimGeneration: number;
+    course: Extract<HelixaGenerationCommand, { operation: 'CREATE_COURSE' }>['course'];
+    selectedSources: Extract<
+      HelixaGenerationCommand,
+      { operation: 'CREATE_COURSE' }
+    >['selectedSources'];
+    originBindingId: string;
+    originCommandId: string;
+    includeWebResearch: false;
+    includeBusinessContextSources: false;
+  }): Promise<void>;
   reconcile(input: {
+    bindingId: string;
     objectKind: HelixaGenerationObjectKind;
     objectId: string;
     organizationId: string;
@@ -241,6 +265,7 @@ export interface HelixaGenerationNativeDependencies {
     | { kind: 'completed'; nativeCompletedAt: string; outboxEventId: string }
   >;
   observe?(input: {
+    bindingId: string;
     objectKind: HelixaGenerationObjectKind;
     objectId: string;
     organizationId: string;
