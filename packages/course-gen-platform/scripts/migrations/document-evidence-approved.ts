@@ -631,8 +631,16 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `helixa_*` scheduling function so the outbox queue name comes from the caller instead of
 // a literal that only matched production. No trigger, and no function inside the security
 // manifest, so no new `after-*` digest.
+// Re-pinned 2026-09-05 for full j149 activation: 260 files, adding
+// 20260905150000_helixa_create_course_generation.sql and
+// 20260905160000_helixa_observation_binding_scope.sql. The first widens the separate
+// `helixa_generation_commands` ledger and its `helixa_*` reservation/scheduling functions
+// for governed direct course creation. The second replaces the Helixa observation function
+// so it selects an outbox event for the command's exact binding. Neither changes the
+// document-evidence chain, any function in its security manifest, or an accepted source
+// digest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'a7aadd502747170e31d5d6ee444af23038f95d55b2bde1500e1b6a3ac4eee5f7';
+  'e8c8efd4bac9705cd61f8240245287da6d332986167301b70a6a4901f36c2eec';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
