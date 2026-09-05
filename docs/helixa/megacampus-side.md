@@ -509,34 +509,44 @@ no binding row exists, `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` is unset and
 sequence below, in this order, once the three joint values in
 `docs/helixa/handoff-for-helixa.md` §4 have been agreed with Helixa.
 
-1. **Service principal.** Create a non-interactive user the inbound commands act as. It must
-   exist in `auth.users` and `users`, carry `raw_app_meta_data->>'kind' = 'service_principal'`
-   and `raw_app_meta_data->>'interactive_login_allowed' = 'false'`, and be an `owner`, `admin`
-   or `instructor` member of the organization (`organization_members`). Use
-   `auth.admin.createUser` with `app_metadata` set and a random unusable password; never a
-   person's account. `reserve_helixa_generation_command` re-checks every one of these on each
-   dispatch.
-2. **Binding row.** One per `(organization, environment)`:
+1. **Plan the service principal and binding.** Set the target explicitly; the operator will
+   not choose or create an organization:
 
-   ```sql
-   INSERT INTO helixa_knowledge_sync_bindings (
-     binding_id, organization_id, environment, destination_binding_id, enabled,
-     generation_service_principal_user_id,
-     job_instruction_creation_enabled, course_from_job_instruction_creation_enabled,
-     course_creation_enabled, source_helixa_organization_id, source_helixa_project_id
-   ) VALUES (
-     '<binding id agreed with Helixa>', '<organization uuid>', 'production',
-     '<destination binding id agreed with Helixa>', false,
-     '<service principal uuid>', true, true,
-     true, '<Helixa organization id>', '<Helixa project id>'
-   );
+   ```bash
+   export SUPABASE_URL='<MegaCampus Supabase URL>'
+   export SUPABASE_SERVICE_KEY='<MegaCampus service-role key>'
+   export MC2_HELIXA_ORGANIZATION_ID='<existing MegaCampus organization UUID>'
+   export MC2_HELIXA_BINDING_ID='<binding id agreed with Helixa>'
+   export MC2_HELIXA_ENVIRONMENT='production'
+   export MC2_HELIXA_DESTINATION_BINDING_ID='<destination binding id agreed with Helixa>'
+   export MC2_HELIXA_SOURCE_ORGANIZATION_ID='<Helixa organization id>'
+   export MC2_HELIXA_SOURCE_PROJECT_ID='<Helixa project id>'
+   export MC2_HELIXA_SERVICE_PRINCIPAL_ROLE='instructor' # owner|admin|instructor
+
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/provision-bridge.ts
    ```
 
-   `enabled = false` at insert time: the row exists, the triggers still see nothing enabled.
-   `course_creation_enabled` gates both the transportless legacy ledger and the governed
-   `CREATE_COURSE` operation. Its existing check constraint requires both
-   `source_helixa_*` ids, so provision the agreed Helixa organization and project values
-   before enabling direct course creation.
+   With no argument the command is read-only and prints a JSON plan containing safe ids,
+   counts and change names. It finds or plans a dedicated Supabase Auth service principal,
+   its `users` row, its exact organization membership, and one disabled binding with all
+   three generation permissions. The principal uses a deterministic address under the
+   reserved `.invalid` domain because `public.users.email` is required. Supabase
+   `auth.admin.createUser` sends no confirmation message, the random password is discarded,
+   and the user is banned from interactive sign-in.
+
+2. **Apply the reviewed plan.** Run the same command with the explicit `apply` argument:
+
+   ```bash
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/provision-bridge.ts apply
+   ```
+
+   Exact replay performs no writes. Any existing identity, membership, environment,
+   destination, source id or permission mismatch is a conflict and is not updated. A newly
+   inserted binding always has `enabled = false`, all three operation capabilities set to
+   `true`, and both `source_helixa_*` values populated. The command neither reads nor stores
+   `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`.
 
 3. **Secrets and ids** into the worker and API env files
    (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):
