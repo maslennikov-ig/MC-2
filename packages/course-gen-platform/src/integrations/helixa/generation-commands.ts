@@ -34,6 +34,61 @@ export class HelixaGenerationPreMutationError extends Error {
   }
 }
 
+/**
+ * The Q&A record a Helixa command stands in for.
+ *
+ * A command carries a role title, a language, a business goal and a context paragraph.
+ * The product's own equivalent of "the requester wrote this down" is a free-form answer,
+ * and free-form text is what reaches the spec-builder prompt, so the command-owned text
+ * goes there verbatim.
+ *
+ * It used to go into `business_context.digest`, which cannot hold it:
+ * `CareerPlaybookBusinessContextDigestSchema` is a structured object of signal arrays, not
+ * a string, so the worker's own `CareerPlaybookQADataSchema.parse` would have thrown on
+ * every command. Nothing caught it because nothing ever called this seam. The context stays
+ * `company_specific` with no digest, which is a state the formatter handles by telling the
+ * model to use the explicit free-form context and invent nothing.
+ */
+function careerPlaybookQADataForCommand(
+  roleTitle: string,
+  language: 'ru' | 'en',
+  commandOwnedTextSource: string
+): Record<string, unknown> {
+  return {
+    fixed: [
+      { question_key: 'position', value: roleTitle },
+      { question_key: 'content_language', value: language },
+    ],
+    followups: [],
+    freeform: [{ text: commandOwnedTextSource }],
+    business_context: {
+      mode: 'company_specific',
+      status: 'collecting',
+      digest: null,
+      source_ids: [],
+    },
+    generation_warnings: [],
+    quality_issues: [],
+  };
+}
+
+/** The scheduling RPCs signal their refusals by message; each maps to one safe error code. */
+function asPreMutationError(error: unknown): unknown {
+  if (error instanceof HelixaGenerationPreMutationError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('ROLE_GUIDE_SOURCE_UNAVAILABLE'))
+    return new HelixaGenerationPreMutationError('megacampus_generation_source_unavailable');
+  if (message.includes('ROLE_GUIDE_SOURCE_STALE'))
+    return new HelixaGenerationPreMutationError('megacampus_generation_source_stale');
+  if (message.includes('GENERATION_SERVICE_PRINCIPAL_INVALID'))
+    return new HelixaGenerationPreMutationError('megacampus_generation_service_principal_invalid');
+  // The row was written and the job was not. Recording it terminally is better than
+  // leaving a reservation whose lease will expire into an uncertain outcome.
+  if (message.includes('ROLE_GUIDE_GENERATION_ENQUEUE_FAILED'))
+    return new HelixaGenerationPreMutationError('megacampus_generation_native_failed');
+  return error;
+}
+
 /** Internal native service. Its injected functions are lower-level persistence/queue seams, never interactive routers. */
 export function createHelixaGenerationNativePort(
   dependencies: HelixaGenerationNativeDependencies
@@ -59,31 +114,29 @@ export function createHelixaGenerationNativePort(
       if (input.command.operation === 'CREATE_JOB_INSTRUCTION') {
         const guide = input.command.jobInstruction;
         const commandOwnedTextSource = `# Business goal\n${guide.businessGoal}\n\n# Context\n${guide.context}`;
-        await dependencies.scheduleRoleGuide({
-          playbookId: input.objectId,
-          organizationId: input.binding.organizationId,
-          userId: input.servicePrincipalUserId,
-          positionTitle: guide.roleTitle,
-          language: guide.language,
-          commandOwnedTextSource,
-          selectedSources: input.command.selectedSources,
-          qAData: {
-            fixed: [
-              { question_key: 'position', value: guide.roleTitle },
-              { question_key: 'content_language', value: guide.language },
-            ],
-            followups: [],
-            freeform: [],
-            business_context: {
-              mode: 'company_specific',
-              status: 'ready',
-              digest: commandOwnedTextSource,
-              source_ids: [],
-            },
-            followup_questions: [],
-            followup_generation_count: 0,
-          },
-        });
+        try {
+          await dependencies.scheduleRoleGuide({
+            playbookId: input.objectId,
+            organizationId: input.binding.organizationId,
+            userId: input.servicePrincipalUserId,
+            positionTitle: guide.roleTitle,
+            language: guide.language,
+            commandOwnedTextSource,
+            selectedSources: input.command.selectedSources,
+            qAData: careerPlaybookQADataForCommand(
+              guide.roleTitle,
+              guide.language,
+              commandOwnedTextSource
+            ),
+            jobInstruction: guide,
+            leaseToken: input.leaseToken,
+            claimGeneration: input.claimGeneration,
+            originBindingId: input.binding.bindingId,
+            originCommandId: input.command.commandId,
+          });
+        } catch (error) {
+          throw asPreMutationError(error);
+        }
         return { objectId: input.objectId };
       }
 
@@ -103,16 +156,7 @@ export function createHelixaGenerationNativePort(
           includeBusinessContextSources: false,
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('ROLE_GUIDE_SOURCE_UNAVAILABLE'))
-          throw new HelixaGenerationPreMutationError('megacampus_generation_source_unavailable');
-        if (message.includes('ROLE_GUIDE_SOURCE_STALE'))
-          throw new HelixaGenerationPreMutationError('megacampus_generation_source_stale');
-        if (message.includes('GENERATION_SERVICE_PRINCIPAL_INVALID'))
-          throw new HelixaGenerationPreMutationError(
-            'megacampus_generation_service_principal_invalid'
-          );
-        throw error;
+        throw asPreMutationError(error);
       }
       return { objectId: input.objectId };
     },

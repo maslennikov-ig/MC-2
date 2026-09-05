@@ -200,6 +200,17 @@ export interface HelixaGenerationNativeDependencies {
       citationId: string;
     }>;
     qAData: Record<string, unknown>;
+    // The lease fence and the command identity. The course scheduler has carried these
+    // since it was written; the role-guide seam could not be implemented without them,
+    // because its RPC has to take the command row under the same lease before it writes.
+    jobInstruction: Extract<
+      HelixaGenerationCommand,
+      { operation: 'CREATE_JOB_INSTRUCTION' }
+    >['jobInstruction'];
+    leaseToken: string;
+    claimGeneration: number;
+    originBindingId: string;
+    originCommandId: string;
   }): Promise<void>;
   scheduleCourseFromRoleGuide(input: {
     courseId: string;

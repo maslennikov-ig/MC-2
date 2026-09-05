@@ -139,12 +139,58 @@ and a native port that schedules nothing, so the transport can be exercised end 
 without touching MegaCampus generation. `live` uses the PostgreSQL ledger and the
 PostgreSQL native port.
 
-**`live` is only half wired.** `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
-`schedule_helixa_course_from_role_guide`. `CREATE_JOB_INSTRUCTION` has no scheduler in
-this repository: nothing here starts a career playbook from a Helixa command yet. Its
-`scheduleRoleGuide` seam therefore refuses with a pre-mutation error, which records a
-terminal `action_required` on the ledger rather than leaving a reservation that would
-never move. Wiring it is the remaining inbound work.
+Both commands are wired in `live`. `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
+`schedule_helixa_course_from_role_guide`; `CREATE_JOB_INSTRUCTION` reaches
+`schedule_helixa_role_guide`, added 2026-09-05 in
+`20260905130000_helixa_schedule_role_guide.sql`.
+
+### Scheduling a career playbook from a command
+
+```
+schedule_helixa_role_guide(
+  p_binding_id TEXT, p_command_id TEXT, p_playbook_id UUID, p_organization_id UUID,
+  p_user_id UUID, p_job_instruction JSONB, p_selected_sources JSONB, p_qa_data JSONB,
+  p_lease_token UUID, p_claim_generation INTEGER
+) RETURNS BOOLEAN
+```
+
+It takes the command row under its lease fence, proves the binding is enabled for
+`job_instruction_creation` and its service principal is legitimate, and refuses unless the
+`jobInstruction` and `selectedSources` being relayed are byte-equal to the payload the
+ledger stored. Then it writes one `career_playbooks` row: status `generating`, the language
+and the role title from the command, and the Q&A record as `q_a_data`. It returns true when
+the caller must enqueue and false when a playbook with that id already exists in some other
+state, which is how a reclaimed lease avoids racing an earlier claim. `object_id` is
+assigned once at reservation and never changes, so the function is idempotent on the command.
+
+**It does not enqueue, and that is forced.** `job_outbox.entity_id` is
+`REFERENCES courses(id)`, so a career playbook cannot ride the transactional outbox the way
+a course does. `createPostgresHelixaRoleGuideScheduler` enqueues afterwards, with the same
+job type, queue and deterministic job id the product uses, and calls
+`fail_helixa_role_guide_generation` if that throws. Row first, job second, compensate on
+failure is exactly the sequence `approveCareerPlaybookGeneration` already follows, so this
+path is no less atomic than the product's own. A failed enqueue surfaces as
+`megacampus_generation_native_failed`.
+
+**What a `CREATE_JOB_INSTRUCTION` payload must carry** for the row to be valid: a non-empty
+`jobInstruction.roleTitle`, a `jobInstruction.language` of `ru` or `en`, a `businessGoal`
+and a `context`, and at least one `selectedSources` entry. The schema enforces all of it;
+the RPC re-checks the title, the language and the Q&A object because the database is the
+last authority on what it stores.
+
+**Where the command text goes.** The business goal and the context become one free-form
+answer, which is the field the product uses for prose the requester wrote and the field that
+reaches the spec-builder prompt. They used to be assigned to `business_context.digest`,
+which cannot hold them: that field is a structured object of signal arrays, so the worker's
+own `CareerPlaybookQADataSchema.parse` would have thrown on every command. Nothing caught it
+because nothing had ever called the seam. The business context stays `company_specific` with
+no digest, a state whose prompt text tells the model to use the explicit free-form context
+and invent nothing.
+
+Helixa's `selectedSources` are recorded as provenance only. They name documents in Helixa,
+which MegaCampus does not hold, so they are checked against the stored command payload and
+not turned into `file_catalog` rows. The command payload in `helixa_generation_commands` is
+where they remain readable.
 
 ### One shape that had to move
 
@@ -418,9 +464,14 @@ says outright.
   defect survived review. The HTTP route's own tests run entirely in `fake` mode against
   an in-memory ledger, so they prove the transport and prove nothing about the SQL. Run
   the PG17 suites against a real instance before setting the mode to `live`.
-- **`live` refuses `CREATE_JOB_INSTRUCTION`.** There is no career-playbook scheduler
-  behind the command yet, so that half answers `action_required` with
-  `megacampus_generation_native_failed`. Section 3 has the detail.
+- **The role-guide enqueue is not in the row's transaction.** `job_outbox` is keyed to
+  `courses(id)`, so the playbook row and its BullMQ job are two steps with a compensating
+  write between them. The product's own create path has the same shape. A crash between
+  them leaves a `generating` playbook with no job; the command's lease expires and the
+  next claim reconciles it.
+- **`schedule_helixa_role_guide` has never run against a database.** Like the rest of the
+  inbound half it is covered by unit tests against fakes and by the PG17 suites, which skip
+  unless `HELIXA_REAL_PG17` is set.
 - **Production is the same database.** Dev, staging and production containers all read one
   Supabase project (verified 2026-08-16 by comparing `SUPABASE_URL` digests across
   `megacampus-api-dev`, `megacampus-api-blue` and both workers). Applying these migrations

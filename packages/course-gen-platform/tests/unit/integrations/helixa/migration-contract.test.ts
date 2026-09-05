@@ -71,6 +71,17 @@ const DEFINER_REQUIRED = [
   'validate_course_job_instruction_native_source',
   'validate_course_job_instruction_source',
   'capture_helixa_role_guide_generation_proof',
+  'schedule_helixa_role_guide',
+  'fail_helixa_role_guide_generation',
+];
+
+// The two role-guide scheduling functions hash nothing today. They carry
+// `extensions` on their search path anyway, so that a later edit adding a hash cannot
+// reintroduce the 2026-09-05 defect by inheriting a `public`-only path.
+const SEARCH_PATH_REQUIRED = [
+  ...DIGEST_CALLERS,
+  'schedule_helixa_role_guide',
+  'fail_helixa_role_guide_generation',
 ];
 
 describe('Helixa migration contract', () => {
@@ -81,8 +92,49 @@ describe('Helixa migration contract', () => {
     expect(definition.body.replace(/extensions\.digest\(/gu, '')).not.toMatch(/\bdigest\(/u);
   });
 
-  it.each(DIGEST_CALLERS)('%s carries extensions on its search_path', name => {
+  it.each(SEARCH_PATH_REQUIRED)('%s carries extensions on its search_path', name => {
     expect(lastDefinitionOf(name).header).toMatch(/SET search_path = public, extensions/u);
+  });
+
+  it.each(['schedule_helixa_role_guide', 'fail_helixa_role_guide_generation'])(
+    '%s calls no bare digest',
+    name => {
+      const definition = lastDefinitionOf(name);
+      expect(definition.body.replace(/extensions\.digest\(/gu, '')).not.toMatch(/\bdigest\(/u);
+    }
+  );
+
+  it('schedules a role guide only under the command lease and an enabled binding', () => {
+    const definition = lastDefinitionOf('schedule_helixa_role_guide');
+    // The fence: the same command row, the same lease, the same claim generation, still
+    // inside its lease window. Without all four a stale caller could write a second row.
+    expect(definition.body).toMatch(/c\.lease_token = p_lease_token/u);
+    expect(definition.body).toMatch(/c\.claim_generation = p_claim_generation/u);
+    expect(definition.body).toMatch(/c\.lease_expires_at > NOW\(\)/u);
+    expect(definition.body).toMatch(/GENERATION_COMMAND_FENCE_LOST/u);
+    // The binding half that gates this command specifically, not the course one.
+    expect(definition.body).toMatch(/binding\.job_instruction_creation_enabled/u);
+    expect(definition.body).toMatch(/GENERATION_SERVICE_PRINCIPAL_INVALID/u);
+    // The row it writes has to be the command the ledger stored, not a rewritten one.
+    expect(definition.body).toMatch(/GENERATION_COMMAND_PAYLOAD_MISMATCH/u);
+  });
+
+  it('grants the role-guide scheduling functions to service_role only', () => {
+    const sql = readFileSync(
+      join(MIGRATIONS_DIR, '20260905130000_helixa_schedule_role_guide.sql'),
+      'utf8'
+    );
+    for (const name of ['schedule_helixa_role_guide', 'fail_helixa_role_guide_generation']) {
+      expect(sql).toMatch(
+        new RegExp(
+          `REVOKE ALL ON FUNCTION ${name}\\([^)]*\\) FROM PUBLIC, anon, authenticated`,
+          'u'
+        )
+      );
+      expect(sql).toMatch(
+        new RegExp(`GRANT EXECUTE ON FUNCTION ${name}\\([^)]*\\) TO service_role`, 'u')
+      );
+    }
   });
 
   it.each(DEFINER_REQUIRED)('%s runs as definer', name => {

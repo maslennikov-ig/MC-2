@@ -11,4 +11,5 @@ export * from './service';
 export * from './scheduler';
 export * from './course-creation';
 export * from './generation-commands';
+export * from './generation-role-guide';
 export * from './errors';

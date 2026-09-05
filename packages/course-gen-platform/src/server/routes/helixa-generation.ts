@@ -33,13 +33,16 @@ import {
   dispatchHelixaGenerationCommand,
   lookupHelixaGenerationCommand,
   readHelixaGenerationMode,
-  HelixaGenerationPreMutationError,
   type GenerationRpcClient,
   type HelixaGenerationBindingAuthority,
   type HelixaGenerationMode,
   type HelixaGenerationNativePort,
   type HelixaGenerationRepository,
 } from '@/integrations/helixa/generation-commands';
+import {
+  createCareerPlaybookGenerationEnqueue,
+  createPostgresHelixaRoleGuideScheduler,
+} from '@/integrations/helixa/generation-role-guide';
 import logger from '@/shared/logger';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 
@@ -169,13 +172,14 @@ function supabaseRuntime(mode: Exclude<HelixaGenerationMode, 'disabled'>) {
     authority,
     repository: createPostgresHelixaGenerationRepository(client),
     nativePort: createHelixaGenerationNativePort({
-      // `CREATE_COURSE_FROM_JOB_INSTRUCTION` has a PostgreSQL scheduler.
-      // `CREATE_JOB_INSTRUCTION` does not: nothing in this repository schedules a career
-      // playbook from a Helixa command yet. Refusing with a pre-mutation error records a
-      // terminal `action_required` on the ledger, which is the answer Helixa can act on,
-      // rather than a reservation that would sit scheduled forever.
-      scheduleRoleGuide: () =>
-        Promise.reject(new HelixaGenerationPreMutationError('megacampus_generation_native_failed')),
+      // Both commands have a PostgreSQL scheduler. The role-guide one writes the
+      // `career_playbooks` row under the command's lease and then enqueues the same job the
+      // product enqueues; it cannot do both in one transaction, because `job_outbox` is
+      // keyed to `courses(id)`.
+      scheduleRoleGuide: createPostgresHelixaRoleGuideScheduler(
+        client,
+        createCareerPlaybookGenerationEnqueue()
+      ),
       scheduleCourseFromRoleGuide: createPostgresHelixaCourseFromRoleGuideScheduler(client),
       reconcile: createPostgresHelixaNativeReconciler(client),
       observe: createPostgresHelixaNativeObserver(client),

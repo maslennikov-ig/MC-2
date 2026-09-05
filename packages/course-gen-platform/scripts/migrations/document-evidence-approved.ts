@@ -621,8 +621,13 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `file_catalog` immutability trigger SECURITY DEFINER so it can read its own
 // revoked table, and adds three indexes for the per-write trigger lookups. It
 // touches no function inside the security manifest, so no new `after-*` digest.
+// Re-pinned again 2026-09-05 in the same edit as the migration: 257 files, adding
+// 20260905130000_helixa_schedule_role_guide.sql. It adds two `helixa_*`-prefixed functions
+// that schedule and compensate a career playbook created by a Helixa
+// `CREATE_JOB_INSTRUCTION` command, installs no trigger, and touches no function inside the
+// security manifest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '63d6fe5d6f3347b9e0fe501a538b357afed619f2f8ec96c45270879698ec7030';
+  'c89a3cf0394df99313f14fd0c57237544066a2af9813ad08e2fb5119a20c008b';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
