@@ -123,6 +123,25 @@ server {
         proxy_connect_timeout 75s;
     }
 
+    # Helixa AIOS bridge, inbound generation commands (mc2-sdjy8.9). Express mounts
+    # the router at this exact prefix, so no rewrite. The body is HMAC-signed
+    # and verified against the raw bytes, which is why nothing here buffers,
+    # rewrites or decompresses it. Everything not under this prefix still falls
+    # through to the web app below, so an unknown /api path stays a 404 there.
+    location /api/integrations/helixa/ {
+        add_header Cache-Control "no-store" always;
+
+        client_max_body_size 2m;
+        proxy_pass http://megacampus_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 15s;
+    }
+
     # Bull Board (job monitoring) - restricted access
     location /admin/queues {
         allow 127.0.0.1;
