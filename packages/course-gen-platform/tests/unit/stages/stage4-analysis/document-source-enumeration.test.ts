@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /* eslint-disable @typescript-eslint/require-await -- async query-builder mocks mirror Supabase */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +28,30 @@ const documentId = (value: number) =>
 
 describe('Stage 4 document source enumeration', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('passes the immutable ROLE_GUIDE canonical content and exact hash into native analysis', async () => {
+    const exactContent = '{"blocks":[],"lessons":[],"structure":{"roleProfileSpec":{}},"summaryMarkdown":"# Exact guide"}';
+    const exactHash = createHash('sha256').update(exactContent, 'utf8').digest('hex');
+    const row = {
+      id: documentId(99), original_name: 'role-guide.json', filename: 'role-guide.json',
+      hash: exactHash, summary_metadata: { original_tokens: 12, summary_tokens: 12, compression_ratio: 1, quality_score: 1 },
+      priority: 'CORE', vector_status: 'indexed', error_message: null,
+    };
+    const builder = {
+      select: vi.fn(() => builder), eq: vi.fn(() => builder), order: vi.fn(() => builder),
+      gt: vi.fn(() => builder),
+      range: vi.fn(async () => ({ data: [row], error: null, count: 1 })),
+      in: vi.fn(async () => ({ data: [{ id: row.id, processed_content: exactContent }], error: null })),
+    };
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => builder) });
+    mocks.getCachedFileProcessedContentBatch.mockResolvedValue(new Map());
+
+    const result = await fetchDocumentSummaries('20000000-0000-4000-8000-000000000001');
+
+    expect(result).toEqual([expect.objectContaining({
+      document_id: row.id, source_version_hash: exactHash, processed_content: exactContent,
+    })]);
+  });
 
   it('partitions audited failures before every processed-content cache or database request', async () => {
     const failedId = documentId(1);

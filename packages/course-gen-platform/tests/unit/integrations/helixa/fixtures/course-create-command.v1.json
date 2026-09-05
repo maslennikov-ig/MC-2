@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "helixa.megacampus-course-create.v1",
+  "commandId": "megacampus_course_command:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "proposalId": "helixa-proposal-fixture",
+  "approvedRevision": 9007199254740991,
+  "course": {
+    "title": "Safety",
+    "brief": "Learn safe operations.",
+    "language": "ru"
+  },
+  "selectedSources": [
+    {
+      "documentId": "document-1",
+      "sourceRevisionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "citationId": "citation-1"
+    }
+  ]
+}
