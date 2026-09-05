@@ -1,9 +1,24 @@
 export const KNOWLEDGE_SYNC_SCHEMA_VERSION = '2026-06-16.megacampus-knowledge-sync.v1' as const;
 
-export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 export type KnowledgeObjectKind = 'COURSE' | 'ROLE_GUIDE';
-export type KnowledgeEventType = 'COURSE_COMPLETED' | 'COURSE_UPDATED' | 'ROLE_GUIDE_COMPLETED' | 'ROLE_GUIDE_UPDATED';
-export type ProcessingRoute = 'docling' | 'local_text' | 'content_rss' | 'meetings_media' | 'unsupported';
+export type KnowledgeEventType =
+  | 'COURSE_COMPLETED'
+  | 'COURSE_UPDATED'
+  | 'ROLE_GUIDE_COMPLETED'
+  | 'ROLE_GUIDE_UPDATED';
+export type ProcessingRoute =
+  | 'docling'
+  | 'local_text'
+  | 'content_rss'
+  | 'meetings_media'
+  | 'unsupported';
 export type EvidenceAuthority = 'primary_source' | 'derived_training' | 'derived_role_guide';
 
 export interface GenerationOriginCommandV1 {
@@ -60,12 +75,41 @@ export interface KnowledgeSyncPackage {
   eventType: KnowledgeEventType;
   sentAt: string;
   producer: { system: 'megacampus'; environment: string; organizationId: string };
-  object: { kind: KnowledgeObjectKind; id: string; version: string; title: string; language: string; status: 'completed'; url?: string };
-  scope: { externalOrganizationId: string; externalProjectId: string | null; destinationPolicy: 'DEFAULT_ORG_KNOWLEDGE_PROJECT' };
-  content: { summaryMarkdown: string; structure: Record<string, JsonValue>; blocks: Record<string, JsonValue>[]; lessons: Record<string, JsonValue>[] };
+  object: {
+    kind: KnowledgeObjectKind;
+    id: string;
+    version: string;
+    title: string;
+    language: string;
+    status: 'completed';
+    url?: string;
+  };
+  scope: {
+    externalOrganizationId: string;
+    externalProjectId: string | null;
+    destinationPolicy: 'DEFAULT_ORG_KNOWLEDGE_PROJECT';
+  };
+  content: {
+    summaryMarkdown: string;
+    structure: Record<string, JsonValue>;
+    blocks: Record<string, JsonValue>[];
+    lessons: Record<string, JsonValue>[];
+  };
   sourceDocuments: SourceDocument[];
-  evidenceSegments: Array<{ segmentKey: string; documentKey: string; artifactKey: string; authority: EvidenceAuthority; text: string; locator: { kind: 'whole_artifact' | 'json_pointer'; pointer?: string } }>;
-  candidateClaims: Array<{ claimKey: string; text: string; evidenceRefs: string[]; metadata?: Record<string, JsonValue> }>;
+  evidenceSegments: Array<{
+    segmentKey: string;
+    documentKey: string;
+    artifactKey: string;
+    authority: EvidenceAuthority;
+    text: string;
+    locator: { kind: 'whole_artifact' | 'json_pointer'; pointer?: string };
+  }>;
+  candidateClaims: Array<{
+    claimKey: string;
+    text: string;
+    evidenceRefs: string[];
+    metadata?: Record<string, JsonValue>;
+  }>;
   relations: KnowledgeRelation[];
   hashes: { payloadHash: string; contentHash: string };
   metadata?: Record<string, JsonValue>;

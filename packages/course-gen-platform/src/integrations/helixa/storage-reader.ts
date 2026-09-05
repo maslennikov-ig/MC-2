@@ -13,7 +13,10 @@ export function createUploadStorageReader(uploadRoot: string) {
     let handle;
     try {
       handle = await open(candidate, constants.O_RDONLY | constants.O_NOFOLLOW);
-      const [openedPath, stat] = await Promise.all([realpath(`/proc/self/fd/${handle.fd}`), handle.stat()]);
+      const [openedPath, stat] = await Promise.all([
+        realpath(`/proc/self/fd/${handle.fd}`),
+        handle.stat(),
+      ]);
       if (!stat.isFile() || !openedPath.startsWith(`${root}${path.sep}`)) {
         throw new KnowledgeSyncPreparationError('provenance', false);
       }
