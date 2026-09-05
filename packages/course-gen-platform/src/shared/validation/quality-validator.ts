@@ -18,6 +18,7 @@
  */
 
 import { generateEmbedding, generateEmbeddings } from '@/shared/embeddings/jina-client';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 import type { CourseMetadata, Section } from '@megacampus/shared-types';
 import type { Logger } from 'pino';
 import defaultLogger from '@/shared/logger';
@@ -186,6 +187,8 @@ export class QualityValidator {
    * @param inputRequirements - Original course requirements/description
    * @param generatedMetadata - Generated course metadata
    * @param language - Language code (en, de, es, ru) for threshold adjustment
+   * @param costContext - Course to charge the embeddings to; omitted only by a
+   *   caller that genuinely has no course, since every embedding here is paid
    * @returns Quality validation result with pass/fail status and score
    * @throws ValidationError if embedding generation or validation fails
    *
@@ -210,7 +213,8 @@ export class QualityValidator {
   async validateMetadata(
     inputRequirements: string,
     generatedMetadata: CourseMetadata,
-    language: string = 'en'
+    language: string = 'en',
+    costContext?: LlmCostContext
   ): Promise<QualityValidationResult> {
     const phase = 'metadata';
 
@@ -223,13 +227,21 @@ export class QualityValidator {
       });
 
       // Generate embedding for input requirements (query-style)
-      const inputEmbedding = await generateEmbedding(inputRequirements, 'retrieval.query');
+      const inputEmbedding = await generateEmbedding(
+        inputRequirements,
+        'retrieval.query',
+        costContext
+      );
 
       // Concatenate key metadata fields for embedding
       const metadataText = this.concatenateMetadataFields(generatedMetadata);
 
       // Generate embedding for metadata (passage-style)
-      const metadataEmbedding = await generateEmbedding(metadataText, 'retrieval.passage');
+      const metadataEmbedding = await generateEmbedding(
+        metadataText,
+        'retrieval.passage',
+        costContext
+      );
 
       // Compute cosine similarity
       const score = this.cosineSimilarity(inputEmbedding, metadataEmbedding);
@@ -319,7 +331,8 @@ export class QualityValidator {
   async validateSections(
     expectedTopics: string[],
     generatedSections: Section[],
-    language: string = 'en'
+    language: string = 'en',
+    costContext?: LlmCostContext
   ): Promise<SectionQualityResult[]> {
     const phase = 'sections';
 
@@ -357,8 +370,8 @@ export class QualityValidator {
 
         // Generate embeddings
         const [sectionEmbedding, topicEmbedding] = await Promise.all([
-          generateEmbedding(sectionText, 'retrieval.passage'),
-          generateEmbedding(expectedTopic, 'retrieval.query'),
+          generateEmbedding(sectionText, 'retrieval.passage', costContext),
+          generateEmbedding(expectedTopic, 'retrieval.query', costContext),
         ]);
 
         // Compute cosine similarity
@@ -412,12 +425,14 @@ export class QualityValidator {
    * @param generatedSections - Array of generated sections to check
    * @param language - Language code for threshold adjustment
    * @param overlapThreshold - Override threshold (default: stage5 threshold 0.75)
+   * @param costContext - Course to charge the batch embedding to
    * @returns CrossSectionOverlapResult with detected overlapping pairs
    */
   async detectCrossSectionOverlap(
     generatedSections: Section[],
     language: string = 'en',
-    overlapThreshold: number = OVERLAP_THRESHOLDS.stage5
+    overlapThreshold: number = OVERLAP_THRESHOLDS.stage5,
+    costContext?: LlmCostContext
   ): Promise<CrossSectionOverlapResult> {
     // Build text representations for each section
     const texts = generatedSections.map(section => {
@@ -430,7 +445,13 @@ export class QualityValidator {
     );
 
     // Delegate to unified core method
-    const result = await this.detectOverlapFromTexts(texts, labels, language, overlapThreshold);
+    const result = await this.detectOverlapFromTexts(
+      texts,
+      labels,
+      language,
+      overlapThreshold,
+      costContext
+    );
 
     // Remap indices to section_numbers for backward compatibility
     result.overlappingPairs = result.overlappingPairs.map(pair => ({
@@ -463,13 +484,15 @@ export class QualityValidator {
    * @param labels - Human-readable labels for reporting (e.g., section titles)
    * @param language - Language code for threshold adjustment (ru: -0.05)
    * @param overlapThreshold - Base threshold (default: OVERLAP_THRESHOLDS.default)
+   * @param costContext - Course to charge the batch embedding to
    * @returns CrossSectionOverlapResult with detected overlapping pairs
    */
   async detectOverlapFromTexts(
     texts: string[],
     labels: string[],
     language: string = 'en',
-    overlapThreshold: number = OVERLAP_THRESHOLDS.default
+    overlapThreshold: number = OVERLAP_THRESHOLDS.default,
+    costContext?: LlmCostContext
   ): Promise<CrossSectionOverlapResult> {
     // Apply language adjustment
     const langCode = language.toLowerCase().slice(0, 2);
@@ -505,7 +528,7 @@ export class QualityValidator {
       }
 
       // Generate embeddings in batch (single API call — efficient)
-      const embeddings = await generateEmbeddings(texts, 'retrieval.passage');
+      const embeddings = await generateEmbeddings(texts, 'retrieval.passage', costContext);
 
       // Compute pairwise cosine similarity
       const overlappingPairs: CrossSectionOverlapResult['overlappingPairs'] = [];
@@ -762,7 +785,8 @@ export interface QualityCheckResult {
  *
  * @param originalText - Original document text
  * @param summary - Generated summary text
- * @param config - Optional configuration {threshold?: number}
+ * @param config - Optional configuration: the similarity threshold, and the
+ *   course whose ledger these two embeddings belong to
  * @returns Quality validation result with score and pass/fail
  *
  * @example
@@ -780,9 +804,10 @@ export interface QualityCheckResult {
 export async function validateSummaryQuality(
   originalText: string,
   summary: string,
-  config: { threshold?: number } = {}
+  config: { threshold?: number; costContext?: LlmCostContext } = {}
 ): Promise<QualityCheckResult> {
   const threshold = config.threshold ?? 0.75;
+  const costContext = config.costContext;
   const logger = defaultLogger;
 
   // Validation: Check for empty inputs
@@ -806,8 +831,8 @@ export async function validateSummaryQuality(
   try {
     // Generate embeddings using Jina-v3
     const [originalEmbedding, summaryEmbedding] = await Promise.all([
-      generateEmbedding(originalText, 'retrieval.passage'),
-      generateEmbedding(summary, 'retrieval.passage'),
+      generateEmbedding(originalText, 'retrieval.passage', costContext),
+      generateEmbedding(summary, 'retrieval.passage', costContext),
     ]);
 
     // Compute cosine similarity using QualityValidator's method

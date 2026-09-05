@@ -27,6 +27,10 @@
  * Jina detectors below are the same rule applied to the same shape: the raw
  * HTTP call must price itself, and the two entry points that reach it must be
  * given a course.
+ *
+ * The two validation modules that were deferred here (`mc2-sv89s`) now carry a
+ * course down from their callers, so the deferred list is empty and the Jina
+ * rule applies to the whole scanned tree.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -74,23 +78,18 @@ const RETRIEVAL_EXCEPTIONS: Record<string, string> = {
  * one down. Different from an exception in the only way that matters: these are
  * holes, they are named, and each names the issue that closes it.
  *
- * `QualityValidator` and `semanticMatch` embed text on Stage 3 and Stage 5
- * quality gates. Neither module mentions a course anywhere — the id would have
- * to be threaded from their callers through several public signatures, which is
- * a wider change than the epic that found this measured, so it is deferred
- * rather than half-done.
+ * Empty since `mc2-sv89s`. It held the two validation modules —
+ * `quality-validator.ts` and `semantic-matching.ts` — which embed on the Stage
+ * 3, 4 and 5 quality gates and mentioned a course nowhere, so their spend was
+ * not merely unattributed but unwritten: `recordJinaCallCost` returns without a
+ * row when it has no context. Both now take an optional `LlmCostContext` and
+ * every course-bearing caller passes one.
+ *
+ * The list stays, because the next deferral should have to name itself here
+ * rather than quietly join RETRIEVAL_EXCEPTIONS, which is for spend that has no
+ * course at all.
  */
-const RETRIEVAL_DEFERRED: Record<string, { reason: string; issue: string }> = {
-  'shared/validation/quality-validator.ts': {
-    reason:
-      'embeds section and metadata text for the quality gates; the class takes no course id and every caller would have to pass one',
-    issue: 'mc2-sv89s',
-  },
-  'shared/validation/semantic-matching.ts': {
-    reason: 'embeds candidate values for semantic matching; same missing course id as its caller',
-    issue: 'mc2-sv89s',
-  },
-};
+const RETRIEVAL_DEFERRED: Record<string, { reason: string; issue: string }> = {};
 
 /**
  * Directories whose calls are spend on a course.

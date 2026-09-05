@@ -16,6 +16,7 @@
  */
 
 import { generateEmbedding, generateEmbeddings } from '@/shared/embeddings/jina-client';
+import type { LlmCostContext } from '@/shared/metrics/llm-cost';
 import logger from '@/shared/logger';
 
 export interface SemanticMatchResult {
@@ -41,17 +42,21 @@ const embeddingCache = new Map<string, number[]>();
  * Uses Jina-embeddings-v3 with task="retrieval.query" for short enum values.
  * Results are cached in-memory for performance.
  *
+ * A cache hit spends nothing and is therefore never priced; only the miss below
+ * reaches the paid API, and it carries whatever course the caller named.
+ *
  * @param text - Text to embed (typically an enum value)
+ * @param costContext - Course to charge a cache miss to, when the caller has one
  * @returns 768-dimensional embedding vector
  */
-async function getEmbedding(text: string): Promise<number[]> {
+async function getEmbedding(text: string, costContext?: LlmCostContext): Promise<number[]> {
   if (embeddingCache.has(text)) {
     return embeddingCache.get(text)!;
   }
 
   try {
     // Use retrieval.query for short enum values (optimized for search)
-    const embedding = await generateEmbedding(text, 'retrieval.query');
+    const embedding = await generateEmbedding(text, 'retrieval.query', costContext);
     embeddingCache.set(text, embedding);
     return embedding;
   } catch (error) {
@@ -87,21 +92,23 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * @param invalidValue - The invalid value from LLM
  * @param validValues - Array of valid enum values
  * @param threshold - Minimum similarity score to accept match (default: 0.85)
+ * @param costContext - Course whose ledger these embeddings belong to
  * @returns Match result with similarity score
  */
 export async function findSemanticMatch(
   invalidValue: string,
   validValues: string[],
-  threshold: number = 0.85
+  threshold: number = 0.85,
+  costContext?: LlmCostContext
 ): Promise<SemanticMatchResult> {
   try {
     logger.info({ invalidValue, validValues, threshold }, '[Semantic Matching] Starting');
 
     // Get embedding for invalid value
-    const invalidEmbedding = await getEmbedding(invalidValue);
+    const invalidEmbedding = await getEmbedding(invalidValue, costContext);
 
     // Get embeddings for all valid values (cached after first call)
-    const validEmbeddings = await Promise.all(validValues.map(v => getEmbedding(v)));
+    const validEmbeddings = await Promise.all(validValues.map(v => getEmbedding(v, costContext)));
 
     // Find closest match
     let bestMatch = validValues[0];
@@ -152,9 +159,18 @@ export async function findSemanticMatch(
  *
  * Uses batch embeddings for efficiency (up to 100 texts per API request).
  *
+ * This one batch is process-wide and runs before any course exists, so its only
+ * caller passes no context and the call is recorded as unattributed rather than
+ * charged to whichever course happened to arrive first. Every later value comes
+ * from the cache it fills, so the API is not paid again.
+ *
  * @param enumFields - Object with field names and valid values
+ * @param costContext - Course to charge the warm-up batch to, if one owns it
  */
-export async function warmupEmbeddingCache(enumFields: Record<string, string[]>): Promise<void> {
+export async function warmupEmbeddingCache(
+  enumFields: Record<string, string[]>,
+  costContext?: LlmCostContext
+): Promise<void> {
   logger.info('[Semantic Matching] Warming up embedding cache');
 
   // Collect all unique values
@@ -167,7 +183,7 @@ export async function warmupEmbeddingCache(enumFields: Record<string, string[]>)
 
   // Batch request for all values (more efficient than individual requests)
   // Jina API handles batching internally (up to 100 texts per request)
-  const embeddings = await generateEmbeddings(valuesArray, 'retrieval.query');
+  const embeddings = await generateEmbeddings(valuesArray, 'retrieval.query', costContext);
 
   // Save to cache
   valuesArray.forEach((value, index) => {

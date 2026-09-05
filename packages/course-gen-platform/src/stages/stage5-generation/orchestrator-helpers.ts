@@ -317,7 +317,13 @@ export async function detectOverlap(
   try {
     const qualityValidator = new QualityValidator(overlapLogger);
     const language = input.frontend_parameters?.language || 'en';
-    const detectedOverlap = await qualityValidator.detectCrossSectionOverlap(sections, language);
+    const detectedOverlap = await qualityValidator.detectCrossSectionOverlap(
+      sections,
+      language,
+      undefined,
+      // One batch embedding over every generated section, per overlap attempt.
+      { courseId: input.course_id, stage: 'stage_5', phase: 'cross_section_overlap' }
+    );
 
     if (detectedOverlap.hasOverlap) {
       const summary = detectedOverlap.overlappingPairs
