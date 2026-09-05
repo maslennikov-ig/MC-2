@@ -251,17 +251,16 @@ delivered, so a report naming a branch again means something really was left beh
 
 Next stage id: none selected. Nothing in `mc2-sdjy8` blocks the queue.
 
-Recommended action: **read run `33961945370` (master) and the first scheduled price sync, then
-wait for the owner's Helixa values.**
+Recommended action: **wait for the owner's Helixa values, then follow §9 of
+`docs/helixa/megacampus-side.md` on dev first, then production.**
 
-1. **Read the first scheduled price sync after 2026-09-06 03:20 UTC** (`gh run list --workflow
-"Model Catalogue Price Sync" --limit 3`). Green, or a delivered failure message, proves AC-1
-   on the workflow `master` now carries; the dispatched run `33961951365` is the same proof.
-2. **Confirm production revision** on `megacampus-api-green`/`blue` after run `33961951365`'s
-   deploy job: `org.opencontainers.image.revision` must read `726ddf1c2`.
-3. When the owner returns with the Helixa values, follow §9 of `docs/helixa/megacampus-side.md`
-   on dev first, then production.
-4. Then pick any ready Beads goal.
+Already proven on 2026-09-05 after the deploy: production run `33961945370` green, all five
+containers report revision `726ddf1c2`, the Helixa route answers through nginx (503
+`generation_not_configured`, not a web 404), and a dispatched price sync `33963162252` on the
+`master` workflow went green end to end — Chromium installed, suite proved, rates committed,
+Telegram sent. The first scheduled run after 2026-09-06 03:20 UTC is the routine check.
+
+Then pick any ready Beads goal.
 
 No reindex, audience-checkbox change, secret/access mutation or force-push has occurred since the
 accepted stage. Eight schema migrations and one production deploy occurred under the owner's
