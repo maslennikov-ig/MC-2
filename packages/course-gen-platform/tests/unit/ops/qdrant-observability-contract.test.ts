@@ -122,6 +122,12 @@ describe('Q9 self-hosted Qdrant observability contract', () => {
         'megacampus_qdrant_last_successful_restore_drill_unixtime_seconds',
       ],
       [
+        'QdrantRestoreDrillFailed',
+        '0m',
+        'warning',
+        'increase(megacampus_qdrant_restore_drill_failures_total[6h]) > 0',
+      ],
+      [
         'QdrantOffHostSnapshotStale',
         '0m',
         'critical',

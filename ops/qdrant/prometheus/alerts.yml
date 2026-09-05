@@ -88,6 +88,19 @@ groups:
           summary: Qdrant restore drill is stale or missing
           description: No successful isolated restore drill has been recorded within 35 days.
 
+      - alert: QdrantRestoreDrillFailed
+        expr: increase(megacampus_qdrant_restore_drill_failures_total[6h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Qdrant restore drill failed
+          description: >-
+            The isolated restore drill recorded a failure. Read the newest file under
+            /var/lib/megacampus-qdrant-recovery/restore-evidence/ on the deploy host. An identity
+            mismatch whose field list omits content means the recovery probe is stale, not the
+            backup; regenerate it with deploy/qdrant/generate-recovery-probe.py and rerun the drill.
+
       - alert: QdrantOffHostSnapshotStale
         expr: |
           (time() - megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds > 36 * 60 * 60)

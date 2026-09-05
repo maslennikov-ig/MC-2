@@ -143,6 +143,32 @@ tests:
               description: No exact-version restore from the second-host copy has succeeded within 35 days.
 
   - interval: 1m
+    input_series:
+      # One monthly run fails at t=61m and the counter stays at 1: the alert must fire on the
+      # step and must resolve once the step leaves the six-hour window.
+      - series: 'megacampus_qdrant_restore_drill_failures_total'
+        values: '0x60 1x420'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: QdrantRestoreDrillFailed
+        exp_alerts: []
+      - eval_time: 61m
+        alertname: QdrantRestoreDrillFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Qdrant restore drill failed
+              description: >-
+                The isolated restore drill recorded a failure. Read the newest file under
+                /var/lib/megacampus-qdrant-recovery/restore-evidence/ on the deploy host. An identity
+                mismatch whose field list omits content means the recovery probe is stale, not the
+                backup; regenerate it with deploy/qdrant/generate-recovery-probe.py and rerun the drill.
+      - eval_time: 8h
+        alertname: QdrantRestoreDrillFailed
+        exp_alerts: []
+
+  - interval: 1m
     alert_rule_test:
       - eval_time: 3m
         alertname: QdrantDown
