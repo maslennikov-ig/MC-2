@@ -642,9 +642,9 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // Re-pinned 2026-09-05 for the Auth prerequisite repair: 261 files, adding
 // 20260905170000_repair_auth_users_email_change.sql. It changes only NULL values in the
 // Supabase-managed `auth.users.email_change` field to the Auth-compatible empty string and
-// replaces the existing postgres-only test-fixture helper so future direct inserts supply
-// that value. It does not touch the document-evidence chain, its security manifest, or any
-// accepted source digest, so no new `after-*` digest is needed.
+// replaces the existing test-fixture helper so future direct inserts supply that value while
+// preserving its live execution ACL. It does not touch the document-evidence chain, its
+// security manifest, or any accepted source digest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
   'c0b15d59117333b8e328de8eb926e241c78e31b79fe8b4815d47d0a9df34b2ee';
 

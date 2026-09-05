@@ -1,5 +1,5 @@
 -- Supabase Auth maps email_change to a non-null Go string. The repository's
--- postgres-only test-user helper inserted auth.users rows without that column,
+-- test-user helper inserted auth.users rows without that column,
 -- leaving NULL values that make every Auth admin users listing fail while scanning.
 -- Repair only the invalid representation and make the same helper supply the
 -- Auth-compatible empty value. Do not change Auth schema or real email/token state.
@@ -108,13 +108,8 @@ EXCEPTION
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_test_auth_user(UUID, TEXT, TEXT, TEXT, BOOLEAN)
-  FROM PUBLIC, authenticated, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.create_test_auth_user(UUID, TEXT, TEXT, TEXT, BOOLEAN)
-  TO postgres;
-
 COMMENT ON FUNCTION public.create_test_auth_user(UUID, TEXT, TEXT, TEXT, BOOLEAN) IS
-'TEST ENVIRONMENT ONLY - Creates predefined Auth fixtures. Granted only to postgres.
+'TEST ENVIRONMENT ONLY - Creates predefined Auth fixtures. Existing execution grants are preserved.
 Every direct auth.users insert supplies the empty-string email_change representation
 required by Supabase Auth; idempotent replay repairs a NULL without replacing a pending value.';
 

@@ -25,6 +25,7 @@ function docker(args: string[], timeout = 120_000): string {
 }
 
 let pool: Pool;
+let functionAclBeforeRepair: string;
 
 describe.runIf(REAL_PG17)('Helixa Auth email_change repair on disposable PostgreSQL 17', () => {
   beforeAll(async () => {
@@ -90,6 +91,17 @@ describe.runIf(REAL_PG17)('Helixa Auth email_change repair on disposable Postgre
       )
     );
     await pool.query(`
+      GRANT EXECUTE ON FUNCTION public.create_test_auth_user(UUID, TEXT, TEXT, TEXT, BOOLEAN)
+        TO service_role;
+    `);
+    functionAclBeforeRepair = (
+      await pool.query(`
+        SELECT proacl::text AS acl
+        FROM pg_proc
+        WHERE oid = 'public.create_test_auth_user(uuid,text,text,text,boolean)'::regprocedure
+      `)
+    ).rows[0].acl;
+    await pool.query(`
       INSERT INTO auth.users(
         id, email, confirmation_token, email_change_token_new, email_change, recovery_token
       ) VALUES
@@ -145,5 +157,42 @@ describe.runIf(REAL_PG17)('Helixa Auth email_change repair on disposable Postgre
         )
       ).rows[0].email_change
     ).toBe('');
+  });
+
+  it('preserves the existing function ACL exactly', async () => {
+    const acl = (
+      await pool.query(`
+        SELECT proacl::text AS acl
+        FROM pg_proc
+        WHERE oid = 'public.create_test_auth_user(uuid,text,text,text,boolean)'::regprocedure
+      `)
+    ).rows[0].acl;
+    expect(acl).toBe(functionAclBeforeRepair);
+    expect(
+      (
+        await pool.query(`
+          SELECT
+            has_function_privilege(
+              'service_role',
+              'public.create_test_auth_user(uuid,text,text,text,boolean)',
+              'EXECUTE'
+            ) AS service_role_execute,
+            has_function_privilege(
+              'authenticated',
+              'public.create_test_auth_user(uuid,text,text,text,boolean)',
+              'EXECUTE'
+            ) AS authenticated_execute,
+            has_function_privilege(
+              'anon',
+              'public.create_test_auth_user(uuid,text,text,text,boolean)',
+              'EXECUTE'
+            ) AS anon_execute
+        `)
+      ).rows[0]
+    ).toEqual({
+      service_role_execute: true,
+      authenticated_execute: false,
+      anon_execute: false,
+    });
   });
 });
