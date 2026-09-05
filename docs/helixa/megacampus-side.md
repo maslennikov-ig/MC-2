@@ -15,16 +15,13 @@ playbook enqueues a row in an outbox table via a database trigger. A timer in th
 worker claims rows, builds a package, freezes its bytes, and POSTs them to Helixa
 with an HMAC signature.
 
-**Inbound (generation commands) has no transport.** The command ledger, the
+**Inbound (generation commands) is now an HTTP route.** The command ledger, the
 reservation and lease functions, the schema parsing, and the native scheduling RPC
-all exist. Nothing calls them. `dispatchHelixaGenerationCommand` and
-`executeHelixaCourseCreationCommand` in
-`packages/course-gen-platform/src/integrations/helixa/` are exported and reachable
-only from tests. There is no HTTP route, no tRPC procedure, and no queue consumer.
-The only import of the Helixa integration from anywhere else in the repository is
-one line in `packages/course-gen-platform/src/orchestrator/worker-entrypoint.ts`,
-which starts the outbound delivery timer. Treat the inbound half as a library that
-is finished but not connected.
+existed first and nothing called them. `src/server/routes/helixa-generation.ts` is the
+transport: two POST endpoints mounted in `src/server/index.ts`, authenticated by an HMAC
+over the raw body. Section 3 has the contract as implemented. The older course-create
+ledger, `executeHelixaCourseCreationCommand` in `course-creation.ts`, still has no
+transport and is reachable only from tests.
 
 ## 2. Outbound contract as implemented
 
@@ -71,25 +68,105 @@ jitter derived from the event id so a retry storm does not synchronize. HTTP 408
 it is still null and the caller holds the lease. A retry re-sends the original
 bytes rather than rebuilding a package that might now hash differently.
 
-## 3. Inbound contract as designed
+## 3. Inbound contract as implemented
 
 Helixa issues two commands, `CREATE_JOB_INSTRUCTION` and
 `CREATE_COURSE_FROM_JOB_INSTRUCTION`, parsed by `HelixaGenerationCommandSchema` in
 `generation-commands.ts`. A separate, older ledger handles a plain course-create
-command in `course-creation.ts`.
+command in `course-creation.ts` and still has no transport.
 
-Both are refused unless their mode variable says `fake`;
-`readHelixaGenerationMode` and `readHelixaCourseCreationMode` treat absent, empty
-and `disabled` alike and throw on anything else.
+### The two endpoints
+
+| URL                                                 | Body                                              | Answers                          |
+| --------------------------------------------------- | ------------------------------------------------- | -------------------------------- |
+| `POST /api/integrations/helixa/generation/dispatch` | `{ "binding": { "bindingId": … }, "command": … }` | a `…generation-result.v1` object |
+| `POST /api/integrations/helixa/generation/lookup`   | `{ "binding": { "bindingId": … }, "query": … }`   | a `…generation-result.v1` object |
+
+Every request carries three headers, and the body is read as raw bytes because the
+signature is computed over exactly those bytes. The route mounts its own
+`express.raw({ type: 'application/json', limit: '2mb' })`; the server has no global JSON
+parser, for the reason recorded next to the CORS block in `src/server/index.ts`.
+
+| Header                        | Value                                      |
+| ----------------------------- | ------------------------------------------ |
+| `Content-Type`                | `application/json`                         |
+| `X-Helixa-External-System-Id` | must equal `HELIXA_EXTERNAL_SYSTEM_ID`     |
+| `X-Helixa-Signature`          | `sha256=<hex HMAC-SHA256 of the raw body>` |
+
+**The two directions share one secret.** `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY` signs outbound
+packages as `X-Megacampus-Signature` and verifies inbound commands as
+`X-Helixa-Signature`. The header names differ deliberately, so a captured signature
+cannot be replayed into the other direction by name alone. Both comparisons — the
+signature and the external system id — use `crypto.timingSafeEqual`.
+
+### Status mapping
+
+Refusals answer `{"error": "<code>"}` and nothing else: no header value, no expected
+signature, no binding, no internal id. Success answers the library's result object
+unchanged, so the state is in the body and the status is a summary of it.
+
+| Situation                                                       | Status | Body                        |
+| --------------------------------------------------------------- | ------ | --------------------------- |
+| dispatch, newly reserved                                        | 202    | result, `state: accepted`   |
+| dispatch, replay of a command the ledger already has            | 200    | result, `state: accepted`   |
+| dispatch, `state: conflict`                                     | 409    | result                      |
+| dispatch, `state: action_required`                              | 200    | result                      |
+| any lookup                                                      | 200    | result                      |
+| method other than POST                                          | 405    | `method_not_allowed`        |
+| `Content-Type` is not `application/json`                        | 415    | `unsupported_media_type`    |
+| a required header is absent                                     | 400    | `missing_required_header`   |
+| body is not JSON                                                | 400    | `malformed_json`            |
+| envelope has no binding locator                                 | 400    | `malformed_body`            |
+| body over 2 MB                                                  | 413    | `payload_too_large`         |
+| signature does not verify                                       | 401    | `invalid_signature`         |
+| external system id does not match                               | 403    | `unknown_external_system`   |
+| binding missing, disabled, mismatched, or its principal invalid | 403    | `binding_denied`            |
+| command fails `HelixaGenerationCommandSchema`                   | 422    | `invalid_command`           |
+| query fails `HelixaGenerationLookupQuerySchema`                 | 422    | `invalid_lookup_query`      |
+| `HELIXA_MEGACAMPUS_GENERATION_MODE` is `disabled`               | 503    | `generation_disabled`       |
+| the shared secret or the system id is unset                     | 503    | `generation_not_configured` |
+| anything else                                                   | 500    | `generation_failed`         |
+
+A 500 is not a lost command. Helixa's worker answers a thrown dispatch by calling
+`lookup`, and the ledger row written before the failure is what that call returns.
+
+### Modes
+
+`readHelixaGenerationMode` accepts `disabled`, `fake` and `live`; absent and empty both
+mean `disabled`, and anything else throws. `fake` runs the whole protocol — signature,
+binding resolution, reservation, lease, replay, conflict — against an in-memory ledger
+and a native port that schedules nothing, so the transport can be exercised end to end
+without touching MegaCampus generation. `live` uses the PostgreSQL ledger and the
+PostgreSQL native port.
+
+**`live` is only half wired.** `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
+`schedule_helixa_course_from_role_guide`. `CREATE_JOB_INSTRUCTION` has no scheduler in
+this repository: nothing here starts a career playbook from a Helixa command yet. Its
+`scheduleRoleGuide` seam therefore refuses with a pre-mutation error, which records a
+terminal `action_required` on the ledger rather than leaving a reservation that would
+never move. Wiring it is the remaining inbound work.
+
+### Result-shape divergence
+
+One shape does not fit Helixa's schema. `dispatchHelixaGenerationCommand` can return
+`state: 'native_completed'` from its reconciliation branch, reached when a reservation is
+reclaimed with `claim_generation > 1` and the native object turns out to be finished.
+`MegaCampusGenerationDispatchResultV1Schema` on the Helixa side accepts only `accepted`,
+`conflict` and `action_required`, so that answer would fail to parse and the worker would
+record `megacampus_generation_outcome_uncertain`. The route does not rewrite it: the
+divergence is in the library, on a branch no test reaches, and papering over it here
+would hide which side is wrong. Either the library should answer `accepted` for a
+completed reclaim, or Helixa's dispatch schema should gain the state its lookup schema
+already has.
 
 Authorization is not a bearer token. It is a database-resident service principal:
 the binding row names `generation_service_principal_user_id`, and
 `reserve_helixa_generation_command` refuses unless that user exists in both
 `auth.users` and `users`, carries `raw_app_meta_data->>'kind' = 'service_principal'`,
 has `interactive_login_allowed` explicitly false, and is an `owner`, `admin` or
-`instructor` member of the binding's organization. Whatever transport is eventually
-built has to authenticate the caller separately; the database only proves the
-principal it acts as is legitimate.
+`instructor` member of the binding's organization. The HTTP route authenticates the
+caller separately, by HMAC; the database only proves the principal it acts as is
+legitimate.
 
 Command identity is a hash. `command_id` must match
 `^megacampus_generation_command:(create_job_instruction|create_course_from_job_instruction):v1:[a-f0-9]{64}$`,
@@ -286,24 +363,28 @@ Outbound delivery, all required together. `readKnowledgeSyncRuntimeConfig` in
 `startKnowledgeSyncDeliveryScheduler` validates before creating a timer, so a
 half-configured worker fails at startup rather than mid-batch.
 
-| Variable                                  | Meaning                                                                                                               |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` | Must be exactly `true` to start the delivery timer. Anything else, including absent, returns null and starts nothing. |
-| `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`          | The Helixa URL packages are POSTed to.                                                                                |
-| `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`          | Secret for the `X-Megacampus-Signature` HMAC.                                                                         |
-| `HELIXA_EXTERNAL_SYSTEM_ID`               | Sent as `X-Helixa-External-System-Id`; identifies this MegaCampus to Helixa.                                          |
-| `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`        | Which binding row this worker claims for.                                                                             |
-| `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`   | Organization half of the binding key.                                                                                 |
-| `HELIXA_DESTINATION_BINDING_ID`           | Destination half of the binding key.                                                                                  |
-| `HELIXA_DESTINATION_PROJECT_ID`           | Optional. Becomes `scope.externalProjectId`; null when absent.                                                        |
-| `APP_ENV` or `NODE_ENV`                   | Environment half of the binding key and the package producer field. Falls back to `development`.                      |
+| Variable                                  | Meaning                                                                                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` | Must be exactly `true` to start the delivery timer. Anything else, including absent, returns null and starts nothing.                      |
+| `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`          | The Helixa URL packages are POSTed to.                                                                                                     |
+| `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`          | Secret for the `X-Megacampus-Signature` HMAC. **Also verifies the inbound `X-Helixa-Signature`.**                                          |
+| `HELIXA_EXTERNAL_SYSTEM_ID`               | Sent as `X-Helixa-External-System-Id`; identifies this MegaCampus to Helixa. **Also the value the inbound route requires in that header.** |
+| `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`        | Which binding row this worker claims for.                                                                                                  |
+| `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`   | Organization half of the binding key.                                                                                                      |
+| `HELIXA_DESTINATION_BINDING_ID`           | Destination half of the binding key.                                                                                                       |
+| `HELIXA_DESTINATION_PROJECT_ID`           | Optional. Becomes `scope.externalProjectId`; null when absent.                                                                             |
+| `APP_ENV` or `NODE_ENV`                   | Environment half of the binding key and the package producer field. Falls back to `development`.                                           |
 
 Inbound, both default to disabled:
 
-| Variable                                 | Meaning                                                                     |
-| ---------------------------------------- | --------------------------------------------------------------------------- |
-| `HELIXA_MEGACAMPUS_GENERATION_MODE`      | `disabled` or `fake`. Anything else throws. Gates both generation commands. |
-| `HELIXA_MEGACAMPUS_COURSE_CREATION_MODE` | Same shape, gates the older course-create ledger.                           |
+| Variable                                 | Meaning                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `HELIXA_MEGACAMPUS_GENERATION_MODE`      | `disabled`, `fake` or `live`. Anything else throws. Gates both generation commands and the HTTP route. |
+| `HELIXA_MEGACAMPUS_COURSE_CREATION_MODE` | `disabled` or `fake`, gates the older course-create ledger. It still has no transport.                 |
+
+The inbound route needs `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY` and `HELIXA_EXTERNAL_SYSTEM_ID`
+even where outbound delivery is off, and refuses with 503 `generation_not_configured`
+until it has both. The mode is read per request, so flipping it does not need a redeploy.
 
 Test-only, not runtime:
 
@@ -327,10 +408,14 @@ says outright.
   database where the fix migration is missing. Apply all six together or none.
 - **Every trigger is in-transaction.** An unforeseen exception in any of them fails
   the course or playbook write it rode in on. There is no degraded mode.
-- **The inbound half has no transport and no test against a real database by
-  default.** The PostgreSQL 17 suites skip unless `HELIXA_REAL_PG17` is set, which
-  is exactly why the `digest` defect survived review. Run them against a real
-  instance before connecting anything to the inbound path.
+- **The inbound half has no test against a real database by default.** The PostgreSQL
+  17 suites skip unless `HELIXA_REAL_PG17` is set, which is exactly why the `digest`
+  defect survived review. The HTTP route's own tests run entirely in `fake` mode against
+  an in-memory ledger, so they prove the transport and prove nothing about the SQL. Run
+  the PG17 suites against a real instance before setting the mode to `live`.
+- **`live` refuses `CREATE_JOB_INSTRUCTION`.** There is no career-playbook scheduler
+  behind the command yet, so that half answers `action_required` with
+  `megacampus_generation_native_failed`. Section 3 has the detail.
 - **Production is the same database.** Dev, staging and production containers all read one
   Supabase project (verified 2026-08-16 by comparing `SUPABASE_URL` digests across
   `megacampus-api-dev`, `megacampus-api-blue` and both workers). Applying these migrations
