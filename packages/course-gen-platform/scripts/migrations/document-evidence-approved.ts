@@ -614,8 +614,15 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // (3) and `file_catalog` (1). Those are outside this guard's reach; they are data-gated on
 // `helixa_knowledge_sync_bindings` / `course_job_instruction_native_sources` being non-empty
 // and are reviewed in docs/helixa/megacampus-side.md. Re-pinning here is not a review of them.
+// Re-pinned again 2026-09-05 in the same edit as the migration: 256 files, adding
+// 20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql. It is the
+// review fix for the five above — it replaces four Helixa functions so `digest`
+// resolves (pgcrypto is in `extensions` here, not `public`), makes the
+// `file_catalog` immutability trigger SECURITY DEFINER so it can read its own
+// revoked table, and adds three indexes for the per-write trigger lookups. It
+// touches no function inside the security manifest, so no new `after-*` digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '7f0cec797741f80c6d329f71449c0cae64810d9bf67d45715c45ecfaabd9a916';
+  '63d6fe5d6f3347b9e0fe501a538b357afed619f2f8ec96c45270879698ec7030';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
