@@ -106,7 +106,7 @@ the sync has not proved.
 
 ## 4. The six triggers on live tables
 
-Dev and staging share one Supabase database; production is separate. The
+Dev, staging and production share one Supabase database. The
 `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` flag gates only the TypeScript timer. All
 six triggers below start behaving the moment the migrations are applied, whatever
 the flag says. What keeps them inert is that their lookup tables are empty.
