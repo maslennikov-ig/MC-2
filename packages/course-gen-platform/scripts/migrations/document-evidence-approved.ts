@@ -626,8 +626,13 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // that schedule and compensate a career playbook created by a Helixa
 // `CREATE_JOB_INSTRUCTION` command, installs no trigger, and touches no function inside the
 // security manifest, so no new `after-*` digest is needed.
+// Re-pinned again 2026-09-05 in the same edit as the migration: 258 files, adding
+// 20260905140000_helixa_course_schedule_target_queue.sql. It drops and recreates one
+// `helixa_*` scheduling function so the outbox queue name comes from the caller instead of
+// a literal that only matched production. No trigger, and no function inside the security
+// manifest, so no new `after-*` digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'c89a3cf0394df99313f14fd0c57237544066a2af9813ad08e2fb5119a20c008b';
+  'a7aadd502747170e31d5d6ee444af23038f95d55b2bde1500e1b6a3ac4eee5f7';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

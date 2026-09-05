@@ -119,6 +119,32 @@ describe('Helixa migration contract', () => {
     expect(definition.body).toMatch(/GENERATION_COMMAND_PAYLOAD_MISMATCH/u);
   });
 
+  it('takes the outbox queue name from its caller, not a literal', () => {
+    const definition = lastDefinitionOf('schedule_helixa_course_from_role_guide');
+    // The outbox processor claims only rows whose target_queue equals its own QUEUE_NAME,
+    // and dev runs as `course-generation-dev`. A literal here addressed every dev row to a
+    // queue no dev worker reads.
+    expect(definition.body).toMatch(/p_target_queue TEXT/u);
+    expect(definition.body).toMatch(/jsonb_build_object\('priority', 0\), p_target_queue/u);
+    expect(definition.body).not.toMatch(/'course-generation'/u);
+    // Refused rather than defaulted: a default is how the literal survived.
+    expect(definition.body).toMatch(/GENERATION_TARGET_QUEUE_REQUIRED/u);
+  });
+
+  it('replaces the course scheduler rather than overloading it', () => {
+    const sql = readFileSync(
+      join(MIGRATIONS_DIR, '20260905140000_helixa_course_schedule_target_queue.sql'),
+      'utf8'
+    );
+    // Two functions sharing a name make every PostgREST rpc() call to it unresolvable.
+    expect(sql).toMatch(
+      /DROP FUNCTION IF EXISTS schedule_helixa_course_from_role_guide\(TEXT, TEXT, UUID, UUID, UUID, JSONB, JSONB, UUID, INTEGER\);/u
+    );
+    expect(sql).toMatch(
+      /GRANT EXECUTE ON FUNCTION schedule_helixa_course_from_role_guide\([^)]*, TEXT\) TO service_role/u
+    );
+  });
+
   it('grants the role-guide scheduling functions to service_role only', () => {
     const sql = readFileSync(
       join(MIGRATIONS_DIR, '20260905130000_helixa_schedule_role_guide.sql'),

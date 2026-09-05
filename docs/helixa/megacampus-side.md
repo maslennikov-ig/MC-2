@@ -163,6 +163,16 @@ the caller must enqueue and false when a playbook with that id already exists in
 state, which is how a reclaimed lease avoids racing an earlier claim. `object_id` is
 assigned once at reservation and never changes, so the function is idempotent on the command.
 
+The course scheduler takes its queue name the same way, as of
+`20260905140000_helixa_course_schedule_target_queue.sql`. It used to write
+`target_queue = 'course-generation'` as a literal, and the outbox processor claims only rows
+whose `target_queue` equals its own `QUEUE_NAME` — which on dev is `course-generation-dev`.
+Every row it wrote there was addressed to a queue nothing reads. The name now comes from
+the caller, which reads the same `QUEUE_NAME` the FSM initialization handler passes to
+`initialize_fsm_with_outbox`, and an empty value is refused rather than defaulted. The
+migration drops and recreates the function rather than adding an overload, because two
+functions sharing a name make every PostgREST `rpc()` call to it unresolvable.
+
 **It does not enqueue, and that is forced.** `job_outbox.entity_id` is
 `REFERENCES courses(id)`, so a career playbook cannot ride the transactional outbox the way
 a course does. `createPostgresHelixaRoleGuideScheduler` enqueues afterwards, with the same

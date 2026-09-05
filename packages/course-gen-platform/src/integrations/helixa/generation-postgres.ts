@@ -5,6 +5,8 @@
 // behaviour: these are the original declarations, moved. `generation-commands.ts`
 // re-exports every one of them, so no import anywhere else had to change.
 
+import { QUEUE_NAME } from '@/orchestrator/queue';
+
 import type {
   HelixaGenerationObjectKind,
   HelixaGenerationOperation,
@@ -18,8 +20,14 @@ import type {
   HelixaGenerationRow,
 } from './generation-types';
 
+/**
+ * `targetQueue` defaults to the same `QUEUE_NAME` the FSM initialization handler passes to
+ * `initialize_fsm_with_outbox`. The RPC used to write the queue name as a literal, which
+ * meant every dev row was addressed to a queue no dev worker claims.
+ */
 export function createPostgresHelixaCourseFromRoleGuideScheduler(
-  client: GenerationRpcClient
+  client: GenerationRpcClient,
+  targetQueue: string = QUEUE_NAME
 ): HelixaGenerationNativeDependencies['scheduleCourseFromRoleGuide'] {
   return async input => {
     const result = await client.rpc<boolean>('schedule_helixa_course_from_role_guide', {
@@ -32,6 +40,7 @@ export function createPostgresHelixaCourseFromRoleGuideScheduler(
       p_source_job_instruction: input.sourceJobInstruction,
       p_lease_token: input.leaseToken,
       p_claim_generation: input.claimGeneration,
+      p_target_queue: targetQueue,
     });
     if (result.error) throw new Error(result.error.message);
     if (result.data !== true) throw new Error('ROLE_GUIDE_SOURCE_UNAVAILABLE');

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createInMemoryHelixaGenerationRepository,
   createHelixaGenerationNativePort,
+  createPostgresHelixaCourseFromRoleGuideScheduler,
   createPostgresHelixaGenerationBindingAuthority,
   createPostgresHelixaGenerationRepository,
   createPostgresHelixaNativeObserver,
@@ -309,6 +310,31 @@ describe('server-only Helixa generation commands', () => {
     });
     expect(rpc.mock.calls[1]?.[1]).not.toHaveProperty('p_user_id');
     expect(rpc.mock.calls[1]?.[1]).not.toHaveProperty('p_organization_id');
+  });
+
+  it('addresses the scheduled course job to the queue this deployment reads', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    // The RPC used to write `course-generation` as a literal, and the outbox processor
+    // claims only rows whose target_queue equals its own QUEUE_NAME. On dev, which runs as
+    // `course-generation-dev`, every row it wrote was addressed to a queue nothing reads.
+    await createPostgresHelixaCourseFromRoleGuideScheduler(
+      { rpc },
+      'course-generation-dev'
+    )({
+      courseId: '44444444-4444-4444-8444-444444444444',
+      organizationId: binding.organizationId,
+      userId: binding.servicePrincipalUserId,
+      leaseToken: '77777777-7777-4777-8777-777777777777',
+      claimGeneration: 1,
+      course: parseHelixaGenerationCommand(courseCommand).course,
+      sourceJobInstruction: parseHelixaGenerationCommand(courseCommand).sourceJobInstruction,
+      originBindingId: binding.bindingId,
+      originCommandId: courseCommand.commandId,
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    });
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_target_queue: 'course-generation-dev' });
   });
 
   it('looks up a durable command from a fresh repository instance after restart', async () => {
