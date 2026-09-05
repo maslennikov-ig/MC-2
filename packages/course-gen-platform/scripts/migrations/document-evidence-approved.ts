@@ -639,8 +639,14 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // so it selects an outbox event for the command's exact binding. Neither changes the
 // document-evidence chain, any function in its security manifest, or an accepted source
 // digest, so no new `after-*` digest is needed.
+// Re-pinned 2026-09-05 for the Auth prerequisite repair: 261 files, adding
+// 20260905170000_repair_auth_users_email_change.sql. It changes only NULL values in the
+// Supabase-managed `auth.users.email_change` field to the Auth-compatible empty string and
+// replaces the existing postgres-only test-fixture helper so future direct inserts supply
+// that value. It does not touch the document-evidence chain, its security manifest, or any
+// accepted source digest, so no new `after-*` digest is needed.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'e8c8efd4bac9705cd61f8240245287da6d332986167301b70a6a4901f36c2eec';
+  'c0b15d59117333b8e328de8eb926e241c78e31b79fe8b4815d47d0a9df34b2ee';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
