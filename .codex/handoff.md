@@ -235,17 +235,12 @@ delivered, so a report naming a branch again means something really was left beh
 
 - `mc2-vlskb` — the Docling timeout wrapper stays until `docling-project/docling-mcp#135` is
   merged and released; then delete only the timeout half of `runtime.py`.
-- `mc2-zxzgf` — 105 visible lessons still carry the English Mermaid fallback paragraph; the code
-  is fixed, the data is not, and clearing it is paid regeneration on published courses the owner
-  declined on 2026-08-28. The 2026-09-05 blanket grant was not read as overriding that ruling.
+- `mc2-zxzgf` — closed 2026-09-05 by owner ruling as no longer relevant; the 105 published lessons
+  with the English Mermaid fallback paragraph stay as they are, no regeneration.
 - `mc2-z08mv`, `mc2-x72bq`, `mc2-vjbb` — unchanged, each names what would end it.
 - The Helixa bridge is delivered, not provisioned: §9 of `docs/helixa/megacampus-side.md` is the
   sequence, and the two values only the owner can mint or name are §4 of the handoff prompt.
 - Eleven REF documents stay `deferred` on purpose and are not a backlog tail.
-- The primary tree cannot run `pnpm install`: `node_modules/.modules.yaml` still points its virtual
-  store at an August sibling worktree, so pnpm demands a purge. Local suites run on whatever was
-  installed on 2026-08-23; a lockfile change is first proven by the CI unit job. Fix when the
-  tree is otherwise idle: remove `node_modules` and reinstall once, with no worktree running.
 
 ## Next recommended
 
