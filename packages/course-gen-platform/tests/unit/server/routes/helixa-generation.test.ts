@@ -46,6 +46,27 @@ const jobCommand = {
   ],
 } as const;
 
+const directCourseCommand = {
+  schemaVersion: 'helixa.megacampus-generation-command.v1',
+  operation: 'CREATE_COURSE',
+  commandId: `megacampus_generation_command:create_course:v1:${'2'.repeat(64)}`,
+  proposalId: 'proposal-direct',
+  approvedRevision: 1,
+  payloadHash: '3'.repeat(64),
+  course: {
+    title: 'Direct onboarding',
+    courseDescription: 'A course created from an approved Helixa proposal.',
+    targetAudience: 'New managers',
+    learningOutcomes: ['Apply the operating policy'],
+    language: 'en',
+    courseSize: 'mini',
+    style: 'practical',
+  },
+  selectedSources: [
+    { documentId: 'document-a', sourceRevisionHash: 'a'.repeat(64), citationId: 'citation-a' },
+  ],
+} as const;
+
 const lookupQuery = {
   schemaVersion: 'helixa.megacampus-generation-lookup.v1',
   commandId: jobCommand.commandId,
@@ -61,6 +82,7 @@ function resolvedBinding(bindingId = BINDING_ID) {
     servicePrincipalUserId: '99999999-9999-4999-8999-999999999999',
     jobInstructionCreationEnabled: true,
     courseFromJobInstructionCreationEnabled: true,
+    courseCreationEnabled: true,
     principal: {
       existsInAuth: true,
       existsInPublic: true,
@@ -348,6 +370,38 @@ describe('Helixa generation route: the protocol', () => {
     expect(parsed.payloadHash).toBe(jobCommand.payloadHash);
     expect(parsed.operation).toBe('CREATE_JOB_INSTRUCTION');
     if (parsed.state === 'accepted') expect(parsed.object.kind).toBe('ROLE_GUIDE');
+  });
+
+  it('dispatches CREATE_COURSE over the signed HTTP contract', async () => {
+    const harness = await start({});
+    const result = await call(harness, HELIXA_GENERATION_DISPATCH_PATH, {
+      body: { binding: { bindingId: BINDING_ID }, command: directCourseCommand },
+    });
+    expect(result.status).toBe(202);
+    const parsed = HelixaDispatchResultSchema.parse(result.body);
+    expect(parsed).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseCommand.commandId,
+      payloadHash: directCourseCommand.payloadHash,
+      state: 'accepted',
+      object: { kind: 'COURSE' },
+    });
+    const lookup = await call(harness, HELIXA_GENERATION_LOOKUP_PATH, {
+      body: {
+        binding: { bindingId: BINDING_ID },
+        query: {
+          schemaVersion: 'helixa.megacampus-generation-lookup.v1',
+          commandId: directCourseCommand.commandId,
+          payloadHash: directCourseCommand.payloadHash,
+        },
+      },
+    });
+    expect(lookup.status).toBe(200);
+    expect(HelixaLookupResultSchema.parse(lookup.body)).toMatchObject({
+      operation: 'CREATE_COURSE',
+      state: 'scheduled',
+      object: { kind: 'COURSE' },
+    });
   });
 
   it('answers a replayed dispatch with 200 and the same object', async () => {

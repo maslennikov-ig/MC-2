@@ -19,6 +19,7 @@ export interface ResolvedHelixaGenerationBinding {
   servicePrincipalUserId: string;
   jobInstructionCreationEnabled: boolean;
   courseFromJobInstructionCreationEnabled: boolean;
+  courseCreationEnabled: boolean;
   principal: {
     existsInAuth: boolean;
     existsInPublic: boolean;
@@ -161,11 +162,11 @@ export interface HelixaGenerationNativePort {
     >['jobInstruction'];
     selectedSources?: Extract<
       HelixaGenerationCommand,
-      { operation: 'CREATE_JOB_INSTRUCTION' }
+      { operation: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE' }
     >['selectedSources'];
     course?: Extract<
       HelixaGenerationCommand,
-      { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }
+      { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' | 'CREATE_COURSE' }
     >['course'];
     sourceJobInstruction?: Extract<
       HelixaGenerationCommand,
@@ -226,6 +227,22 @@ export interface HelixaGenerationNativeDependencies {
       HelixaGenerationCommand,
       { operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' }
     >['sourceJobInstruction'];
+    originBindingId: string;
+    originCommandId: string;
+    includeWebResearch: false;
+    includeBusinessContextSources: false;
+  }): Promise<void>;
+  scheduleCourse(input: {
+    courseId: string;
+    organizationId: string;
+    userId: string;
+    leaseToken: string;
+    claimGeneration: number;
+    course: Extract<HelixaGenerationCommand, { operation: 'CREATE_COURSE' }>['course'];
+    selectedSources: Extract<
+      HelixaGenerationCommand,
+      { operation: 'CREATE_COURSE' }
+    >['selectedSources'];
     originBindingId: string;
     originCommandId: string;
     includeWebResearch: false;

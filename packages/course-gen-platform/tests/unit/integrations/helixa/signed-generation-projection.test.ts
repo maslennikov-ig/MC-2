@@ -53,6 +53,16 @@ const courseOriginRow = {
   status: 'native_completed',
 } as const;
 
+const directCourseOriginRow = {
+  ...courseOriginRow,
+  command_id:
+    'megacampus_generation_command:create_course:v1:2d5f8c1f2142e7b73a00f24518ed968c55d9f0200d87398afc0cae567282bf9d',
+  command_kind: 'CREATE_COURSE',
+  proposal_id: 'proposal-c',
+  approved_revision: 5,
+  proposal_payload_hash: 'c'.repeat(64),
+} as const;
+
 const courseSourceRow = {
   course_id: courseId,
   organization_id: organizationId,
@@ -266,6 +276,36 @@ describe('signed Helixa generation projection', () => {
     expect(result.hashes.contentHash).toBe(
       createHash('sha256').update(canonical(result.content), 'utf8').digest('hex')
     );
+    expect(result.hashes.payloadHash).toBe(expectedPayloadHash(result));
+  });
+
+  it('projects direct CREATE_COURSE origin without inventing a role-guide relation', async () => {
+    const snapshot = await mapCompletedCourse({
+      course: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+      },
+      lessonContents: [],
+      files: [],
+      readBytes: vi.fn(),
+      generationOrigin: directCourseOriginRow,
+      jobInstructionSource: null,
+    });
+    const result = await buildKnowledgeSyncPackage(snapshot, {
+      environment: 'test',
+      externalProjectId: null,
+    });
+    expect(result.originCommand).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseOriginRow.command_id,
+    });
+    expect(result.relations).toEqual([]);
     expect(result.hashes.payloadHash).toBe(expectedPayloadHash(result));
   });
 

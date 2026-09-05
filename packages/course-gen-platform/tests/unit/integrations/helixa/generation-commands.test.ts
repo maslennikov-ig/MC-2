@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createInMemoryHelixaGenerationRepository,
   createHelixaGenerationNativePort,
+  createPostgresHelixaCourseScheduler,
   createPostgresHelixaCourseFromRoleGuideScheduler,
   createPostgresHelixaGenerationBindingAuthority,
   createPostgresHelixaGenerationRepository,
@@ -72,6 +73,18 @@ const courseCommand = {
   },
 } as const;
 
+const directCourseCommand = {
+  schemaVersion: 'helixa.megacampus-generation-command.v1',
+  operation: 'CREATE_COURSE',
+  commandId:
+    'megacampus_generation_command:create_course:v1:2d5f8c1f2142e7b73a00f24518ed968c55d9f0200d87398afc0cae567282bf9d',
+  proposalId: 'proposal-c',
+  approvedRevision: 5,
+  payloadHash: 'c'.repeat(64),
+  course: courseCommand.course,
+  selectedSources: jobCommand.selectedSources,
+} as const;
+
 const binding = {
   bindingId: 'binding-a',
   organizationId: '11111111-1111-4111-8111-111111111111',
@@ -80,6 +93,7 @@ const binding = {
   servicePrincipalUserId: '99999999-9999-4999-8999-999999999999',
   jobInstructionCreationEnabled: true,
   courseFromJobInstructionCreationEnabled: true,
+  courseCreationEnabled: true,
 } as const;
 
 function authority(overrides: Record<string, unknown> = {}): HelixaGenerationBindingAuthority {
@@ -143,6 +157,25 @@ describe('server-only Helixa generation commands', () => {
     expect(generationCommandHash(parseHelixaGenerationCommand(courseCommand))).toBe(
       'd061be1974e806f98721ef9cbf23d518db55133f20e58229273a7e81d8b5d51b'
     );
+  });
+
+  it('accepts CREATE_COURSE with governed sources and no source Job Instruction', () => {
+    expect(parseHelixaGenerationCommand(directCourseCommand)).toEqual(directCourseCommand);
+    expect(() =>
+      parseHelixaGenerationCommand({
+        ...directCourseCommand,
+        sourceJobInstruction: courseCommand.sourceJobInstruction,
+      })
+    ).toThrow();
+    expect(() =>
+      parseHelixaGenerationCommand({
+        ...directCourseCommand,
+        selectedSources: [
+          { documentId: 'z', sourceRevisionHash: 'a'.repeat(64), citationId: 'z' },
+          { documentId: 'a', sourceRevisionHash: 'b'.repeat(64), citationId: 'a' },
+        ],
+      })
+    ).toThrow(/canonical/i);
   });
 
   it('rejects identity injection, unknown fields, bad namespace, duplicates, and source order', () => {
@@ -255,6 +288,7 @@ describe('server-only Helixa generation commands', () => {
             service_principal_user_id: binding.servicePrincipalUserId,
             job_instruction_creation_enabled: true,
             course_from_job_instruction_creation_enabled: true,
+            course_creation_enabled: true,
             principal_exists_in_auth: true,
             principal_exists_in_public: true,
             principal_organization_id: binding.organizationId,
@@ -293,6 +327,7 @@ describe('server-only Helixa generation commands', () => {
     );
     expect(resolved).toMatchObject({
       organizationId: binding.organizationId,
+      courseCreationEnabled: true,
       principal: { kind: 'service_principal' },
     });
     const repository = createPostgresHelixaGenerationRepository(client);
@@ -335,6 +370,38 @@ describe('server-only Helixa generation commands', () => {
     });
     expect(rpc).toHaveBeenCalledOnce();
     expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_target_queue: 'course-generation-dev' });
+  });
+
+  it('passes CREATE_COURSE governed sources to the native no-file scheduler', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    await createPostgresHelixaCourseScheduler(
+      { rpc },
+      'course-generation-dev'
+    )({
+      courseId: '55555555-5555-4555-8555-555555555555',
+      organizationId: binding.organizationId,
+      userId: binding.servicePrincipalUserId,
+      leaseToken: '77777777-7777-4777-8777-777777777777',
+      claimGeneration: 1,
+      course: directCourseCommand.course,
+      selectedSources: directCourseCommand.selectedSources,
+      originBindingId: binding.bindingId,
+      originCommandId: directCourseCommand.commandId,
+      includeWebResearch: false,
+      includeBusinessContextSources: false,
+    });
+    expect(rpc).toHaveBeenCalledWith('schedule_helixa_course', {
+      p_binding_id: binding.bindingId,
+      p_command_id: directCourseCommand.commandId,
+      p_course_id: '55555555-5555-4555-8555-555555555555',
+      p_organization_id: binding.organizationId,
+      p_user_id: binding.servicePrincipalUserId,
+      p_course: directCourseCommand.course,
+      p_selected_sources: directCourseCommand.selectedSources,
+      p_lease_token: '77777777-7777-4777-8777-777777777777',
+      p_claim_generation: 1,
+      p_target_queue: 'course-generation-dev',
+    });
   });
 
   it('looks up a durable command from a fresh repository instance after restart', async () => {
@@ -560,10 +627,52 @@ describe('server-only Helixa generation commands', () => {
     );
   });
 
+  it('dispatches CREATE_COURSE through the direct native course branch', async () => {
+    const repository = createInMemoryHelixaGenerationRepository({
+      objectId: () => '55555555-5555-4555-8555-555555555555',
+    });
+    const schedule = vi.fn(async input => ({ objectId: input.objectId }));
+    const result = await dispatchHelixaGenerationCommand({
+      bindingLocator: { bindingId: binding.bindingId },
+      command: directCourseCommand,
+      mode: 'fake',
+      authority: authority(),
+      repository,
+      nativePort: { schedule },
+    });
+    expect(result).toMatchObject({
+      operation: 'CREATE_COURSE',
+      state: 'accepted',
+      object: { kind: 'COURSE', id: '55555555-5555-4555-8555-555555555555' },
+    });
+    expect(schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: directCourseCommand,
+        course: directCourseCommand.course,
+        selectedSources: directCourseCommand.selectedSources,
+      })
+    );
+    expect(schedule.mock.calls[0]?.[0]).not.toHaveProperty('sourceJobInstruction');
+  });
+
+  it('refuses CREATE_COURSE when its direct-course permission is disabled', async () => {
+    await expect(
+      dispatchHelixaGenerationCommand({
+        bindingLocator: { bindingId: binding.bindingId },
+        command: directCourseCommand,
+        mode: 'fake',
+        authority: authority({ courseCreationEnabled: false }),
+        repository: createInMemoryHelixaGenerationRepository(),
+        nativePort: { schedule: vi.fn() },
+      })
+    ).rejects.toThrow('MegaCampus generation binding unavailable');
+  });
+
   it('builds the native ROLE_GUIDE queue input without dropping pane fields', async () => {
     const scheduleRoleGuide = vi.fn(async () => undefined);
     const port = createHelixaGenerationNativePort({
       scheduleRoleGuide,
+      scheduleCourse: vi.fn(),
       scheduleCourseFromRoleGuide: vi.fn(),
       reconcile: vi.fn(async () => 'missing'),
     });
@@ -614,6 +723,7 @@ describe('server-only Helixa generation commands', () => {
     });
     const port = createHelixaGenerationNativePort({
       scheduleRoleGuide: vi.fn(),
+      scheduleCourse: vi.fn(),
       scheduleCourseFromRoleGuide,
       reconcile: vi.fn(async () => 'missing'),
       observe: vi.fn(async () => 'running'),

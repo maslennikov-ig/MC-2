@@ -43,6 +43,7 @@ const binding = {
   servicePrincipalUserId: PRINCIPAL_ID,
   jobInstructionCreationEnabled: true,
   courseFromJobInstructionCreationEnabled: true,
+  courseCreationEnabled: true,
   principal: {
     existsInAuth: true,
     existsInPublic: true,
@@ -168,6 +169,7 @@ describe('Helixa CREATE_JOB_INSTRUCTION through the native port', () => {
   function nativePort(scheduleRoleGuide: ReturnType<typeof vi.fn>) {
     return createHelixaGenerationNativePort({
       scheduleRoleGuide,
+      scheduleCourse: vi.fn(),
       scheduleCourseFromRoleGuide: vi.fn(),
       reconcile: vi.fn(() => Promise.resolve('missing' as const)),
       observe: vi.fn(() => Promise.resolve('running' as const)),

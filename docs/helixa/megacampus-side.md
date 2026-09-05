@@ -70,10 +70,10 @@ bytes rather than rebuilding a package that might now hash differently.
 
 ## 3. Inbound contract as implemented
 
-Helixa issues two commands, `CREATE_JOB_INSTRUCTION` and
-`CREATE_COURSE_FROM_JOB_INSTRUCTION`, parsed by `HelixaGenerationCommandSchema` in
-`generation-commands.ts`. A separate, older ledger handles a plain course-create
-command in `course-creation.ts` and still has no transport.
+Helixa issues three commands: `CREATE_JOB_INSTRUCTION`,
+`CREATE_COURSE_FROM_JOB_INSTRUCTION`, and `CREATE_COURSE`. They are parsed by
+`HelixaGenerationCommandSchema` and use the same HTTP transport and generation ledger.
+A separate, older ledger in `course-creation.ts` remains transportless and compatible.
 
 ### The two endpoints
 
@@ -139,10 +139,12 @@ and a native port that schedules nothing, so the transport can be exercised end 
 without touching MegaCampus generation. `live` uses the PostgreSQL ledger and the
 PostgreSQL native port.
 
-Both commands are wired in `live`. `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
+All three commands are wired in `live`. `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
 `schedule_helixa_course_from_role_guide`; `CREATE_JOB_INSTRUCTION` reaches
 `schedule_helixa_role_guide`, added 2026-09-05 in
-`20260905130000_helixa_schedule_role_guide.sql`.
+`20260905130000_helixa_schedule_role_guide.sql`; and `CREATE_COURSE` reaches
+`schedule_helixa_course`, added by
+`20260905150000_helixa_create_course_generation.sql`.
 
 ### Scheduling a career playbook from a command
 
@@ -201,6 +203,17 @@ Helixa's `selectedSources` are recorded as provenance only. They name documents 
 which MegaCampus does not hold, so they are checked against the stored command payload and
 not turned into `file_catalog` rows. The command payload in `helixa_generation_commands` is
 where they remain readable.
+
+### Scheduling a course from scratch
+
+`CREATE_COURSE` carries the same `course` object as
+`CREATE_COURSE_FROM_JOB_INSTRUCTION` and the same canonical `selectedSources` array as
+`CREATE_JOB_INSTRUCTION`; `sourceJobInstruction` is forbidden. The SQL scheduler validates
+the lease fence, service principal, `course_creation_enabled` permission, and byte-equality
+of both payload branches against the immutable ledger row. It writes a native no-file course
+and a `structure_analysis` row addressed to the caller's configured queue. Completion then
+uses the existing course trigger and signed knowledge-sync outbox. A direct course origin is
+exported as `CREATE_COURSE` without inventing a `COURSE_FROM_ROLE_GUIDE` relation.
 
 ### One shape that had to move
 
@@ -515,13 +528,15 @@ sequence below, in this order, once the three joint values in
      '<binding id agreed with Helixa>', '<organization uuid>', 'production',
      '<destination binding id agreed with Helixa>', false,
      '<service principal uuid>', true, true,
-     false, NULL, NULL
+     true, '<Helixa organization id>', '<Helixa project id>'
    );
    ```
 
    `enabled = false` at insert time: the row exists, the triggers still see nothing enabled.
-   `course_creation_enabled` is the older plain course-create ledger and stays off unless
-   Helixa asks for it; its check constraint then requires both `source_helixa_*` ids.
+   `course_creation_enabled` gates both the transportless legacy ledger and the governed
+   `CREATE_COURSE` operation. Its existing check constraint requires both
+   `source_helixa_*` ids, so provision the agreed Helixa organization and project values
+   before enabling direct course creation.
 
 3. **Secrets and ids** into the worker and API env files
    (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):

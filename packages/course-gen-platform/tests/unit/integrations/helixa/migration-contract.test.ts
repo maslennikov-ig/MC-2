@@ -131,6 +131,19 @@ describe('Helixa migration contract', () => {
     expect(definition.body).toMatch(/GENERATION_TARGET_QUEUE_REQUIRED/u);
   });
 
+  it('schedules CREATE_COURSE under its ledger fence and direct-course permission', () => {
+    const definition = lastDefinitionOf('schedule_helixa_course');
+    expect(definition.body).toMatch(/c\.command_kind = 'CREATE_COURSE'/u);
+    expect(definition.body).toMatch(/c\.lease_token = p_lease_token/u);
+    expect(definition.body).toMatch(/c\.claim_generation = p_claim_generation/u);
+    expect(definition.body).toMatch(/binding\.course_creation_enabled/u);
+    expect(definition.body).toMatch(
+      /command\.command_payload->'selectedSources' <> p_selected_sources/u
+    );
+    expect(definition.body).toMatch(/jsonb_build_object\('priority', 0\), p_target_queue/u);
+    expect(definition.body).toMatch(/'structure_analysis'/u);
+  });
+
   it('replaces the course scheduler rather than overloading it', () => {
     const sql = readFileSync(
       join(MIGRATIONS_DIR, '20260905140000_helixa_course_schedule_target_queue.sql'),

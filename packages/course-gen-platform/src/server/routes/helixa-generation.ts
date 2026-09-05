@@ -26,6 +26,7 @@ import {
   createHelixaGenerationNativePort,
   createInMemoryHelixaGenerationRepository,
   createPostgresHelixaCourseFromRoleGuideScheduler,
+  createPostgresHelixaCourseScheduler,
   createPostgresHelixaGenerationBindingAuthority,
   createPostgresHelixaGenerationRepository,
   createPostgresHelixaNativeObserver,
@@ -172,7 +173,7 @@ function supabaseRuntime(mode: Exclude<HelixaGenerationMode, 'disabled'>) {
     authority,
     repository: createPostgresHelixaGenerationRepository(client),
     nativePort: createHelixaGenerationNativePort({
-      // Both commands have a PostgreSQL scheduler. The role-guide one writes the
+      // All three commands have a PostgreSQL scheduler. The role-guide one writes the
       // `career_playbooks` row under the command's lease and then enqueues the same job the
       // product enqueues; it cannot do both in one transaction, because `job_outbox` is
       // keyed to `courses(id)`.
@@ -181,6 +182,7 @@ function supabaseRuntime(mode: Exclude<HelixaGenerationMode, 'disabled'>) {
         createCareerPlaybookGenerationEnqueue()
       ),
       scheduleCourseFromRoleGuide: createPostgresHelixaCourseFromRoleGuideScheduler(client),
+      scheduleCourse: createPostgresHelixaCourseScheduler(client),
       reconcile: createPostgresHelixaNativeReconciler(client),
       observe: createPostgresHelixaNativeObserver(client),
     }),

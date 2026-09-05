@@ -140,6 +140,27 @@ export function createHelixaGenerationNativePort(
         return { objectId: input.objectId };
       }
 
+      if (input.command.operation === 'CREATE_COURSE') {
+        try {
+          await dependencies.scheduleCourse({
+            courseId: input.objectId,
+            organizationId: input.binding.organizationId,
+            userId: input.servicePrincipalUserId,
+            leaseToken: input.leaseToken,
+            claimGeneration: input.claimGeneration,
+            course: input.command.course,
+            selectedSources: input.command.selectedSources,
+            originBindingId: input.binding.bindingId,
+            originCommandId: input.command.commandId,
+            includeWebResearch: false,
+            includeBusinessContextSources: false,
+          });
+        } catch (error) {
+          throw asPreMutationError(error);
+        }
+        return { objectId: input.objectId };
+      }
+
       const source = input.command.sourceJobInstruction;
       try {
         await dependencies.scheduleCourseFromRoleGuide({
@@ -171,7 +192,9 @@ function assertBinding(
   const enabled =
     command.operation === 'CREATE_JOB_INSTRUCTION'
       ? binding.jobInstructionCreationEnabled
-      : binding.courseFromJobInstructionCreationEnabled;
+      : command.operation === 'CREATE_COURSE'
+        ? binding.courseCreationEnabled
+        : binding.courseFromJobInstructionCreationEnabled;
   if (!enabled) throw new Error('MegaCampus generation binding unavailable');
 }
 
@@ -356,7 +379,9 @@ export async function dispatchHelixaGenerationCommand(input: {
       claimGeneration: row.claimGeneration,
       ...(command.operation === 'CREATE_JOB_INSTRUCTION'
         ? { jobInstruction: command.jobInstruction, selectedSources: command.selectedSources }
-        : { course: command.course, sourceJobInstruction: command.sourceJobInstruction }),
+        : command.operation === 'CREATE_COURSE'
+          ? { course: command.course, selectedSources: command.selectedSources }
+          : { course: command.course, sourceJobInstruction: command.sourceJobInstruction }),
       includeWebResearch: false,
       includeBusinessContextSources: false,
     });

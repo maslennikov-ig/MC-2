@@ -81,38 +81,40 @@ const jobInstructionCommand = z
   })
   .strict();
 
-const courseCommand = z
+const course = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    courseDescription: z.string().trim().min(1).max(7000),
+    targetAudience: z.string().trim().min(1).max(2000),
+    learningOutcomes: z.array(z.string().trim().min(1).max(500)).min(1).max(20).readonly(),
+    language: z.enum(['ru', 'en']),
+    courseSize: z.enum(['auto', 'micro', 'mini', 'compact', 'standard', 'comprehensive']),
+    style: z.enum([
+      'professional',
+      'practical',
+      'problem_based',
+      'analytical',
+      'conversational',
+      'storytelling',
+      'interactive',
+      'motivational',
+      'academic',
+      'technical',
+      'research',
+      'gamified',
+    ]),
+  })
+  .strict()
+  .readonly();
+
+const courseFromJobInstructionCommand = z
   .object({
     ...common,
     operation: z.literal('CREATE_COURSE_FROM_JOB_INSTRUCTION'),
     commandId: z
       .string()
       .regex(/^megacampus_generation_command:create_course_from_job_instruction:v1:[a-f0-9]{64}$/),
-    course: z
-      .object({
-        title: z.string().trim().min(1).max(200),
-        courseDescription: z.string().trim().min(1).max(7000),
-        targetAudience: z.string().trim().min(1).max(2000),
-        learningOutcomes: z.array(z.string().trim().min(1).max(500)).min(1).max(20).readonly(),
-        language: z.enum(['ru', 'en']),
-        courseSize: z.enum(['auto', 'micro', 'mini', 'compact', 'standard', 'comprehensive']),
-        style: z.enum([
-          'professional',
-          'practical',
-          'problem_based',
-          'analytical',
-          'conversational',
-          'storytelling',
-          'interactive',
-          'motivational',
-          'academic',
-          'technical',
-          'research',
-          'gamified',
-        ]),
-      })
-      .strict()
-      .readonly(),
+    course,
     sourceJobInstruction: z
       .object({
         kind: z.literal('ROLE_GUIDE'),
@@ -125,9 +127,20 @@ const courseCommand = z
   })
   .strict();
 
+const directCourseCommand = z
+  .object({
+    ...common,
+    operation: z.literal('CREATE_COURSE'),
+    commandId: z.string().regex(/^megacampus_generation_command:create_course:v1:[a-f0-9]{64}$/),
+    course,
+    selectedSources,
+  })
+  .strict();
+
 export const HelixaGenerationCommandSchema = z.discriminatedUnion('operation', [
   jobInstructionCommand,
-  courseCommand,
+  courseFromJobInstructionCommand,
+  directCourseCommand,
 ]);
 export type HelixaGenerationCommand = z.infer<typeof HelixaGenerationCommandSchema>;
 export type HelixaGenerationOperation = HelixaGenerationCommand['operation'];

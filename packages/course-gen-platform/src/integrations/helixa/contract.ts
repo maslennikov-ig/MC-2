@@ -23,7 +23,7 @@ export type EvidenceAuthority = 'primary_source' | 'derived_training' | 'derived
 
 export interface GenerationOriginCommandV1 {
   schemaVersion: 'helixa.megacampus-generation-origin.v1';
-  operation: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE_FROM_JOB_INSTRUCTION';
+  operation: 'CREATE_JOB_INSTRUCTION' | 'CREATE_COURSE_FROM_JOB_INSTRUCTION' | 'CREATE_COURSE';
   commandId: string;
   proposalId: string;
   approvedRevision: number;
