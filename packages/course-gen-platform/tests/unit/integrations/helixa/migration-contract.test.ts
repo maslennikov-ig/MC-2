@@ -144,6 +144,31 @@ describe('Helixa migration contract', () => {
     expect(definition.body).toMatch(/'structure_analysis'/u);
   });
 
+  it.each(['schedule_helixa_course_from_role_guide', 'schedule_helixa_course'])(
+    '%s starts the approved Helixa course in the existing automatic quality-gated pipeline',
+    name => {
+      const definition = lastDefinitionOf(name);
+      expect(definition.file).toBe('20260906042000_helixa_automatic_course_generation.sql');
+      expect(definition.body).toMatch(
+        /generation_mode, auto_finalize_after_stage6, settings, has_files/u
+      );
+      expect(definition.body).toMatch(/'automatic', true, jsonb_build_object\(/u);
+      expect(definition.body).not.toMatch(/'semi_automatic'/u);
+    }
+  );
+
+  it('preserves the existing scheduler ACLs instead of restating or widening them', () => {
+    const sql = readFileSync(
+      join(MIGRATIONS_DIR, '20260906042000_helixa_automatic_course_generation.sql'),
+      'utf8'
+    );
+    expect(sql).not.toMatch(/\b(?:GRANT|REVOKE)\b/u);
+    for (const name of ['schedule_helixa_course_from_role_guide', 'schedule_helixa_course']) {
+      expect(lastDefinitionOf(name).header).toMatch(/SECURITY DEFINER/u);
+      expect(lastDefinitionOf(name).header).toMatch(/SET search_path = public, extensions/u);
+    }
+  });
+
   it('replaces the course scheduler rather than overloading it', () => {
     const sql = readFileSync(
       join(MIGRATIONS_DIR, '20260905140000_helixa_course_schedule_target_queue.sql'),

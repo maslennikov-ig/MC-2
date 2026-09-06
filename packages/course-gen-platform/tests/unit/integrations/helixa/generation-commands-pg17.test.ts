@@ -57,7 +57,8 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       }
     }
     await pool.query(`
-      CREATE EXTENSION pgcrypto;
+      CREATE SCHEMA extensions;
+      CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
       CREATE SCHEMA auth;
       CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
       CREATE TYPE org_role AS ENUM ('owner','admin','instructor','student');
@@ -67,7 +68,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       CREATE TABLE organization_members(organization_id uuid NOT NULL REFERENCES organizations(id), user_id uuid NOT NULL REFERENCES auth.users(id), role org_role NOT NULL, UNIQUE(organization_id,user_id));
       CREATE TABLE career_playbooks(id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES auth.users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL, completed_at timestamptz, final_markdown text, role_profile_spec jsonb, generated_blocks jsonb);
       CREATE TYPE vector_status AS ENUM ('pending','indexing','indexed','failed');
-      CREATE TABLE courses(id uuid PRIMARY KEY, title text NOT NULL DEFAULT 'fixture', slug text NOT NULL DEFAULT 'fixture', user_id uuid NOT NULL REFERENCES users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL DEFAULT 'draft', course_description text, target_audience text, learning_outcomes text, language text, course_size text, style text, generation_mode text, settings jsonb, has_files boolean, created_at timestamptz, updated_at timestamptz, generation_status text, generation_completed_at timestamptz);
+      CREATE TABLE courses(id uuid PRIMARY KEY, title text NOT NULL DEFAULT 'fixture', slug text NOT NULL DEFAULT 'fixture', user_id uuid NOT NULL REFERENCES users(id), organization_id uuid NOT NULL REFERENCES organizations(id), status text NOT NULL DEFAULT 'draft', course_description text, target_audience text, learning_outcomes text, language text, course_size text, style text, generation_mode text, auto_finalize_after_stage6 boolean DEFAULT true, settings jsonb, has_files boolean, created_at timestamptz, updated_at timestamptz, generation_status text, generation_completed_at timestamptz);
       CREATE TABLE file_catalog(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL REFERENCES organizations(id), course_id uuid REFERENCES courses(id), filename text NOT NULL, original_name text, file_type text NOT NULL, file_size bigint NOT NULL CHECK(file_size > 0), storage_path text NOT NULL, hash text NOT NULL, mime_type text NOT NULL, vector_status vector_status NOT NULL DEFAULT 'pending', markdown_content text, processed_content text, processing_method text, summary_metadata jsonb, priority text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
       CREATE TABLE helixa_knowledge_sync_bindings(binding_id text PRIMARY KEY, organization_id uuid NOT NULL REFERENCES organizations(id), environment text NOT NULL, destination_binding_id text NOT NULL, enabled boolean NOT NULL DEFAULT true, UNIQUE(binding_id,organization_id,environment,destination_binding_id));
       CREATE TABLE helixa_knowledge_sync_outbox(binding_id text NOT NULL, organization_id uuid NOT NULL REFERENCES organizations(id), event_id text NOT NULL, object_kind text NOT NULL, object_id uuid NOT NULL, completed_at timestamptz NOT NULL);
@@ -105,6 +106,22 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       'utf8'
     );
     await pool.query(sourceMigration);
+    const triggerReachMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(triggerReachMigration);
+    const targetQueueMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260905140000_helixa_course_schedule_target_queue.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(targetQueueMigration);
     const directCourseMigration = await readFile(
       new URL(
         '../../../../supabase/migrations/20260905150000_helixa_create_course_generation.sql',
@@ -121,6 +138,14 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       'utf8'
     );
     await pool.query(observationBindingMigration);
+    const automaticCourseMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260906042000_helixa_automatic_course_generation.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(automaticCourseMigration);
   }, 120_000);
 
   afterAll(async () => {
@@ -236,6 +261,8 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
     ).toMatchObject({
       title: course.title,
       has_files: false,
+      generation_mode: 'automatic',
+      auto_finalize_after_stage6: true,
       settings: { includeWebResearch: false, includeBusinessContextSources: false },
     });
     expect(
@@ -256,6 +283,43 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
         ])
       ).rows[0].count
     ).toBe(0);
+  });
+
+  it('preserves the service-role-only scheduler security boundary', async () => {
+    const result = await pool.query<{
+      proname: string;
+      owner_name: string;
+      security_definer: boolean;
+      search_path: string[];
+      service_role_execute: boolean;
+      anon_execute: boolean;
+      authenticated_execute: boolean;
+    }>(`
+      SELECT p.proname,
+        pg_get_userbyid(p.proowner) owner_name,
+        p.prosecdef security_definer,
+        p.proconfig search_path,
+        has_function_privilege('service_role', p.oid, 'EXECUTE') service_role_execute,
+        has_function_privilege('anon', p.oid, 'EXECUTE') anon_execute,
+        has_function_privilege('authenticated', p.oid, 'EXECUTE') authenticated_execute
+      FROM pg_proc p
+      WHERE p.oid IN (
+        'schedule_helixa_course(text,text,uuid,uuid,uuid,jsonb,jsonb,uuid,integer,text)'::regprocedure,
+        'schedule_helixa_course_from_role_guide(text,text,uuid,uuid,uuid,jsonb,jsonb,uuid,integer,text)'::regprocedure
+      )
+      ORDER BY p.proname
+    `);
+    expect(result.rows).toHaveLength(2);
+    for (const row of result.rows) {
+      expect(row).toMatchObject({
+        owner_name: 'postgres',
+        security_definer: true,
+        search_path: ['search_path=public, extensions'],
+        service_role_execute: true,
+        anon_execute: false,
+        authenticated_execute: false,
+      });
+    }
   });
 
   it('fences stale owners and permits one expired-lease takeover', async () => {
@@ -542,7 +606,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       )
     ).rows[0];
     const scheduled = await pool.query(
-      `SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9) value`,
+      `SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) value`,
       [
         'binding-a',
         commandId,
@@ -553,16 +617,16 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
         source,
         reserved.lease_token,
         reserved.claim_generation,
+        'course-generation-test',
       ]
     );
     expect(scheduled.rows[0].value).toBe(true);
     expect(
-      (
-        await pool.query('SELECT count(*)::int count FROM courses WHERE id=$1', [
-          reserved.object_id,
-        ])
-      ).rows[0].count
-    ).toBe(1);
+      (await pool.query('SELECT * FROM courses WHERE id=$1', [reserved.object_id])).rows[0]
+    ).toMatchObject({
+      generation_mode: 'automatic',
+      auto_finalize_after_stage6: true,
+    });
     expect(
       (
         await pool.query('SELECT * FROM course_job_instruction_sources WHERE course_id=$1', [
@@ -656,7 +720,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       )
     ).rows[0];
     await expect(
-      pool.query(`SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [
+      pool.query(`SELECT schedule_helixa_course_from_role_guide($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [
         'binding-a',
         commandId,
         reserved.object_id,
@@ -666,6 +730,7 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
         source,
         reserved.lease_token,
         reserved.claim_generation,
+        'course-generation-test',
       ])
     ).rejects.toThrow(/ROLE_GUIDE_SOURCE_STALE/);
     expect(

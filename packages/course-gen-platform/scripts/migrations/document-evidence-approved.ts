@@ -645,8 +645,13 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // replaces the existing test-fixture helper so future direct inserts supply that value while
 // preserving its live execution ACL. It does not touch the document-evidence chain, its
 // security manifest, or any accepted source digest, so no new `after-*` digest is needed.
+// Re-pinned 2026-09-06 for the owner-selected single-approval Course flow: 262 files, adding
+// 20260906042000_helixa_automatic_course_generation.sql. It replaces only the two existing
+// `helixa_*` Course scheduling functions so newly approved Helixa Courses enter the already
+// shipped automatic Stage 4 -> 5 -> 6 pipeline. It changes no table, historical row, trigger,
+// document-evidence function, security-manifest function, or accepted source digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'c0b15d59117333b8e328de8eb926e241c78e31b79fe8b4815d47d0a9df34b2ee';
+  '1c1195e6b2b18d5dc7320fd6579499389166641e29faf464db096d1a9cf6fcc0';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
