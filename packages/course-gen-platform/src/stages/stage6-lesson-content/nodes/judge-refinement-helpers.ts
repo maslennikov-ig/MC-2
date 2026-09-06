@@ -24,6 +24,20 @@ import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import type { JudgeContext } from './judge-node-helpers';
 import { QualityRemediationAction, buildQaSignals } from '../quality/remediation';
 
+const READABILITY_ABOVE_MAXIMUM =
+  /^Flesch-Kincaid grade level \(\d+(?:\.\d+)?\) exceeds target maximum \(\d+(?:\.\d+)?\)$/u;
+
+function hasOnlyReadabilityAboveMaximumFailure(
+  cascadeResult: CascadeResult | null | undefined
+): boolean {
+  const reasons = cascadeResult?.heuristicResults?.failureReasons;
+  return (
+    Array.isArray(reasons) &&
+    reasons.length > 0 &&
+    reasons.every(reason => READABILITY_ABOVE_MAXIMUM.test(reason))
+  );
+}
+
 /**
  * Execute targeted refinement flow
  *
@@ -338,6 +352,10 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
   const recommendation = cascadeResult?.finalRecommendation ?? 'REGENERATE';
   const needsRegeneration = recommendation === 'REGENERATE';
   const needsHumanReview = recommendation === 'ESCALATE_TO_HUMAN';
+  const qualityRemediationDirective =
+    needsRegeneration && hasOnlyReadabilityAboveMaximumFailure(cascadeResult)
+      ? ('readability_above_maximum' as const)
+      : undefined;
   const durationMs = Date.now() - startTime;
 
   // Build enriched output
@@ -407,6 +425,7 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsHumanReview,
     lessonContent: needsRegeneration ? null : state.lessonContent,
     regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    ...(qualityRemediationDirective && { qualityRemediationDirective }),
     regenerateCount: needsRegeneration
       ? (state.regenerateCount ?? 0) + 1
       : (state.regenerateCount ?? 0),

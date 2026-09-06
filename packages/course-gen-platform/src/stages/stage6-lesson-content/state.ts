@@ -28,7 +28,7 @@ import type {
   ProgressSummary,
 } from '@megacampus/shared-types/judge-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import type { Stage6PrefetchedGeneratorResponse } from './types';
+import type { Stage6PrefetchedGeneratorResponse, Stage6QualityRemediationDirective } from './types';
 
 /**
  * Graph node names for state tracking
@@ -133,6 +133,15 @@ export const LessonGraphState = Annotation.Root({
    * Provided when regenerating with specific feedback
    */
   userRefinementPrompt: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Code-owned correction requested by a deterministic quality gate.
+   * Unlike userRefinementPrompt, this is a closed union and cannot carry free-form input.
+   */
+  qualityRemediationDirective: Annotation<Stage6QualityRemediationDirective | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),

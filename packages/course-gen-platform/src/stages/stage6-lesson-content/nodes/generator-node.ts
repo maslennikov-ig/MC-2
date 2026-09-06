@@ -125,7 +125,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         state.maxTokensOverride ?? undefined,
         state.prefetchedGeneratorResponseConsumed
           ? undefined
-          : (state.prefetchedGeneratorResponse ?? undefined)
+          : (state.prefetchedGeneratorResponse ?? undefined),
+        state.qualityRemediationDirective ?? undefined
       );
       generatedContent = result.content;
       lessonDigest = result.lessonDigest;

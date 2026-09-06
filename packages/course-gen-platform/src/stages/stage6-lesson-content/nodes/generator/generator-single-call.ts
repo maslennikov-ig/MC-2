@@ -25,6 +25,7 @@ import {
 import { extractLessonDigest, stripUnwantedConclusionSections } from './generator-postprocess';
 import { prepareLessonSingleCallRequest } from './generator-request';
 import type { Stage6PrefetchedGeneratorResponse } from '../../types';
+import type { Stage6QualityRemediationDirective } from '../../types';
 
 /**
  * Generate complete lesson content in a single LLM call
@@ -53,7 +54,8 @@ export async function generateLessonSingleCall(
   analysisResult: AnalysisResult | null,
   courseId?: string,
   maxTokensOverride?: number,
-  prefetchedResponse?: Stage6PrefetchedGeneratorResponse
+  prefetchedResponse?: Stage6PrefetchedGeneratorResponse,
+  qualityRemediationDirective?: Stage6QualityRemediationDirective
 ): Promise<{
   content: string;
   lessonDigest: string;
@@ -83,7 +85,8 @@ export async function generateLessonSingleCall(
     style,
     analysisResult,
     courseId,
-    maxTokensOverride
+    maxTokensOverride,
+    qualityRemediationDirective
   );
   const {
     prompt,

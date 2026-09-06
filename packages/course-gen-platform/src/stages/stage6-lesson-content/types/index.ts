@@ -14,6 +14,9 @@ export type Stage6QualityRungName = Stage6QualityRungPhaseName;
 export type Stage6ExecutionPolicyMode = 'manual_top_regeneration';
 export type Stage6QualityAttemptOutcome = 'accepted' | 'quality_retryable' | 'failed';
 
+/** Internal, code-owned guidance carried between quality evaluation and regeneration. */
+export type Stage6QualityRemediationDirective = 'readability_above_maximum';
+
 export interface Stage6PrefetchedGeneratorResponse {
   /** Raw assistant text returned for this lesson by OpenRouter Batch API. */
   content: string;

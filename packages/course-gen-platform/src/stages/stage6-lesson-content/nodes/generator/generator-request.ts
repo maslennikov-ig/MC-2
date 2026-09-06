@@ -26,6 +26,27 @@ import {
 } from './generator-constants';
 import { formatGenerationGuidanceXML, formatInterLessonContextXML } from './generator-helpers';
 import { selectStage6ModelTier } from './model-selector';
+import type { Stage6QualityRemediationDirective } from '../../types';
+
+const READABILITY_REMEDIATION_PROMPT = `<quality_remediation kind="readability_above_maximum">
+The previous draft failed the deterministic English readability check. Rewrite the complete
+lesson with shorter sentences and plain explanations, define necessary technical terms, and
+keep its Flesch-Kincaid grade at or below 12. Preserve factual accuracy, learning objectives,
+required structure, examples, exercises, citations, and source constraints. Do not remove
+required technical content merely to lower the score.
+</quality_remediation>`;
+
+function appendQualityRemediation(
+  prompt: string,
+  directive?: Stage6QualityRemediationDirective
+): string {
+  switch (directive) {
+    case 'readability_above_maximum':
+      return `${prompt}\n\n${READABILITY_REMEDIATION_PROMPT}`;
+    case undefined:
+      return prompt;
+  }
+}
 
 export interface PreparedLessonSingleCallRequest {
   prompt: string;
@@ -55,7 +76,8 @@ export async function prepareLessonSingleCallRequest(
   style: string | null,
   analysisResult: AnalysisResult | null,
   courseId?: string,
-  maxTokensOverride?: number
+  maxTokensOverride?: number,
+  qualityRemediationDirective?: Stage6QualityRemediationDirective
 ): Promise<PreparedLessonSingleCallRequest> {
   const durationMinutes = Math.max(5, lessonSpec.estimated_duration_minutes || 15);
   const targetWordCount = Math.round(durationMinutes * WORDS_PER_MINUTE);
@@ -121,7 +143,7 @@ export async function prepareLessonSingleCallRequest(
   const hookStrategy = lessonSpec.intro_blueprint?.hook_strategy || 'challenge';
   const hookTopic = lessonSpec.intro_blueprint?.hook_topic || lessonSpec.title;
 
-  const prompt = await createPromptService().renderPrompt('stage6_single_call_generator', {
+  const renderedPrompt = await createPromptService().renderPrompt('stage6_single_call_generator', {
     lessonTitle: lessonSpec.title,
     lessonDescription: lessonSpec.description,
     durationMinutes: String(durationMinutes),
@@ -153,6 +175,7 @@ export async function prepareLessonSingleCallRequest(
         ? '5. **Code blocks** with filenames when relevant'
         : '',
   });
+  const prompt = appendQualityRemediation(renderedPrompt, qualityRemediationDirective);
 
   const languageMultiplier = getTokenMultiplier(language);
   const rawTokens = Math.ceil(
