@@ -31,7 +31,10 @@ import {
   mapCompletedCourse,
   mapCompletedRoleGuide,
 } from '@/integrations/helixa/snapshot-loader';
-import { createUploadStorageReader } from '@/integrations/helixa/storage-reader';
+import {
+  createCourseSourceReader,
+  createUploadStorageReader,
+} from '@/integrations/helixa/storage-reader';
 import { readKnowledgeSyncRuntimeConfig } from '@/integrations/helixa/runtime-repository';
 import { claimKnowledgeSyncOutbox } from '@/integrations/helixa/runtime-repository';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -423,6 +426,185 @@ describe('MegaCampus knowledge package', () => {
     expect(() => bindAcceptedCourseSources(undefined, files)).toThrow(/provenance/i);
   });
 
+  it('exports a governed native Role Guide source from immutable canonical bytes', async () => {
+    const roleGuideId = 'role-guide-1';
+    const fileId = 'native-file-1';
+    const body = JSON.stringify({ finalMarkdown: '# Native source', roleProfileSpec: {} });
+    const hash = createHash('sha256').update(body, 'utf8').digest('hex');
+    const relation = {
+      course_id: courseId,
+      organization_id: organizationId,
+      job_instruction_id: roleGuideId,
+      source_version: completedAt,
+      source_content_hash: hash,
+      origin_binding_id: 'binding-1',
+      origin_command_id: `megacampus_generation_command:create_course_from_job_instruction:v1:${'a'.repeat(64)}`,
+    };
+    const file = {
+      id: fileId,
+      organization_id: organizationId,
+      course_id: courseId,
+      filename: 'role-guide.json',
+      mime_type: 'application/json',
+      hash,
+      storage_path: `helixa-generation://role-guide/${roleGuideId}/${hash}`,
+      markdown_content: body,
+      processed_content: body,
+      summary_metadata: { source: 'helixa_role_guide', source_version_hash: hash },
+      approved: true as const,
+      approvedVersion: hash,
+    };
+    const uploadReader = vi.fn();
+    const readBytes = createCourseSourceReader({
+      courseId,
+      organizationId,
+      jobInstructionSource: relation,
+      nativeSources: [
+        {
+          course_id: courseId,
+          organization_id: organizationId,
+          file_catalog_id: fileId,
+          source_canonical_content: body,
+          source_content_hash: hash,
+        },
+      ],
+      readUploadBytes: uploadReader,
+    });
+    const mapped = await mapCompletedCourse({
+      course: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Native Course',
+        language: 'ru',
+        course_structure: { sections: [] },
+      },
+      lessonContents: [],
+      files: [file],
+      readBytes,
+      generationOrigin: {
+        binding_id: 'binding-1',
+        command_id: relation.origin_command_id,
+        command_kind: 'CREATE_COURSE_FROM_JOB_INSTRUCTION',
+        proposal_id: 'proposal-1',
+        approved_revision: 1,
+        proposal_payload_hash: 'b'.repeat(64),
+        object_kind: 'COURSE',
+        object_id: courseId,
+        organization_id: organizationId,
+        status: 'native_completed',
+      },
+      jobInstructionSource: relation,
+    });
+    const result = await buildKnowledgeSyncPackage(mapped, {
+      environment: 'test',
+      externalProjectId: null,
+    });
+    const rawBody = serializeKnowledgeSyncPackage(result);
+    const request = vi.fn().mockResolvedValue({ status: 202, body: '' });
+    await deliverClaimedKnowledgeSync(
+      { id: 'outbox-native-1', eventId: result.eventId, rawBody },
+      {
+        endpoint: 'https://helixa.test/api/integrations/megacampus/knowledge-sync',
+        hmacKey: 'test-only-key',
+        externalSystemId: 'system-1',
+        request,
+      }
+    );
+    const primary = result.sourceDocuments.find(item => item.authority === 'primary_source');
+
+    expect(primary?.artifacts[0]).toMatchObject({
+      representation: 'original_bytes',
+      sha256: hash,
+      content: Buffer.from(body).toString('base64'),
+    });
+    expect(result.relations).toEqual([
+      expect.objectContaining({ type: 'COURSE_FROM_ROLE_GUIDE' }),
+    ]);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: rawBody,
+        headers: expect.objectContaining({
+          'X-Megacampus-Event-Id': result.eventId,
+          'X-Megacampus-Signature': `sha256=${createHmac('sha256', 'test-only-key').update(rawBody).digest('hex')}`,
+        }),
+      })
+    );
+    expect(uploadReader).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['source hash mismatch', { proofHash: 'c'.repeat(64) }],
+    ['foreign organization', { proofOrganizationId: 'other-org' }],
+  ])('refuses governed native source with %s', async (_label, override) => {
+    const body = '{"native":true}';
+    const hash = createHash('sha256').update(body, 'utf8').digest('hex');
+    const reader = createCourseSourceReader({
+      courseId,
+      organizationId,
+      jobInstructionSource: {
+        course_id: courseId,
+        organization_id: organizationId,
+        job_instruction_id: 'role-guide-1',
+        source_content_hash: hash,
+      },
+      nativeSources: [
+        {
+          course_id: courseId,
+          organization_id: override.proofOrganizationId ?? organizationId,
+          file_catalog_id: 'native-file-1',
+          source_canonical_content: body,
+          source_content_hash: override.proofHash ?? hash,
+        },
+      ],
+      readUploadBytes: vi.fn(),
+    });
+
+    await expect(
+      reader({
+        id: 'native-file-1',
+        organization_id: organizationId,
+        course_id: courseId,
+        hash,
+        storage_path: `helixa-generation://role-guide/role-guide-1/${hash}`,
+        markdown_content: body,
+        processed_content: body,
+        summary_metadata: { source: 'helixa_role_guide', source_version_hash: hash },
+      })
+    ).rejects.toThrow(/provenance/i);
+  });
+
+  it('keeps ordinary uploaded Course sources on the filesystem reader', async () => {
+    const uploadReader = vi.fn().mockResolvedValue(Buffer.from('upload bytes'));
+    const reader = createCourseSourceReader({
+      courseId,
+      organizationId,
+      jobInstructionSource: null,
+      nativeSources: [],
+      readUploadBytes: uploadReader,
+    });
+    const file = {
+      id: 'upload-1',
+      organization_id: organizationId,
+      course_id: courseId,
+      hash: 'd'.repeat(64),
+      storage_path: 'org/course/upload.pdf',
+      markdown_content: null,
+      processed_content: null,
+      summary_metadata: {},
+    };
+
+    await expect(reader(file)).resolves.toEqual(Buffer.from('upload bytes'));
+    expect(uploadReader).toHaveBeenCalledWith(file);
+
+    uploadReader.mockClear();
+    await expect(reader({ ...file, storage_path: 'https://untrusted.example/source' })).rejects.toThrow(
+      /provenance/i
+    );
+    expect(uploadReader).not.toHaveBeenCalled();
+  });
+
   it('keeps Role Guide source-row identity object-scoped when two guides share one file', async () => {
     const sharedFile = {
       id: 'file-shared',
@@ -528,6 +710,28 @@ describe('delivery and durable intent', () => {
       destinationBindingId: 'destination-1',
     });
     expect(() => readKnowledgeSyncRuntimeConfig({})).toThrow(/incomplete/i);
+  });
+  it('uses the dedicated Helixa binding environment before shared process fallbacks', () => {
+    const required = {
+      HELIXA_KNOWLEDGE_SYNC_ENDPOINT: 'https://helixa.test',
+      HELIXA_KNOWLEDGE_SYNC_HMAC_KEY: 'runtime-only',
+      HELIXA_EXTERNAL_SYSTEM_ID: 'system-1',
+      HELIXA_KNOWLEDGE_SYNC_BINDING_ID: 'binding-1',
+      HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID: organizationId,
+      HELIXA_DESTINATION_BINDING_ID: 'destination-1',
+    };
+    expect(
+      readKnowledgeSyncRuntimeConfig({
+        ...required,
+        HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT: 'acceptance',
+        APP_ENV: 'shared-app-environment',
+        NODE_ENV: 'production',
+      }).environment
+    ).toBe('acceptance');
+    expect(
+      readKnowledgeSyncRuntimeConfig({ ...required, APP_ENV: 'staging', NODE_ENV: 'production' })
+        .environment
+    ).toBe('staging');
   });
   it('claims only the invoking organization/environment/destination binding', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: [], error: null });

@@ -47,6 +47,28 @@ export function createPostgresHelixaCourseFromRoleGuideScheduler(
   };
 }
 
+export function createPostgresHelixaCourseScheduler(
+  client: GenerationRpcClient,
+  targetQueue: string = QUEUE_NAME
+): HelixaGenerationNativeDependencies['scheduleCourse'] {
+  return async input => {
+    const result = await client.rpc<boolean>('schedule_helixa_course', {
+      p_binding_id: input.originBindingId,
+      p_command_id: input.originCommandId,
+      p_course_id: input.courseId,
+      p_organization_id: input.organizationId,
+      p_user_id: input.userId,
+      p_course: input.course,
+      p_selected_sources: input.selectedSources,
+      p_lease_token: input.leaseToken,
+      p_claim_generation: input.claimGeneration,
+      p_target_queue: targetQueue,
+    });
+    if (result.error) throw new Error(result.error.message);
+    if (result.data !== true) throw new Error('COURSE_GENERATION_SCHEDULING_FAILED');
+  };
+}
+
 type NativeObservationRow = {
   outcome: 'missing' | 'running' | 'succeeded_awaiting_signed_import' | 'completed' | 'failed';
   native_completed_at: string | null;
@@ -57,6 +79,7 @@ export function createPostgresHelixaNativeObserver(
 ): NonNullable<HelixaGenerationNativeDependencies['observe']> {
   return async input => {
     const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_binding_id: input.bindingId,
       p_organization_id: input.organizationId,
       p_object_kind: input.objectKind,
       p_object_id: input.objectId,
@@ -82,6 +105,7 @@ export function createPostgresHelixaNativeReconciler(
 ): HelixaGenerationNativeDependencies['reconcile'] {
   return async input => {
     const result = await client.rpc<NativeObservationRow[]>('observe_helixa_native_generation', {
+      p_binding_id: input.bindingId,
       p_organization_id: input.organizationId,
       p_object_kind: input.objectKind,
       p_object_id: input.objectId,
@@ -107,6 +131,7 @@ type ResolvedBindingRow = {
   service_principal_user_id: string;
   job_instruction_creation_enabled: boolean;
   course_from_job_instruction_creation_enabled: boolean;
+  course_creation_enabled: boolean;
   principal_exists_in_auth: boolean;
   principal_exists_in_public: boolean;
   principal_organization_id: string;
@@ -134,6 +159,7 @@ export function createPostgresHelixaGenerationBindingAuthority(
         servicePrincipalUserId: row.service_principal_user_id,
         jobInstructionCreationEnabled: row.job_instruction_creation_enabled,
         courseFromJobInstructionCreationEnabled: row.course_from_job_instruction_creation_enabled,
+        courseCreationEnabled: row.course_creation_enabled,
         principal: {
           existsInAuth: row.principal_exists_in_auth,
           existsInPublic: row.principal_exists_in_public,
@@ -215,10 +241,12 @@ export function createPostgresHelixaGenerationRepository(
         throw new Error('Failed to reserve MegaCampus generation command');
       const row = result.data[0];
       if (row.conflict) return { kind: 'conflict' };
+      const mutationOwner = row.mutation_owner === true;
       return {
         kind: 'reserved',
         row: mapCommandRow(row, input.binding.bindingId),
-        mutationOwner: row.mutation_owner === true,
+        mutationOwner,
+        newlyReserved: mutationOwner && row.claim_generation === 1 && row.accepted_at === null,
       };
     },
     renew(input) {

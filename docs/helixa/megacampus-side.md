@@ -38,7 +38,11 @@ itself created by a Helixa generation command.
 non-finite numbers and non-plain objects. `computePayloadHash` hashes the whole
 package with `hashes.payloadHash` removed, so the field never hashes itself.
 `serializeKnowledgeSyncPackage` in `package-builder.ts` recomputes that hash and
-refuses to serialize a package whose stored hash disagrees.
+refuses to serialize a package whose stored hash disagrees. The content hash uses
+this same knowledge-sync canonicalizer for every package, including packages with
+an `originCommand`, so finite fractional values in generated lesson data remain
+valid. The stricter safe-integer canonicalizer is limited to generation proposal,
+command, and command-identity contracts.
 
 **Signature.** `deliverClaimedKnowledgeSync` in `delivery.ts` computes
 `HMAC-SHA256` over the exact frozen bytes and sends four headers:
@@ -68,12 +72,21 @@ jitter derived from the event id so a retry storm does not synchronize. HTTP 408
 it is still null and the caller holds the lease. A retry re-sends the original
 bytes rather than rebuilding a package that might now hash differently.
 
+**Governed native Course sources.** A Course created from a Role Guide has a virtual
+`helixa-generation://role-guide/<id>/<sha256>` source instead of an uploaded file.
+The outbound snapshot reader resolves only that exact URI from
+`course_job_instruction_native_sources`. Before returning its canonical UTF-8 bytes,
+it checks the organization, course, file, Course-to-Role-Guide relation, source
+metadata, stored bodies, and SHA-256 as one proof. Any other URI scheme fails the
+provenance gate; ordinary relative upload paths continue through the confined
+filesystem reader.
+
 ## 3. Inbound contract as implemented
 
-Helixa issues two commands, `CREATE_JOB_INSTRUCTION` and
-`CREATE_COURSE_FROM_JOB_INSTRUCTION`, parsed by `HelixaGenerationCommandSchema` in
-`generation-commands.ts`. A separate, older ledger handles a plain course-create
-command in `course-creation.ts` and still has no transport.
+Helixa issues three commands: `CREATE_JOB_INSTRUCTION`,
+`CREATE_COURSE_FROM_JOB_INSTRUCTION`, and `CREATE_COURSE`. They are parsed by
+`HelixaGenerationCommandSchema` and use the same HTTP transport and generation ledger.
+A separate, older ledger in `course-creation.ts` remains transportless and compatible.
 
 ### The two endpoints
 
@@ -139,10 +152,12 @@ and a native port that schedules nothing, so the transport can be exercised end 
 without touching MegaCampus generation. `live` uses the PostgreSQL ledger and the
 PostgreSQL native port.
 
-Both commands are wired in `live`. `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
+All three commands are wired in `live`. `CREATE_COURSE_FROM_JOB_INSTRUCTION` reaches
 `schedule_helixa_course_from_role_guide`; `CREATE_JOB_INSTRUCTION` reaches
 `schedule_helixa_role_guide`, added 2026-09-05 in
-`20260905130000_helixa_schedule_role_guide.sql`.
+`20260905130000_helixa_schedule_role_guide.sql`; and `CREATE_COURSE` reaches
+`schedule_helixa_course`, added by
+`20260905150000_helixa_create_course_generation.sql`.
 
 ### Scheduling a career playbook from a command
 
@@ -201,6 +216,50 @@ Helixa's `selectedSources` are recorded as provenance only. They name documents 
 which MegaCampus does not hold, so they are checked against the stored command payload and
 not turned into `file_catalog` rows. The command payload in `helixa_generation_commands` is
 where they remain readable.
+
+### Scheduling a course from scratch
+
+`CREATE_COURSE` carries the same `course` object as
+`CREATE_COURSE_FROM_JOB_INSTRUCTION` and the same canonical `selectedSources` array as
+`CREATE_JOB_INSTRUCTION`; `sourceJobInstruction` is forbidden. The SQL scheduler validates
+the lease fence, service principal, `course_creation_enabled` permission, and byte-equality
+of both payload branches against the immutable ledger row. It writes a native no-file course
+and a `structure_analysis` row addressed to the caller's configured queue. Completion then
+uses the existing course trigger and signed knowledge-sync outbox. A direct course origin is
+exported as `CREATE_COURSE` without inventing a `COURSE_FROM_ROLE_GUIDE` relation.
+
+### One Helixa approval starts the automatic Course pipeline
+
+`20260906042000_helixa_automatic_course_generation.sql` replaces both Course scheduler
+functions without changing their signatures, owners or ACLs. A newly accepted
+`CREATE_COURSE_FROM_JOB_INSTRUCTION` or `CREATE_COURSE` is inserted with
+`generation_mode = 'automatic'` and `auto_finalize_after_stage6 = true`. The existing
+application then advances Stage 4 to Stage 5 and Stage 5 to Stage 6 without another human
+approval; each stage reads the stored mode.
+
+The Stage 5 to Stage 6 boundary uses a retryable `stage6_handoff` queue job. It first
+verifies the course organization, claims `stage_6_generating`, then enqueues lessons with
+stable IDs. A partial fanout is replayed by the same handoff, and the handoff reruns the
+aggregate completion check after all lesson jobs are present. A failed or lost status claim
+fails the handoff instead of reporting success. If the worker loses its acknowledgement after
+the course reaches `completed` or `stage_6_complete`, the exact tenant/course retry is a no-op.
+
+Lesson job-ID deduplication covers the handoff's three retry attempts while BullMQ retains the
+jobs (completed Stage 6 jobs are retained for 24 hours, capped at 1000). It does not promise
+exactly-once generation after that retention window; later regeneration uses the explicit
+lesson recovery paths and their paid-work checks.
+
+The automatic-mode SQL can be applied without restarting the application. The durable
+handoff is application code and must be released to both the main worker and the dedicated
+Stage 6 worker before unattended Course generation is enabled.
+
+Automatic means unattended progression, not weaker quality checks. Critical Stage 5
+structure issues still stop at `stage_5_awaiting_approval`. Stage 6 publishes and marks the
+course `completed` only after every lesson has fully completed and unconditional lesson
+publishability checks pass. The cross-course quality audit remains an additional completion
+gate only when `FEATURE_STAGE6_COURSE_AUDIT=true`. A quality failure remains at
+`stage_6_complete` for remediation. Only the real `completed` transition creates the signed
+outbox result returned to Helixa.
 
 ### One shape that had to move
 
@@ -329,7 +388,10 @@ trigger adds the update half and a clearer message.
 
 ## 5. Defects fixed
 
-All in `20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`.
+The trigger fixes landed in
+`20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`; the exact-binding
+observer correction is the forward migration
+`20260905160000_helixa_observation_binding_scope.sql`.
 
 1. **`digest` could not resolve.** Four functions now declare
    `SET search_path = public, extensions` and call `extensions.digest(...)`
@@ -337,19 +399,18 @@ All in `20260905120000_helixa_triggers_reach_digest_and_their_own_tables.sql`.
 2. **`file_catalog` guard had no definer rights.** `prevent_helixa_native_source_file_mutation`
    and `validate_course_job_instruction_native_source` are now `SECURITY DEFINER`,
    as is `validate_course_job_instruction_source` for the same reason.
-3. **Three per-write lookups had no index.** Added on
+3. **Three live-table lookups had no index.** Added on
    `helixa_knowledge_sync_bindings(organization_id) WHERE enabled`,
    `helixa_generation_commands(organization_id, object_kind, object_id)`, and
    `helixa_knowledge_sync_outbox(organization_id, object_kind, object_id, completed_at)`.
-   None of the existing unique constraints could serve these: each leads with
-   `binding_id`, and none of these three call sites has one.
-4. **`observe_helixa_native_generation` ignored the organization it was given.** It
-   matched an outbox row on object and timestamp alone, so with more than one
-   binding it could return another binding's event id, which
-   `complete_observed_helixa_generation_command` then rejects as an unavailable
-   proof. Now filtered by organization. The signature is deliberately unchanged;
-   adding a parameter would leave two same-named functions and make the PostgREST
-   `rpc()` call unresolvable.
+   The later binding-scoped observer can use the existing binding-leading unique
+   constraint; the two trigger lookups still require their organization-leading indexes.
+4. **`observe_helixa_native_generation` ignored part of its proof scope.** The first
+   correction filtered by organization, but two bindings in the same organization
+   still produced competing event ids. The forward migration
+   `20260905160000_helixa_observation_binding_scope.sql` drops the old signature,
+   adds `p_binding_id`, and filters by both binding and organization. Dropping the
+   three-argument function first keeps one unambiguous PostgREST `rpc()` target.
 
 ## 6. Rollback
 
@@ -392,6 +453,7 @@ DROP FUNCTION IF EXISTS mark_helixa_generation_native_completed();
 DROP FUNCTION IF EXISTS enqueue_helixa_course_knowledge_sync();
 DROP FUNCTION IF EXISTS enqueue_helixa_role_guide_knowledge_sync();
 DROP FUNCTION IF EXISTS observe_helixa_native_generation(UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS observe_helixa_native_generation(TEXT, UUID, TEXT, UUID);
 DROP FUNCTION IF EXISTS schedule_helixa_course_from_role_guide(TEXT, TEXT, UUID, UUID, UUID, JSONB, JSONB, UUID, INTEGER);
 DROP FUNCTION IF EXISTS helixa_role_guide_content_v1(TEXT, JSONB, JSONB);
 DROP FUNCTION IF EXISTS helixa_canonical_json_v1(JSONB);
@@ -413,6 +475,20 @@ COMMIT;
 Dropping the triggers is the whole of the rollback that matters for the live tables:
 courses, career playbooks and file catalog rows are never modified by any of this,
 only read.
+
+The automatic Course correction is code-only database state: it updates two function
+definitions and no row. Its apply preconditions are the existing ten-argument scheduler
+signatures from `20260905140000_helixa_course_schedule_target_queue.sql` and
+`20260905150000_helixa_create_course_generation.sql`, plus the existing
+`courses.generation_mode` and `courses.auto_finalize_after_stage6` columns. Capture
+`pg_get_functiondef`, owner, `prosecdef`, `proconfig` and ACL for both functions before apply;
+after apply, only the two function bodies may differ.
+
+To stop new work first, disable the exact binding and generation route. A rollback must be a
+reviewed forward migration that restores the prior `semi_automatic` function definitions;
+do not edit migration history or bulk-update courses already created as `automatic`. Courses
+accepted before rollback keep their stored mode and are handled explicitly. Reapplying the
+automatic definition is the roll-forward. Neither direction needs an application restart.
 
 `DROP TRIGGER` requires ownership of the table, not a privilege. Run the rollback as
 the table owner.
@@ -496,32 +572,53 @@ no binding row exists, `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` is unset and
 sequence below, in this order, once the three joint values in
 `docs/helixa/handoff-for-helixa.md` §4 have been agreed with Helixa.
 
-1. **Service principal.** Create a non-interactive user the inbound commands act as. It must
-   exist in `auth.users` and `users`, carry `raw_app_meta_data->>'kind' = 'service_principal'`
-   and `raw_app_meta_data->>'interactive_login_allowed' = 'false'`, and be an `owner`, `admin`
-   or `instructor` member of the organization (`organization_members`). Use
-   `auth.admin.createUser` with `app_metadata` set and a random unusable password; never a
-   person's account. `reserve_helixa_generation_command` re-checks every one of these on each
-   dispatch.
-2. **Binding row.** One per `(organization, environment)`:
+1. **Plan the service principal and binding.** Set the target explicitly; the operator will
+   not choose or create an organization:
 
-   ```sql
-   INSERT INTO helixa_knowledge_sync_bindings (
-     binding_id, organization_id, environment, destination_binding_id, enabled,
-     generation_service_principal_user_id,
-     job_instruction_creation_enabled, course_from_job_instruction_creation_enabled,
-     course_creation_enabled, source_helixa_organization_id, source_helixa_project_id
-   ) VALUES (
-     '<binding id agreed with Helixa>', '<organization uuid>', 'production',
-     '<destination binding id agreed with Helixa>', false,
-     '<service principal uuid>', true, true,
-     false, NULL, NULL
-   );
+   ```bash
+   export SUPABASE_URL='<MegaCampus Supabase URL>'
+   export SUPABASE_SERVICE_KEY='<MegaCampus service-role key>'
+   export MC2_HELIXA_ORGANIZATION_ID='<existing MegaCampus organization UUID>'
+   export MC2_HELIXA_BINDING_ID='<binding id agreed with Helixa>'
+   export MC2_HELIXA_ENVIRONMENT='production'
+   export MC2_HELIXA_DESTINATION_BINDING_ID='<destination binding id agreed with Helixa>'
+   export MC2_HELIXA_SOURCE_ORGANIZATION_ID='<Helixa organization id>'
+   export MC2_HELIXA_SOURCE_PROJECT_ID='<Helixa project id>'
+   export MC2_HELIXA_SERVICE_PRINCIPAL_ROLE='instructor' # owner|admin|instructor
+
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/provision-bridge.ts
    ```
 
-   `enabled = false` at insert time: the row exists, the triggers still see nothing enabled.
-   `course_creation_enabled` is the older plain course-create ledger and stays off unless
-   Helixa asks for it; its check constraint then requires both `source_helixa_*` ids.
+   With no argument the command is read-only and prints a JSON plan containing safe ids,
+   counts and change names. It finds or plans a dedicated Supabase Auth service principal,
+   its `users` row, its exact organization membership, and one disabled binding with all
+   three generation permissions. The principal uses a deterministic address under the
+   reserved `.invalid` domain because `public.users.email` is required. Supabase
+   `auth.admin.createUser` sends no confirmation message, the random password is discarded,
+   and the user is banned from interactive sign-in.
+
+2. **Apply the reviewed plan.** Run the same command with the explicit `apply` argument:
+
+   ```bash
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/provision-bridge.ts apply
+   ```
+
+   Exact replay performs no writes. Any existing identity, membership, environment,
+   destination, source id or permission mismatch is a conflict and is not updated. A newly
+   inserted binding always has `enabled = false`, all three operation capabilities set to
+   `true`, and both `source_helixa_*` values populated. The command neither reads nor stores
+   `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`. If a write response is lost, the operator first reads
+   the exact tuple back. A complete match is success; an uncertain state retains the
+   principal for an explicit plan instead of attempting unsafe deletion through the
+   binding's restrictive foreign keys.
+
+   Save the returned `principalId` for the activation check:
+
+   ```bash
+   export MC2_HELIXA_SERVICE_PRINCIPAL_USER_ID='<principalId from provision output>'
+   ```
 
 3. **Secrets and ids** into the worker and API env files
    (`/opt/megacampus/.env.<active_color>` for production, the dev compose env for dev):
@@ -530,11 +627,28 @@ sequence below, in this order, once the three joint values in
    `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`, `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`,
    `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`, `HELIXA_DESTINATION_BINDING_ID`, optionally
    `HELIXA_DESTINATION_PROJECT_ID`. Redeploy the API and the worker so they read them.
-4. **Inbound first, on dev.** Set `HELIXA_MEGACAMPUS_GENERATION_MODE=live` on the dev API and
-   flip the dev binding to `enabled = true`. Have Helixa dispatch one `CREATE_JOB_INSTRUCTION`
-   against `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect
-   202, then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned
-   by the service principal. Watch `helixa_generation_commands` and the worker log.
+4. **Inbound first, on dev.** Set `HELIXA_MEGACAMPUS_GENERATION_MODE=live` on the dev API.
+   Plan the binding activation, review the safe JSON result, then apply that exact action:
+
+   ```bash
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/binding-activation.ts plan activate
+
+   pnpm --filter @megacampus/course-gen-platform exec \
+     tsx scripts/helixa/binding-activation.ts apply activate
+   ```
+
+   The operator requires the same organization, binding, environment, destination and
+   both source ids as provisioning, plus the exact `principalId`. Activation also requires
+   all three operation capabilities to remain enabled. The write is conditional on every
+   column read from the binding, and an exact readback must show `enabled = true`. A repeated
+   activation performs no write. The provisioner deliberately continues to reject an
+   enabled binding; activation replay belongs to this separate operator.
+
+   Have Helixa dispatch one `CREATE_JOB_INSTRUCTION` against
+   `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect 202,
+   then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned by
+   the service principal. Watch `helixa_generation_commands` and the worker log.
 5. **Outbound second, on dev.** Set `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=true` on the dev
    worker. The completed playbook from step 4 must produce one `helixa_knowledge_sync_outbox`
    row that reaches `delivered`, and Helixa's receiver must answer 202 with `originCommand`
@@ -542,6 +656,50 @@ sequence below, in this order, once the three joint values in
    (`reset_helixa_knowledge_sync_intent`).
 6. **Production**, same two steps, same order, with the production binding and ids.
 
-Rollback at any step: `enabled = false` on the binding row silences every trigger and both
-ledgers immediately; unsetting the two mode variables stops the timer and the route on the next
-request. Nothing needs to be dropped to stop.
+Rollback at any step uses the same guarded operator rather than a broad SQL update:
+
+```bash
+pnpm --filter @megacampus/course-gen-platform exec \
+  tsx scripts/helixa/binding-activation.ts plan deactivate
+
+pnpm --filter @megacampus/course-gen-platform exec \
+  tsx scripts/helixa/binding-activation.ts apply deactivate
+```
+
+The exact readback must show `enabled = false`; repeated deactivation performs no write.
+This silences every trigger and both ledgers immediately. Unsetting the two mode variables
+stops the timer and the route on the next request. Nothing needs to be dropped to stop.
+
+## 10. J149 activation checkpoint (2026-09-05)
+
+The shared database now has the two additional J149 migrations. They were applied
+through the existing project-scoped Supabase MCP under the host-operation lock,
+in repository order, and independently checked through a TLS-verified read-only
+catalog/history connection:
+
+| Migration | Applied history version | SQL SHA-256 |
+| --- | --- | --- |
+| `helixa_create_course_generation` | `20260905162359` | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
+| `helixa_observation_binding_scope` | `20260905162619` | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
+
+The verified repository watermark is
+`20260905160000_helixa_observation_binding_scope.sql`; there are no missing,
+historically missing, or stale-allowlist entries. The direct-course constraints,
+scheduler signature and service-role-only execution grants are installed. The
+observer has only the four-argument binding-scoped signature; the old overload
+is absent.
+
+At this checkpoint, bindings, generation commands, sync outbox and legacy course
+commands each contain zero rows, the active application color is green, and the
+four Helixa runtime configuration keys inspected remain absent. Applying the SQL
+has not activated generation. The new provisioner creates a disabled binding;
+only an enabled binding participates in the completion triggers. The earlier
+incident discussion describes the pre-fix state and must not be used as a claim
+that these J149 changes have already passed live product acceptance.
+
+The owner selected Default Organization
+`9b98a7d5-27ea-4441-81dc-de79d488e5db` for both isolated acceptance and production.
+Separate source Helixa organizations, bindings and HMAC materials keep those
+contours distinct. Provisioning, application rollout and the three actual paid
+generation flows remain pending. A rollback preserves migration history and
+native objects: keep the bridge disabled or apply a reviewed forward correction.

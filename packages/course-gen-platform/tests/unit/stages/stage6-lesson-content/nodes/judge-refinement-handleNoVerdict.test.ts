@@ -144,6 +144,84 @@ describe('handleNoVerdict', () => {
   });
 
   describe('REGENERATE recommendation', () => {
+    it('carries a controlled readability remediation into the next generation', async () => {
+      const state = buildState({ language: 'en' });
+      const cascadeResult = buildCascadeResult('REGENERATE', {
+        heuristicResults: {
+          passed: false,
+          wordCount: 2_109,
+          fleschKincaid: 12.6,
+          fleschKincaidSkipped: false,
+          requiredSectionsPresent: true,
+          missingSections: [],
+          keywordCoverage: 1,
+          examplesCount: 0,
+          exercisesCount: 2,
+          failureReasons: ['Flesch-Kincaid grade level (12.6) exceeds target maximum (12)'],
+          warnings: [],
+          durationMs: 1,
+        },
+      });
+
+      const result = await handleNoVerdict(buildContext(state, cascadeResult));
+
+      expect(result.qualityRemediationDirective).toEqual({
+        kind: 'readability_above_maximum',
+        maximumGrade: 12,
+      });
+    });
+
+    it('carries the configured readability maximum instead of assuming grade 12', async () => {
+      const state = buildState({ language: 'en' });
+      const cascadeResult = buildCascadeResult('REGENERATE', {
+        heuristicResults: {
+          passed: false,
+          wordCount: 2_109,
+          fleschKincaid: 14.6,
+          fleschKincaidSkipped: false,
+          requiredSectionsPresent: true,
+          missingSections: [],
+          keywordCoverage: 1,
+          examplesCount: 0,
+          exercisesCount: 2,
+          failureReasons: ['Flesch-Kincaid grade level (14.6) exceeds target maximum (14)'],
+          warnings: [],
+          durationMs: 1,
+        },
+      });
+
+      const result = await handleNoVerdict(buildContext(state, cascadeResult));
+
+      expect(result.qualityRemediationDirective).toEqual({
+        kind: 'readability_above_maximum',
+        maximumGrade: 14,
+      });
+    });
+
+    it('does not invent a readability remediation for another heuristic failure', async () => {
+      const state = buildState({ language: 'en' });
+      const cascadeResult = buildCascadeResult('REGENERATE', {
+        heuristicResults: {
+          passed: false,
+          wordCount: 20,
+          fleschKincaid: 10,
+          fleschKincaidSkipped: false,
+          requiredSectionsPresent: true,
+          missingSections: [],
+          keywordCoverage: 1,
+          examplesCount: 0,
+          exercisesCount: 2,
+          failureReasons: ['Word count critically low (20)'],
+          warnings: [],
+          durationMs: 1,
+        },
+      });
+
+      const result = await handleNoVerdict(buildContext(state, cascadeResult));
+
+      expect(result.qualityRemediationDirective).toBeUndefined();
+    });
+
     it('sets regenerationMode to full_regenerate when recommendation is REGENERATE', async () => {
       const state = buildState({ regenerateCount: 0 });
       const cascadeResult = buildCascadeResult('REGENERATE');

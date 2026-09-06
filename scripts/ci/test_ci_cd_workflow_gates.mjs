@@ -80,6 +80,7 @@ for (const contractCommand of [
   'node scripts/ci/test_color_env_contract.mjs',
   'node scripts/ci/test_ci_cd_workflow_gates.mjs',
   'bash scripts/ci/test_detect_deploy_changes.sh',
+  'bash scripts/ci/test_resolve_development_deploy_base.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
   'bash scripts/ci/test_host_operation_lock.sh',
   'bash scripts/ci/test_ephemeral_ghcr_auth.sh',
@@ -113,6 +114,38 @@ for (const jobName of ['deploy', 'deploy-dev']) {
   );
 }
 
+const changesJob = jobs.changes;
+const developmentDeployBase = changesJob?.steps?.find(
+  step => step?.name === 'Resolve development deploy base'
+);
+const deployChangeDetection = changesJob?.steps?.find(
+  step => step?.name === 'Detect deploy-relevant changes'
+);
+assert(
+  changesJob?.permissions?.contents === 'read' &&
+    changesJob?.permissions?.deployments === 'read',
+  'change detection must have read-only access to development deployment history'
+);
+assert(
+  developmentDeployBase?.if ===
+    "github.event_name == 'push' && github.ref == 'refs/heads/develop'",
+  'development deployment history must be read only for develop pushes'
+);
+assert(
+  developmentDeployBase?.run === 'scripts/ci/resolve_development_deploy_base.sh',
+  'develop pushes must resolve the last successful development deployment'
+);
+assert(
+  deployChangeDetection?.env?.BASE_SHA ===
+    '${{ steps.development-deploy-base.outputs.base_sha || github.event.before }}',
+  'deployment change detection must diff from the resolved development baseline'
+);
+assert(
+  deployChangeDetection?.env?.FORCE_DEPLOY ===
+    '${{ inputs.force_deploy || steps.development-deploy-base.outputs.force_all_runtime || false }}',
+  'an untrusted development baseline must conservatively rebuild every runtime image'
+);
+
 const stagingDeploy = jobs.deploy;
 const copyDeploymentFiles = stagingDeploy?.steps?.find(
   step => step?.name === 'Copy deployment files'
@@ -134,6 +167,9 @@ const verifyDeployment = stagingDeploy?.steps?.find(
 const rollbackCommand = jobs.rollback?.steps?.find(step => step?.name === 'Execute rollback')?.run;
 const copyDevDeploymentFiles = jobs['deploy-dev']?.steps?.find(
   step => step?.name === 'Copy deployment files'
+)?.run;
+const createDevEnv = jobs['deploy-dev']?.steps?.find(
+  step => step?.name === 'Create .env.dev'
 )?.run;
 
 assert(copyDeploymentFiles, 'staging deploy must copy deployment files');
@@ -174,6 +210,42 @@ for (const requiredLine of [
   assert(
     createProductionEnv.includes(requiredLine),
     `staging production env must include ${requiredLine}`
+  );
+}
+
+// J149 Helixa bridge settings are written into full-file environment writers.
+// Both deploy jobs use GitHub Environment-scoped secrets, so the same secret key
+// resolves independently in `production` and `development` without a second
+// prefix convention or a repository-level shared HMAC.
+assert(createDevEnv, 'development deploy must create .env.dev');
+assert(
+  stagingDeploy?.environment?.name === 'production' &&
+    jobs['deploy-dev']?.environment?.name === 'development',
+  'Helixa bridge secret references must resolve in distinct GitHub Environments'
+);
+const helixaRequiredSecretLines = [
+  'HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}',
+  'HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}',
+  'HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}',
+  'HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}',
+  'HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}',
+];
+const helixaSafeDefaultLines = [
+  "HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}",
+  "HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}",
+];
+for (const [writerName, writer] of [
+  ['.env.production', createProductionEnv],
+  ['.env.dev', createDevEnv],
+]) {
+  for (const requiredLine of [...helixaRequiredSecretLines, ...helixaSafeDefaultLines]) {
+    assert(writer.includes(requiredLine), `${writerName} must persist ${requiredLine}`);
+  }
+  assert(
+    !writer.includes('HELIXA_DESTINATION_PROJECT_ID='),
+    `${writerName} must omit HELIXA_DESTINATION_PROJECT_ID when the Helixa binding has null external project scope`
   );
 }
 // mc2-cva3o. QDRANT_METRICS_GID is host-derived, not a secret, and `secrets.QDRANT_METRICS_GID`

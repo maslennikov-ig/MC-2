@@ -21,7 +21,7 @@ durable docs in English; tests are `node --test` on `tests/*.test.mjs`.
 
 ## 1. What MegaCampus delivered (the other half is done)
 
-Delivered to `develop` and released as `<<RELEASE_TAG>>` (commit `<<DEVELOP_SHA>>`) on
+Delivered to `develop` and released as `v0.31.44` (commit `eeb056d9c`) on
 2026-09-05. The full description with file references is
 `docs/helixa/megacampus-side.md` in the MegaCampus repository (`maslennikov-ig/MC-2`).
 
@@ -85,16 +85,18 @@ not `native_completed`; your worker then polls lookup, sees `native_completed`, 
 the signed import through the knowledge-sync package. That is the flow your worker already
 implements, so nothing on your side changes.
 
-Both operations run end to end on the MegaCampus side: `CREATE_COURSE_FROM_JOB_INSTRUCTION`
+Three operations run end to end on the MegaCampus side: `CREATE_COURSE_FROM_JOB_INSTRUCTION`
 schedules a course from an existing role guide; `CREATE_JOB_INSTRUCTION` creates and
 generates a role guide (Career Playbook) from the command's `jobInstruction` fields
-(`roleTitle`, `businessGoal`, `context`, `language: ru|en`) and `selectedSources`.
+(`roleTitle`, `businessGoal`, `context`, `language: ru|en`) and `selectedSources`; and
+`CREATE_COURSE` creates a course from the same `course` fields plus canonical
+`selectedSources`, with no `sourceJobInstruction`.
 Completion is never pushed by the command path itself: the command row moves to
 `native_completed`, and the ordinary knowledge-sync package carries the result back with
 `originCommand`.
 
 **Idempotency and identity.** `commandId` must match
-`^megacampus_generation_command:(create_job_instruction|create_course_from_job_instruction):v1:[a-f0-9]{64}$`.
+`^megacampus_generation_command:(create_job_instruction|create_course_from_job_instruction|create_course):v1:[a-f0-9]{64}$`.
 Re-dispatching the same `commandId` with a different `payloadHash` is a `conflict`; an exact
 replay is a no-op. Reservations carry a two-minute lease with a `claim_generation` fence.
 
@@ -145,7 +147,7 @@ object arrives as `kind: "ROLE_GUIDE"`; and opening a fresh result needs `j149.5
 Both cross-repo proofs (`scripts/testing/run-megacampus-course-platform-proof.sh`,
 `run-megacampus-sync-postgres-proof.sh`) bundle MegaCampus source and default to worktrees
 frozen on 2026-08-23. Point `MC2_GENERATION_PROOF_ROOT` and `MC2_KNOWLEDGE_FIXTURE_ROOT` at a
-checkout of MegaCampus `develop` at `<<DEVELOP_SHA>>` or later before trusting a green run.
+checkout of MegaCampus `develop` at `eeb056d9c` or later before trusting a green run.
 The MegaCampus PostgreSQL 17 suites (`HELIXA_REAL_PG17=1`, `HELIXA_GENERATION_REAL_PG17=1`)
 exercise the same SQL the production database now runs.
 

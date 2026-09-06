@@ -34,6 +34,7 @@ import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/han
 import type { Stage6JobInput } from '../stages/stage6-lesson-content/types';
 import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
 import { careerPlaybookHandler } from './handlers/career-playbook-handler.js';
+import { stage6HandoffHandler } from './handlers/stage6-handoff-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 import { getJobCourseId } from './job-data-fields.js';
 import { getProcessorMaxTtlMsForJobType, getProcessorSoftBudgetMs } from './processor-ttl.js';
@@ -140,6 +141,7 @@ const jobHandlers: Record<string, JobHandler> = {
       return processStage6JobAsJobResult(job, token);
     },
   }),
+  [JobType.STAGE6_HANDOFF]: adaptHandler(stage6HandoffHandler),
   [JobType.CAREER_PLAYBOOK]: adaptHandler(careerPlaybookHandler),
   [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
 };
@@ -155,6 +157,7 @@ const requiredJobHandlerTypes = [
   JobType.STRUCTURE_ANALYSIS,
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
+  JobType.STAGE6_HANDOFF,
   JobType.CAREER_PLAYBOOK,
   JobType.BLOCK_REGENERATION,
 ] as const;

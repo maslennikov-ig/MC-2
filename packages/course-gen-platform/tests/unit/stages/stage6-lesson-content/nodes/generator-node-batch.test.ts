@@ -80,4 +80,19 @@ describe('generatorNode Batch API handoff', () => {
     await generatorNode(state(true));
     expect(generateLessonSingleCallMock.mock.calls[1][8]).toBeUndefined();
   });
+
+  it('forwards a controlled quality remediation to the generator', async () => {
+    const input = state(true);
+    input.qualityRemediationDirective = {
+      kind: 'readability_above_maximum',
+      maximumGrade: 12,
+    };
+
+    await generatorNode(input);
+
+    expect(generateLessonSingleCallMock.mock.calls[0][9]).toEqual({
+      kind: 'readability_above_maximum',
+      maximumGrade: 12,
+    });
+  });
 });

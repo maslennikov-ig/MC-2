@@ -36,7 +36,11 @@ const ResultCommon = {
   commandId: z.string().max(180),
   payloadHash: Sha256,
 };
-const Operation = z.enum(['CREATE_JOB_INSTRUCTION', 'CREATE_COURSE_FROM_JOB_INSTRUCTION']);
+const Operation = z.enum([
+  'CREATE_JOB_INSTRUCTION',
+  'CREATE_COURSE_FROM_JOB_INSTRUCTION',
+  'CREATE_COURSE',
+]);
 const ConflictError = z
   .object({
     code: z.literal('megacampus_generation_command_conflict'),

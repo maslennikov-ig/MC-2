@@ -24,6 +24,32 @@ import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import type { JudgeContext } from './judge-node-helpers';
 import { QualityRemediationAction, buildQaSignals } from '../quality/remediation';
 
+const READABILITY_ABOVE_MAXIMUM =
+  /^Flesch-Kincaid grade level \(\d+(?:\.\d+)?\) exceeds target maximum \((\d+(?:\.\d+)?)\)$/u;
+
+function buildReadabilityRemediationDirective(
+  cascadeResult: CascadeResult | null | undefined
+): { kind: 'readability_above_maximum'; maximumGrade: number } | undefined {
+  const reasons = cascadeResult?.heuristicResults?.failureReasons;
+  if (!Array.isArray(reasons) || reasons.length === 0) return undefined;
+
+  const matches = reasons.map(reason => READABILITY_ABOVE_MAXIMUM.exec(reason));
+  if (matches.some(match => !match)) return undefined;
+
+  const maximumGrades = matches.map(match => Number(match![1]));
+  const maximumGrade = maximumGrades[0];
+  if (
+    !Number.isFinite(maximumGrade) ||
+    maximumGrade < 1 ||
+    maximumGrade > 20 ||
+    maximumGrades.some(candidate => candidate !== maximumGrade)
+  ) {
+    return undefined;
+  }
+
+  return { kind: 'readability_above_maximum', maximumGrade };
+}
+
 /**
  * Execute targeted refinement flow
  *
@@ -338,6 +364,9 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
   const recommendation = cascadeResult?.finalRecommendation ?? 'REGENERATE';
   const needsRegeneration = recommendation === 'REGENERATE';
   const needsHumanReview = recommendation === 'ESCALATE_TO_HUMAN';
+  const qualityRemediationDirective = needsRegeneration
+    ? buildReadabilityRemediationDirective(cascadeResult)
+    : undefined;
   const durationMs = Date.now() - startTime;
 
   // Build enriched output
@@ -407,6 +436,7 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsHumanReview,
     lessonContent: needsRegeneration ? null : state.lessonContent,
     regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    ...(qualityRemediationDirective && { qualityRemediationDirective }),
     regenerateCount: needsRegeneration
       ? (state.regenerateCount ?? 0) + 1
       : (state.regenerateCount ?? 0),

@@ -140,6 +140,141 @@ qdrant_dev_gate() {
     unset admin_key
 }
 
+# BEGIN DEV NGINX SYNC FUNCTION
+sync_dev_nginx_config() {
+    local staged="${DEV_NGINX_STAGED_PATH:-$BASE_PATH/nginx-dev.conf}"
+    local active="${DEV_NGINX_ACTIVE_PATH:-/etc/nginx/sites-enabled/megacampus-dev}"
+    local backup_dir="${DEV_NGINX_BACKUP_DIR:-$BASE_PATH/backups/nginx-dev}"
+    local active_sha staged_sha current_sha backup candidate rollback_candidate metadata mode
+
+    if [ ! -f "$staged" ] || [ -L "$staged" ] || [ ! -r "$staged" ]; then
+        echo "ERROR: staged dev Nginx config must be a readable regular file, not a symlink: $staged" >&2
+        return 1
+    fi
+    mode="$(stat -c '%a' "$staged")"
+    if (( (8#$mode & 022) != 0 )); then
+        echo "ERROR: staged dev Nginx config must not be group- or world-writable: $staged" >&2
+        return 1
+    fi
+
+    if ! sudo -n test -f "$active" || sudo -n test -L "$active"; then
+        echo "ERROR: active dev Nginx config must be a regular file, not a symlink: $active" >&2
+        return 1
+    fi
+    metadata="$(sudo -n stat -c '%u:%g:%a' "$active")"
+    if [ "$metadata" != '0:0:644' ]; then
+        echo "ERROR: active dev Nginx config must be owned root:root with mode 0644" >&2
+        return 1
+    fi
+
+    staged_sha="$(sha256sum "$staged" | awk '{print $1}')"
+    active_sha="$(sudo -n sha256sum "$active" | awk '{print $1}')"
+    if [ "$staged_sha" = "$active_sha" ]; then
+        echo "Dev Nginx config already matches staged source."
+        return 0
+    fi
+
+    if sudo -n test -e "$backup_dir" || sudo -n test -L "$backup_dir"; then
+        if ! sudo -n test -d "$backup_dir" || sudo -n test -L "$backup_dir"; then
+            echo "ERROR: dev Nginx backup path must be a directory, not a symlink: $backup_dir" >&2
+            return 1
+        fi
+        metadata="$(sudo -n stat -c '%u:%g:%a' "$backup_dir")"
+        if [ "$metadata" != '0:0:700' ]; then
+            echo "ERROR: dev Nginx backup directory must be owned root:root with mode 0700" >&2
+            return 1
+        fi
+    else
+        sudo -n install -d -o root -g root -m 0700 "$backup_dir"
+    fi
+
+    backup="$backup_dir/megacampus-dev.$active_sha.conf"
+    if sudo -n test -e "$backup" || sudo -n test -L "$backup"; then
+        if ! sudo -n test -f "$backup" || sudo -n test -L "$backup"; then
+            echo "ERROR: existing dev Nginx backup is not a regular file: $backup" >&2
+            return 1
+        fi
+        metadata="$(sudo -n stat -c '%u:%g:%a' "$backup")"
+        current_sha="$(sudo -n sha256sum "$backup" | awk '{print $1}')"
+        if [ "$metadata" != '0:0:600' ] || [ "$current_sha" != "$active_sha" ]; then
+            echo "ERROR: existing dev Nginx backup conflicts with the active config" >&2
+            return 1
+        fi
+    else
+        sudo -n install -o root -g root -m 0600 "$active" "$backup"
+        current_sha="$(sudo -n sha256sum "$backup" | awk '{print $1}')"
+        if [ "$current_sha" != "$active_sha" ]; then
+            echo "ERROR: dev Nginx backup verification failed" >&2
+            return 1
+        fi
+    fi
+
+    candidate="${active}.candidate.$$"
+    rollback_candidate="${active}.rollback.$$"
+    if sudo -n test -e "$candidate" || sudo -n test -L "$candidate" || \
+       sudo -n test -e "$rollback_candidate" || sudo -n test -L "$rollback_candidate"; then
+        echo "ERROR: dev Nginx candidate path already exists" >&2
+        return 1
+    fi
+    if ! sudo -n install -o root -g root -m 0644 "$staged" "$candidate"; then
+        sudo -n rm -f "$candidate"
+        return 1
+    fi
+    current_sha="$(sudo -n sha256sum "$candidate" | awk '{print $1}')"
+    if [ "$current_sha" != "$staged_sha" ]; then
+        sudo -n rm -f "$candidate"
+        echo "ERROR: dev Nginx candidate verification failed" >&2
+        return 1
+    fi
+
+    # Compare-and-swap guard: the host lock coordinates supported deploys, while
+    # this second read also refuses an out-of-band edit made after the backup.
+    if ! sudo -n test -f "$active" || sudo -n test -L "$active"; then
+        sudo -n rm -f "$candidate"
+        echo "ERROR: active dev Nginx config changed type before replacement" >&2
+        return 1
+    fi
+    metadata="$(sudo -n stat -c '%u:%g:%a' "$active")"
+    current_sha="$(sudo -n sha256sum "$active" | awk '{print $1}')"
+    if [ "$metadata" != '0:0:644' ] || [ "$current_sha" != "$active_sha" ]; then
+        sudo -n rm -f "$candidate"
+        echo "ERROR: active dev Nginx config changed after backup; refusing overwrite" >&2
+        return 1
+    fi
+
+    sudo -n mv "$candidate" "$active"
+
+    if ! sudo -n nginx -t; then
+        sudo -n install -o root -g root -m 0644 "$backup" "$rollback_candidate"
+        sudo -n mv "$rollback_candidate" "$active"
+        sudo -n nginx -t
+        echo "ERROR: staged dev Nginx config failed validation; prior config restored" >&2
+        return 1
+    fi
+
+    if ! sudo -n nginx -s reload; then
+        sudo -n install -o root -g root -m 0644 "$backup" "$rollback_candidate"
+        sudo -n mv "$rollback_candidate" "$active"
+        sudo -n nginx -t
+        sudo -n nginx -s reload
+        echo "ERROR: dev Nginx reload failed; prior config restored and reloaded" >&2
+        return 1
+    fi
+
+    current_sha="$(sudo -n sha256sum "$active" | awk '{print $1}')"
+    metadata="$(sudo -n stat -c '%u:%g:%a' "$active")"
+    if [ "$current_sha" != "$staged_sha" ] || [ "$metadata" != '0:0:644' ]; then
+        echo "ERROR: active dev Nginx config failed post-reload verification" >&2
+        return 1
+    fi
+    echo "Dev Nginx config validated and reloaded."
+}
+# END DEV NGINX SYNC FUNCTION
+
+# Install the authoritative dev vhost before registry, container, or worker
+# mutations. The host-operation lock above covers this compare-and-swap.
+sync_dev_nginx_config
+
 # 1. Authenticate CI without replacing the persistent read-only host credential.
 ghcr_login_with_ci_token
 

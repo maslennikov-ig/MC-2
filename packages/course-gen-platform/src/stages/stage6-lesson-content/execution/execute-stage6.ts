@@ -65,6 +65,7 @@ function buildInitialState(
     ragChunks: input.ragChunks ?? [],
     ragContextId: input.ragContextId ?? null,
     userRefinementPrompt: input.userRefinementPrompt ?? null,
+    qualityRemediationDirective: null,
     modelOverride,
     style: input.style ?? null,
     analysisResult: input.analysisResult ?? null,

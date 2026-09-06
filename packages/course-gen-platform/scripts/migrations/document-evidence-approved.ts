@@ -631,8 +631,33 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `helixa_*` scheduling function so the outbox queue name comes from the caller instead of
 // a literal that only matched production. No trigger, and no function inside the security
 // manifest, so no new `after-*` digest.
+// Re-pinned 2026-09-05 for full j149 activation: 260 files, adding
+// 20260905150000_helixa_create_course_generation.sql and
+// 20260905160000_helixa_observation_binding_scope.sql. The first widens the separate
+// `helixa_generation_commands` ledger and its `helixa_*` reservation/scheduling functions
+// for governed direct course creation. The second replaces the Helixa observation function
+// so it selects an outbox event for the command's exact binding. Neither changes the
+// document-evidence chain, any function in its security manifest, or an accepted source
+// digest, so no new `after-*` digest is needed.
+// Re-pinned 2026-09-05 for the Auth prerequisite repair: 261 files, adding
+// 20260905170000_repair_auth_users_email_change.sql. It changes only NULL values in the
+// Supabase-managed `auth.users.email_change` field to the Auth-compatible empty string and
+// replaces the existing test-fixture helper so future direct inserts supply that value while
+// preserving its live execution ACL. It does not touch the document-evidence chain, its
+// security manifest, or any accepted source digest, so no new `after-*` digest is needed.
+// Re-pinned 2026-09-06 for the owner-selected single-approval Course flow: 262 files, adding
+// 20260906042000_helixa_automatic_course_generation.sql. It replaces only the two existing
+// `helixa_*` Course scheduling functions so newly approved Helixa Courses enter the already
+// shipped automatic Stage 4 -> 5 -> 6 pipeline. It changes no table, historical row, trigger,
+// document-evidence function, security-manifest function, or accepted source digest.
+// Re-pinned 2026-09-06 for terminal automatic Course observation: 263 files, adding
+// 20260906123000_helixa_terminal_course_quality_observation.sql. It replaces only the
+// separate `observe_helixa_native_generation` function so a Course that reaches
+// `stage_6_complete` with terminal lesson quality states is surfaced to Helixa as a native
+// failure instead of remaining scheduled. It changes no document-evidence function,
+// security-manifest function, or accepted source digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'a7aadd502747170e31d5d6ee444af23038f95d55b2bde1500e1b6a3ac4eee5f7';
+  'eb5900831e13e936bfb7e0c5c60f6855448d9c16eca5efed67a2a9f8d5a40610';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are

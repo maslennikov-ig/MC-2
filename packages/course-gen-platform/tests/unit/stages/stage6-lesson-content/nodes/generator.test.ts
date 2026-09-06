@@ -1035,6 +1035,29 @@ Main section.`,
   });
 
   describe('word budget calculation', () => {
+    it('adds only the controlled readability remediation to the generation prompt', async () => {
+      await generateLessonSingleCall(
+        mockLessonSpec,
+        [],
+        'en',
+        null,
+        null,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        { kind: 'readability_above_maximum', maximumGrade: 14 }
+      );
+
+      expect(mockModelInvoke).toHaveBeenCalledWith(
+        expect.stringContaining('<quality_remediation kind="readability_above_maximum">')
+      );
+      expect(mockModelInvoke).toHaveBeenCalledWith(expect.stringContaining('grade at or below 14'));
+      expect(mockModelInvoke).toHaveBeenCalledWith(
+        expect.stringContaining('Preserve factual accuracy, learning objectives,')
+      );
+    });
+
     it('should calculate correct word budget for 5-min lesson', async () => {
       await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
 

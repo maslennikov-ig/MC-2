@@ -20,12 +20,17 @@ run_entrypoint() {
   local home_dir="$case_dir/home"
   local base_path="$case_dir/base"
   local record_dir="$case_dir/record"
+  local staged_nginx="$base_path/nginx-dev.conf"
+  local active_nginx="$case_dir/active-nginx-dev.conf"
   local original_config='{"auths":{"ghcr.io":{"auth":"persistent-read-only"}}}'
   local output status config_path
 
   mkdir -p "$fake_bin" "$home_dir/.docker" "$base_path/scripts/lib" "$record_dir"
   printf '%s\n' "$original_config" > "$home_dir/.docker/config.json"
   cp "$ROOT_DIR/scripts/lib/docling-rollout.sh" "$base_path/scripts/lib/docling-rollout.sh"
+  cp "$ROOT_DIR/deploy/nginx/megacampus-dev.conf" "$staged_nginx"
+  cp "$staged_nginx" "$active_nginx"
+  chmod 0644 "$staged_nginx" "$active_nginx"
 
   cat > "$fake_bin/docker" <<'EOF'
 #!/usr/bin/env bash
@@ -40,7 +45,18 @@ mkdir -p "$config_dir"
 printf '%s\n' '{"auths":{"ghcr.io":{"auth":"temporary-job-token"}}}' > "$config_dir/config.json"
 exit 42
 EOF
-  chmod +x "$fake_bin/docker"
+  cat > "$fake_bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+[ "${1:-}" != -n ] || shift
+if [ "${1:-}" = stat ] && [ "${2:-}" = -c ] && [ "${3:-}" = '%u:%g:%a' ]; then
+  printf '0:0:%s\n' "$(/usr/bin/stat -c '%a' "${4:-}")"
+  exit 0
+fi
+exec "$@"
+EOF
+  chmod +x "$fake_bin/docker" "$fake_bin/sudo"
 
   set +e
   output="$({
@@ -48,6 +64,9 @@ EOF
       PATH="$fake_bin:$PATH" \
       BASE_PATH="$base_path" \
       GHCR_TEST_RECORD="$record_dir" \
+      DEV_NGINX_STAGED_PATH="$staged_nginx" \
+      DEV_NGINX_ACTIVE_PATH="$active_nginx" \
+      DEV_NGINX_BACKUP_DIR="$case_dir/nginx-backups" \
       GITHUB_TOKEN=test-ci-token \
       GITHUB_ACTOR=test-actor \
       DEPLOY_WEB_CHANGED=false \

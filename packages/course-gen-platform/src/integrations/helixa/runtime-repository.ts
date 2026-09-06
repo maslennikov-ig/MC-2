@@ -11,7 +11,11 @@ import {
   type CourseJobInstructionSourceRow,
   type GenerationOriginRow,
 } from './snapshot-loader';
-import { createUploadStorageReader } from './storage-reader';
+import {
+  createCourseSourceReader,
+  createUploadStorageReader,
+  type CourseNativeSourceProofRow,
+} from './storage-reader';
 import type { CompletedObject, ReconcileRepository } from './reconciler';
 
 interface QueryResult<T> {
@@ -141,7 +145,7 @@ export async function loadKnowledgeSnapshot(
   >
 ) {
   const db = client();
-  const readBytes = createUploadStorageReader(getUploadStorageRootPath());
+  const readUploadBytes = createUploadStorageReader(getUploadStorageRootPath());
   const originResult = await db
     .from<GenerationOriginRow>('helixa_generation_commands')
     .select(
@@ -174,45 +178,6 @@ export async function loadKnowledgeSnapshot(
         .eq('course_id', entry.objectId),
       'Failed to load Course lesson content'
     );
-    const acceptedRunResult = await db
-      .from<{
-        source_manifest: Array<{
-          document_id: string;
-          source_version_hash: string;
-          document_name: string;
-        }>;
-      }>('document_evidence_runs')
-      .select('source_manifest')
-      .eq('course_id', entry.objectId)
-      .eq('organization_id', entry.organizationId)
-      .eq('status', 'accepted')
-      .order('completed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (acceptedRunResult.error)
-      throw new Error(
-        `Failed to load accepted Course provenance: ${acceptedRunResult.error.message}`
-      );
-    const manifest = parseAcceptedCourseSourceManifest(acceptedRunResult.data?.source_manifest);
-    const sourceIds = manifest.map((item: { document_id: string }) => item.document_id);
-    const files =
-      sourceIds.length === 0
-        ? []
-        : expectData(
-            await db
-              .from('file_catalog')
-              .select(
-                'id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, parsed_content'
-              )
-              .in('id', sourceIds)
-              .eq('organization_id', entry.organizationId)
-              .eq('course_id', entry.objectId),
-            'Failed to load approved Course sources'
-          );
-    const approvedFiles = bindAcceptedCourseSources(
-      manifest,
-      files as Array<{ id: string; hash: string }>
-    );
     const relationResult = await db
       .from<CourseJobInstructionSourceRow>('course_job_instruction_sources')
       .select(
@@ -225,6 +190,71 @@ export async function loadKnowledgeSnapshot(
       throw new Error(
         `Failed to load Course Job Instruction source: ${relationResult.error.message}`
       );
+    const isDirectCourse = originResult.data?.command_kind === 'CREATE_COURSE';
+    let approvedFiles: Array<{ id: string; hash: string }> = [];
+    let nativeSources: CourseNativeSourceProofRow[] = [];
+    if (!isDirectCourse) {
+      const acceptedRunResult = await db
+        .from<{
+          source_manifest: Array<{
+            document_id: string;
+            source_version_hash: string;
+            document_name: string;
+          }>;
+        }>('document_evidence_runs')
+        .select('source_manifest')
+        .eq('course_id', entry.objectId)
+        .eq('organization_id', entry.organizationId)
+        .eq('status', 'accepted')
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (acceptedRunResult.error)
+        throw new Error(
+          `Failed to load accepted Course provenance: ${acceptedRunResult.error.message}`
+        );
+      const manifest = parseAcceptedCourseSourceManifest(acceptedRunResult.data?.source_manifest);
+      const sourceIds = manifest.map((item: { document_id: string }) => item.document_id);
+      const files =
+        sourceIds.length === 0
+          ? []
+          : expectData(
+              await db
+                .from('file_catalog')
+                .select(
+                  'id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, processed_content, parsed_content, summary_metadata'
+                )
+                .in('id', sourceIds)
+                .eq('organization_id', entry.organizationId)
+                .eq('course_id', entry.objectId),
+              'Failed to load approved Course sources'
+            );
+      approvedFiles = bindAcceptedCourseSources(
+        manifest,
+        files as Array<{ id: string; hash: string }>
+      );
+      nativeSources =
+        sourceIds.length === 0
+          ? []
+          : expectData(
+              await db
+                .from<CourseNativeSourceProofRow[]>('course_job_instruction_native_sources')
+                .select(
+                  'course_id, organization_id, file_catalog_id, source_canonical_content, source_content_hash'
+                )
+                .eq('course_id', entry.objectId)
+                .eq('organization_id', entry.organizationId)
+                .in('file_catalog_id', sourceIds),
+              'Failed to load governed Course native sources'
+            );
+    }
+    const readBytes = createCourseSourceReader({
+      courseId: entry.objectId,
+      organizationId: entry.organizationId,
+      jobInstructionSource: relationResult.data,
+      nativeSources,
+      readUploadBytes,
+    });
     return mapCompletedCourse({
       course: course as never,
       lessonContents: lessons as never[],
@@ -259,7 +289,7 @@ export async function loadKnowledgeSnapshot(
   return mapCompletedRoleGuide({
     playbook: playbook as never,
     sources: sources as never[],
-    readBytes,
+    readBytes: readUploadBytes,
     generationOrigin: originResult.data,
   });
 }
@@ -375,7 +405,11 @@ export function readKnowledgeSyncRuntimeConfig(
     bindingId,
     organizationId,
     destinationBindingId,
-    environment: environment.APP_ENV ?? environment.NODE_ENV ?? 'development',
+    environment:
+      environment.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT ??
+      environment.APP_ENV ??
+      environment.NODE_ENV ??
+      'development',
     externalProjectId: environment.HELIXA_DESTINATION_PROJECT_ID ?? null,
   };
 }

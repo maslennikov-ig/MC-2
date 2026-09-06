@@ -108,6 +108,9 @@ jobs:
   changes:
     name: Detect Deploy-Relevant Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
     timeout-minutes: 5
     outputs:
       should_deploy: ${{ steps.detect.outputs.should_deploy }}
@@ -125,12 +128,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      # A red run never updates the development environment deployment record.
+      # Resolve the last job whose final deployment status was success so the
+      # next push includes every change that has not reached dev yet. If the
+      # bounded history lookup cannot prove a usable ancestor, the resolver
+      # asks the detector to rebuild every runtime image.
+      - name: Resolve development deploy base
+        id: development-deploy-base
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: scripts/ci/resolve_development_deploy_base.sh
+
       - name: Detect deploy-relevant changes
         id: detect
         env:
-          BASE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ steps.development-deploy-base.outputs.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
-          FORCE_DEPLOY: ${{ inputs.force_deploy || false }}
+          FORCE_DEPLOY: ${{ inputs.force_deploy || steps.development-deploy-base.outputs.force_all_runtime || false }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: scripts/ci/detect_deploy_changes.sh
 
@@ -183,8 +200,10 @@ jobs:
           node scripts/ci/test_color_env_contract.mjs
           node scripts/ci/test_ci_cd_workflow_gates.mjs
           bash scripts/ci/test_detect_deploy_changes.sh
+          bash scripts/ci/test_resolve_development_deploy_base.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
           bash scripts/ci/test_host_operation_lock.sh
+          bash scripts/ci/test_dev_nginx_deploy.sh
           bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
           bash scripts/ci/test_course_gen_types_rebuild.sh
@@ -946,6 +965,17 @@ jobs:
           TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          # GitHub Environment-scoped secrets keep production and development
+          # bridge tuples independent. Missing opt-ins stay fail-closed.
+          HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}
+          HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}
+          HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}
+          HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}
+          HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
+          HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
+          HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
           CORS_ORIGIN=https://ai.megacampus.ru
@@ -1368,6 +1398,17 @@ jobs:
           TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          # The development GitHub Environment owns a separate Helixa tuple and
+          # HMAC. Missing opt-ins keep generation disabled and the sender stopped.
+          HELIXA_EXTERNAL_SYSTEM_ID=${{ secrets.HELIXA_EXTERNAL_SYSTEM_ID }}
+          HELIXA_KNOWLEDGE_SYNC_HMAC_KEY=${{ secrets.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY }}
+          HELIXA_KNOWLEDGE_SYNC_ENDPOINT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENDPOINT }}
+          HELIXA_KNOWLEDGE_SYNC_BINDING_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID }}
+          HELIXA_DESTINATION_BINDING_ID=${{ secrets.HELIXA_DESTINATION_BINDING_ID }}
+          HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
+          HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
+          HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru

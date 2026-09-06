@@ -9,21 +9,20 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { enqueueStage6Lesson } from '../../stages/stage6-lesson-content/enqueue';
 import {
   JobType,
   buildStructureGenerationJobData,
   type JobData,
+  type BaseJobData,
   type GenerationJobInput,
   type LessonSpecificationV2,
   type AnalysisResult,
   type CourseStyle,
-  type Language,
 } from '@megacampus/shared-types';
 import { logger } from '../logger/index.js';
 import type { Database } from '@megacampus/shared-types';
 import type { CourseSettings } from '../../server/routers/generation/_shared/types';
-import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
+import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 
 // CR-008: Valid enum values for input validation
 const VALID_TARGET_AUDIENCES = ['beginner', 'intermediate', 'advanced', 'mixed'] as const;
@@ -355,100 +354,21 @@ export async function queueStage5Job(
 }
 
 /**
- * Queue Stage 6 (Lesson Content Generation) jobs - one per lesson
+ * Queue the durable Stage 6 course handoff. Its retryable worker owns the
+ * status claim, per-lesson fanout, and aggregate completion revisit.
  */
-export async function queueStage6Jobs(courseId: string, priority: number): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { data: courseData, error: fetchError } = await supabase
-    .from('courses')
-    .select('course_structure, language, style, title, analysis_result')
-    .eq('id', courseId)
-    .single();
-
-  if (fetchError || !courseData?.course_structure) {
-    throw new Error(`Course structure not found for Stage 6: ${fetchError?.message || 'no data'}`);
-  }
-
-  // Parse course structure to get all lessons
-  const allLessons = parseCourseStructureLessons(courseData.course_structure);
-
-  if (allLessons.length === 0) {
-    throw new Error('No lessons found in course structure for Stage 6');
-  }
-
-  // Determine language and style
-  const language = (courseData.language || 'ru') as Language;
-  const style =
-    courseData.style && isValidStyle(courseData.style) ? courseData.style : DEFAULT_COURSE_STYLE;
-
-  const courseTitle = courseData.title || 'Untitled Course';
-
-  try {
-    let queuedCount = 0;
-    for (const lesson of allLessons) {
-      const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
-      const fullLessonSpec = convertToLessonSpecV2(lesson, courseTitle);
-
-      await enqueueStage6Lesson({
-        jobData: {
-          lessonSpec: fullLessonSpec,
-          courseId,
-          language,
-          style,
-          ragChunks: [],
-          ragContextId: null,
-          executionContext: 'full_generation',
-          analysisResult: courseData.analysis_result as AnalysisResult | undefined,
-        },
-        jobName: `lesson:${lesson.lesson_id}`,
-        source: 'autoApproval',
-        priority,
-        deduplication: { kind: 'jobId', jobId: lessonJobId },
-      });
-      queuedCount++;
-    }
-
-    // Update status to stage_6_generating so checkAndSetStage6Complete can track completion
-    const { error: statusError } = await supabase
-      .from('courses')
-      .update({ generation_status: 'stage_6_generating' })
-      .eq('id', courseId)
-      .eq('generation_status', 'stage_6_init');
-
-    if (statusError) {
-      logger.warn(
-        { courseId, error: statusError.message },
-        'Failed to update status to stage_6_generating (non-fatal)'
-      );
-    }
-
-    logger.info(
-      {
-        courseId,
-        nextStage: 6,
-        lessonCount: allLessons.length,
-        queuedCount,
-        jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
-        statusUpdated: !statusError,
-        queue: 'stage6-lesson-content',
-      },
-      'Queued LESSON_CONTENT jobs to dedicated Stage 6 queue'
-    );
-  } catch (queueError) {
-    // CR-002: Log error with partial progress info
-    logger.error(
-      {
-        courseId,
-        nextStage: 6,
-        totalLessons: allLessons.length,
-        error: queueError instanceof Error ? queueError.message : String(queueError),
-      },
-      'Failed to queue Stage 6 jobs (partial jobs may exist, safe to retry due to idempotent jobIds)'
-    );
-    throw new Error(
-      `Failed to queue Stage 6 jobs: ${queueError instanceof Error ? queueError.message : String(queueError)}`
-    );
-  }
+export async function queueStage6Jobs(
+  courseId: string,
+  priority: number,
+  baseJobData: Omit<BaseJobData, 'jobType'>
+): Promise<void> {
+  const jobId = `auto-${courseId}-stage6-handoff`;
+  await addJob(
+    JobType.STAGE6_HANDOFF,
+    { ...baseJobData, jobType: JobType.STAGE6_HANDOFF, courseId, priority },
+    { priority, jobId }
+  );
+  logger.info({ courseId, nextStage: 6, jobId }, 'Queued durable Stage 6 handoff');
 }
 
 // ============================================================================
@@ -490,7 +410,7 @@ interface MappedLesson {
 /**
  * Parse course_structure JSON into mapped lesson array.
  */
-function parseCourseStructureLessons(courseStructure: unknown): MappedLesson[] {
+export function parseCourseStructureLessons(courseStructure: unknown): MappedLesson[] {
   const structure = courseStructure as CourseStructure;
 
   return structure.sections.flatMap((section, sectionIndex) =>

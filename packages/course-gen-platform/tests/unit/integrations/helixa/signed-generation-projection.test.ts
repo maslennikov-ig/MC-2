@@ -6,15 +6,11 @@ vi.mock('@/shared/supabase/admin', () => ({ getSupabaseAdmin: vi.fn() }));
 vi.mock('@/stages/stage1-document-upload/storage-paths', () => ({
   getUploadStorageRootPath: () => '/tmp/uploads',
 }));
-vi.mock('@/integrations/helixa/storage-reader', () => ({
-  createUploadStorageReader: () => () => Promise.resolve(Buffer.from('approved source')),
-}));
 
 import {
   buildKnowledgeSyncPackage,
   serializeKnowledgeSyncPackage,
 } from '@/integrations/helixa/package-builder';
-import { canonicalGenerationJsonV1 } from '@/integrations/helixa/generation-canonical-json';
 import { loadKnowledgeSnapshot } from '@/integrations/helixa/runtime-repository';
 import { mapCompletedCourse, mapCompletedRoleGuide } from '@/integrations/helixa/snapshot-loader';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -53,6 +49,16 @@ const courseOriginRow = {
   status: 'native_completed',
 } as const;
 
+const directCourseOriginRow = {
+  ...courseOriginRow,
+  command_id:
+    'megacampus_generation_command:create_course:v1:2d5f8c1f2142e7b73a00f24518ed968c55d9f0200d87398afc0cae567282bf9d',
+  command_kind: 'CREATE_COURSE',
+  proposal_id: 'proposal-c',
+  approved_revision: 5,
+  proposal_payload_hash: 'c'.repeat(64),
+} as const;
+
 const courseSourceRow = {
   course_id: courseId,
   organization_id: organizationId,
@@ -78,6 +84,28 @@ function expectedPayloadHash(value: { hashes: { payloadHash: string } }): string
   const projection = structuredClone(value);
   delete (projection.hashes as { payloadHash?: string }).payloadHash;
   return createHash('sha256').update(canonical(projection), 'utf8').digest('hex');
+}
+
+function mockSnapshotRows(rows: Record<string, unknown>) {
+  const from = vi.fn((table: string) => {
+    const result = { data: rows[table] ?? null, error: null };
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      in: vi.fn(),
+      is: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      single: vi.fn(() => Promise.resolve(result)),
+      maybeSingle: vi.fn(() => Promise.resolve(result)),
+      then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
+    };
+    for (const method of ['select', 'eq', 'in', 'is', 'order', 'limit'] as const)
+      query[method].mockReturnValue(query);
+    return query;
+  });
+  vi.mocked(getSupabaseAdmin).mockReturnValue({ from } as never);
+  return from;
 }
 
 describe('signed Helixa generation projection', () => {
@@ -107,7 +135,7 @@ describe('signed Helixa generation projection', () => {
     expect(result.relations).toEqual([]);
   });
 
-  it('keeps legacy package bytes on the legacy canonicalizer while new origins reject fractional proof content', async () => {
+  it('keeps the legacy fractional package bytes unchanged', async () => {
     const legacy = await buildKnowledgeSyncPackage(
       {
         kind: 'ROLE_GUIDE',
@@ -128,29 +156,49 @@ describe('signed Helixa generation projection', () => {
     expect(createHash('sha256').update(legacyBytes).digest('hex')).toBe(
       '077efac7339bd3061582e57111bfbdeaeda6b8fb25e08d131ac26ba6da91dfbd'
     );
+  });
+
+  it('preserves finite fractional lesson content in a signed generation package', async () => {
+    const snapshot = {
+      kind: 'COURSE' as const,
+      id: courseId,
+      organizationId,
+      completedAt,
+      title: 'Generated course',
+      language: 'en',
+      summaryMarkdown: '# Generated course',
+      structure: { sections: [] },
+      blocks: [],
+      lessons: [{ lessonId: 'lesson-a', content: { qualityScore: 0.875 } }],
+      originCommand: {
+        schemaVersion: 'helixa.megacampus-generation-origin.v1' as const,
+        operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' as const,
+        commandId: courseOriginRow.command_id,
+        proposalId: 'proposal-b',
+        approvedRevision: 4,
+        payloadHash: courseOriginRow.proposal_payload_hash,
+      },
+    };
+    const result = await buildKnowledgeSyncPackage(snapshot, {
+      environment: 'test',
+      externalProjectId: null,
+    });
+
+    expect(result.content.lessons).toEqual(snapshot.lessons);
+    expect(result.originCommand).toEqual(snapshot.originCommand);
+    expect(result.hashes.contentHash).toBe(
+      createHash('sha256').update(canonical(result.content), 'utf8').digest('hex')
+    );
+    expect(result.hashes.contentHash).toBe(
+      '964d878ff521b6dd97ad464427653a471d2844c3775e970fd1401b1b5e94592a'
+    );
+    expect(serializeKnowledgeSyncPackage(result).toString('utf8')).toContain(
+      '"qualityScore":0.875'
+    );
 
     await expect(
       buildKnowledgeSyncPackage(
-        {
-          kind: 'ROLE_GUIDE',
-          id: roleGuideId,
-          organizationId,
-          completedAt,
-          title: 'Generated',
-          language: 'en',
-          summaryMarkdown: '# Generated',
-          structure: { '\u{10000}': 1, '\uE000': 1.5 },
-          blocks: [],
-          lessons: [],
-          originCommand: {
-            schemaVersion: 'helixa.megacampus-generation-origin.v1',
-            operation: 'CREATE_JOB_INSTRUCTION',
-            commandId: jobInstructionOriginRow.command_id,
-            proposalId: 'proposal-a',
-            approvedRevision: 3,
-            payloadHash: jobInstructionOriginRow.proposal_payload_hash,
-          },
-        },
+        { ...snapshot, lessons: [{ lessonId: 'lesson-a', content: { qualityScore: Number.NaN } }] },
         { environment: 'test', externalProjectId: null }
       )
     ).rejects.toThrow(/contract/i);
@@ -194,7 +242,7 @@ describe('signed Helixa generation projection', () => {
     );
   });
 
-  it('uses the generation canonical contract for Unicode content proof without changing semantic block order', async () => {
+  it('uses the knowledge-sync canonical contract for Unicode content proof without changing semantic block order', async () => {
     const snapshot = await mapCompletedRoleGuide({
       playbook: {
         id: roleGuideId,
@@ -217,7 +265,7 @@ describe('signed Helixa generation projection', () => {
       externalProjectId: null,
     });
     expect(result.hashes.contentHash).toBe(
-      createHash('sha256').update(canonicalGenerationJsonV1(result.content), 'utf8').digest('hex')
+      createHash('sha256').update(canonical(result.content), 'utf8').digest('hex')
     );
   });
 
@@ -269,6 +317,121 @@ describe('signed Helixa generation projection', () => {
     expect(result.hashes.payloadHash).toBe(expectedPayloadHash(result));
   });
 
+  it('projects direct CREATE_COURSE origin without inventing a role-guide relation', async () => {
+    const snapshot = await mapCompletedCourse({
+      course: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+      },
+      lessonContents: [],
+      files: [],
+      readBytes: vi.fn(),
+      generationOrigin: directCourseOriginRow,
+      jobInstructionSource: null,
+    });
+    const result = await buildKnowledgeSyncPackage(snapshot, {
+      environment: 'test',
+      externalProjectId: null,
+    });
+    expect(result.originCommand).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseOriginRow.command_id,
+    });
+    expect(result.relations).toEqual([]);
+    expect(result.hashes.payloadHash).toBe(expectedPayloadHash(result));
+  });
+
+  it('loads a direct CREATE_COURSE without inventing MC2 source evidence', async () => {
+    const from = mockSnapshotRows({
+      helixa_generation_commands: directCourseOriginRow,
+      courses: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+        slug: null,
+      },
+      lesson_contents: [],
+      course_job_instruction_sources: null,
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      objectKind: 'COURSE',
+      objectId: courseId,
+      organizationId,
+      completedAt,
+      bindingId: directCourseOriginRow.binding_id,
+    });
+
+    expect(snapshot.originCommand).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseOriginRow.command_id,
+    });
+    expect(snapshot.sources).toEqual([]);
+    expect(snapshot.relations).toBeUndefined();
+    expect(from.mock.calls.map(([table]) => table)).not.toContain('document_evidence_runs');
+    expect(from.mock.calls.map(([table]) => table)).not.toContain('file_catalog');
+    expect(from.mock.calls.map(([table]) => table)).not.toContain(
+      'course_job_instruction_native_sources'
+    );
+  });
+
+  it.each([
+    ['invalid origin', { origin: { ...directCourseOriginRow, status: 'scheduled' } }],
+    [
+      'foreign origin organization',
+      { origin: { ...directCourseOriginRow, organization_id: '99999999-9999-4999-8999-999999999999' } },
+    ],
+    [
+      'foreign origin course',
+      { origin: { ...directCourseOriginRow, object_id: '88888888-8888-4888-8888-888888888888' } },
+    ],
+    [
+      'forbidden Job Instruction relation',
+      {
+        origin: directCourseOriginRow,
+        relation: { ...courseSourceRow, origin_command_id: directCourseOriginRow.command_id },
+      },
+    ],
+  ])('fails closed for direct CREATE_COURSE with %s', async (_label, fixture) => {
+    mockSnapshotRows({
+      helixa_generation_commands: fixture.origin,
+      courses: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+        slug: null,
+      },
+      lesson_contents: [],
+      course_job_instruction_sources: fixture.relation ?? null,
+    });
+
+    await expect(
+      loadKnowledgeSnapshot({
+        objectKind: 'COURSE',
+        objectId: courseId,
+        organizationId,
+        completedAt,
+        bindingId: directCourseOriginRow.binding_id,
+      })
+    ).rejects.toThrow(/provenance/i);
+  });
+
   it('fails closed when an authoritative command row and immutable relation disagree', async () => {
     await expect(
       mapCompletedCourse({
@@ -292,7 +455,9 @@ describe('signed Helixa generation projection', () => {
 
   it('loads COURSE origin and relation from their authoritative rows', async () => {
     const fileId = '550e8400-e29b-41d4-a716-446655440000';
-    const fileHash = 'a'.repeat(64);
+    const nativeBody = JSON.stringify({ finalMarkdown: '# Sales Manager', roleProfileSpec: {} });
+    const fileHash = createHash('sha256').update(nativeBody, 'utf8').digest('hex');
+    const sourceRow = { ...courseSourceRow, source_content_hash: fileHash };
     const rows: Record<string, unknown> = {
       helixa_generation_commands: courseOriginRow,
       courses: {
@@ -309,7 +474,7 @@ describe('signed Helixa generation projection', () => {
       lesson_contents: [],
       document_evidence_runs: {
         source_manifest: [
-          { document_id: fileId, source_version_hash: fileHash, document_name: 'policy' },
+          { document_id: fileId, source_version_hash: fileHash, document_name: 'role-guide' },
         ],
       },
       file_catalog: [
@@ -317,15 +482,26 @@ describe('signed Helixa generation projection', () => {
           id: fileId,
           organization_id: organizationId,
           course_id: courseId,
-          filename: 'policy.txt',
-          mime_type: 'text/plain',
+          filename: `role-guide-${roleGuideId}.json`,
+          mime_type: 'application/json',
           hash: fileHash,
-          storage_path: `${organizationId}/policy.txt`,
-          markdown_content: null,
+          storage_path: `helixa-generation://role-guide/${roleGuideId}/${fileHash}`,
+          markdown_content: nativeBody,
+          processed_content: nativeBody,
+          summary_metadata: { source: 'helixa_role_guide', source_version_hash: fileHash },
           parsed_content: null,
         },
       ],
-      course_job_instruction_sources: courseSourceRow,
+      course_job_instruction_sources: sourceRow,
+      course_job_instruction_native_sources: [
+        {
+          course_id: courseId,
+          organization_id: organizationId,
+          file_catalog_id: fileId,
+          source_canonical_content: nativeBody,
+          source_content_hash: fileHash,
+        },
+      ],
     };
     const from = vi.fn((table: string) => {
       const result = { data: rows[table] ?? null, error: null };
@@ -356,12 +532,15 @@ describe('signed Helixa generation projection', () => {
 
     expect(from.mock.calls.map(([table]) => table)).toContain('helixa_generation_commands');
     expect(from.mock.calls.map(([table]) => table)).toContain('course_job_instruction_sources');
+    expect(from.mock.calls.map(([table]) => table)).toContain(
+      'course_job_instruction_native_sources'
+    );
     expect(snapshot.originCommand?.commandId).toBe(courseOriginRow.command_id);
     expect(snapshot.relations).toEqual([
       expect.objectContaining({
         type: 'COURSE_FROM_ROLE_GUIDE',
         toKey: `ROLE_GUIDE:${roleGuideId}`,
-        metadata: { sourceVersion: completedAt, contentHash: sourceContentHash },
+        metadata: { sourceVersion: completedAt, contentHash: fileHash },
       }),
     ]);
   });

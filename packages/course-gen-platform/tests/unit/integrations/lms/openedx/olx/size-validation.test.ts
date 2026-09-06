@@ -529,18 +529,31 @@ describe('Integration with packageOLX', () => {
   });
 
   it('should throw before creating archive (fail fast)', async () => {
-    const structure = createLargeOLXStructure(MAX_PACKAGE_SIZE_BYTES * 1.5);
-
-    const startTime = Date.now();
+    // "Fail fast" means the archive is never started, not that the rejection lands under a
+    // wall-clock bound. The stopwatch version read 107 ms on a busy GitHub runner
+    // (2026-09-05, the nightly price sync) and failed a job that had nothing to do with
+    // OLX. So the archiver factory itself is the witness: it must never be constructed.
+    vi.resetModules();
+    const archiverFactory = vi.fn(() => {
+      throw new Error('archiver must not be constructed before size validation');
+    });
+    vi.doMock('archiver', () => ({ default: archiverFactory }));
     try {
-      await packageOLX(structure);
-      expect.fail('Should have thrown');
-    } catch (error) {
-      const elapsed = Date.now() - startTime;
+      const { packageOLX: packageOLXWithMockedArchiver } = await import(
+        '@/integrations/lms/openedx/olx/packager'
+      );
+      const structure = createLargeOLXStructure(MAX_PACKAGE_SIZE_BYTES * 1.5);
 
-      // Should fail quickly (within 100ms) since validation happens before archiving
-      expect(elapsed).toBeLessThan(100);
-      expect(error).toBeInstanceOf(OLXValidationError);
+      // `resetModules` gives the re-imported packager its own copy of the error class, so
+      // identity is checked by name rather than by `instanceof`.
+      await expect(packageOLXWithMockedArchiver(structure)).rejects.toMatchObject({
+        name: OLXValidationError.name,
+        message: expect.stringContaining('Package size'),
+      });
+      expect(archiverFactory).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock('archiver');
+      vi.resetModules();
     }
   });
 

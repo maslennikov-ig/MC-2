@@ -53,6 +53,7 @@ export enum JobType {
 
   // Lesson content generation (Stage 6+)
   LESSON_CONTENT = 'lesson_content',
+  STAGE6_HANDOFF = 'stage6_handoff',
 
   // Enrichment generation (Stage 7+)
   ENRICHMENT_GENERATION = 'enrichment_generation',
@@ -361,6 +362,17 @@ export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
 
 export type LessonContentJobData = z.infer<typeof LessonContentJobDataSchema>;
 
+/**
+ * Durable Stage 5 -> Stage 6 handoff. The job performs the status claim and
+ * idempotent per-lesson fanout inside a retryable worker attempt.
+ */
+export const Stage6HandoffJobDataSchema = BaseJobDataSchema.extend({
+  jobType: z.literal(JobType.STAGE6_HANDOFF),
+  priority: z.number().int().min(1).max(10),
+});
+
+export type Stage6HandoffJobData = z.infer<typeof Stage6HandoffJobDataSchema>;
+
 // ============================================================================
 // Enrichment Generation Job Schema (Stage 7+)
 // ============================================================================
@@ -520,6 +532,7 @@ export type JobData =
   | StructureGenerationJobData
   | TextGenerationJobData
   | LessonContentJobData
+  | Stage6HandoffJobData
   | EnrichmentGenerationJobData
   | BlockRegenerationJobData
   | CareerPlaybookJobData
@@ -537,6 +550,7 @@ export const JobDataSchema = z.union([
   StructureGenerationJobDataSchema,
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
+  Stage6HandoffJobDataSchema,
   EnrichmentGenerationJobDataSchema,
   BlockRegenerationJobDataSchema,
   CareerPlaybookOperationJobDataSchema,
@@ -649,6 +663,13 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: 1000,
     removeOnFail: false,
     priority: 5, // Medium priority for lesson generation
+  },
+  [JobType.STAGE6_HANDOFF]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 60000,
+    removeOnComplete: 1000,
+    removeOnFail: false,
   },
   [JobType.ENRICHMENT_GENERATION]: {
     attempts: 3,

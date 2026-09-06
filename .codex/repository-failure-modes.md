@@ -447,6 +447,21 @@ means every place the value is read — the local `.env`, the GitHub Actions sec
 from, `/opt/megacampus/.env.{dev,blue,green,production}`, and each running container — and the proof
 is a 200 from `/v1/embeddings` at 768 dims through our own code, not a config diff.
 
+**A cancelled job is not a failed job, and a job that runs the suite inherits the suite's
+toolchain.** The nightly price sync died two nights after its 2026-09-03 fix: a 10-minute
+`timeout-minutes` cancelled the full unit suite and `if: failure()` stayed silent, then
+`career-playbook-pdf.test.ts` launched a Chromium the job had never installed. Any workflow that
+widens to `pnpm test:unit` must copy the main pipeline's `playwright install --with-deps chromium`
+step, size its timeout on the real suite duration, and gate its alarm on
+`failure() || cancelled()`. A scheduled or dispatched run reads the workflow file from `master`, so
+a workflow fix on `develop` is proven only after `/deploy`.
+
+**An audit override written as a range crosses a major.** `"@xmldom/xmldom": ">=0.8.15"` resolved
+to 0.9.12 under pnpm overrides, and mammoth's DOCX fallback died on `parseFromString` with no
+mimeType — on CI only, because the primary tree could not reinstall and still held 0.8.13. Pin
+the patched version inside the same major, and when the local tree cannot install the lockfile,
+say so and treat the CI unit job as the first real run.
+
 ## Local traps that waste an afternoon
 
 - Host port **6333 is the DEV Qdrant** and holds **12 points** across one course (2026-08-27).
