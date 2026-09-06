@@ -137,6 +137,7 @@ const registeredJobTypes = [
   JobType.STRUCTURE_ANALYSIS,
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
+  JobType.STAGE6_HANDOFF,
   JobType.BLOCK_REGENERATION,
   JobType.CAREER_PLAYBOOK,
 ];

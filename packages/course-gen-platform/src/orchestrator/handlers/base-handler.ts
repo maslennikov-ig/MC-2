@@ -89,6 +89,7 @@ export const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.STRUCTURE_GENERATION]: 5, // Stage 5 → RPC step 5
   [JobType.TEXT_GENERATION]: null, // Stage 6 — uses lesson-level progress tracking
   [JobType.LESSON_CONTENT]: null, // Stage 6 — uses lesson-level progress tracking
+  [JobType.STAGE6_HANDOFF]: null, // Durable Stage 5 -> Stage 6 fanout
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
   [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
   [JobType.CAREER_PLAYBOOK]: null, // Career Playbook uses career_playbooks status, not course progress

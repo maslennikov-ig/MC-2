@@ -393,7 +393,7 @@ async function queueNextStageJob(
       await queueStage5Job(courseId, course, userId, organizationId, priority, idempotentJobId);
       break;
     case 6:
-      await queueStage6Jobs(courseId, priority);
+      await queueStage6Jobs(courseId, priority, baseJobData);
       break;
     default:
       logger.warn({ courseId, nextStage }, 'Unknown next stage for auto-queue');

@@ -222,7 +222,17 @@ functions without changing their signatures, owners or ACLs. A newly accepted
 `CREATE_COURSE_FROM_JOB_INSTRUCTION` or `CREATE_COURSE` is inserted with
 `generation_mode = 'automatic'` and `auto_finalize_after_stage6 = true`. The existing
 application then advances Stage 4 to Stage 5 and Stage 5 to Stage 6 without another human
-approval; no application restart is required because each stage reads the stored mode.
+approval; each stage reads the stored mode.
+
+The Stage 5 to Stage 6 boundary uses a retryable `stage6_handoff` queue job. It first
+claims `stage_6_generating`, then enqueues lessons with stable IDs. A partial fanout is
+replayed by the same handoff without duplicating lesson work, and the handoff reruns the
+aggregate completion check after all lesson jobs are present. A failed or lost status claim
+fails the handoff instead of reporting success.
+
+The automatic-mode SQL can be applied without restarting the application. The durable
+handoff is application code and must be released to both the main worker and the dedicated
+Stage 6 worker before unattended Course generation is enabled.
 
 Automatic means unattended progression, not weaker quality checks. Critical Stage 5
 structure issues still stop at `stage_5_awaiting_approval`. Stage 6 publishes and marks the
