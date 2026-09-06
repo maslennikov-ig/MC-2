@@ -36,6 +36,8 @@ interface FileRow {
   hash: string;
   storage_path: string;
   markdown_content?: string | null;
+  processed_content?: string | null;
+  summary_metadata?: unknown;
   parsed_content?: unknown;
   approved: boolean;
   approvedVersion?: string;
