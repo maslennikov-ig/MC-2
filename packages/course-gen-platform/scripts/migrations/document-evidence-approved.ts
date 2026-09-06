@@ -650,8 +650,14 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `helixa_*` Course scheduling functions so newly approved Helixa Courses enter the already
 // shipped automatic Stage 4 -> 5 -> 6 pipeline. It changes no table, historical row, trigger,
 // document-evidence function, security-manifest function, or accepted source digest.
+// Re-pinned 2026-09-06 for terminal automatic Course observation: 263 files, adding
+// 20260906123000_helixa_terminal_course_quality_observation.sql. It replaces only the
+// separate `observe_helixa_native_generation` function so a Course that reaches
+// `stage_6_complete` with terminal lesson quality states is surfaced to Helixa as a native
+// failure instead of remaining scheduled. It changes no document-evidence function,
+// security-manifest function, or accepted source digest.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  '1c1195e6b2b18d5dc7320fd6579499389166641e29faf464db096d1a9cf6fcc0';
+  'eb5900831e13e936bfb7e0c5c60f6855448d9c16eca5efed67a2a9f8d5a40610';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
