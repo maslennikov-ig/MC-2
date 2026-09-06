@@ -27,7 +27,7 @@ interface LessonContentRow {
   content: unknown;
   metadata: unknown;
 }
-interface FileRow {
+export interface FileRow {
   id: string;
   organization_id: string;
   course_id: string | null;
@@ -87,7 +87,7 @@ export interface CourseJobInstructionSourceRow {
   origin_command_id: string;
 }
 
-type ReadBytes = (file: Pick<FileRow, 'id' | 'storage_path'>) => Promise<Buffer>;
+type ReadBytes = (file: FileRow) => Promise<Buffer>;
 
 function jsonObject(value: unknown): Record<string, JsonValue> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
