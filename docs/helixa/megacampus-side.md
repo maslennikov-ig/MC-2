@@ -68,6 +68,15 @@ jitter derived from the event id so a retry storm does not synchronize. HTTP 408
 it is still null and the caller holds the lease. A retry re-sends the original
 bytes rather than rebuilding a package that might now hash differently.
 
+**Governed native Course sources.** A Course created from a Role Guide has a virtual
+`helixa-generation://role-guide/<id>/<sha256>` source instead of an uploaded file.
+The outbound snapshot reader resolves only that exact URI from
+`course_job_instruction_native_sources`. Before returning its canonical UTF-8 bytes,
+it checks the organization, course, file, Course-to-Role-Guide relation, source
+metadata, stored bodies, and SHA-256 as one proof. Any other URI scheme fails the
+provenance gate; ordinary relative upload paths continue through the confined
+filesystem reader.
+
 ## 3. Inbound contract as implemented
 
 Helixa issues three commands: `CREATE_JOB_INSTRUCTION`,

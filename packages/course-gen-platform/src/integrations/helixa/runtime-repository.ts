@@ -11,7 +11,11 @@ import {
   type CourseJobInstructionSourceRow,
   type GenerationOriginRow,
 } from './snapshot-loader';
-import { createUploadStorageReader } from './storage-reader';
+import {
+  createCourseSourceReader,
+  createUploadStorageReader,
+  type CourseNativeSourceProofRow,
+} from './storage-reader';
 import type { CompletedObject, ReconcileRepository } from './reconciler';
 
 interface QueryResult<T> {
@@ -141,7 +145,7 @@ export async function loadKnowledgeSnapshot(
   >
 ) {
   const db = client();
-  const readBytes = createUploadStorageReader(getUploadStorageRootPath());
+  const readUploadBytes = createUploadStorageReader(getUploadStorageRootPath());
   const originResult = await db
     .from<GenerationOriginRow>('helixa_generation_commands')
     .select(
@@ -202,7 +206,7 @@ export async function loadKnowledgeSnapshot(
             await db
               .from('file_catalog')
               .select(
-                'id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, parsed_content'
+                'id, organization_id, course_id, filename, mime_type, hash, storage_path, markdown_content, processed_content, parsed_content, summary_metadata'
               )
               .in('id', sourceIds)
               .eq('organization_id', entry.organizationId)
@@ -225,6 +229,27 @@ export async function loadKnowledgeSnapshot(
       throw new Error(
         `Failed to load Course Job Instruction source: ${relationResult.error.message}`
       );
+    const nativeSources =
+      sourceIds.length === 0
+        ? []
+        : expectData(
+            await db
+              .from<CourseNativeSourceProofRow[]>('course_job_instruction_native_sources')
+              .select(
+                'course_id, organization_id, file_catalog_id, source_canonical_content, source_content_hash'
+              )
+              .eq('course_id', entry.objectId)
+              .eq('organization_id', entry.organizationId)
+              .in('file_catalog_id', sourceIds),
+            'Failed to load governed Course native sources'
+          );
+    const readBytes = createCourseSourceReader({
+      courseId: entry.objectId,
+      organizationId: entry.organizationId,
+      jobInstructionSource: relationResult.data,
+      nativeSources,
+      readUploadBytes,
+    });
     return mapCompletedCourse({
       course: course as never,
       lessonContents: lessons as never[],
@@ -259,7 +284,7 @@ export async function loadKnowledgeSnapshot(
   return mapCompletedRoleGuide({
     playbook: playbook as never,
     sources: sources as never[],
-    readBytes,
+    readBytes: readUploadBytes,
     generationOrigin: originResult.data,
   });
 }
