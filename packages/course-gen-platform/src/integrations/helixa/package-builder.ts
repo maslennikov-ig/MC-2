@@ -1,5 +1,4 @@
 import { canonicalJson, computePayloadHash, sha256 } from './canonical-json';
-import { canonicalGenerationJsonV1 } from './generation-canonical-json';
 import {
   KNOWLEDGE_SYNC_SCHEMA_VERSION,
   type GenerationOriginCommandV1,
@@ -364,9 +363,7 @@ export async function buildKnowledgeSyncPackage(
   const eventType = snapshot.kind === 'COURSE' ? 'COURSE_COMPLETED' : 'ROLE_GUIDE_COMPLETED';
   let contentHash: string;
   try {
-    contentHash = sha256(
-      snapshot.originCommand ? canonicalGenerationJsonV1(content) : canonicalJson(content)
-    );
+    contentHash = sha256(canonicalJson(content));
   } catch {
     throw new KnowledgeSyncPreparationError('contract', false);
   }

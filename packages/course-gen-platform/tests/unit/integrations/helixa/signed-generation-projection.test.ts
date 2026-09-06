@@ -11,7 +11,6 @@ import {
   buildKnowledgeSyncPackage,
   serializeKnowledgeSyncPackage,
 } from '@/integrations/helixa/package-builder';
-import { canonicalGenerationJsonV1 } from '@/integrations/helixa/generation-canonical-json';
 import { loadKnowledgeSnapshot } from '@/integrations/helixa/runtime-repository';
 import { mapCompletedCourse, mapCompletedRoleGuide } from '@/integrations/helixa/snapshot-loader';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
@@ -114,7 +113,7 @@ describe('signed Helixa generation projection', () => {
     expect(result.relations).toEqual([]);
   });
 
-  it('keeps legacy package bytes on the legacy canonicalizer while new origins reject fractional proof content', async () => {
+  it('keeps the legacy fractional package bytes unchanged', async () => {
     const legacy = await buildKnowledgeSyncPackage(
       {
         kind: 'ROLE_GUIDE',
@@ -135,29 +134,49 @@ describe('signed Helixa generation projection', () => {
     expect(createHash('sha256').update(legacyBytes).digest('hex')).toBe(
       '077efac7339bd3061582e57111bfbdeaeda6b8fb25e08d131ac26ba6da91dfbd'
     );
+  });
+
+  it('preserves finite fractional lesson content in a signed generation package', async () => {
+    const snapshot = {
+      kind: 'COURSE' as const,
+      id: courseId,
+      organizationId,
+      completedAt,
+      title: 'Generated course',
+      language: 'en',
+      summaryMarkdown: '# Generated course',
+      structure: { sections: [] },
+      blocks: [],
+      lessons: [{ lessonId: 'lesson-a', content: { qualityScore: 0.875 } }],
+      originCommand: {
+        schemaVersion: 'helixa.megacampus-generation-origin.v1' as const,
+        operation: 'CREATE_COURSE_FROM_JOB_INSTRUCTION' as const,
+        commandId: courseOriginRow.command_id,
+        proposalId: 'proposal-b',
+        approvedRevision: 4,
+        payloadHash: courseOriginRow.proposal_payload_hash,
+      },
+    };
+    const result = await buildKnowledgeSyncPackage(snapshot, {
+      environment: 'test',
+      externalProjectId: null,
+    });
+
+    expect(result.content.lessons).toEqual(snapshot.lessons);
+    expect(result.originCommand).toEqual(snapshot.originCommand);
+    expect(result.hashes.contentHash).toBe(
+      createHash('sha256').update(canonical(result.content), 'utf8').digest('hex')
+    );
+    expect(result.hashes.contentHash).toBe(
+      '964d878ff521b6dd97ad464427653a471d2844c3775e970fd1401b1b5e94592a'
+    );
+    expect(serializeKnowledgeSyncPackage(result).toString('utf8')).toContain(
+      '"qualityScore":0.875'
+    );
 
     await expect(
       buildKnowledgeSyncPackage(
-        {
-          kind: 'ROLE_GUIDE',
-          id: roleGuideId,
-          organizationId,
-          completedAt,
-          title: 'Generated',
-          language: 'en',
-          summaryMarkdown: '# Generated',
-          structure: { '\u{10000}': 1, '\uE000': 1.5 },
-          blocks: [],
-          lessons: [],
-          originCommand: {
-            schemaVersion: 'helixa.megacampus-generation-origin.v1',
-            operation: 'CREATE_JOB_INSTRUCTION',
-            commandId: jobInstructionOriginRow.command_id,
-            proposalId: 'proposal-a',
-            approvedRevision: 3,
-            payloadHash: jobInstructionOriginRow.proposal_payload_hash,
-          },
-        },
+        { ...snapshot, lessons: [{ lessonId: 'lesson-a', content: { qualityScore: Number.NaN } }] },
         { environment: 'test', externalProjectId: null }
       )
     ).rejects.toThrow(/contract/i);
@@ -201,7 +220,7 @@ describe('signed Helixa generation projection', () => {
     );
   });
 
-  it('uses the generation canonical contract for Unicode content proof without changing semantic block order', async () => {
+  it('uses the knowledge-sync canonical contract for Unicode content proof without changing semantic block order', async () => {
     const snapshot = await mapCompletedRoleGuide({
       playbook: {
         id: roleGuideId,
@@ -224,7 +243,7 @@ describe('signed Helixa generation projection', () => {
       externalProjectId: null,
     });
     expect(result.hashes.contentHash).toBe(
-      createHash('sha256').update(canonicalGenerationJsonV1(result.content), 'utf8').digest('hex')
+      createHash('sha256').update(canonical(result.content), 'utf8').digest('hex')
     );
   });
 
