@@ -193,7 +193,7 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.08526, 0.17052],
+      'deepseek/deepseek-v4-flash': [0.08134, 0.16268],
       '~deepseek/deepseek-v4-flash-latest': [0.05, 0.09996],
     };
 

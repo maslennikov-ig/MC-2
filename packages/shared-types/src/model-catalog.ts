@@ -443,8 +443,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.08526,
-    outputPricePerMillion: 0.17052,
+    inputPricePerMillion: 0.08134,
+    outputPricePerMillion: 0.16268,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
