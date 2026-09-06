@@ -80,6 +80,7 @@ for (const contractCommand of [
   'node scripts/ci/test_color_env_contract.mjs',
   'node scripts/ci/test_ci_cd_workflow_gates.mjs',
   'bash scripts/ci/test_detect_deploy_changes.sh',
+  'bash scripts/ci/test_resolve_development_deploy_base.sh',
   'bash scripts/ci/test_blue_green_fail_closed.sh',
   'bash scripts/ci/test_host_operation_lock.sh',
   'bash scripts/ci/test_ephemeral_ghcr_auth.sh',
@@ -112,6 +113,38 @@ for (const jobName of ['deploy', 'deploy-dev']) {
     `${jobName} must restrict its job token to contents:read and packages:read`
   );
 }
+
+const changesJob = jobs.changes;
+const developmentDeployBase = changesJob?.steps?.find(
+  step => step?.name === 'Resolve development deploy base'
+);
+const deployChangeDetection = changesJob?.steps?.find(
+  step => step?.name === 'Detect deploy-relevant changes'
+);
+assert(
+  changesJob?.permissions?.contents === 'read' &&
+    changesJob?.permissions?.deployments === 'read',
+  'change detection must have read-only access to development deployment history'
+);
+assert(
+  developmentDeployBase?.if ===
+    "github.event_name == 'push' && github.ref == 'refs/heads/develop'",
+  'development deployment history must be read only for develop pushes'
+);
+assert(
+  developmentDeployBase?.run === 'scripts/ci/resolve_development_deploy_base.sh',
+  'develop pushes must resolve the last successful development deployment'
+);
+assert(
+  deployChangeDetection?.env?.BASE_SHA ===
+    '${{ steps.development-deploy-base.outputs.base_sha || github.event.before }}',
+  'deployment change detection must diff from the resolved development baseline'
+);
+assert(
+  deployChangeDetection?.env?.FORCE_DEPLOY ===
+    '${{ inputs.force_deploy || steps.development-deploy-base.outputs.force_all_runtime || false }}',
+  'an untrusted development baseline must conservatively rebuild every runtime image'
+);
 
 const stagingDeploy = jobs.deploy;
 const copyDeploymentFiles = stagingDeploy?.steps?.find(
