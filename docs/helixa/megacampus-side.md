@@ -222,12 +222,29 @@ functions without changing their signatures, owners or ACLs. A newly accepted
 `CREATE_COURSE_FROM_JOB_INSTRUCTION` or `CREATE_COURSE` is inserted with
 `generation_mode = 'automatic'` and `auto_finalize_after_stage6 = true`. The existing
 application then advances Stage 4 to Stage 5 and Stage 5 to Stage 6 without another human
-approval; no application restart is required because each stage reads the stored mode.
+approval; each stage reads the stored mode.
+
+The Stage 5 to Stage 6 boundary uses a retryable `stage6_handoff` queue job. It first
+verifies the course organization, claims `stage_6_generating`, then enqueues lessons with
+stable IDs. A partial fanout is replayed by the same handoff, and the handoff reruns the
+aggregate completion check after all lesson jobs are present. A failed or lost status claim
+fails the handoff instead of reporting success. If the worker loses its acknowledgement after
+the course reaches `completed` or `stage_6_complete`, the exact tenant/course retry is a no-op.
+
+Lesson job-ID deduplication covers the handoff's three retry attempts while BullMQ retains the
+jobs (completed Stage 6 jobs are retained for 24 hours, capped at 1000). It does not promise
+exactly-once generation after that retention window; later regeneration uses the explicit
+lesson recovery paths and their paid-work checks.
+
+The automatic-mode SQL can be applied without restarting the application. The durable
+handoff is application code and must be released to both the main worker and the dedicated
+Stage 6 worker before unattended Course generation is enabled.
 
 Automatic means unattended progression, not weaker quality checks. Critical Stage 5
 structure issues still stop at `stage_5_awaiting_approval`. Stage 6 publishes and marks the
-course `completed` only after every lesson has fully completed and both lesson
-publishability and course-quality audits pass. A quality failure remains at
+course `completed` only after every lesson has fully completed and unconditional lesson
+publishability checks pass. The cross-course quality audit remains an additional completion
+gate only when `FEATURE_STAGE6_COURSE_AUDIT=true`. A quality failure remains at
 `stage_6_complete` for remediation. Only the real `completed` transition creates the signed
 outbox result returned to Helixa.
 

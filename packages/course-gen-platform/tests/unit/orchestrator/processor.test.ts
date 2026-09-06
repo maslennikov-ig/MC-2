@@ -6,4 +6,8 @@ describe('sandbox processor registry', () => {
   it('registers Career Playbook jobs with the sandbox processor', () => {
     expect(isJobTypeRegistered(JobType.CAREER_PLAYBOOK)).toBe(true);
   });
+
+  it('registers the durable Stage 6 handoff job with the sandbox processor', () => {
+    expect(isJobTypeRegistered(JobType.STAGE6_HANDOFF)).toBe(true);
+  });
 });
