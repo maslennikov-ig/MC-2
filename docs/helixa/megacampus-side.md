@@ -38,7 +38,11 @@ itself created by a Helixa generation command.
 non-finite numbers and non-plain objects. `computePayloadHash` hashes the whole
 package with `hashes.payloadHash` removed, so the field never hashes itself.
 `serializeKnowledgeSyncPackage` in `package-builder.ts` recomputes that hash and
-refuses to serialize a package whose stored hash disagrees.
+refuses to serialize a package whose stored hash disagrees. The content hash uses
+this same knowledge-sync canonicalizer for every package, including packages with
+an `originCommand`, so finite fractional values in generated lesson data remain
+valid. The stricter safe-integer canonicalizer is limited to generation proposal,
+command, and command-identity contracts.
 
 **Signature.** `deliverClaimedKnowledgeSync` in `delivery.ts` computes
 `HMAC-SHA256` over the exact frozen bytes and sends four headers:
