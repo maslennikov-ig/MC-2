@@ -115,18 +115,18 @@ export async function runStage6Handoff(
     throw new Error('Stage 6 handoff organization does not match course organization');
   }
 
+  const lessons = parseCourseStructureLessons(course.course_structure);
+  if (lessons.length === 0) throw new Error('No lessons found in course structure for Stage 6');
+
   // The worker may finish the aggregate update and lose its BullMQ ACK. A
-  // retry of that exact tenant/course command is complete already and must not
-  // poison the queue or recreate paid lesson work.
+  // retry of that exact tenant/course command with a valid stored structure is
+  // complete already and must not poison the queue or recreate paid work.
   if (
     course.generation_status === 'completed' ||
     course.generation_status === 'stage_6_complete'
   ) {
     return;
   }
-
-  const lessons = parseCourseStructureLessons(course.course_structure);
-  if (lessons.length === 0) throw new Error('No lessons found in course structure for Stage 6');
 
   await dependencies.claimGenerating(input.courseId, course.generation_status);
 

@@ -242,8 +242,9 @@ Stage 6 worker before unattended Course generation is enabled.
 
 Automatic means unattended progression, not weaker quality checks. Critical Stage 5
 structure issues still stop at `stage_5_awaiting_approval`. Stage 6 publishes and marks the
-course `completed` only after every lesson has fully completed and both lesson
-publishability and course-quality audits pass. A quality failure remains at
+course `completed` only after every lesson has fully completed and unconditional lesson
+publishability checks pass. The cross-course quality audit remains an additional completion
+gate only when `FEATURE_STAGE6_COURSE_AUDIT=true`. A quality failure remains at
 `stage_6_complete` for remediation. Only the real `completed` transition creates the signed
 outbox result returned to Helixa.
 
