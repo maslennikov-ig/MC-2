@@ -215,6 +215,22 @@ and a `structure_analysis` row addressed to the caller's configured queue. Compl
 uses the existing course trigger and signed knowledge-sync outbox. A direct course origin is
 exported as `CREATE_COURSE` without inventing a `COURSE_FROM_ROLE_GUIDE` relation.
 
+### One Helixa approval starts the automatic Course pipeline
+
+`20260906042000_helixa_automatic_course_generation.sql` replaces both Course scheduler
+functions without changing their signatures, owners or ACLs. A newly accepted
+`CREATE_COURSE_FROM_JOB_INSTRUCTION` or `CREATE_COURSE` is inserted with
+`generation_mode = 'automatic'` and `auto_finalize_after_stage6 = true`. The existing
+application then advances Stage 4 to Stage 5 and Stage 5 to Stage 6 without another human
+approval; no application restart is required because each stage reads the stored mode.
+
+Automatic means unattended progression, not weaker quality checks. Critical Stage 5
+structure issues still stop at `stage_5_awaiting_approval`. Stage 6 publishes and marks the
+course `completed` only after every lesson has fully completed and both lesson
+publishability and course-quality audits pass. A quality failure remains at
+`stage_6_complete` for remediation. Only the real `completed` transition creates the signed
+outbox result returned to Helixa.
+
 ### One shape that had to move
 
 `dispatchHelixaGenerationCommand` used to answer `state: 'native_completed'` from its
@@ -429,6 +445,20 @@ COMMIT;
 Dropping the triggers is the whole of the rollback that matters for the live tables:
 courses, career playbooks and file catalog rows are never modified by any of this,
 only read.
+
+The automatic Course correction is code-only database state: it updates two function
+definitions and no row. Its apply preconditions are the existing ten-argument scheduler
+signatures from `20260905140000_helixa_course_schedule_target_queue.sql` and
+`20260905150000_helixa_create_course_generation.sql`, plus the existing
+`courses.generation_mode` and `courses.auto_finalize_after_stage6` columns. Capture
+`pg_get_functiondef`, owner, `prosecdef`, `proconfig` and ACL for both functions before apply;
+after apply, only the two function bodies may differ.
+
+To stop new work first, disable the exact binding and generation route. A rollback must be a
+reviewed forward migration that restores the prior `semi_automatic` function definitions;
+do not edit migration history or bulk-update courses already created as `automatic`. Courses
+accepted before rollback keep their stored mode and are handled explicitly. Reapplying the
+automatic definition is the roll-forward. Neither direction needs an application restart.
 
 `DROP TRIGGER` requires ownership of the table, not a privilege. Run the rollback as
 the table owner.
