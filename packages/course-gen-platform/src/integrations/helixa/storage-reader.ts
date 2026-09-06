@@ -3,17 +3,7 @@ import { createHash } from 'node:crypto';
 import { open, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { KnowledgeSyncPreparationError } from './errors';
-
-interface CourseSourceFile {
-  id: string;
-  organization_id: string;
-  course_id: string | null;
-  hash: string;
-  storage_path: string;
-  markdown_content?: string | null;
-  processed_content?: string | null;
-  summary_metadata?: unknown;
-}
+import type { FileRow } from './snapshot-loader';
 
 export interface CourseNativeSourceProofRow {
   course_id: string;
@@ -56,9 +46,9 @@ export function createCourseSourceReader(input: {
   organizationId: string;
   jobInstructionSource: CourseJobInstructionProof | null;
   nativeSources: CourseNativeSourceProofRow[];
-  readUploadBytes: (file: Pick<CourseSourceFile, 'id' | 'storage_path'>) => Promise<Buffer>;
+  readUploadBytes: (file: Pick<FileRow, 'id' | 'storage_path'>) => Promise<Buffer>;
 }) {
-  return async (file: CourseSourceFile): Promise<Buffer> => {
+  return async (file: FileRow): Promise<Buffer> => {
     if (!file.storage_path.startsWith(NATIVE_ROLE_GUIDE_PREFIX)) {
       if (file.storage_path.includes('://')) provenanceFailure();
       return input.readUploadBytes(file);
