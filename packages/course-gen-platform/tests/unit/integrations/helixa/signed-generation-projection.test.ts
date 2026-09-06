@@ -86,6 +86,28 @@ function expectedPayloadHash(value: { hashes: { payloadHash: string } }): string
   return createHash('sha256').update(canonical(projection), 'utf8').digest('hex');
 }
 
+function mockSnapshotRows(rows: Record<string, unknown>) {
+  const from = vi.fn((table: string) => {
+    const result = { data: rows[table] ?? null, error: null };
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      in: vi.fn(),
+      is: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      single: vi.fn(() => Promise.resolve(result)),
+      maybeSingle: vi.fn(() => Promise.resolve(result)),
+      then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
+    };
+    for (const method of ['select', 'eq', 'in', 'is', 'order', 'limit'] as const)
+      query[method].mockReturnValue(query);
+    return query;
+  });
+  vi.mocked(getSupabaseAdmin).mockReturnValue({ from } as never);
+  return from;
+}
+
 describe('signed Helixa generation projection', () => {
   it('keeps an existing non-command ROLE_GUIDE package unchanged', async () => {
     const snapshot = await mapCompletedRoleGuide({
@@ -323,6 +345,91 @@ describe('signed Helixa generation projection', () => {
     });
     expect(result.relations).toEqual([]);
     expect(result.hashes.payloadHash).toBe(expectedPayloadHash(result));
+  });
+
+  it('loads a direct CREATE_COURSE without inventing MC2 source evidence', async () => {
+    const from = mockSnapshotRows({
+      helixa_generation_commands: directCourseOriginRow,
+      courses: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+        slug: null,
+      },
+      lesson_contents: [],
+      course_job_instruction_sources: null,
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      objectKind: 'COURSE',
+      objectId: courseId,
+      organizationId,
+      completedAt,
+      bindingId: directCourseOriginRow.binding_id,
+    });
+
+    expect(snapshot.originCommand).toMatchObject({
+      operation: 'CREATE_COURSE',
+      commandId: directCourseOriginRow.command_id,
+    });
+    expect(snapshot.sources).toEqual([]);
+    expect(snapshot.relations).toBeUndefined();
+    expect(from.mock.calls.map(([table]) => table)).not.toContain('document_evidence_runs');
+    expect(from.mock.calls.map(([table]) => table)).not.toContain('file_catalog');
+    expect(from.mock.calls.map(([table]) => table)).not.toContain(
+      'course_job_instruction_native_sources'
+    );
+  });
+
+  it.each([
+    ['invalid origin', { origin: { ...directCourseOriginRow, status: 'scheduled' } }],
+    [
+      'foreign origin organization',
+      { origin: { ...directCourseOriginRow, organization_id: '99999999-9999-4999-8999-999999999999' } },
+    ],
+    [
+      'foreign origin course',
+      { origin: { ...directCourseOriginRow, object_id: '88888888-8888-4888-8888-888888888888' } },
+    ],
+    [
+      'forbidden Job Instruction relation',
+      {
+        origin: directCourseOriginRow,
+        relation: { ...courseSourceRow, origin_command_id: directCourseOriginRow.command_id },
+      },
+    ],
+  ])('fails closed for direct CREATE_COURSE with %s', async (_label, fixture) => {
+    mockSnapshotRows({
+      helixa_generation_commands: fixture.origin,
+      courses: {
+        id: courseId,
+        organization_id: organizationId,
+        generation_status: 'completed',
+        generation_completed_at: completedAt,
+        title: 'Sales Manager Onboarding',
+        language: 'en',
+        course_structure: { sections: [] },
+        course_description: 'Practical onboarding.',
+        slug: null,
+      },
+      lesson_contents: [],
+      course_job_instruction_sources: fixture.relation ?? null,
+    });
+
+    await expect(
+      loadKnowledgeSnapshot({
+        objectKind: 'COURSE',
+        objectId: courseId,
+        organizationId,
+        completedAt,
+        bindingId: directCourseOriginRow.binding_id,
+      })
+    ).rejects.toThrow(/provenance/i);
   });
 
   it('fails closed when an authoritative command row and immutable relation disagree', async () => {
