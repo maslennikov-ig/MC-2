@@ -146,6 +146,14 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       'utf8'
     );
     await pool.query(automaticCourseMigration);
+    const terminalQualityObservationMigration = await readFile(
+      new URL(
+        '../../../../supabase/migrations/20260906123000_helixa_terminal_course_quality_observation.sql',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    await pool.query(terminalQualityObservationMigration);
   }, 120_000);
 
   afterAll(async () => {
@@ -859,6 +867,34 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       ).rows[0].outcome
     ).toBe('failed');
 
+    const automaticReviewCourseId = '66666666-6666-4666-8666-666666666666';
+    await pool.query(
+      `INSERT INTO courses(id,user_id,organization_id,generation_status,auto_finalize_after_stage6) VALUES ($1,$2,$3,'stage_6_complete',true)`,
+      [automaticReviewCourseId, PRINCIPAL_ID, ORGANIZATION_ID]
+    );
+    expect(
+      (
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, automaticReviewCourseId]
+        )
+      ).rows[0].outcome
+    ).toBe('failed');
+
+    const manualReviewCourseId = '77777777-7777-4777-8777-777777777777';
+    await pool.query(
+      `INSERT INTO courses(id,user_id,organization_id,generation_status,auto_finalize_after_stage6) VALUES ($1,$2,$3,'stage_6_complete',false)`,
+      [manualReviewCourseId, PRINCIPAL_ID, ORGANIZATION_ID]
+    );
+    expect(
+      (
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, manualReviewCourseId]
+        )
+      ).rows[0].outcome
+    ).toBe('running');
+
     const completedCourseId = '55555555-5555-4555-8555-555555555555';
     const completedAt = '2026-08-23T10:40:00.000Z';
     await pool.query(
@@ -881,6 +917,14 @@ describe.runIf(REAL_PG17)('Helixa generation ledger on disposable PostgreSQL 17'
       `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-b',$1,'aaa:foreign-binding','COURSE',$2,$3)`,
       [ORGANIZATION_ID, completedCourseId, completedAt]
     );
+    expect(
+      (
+        await pool.query(
+          `SELECT * FROM observe_helixa_native_generation('binding-a',$1,'COURSE',$2)`,
+          [ORGANIZATION_ID, completedCourseId]
+        )
+      ).rows[0].outcome
+    ).toBe('succeeded_awaiting_signed_import');
     await pool.query(
       `INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,event_id,object_kind,object_id,completed_at) VALUES ('binding-a',$1,'mc2:COURSE:observed','COURSE',$2,$3)`,
       [ORGANIZATION_ID, completedCourseId, completedAt]
