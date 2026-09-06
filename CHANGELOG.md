@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.45] - 2026-09-06
+
+### Added
+- **helixa**: auto-complete approved courses (3426d0f29)
+- **helixa**: add guarded binding activation operator (608996042)
+- **helixa**: add bridge provisioning operator (cb1e40591)
+- **helixa**: activate direct course generation (f0a936d54)
+
+### Fixed
+- **migrations**: account for terminal course observation (6d44329ce)
+- **helixa**: export direct generated courses (3a60a3165)
+- **stage6**: carry configured readability limit (47d6ae4fa)
+- **stage6**: guide readability retries (52e8d4e71)
+- **helixa**: surface terminal automatic course review (715aab3bc)
+- **helixa**: preserve fractional generated content (9e7e786f3)
+- **ci**: catch up undeployed dev changes (f16e946ed)
+- **helixa**: align course source reader types (b7168757d)
+- **helixa**: read governed native course sources (5979347f7)
+- **stage6**: fence durable handoff replays (caadd6211)
+- **stage6**: make automatic fanout retryable (a1ecdf388)
+- **deploy**: activate dev nginx configuration (ef115583a)
+- **ci**: persist Helixa bridge environment (15f67d960)
+- **auth**: preserve fixture helper grants (298bc013f)
+- **auth**: repair null email change fixtures (90694afbf)
+- **migrations**: review j149 repository frontier (bc090acf2)
+- **helixa**: close activation race boundaries (fc6f42def)
+
+### Other
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (764d419cc)
+- **deploy**: satisfy dev nginx auth preflight (c13c4ab5f)
+- **helixa**: model native course source proof (4a93b2e98)
+- **stage6**: validate terminal handoff replay (be4d5b5f2)
+- **helixa**: record verified j149 database activation checkpoint (ffea11b3a)
+- **beads**: record the mc2-sdjy8 closeout and mc2-zxzgf closure interactions (40ea2a973)
+- **handoff**: node_modules reinstalled from the frozen lockfile; mc2-zxzgf closed by owner (c51579f78)
+- **handoff**: record the post-deploy proofs of stage mc2-sdjy8 (cef412e91)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (7b7360eaa)
+- **orchestration**: accept stage mc2-sdjy8 (debt closeout 2026-09-05) (10a18a03b)
+- **lms**: fail-fast is a witness that archiver was never built, not a stopwatch (f5605e72a)
+
+
 ## [0.31.44] - 2026-09-05
 
 ### Added

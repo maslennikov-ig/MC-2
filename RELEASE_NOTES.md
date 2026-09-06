@@ -2,6 +2,41 @@
 
 User-facing release notes for all versions.
 
+## v0.31.45
+
+_Released on 2026-09-06_
+
+### ✨ New Features
+
+- **helixa**: Auto-complete approved courses
+- **helixa**: Add guarded binding activation operator
+- **helixa**: Add bridge provisioning operator
+- **helixa**: Activate direct course generation
+
+### 🐛 Bug Fixes
+
+- **migrations**: Account for terminal course observation
+- **helixa**: Export direct generated courses
+- **stage6**: Carry configured readability limit
+- **stage6**: Guide readability retries
+- **helixa**: Surface terminal automatic course review
+- **helixa**: Preserve fractional generated content
+- **CI/CD**: Catch up undeployed dev changes
+- **helixa**: Align course source reader types
+- **helixa**: Read governed native course sources
+- **stage6**: Fence durable handoff replays
+- **stage6**: Make automatic fanout retryable
+- **deploy**: Activate dev nginx configuration
+- **CI/CD**: Persist Helixa bridge environment
+- **Authentication**: Preserve fixture helper grants
+- **Authentication**: Repair null email change fixtures
+- **migrations**: Review j149 repository frontier
+- **helixa**: Close activation race boundaries
+
+---
+
+_This release was automatically generated from 32 commits._
+
 ## v0.31.44
 
 _Released on 2026-09-05_
