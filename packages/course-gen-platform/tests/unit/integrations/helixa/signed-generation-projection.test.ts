@@ -6,9 +6,6 @@ vi.mock('@/shared/supabase/admin', () => ({ getSupabaseAdmin: vi.fn() }));
 vi.mock('@/stages/stage1-document-upload/storage-paths', () => ({
   getUploadStorageRootPath: () => '/tmp/uploads',
 }));
-vi.mock('@/integrations/helixa/storage-reader', () => ({
-  createUploadStorageReader: () => () => Promise.resolve(Buffer.from('approved source')),
-}));
 
 import {
   buildKnowledgeSyncPackage,
@@ -332,7 +329,9 @@ describe('signed Helixa generation projection', () => {
 
   it('loads COURSE origin and relation from their authoritative rows', async () => {
     const fileId = '550e8400-e29b-41d4-a716-446655440000';
-    const fileHash = 'a'.repeat(64);
+    const nativeBody = JSON.stringify({ finalMarkdown: '# Sales Manager', roleProfileSpec: {} });
+    const fileHash = createHash('sha256').update(nativeBody, 'utf8').digest('hex');
+    const sourceRow = { ...courseSourceRow, source_content_hash: fileHash };
     const rows: Record<string, unknown> = {
       helixa_generation_commands: courseOriginRow,
       courses: {
@@ -349,7 +348,7 @@ describe('signed Helixa generation projection', () => {
       lesson_contents: [],
       document_evidence_runs: {
         source_manifest: [
-          { document_id: fileId, source_version_hash: fileHash, document_name: 'policy' },
+          { document_id: fileId, source_version_hash: fileHash, document_name: 'role-guide' },
         ],
       },
       file_catalog: [
@@ -357,15 +356,26 @@ describe('signed Helixa generation projection', () => {
           id: fileId,
           organization_id: organizationId,
           course_id: courseId,
-          filename: 'policy.txt',
-          mime_type: 'text/plain',
+          filename: `role-guide-${roleGuideId}.json`,
+          mime_type: 'application/json',
           hash: fileHash,
-          storage_path: `${organizationId}/policy.txt`,
-          markdown_content: null,
+          storage_path: `helixa-generation://role-guide/${roleGuideId}/${fileHash}`,
+          markdown_content: nativeBody,
+          processed_content: nativeBody,
+          summary_metadata: { source: 'helixa_role_guide', source_version_hash: fileHash },
           parsed_content: null,
         },
       ],
-      course_job_instruction_sources: courseSourceRow,
+      course_job_instruction_sources: sourceRow,
+      course_job_instruction_native_sources: [
+        {
+          course_id: courseId,
+          organization_id: organizationId,
+          file_catalog_id: fileId,
+          source_canonical_content: nativeBody,
+          source_content_hash: fileHash,
+        },
+      ],
     };
     const from = vi.fn((table: string) => {
       const result = { data: rows[table] ?? null, error: null };
@@ -396,12 +406,15 @@ describe('signed Helixa generation projection', () => {
 
     expect(from.mock.calls.map(([table]) => table)).toContain('helixa_generation_commands');
     expect(from.mock.calls.map(([table]) => table)).toContain('course_job_instruction_sources');
+    expect(from.mock.calls.map(([table]) => table)).toContain(
+      'course_job_instruction_native_sources'
+    );
     expect(snapshot.originCommand?.commandId).toBe(courseOriginRow.command_id);
     expect(snapshot.relations).toEqual([
       expect.objectContaining({
         type: 'COURSE_FROM_ROLE_GUIDE',
         toKey: `ROLE_GUIDE:${roleGuideId}`,
-        metadata: { sourceVersion: completedAt, contentHash: sourceContentHash },
+        metadata: { sourceVersion: completedAt, contentHash: fileHash },
       }),
     ]);
   });
