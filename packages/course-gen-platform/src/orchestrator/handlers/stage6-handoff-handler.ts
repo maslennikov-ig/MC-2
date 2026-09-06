@@ -24,6 +24,7 @@ import {
 } from '@megacampus/shared-types/style-prompts';
 
 interface Stage6HandoffCourse {
+  organization_id: string;
   generation_status: string | null;
   course_structure: unknown;
   language: string | null;
@@ -76,7 +77,9 @@ export async function claimStage6Generating(
 async function loadStage6HandoffCourse(courseId: string): Promise<Stage6HandoffCourse> {
   const { data, error } = await getSupabaseAdmin()
     .from('courses')
-    .select('generation_status, course_structure, language, style, title, analysis_result')
+    .select(
+      'organization_id, generation_status, course_structure, language, style, title, analysis_result'
+    )
     .eq('id', courseId)
     .single();
 
@@ -103,10 +106,25 @@ const productionDependencies: Stage6HandoffDependencies = {
  * a recovered partial fanout.
  */
 export async function runStage6Handoff(
-  input: Pick<Stage6HandoffJobData, 'courseId' | 'priority'>,
+  input: Pick<Stage6HandoffJobData, 'courseId' | 'organizationId' | 'userId' | 'priority'>,
   dependencies: Stage6HandoffDependencies = productionDependencies
 ): Promise<void> {
   const course = await dependencies.loadCourse(input.courseId);
+
+  if (course.organization_id !== input.organizationId) {
+    throw new Error('Stage 6 handoff organization does not match course organization');
+  }
+
+  // The worker may finish the aggregate update and lose its BullMQ ACK. A
+  // retry of that exact tenant/course command is complete already and must not
+  // poison the queue or recreate paid lesson work.
+  if (
+    course.generation_status === 'completed' ||
+    course.generation_status === 'stage_6_complete'
+  ) {
+    return;
+  }
+
   const lessons = parseCourseStructureLessons(course.course_structure);
   if (lessons.length === 0) throw new Error('No lessons found in course structure for Stage 6');
 
@@ -121,6 +139,8 @@ export async function runStage6Handoff(
       jobData: {
         lessonSpec: convertToLessonSpecV2(lesson, courseTitle),
         courseId: input.courseId,
+        organizationId: input.organizationId,
+        userId: input.userId,
         language,
         style,
         ragChunks: [],

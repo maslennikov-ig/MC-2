@@ -19,7 +19,10 @@ const BASE_JOB_DATA = {
   locale: 'en' as const,
 };
 
-const course = (status: 'stage_6_init' | 'stage_6_generating' = 'stage_6_init') => ({
+const course = (
+  status: 'stage_6_init' | 'stage_6_generating' | 'stage_6_complete' | 'completed' = 'stage_6_init'
+) => ({
+  organization_id: BASE_JOB_DATA.organizationId,
   generation_status: status,
   course_structure: {
     sections: [
@@ -106,7 +109,7 @@ describe('Stage 6 durable handoff', () => {
       }),
     });
 
-    await runStage6Handoff({ courseId: COURSE_ID, priority: 5 }, deps);
+    await runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, deps);
 
     expect(events).toEqual(['claimed', 'lesson-completed', 'completion-rechecked']);
   });
@@ -125,9 +128,9 @@ describe('Stage 6 durable handoff', () => {
     const deps = dependencies({
       claimGenerating: vi.fn().mockRejectedValue(new Error('updated 0 rows')),
     });
-    await expect(runStage6Handoff({ courseId: COURSE_ID, priority: 5 }, deps)).rejects.toThrow(
-      'updated 0 rows'
-    );
+    await expect(
+      runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, deps)
+    ).rejects.toThrow('updated 0 rows');
     expect(vi.mocked(deps.enqueueLesson)).not.toHaveBeenCalled();
     expect(vi.mocked(deps.checkComplete)).not.toHaveBeenCalled();
   });
@@ -139,9 +142,9 @@ describe('Stage 6 durable handoff', () => {
       .mockRejectedValueOnce(new Error('Redis unavailable'));
     const first = dependencies({ enqueueLesson: firstEnqueue });
 
-    await expect(runStage6Handoff({ courseId: COURSE_ID, priority: 5 }, first)).rejects.toThrow(
-      'Redis unavailable'
-    );
+    await expect(
+      runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, first)
+    ).rejects.toThrow('Redis unavailable');
     expect(vi.mocked(first.checkComplete)).not.toHaveBeenCalled();
 
     const secondEnqueue = vi.fn().mockResolvedValue({ id: 'deduplicated-or-new' });
@@ -150,7 +153,7 @@ describe('Stage 6 durable handoff', () => {
       enqueueLesson: secondEnqueue,
     });
 
-    await runStage6Handoff({ courseId: COURSE_ID, priority: 5 }, retry);
+    await runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, retry);
 
     const firstAttemptIds = firstEnqueue.mock.calls.map(call => call[0].deduplication.jobId);
     const retryIds = secondEnqueue.mock.calls.map(call => call[0].deduplication.jobId);
@@ -174,9 +177,39 @@ describe('Stage 6 durable handoff', () => {
       }),
     });
 
-    await expect(runStage6Handoff({ courseId: COURSE_ID, priority: 5 }, deps)).rejects.toThrow(
-      'lesson job failed-lesson is already failed'
-    );
+    await expect(
+      runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, deps)
+    ).rejects.toThrow('lesson job failed-lesson is already failed');
+    expect(vi.mocked(deps.checkComplete)).not.toHaveBeenCalled();
+  });
+
+  it.each(['completed', 'stage_6_complete'] as const)(
+    'treats an acknowledged-lost retry at %s as a verified terminal no-op',
+    async status => {
+      const deps = dependencies({ loadCourse: vi.fn().mockResolvedValue(course(status)) });
+
+      await runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, deps);
+
+      expect(vi.mocked(deps.claimGenerating)).not.toHaveBeenCalled();
+      expect(vi.mocked(deps.enqueueLesson)).not.toHaveBeenCalled();
+      expect(vi.mocked(deps.checkComplete)).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a cross-organization handoff before terminal replay or fanout', async () => {
+    const completedOtherTenant = {
+      ...course('completed'),
+      organization_id: '44444444-4444-4444-8444-444444444444',
+    };
+    const deps = dependencies({
+      loadCourse: vi.fn().mockResolvedValue(completedOtherTenant),
+    });
+
+    await expect(
+      runStage6Handoff({ courseId: COURSE_ID, priority: 5, ...BASE_JOB_DATA }, deps)
+    ).rejects.toThrow('organization does not match');
+    expect(vi.mocked(deps.claimGenerating)).not.toHaveBeenCalled();
+    expect(vi.mocked(deps.enqueueLesson)).not.toHaveBeenCalled();
     expect(vi.mocked(deps.checkComplete)).not.toHaveBeenCalled();
   });
 });

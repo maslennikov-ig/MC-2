@@ -69,7 +69,8 @@ export async function handleStageCompletion(
 2. If `automatic`: auto-approve and queue next stage. Stage 5 queues one
    retryable `stage6_handoff` job; that job claims `stage_6_generating` before
    any lesson can run, fans out stable per-lesson job IDs, and revisits course
-   completion after a recovered retry.
+   completion after a recovered retry. It verifies the stored course belongs to
+   the job organization before accepting either active or terminal state.
 3. If `semi_automatic`: set status to `stage_X_awaiting_approval`
 
 #### 2. Course Notifications Service

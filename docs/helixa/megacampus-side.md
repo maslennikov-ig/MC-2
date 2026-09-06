@@ -225,10 +225,16 @@ application then advances Stage 4 to Stage 5 and Stage 5 to Stage 6 without anot
 approval; each stage reads the stored mode.
 
 The Stage 5 to Stage 6 boundary uses a retryable `stage6_handoff` queue job. It first
-claims `stage_6_generating`, then enqueues lessons with stable IDs. A partial fanout is
-replayed by the same handoff without duplicating lesson work, and the handoff reruns the
+verifies the course organization, claims `stage_6_generating`, then enqueues lessons with
+stable IDs. A partial fanout is replayed by the same handoff, and the handoff reruns the
 aggregate completion check after all lesson jobs are present. A failed or lost status claim
-fails the handoff instead of reporting success.
+fails the handoff instead of reporting success. If the worker loses its acknowledgement after
+the course reaches `completed` or `stage_6_complete`, the exact tenant/course retry is a no-op.
+
+Lesson job-ID deduplication covers the handoff's three retry attempts while BullMQ retains the
+jobs (completed Stage 6 jobs are retained for 24 hours, capped at 1000). It does not promise
+exactly-once generation after that retention window; later regeneration uses the explicit
+lesson recovery paths and their paid-work checks.
 
 The automatic-mode SQL can be applied without restarting the application. The durable
 handoff is application code and must be released to both the main worker and the dedicated
