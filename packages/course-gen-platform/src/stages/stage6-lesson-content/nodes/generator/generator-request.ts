@@ -28,24 +28,22 @@ import { formatGenerationGuidanceXML, formatInterLessonContextXML } from './gene
 import { selectStage6ModelTier } from './model-selector';
 import type { Stage6QualityRemediationDirective } from '../../types';
 
-const READABILITY_REMEDIATION_PROMPT = `<quality_remediation kind="readability_above_maximum">
+function buildReadabilityRemediationPrompt(maximumGrade: number): string {
+  return `<quality_remediation kind="readability_above_maximum">
 The previous draft failed the deterministic English readability check. Rewrite the complete
 lesson with shorter sentences and plain explanations, define necessary technical terms, and
-keep its Flesch-Kincaid grade at or below 12. Preserve factual accuracy, learning objectives,
+keep its Flesch-Kincaid grade at or below ${maximumGrade}. Preserve factual accuracy, learning objectives,
 required structure, examples, exercises, citations, and source constraints. Do not remove
 required technical content merely to lower the score.
 </quality_remediation>`;
+}
 
 function appendQualityRemediation(
   prompt: string,
   directive?: Stage6QualityRemediationDirective
 ): string {
-  switch (directive) {
-    case 'readability_above_maximum':
-      return `${prompt}\n\n${READABILITY_REMEDIATION_PROMPT}`;
-    case undefined:
-      return prompt;
-  }
+  if (!directive) return prompt;
+  return `${prompt}\n\n${buildReadabilityRemediationPrompt(directive.maximumGrade)}`;
 }
 
 export interface PreparedLessonSingleCallRequest {

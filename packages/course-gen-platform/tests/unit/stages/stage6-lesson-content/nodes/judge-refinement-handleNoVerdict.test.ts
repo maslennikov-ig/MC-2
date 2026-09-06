@@ -165,7 +165,37 @@ describe('handleNoVerdict', () => {
 
       const result = await handleNoVerdict(buildContext(state, cascadeResult));
 
-      expect(result.qualityRemediationDirective).toBe('readability_above_maximum');
+      expect(result.qualityRemediationDirective).toEqual({
+        kind: 'readability_above_maximum',
+        maximumGrade: 12,
+      });
+    });
+
+    it('carries the configured readability maximum instead of assuming grade 12', async () => {
+      const state = buildState({ language: 'en' });
+      const cascadeResult = buildCascadeResult('REGENERATE', {
+        heuristicResults: {
+          passed: false,
+          wordCount: 2_109,
+          fleschKincaid: 14.6,
+          fleschKincaidSkipped: false,
+          requiredSectionsPresent: true,
+          missingSections: [],
+          keywordCoverage: 1,
+          examplesCount: 0,
+          exercisesCount: 2,
+          failureReasons: ['Flesch-Kincaid grade level (14.6) exceeds target maximum (14)'],
+          warnings: [],
+          durationMs: 1,
+        },
+      });
+
+      const result = await handleNoVerdict(buildContext(state, cascadeResult));
+
+      expect(result.qualityRemediationDirective).toEqual({
+        kind: 'readability_above_maximum',
+        maximumGrade: 14,
+      });
     });
 
     it('does not invent a readability remediation for another heuristic failure', async () => {

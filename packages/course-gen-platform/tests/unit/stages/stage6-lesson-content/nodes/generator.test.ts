@@ -1046,13 +1046,13 @@ Main section.`,
         undefined,
         undefined,
         undefined,
-        'readability_above_maximum'
+        { kind: 'readability_above_maximum', maximumGrade: 14 }
       );
 
       expect(mockModelInvoke).toHaveBeenCalledWith(
         expect.stringContaining('<quality_remediation kind="readability_above_maximum">')
       );
-      expect(mockModelInvoke).toHaveBeenCalledWith(expect.stringContaining('grade at or below 12'));
+      expect(mockModelInvoke).toHaveBeenCalledWith(expect.stringContaining('grade at or below 14'));
       expect(mockModelInvoke).toHaveBeenCalledWith(
         expect.stringContaining('Preserve factual accuracy, learning objectives,')
       );
