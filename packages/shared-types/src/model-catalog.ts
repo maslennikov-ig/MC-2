@@ -385,8 +385,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.065,
-    outputPricePerMillion: 0.18,
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.28,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -411,7 +411,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
     inputPricePerMillion: 0.05,
-    outputPricePerMillion: 0.09996,
+    outputPricePerMillion: 0.16,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -443,8 +443,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.08134,
-    outputPricePerMillion: 0.16268,
+    inputPricePerMillion: 0.088606,
+    outputPricePerMillion: 0.177212,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,

@@ -95,7 +95,7 @@ describe('model catalogue coverage', () => {
       // hours on 2026-08-25. Dates are deliberately absent from the line below,
       // because the nightly sync rewrites the number and cannot rewrite a date
       // beside it (mc2-rhyac).
-      'deepseek/deepseek-v4-flash-0731': [0.065, 0.18],
+      'deepseek/deepseek-v4-flash-0731': [0.14, 0.28],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [0.966, 3.036],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
@@ -193,8 +193,8 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.08134, 0.16268],
-      '~deepseek/deepseek-v4-flash-latest': [0.05, 0.09996],
+      'deepseek/deepseek-v4-flash': [0.088606, 0.177212],
+      '~deepseek/deepseek-v4-flash-latest': [0.05, 0.16],
     };
 
     const actual = Object.fromEntries(
