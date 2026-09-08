@@ -385,8 +385,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.14,
-    outputPricePerMillion: 0.28,
+    inputPricePerMillion: 0.065,
+    outputPricePerMillion: 0.18,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
