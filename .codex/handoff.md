@@ -291,3 +291,9 @@ Use $orchestrator-stage after selecting the next ready Beads goal. Read `AGENTS.
 `.codex/orchestrator.toml`, this handoff, `.codex/repository-failure-modes.md` and the selected
 issue before creating a new stage; do not reopen the accepted Role Guide boundary or the Helixa
 go-live without a new owner request.
+
+## Snapshot alert repair (mc2-qa5th)
+
+Owner authorized fix and immediate deploy on 2026-09-16. Isolated work starts at
+`ce8f269fa`; env publication and bounded snapshot retries are in progress. See
+`.codex/stages/mc2-qa5th/summary.md` for evidence, risk bounds and delivery status.

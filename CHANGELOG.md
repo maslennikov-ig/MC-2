@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.48] - 2026-09-16
+
+### Fixed
+- **qdrant**: retry failed scheduled snapshots within a bounded window (f2e1d1436)
+- **ci**: publish production env atomically (11a1c67c9)
+
+
 ## [0.31.47] - 2026-09-16
 
 ### Fixed
