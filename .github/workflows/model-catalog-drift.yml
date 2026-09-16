@@ -55,21 +55,24 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
+        id: checkout
         with:
           ref: develop
       - uses: pnpm/action-setup@v6
+        id: pnpm
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v6
+        id: node
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - name: Install dependencies
+        id: dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Apply the published rates across the whole catalogue
         id: drift
-        continue-on-error: true
         run: |
           set +e
           pnpm -F course-gen-platform exec tsx scripts/check-model-catalog-drift.ts \
@@ -78,10 +81,18 @@ jobs:
           echo "status=${status}" >> "$GITHUB_OUTPUT"
           # 0 done, 2 we could not reach the API. Those must not look alike,
           # which is why the script separates them.
-          exit 0
+          if [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+          if git diff --quiet -- packages/shared-types/src/model-catalog.ts \
+              packages/course-gen-platform/tests/unit/model-catalog-coverage.test.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Report the API being unreachable, and stop
-        if: steps.drift.outputs.status == '2'
+        if: always() && steps.drift.outputs.status == '2'
         run: echo "::notice::OpenRouter was unreachable; the catalogue was not checked."
 
       # The snapshot beside the catalogue is rewritten too, so this proves the
@@ -102,11 +113,13 @@ jobs:
       # `browserType.launch: Executable doesn't exist` and the rates were thrown
       # away with the runner again.
       - name: Install Playwright Chromium
-        if: steps.drift.outputs.status == '0'
+        id: chromium
+        if: steps.drift.outputs.changed == 'true'
         run: pnpm --filter @megacampus/course-gen-platform exec playwright install --with-deps chromium
 
       - name: Prove the catalogue and its snapshot still agree
-        if: steps.drift.outputs.status == '0'
+        id: verify
+        if: steps.drift.outputs.changed == 'true'
         env:
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_KEY: test-service-key
@@ -139,7 +152,8 @@ jobs:
           pnpm -F course-gen-platform test:unit
 
       - name: Commit the new rates
-        if: steps.drift.outputs.status == '0'
+        id: commit
+        if: steps.drift.outputs.changed == 'true'
         run: |
           set -euo pipefail
           if git diff --quiet; then
@@ -157,10 +171,17 @@ jobs:
           Applied by the nightly price sync. The catalogue is the frozen fallback
           for provider.max_price; the live rate is preferred at call time and the
           receipt settles the real cost."
+          # Never publish against a develop that moved during verification.
+          git fetch --no-tags origin develop
+          if ! git merge-base --is-ancestor origin/develop HEAD; then
+            echo "::error::develop advanced during price verification; retry the sync on its new revision"
+            exit 1
+          fi
           git push origin HEAD:develop
 
       - name: Say so in Telegram when a price moved far enough to matter
-        if: steps.drift.outputs.status == '0' && hashFiles('packages/course-gen-platform/drift-loud.txt') != ''
+        id: price_notice
+        if: steps.commit.outcome == 'success' && hashFiles('packages/course-gen-platform/drift-loud.txt') != ''
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -172,7 +193,7 @@ jobs:
             '' \
             'Ночная сверка с OpenRouter. Новые цены уже записаны в каталог и запушены в `develop` — делать ничего не нужно. Это к сведению.' \
             '' \
-            'Порог — 1.5x, столько же, во сколько раз потолок `max_price` строится от цены. За ним замороженная цена начинает отбивать вызовы.' \
+            'Порог уведомления — изменение в 1.5 раза. Потолок max_price использует актуальную цену; каталог служит запасным источником, если актуальная цена недоступна.' \
             '' \
             '```' "$moves" '```' \
             '' \
@@ -183,28 +204,45 @@ jobs:
             -d "$(jq -n --arg c "$TELEGRAM_CHAT_ID" --arg t "$text" \
                   '{chat_id:$c, text:$t, parse_mode:"Markdown"}')" >/dev/null
 
-      # A sync that stops before its commit step delivers nothing, and until
-      # 2026-08-29 it said so only in a run list nobody reads: the write mode
-      # ran once, failed on a missing test variable, and the catalogue kept the
-      # rates it had. The point of a job that fixes something by itself is that
-      # nobody watches it, so its silence has to be the loud thing.
-      # `failure()` is false for a job GitHub cancelled on `timeout-minutes`,
-      # which is how the 2026-09-04 run delivered nothing and said nothing.
+      # Report the actual failed phase. A notification failure after a successful
+      # push must never claim that the catalogue was not published.
       - name: Say so in Telegram when the sync itself failed
         if: failure() || cancelled()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STEP_RESULTS: ${{ toJSON(steps) }}
+          DRIFT_STATUS: ${{ steps.drift.outputs.status }}
+          COMMIT_OUTCOME: ${{ steps.commit.outcome }}
         run: |
           set -euo pipefail
-          text=$(printf '%s\n' \
-            '*Ночная сверка цен не доехала*' \
-            '' \
-            'Задание упало или было отменено по таймауту до того, как записать новые цены в `develop`. Каталог остался с прежними значениями — это не авария, но чем дольше так, тем выше шанс, что замороженный потолок `max_price` начнёт отбивать вызовы.' \
-            '' \
+          failed=$(jq -r 'to_entries | map(select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key) | join(", ")' <<< "$STEP_RESULTS")
+          case "$failed" in
+            checkout) reason='Не удалось получить код из develop.' ;;
+            pnpm|node|dependencies) reason='Не удалось подготовить зависимости задания.' ;;
+            drift)
+              if [ "$DRIFT_STATUS" = '2' ]; then
+                reason='Не удалось получить список цен OpenRouter.'
+              else
+                reason='Ошибка скрипта обновления каталога или ожидаемых значений теста.'
+              fi ;;
+            chromium) reason='Не удалось установить браузер для тестов.' ;;
+            verify) reason='Проверки обновлённого каталога завершились ошибкой. Подробности — в логах шага проверки.' ;;
+            commit) reason='Не удалось опубликовать цены в develop. Подробности — в логах шага коммита.' ;;
+            price_notice) reason='Не удалось отправить уведомление об изменении цен.' ;;
+            *) reason='Задание прервано или завершилось ошибкой. Точная причина — в логах запуска.' ;;
+          esac
+          if [ "$COMMIT_OUTCOME" = 'success' ]; then
+            title='Сверка цен: ошибка после публикации'
+            state='Обновлённые цены уже опубликованы в develop.'
+          else
+            title='Ночная сверка цен не доехала'
+            state='Этот запуск не опубликовал обновлённые цены в develop. Потолок max_price предпочитает актуальную цену; каталог используется, когда она недоступна.'
+          fi
+          text=$(printf '%s\n' "$title" '' "$reason" '' "$state" '' \
             "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
           curl -sS --fail-with-body -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg c "$TELEGRAM_CHAT_ID" --arg t "$text" \
-                  '{chat_id:$c, text:$t, parse_mode:"Markdown"}')" >/dev/null
+                  '{chat_id:$c, text:$t}')" >/dev/null

@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 0.966,
-    outputPricePerMillion: 3.036,
+    inputPricePerMillion: 1.4,
+    outputPricePerMillion: 4.4,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.075,
-    outputPricePerMillion: 0.25,
+    inputPricePerMillion: 0.1,
+    outputPricePerMillion: 0.3333,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -356,8 +356,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'z-ai/glm-5.2:batch': {
-    inputPricePerMillion: 1.4,
-    outputPricePerMillion: 4.4,
+    inputPricePerMillion: 0.7,
+    outputPricePerMillion: 2.2,
     contextLength: 512000,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -385,8 +385,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.065,
-    outputPricePerMillion: 0.18,
+    inputPricePerMillion: 0.06,
+    outputPricePerMillion: 0.12,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.05,
-    outputPricePerMillion: 0.16,
+    inputPricePerMillion: 0.04,
+    outputPricePerMillion: 0.1,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
