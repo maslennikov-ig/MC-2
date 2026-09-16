@@ -2,6 +2,19 @@
 
 User-facing release notes for all versions.
 
+## v0.31.48
+
+_Released on 2026-09-16_
+
+### 🐛 Bug Fixes
+
+- **qdrant**: Retry failed scheduled snapshots within a bounded window
+- **CI/CD**: Publish production env atomically
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.47
 
 _Released on 2026-09-16_
