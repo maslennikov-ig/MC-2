@@ -60,7 +60,7 @@ describe('model catalogue coverage', () => {
       'google/gemini-3.7-flash:batch': [0.375, 1.875, 1_048_576],
       'minimax/minimax-m3:batch': [0.3, 1.2, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
-      'z-ai/glm-5.2:batch': [1.4, 4.4, 512_000],
+      'z-ai/glm-5.2:batch': [0.7, 2.2, 512_000],
     };
 
     const actual = Object.fromEntries(
@@ -95,12 +95,12 @@ describe('model catalogue coverage', () => {
       // hours on 2026-08-25. Dates are deliberately absent from the line below,
       // because the nightly sync rewrites the number and cannot rewrite a date
       // beside it (mc2-rhyac).
-      'deepseek/deepseek-v4-flash-0731': [0.065, 0.18],
+      'deepseek/deepseek-v4-flash-0731': [0.06, 0.12],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [0.966, 3.036],
+      'z-ai/glm-5.2': [1.4, 4.4],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.075, 0.25],
+      'z-ai/glm-5.3-flash': [0.1, 0.3333],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
@@ -193,8 +193,8 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.08134, 0.16268],
-      '~deepseek/deepseek-v4-flash-latest': [0.05, 0.09996],
+      'deepseek/deepseek-v4-flash': [0.088606, 0.177212],
+      '~deepseek/deepseek-v4-flash-latest': [0.04, 0.1],
     };
 
     const actual = Object.fromEntries(

@@ -1,10 +1,24 @@
 # Orchestrator Handoff
 
-Updated: 2026-09-05. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-09-16. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
+
+## Price sync repair (mc2-x9che)
+
+Owner authorized fix, delivery and deployment on 2026-09-16. Work is isolated
+from the dirty primary worktree. Eight scheduled failures (September 9-16)
+came from the snapshot updater accepting pairs but not Batch triples. The
+repair preserves context length and rejects unsupported existing snapshots;
+workflow failures retain their exit status and report the actual failed phase
+and publication state. Unchanged prices skip the suite and commit.
+The full unit-suite gate remains for changed prices. Publish to develop and
+master: scheduled workflow definitions come from master, source from develop.
+Acceptance: 33 focused tests passed; type-check/build passed, shared-types
+rebuilt after 10 live rate updates. docs-reviewed: updated. Deployment
+identifiers and graph refresh result are recorded in `bd show mc2-x9che`.
 
 ## Current stage
 

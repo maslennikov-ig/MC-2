@@ -91,6 +91,54 @@ describe('the nightly price sync, where it writes', () => {
     expect(next.match(/\[0\.9, 0\.12\]/gu)).toHaveLength(2);
   });
 
+  it('rewrites both prices in a Batch triple and preserves its context and spacing', () => {
+    const snapshot = `      'vendor/batch': [0.06,  0.12,  1_048_576],\n`;
+
+    expect(applyRateToSnapshot(snapshot, 'vendor/batch', 'inputPricePerMillion', 0.9)).toBe(
+      `      'vendor/batch': [0.9,  0.12,  1_048_576],\n`
+    );
+    expect(applyRateToSnapshot(snapshot, 'vendor/batch', 'outputPricePerMillion', 0.9)).toBe(
+      `      'vendor/batch': [0.06,  0.9,  1_048_576],\n`
+    );
+  });
+
+  it('updates duplicate pair and triple entries even when they are adjacent', () => {
+    const snapshot =
+      `      'vendor/batch': [0.06, 0.12], ` + `'vendor/batch': [0.07, 0.13, 512_000],\n`;
+
+    const next = applyRateToSnapshot(snapshot, 'vendor/batch', 'outputPricePerMillion', 0.9);
+
+    expect(next).toBe(
+      `      'vendor/batch': [0.06, 0.9], ` + `'vendor/batch': [0.07, 0.9, 512_000],\n`
+    );
+  });
+
+  it('fails explicitly for an existing snapshot entry with an unsupported shape', () => {
+    const snapshot = `      'vendor/batch': [0.06, 0.12, 512_000, 99],\n`;
+
+    expect(() =>
+      applyRateToSnapshot(snapshot, 'vendor/batch', 'inputPricePerMillion', 0.9)
+    ).toThrow(/unsupported snapshot shape.*vendor\/batch/iu);
+  });
+
+  it('leaves a snapshot untouched when the model is legitimately absent', () => {
+    const snapshot = `      'vendor/other': [0.06, 0.12, 512_000],\n`;
+
+    expect(applyRateToSnapshot(snapshot, 'vendor/batch', 'inputPricePerMillion', 0.9)).toBe(
+      snapshot
+    );
+  });
+
+  it('keeps text and image rates separate for the same model id', () => {
+    const snapshot = `'vendor/model.2': [1.4, 4.4, 512_000],\n'Vendor': 1,\n'vendor/model.2': 30,\n`;
+    expect(applyRateToSnapshot(snapshot, 'vendor/model.2', 'inputPricePerMillion', 0.7)).toBe(
+      `'vendor/model.2': [0.7, 4.4, 512_000],\n'Vendor': 1,\n'vendor/model.2': 30,\n`
+    );
+    expect(applyRateToSnapshot(snapshot, 'vendor/model.2', 'imageOutputPricePerMillion', 15)).toBe(
+      `'vendor/model.2': [1.4, 4.4, 512_000],\n'Vendor': 1,\n'vendor/model.2': 15,\n`
+    );
+  });
+
   it('writes a price rather than a float artefact', () => {
     // Published figures are per-token decimals multiplied by a million here, so
     // they arrive as 0.09999999999999999 and 0.07798000000000001.

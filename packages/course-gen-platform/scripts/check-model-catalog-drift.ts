@@ -347,10 +347,10 @@ export function applyRateToCatalogue(
 /**
  * Replace one rate in the hand-verified snapshot beside the catalogue.
  *
- * Two shapes live there: `'id': [input, output],` for text rates and
- * `'id': N,` for the image ones. Every occurrence of the id is updated rather
- * than the first — the retired-model table states the same published fact as the
- * live one, and leaving one of them behind would make the pair disagree about
+ * Text rates use pairs or Batch triples `[input, output, context]`; image
+ * rates use scalars. Preserve the context and unrelated price tables. Update
+ * every occurrence of the id rather than the first — the retired-model table
+ * states the same published fact as the live one, and leaving one of them behind would make the pair disagree about
  * what OpenRouter charges.
  */
 export function applyRateToSnapshot(
@@ -362,18 +362,29 @@ export function applyRateToSnapshot(
   const literal = formatRate(value);
   const id = modelId.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
-  if (field === 'inputPricePerMillion' || field === 'outputPricePerMillion') {
-    const slot = field === 'inputPricePerMillion' ? 1 : 2;
-    return source.replace(
-      new RegExp(`('${id}':\\s*\\[)([\\d.]+)(,\\s*)([\\d.]+)(\\])`, 'gu'),
-      (_match, open: string, input: string, gap: string, output: string, close: string) =>
-        slot === 1
-          ? `${open}${literal}${gap}${output}${close}`
-          : `${open}${input}${gap}${literal}${close}`
-    );
-  }
-
-  return source.replace(new RegExp(`('${id}':\\s*)[\\d.]+(,)`, 'gu'), `$1${literal}$2`);
+  const isText = field === 'inputPricePerMillion' || field === 'outputPricePerMillion';
+  return source.replace(
+    new RegExp(`('${id}':\\s*)(\\[[^\\]]*\\]|[^,\\n]+)`, 'gu'),
+    (_match, key: string, raw: string) => {
+      const value = raw.trimEnd();
+      const trailing = raw.slice(value.length);
+      if (value.startsWith('[')) {
+        // A model can also occur in an image-price table: only rewrite the
+        // table for this field, preserving context and every separator.
+        if (!isText) return `${key}${raw}`;
+        const tuple = /^(\[\s*)([\d.]+)(,\s*)([\d.]+)((?:,\s*[\d_]+)?\s*\])$/u.exec(value);
+        if (!tuple) throw new Error(`unsupported snapshot shape for ${modelId}: ${value}`);
+        const [, open, input, gap, output, close] = tuple;
+        return field === 'inputPricePerMillion'
+          ? `${key}${open}${literal}${gap}${output}${close}${trailing}`
+          : `${key}${open}${input}${gap}${literal}${close}${trailing}`;
+      }
+      if (!/^[\d.]+$/u.test(value)) {
+        throw new Error(`unsupported snapshot shape for ${modelId}: ${value}`);
+      }
+      return isText ? `${key}${raw}` : `${key}${literal}${trailing}`;
+    }
+  );
 }
 
 /** Write every finding into both files, and say how many landed. */
@@ -390,10 +401,7 @@ function applyFindings(findings: DriftFinding[]): number {
       finding.published
     );
     if (nextCatalogue === catalogue) {
-      console.warn(
-        `  could not find ${finding.modelId} ${finding.field} in the catalogue; left as it was`
-      );
-      continue;
+      throw new Error(`could not rewrite ${finding.modelId} ${finding.field} in the catalogue`);
     }
     catalogue = nextCatalogue;
     snapshot = applyRateToSnapshot(snapshot, finding.modelId, finding.field, finding.published);

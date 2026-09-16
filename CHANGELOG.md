@@ -7,15 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.46] - 2026-09-16
+
+### Fixed
+
+- **cost**: repair nightly batch price synchronization (e8e7706d4)
+
+### Other
+
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (27f5e56a5)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (8aedf114d)
+
 ## [0.31.45] - 2026-09-06
 
 ### Added
+
 - **helixa**: auto-complete approved courses (3426d0f29)
 - **helixa**: add guarded binding activation operator (608996042)
 - **helixa**: add bridge provisioning operator (cb1e40591)
 - **helixa**: activate direct course generation (f0a936d54)
 
 ### Fixed
+
 - **migrations**: account for terminal course observation (6d44329ce)
 - **helixa**: export direct generated courses (3a60a3165)
 - **stage6**: carry configured readability limit (47d6ae4fa)
@@ -35,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **helixa**: close activation race boundaries (fc6f42def)
 
 ### Other
+
 - **cost**: sync MODEL_CATALOG with the published OpenRouter rates (764d419cc)
 - **deploy**: satisfy dev nginx auth preflight (c13c4ab5f)
 - **helixa**: model native course source proof (4a93b2e98)
@@ -46,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cost**: sync MODEL_CATALOG with the published OpenRouter rates (7b7360eaa)
 - **orchestration**: accept stage mc2-sdjy8 (debt closeout 2026-09-05) (10a18a03b)
 - **lms**: fail-fast is a witness that archiver was never built, not a stopwatch (f5605e72a)
-
 
 ## [0.31.44] - 2026-09-05
 
