@@ -1,0 +1,38 @@
+{
+  "issue": "mc2-qa5th",
+  "release": "v0.31.48",
+  "production_commit": "f1742fe211f17933188eaf892ed02e438b04bb4e",
+  "pipeline_url": "https://github.com/maslennikov-ig/MC-2/actions/runs/35110102224",
+  "pipeline_conclusion": "success",
+  "active_color": "green",
+  "api_http_status": 200,
+  "qdrant_health": "healthy",
+  "snapshot": {
+    "schema_version": "megacampus.qdrant.snapshot-manifest/v1",
+    "status": "success",
+    "logical_alias": "course_embeddings",
+    "physical_collection": "course_embeddings_v1",
+    "snapshot_name": "course_embeddings_v1-5955849841203827-2026-09-16-15-04-52.snapshot",
+    "point_count": 6856,
+    "size_bytes": 103021568,
+    "server_checksum": "056a0e52795944dd40834bd766be7224fda8924b0269cd92e9ff3aa97b3fc826",
+    "sha256": "056a0e52795944dd40834bd766be7224fda8924b0269cd92e9ff3aa97b3fc826",
+    "created_at": "2026-09-16T15:04:52.461Z",
+    "storage_mode": "local",
+    "server_version": "1.18.2",
+    "client_version": "1.18.0"
+  },
+  "prometheus_snapshot_epoch": 1789571092,
+  "firing_snapshot_freshness_alerts": [],
+  "retry_policy": {
+    "restart": "on-failure",
+    "delay_seconds": 300,
+    "start_limit_burst": 3,
+    "start_limit_interval_seconds": 12600
+  },
+  "live_unit_sha256": "ce7ecd8a81ba87e0dc80ba6182d10299824eb5f66bea8834894c7c2a4923f7a1",
+  "live_publisher_sha256": "f4c51bd3124a3f107a62e064705c2c0c59526ddc81b633265ecc7b0fca8514d6",
+  "unit_backup": "/etc/systemd/system/megacampus-qdrant-snapshot.service.mc2-qa5th.bak",
+  "graph_reviewed": "blocked",
+  "graph_reason": "Used dirty primary owner graph read-only; no owned graph in isolated release worktree."
+}

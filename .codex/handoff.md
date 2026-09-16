@@ -291,3 +291,12 @@ Use $orchestrator-stage after selecting the next ready Beads goal. Read `AGENTS.
 `.codex/orchestrator.toml`, this handoff, `.codex/repository-failure-modes.md` and the selected
 issue before creating a new stage; do not reopen the accepted Role Guide boundary or the Helixa
 go-live without a new owner request.
+
+## Snapshot alert repair (mc2-qa5th)
+
+Deployed `v0.31.48`, production `f1742fe21`, pipeline `35110102224` green. Env
+publication atomically preserves the operator digest and metrics GID. Snapshot
+failures retry after five minutes, with three starts per 210-minute window.
+Live snapshot verified at 18:04:52 MSK on 2026-09-16; Prometheus freshness confirmed,
+no firing snapshot alerts. Receipt and rollback: `.codex/stages/mc2-qa5th/`.
+The verified runtime tree is synchronized to develop without a separate dev rollout.

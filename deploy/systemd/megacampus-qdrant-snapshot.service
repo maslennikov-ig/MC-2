@@ -2,9 +2,15 @@
 Description=MegaCampus Qdrant authenticated snapshot and retention
 After=network-online.target
 Wants=network-online.target
+# Initial attempt plus two retries, including three 55-minute timeouts.
+# 210 minutes is below the four-hour timer's minimum interval (230 minutes).
+StartLimitIntervalSec=210min
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
+Restart=on-failure
+RestartSec=5m
 UMask=0077
 LoadCredential=qdrant_api_key:/opt/megacampus/secrets/qdrant_api_key
 Environment=QDRANT_URL=http://qdrant:6333
