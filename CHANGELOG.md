@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.47] - 2026-09-16
+
+### Fixed
+
+- **deps**: patch security advisories blocking price sync release (74d8ac9c1)
+
 ## [0.31.46] - 2026-09-16
 
 ### Fixed

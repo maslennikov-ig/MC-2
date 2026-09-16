@@ -2,6 +2,18 @@
 
 User-facing release notes for all versions.
 
+## v0.31.47
+
+_Released on 2026-09-16_
+
+### 🐛 Bug Fixes
+
+- **deps**: Patch security advisories blocking price sync release
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.46
 
 _Released on 2026-09-16_
