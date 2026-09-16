@@ -203,6 +203,7 @@ jobs:
           bash scripts/ci/test_resolve_development_deploy_base.sh
           bash scripts/ci/test_blue_green_fail_closed.sh
           bash scripts/ci/test_host_operation_lock.sh
+          bash scripts/ci/test_publish_production_env.sh
           bash scripts/ci/test_dev_nginx_deploy.sh
           bash scripts/ci/test_ephemeral_ghcr_auth.sh
           bash scripts/ci/test_docling_rollout.sh
@@ -865,6 +866,7 @@ jobs:
             scripts/deploy_blue_green.sh \
             scripts/rollback_blue_green.sh \
             scripts/with_host_operation_lock.sh \
+            scripts/publish_production_env.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
           scp -i ~/.ssh/deploy_key \
             scripts/lib/docling-rollout.sh \
@@ -928,7 +930,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cat > ${{ env.DEPLOY_PATH }}/.env.production << 'ENVEOF'
+            "bash ${{ env.DEPLOY_PATH }}/scripts/publish_production_env.sh ${{ env.DEPLOY_PATH }}/.env.production" <<'ENVEOF'
           NODE_ENV=production
           PORT=4000
           LOG_LEVEL=info
@@ -1015,7 +1017,6 @@ jobs:
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=2048
           ENVEOF
-          chmod 600 ${{ env.DEPLOY_PATH }}/.env.production"
 
       # A typo here is invisible everywhere else. `resolveChunkingStrategy` warns
       # and falls back to `legacy_markdown` on an unrecognised value, so
