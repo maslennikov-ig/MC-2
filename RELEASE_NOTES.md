@@ -2,6 +2,18 @@
 
 User-facing release notes for all versions.
 
+## v0.31.46
+
+_Released on 2026-09-16_
+
+### 🐛 Bug Fixes
+
+- **cost**: Repair nightly batch price synchronization
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.45
 
 _Released on 2026-09-06_
