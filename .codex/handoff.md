@@ -294,6 +294,9 @@ go-live without a new owner request.
 
 ## Snapshot alert repair (mc2-qa5th)
 
-Owner authorized fix and immediate deploy on 2026-09-16. Isolated work starts at
-`ce8f269fa`; env publication and bounded snapshot retries are in progress. See
-`.codex/stages/mc2-qa5th/summary.md` for evidence, risk bounds and delivery status.
+Deployed `v0.31.48`, production `f1742fe21`, pipeline `35110102224` green. Env
+publication atomically preserves the operator digest and metrics GID. Snapshot
+failures retry after five minutes, with three starts per 210-minute window.
+Live snapshot verified at 18:04:52 MSK on 2026-09-16; Prometheus freshness confirmed,
+no firing snapshot alerts. Receipt and rollback: `.codex/stages/mc2-qa5th/`.
+The verified runtime tree is synchronized to develop without a separate dev rollout.
