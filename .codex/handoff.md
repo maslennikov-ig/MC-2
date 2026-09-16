@@ -19,6 +19,12 @@ master: scheduled workflow definitions come from master, source from develop.
 Acceptance: 33 focused tests passed; type-check/build passed, shared-types
 rebuilt after 10 live rate updates. docs-reviewed: updated. Deployment
 identifiers and graph refresh result are recorded in `bd show mc2-x9che`.
+The master price-sync run `35081600425` passed on 2026-09-16. The first
+release candidate was stopped before deployment by dependency security audit;
+`mc2-xyklh` patches Next.js 15.5.24, Sharp 0.35.4 and js-yaml 4.3.2.
+Security gate remains unchanged. Dependency documentation decision: patch
+versions only, no API/workflow migration; package manifests and lockfile are
+the canonical version records.
 
 ## Current stage
 
@@ -246,6 +252,10 @@ run `scripts/orchestration/check_stranded_commits.py`. `/push-dev` deletes the b
 delivered, so a report naming a branch again means something really was left behind.
 
 ## Explicit defers
+
+- `mc2-5hqt3` — four moderate tooling advisories remain outside the price-sync
+  repair: @humanfs/node, vitest/@vitest/mocker, baseline-browser-mapping.
+  The release-blocking high/critical findings are handled in `mc2-xyklh`.
 
 - `mc2-vlskb` — the Docling timeout wrapper stays until `docling-project/docling-mcp#135` is
   merged and released; then delete only the timeout half of `runtime.py`.
