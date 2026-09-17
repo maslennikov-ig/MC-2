@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.1,
-    outputPricePerMillion: 0.3333,
+    inputPricePerMillion: 0.09,
+    outputPricePerMillion: 0.3,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.04,
-    outputPricePerMillion: 0.1,
+    inputPricePerMillion: 0.03,
+    outputPricePerMillion: 0.13,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
