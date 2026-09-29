@@ -309,7 +309,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 1.4,
+    inputPricePerMillion: 0.39,
     outputPricePerMillion: 4.4,
     contextLength: 1048576,
     maxOutputTokens: 262144,
@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.09,
-    outputPricePerMillion: 0.3,
+    inputPricePerMillion: 0.15,
+    outputPricePerMillion: 0.5,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -385,8 +385,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.06,
-    outputPricePerMillion: 0.12,
+    inputPricePerMillion: 0.018,
+    outputPricePerMillion: 0.32,
     contextLength: 1310720,
     maxOutputTokens: 384000,
     supportsTemperature: true,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.03,
-    outputPricePerMillion: 0.13,
+    inputPricePerMillion: 0.012,
+    outputPricePerMillion: 1.25,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -443,8 +443,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.088606,
-    outputPricePerMillion: 0.177212,
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.28,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
