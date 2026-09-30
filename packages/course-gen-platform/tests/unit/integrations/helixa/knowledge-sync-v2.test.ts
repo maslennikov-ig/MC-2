@@ -15,6 +15,8 @@ import * as schedulerModule from '@/integrations/helixa/scheduler';
 import * as service from '@/integrations/helixa/service';
 import { canonicalJson, sha256 } from '@/integrations/helixa/canonical-json';
 import { processKnowledgeSyncOutboxEntry } from '@/integrations/helixa/outbox';
+import type { KnowledgeSyncPackage, KnowledgeSyncTombstone } from '@/integrations/helixa/contract';
+import type { DeliveryConfig } from '@/integrations/helixa/delivery';
 import type { KnowledgeSyncOutboxEntry } from '@/integrations/helixa/outbox';
 import type { KnowledgeExportSnapshot } from '@/integrations/helixa/package-builder';
 
@@ -149,7 +151,7 @@ function entry(overrides: Partial<KnowledgeSyncOutboxEntry> = {}): KnowledgeSync
 }
 function repository() {
   return {
-    persistRawBodyOnce: vi.fn(async (_id, _lease, bytes: Buffer) => bytes),
+    persistRawBodyOnce: vi.fn((_id, _lease, bytes: Buffer) => Promise.resolve(bytes)),
     markDelivered: vi.fn().mockResolvedValue(true),
     reschedule: vi.fn().mockResolvedValue(true),
     markTerminal: vi.fn().mockResolvedValue(true),
@@ -427,7 +429,9 @@ describe('knowledge-sync v2 exact contract', () => {
 
 describe('v2 protocol-pinned delivery', () => {
   it('delivers a full v2 update from the frozen semantic snapshot through the real outbox path', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, body: '{}' });
+    const request = vi
+      .fn<DeliveryConfig['request']>()
+      .mockResolvedValue({ status: 200, body: '{}' });
     const repo = repository();
     const from = vi.fn(() => {
       throw new Error('current native content must not be read');
@@ -437,13 +441,13 @@ describe('v2 protocol-pinned delivery', () => {
       await service.runKnowledgeSyncDeliveryBatch({
         dependencies: {
           config,
-          claim: async () => [entry()],
+          claim: () => Promise.resolve([entry()]),
           repository: repo,
           request,
         },
       })
     ).toEqual([{ id: 'outbox', result: 'delivered' }]);
-    const wire = JSON.parse(request.mock.calls[0][0].body.toString());
+    const wire: unknown = JSON.parse(request.mock.calls[0][0].body.toString());
     expect(wire).toMatchObject({
       schemaVersion: schemaV2,
       eventType: 'COURSE_UPDATED',
@@ -456,21 +460,24 @@ describe('v2 protocol-pinned delivery', () => {
 
   it('delivers a deletion without loading the missing snapshot and without wire hashes', async () => {
     const loadSnapshot = vi.fn().mockRejectedValue(new Error('deleted snapshot must not be read'));
-    const request = vi.fn().mockResolvedValue({ status: 200, body: '{}' });
+    const request = vi
+      .fn<DeliveryConfig['request']>()
+      .mockResolvedValue({ status: 200, body: '{}' });
     const repo = repository();
     const result = await service.runKnowledgeSyncDeliveryBatch({
       dependencies: {
         config,
-        claim: async () => [
-          entry({
-            eventId: 'mc2:COURSE:org:course:RETRACTED:5',
-            eventType: 'COURSE_RETRACTED',
-            revision: 5,
-            retractionReason: 'deleted',
-            snapshot: null,
-            contentHash: null,
-          }),
-        ],
+        claim: () =>
+          Promise.resolve([
+            entry({
+              eventId: 'mc2:COURSE:org:course:RETRACTED:5',
+              eventType: 'COURSE_RETRACTED',
+              revision: 5,
+              retractionReason: 'deleted',
+              snapshot: null,
+              contentHash: null,
+            }),
+          ]),
         loadSnapshot,
         repository: repo,
         request,
@@ -478,7 +485,7 @@ describe('v2 protocol-pinned delivery', () => {
     });
     expect(result).toEqual([{ id: 'outbox', result: 'delivered' }]);
     expect(loadSnapshot).not.toHaveBeenCalled();
-    const wire = JSON.parse(request.mock.calls[0][0].body.toString());
+    const wire = JSON.parse(request.mock.calls[0][0].body.toString()) as KnowledgeSyncTombstone;
     expect(wire.eventType).toBe('COURSE_RETRACTED');
     expect(wire).not.toHaveProperty('hashes');
     expect(repo.persistRawBodyOnce).toHaveBeenCalledWith(
@@ -674,9 +681,15 @@ describe('v2 protocol-pinned delivery', () => {
     const results = await service.runKnowledgeSyncDeliveryBatch({
       dependencies: {
         config,
-        claim: async () => [
-          entry({ id: 'legacy', contractVersion: 1, eventId: 'legacy-event', rawBody: legacyBody }),
-        ],
+        claim: () =>
+          Promise.resolve([
+            entry({
+              id: 'legacy',
+              contractVersion: 1,
+              eventId: 'legacy-event',
+              rawBody: legacyBody,
+            }),
+          ]),
         loadSnapshot,
         repository: repo,
         request,
@@ -688,9 +701,15 @@ describe('v2 protocol-pinned delivery', () => {
     const restoredV1 = await service.runKnowledgeSyncDeliveryBatch({
       dependencies: {
         config: { ...config, contractV2: false },
-        claim: async () => [
-          entry({ id: 'legacy', contractVersion: 1, eventId: 'legacy-event', rawBody: legacyBody }),
-        ],
+        claim: () =>
+          Promise.resolve([
+            entry({
+              id: 'legacy',
+              contractVersion: 1,
+              eventId: 'legacy-event',
+              rawBody: legacyBody,
+            }),
+          ]),
         loadSnapshot,
         repository: repo,
         request,
@@ -702,7 +721,7 @@ describe('v2 protocol-pinned delivery', () => {
     const disabled = await service.runKnowledgeSyncDeliveryBatch({
       dependencies: {
         config: { ...config, contractV2: false },
-        claim: async () => [entry({ rawBody: frozenV2 })],
+        claim: () => Promise.resolve([entry({ rawBody: frozenV2 })]),
         loadSnapshot,
         repository: repo,
         request,
@@ -720,17 +739,18 @@ describe('v2 protocol-pinned delivery', () => {
     );
     const frozenBody = builder.serializeKnowledgeSyncPackage(legacy);
     let materialized = '# Current revision 4 answer';
-    const request = vi.fn(async input => {
-      const wire = JSON.parse(input.body.toString());
+    const request = vi.fn<DeliveryConfig['request']>(input => {
+      const wire = JSON.parse(input.body.toString()) as KnowledgeSyncPackage;
       materialized = wire.content.summaryMarkdown;
-      return { status: 200, body: '{}' };
+      return Promise.resolve({ status: 200, body: '{}' });
     });
     const result = await service.runKnowledgeSyncDeliveryBatch({
       dependencies: {
         config,
-        claim: async () => [
-          entry({ contractVersion: 1, eventId: legacy.eventId, rawBody: frozenBody }),
-        ],
+        claim: () =>
+          Promise.resolve([
+            entry({ contractVersion: 1, eventId: legacy.eventId, rawBody: frozenBody }),
+          ]),
         repository: repository(),
         request,
       },
@@ -798,7 +818,7 @@ describe('current organization manifest', () => {
       service.runKnowledgeSyncManifest({
         dependencies: {
           config,
-          loadInventory: async () => [inventory(1)[0], inventory(1)[0]],
+          loadInventory: () => Promise.resolve([inventory(1)[0], inventory(1)[0]]),
           request,
         },
       })
@@ -826,7 +846,7 @@ describe('current organization manifest', () => {
   it('uses the event HMAC route and only last-page resend feedback with current-revision enqueue', async () => {
     const objects = inventory(1001);
     const request = vi
-      .fn()
+      .fn<DeliveryConfig['request']>()
       .mockResolvedValueOnce({
         status: 200,
         body: JSON.stringify({
@@ -847,7 +867,12 @@ describe('current organization manifest', () => {
     const result = await service.runKnowledgeSyncManifest({
       manifestId: 'manifest',
       sentAt: createdAt,
-      dependencies: { config, loadInventory: async () => objects, enqueueResend, request },
+      dependencies: {
+        config,
+        loadInventory: () => Promise.resolve(objects),
+        enqueueResend,
+        request,
+      },
     });
     expect(result).toMatchObject({ pageCount: 2, objects: 1001, enqueued: 1, retracted: 2 });
     expect(enqueueResend).toHaveBeenCalledExactlyOnceWith(config, [
@@ -903,7 +928,7 @@ describe('current organization manifest', () => {
         service.runKnowledgeSyncManifest({
           dependencies: {
             config,
-            loadInventory: async () => inventory(1),
+            loadInventory: () => Promise.resolve(inventory(1)),
             enqueueResend,
             request: vi.fn().mockResolvedValue(response),
           },
@@ -932,10 +957,11 @@ describe('v2 maintenance and durable capture mode', () => {
   it('preserves an injected clock receiver and retries a synchronous non-Error maintenance failure', async () => {
     let tick!: () => void;
     const onFailure = vi.fn();
+    const externalFailure = (): unknown => 'temporary maintenance rejection';
     const runMaintenance = vi
       .fn<() => Promise<void>>()
       .mockImplementationOnce(() => {
-        throw 'temporary maintenance rejection';
+        throw externalFailure();
       })
       .mockResolvedValue(undefined);
     const options = {
@@ -1009,10 +1035,12 @@ describe('v2 maintenance and durable capture mode', () => {
   });
 
   it('keeps v1 working before the v2 migration exists but fails closed for v2 activation', async () => {
-    const rpc = vi.fn(async name =>
-      name === 'set_helixa_knowledge_sync_v2_enabled'
-        ? { data: null, error: { code: 'PGRST202', message: 'RPC not present in schema cache' } }
-        : { data: [], error: null }
+    const rpc = vi.fn(name =>
+      Promise.resolve(
+        name === 'set_helixa_knowledge_sync_v2_enabled'
+          ? { data: null, error: { code: 'PGRST202', message: 'RPC not present in schema cache' } }
+          : { data: [], error: null }
+      )
     );
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
     await expect(
@@ -1054,9 +1082,9 @@ describe('v2 maintenance and durable capture mode', () => {
       lease_token: 'lease',
       binding_id: 'binding',
     };
-    const rpc = vi.fn(async (name, args) => {
+    const rpc = vi.fn((name, args) => {
       calls.push({ name, args });
-      return {
+      return Promise.resolve({
         data:
           name === 'set_helixa_knowledge_sync_v2_enabled'
             ? true
@@ -1064,7 +1092,7 @@ describe('v2 maintenance and durable capture mode', () => {
               ? [row]
               : [],
         error: null,
-      };
+      });
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
     for (const enabled of [false, true, false]) {
@@ -1259,10 +1287,12 @@ describe('v2 maintenance and durable capture mode', () => {
   });
 
   it('does not abort disabled-scheduler boot when the exact disabled binding accepts gate false', async () => {
-    const rpc = vi.fn(async (name, args) => ({
-      data: args.p_enabled === false ? true : null,
-      error: args.p_enabled === false ? null : { code: '42501', message: 'disabled binding' },
-    }));
+    const rpc = vi.fn((name, args) =>
+      Promise.resolve({
+        data: args.p_enabled === false ? true : null,
+        error: args.p_enabled === false ? null : { code: '42501', message: 'disabled binding' },
+      })
+    );
     const from = vi.fn();
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc, from } as never);
     const setInterval = vi.fn();
