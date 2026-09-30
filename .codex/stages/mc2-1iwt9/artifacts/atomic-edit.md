@@ -61,7 +61,7 @@ depends_on_streams:
   - transport_v2
 parallel_decision: parallel
 status: accepted
-delivery_method: n/a
+delivery_method: cherry-pick
 accepted_by_orchestrator: yes
 cleanup_status: blocked
 cleanup_notes: source accepted by cherry-pick and direct review; child branch/worktree retained until remote delivery is authorized; no ancestor-proof cleanup or force removal
