@@ -275,7 +275,7 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Next recommended
 
-Active stage: `mc2-1iwt9`. The accepted `mc2-sdjy8` history remains unchanged.
+Next stage id: `mc2-1iwt9`
 
 Recommended action: **finish mc2-1iwt9, run its bounded acceptance, and retain the default-off v2 activation gate.**
 
