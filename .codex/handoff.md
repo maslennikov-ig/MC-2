@@ -9,7 +9,7 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 ## Current stage
 
 Current stage id: `mc2-1iwt9`
-Stage/task: `mc2-1iwt9`, integration, accepted locally (2026-09-30); tested source `2048b6620`, 142 behavior controls + CI guard + lint/type-check/build pass. Feature publication/PR authorized; develop integration pending.
+Stage/task: `mc2-1iwt9`, integration, accepted locally; app `2048b6620`, 142 behavior checks + CI guard + lint/type/build pass; catalog fix `98bf0ce2b`, 6/6 pass. PR 341 open, CI/release blocked by inherited Security Audit (`mc2-bot88`); develop integration pending.
 Wire: Helixa origin/main 3e0a62686 section C. Owner: every completed object readable by an actual org member stays current; publication/visibility retract only after LAST-member access is lost, not from public-link removal alone.
 Plan: `docs/helixa/contract-v2-implementation.md`; summary: `.codex/stages/mc2-1iwt9/summary.md`; rollout: `docs/helixa/megacampus-side.md` section 11. Graph/docs updated; task worktrees retained. V2 stays off; no Helixa writes/live mutations/activation occurred.
 
@@ -259,7 +259,7 @@ run `scripts/orchestration/check_stranded_commits.py`. `/push-dev` deletes the b
 delivered, so a report naming a branch again means something really was left behind.
 
 ## Explicit defers
-
+- `mc2-bot88` — PR 341 Security Audit found 14 inherited high dependency vulnerabilities; preserve the audit gate, resolve this before merge/release. The migration-catalog failure was separately corrected (6/6 local controls pass).
 - `mc2-5hqt3` — four moderate tooling advisories remain outside the price-sync
   repair: @humanfs/node, vitest/@vitest/mocker, baseline-browser-mapping.
   The release-blocking high/critical findings are handled in `mc2-xyklh`.
@@ -277,7 +277,7 @@ delivered, so a report naming a branch again means something really was left beh
 
 Next stage id: `mc2-1iwt9`
 
-Recommended action: **track the mc2-1iwt9 feature PR; retain v2 off until owner receiver confirmation and authorized rollout.**
+Recommended action: **track PR 341 and resolve mc2-bot88 before accepting CI/release; retain v2 off until owner receiver confirmation and authorized rollout.**
 
 Already proven on 2026-09-05 after the deploy: production run `33961945370` green, all five
 containers report revision `726ddf1c2`, the Helixa route answers through nginx (503

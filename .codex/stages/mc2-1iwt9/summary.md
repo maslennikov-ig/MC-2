@@ -1,7 +1,8 @@
 # Stage mc2-1iwt9: Helixa knowledge-sync v2
 
 Status: accepted locally; develop integration pending authorization. Level: integration.
-Acceptance owner: root. Tested source: 2048b6620e82da08b3e599dc2d44687d4b71890e.
+Acceptance owner: root. Tested application: 2048b6620e82da08b3e599dc2d44687d4b71890e.
+Migration catalog correction: 98bf0ce2b, bounded acceptance passed below.
 Base: origin/develop c7a000ec6cf387153f94b26d00b5db7c51237d03.
 
 ## Owner decision
@@ -38,11 +39,13 @@ feature activation, Helixa source writes or customer-content access occurred.
 | Corrected v2 fixtures and combined lint | b6d6f85f5 | 45 unit + 50 disposable PG17; combined ESLint clean |
 | Type-only export correction and final gates | 2048b6620 | changed-module ESLint, full repository type-check/build, process verification; exit 0 |
 
-The final receipt is `acceptance-receipt.json`, bound to the clean tested source
+The application receipt is `acceptance-receipt-application.json`, bound to the clean tested source
 above. It covers the final three commands, not earlier cached test executions.
 `unit-acceptance.md` records the retained proofs and exact command selections;
 only an erased type export changed application source after the 142 passing
-controls. Subsequent closeout commits contain evidence/documentation only.
+controls. Closeout/publication commits through 73840115f contain metadata only.
+The later script-only catalog correction below does not change application modules
+or dependency versions; matching application proof remains applicable.
 Final private log: `/tmp/mc2-1iwt9-root-acceptance.log`.
 
 | Criterion | Acceptance |
@@ -77,8 +80,10 @@ native capture shares the binding lock to preserve concurrent edits and withdraw
 
 ## Explicit defers
 
-None inside implementation scope. Deployment, live schema apply and v2 activation
-are separate authority boundaries, with activation after owner receiver confirmation.
+No remaining v2 implementation defer. Inherited dependency audit findings block
+CI/release and are tracked separately in mc2-bot88 (14 high, existing audit gate
+preserved). Deployment, live schema apply and v2 activation are separate authority
+boundaries, with activation after owner receiver confirmation.
 
 docs-reviewed: updated - wire/access authority, default-off env forwarding,
 local PG test entrypoint and receiver-first rollout in docs/helixa and project index.
@@ -105,3 +110,27 @@ completion of previously claimed/frozen v1, no old in-flight API/worker operatio
 consistent flags for all writers sharing this organization's database, then
 first complete manifest and resend/edit/retraction proof. Owner confirmation
 that Helixa v2 is live on helixa.ru has not been received; the flag stays false.
+
+## Post-publication CI and correction
+
+PR 341 is open into develop. Run 36748347854 on 73840115f passed lint, type-check,
+package builds, integration and NotebookLM bridge checks. It failed Security Audit
+and the full unit job: backend 7,946 passed, 6 failed, 857 skipped. All six failures
+were document-evidence-frontier tests, because this task's new migration changed
+the filename list without updating its exact manifest pin. The base filename list
+matches the old pin; the only added name is 20260930120000_helixa_knowledge_sync_v2.sql.
+
+Root reproduced six failures locally, then re-pinned the reviewed 264-file list.
+No guard was removed: fixed approved sources, history frontier, chain/security
+manifests and accepted source digests remain unchanged. Canonical focused acceptance
+on 98bf0ce2b passed 6/6 frontier controls and script ESLint, with process verification.
+Its receipt is acceptance-receipt.json; commands: acceptance-commands-frontier.json.
+Private red/green logs: /tmp/mc2-1iwt9-frontier-red.log and
+/tmp/mc2-1iwt9-frontier-green.log. No unchanged passing suite was rerun locally.
+
+Security Audit reported 37 findings: 14 high, 19 moderate, 4 low, involving
+fast-uri, undici, brace-expansion and axios for the high entries. This PR changes
+no dependency version or lockfile. mc2-bot88 tracks the scoped dependency repair;
+it is outside the wire/capture implementation. Current CI must become green before
+merge/release can be accepted. Do not turn local code acceptance into a CI-green,
+merged, deployed or activated claim. See docs/helixa/contract-v2-final-agent-report.md.

@@ -1,36 +1,30 @@
 {
   "command_results": [
     {
-      "command": "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint src/server/routers/generation/editing/field-update.router.ts",
-      "duration_seconds": 4.638,
+      "command": "env SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-unit-placeholder pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/scripts/document-evidence-frontier.test.ts",
+      "duration_seconds": 1.252,
       "result": "passed"
     },
     {
-      "command": "env NODE_OPTIONS=--max-old-space-size=8192 pnpm type-check",
-      "duration_seconds": 54.736,
-      "result": "passed"
-    },
-    {
-      "command": "env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-build-placeholder SUPABASE_SERVICE_ROLE_KEY=offline-build-placeholder SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-build-placeholder COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 NEXT_PUBLIC_COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=false HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=false pnpm build",
-      "duration_seconds": 149.093,
+      "command": "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint scripts/migrations/document-evidence-approved.ts",
+      "duration_seconds": 14.65,
       "result": "passed"
     }
   ],
   "commands": [
-    "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint src/server/routers/generation/editing/field-update.router.ts",
-    "env NODE_OPTIONS=--max-old-space-size=8192 pnpm type-check",
-    "env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-build-placeholder SUPABASE_SERVICE_ROLE_KEY=offline-build-placeholder SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-build-placeholder COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 NEXT_PUBLIC_COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=false HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=false pnpm build"
+    "env SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-unit-placeholder pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/scripts/document-evidence-frontier.test.ts",
+    "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint scripts/migrations/document-evidence-approved.ts"
   ],
-  "completed_at": "2026-09-30T15:49:03.441158+00:00",
+  "completed_at": "2026-09-30T18:51:00.164881+00:00",
   "diff_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "environment_marker": "Linux-x86_64-python-3.14|node=v24.19.0,pnpm=10.34.5",
-  "git_head": "2048b6620e82da08b3e599dc2d44687d4b71890e",
-  "idempotency_key": "91e6e94f781d2259b35965c2bd1083324be41feb7cb551732393f3fde0f7464c",
+  "git_head": "98bf0ce2bb655db23e52410eb02ab14bbae65999",
+  "idempotency_key": "88b784c8feff8e410141774c4b99d2fc91cbd2bc6cb27e2d06d524f118879109",
   "orchestration_level": "integration",
   "process_check": "passed",
   "result": "passed",
   "schema_version": "acceptance-receipt/v1",
   "stage_id": "mc2-1iwt9",
-  "started_at": "2026-09-30T15:45:34.982524+00:00",
-  "verification_fingerprint": "91e6e94f781d2259b35965c2bd1083324be41feb7cb551732393f3fde0f7464c"
+  "started_at": "2026-09-30T18:50:44.262329+00:00",
+  "verification_fingerprint": "88b784c8feff8e410141774c4b99d2fc91cbd2bc6cb27e2d06d524f118879109"
 }

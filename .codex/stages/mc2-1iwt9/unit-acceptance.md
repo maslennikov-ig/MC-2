@@ -36,3 +36,13 @@ it changes no emitted JavaScript or behavior. All 142 passing behavior controls
 and the CI guard remain applicable. Root runs changed-module lint, type-check
 and the previously unexecuted build in `acceptance-commands-type-build.json`.
 Private prior log: `/tmp/mc2-1iwt9-root-type-export-red.log`.
+
+Post-publication run 36748347854 exposed six legacy migration-frontier failures.
+Root reproduced 6/6 red locally: the exact filename manifest lacked the new v2
+migration. Only the reviewed manifest pin was extended to 264 files; accepted
+sources/security/history pins and all application modules are unchanged. Root's
+canonical bounded acceptance on `98bf0ce2b` passes 6/6 and script ESLint, recorded
+in `acceptance-receipt.json`. The earlier application receipt is preserved byte
+for byte as `acceptance-receipt-application.json`. Core 142 behavior controls and
+matching type/build evidence remain applicable. Dependency Security Audit is
+separate and still blocks CI/release, tracked in `mc2-bot88`.

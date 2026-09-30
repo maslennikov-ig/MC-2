@@ -64,8 +64,14 @@ affected tests and failed/unexecuted gates were rerun as recorded in
 Root reproduced TS4023 for a local cascade response type missing from exports;
 exporting the existing interface fixed router declaration naming without runtime
 changes. Final source: `2048b6620e82da08b3e599dc2d44687d4b71890e`, with a clean
-source digest in `.codex/stages/mc2-1iwt9/acceptance-receipt.json`. Later commits
-only record closeout evidence and documentation. This is local acceptance;
+source digest in `.codex/stages/mc2-1iwt9/acceptance-receipt-application.json`.
+Closeout/publication commits through `73840115f` contain only metadata. The later
+migration-catalog correction on `98bf0ce2b` extends the exact filename pin for
+the one reviewed new migration (264 files) while preserving all approved source,
+history and security-chain pins; six reproduced frontier failures now pass with
+script ESLint in canonical bounded acceptance. Application modules and dependency
+versions are unchanged. Security Audit in PR 341 remains a release blocker:
+14 inherited high findings are tracked in `mc2-bot88`. This is local acceptance;
 publication, live schema application and deployment were not performed.
 Disposable PostgreSQL tests exercise the checked-in outbox/v2 migrations against
 synthetic native fixtures; they do not replay the complete production migration
