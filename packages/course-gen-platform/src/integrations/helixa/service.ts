@@ -274,7 +274,9 @@ export async function startKnowledgeSyncDeliveryScheduler(
               environment,
             });
           },
-          onFailure: options.onMaintenanceFailure,
+          onFailure: options.onMaintenanceFailure
+            ? error => options.onMaintenanceFailure?.(error)
+            : undefined,
           timers: dependencies?.timers,
         })
       : null;

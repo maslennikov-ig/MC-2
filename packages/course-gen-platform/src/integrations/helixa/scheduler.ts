@@ -148,7 +148,7 @@ export function createKnowledgeSyncMaintenanceScheduler(
   ) {
     throw new TypeError('Knowledge sync maintenance intervals are invalid');
   }
-  const now = options.now ?? Date.now;
+  const now = (): number => options.now?.() ?? Date.now();
   let timer: TimerHandle | null = null;
   let running = false;
   let stopped = false;
@@ -161,7 +161,11 @@ export function createKnowledgeSyncMaintenanceScheduler(
     try {
       maintenance = options.runMaintenance();
     } catch (error) {
-      maintenance = Promise.reject(error);
+      maintenance = Promise.reject(
+        error instanceof Error
+          ? error
+          : new Error('Knowledge sync maintenance failed', { cause: error })
+      );
     }
     void maintenance
       .then(

@@ -718,6 +718,74 @@ describe('current organization manifest', () => {
 });
 
 describe('v2 maintenance and durable capture mode', () => {
+  it('preserves an injected clock receiver and retries a synchronous non-Error maintenance failure', async () => {
+    let tick!: () => void;
+    const onFailure = vi.fn();
+    const runMaintenance = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(() => {
+        throw 'temporary maintenance rejection';
+      })
+      .mockResolvedValue(undefined);
+    const options = {
+      enabled: true,
+      clock: 1000,
+      now(this: { clock: number }) {
+        return this.clock;
+      },
+      runMaintenance,
+      onFailure,
+      timers: {
+        setInterval: vi.fn((callback: () => void) => {
+          tick = callback;
+          return 'timer' as never;
+        }),
+        clearInterval: vi.fn(),
+      },
+    };
+    const scheduler = schedulerModule.createKnowledgeSyncMaintenanceScheduler(options);
+    expect(scheduler.start()).toBe(true);
+    await flush();
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cause: 'temporary maintenance rejection',
+      })
+    );
+    expect(onFailure.mock.calls[0][0]).toBeInstanceOf(Error);
+    tick();
+    await flush();
+    expect(runMaintenance).toHaveBeenCalledTimes(2);
+    scheduler.stop();
+  });
+
+  it('preserves the caller receiver when reporting scheduler maintenance failures', async () => {
+    const receivers: unknown[] = [];
+    const reported: unknown[] = [];
+    const failure = new Error('temporary reconciliation error');
+    const options = {
+      environment: {
+        ...environment,
+        HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2: 'true',
+        HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED: 'true',
+      },
+      onMaintenanceFailure(error: unknown) {
+        receivers.push(this);
+        reported.push(error);
+      },
+      dependencies: {
+        synchronizeCaptureGate: vi.fn().mockResolvedValue(undefined),
+        runBatch: vi.fn().mockResolvedValue([]),
+        runReconciler: vi.fn().mockRejectedValue(failure),
+        timers: { setInterval: vi.fn().mockReturnValue('timer'), clearInterval: vi.fn() },
+      },
+    };
+    const scheduler = await service.startKnowledgeSyncDeliveryScheduler(options);
+    await flush();
+    expect(receivers).toEqual([options]);
+    expect(reported).toEqual([failure]);
+    scheduler?.stop();
+  });
+
   it('returns the exact DB v2 reconciliation metrics instead of assuming the v1 result shape', async () => {
     const metrics = { missing: 3, inserted: 2, applied: true };
     const rpc = vi.fn().mockResolvedValue({ data: metrics, error: null });

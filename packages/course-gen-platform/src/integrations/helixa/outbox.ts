@@ -77,7 +77,7 @@ export async function processKnowledgeSyncOutboxEntry(input: {
         input.entry.leaseToken,
         preparedBody!,
         'hashes' in packageValue!
-          ? packageValue!.hashes.payloadHash
+          ? packageValue.hashes.payloadHash
           : createHash('sha256').update(preparedBody!).digest('hex')
       ));
     if (rawBody == null) return 'lost_lease';

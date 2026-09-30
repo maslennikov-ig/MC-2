@@ -47,6 +47,7 @@ selected_docs:
   - Helixa origin/main sources-complete-and-current spec section C
 selected_skills:
   - superpowers:test-driven-development
+  - superpowers:systematic-debugging
   - superpowers:verification-before-completion
   - format-commit-message
 selected_agents:
@@ -84,6 +85,8 @@ docs_review_notes: this artifact records transport interfaces; parent owns durab
 verification:
   - same-tree c7a000ec v2 baseline replay: expected red, 39 failed, exit 1
   - focused v2 plus existing v1 and scheduler unit tests: passed, 72 tests, exit 0
+  - focused transport correction lint: passed, zero errors and warnings
+  - focused transport correction tests: passed, 74 tests, exit 0
   - git diff --check: passed
 changed_files:
   - packages/course-gen-platform/src/integrations/helixa/contract.ts
@@ -158,6 +161,34 @@ Root must forward `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2` through worker env paths;
 existing `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` is an independent flag.
 `isKnowledgeSyncContractV2Enabled` is exported from lightweight `scheduler.ts`
 and re-exported by `runtime-repository.ts` for consumers.
+
+## Integration lint correction
+
+Root integration found four typed lint errors in the assigned source. They were
+reproduced unchanged in the child branch. The correction removes the redundant
+narrowed assertion, invokes injected clock/error callbacks through their owning
+objects, and wraps a synchronous non-Error maintenance rejection in an `Error`
+with its original cause. No lint rule was suppressed. Two regression controls
+first failed: an injected clock lost its receiver, and the forwarded failure
+callback received the scheduler options instead of the caller options.
+
+Correction acceptance supersedes the earlier 72-test final count: **74/74 passed**
+(41 v2 + 28 v1 + 5 scheduler), exit 0. Exact same three-file Vitest command as
+above. Log: `/tmp/mc2-1iwt9-transport-correction-green.log`.
+Callback red log: `/tmp/mc2-1iwt9-transport-callback-red.log` (2 failed, 39 skipped).
+
+Focused lint command:
+
+```bash
+pnpm exec eslint \
+  packages/course-gen-platform/src/integrations/helixa/outbox.ts \
+  packages/course-gen-platform/src/integrations/helixa/scheduler.ts \
+  packages/course-gen-platform/src/integrations/helixa/service.ts
+```
+
+Result: exit 0, zero warnings/errors.
+Logs: `/tmp/mc2-1iwt9-transport-lint-red.log` (4 errors before correction) and
+`/tmp/mc2-1iwt9-transport-lint-green.log` (empty successful output).
 
 # Verification
 
