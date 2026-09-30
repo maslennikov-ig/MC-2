@@ -17,3 +17,13 @@ Initial private log: `/tmp/mc2-1iwt9-root-initial-acceptance.log`.
 Source parity across the correction is verified with
 `git diff d839652b1 -- packages/course-gen-platform/src packages/course-gen-platform/tests packages/web`.
 Final remaining-command receipt and accepted revision are recorded in `summary.md`.
+
+On `f4cb79f9f`, root's remaining command selection passed PG **50/50** and the
+bounded CI/CD guard **1/1**, then halted on new-test-only ESLint errors/warnings.
+Production lint targets had no findings. Private log:
+`/tmp/mc2-1iwt9-root-pg-ci-acceptance.log`. The test fixture typing corrections
+affect only `knowledge-sync-v2.test.ts` and `knowledge-sync-v2-pg17.test.ts`.
+Root reruns those affected 45+50 controls, combined lint and unexecuted type/build
+through `acceptance-commands-final.json`. Existing v1/scheduler/atomic/web (44+3)
+and unchanged CI guard evidence are retained; no passing result is represented
+as an executed cache step in the new receipt.
