@@ -19,7 +19,7 @@ session_id: n/a
 milestone: Durable v2 capture and scoped atomic course editing
 milestone_status: in_progress
 agent_type: worker
-subagent_model: gpt-6-sol
+subagent_model: gpt-6.1-sol
 reasoning_effort: max
 model_reasoning_rationale: Critical migration, concurrency, tenancy and immutable revision semantics
 repo: /home/me/code/mc2
@@ -83,7 +83,12 @@ docs_review_notes: Internal RPC contract and evidence recorded here; root owns p
 verification:
   - Original disposable PG17 baseline controls: expected red, 21 failed and 1 legacy passed
   - Supplemental baseline controls: expected red, 6 failed, 3 failed, and 1 failed
-  - Disposable PG17 final focused controls: passed, 32 of 32
+  - Original disposable PG17 focused controls: passed, 32 of 32
+  - Review regression controls on original v2 migration: expected red, 3 failed
+  - Review normalization and disabled-binding controls: expected red, 4 failed
+  - Review protocol-switch controls: expected red, 7 failed and 1 delivered/scoped control passed
+  - Review frozen-body activation control: expected red, 1 failed
+  - Review disposable PG17 final focused controls: passed, 46 of 46, exit 0
   - Prettier test formatting: passed
 changed_files:
   - packages/course-gen-platform/supabase/migrations/20260930120000_helixa_knowledge_sync_v2.sql
@@ -117,6 +122,23 @@ withdrawal before publishing in the new org, with sequential global revisions;
 an earlier-v2 binding currently gated off retains its pinned withdrawal intent.
 Never-enabled v1-only bindings receive no speculative v2 events.
 
+V2 course lessons select one current usable completed/approved version per
+lesson, ordered by `created_at DESC,id DESC`. Empty/failed newest versions do
+not hide older usable content. Old-version edits and native envelope telemetry
+do not advance a revision. Native preview's answerable outer
+`metadata.markdownContent` survives exactly when ECMAScript whitespace trimming
+leaves text; all other outer metadata is omitted. For object content containing
+an object `.content`, only envelope-level `metadata,status,created_at,updated_at`
+are removed. Actual body fields and nested semantic metadata remain intact.
+
+Activation holds the exact binding row lock and refuses outstanding v1 delivery
+history: non-delivered scoped legacy rows with `claim_generation > 0`,
+`attempts > 0`, or a frozen body. Resetting attempts cannot bypass the barrier.
+Legacy claims hold a compatible binding lock through leasing and return no rows
+in v2 mode. Dormant unattempted v1 rows remain unchanged until flag-off; completed
+legacy delivery allows activation. Disabling succeeds for an exact existing
+disabled binding; enabling and claims still require an enabled binding.
+
 # Scope / Routing
 
 Only the four listed files were written. Transport and atomic-edit workers own
@@ -146,7 +168,8 @@ raw_body_base64,attempts,claim_generation,lease_token,binding_id,event_type,
 revision,retraction_reason,content_hash,created_at,snapshot`.
 `event_id=mc2:<KIND>:<org>:<id>:<COMPLETED|UPDATED|RETRACTED>:<revision>`.
 Legacy claims keep their original shape and select only protocol 1. Transport
-can drain both backlogs in v2 mode without converting legacy bytes. Existing
+selects only protocol 2 in v2 mode; legacy backlog resumes when the flag is off.
+No legacy bytes or identities are converted. Existing
 `freeze_helixa_knowledge_sync_payload` and
 `transition_helixa_knowledge_sync_outbox` are reused unchanged.
 
@@ -191,7 +214,7 @@ guide recreate, >1000 resend, source processing metadata), then **3 failed**
 (warm enable, both org-transfer gate cases), then **1 failed** (historical source
 version). Each control failed on missing v2 behavior as expected.
 
-Final focused green after all source edits and formatting: **32/32 passed**,
+Original focused green after the first implementation and formatting: **32/32 passed**,
 exit 0, 34.48 seconds. Command:
 
 ```bash
@@ -215,6 +238,30 @@ Local logs: `/tmp/mc2-1iwt9-database-red.log`,
 `/tmp/mc2-1iwt9-database-green.log`.
 These logs are working evidence; root owns integrated acceptance and its receipt.
 No broad suite, build or production proof is claimed here.
+
+Review corrections were developed on the assigned branch after initial commit
+`219d7075d7b1a37747fa49aa8d35e0b48b752093`. Latest-version controls first ran against
+that unchanged v2 snapshot: **3 failed** (6.44 seconds). Normalization and disabled
+binding controls then ran before those corrections: **4 failed** (6.46 seconds).
+Protocol-switch controls ran before the barrier and claim-lock correction:
+**7 failed, 1 delivered/scoped positive passed** (12.26 seconds); an additional
+zero-counter frozen-body control failed separately (4.76 seconds). An invalid
+synthetic processing fixture was corrected before counting protocol red evidence.
+Both race orders use separate real PostgreSQL connections and a transaction
+checkpoint before the second call. No customer or provider service is involved.
+
+Review logs: `/tmp/mc2-1iwt9-database-latest-lesson-red.log`,
+`/tmp/mc2-1iwt9-database-lesson-normalization-red.log`,
+`/tmp/mc2-1iwt9-database-switch-barrier-red.log`,
+`/tmp/mc2-1iwt9-database-switch-frozen-red.log`,
+`/tmp/mc2-1iwt9-database-review-green.log`.
+Final review green after SQL changes and test formatting: **46/46 passed**,
+exit 0, 75.39 seconds, using the same focused command above. It covers both lock
+race orders, byte-preserving dormant v1 pause/resume, reset history, frozen-body
+history, current lesson selection, body/envelope distinction, exact markdown
+and disabled binding behavior. All disposable containers were removed.
+The model field uses root's recorded launch setting, correcting the earlier
+inference from the task's generic "Sol max" routing description.
 
 # Delivery / Cleanup
 

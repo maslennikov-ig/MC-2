@@ -56,6 +56,18 @@ function concurrentSql(query: string): Promise<void> {
     process.stdin.end(query);
   });
 }
+async function waitForSleepingSession(name: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (
+      sql(
+        `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event='PgSleep');`
+      ) === 't'
+    )
+      return;
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  throw new Error(`Session ${name} did not reach its transaction lock checkpoint`);
+}
 function rows(
   query = 'SELECT to_jsonb(o) row FROM helixa_knowledge_sync_outbox o ORDER BY created_at,id'
 ): any[] {
@@ -438,13 +450,13 @@ describe.runIf(enabled)('knowledge-sync v2 on disposable PostgreSQL 17', () => {
     gate();
     complete('ROLE_GUIDE');
     expect(sql(`SELECT count(*) FROM claim_helixa_knowledge_sync_outbox(${tuple()},10);`)).toBe(
-      '1'
+      '0'
     );
     gate(false);
     const next = randomUUID();
     complete('COURSE', next);
     expect(sql(`SELECT count(*) FROM claim_helixa_knowledge_sync_outbox(${tuple()},10);`)).toBe(
-      '1'
+      '2'
     );
     expect(() =>
       sql(`SELECT * FROM claim_helixa_knowledge_sync_v2_outbox(${tuple()},10);`)
@@ -706,5 +718,262 @@ describe.runIf(enabled)('knowledge-sync v2 on disposable PostgreSQL 17', () => {
     const descriptor = rows().at(-1).snapshot.sources[0];
     expect(descriptor.version).toBe('historical-version');
     expect(descriptor.sourceSha256).toBeUndefined();
+  });
+
+  it('exports only the latest usable lesson version after a multi-version edit', () => {
+    gate();
+    complete('COURSE');
+    const lesson = randomUUID();
+    sql(`BEGIN; INSERT INTO lesson_contents(lesson_id,course_id,status,content,created_at)
+      VALUES('${lesson}','${course}','completed','{"text":"obsolete"}','2026-09-30T10:00:00Z'),
+        ('${lesson}','${course}','completed','{"text":"current"}','2026-09-30T11:00:00Z'); COMMIT;`);
+    expect(rows().at(-1).snapshot.lessons).toEqual([
+      { lesson_id: lesson, content: { text: 'current' } },
+    ]);
+    expect(eventProjection().map(row => [row.type, row.revision])).toEqual([
+      ['COURSE_COMPLETED', 1],
+      ['COURSE_UPDATED', 2],
+    ]);
+    expect(manifest()[0].revision).toBe(2);
+  });
+
+  it('does not advance a revision when only an obsolete lesson version is edited', () => {
+    gate();
+    complete('COURSE');
+    const lesson = randomUUID();
+    const old = randomUUID();
+    sql(`BEGIN; INSERT INTO lesson_contents(id,lesson_id,course_id,status,content,created_at)
+      VALUES('${old}','${lesson}','${course}','completed','{"text":"obsolete"}','2026-09-30T10:00:00Z'),
+        ('${randomUUID()}','${lesson}','${course}','completed','{"text":"current"}','2026-09-30T11:00:00Z'); COMMIT;`);
+    const before = rows().length;
+    sql(`UPDATE lesson_contents SET content='{"text":"edited history"}' WHERE id='${old}';`);
+    expect(rows()).toHaveLength(before);
+    expect(manifest()[0].revision).toBe(2);
+  });
+
+  it('falls back from empty or failed lesson versions and resolves usable timestamp ties deterministically', () => {
+    gate();
+    complete('COURSE');
+    const lesson = randomUUID();
+    sql(`BEGIN; INSERT INTO lesson_contents(id,lesson_id,course_id,status,content,created_at)
+      VALUES('11111111-1111-4111-8111-111111111111','${lesson}','${course}','completed','{"text":"lower"}','2026-09-30T10:00:00Z'),
+        ('22222222-2222-4222-8222-222222222222','${lesson}','${course}','approved','{"text":"higher"}','2026-09-30T10:00:00Z'),
+        ('${randomUUID()}','${lesson}','${course}','completed','{}','2026-09-30T11:00:00Z'),
+        ('${randomUUID()}','${lesson}','${course}','failed','{"text":"failed"}','2026-09-30T12:00:00Z'),
+        ('${randomUUID()}','${lesson}','${course}','completed',${quote(JSON.stringify({ text: '\n\t \u00a0' }))}::jsonb,'2026-09-30T13:00:00Z'); COMMIT;`);
+    expect(rows().at(-1).snapshot.lessons).toEqual([
+      { lesson_id: lesson, content: { text: 'higher' } },
+    ]);
+    expect(manifest()[0].revision).toBe(2);
+  });
+
+  it('ignores nested native lesson envelope telemetry while preserving all actual body fields', () => {
+    gate();
+    complete('COURSE');
+    const lesson = randomUUID();
+    const version = randomUUID();
+    const body = {
+      text: 'body',
+      metadata: { label: 'body field' },
+      status: 'body status',
+      updated_at: 'body caption',
+    };
+    const envelope = {
+      lesson_id: lesson,
+      content: body,
+      status: 'completed',
+      created_at: 'first',
+      updated_at: 'first',
+      metadata: { tokens: 1, cost: 1, model: 'old' },
+    };
+    sql(`INSERT INTO lesson_contents(id,lesson_id,course_id,content)
+      VALUES('${version}','${lesson}','${course}',${quote(JSON.stringify(envelope))}::jsonb);`);
+    const before = rows().length;
+    const changed = {
+      ...envelope,
+      status: 'updated',
+      created_at: 'later',
+      updated_at: 'later',
+      metadata: { tokens: 200, cost: 10, model: 'new' },
+    };
+    sql(
+      `UPDATE lesson_contents SET content=${quote(JSON.stringify(changed))}::jsonb,metadata='{"tokens":300,"cost":20}' WHERE id='${version}';`
+    );
+    expect(rows()).toHaveLength(before);
+    expect(rows().at(-1).snapshot.lessons[0].content).toEqual({ lesson_id: lesson, content: body });
+    expect(manifest()[0].revision).toBe(2);
+  });
+
+  it('retains only answerable outer lesson markdown and captures markdown-only edits once', () => {
+    gate();
+    complete('COURSE');
+    const lesson = randomUUID();
+    const version = randomUUID();
+    sql(`INSERT INTO lesson_contents(id,lesson_id,course_id,content,metadata)
+      VALUES('${version}','${lesson}','${course}','{}','{"markdownContent":"# First preview","tokens":1,"model":"old"}');`);
+    expect(rows().at(-1).snapshot.lessons).toEqual([
+      { lesson_id: lesson, content: {}, metadata: { markdownContent: '# First preview' } },
+    ]);
+    sql(
+      `UPDATE lesson_contents SET metadata='{"markdownContent":"# Second preview","tokens":2,"model":"new"}' WHERE id='${version}';`
+    );
+    expect(eventProjection().map(row => row.revision)).toEqual([1, 2, 3]);
+    expect(rows().at(-1).snapshot.lessons[0].metadata).toEqual({
+      markdownContent: '# Second preview',
+    });
+    const before = rows().length;
+    sql(
+      `UPDATE lesson_contents SET metadata='{"markdownContent":"# Second preview","tokens":999,"cost":9,"model":"another"}' WHERE id='${version}';`
+    );
+    expect(rows()).toHaveLength(before);
+    expect(manifest()[0].revision).toBe(3);
+  });
+
+  it('disables the v2 capture gate for an exact tuple whose binding is intentionally disabled', () => {
+    gate();
+    complete('COURSE');
+    sql("UPDATE helixa_knowledge_sync_bindings SET enabled=false WHERE binding_id='fixture';");
+    expect(sql(`SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},false);`)).toBe('t');
+    expect(
+      sql(
+        "SELECT contract_v2_enabled FROM helixa_knowledge_sync_bindings WHERE binding_id='fixture';"
+      )
+    ).toBe('f');
+    expect(() => sql(`SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},true);`)).toThrow();
+    expect(() =>
+      sql(
+        `SELECT set_helixa_knowledge_sync_v2_enabled('fixture','${randomUUID()}','test','destination',false);`
+      )
+    ).toThrow();
+    expect(() =>
+      sql(`SELECT * FROM claim_helixa_knowledge_sync_v2_outbox(${tuple()},10);`)
+    ).toThrow();
+    expect(() => sql(`SELECT * FROM claim_helixa_knowledge_sync_outbox(${tuple()},10);`)).toThrow();
+  });
+
+  it.each(['processing', 'retryable', 'action_required'] as const)(
+    'refuses v2 activation while an attempted v1 event remains %s',
+    status => {
+      complete('COURSE');
+      const claim = rows(
+        `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_outbox(${tuple()},1) c`
+      )[0];
+      const body = '{"legacy":"immutable"}';
+      const hash = createHash('sha256').update(body).digest('hex');
+      sql(
+        `SELECT freeze_helixa_knowledge_sync_payload('${claim.id}','${claim.lease_token}',${quote(body)},'${hash}');`
+      );
+      if (status !== 'processing')
+        sql(
+          `SELECT transition_helixa_knowledge_sync_outbox('${claim.id}','${claim.lease_token}','${status}',now(),'fixture failure');`
+        );
+      const before = rows()[0];
+      expect(() => gate()).toThrow(
+        /Knowledge sync v1 delivery must complete before v2 activation/u
+      );
+      expect(
+        sql(
+          "SELECT contract_v2_enabled FROM helixa_knowledge_sync_bindings WHERE binding_id='fixture';"
+        )
+      ).toBe('f');
+      expect(rows()[0]).toEqual(before);
+      expect(rows().filter(row => row.contract_version === 2)).toHaveLength(0);
+    }
+  );
+
+  it('does not let a manual v1 reset bypass the activation delivery barrier', () => {
+    complete('COURSE');
+    const claim = rows(
+      `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_outbox(${tuple()},1) c`
+    )[0];
+    sql(`SELECT transition_helixa_knowledge_sync_outbox('${claim.id}','${claim.lease_token}','action_required',NULL,'fixture failure');
+      SELECT reset_helixa_knowledge_sync_intent(${tuple()},${quote(claim.event_id)});`);
+    const before = rows()[0];
+    expect(before.attempts).toBe(0);
+    expect(before.claim_generation).toBe(1);
+    expect(before.raw_body).toBeNull();
+    expect(() => gate()).toThrow(/Knowledge sync v1 delivery must complete before v2 activation/u);
+    expect(rows()[0]).toEqual(before);
+    expect(
+      sql(
+        "SELECT contract_v2_enabled FROM helixa_knowledge_sync_bindings WHERE binding_id='fixture';"
+      )
+    ).toBe('f');
+  });
+
+  it('permits activation after attempted v1 delivery and ignores other binding scope', () => {
+    complete('COURSE');
+    const claim = rows(
+      `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_outbox(${tuple()},1) c`
+    )[0];
+    sql(`SELECT transition_helixa_knowledge_sync_outbox('${claim.id}','${claim.lease_token}','delivered',NULL,NULL);
+      INSERT INTO helixa_knowledge_sync_bindings(binding_id,organization_id,environment,destination_binding_id) VALUES('other','${org}','test','other');
+      INSERT INTO helixa_knowledge_sync_outbox(binding_id,organization_id,environment,destination_binding_id,event_id,object_kind,object_id,completed_at,status,attempts)
+        VALUES('other','${org}','test','other','other','COURSE','${course}',now(),'retryable',1);`);
+    gate();
+    expect(
+      sql(
+        "SELECT contract_v2_enabled FROM helixa_knowledge_sync_bindings WHERE binding_id='fixture';"
+      )
+    ).toBe('t');
+    expect(rows().find(row => row.id === claim.id)?.status).toBe('delivered');
+    expect(
+      rows().filter(row => row.binding_id === 'fixture' && row.contract_version === 2)
+    ).toHaveLength(1);
+  });
+
+  it('treats an already frozen pending legacy body as delivery history even with zero counters', () => {
+    complete('COURSE');
+    const body = '{"legacy":"frozen pending"}';
+    const hash = createHash('sha256').update(body).digest('hex');
+    sql(
+      `UPDATE helixa_knowledge_sync_outbox SET raw_body=convert_to(${quote(body)},'UTF8'),payload_hash='${hash}' WHERE contract_version=1;`
+    );
+    const before = rows()[0];
+    expect(before.attempts).toBe(0);
+    expect(before.claim_generation).toBe(0);
+    expect(() => gate()).toThrow(/Knowledge sync v1 delivery must complete before v2 activation/u);
+    expect(rows()[0]).toEqual(before);
+  });
+
+  it('serializes activation behind a preceding v1 claim and refuses its outstanding attempt', async () => {
+    complete('COURSE');
+    const claiming = concurrentSql(`BEGIN; SET LOCAL application_name='v2-barrier-claim-first';
+      SELECT * FROM claim_helixa_knowledge_sync_outbox(${tuple()},1); SELECT pg_sleep(1); COMMIT;`);
+    await waitForSleepingSession('v2-barrier-claim-first');
+    const activating = concurrentSql(
+      `SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},true);`
+    );
+    const results = await Promise.allSettled([claiming, activating]);
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect(
+      sql(
+        "SELECT contract_v2_enabled FROM helixa_knowledge_sync_bindings WHERE binding_id='fixture';"
+      )
+    ).toBe('f');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].attempts).toBe(1);
+  });
+
+  it('serializes a subsequent v1 claim behind activation and leaves dormant legacy bytes untouched', async () => {
+    complete('COURSE');
+    const before = rows()[0];
+    const activating =
+      concurrentSql(`BEGIN; SET LOCAL application_name='v2-barrier-activation-first';
+      SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},true); SELECT pg_sleep(1); COMMIT;`);
+    await waitForSleepingSession('v2-barrier-activation-first');
+    const claiming = concurrentSql(
+      `SELECT * FROM claim_helixa_knowledge_sync_outbox(${tuple()},1);`
+    );
+    const results = await Promise.allSettled([activating, claiming]);
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'fulfilled']);
+    expect(rows().find(row => row.id === before.id)).toEqual(before);
+    gate(false);
+    const legacy = rows(
+      `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_outbox(${tuple()},1) c`
+    )[0];
+    expect(legacy.id).toBe(before.id);
+    expect(legacy.event_id).toBe(before.event_id);
+    expect(legacy.attempts).toBe(1);
   });
 });

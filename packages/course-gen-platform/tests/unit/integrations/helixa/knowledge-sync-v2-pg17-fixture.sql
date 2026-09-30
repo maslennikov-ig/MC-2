@@ -37,7 +37,7 @@ CREATE TABLE sections(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), course_id u
 CREATE TABLE lessons(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), section_id uuid REFERENCES sections(id) ON DELETE CASCADE);
 CREATE TABLE lesson_contents(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), lesson_id uuid NOT NULL,
   course_id uuid REFERENCES courses(id) ON DELETE CASCADE, status text DEFAULT 'completed',
-  content jsonb DEFAULT '{}', metadata jsonb DEFAULT '{}', updated_at timestamptz DEFAULT now());
+  content jsonb DEFAULT '{}', metadata jsonb DEFAULT '{}', created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
 CREATE TABLE file_catalog(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid REFERENCES organizations(id),
   course_id uuid REFERENCES courses(id) ON DELETE CASCADE, filename text DEFAULT 'source.txt',
   mime_type text DEFAULT 'text/plain', hash text, storage_path text DEFAULT 'fixtures/source.txt',

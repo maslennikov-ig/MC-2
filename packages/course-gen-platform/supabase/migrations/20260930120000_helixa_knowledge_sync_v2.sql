@@ -174,6 +174,42 @@ LANGUAGE sql IMMUTABLE SET search_path=public AS $$
     'trustedMarkdown',CASE WHEN btrim(p_file->>'markdown_content')<>'' THEN p_file->>'markdown_content' END,
     '_file',p_file,'_nativeProof',p_native))
 $$;
+-- Match native latest-usable-lesson-content.ts: completed/approved is filtered
+-- by the caller; an empty or failed newest version must not hide older usable
+-- content. markdownContent is answerable metadata, unlike worker bookkeeping.
+CREATE FUNCTION helixa_sync_text_is_nonempty(p_value JSONB) RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE SET search_path=public AS $$
+  SELECT coalesce(jsonb_typeof(p_value)='string' AND btrim(p_value#>>'{}',
+    -- ECMAScript String.trim whitespace, including Unicode and BOM.
+    chr(9)||chr(10)||chr(11)||chr(12)||chr(13)||chr(32)||chr(160)||chr(5760)||
+    chr(8192)||chr(8193)||chr(8194)||chr(8195)||chr(8196)||chr(8197)||chr(8198)||
+    chr(8199)||chr(8200)||chr(8201)||chr(8202)||chr(8232)||chr(8233)||chr(8239)||
+    chr(8287)||chr(12288)||chr(65279))<>'',false)
+$$;
+CREATE FUNCTION helixa_sync_normalize_lesson_content(p_value JSONB) RETURNS JSONB
+LANGUAGE sql IMMUTABLE SET search_path=public AS $$
+  SELECT CASE WHEN jsonb_typeof(p_value)='object' AND jsonb_typeof(p_value->'content')='object'
+    THEN p_value-'metadata'-'status'-'created_at'-'updated_at' ELSE p_value END
+$$;
+CREATE FUNCTION helixa_sync_lesson_content_is_usable(p_content JSONB,p_metadata JSONB) RETURNS BOOLEAN
+LANGUAGE plpgsql IMMUTABLE SET search_path=public AS $$
+DECLARE content JSONB; key TEXT;
+BEGIN
+  IF helixa_sync_text_is_nonempty(p_metadata->'markdownContent') THEN RETURN true; END IF;
+  IF jsonb_typeof(p_content)='string' THEN RETURN helixa_sync_text_is_nonempty(p_content); END IF;
+  IF jsonb_typeof(p_content) IS DISTINCT FROM 'object' THEN RETURN false; END IF;
+  content:=CASE WHEN jsonb_typeof(p_content->'content')='object' THEN p_content->'content' ELSE p_content END;
+  FOREACH key IN ARRAY ARRAY['markdown','rawMarkdown','raw_markdown','text','intro','introduction',
+    'mainContent','main_content','summary','body'] LOOP
+    IF helixa_sync_text_is_nonempty(content->key) THEN RETURN true; END IF;
+  END LOOP;
+  IF jsonb_typeof(content->'sections')='array' AND EXISTS(
+    SELECT 1 FROM jsonb_array_elements(content->'sections') section WHERE
+      helixa_sync_text_is_nonempty(section->'title') OR helixa_sync_text_is_nonempty(section->'content')) THEN RETURN true; END IF;
+  IF jsonb_typeof(content->'exercises')='array' THEN RETURN jsonb_array_length(content->'exercises')>0; END IF;
+  RETURN false;
+END;
+$$;
 CREATE FUNCTION get_helixa_knowledge_sync_v2_snapshot(p_object_kind TEXT,p_object_id UUID,p_organization_id UUID)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
 DECLARE native JSONB; origin JSONB; relation JSONB; source_rows JSONB; block_rows JSONB; lesson_rows JSONB; result JSONB;
@@ -188,9 +224,15 @@ BEGIN
     SELECT to_jsonb(c) INTO native FROM courses c WHERE c.id=p_object_id AND c.organization_id=p_organization_id
       AND c.generation_status='completed' AND c.generation_completed_at IS NOT NULL;
     IF native IS NULL THEN RETURN NULL; END IF;
-    SELECT coalesce(jsonb_agg(jsonb_build_object('lesson_id',l.lesson_id,'content',l.content)
-      ORDER BY l.lesson_id,l.id),'[]') INTO lesson_rows FROM lesson_contents l
-      WHERE l.course_id=p_object_id AND l.status IN ('completed','approved');
+    SELECT coalesce(jsonb_agg(jsonb_build_object('lesson_id',l.lesson_id,'content',helixa_sync_normalize_lesson_content(l.content))||
+      CASE WHEN helixa_sync_text_is_nonempty(l.metadata->'markdownContent') THEN
+        jsonb_build_object('metadata',jsonb_build_object('markdownContent',l.metadata->'markdownContent')) ELSE '{}'::jsonb END
+      ORDER BY l.lesson_id),'[]') INTO lesson_rows FROM (
+      SELECT DISTINCT ON (candidate.lesson_id) candidate.lesson_id,candidate.content,candidate.metadata
+      FROM lesson_contents candidate WHERE candidate.course_id=p_object_id AND candidate.status IN ('completed','approved')
+        AND helixa_sync_lesson_content_is_usable(candidate.content,candidate.metadata)
+      ORDER BY candidate.lesson_id,candidate.created_at DESC,candidate.id DESC
+    ) l;
     SELECT jsonb_build_object('course_id',r.course_id,'organization_id',r.organization_id,
       'job_instruction_id',r.job_instruction_id,'source_version',r.source_version,'source_content_hash',r.source_content_hash,
       'origin_binding_id',r.origin_binding_id,'origin_command_id',r.origin_command_id) INTO relation FROM course_job_instruction_sources r
@@ -271,11 +313,20 @@ CREATE FUNCTION set_helixa_knowledge_sync_v2_enabled(p_binding_id TEXT,p_organiz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE previous_mode BOOLEAN;
 BEGIN
-  PERFORM assert_helixa_knowledge_sync_v2_binding(p_binding_id,p_organization_id,p_environment,p_destination_binding_id,false);
   IF p_enabled IS NULL THEN RAISE EXCEPTION 'Capture gate requires explicit boolean'; END IF;
-  SELECT b.contract_v2_enabled INTO STRICT previous_mode FROM helixa_knowledge_sync_bindings b
+  SELECT b.contract_v2_enabled INTO previous_mode FROM helixa_knowledge_sync_bindings b
     WHERE b.binding_id=p_binding_id AND b.organization_id=p_organization_id AND b.environment=p_environment
-      AND b.destination_binding_id=p_destination_binding_id AND b.enabled FOR UPDATE;
+      AND b.destination_binding_id=p_destination_binding_id AND (NOT p_enabled OR b.enabled) FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Knowledge sync binding is not active for requested contract'; END IF;
+  -- A timeout may leave the v1 receiver materializing after the HTTP request.
+  -- Do not switch protocols until every previously leased/frozen v1 intent is
+  -- delivered. Durable history prevents a manual attempts reset bypassing this.
+  IF p_enabled AND NOT previous_mode AND EXISTS(SELECT 1 FROM helixa_knowledge_sync_outbox o
+    WHERE o.binding_id=p_binding_id AND o.organization_id=p_organization_id AND o.environment=p_environment
+      AND o.destination_binding_id=p_destination_binding_id AND o.contract_version=1 AND o.status<>'delivered'
+      AND (o.claim_generation>0 OR o.attempts>0 OR o.raw_body IS NOT NULL)) THEN
+    RAISE EXCEPTION 'Knowledge sync v1 delivery must complete before v2 activation';
+  END IF;
   UPDATE helixa_knowledge_sync_bindings SET contract_v2_enabled=p_enabled,updated_at=now()
     WHERE binding_id=p_binding_id AND organization_id=p_organization_id AND environment=p_environment
       AND destination_binding_id=p_destination_binding_id;
@@ -474,8 +525,15 @@ CREATE OR REPLACE FUNCTION claim_helixa_knowledge_sync_outbox(p_binding_id TEXT,
 RETURNS TABLE(id UUID,event_id TEXT,object_kind TEXT,object_id UUID,organization_id UUID,completed_at TIMESTAMPTZ,
   raw_body_base64 TEXT,attempts INTEGER,claim_generation INTEGER,lease_token UUID,binding_id TEXT)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v2_enabled BOOLEAN;
 BEGIN
-  PERFORM assert_helixa_knowledge_sync_v2_binding(p_binding_id,p_organization_id,p_environment,p_destination_binding_id,false);
+  -- Hold the binding lock through lease allocation. FOR KEY SHARE conflicts
+  -- with the activation setter's FOR UPDATE, closing both switch race orders.
+  SELECT b.contract_v2_enabled INTO v2_enabled FROM helixa_knowledge_sync_bindings b
+    WHERE b.binding_id=p_binding_id AND b.organization_id=p_organization_id AND b.environment=p_environment
+      AND b.destination_binding_id=p_destination_binding_id AND b.enabled FOR KEY SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Knowledge sync binding is not active for requested contract'; END IF;
+  IF v2_enabled THEN RETURN; END IF;
   UPDATE helixa_knowledge_sync_outbox o SET status='action_required',lease_token=NULL,last_error='Retry budget exhausted',updated_at=now()
   WHERE o.binding_id=p_binding_id AND o.organization_id=p_organization_id AND o.environment=p_environment
     AND o.destination_binding_id=p_destination_binding_id AND o.contract_version=1 AND o.attempts>=8
