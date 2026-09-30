@@ -6,21 +6,15 @@ import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import {
   updateFieldInputSchema,
-  STAGE4_EDITABLE_FIELDS,
-  STAGE5_EDITABLE_FIELDS,
+  type UpdateFieldResponse,
 } from '@megacampus/shared-types/regeneration-types';
 import type { CourseStructure } from '@megacampus/shared-types';
-import {
-  applyFieldUpdate,
-  ensureStableIdsAndSchemaVersionInMemory,
-} from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
-import { assertStableIds, isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
+import { isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
-import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
-import { buildStage5StructuralQualityMetadataUpdate } from './structural-quality-metadata';
+import { isKnowledgeSyncContractV2Enabled } from '../../../../integrations/helixa/scheduler';
+import { prepareCourseFieldUpdate } from './field-update-preparation';
 
 // Schema for checking downstream stages
 const checkDownstreamStagesInputSchema = z.object({
@@ -31,13 +25,49 @@ const checkDownstreamStagesInputSchema = z.object({
 const deleteDownstreamStagesInputSchema = z.object({
   courseId: z.string().uuid(),
   fromStage: z.union([z.literal(4), z.literal(5)]),
+  pendingEdit: updateFieldInputSchema.pick({ fieldPath: true, value: true }).optional(),
 });
+
+const cascadeDeleteResultSchema = z.object({
+  deletedLessonsCount: z.number().int().nonnegative(),
+  deletedSectionsCount: z.number().int().nonnegative(),
+  deletedStructure: z.boolean(),
+  fieldApplied: z.literal(true).optional(),
+});
+
+interface DeleteDownstreamStagesResponse {
+  success: true;
+  deletedLessonsCount: number;
+  deletedSectionsCount: number;
+  deletedStructure: boolean;
+  fieldApplied?: boolean;
+  recalculated?: UpdateFieldResponse['recalculated'];
+}
+
+/** Narrow adapter for the additive RPC until generated Supabase types include it. */
+function atomicCascadeRpc(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  return supabase.rpc.bind(supabase) as unknown as (
+    name: 'delete_helixa_course_downstream_v2',
+    args: {
+      p_course_id: string;
+      p_organization_id: string;
+      p_from_stage: 4 | 5;
+      p_course_patch?: Record<string, unknown>;
+      p_expected_course_state?: {
+        updated_at: string;
+        analysis_result: unknown;
+        course_structure: unknown;
+        generation_metadata: unknown;
+      };
+    }
+  ) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+}
 
 export const fieldUpdateRouter = {
   updateField: instructorProcedure
     .input(updateFieldInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const { courseId, stageId, fieldPath, value } = input;
+      const { courseId, stageId, fieldPath } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
 
@@ -63,96 +93,12 @@ export const fieldUpdateRouter = {
         // Check authorization: superadmin/admin/owner can update
         assertCourseAccess(buildAuthContext(ctx.user), course, 'update field');
 
-        const allowedFields =
-          stageId === 'stage_4' ? STAGE4_EDITABLE_FIELDS : STAGE5_EDITABLE_FIELDS;
-
-        const normalizedFieldPath =
-          stageId === 'stage_5' ? normalizePathForValidation(fieldPath) : fieldPath;
-
-        if (!allowedFields.includes(normalizedFieldPath)) {
-          logger.warn(
-            {
-              requestId,
-              courseId,
-              stageId,
-              fieldPath,
-              normalizedFieldPath,
-              allowedFields,
-            },
-            'Field path not in whitelist'
-          );
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Field "${fieldPath}" is not editable`,
-          });
-        }
-
-        const currentData =
-          stageId === 'stage_4'
-            ? course.analysis_result
-            : await resolveStructure(courseId, course.course_structure, supabase);
-
-        if (!currentData) {
-          logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Cannot update field: ${stageId === 'stage_4' ? 'analysis_result' : 'course_structure'} is empty`,
-          });
-        }
-
-        let updatedData: unknown;
-        let recalculated: { sectionDuration?: number; courseDuration?: number } | undefined;
-
-        try {
-          if (stageId === 'stage_5') {
-            const result = applyFieldUpdate(currentData as CourseStructure, fieldPath, value);
-            updatedData = result.updatedStructure;
-            recalculated = result.recalculated;
-          } else {
-            updatedData = structuredClone(currentData);
-            setNestedValue(updatedData, fieldPath, value);
-          }
-        } catch (error) {
-          logger.warn(
-            {
-              requestId,
-              courseId,
-              fieldPath,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            'Invalid field path'
-          );
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Invalid field path: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
-        }
-
-        let dataToPersist: unknown = updatedData;
-        if (stageId === 'stage_5') {
-          const normalizedStructure = ensureStableIdsAndSchemaVersionInMemory(
-            updatedData as CourseStructure
-          );
-          // Phase 4: Guard — block writes without stable IDs
-          assertStableIds(normalizedStructure);
-          dataToPersist = normalizedStructure;
-        }
-
-        const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
-        const now = new Date().toISOString();
-
-        const updatePayload: Record<string, unknown> = {
-          [updateColumn]: dataToPersist,
-          updated_at: now,
-        };
-        if (stageId === 'stage_5') {
-          updatePayload.generation_metadata = await buildStage5StructuralQualityMetadataUpdate(
-            supabase,
-            courseId,
-            dataToPersist as CourseStructure,
-            requestId
-          );
-        }
+        const { dataToPersist, updatePayload, now, recalculated } = await prepareCourseFieldUpdate(
+          supabase,
+          course,
+          input,
+          requestId
+        );
 
         const { error: updateError } = await supabase
           .from('courses')
@@ -313,10 +259,11 @@ export const fieldUpdateRouter = {
    */
   deleteDownstreamStages: instructorProcedure
     .input(deleteDownstreamStagesInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { courseId, fromStage } = input;
+    .mutation(async ({ ctx, input }): Promise<DeleteDownstreamStagesResponse> => {
+      const { courseId, fromStage, pendingEdit } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
+      const useAtomicCascade = isKnowledgeSyncContractV2Enabled();
 
       if (!ctx.user) {
         throw new TRPCError({
@@ -329,7 +276,11 @@ export const fieldUpdateRouter = {
         // Get course for authorization
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, user_id, organization_id')
+          .select(
+            useAtomicCascade
+              ? 'id, user_id, organization_id, analysis_result, course_structure, generation_metadata, updated_at'
+              : 'id, user_id, organization_id'
+          )
           .eq('id', courseId)
           .single();
 
@@ -338,6 +289,104 @@ export const fieldUpdateRouter = {
 
         // Check authorization
         assertCourseAccess(buildAuthContext(ctx.user), course, 'delete downstream stages');
+
+        if (useAtomicCascade) {
+          const snapshot = course as typeof course & {
+            updated_at: string;
+            analysis_result: unknown;
+            course_structure: unknown;
+            generation_metadata: unknown;
+          };
+          // Validate the entire final edit before any downstream data is removed.
+          const prepared = pendingEdit
+            ? await prepareCourseFieldUpdate(
+                supabase,
+                snapshot,
+                {
+                  courseId,
+                  stageId: fromStage === 4 ? 'stage_4' : 'stage_5',
+                  fieldPath: pendingEdit.fieldPath,
+                  value: pendingEdit.value,
+                },
+                requestId
+              )
+            : undefined;
+          const patch = prepared
+            ? Object.fromEntries(
+                Object.entries(prepared.updatePayload).filter(([key]) => key !== 'updated_at')
+              )
+            : undefined;
+
+          // The scoped row lock, optimistic check, cascades and final patch share
+          // one transaction, so v2 captures only the final answerable package.
+          const { data, error } = await atomicCascadeRpc(supabase)(
+            'delete_helixa_course_downstream_v2',
+            {
+              p_course_id: courseId,
+              p_organization_id: course.organization_id,
+              p_from_stage: fromStage,
+              ...(patch && {
+                p_course_patch: patch,
+                p_expected_course_state: {
+                  updated_at: snapshot.updated_at,
+                  analysis_result: snapshot.analysis_result,
+                  course_structure: snapshot.course_structure,
+                  generation_metadata: snapshot.generation_metadata,
+                },
+              }),
+            }
+          );
+
+          if (error) {
+            logger.error({ requestId, courseId, fromStage, error }, 'Atomic cascade edit failed');
+            throw new TRPCError({
+              code: error.code === '40001' ? 'CONFLICT' : 'INTERNAL_SERVER_ERROR',
+              message:
+                error.code === '40001'
+                  ? 'Course changed while editing. Refresh and try again.'
+                  : 'Failed to delete downstream stages',
+            });
+          }
+
+          const result = cascadeDeleteResultSchema.parse(data);
+          if (pendingEdit && !result.fieldApplied) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Atomic cascade edit did not confirm the field update',
+            });
+          }
+
+          if (fromStage === 5 && prepared) {
+            await writeCourseNodes(
+              courseId,
+              prepared.dataToPersist as CourseStructure,
+              supabase,
+              logger
+            ).catch(err =>
+              logger.warn(
+                { courseId, error: err instanceof Error ? err.message : String(err) },
+                'course_nodes dual-write failed (non-fatal)'
+              )
+            );
+          } else if (fromStage === 4 && isDualWriteEnabled()) {
+            const { error: nodesError } = await supabase
+              .from('course_nodes')
+              .delete()
+              .eq('course_id', courseId);
+            if (nodesError) {
+              logger.warn(
+                { courseId, error: nodesError.message },
+                'course_nodes cleanup failed (non-fatal)'
+              );
+            }
+          }
+
+          return {
+            success: true,
+            ...result,
+            ...(prepared?.recalculated && { recalculated: prepared.recalculated }),
+          };
+        }
 
         const now = new Date().toISOString();
         let deletedLessonsCount = 0;

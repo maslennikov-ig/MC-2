@@ -87,6 +87,7 @@ export function useCascadeStageDelete(
   const [isDeleting, setIsDeleting] = useState(false)
   // Track if we've already checked and confirmed deletion for this session
   const downstreamDeletedRef = useRef(false)
+  const cascadeConfirmInFlightRef = useRef(false)
   // Key to force re-render of EditableFields when cascade is canceled (resets local state to original values)
   const [fieldResetKey, setFieldResetKey] = useState(0)
 
@@ -142,12 +143,14 @@ export function useCascadeStageDelete(
 
   // Handle cascade delete confirmation (async handler)
   const handleCascadeConfirmAsync = useCallback(async () => {
-    if (!courseId || !pendingChange) return
+    if (!courseId || !pendingChange || cascadeConfirmInFlightRef.current) return
 
+    cascadeConfirmInFlightRef.current = true
     setIsDeleting(true)
     try {
-      // Delete downstream stages
-      const result = await deleteDownstreamStagesAction(courseId, sourceStage)
+      // v2 applies the validated pending edit in the same transaction as deletion.
+      // The backend chooses the legacy path when its contract flag is disabled.
+      const result = await deleteDownstreamStagesAction(courseId, sourceStage, pendingChange)
 
       // Show appropriate toast based on source stage
       if (sourceStage === 4) {
@@ -167,8 +170,14 @@ export function useCascadeStageDelete(
       // Mark as deleted for this session so we don't ask again
       downstreamDeletedRef.current = true
 
-      // Now apply the pending change
-      performSave(pendingChange.fieldPath, pendingChange.value)
+      if (result.fieldApplied) {
+        // Refresh query state without emitting another semantic field write.
+        void utils.invalidate().catch((error: unknown) => {
+          console.error('Failed to refresh after cascade edit:', error)
+        })
+      } else {
+        performSave(pendingChange.fieldPath, pendingChange.value)
+      }
 
       // Close modal and clear state
       setCascadeModalOpen(false)
@@ -180,9 +189,10 @@ export function useCascadeStageDelete(
         locale === 'ru' ? 'Ошибка при удалении данных' : 'Failed to delete downstream data'
       )
     } finally {
+      cascadeConfirmInFlightRef.current = false
       setIsDeleting(false)
     }
-  }, [courseId, pendingChange, performSave, sourceStage, locale])
+  }, [courseId, pendingChange, performSave, sourceStage, locale, utils])
 
   // Sync wrapper for void callback (avoids @typescript-eslint/no-misused-promises)
   const handleCascadeConfirm = useCallback(() => {
