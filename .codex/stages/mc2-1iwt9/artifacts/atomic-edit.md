@@ -40,7 +40,6 @@ success_criteria:
   - invalid fields and failed metadata preparation do not delete downstream data
   - optimistic conflict never falls back to a second field save
   - flag-off preserves original cascade-only server path and one UI save
-  - repeated in-flight UI confirmation sends only one logical operation
 selected_docs:
   - AGENTS.md
   - .codex/orchestrator.toml
@@ -51,6 +50,7 @@ selected_skills:
   - graphify-project
   - verification-before-completion
   - format-commit-message
+  - receiving-code-review
 selected_agents:
   - none
 catalog_candidates:
@@ -89,9 +89,8 @@ docs_review_notes: root owns contract and rollout docs; stream records internal 
 verification:
   - backend focused Vitest target before implementation: 6 failed, 2 passed
   - web focused Vitest target before implementation: 1 failed, 2 passed
-  - web repeat-confirm focused red control: 1 failed, 3 skipped
-  - backend focused Vitest target after implementation: 11 passed
-  - web focused Vitest target after implementation: 4 passed
+  - backend focused Vitest target after implementation: 11 passed, unchanged evidence reused after UI review correction
+  - web focused Vitest target after UI review correction: 3 passed
   - git diff --check: passed
 changed_files:
   - packages/course-gen-platform/src/server/routers/generation/editing/field-update.router.ts
@@ -112,8 +111,7 @@ Behind the default-off `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2` flag, the endpoint va
 and prepares the final field patch before any deletion, then calls the database
 worker's atomic cascade RPC. A confirmed `fieldApplied` response suppresses the
 separate `performSave` semantic write. The flag-off path retains the original
-server deletes and original UI save. Repeated confirmation while the same request
-is in flight is ignored.
+server deletes and original UI save, loading and confirmation behavior.
 
 # Scope / Routing
 
@@ -164,18 +162,18 @@ Commands from `packages/web`:
 
 ```sh
 pnpm exec vitest run components/generation-graph/hooks/__tests__/useCascadeStageDelete.test.tsx
-pnpm exec vitest run components/generation-graph/hooks/__tests__/useCascadeStageDelete.test.tsx -t 'ignores repeated'
 ```
 
 Original UI baseline: 3 tests, 1 failed/2 passed (missing pending edit argument).
-Repeated-confirm red: 2 action calls instead of 1, 1 failed/3 skipped.
-Final green: 4/4, including no second save after v2 success, one legacy save,
-failure retaining the modal, and repeat-confirm prevention.
+Final green after the root review correction: 3/3, including no second save after
+v2 success, one legacy save, and failure retaining the modal. The unconditional
+in-flight confirmation guard and its standalone test were removed because they
+changed the flag-off behavior beyond the assigned v2 scope. Backend source/tests
+are unchanged, so matching 11/11 evidence is reused; they were not rerun.
 
 Exact private output is in `/tmp/mc2-atomic-edit-backend-red.log`,
-`/tmp/mc2-atomic-edit-backend-green.log`, `/tmp/mc2-atomic-edit-web-red.log`,
-`/tmp/mc2-atomic-edit-web-repeated-red.log`, and
-`/tmp/mc2-atomic-edit-web-green.log`. Initial setup-only errors from missing
+`/tmp/mc2-atomic-edit-backend-green.log`, `/tmp/mc2-atomic-edit-web-red.log`, and
+`/tmp/mc2-atomic-edit-web-green-review.log`. Initial setup-only errors from missing
 fake Supabase environment and unbuilt local shared packages were corrected
 before behavioral red; they are not red-control evidence. Offline dependency
 installation used `pnpm install --frozen-lockfile --offline --ignore-scripts`.

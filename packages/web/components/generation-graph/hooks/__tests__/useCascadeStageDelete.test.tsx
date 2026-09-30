@@ -76,21 +76,6 @@ describe('useCascadeStageDelete: one logical edit', () => {
     expect(invalidate).not.toHaveBeenCalled()
   })
 
-  it('ignores repeated confirmation while the same logical edit is in progress', async () => {
-    const performSave = vi.fn()
-    const { result } = renderHook(() => useCascadeStageDelete('course-1', 4, performSave))
-    await act(async () => {
-      result.current.handleFieldSave('topic_analysis.determined_topic', 'New topic')
-    })
-    await act(async () => {
-      result.current.handleCascadeConfirm()
-      result.current.handleCascadeConfirm()
-    })
-
-    expect(deleteAction).toHaveBeenCalledOnce()
-    expect(performSave).not.toHaveBeenCalled()
-  })
-
   it('keeps confirmation open and does not save after the transaction fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     deleteAction.mockRejectedValueOnce(new Error('Course state changed'))

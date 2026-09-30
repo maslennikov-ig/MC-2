@@ -87,7 +87,6 @@ export function useCascadeStageDelete(
   const [isDeleting, setIsDeleting] = useState(false)
   // Track if we've already checked and confirmed deletion for this session
   const downstreamDeletedRef = useRef(false)
-  const cascadeConfirmInFlightRef = useRef(false)
   // Key to force re-render of EditableFields when cascade is canceled (resets local state to original values)
   const [fieldResetKey, setFieldResetKey] = useState(0)
 
@@ -143,9 +142,8 @@ export function useCascadeStageDelete(
 
   // Handle cascade delete confirmation (async handler)
   const handleCascadeConfirmAsync = useCallback(async () => {
-    if (!courseId || !pendingChange || cascadeConfirmInFlightRef.current) return
+    if (!courseId || !pendingChange) return
 
-    cascadeConfirmInFlightRef.current = true
     setIsDeleting(true)
     try {
       // v2 applies the validated pending edit in the same transaction as deletion.
@@ -189,7 +187,6 @@ export function useCascadeStageDelete(
         locale === 'ru' ? 'Ошибка при удалении данных' : 'Failed to delete downstream data'
       )
     } finally {
-      cascadeConfirmInFlightRef.current = false
       setIsDeleting(false)
     }
   }, [courseId, pendingChange, performSave, sourceStage, locale, utils])
