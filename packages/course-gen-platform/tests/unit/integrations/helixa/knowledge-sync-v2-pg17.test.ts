@@ -68,11 +68,11 @@ async function waitForSleepingSession(name: string): Promise<void> {
   }
   throw new Error(`Session ${name} did not reach its transaction lock checkpoint`);
 }
-function rows(
+function rows<Row = any>(
   query = 'SELECT to_jsonb(o) row FROM helixa_knowledge_sync_outbox o ORDER BY created_at,id'
-): any[] {
+): Row[] {
   const output = sql(`SELECT coalesce(jsonb_agg(row),'[]'::jsonb) FROM (${query}) r;`);
-  return JSON.parse(output);
+  return JSON.parse(output) as Row[];
 }
 function quote(input: string) {
   return `'${input.replaceAll("'", "''")}'`;
@@ -103,8 +103,16 @@ function complete(
     VALUES('${id}','${org}','${owner}','${visibility}','completed','2026-09-30T12:00:00.000Z','# Fixture');`);
   return id;
 }
-function manifest(): any[] {
-  return JSON.parse(sql(`SELECT get_helixa_knowledge_sync_manifest(${tuple()});`));
+type ManifestItem = {
+  kind: 'COURSE' | 'ROLE_GUIDE';
+  id: string;
+  revision: number;
+  contentHash: string;
+};
+function manifest(): ManifestItem[] {
+  return JSON.parse(
+    sql(`SELECT get_helixa_knowledge_sync_manifest(${tuple()});`)
+  ) as ManifestItem[];
 }
 function eventProjection() {
   return rows().map(row => ({
@@ -431,7 +439,7 @@ describe.runIf(enabled)('knowledge-sync v2 on disposable PostgreSQL 17', () => {
     sql(`SELECT freeze_helixa_knowledge_sync_payload('${claim.id}','${claim.lease_token}',${quote(body)},'${hash}');
       SELECT transition_helixa_knowledge_sync_outbox('${claim.id}','${claim.lease_token}','delivered',NULL,NULL);
       SELECT enqueue_helixa_knowledge_sync_v2_resend(${tuple()},'[{"kind":"COURSE","id":"${course}"}]');`);
-    const retry = rows(
+    const retry = rows<{ event_id: string; revision: number; raw_body_base64: string }>(
       `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_v2_outbox(${tuple()},1) c`
     )[0];
     expect(retry.event_id).toBe(claim.event_id);
@@ -883,7 +891,7 @@ describe.runIf(enabled)('knowledge-sync v2 on disposable PostgreSQL 17', () => {
 
   it('does not let a manual v1 reset bypass the activation delivery barrier', () => {
     complete('COURSE');
-    const claim = rows(
+    const claim = rows<{ id: string; lease_token: string; event_id: string }>(
       `SELECT to_jsonb(c) row FROM claim_helixa_knowledge_sync_outbox(${tuple()},1) c`
     )[0];
     sql(`SELECT transition_helixa_knowledge_sync_outbox('${claim.id}','${claim.lease_token}','action_required',NULL,'fixture failure');
