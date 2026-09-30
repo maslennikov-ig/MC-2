@@ -1,0 +1,5 @@
+[
+  "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint src/server/routers/generation/editing/field-update.router.ts",
+  "env NODE_OPTIONS=--max-old-space-size=8192 pnpm type-check",
+  "env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-build-placeholder SUPABASE_SERVICE_ROLE_KEY=offline-build-placeholder SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-build-placeholder COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 NEXT_PUBLIC_COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=false HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=false pnpm build"
+]

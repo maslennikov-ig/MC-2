@@ -27,3 +27,12 @@ Root reruns those affected 45+50 controls, combined lint and unexecuted type/bui
 through `acceptance-commands-final.json`. Existing v1/scheduler/atomic/web (44+3)
 and unchanged CI guard evidence are retained; no passing result is represented
 as an executed cache step in the new receipt.
+
+On `b6d6f85f5`, root passed the corrected v2 unit **45/45**, PostgreSQL
+**50/50**, and combined production/test lint, then type-check reproduced TS4023:
+the local `DeleteDownstreamStagesResponse` interface could not be named in the
+exported router declarations. The correction only exports this existing type;
+it changes no emitted JavaScript or behavior. All 142 passing behavior controls
+and the CI guard remain applicable. Root runs changed-module lint, type-check
+and the previously unexecuted build in `acceptance-commands-type-build.json`.
+Private prior log: `/tmp/mc2-1iwt9-root-type-export-red.log`.

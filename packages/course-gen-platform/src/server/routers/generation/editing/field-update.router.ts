@@ -35,7 +35,7 @@ const cascadeDeleteResultSchema = z.object({
   fieldApplied: z.literal(true).optional(),
 });
 
-interface DeleteDownstreamStagesResponse {
+export interface DeleteDownstreamStagesResponse {
   success: true;
   deletedLessonsCount: number;
   deletedSectionsCount: number;

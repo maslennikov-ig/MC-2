@@ -779,13 +779,15 @@ Activation is a separate authorized operation:
    repository's dev/release/deploy flow with the new flag still `false`.
 3. With v2 still off, drain every previously claimed/frozen v1 intent for the
    exact binding to a successful receiver acknowledgement. Resolve failed
-   deliveries through the existing v1 retry path. Stop previous worker instances
-   sharing the binding before switching versions; do not reset or discard
-   backlog to simulate a drained queue.
+   deliveries through the existing v1 retry path. Stop previous API and worker
+   instances sharing the binding and let in-flight edits finish before switching
+   versions; do not reset or discard backlog to simulate a drained queue.
 4. After the owner's confirmation and deployment authorization, enable exactly
    `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=true` for the intended environment and
-   restart its configured API/worker. Keep the existing endpoint, HMAC and binding
-   tuple; outbound scheduling still requires its existing scheduler flag.
+   restart its configured API/worker with the same flag on every instance writing
+   to this binding's organization, including environments sharing Supabase. Keep
+   the existing endpoint, HMAC and binding tuple; outbound scheduling still
+   requires its existing scheduler flag.
 5. Verify the first complete manifest and its count, then check `resend` after
    the next hour. Use a disposable test course for edit/retract/re-publish proof.
    The withdrawal test must remove access of its last organization reader;
