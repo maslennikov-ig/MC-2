@@ -1,0 +1,4 @@
+[
+  "env SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-unit-placeholder pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/scripts/document-evidence-frontier.test.ts",
+  "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint scripts/migrations/document-evidence-approved.ts"
+]

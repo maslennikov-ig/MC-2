@@ -656,8 +656,12 @@ const DOCUMENT_EVIDENCE_DOWNSTREAM_MIGRATIONS = [
 // `stage_6_complete` with terminal lesson quality states is surfaced to Helixa as a native
 // failure instead of remaining scheduled. It changes no document-evidence function,
 // security-manifest function, or accepted source digest.
+// Re-pinned 2026-09-30 for default-off Helixa knowledge contract v2: 264 files,
+// adding only 20260930120000_helixa_knowledge_sync_v2.sql. The exact repository
+// filename manifest remains enforced; document-evidence approved sources,
+// history frontier, chain/security manifests and source digests are unchanged.
 const REPOSITORY_MIGRATION_MANIFEST_SHA256 =
-  'eb5900831e13e936bfb7e0c5c60f6855448d9c16eca5efed67a2a9f8d5a40610';
+  '6883aedc7851ba6f6b36654af2f024b862961f47619f2f2e1c681fe3414a4c1e';
 
 // The reviewed migration frontier: the maximum Supabase history version that may exist
 // BEFORE this project's approved chain applies. In this codebase production migrations are
