@@ -976,4 +976,86 @@ describe.runIf(enabled)('knowledge-sync v2 on disposable PostgreSQL 17', () => {
     expect(legacy.event_id).toBe(before.event_id);
     expect(legacy.attempts).toBe(1);
   });
+
+  it.each(['title edit', 'native delete', 'last member loss'] as const)(
+    'captures %s after an activation transaction has warmed but not committed',
+    async change => {
+      const kind = change === 'last member loss' ? 'ROLE_GUIDE' : 'COURSE';
+      complete(
+        kind,
+        kind === 'COURSE' ? course : guide,
+        change === 'last member loss' ? 'private' : 'organization'
+      );
+      const dormant = rows()[0];
+      const activating =
+        concurrentSql(`BEGIN; SET LOCAL application_name='v2-capture-activation-first';
+        SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},true); SELECT pg_sleep(1.5); COMMIT;`);
+      await waitForSleepingSession('v2-capture-activation-first');
+      const mutation =
+        change === 'title edit'
+          ? `UPDATE courses SET title='After activation warm' WHERE id='${course}';`
+          : change === 'native delete'
+            ? `DELETE FROM courses WHERE id='${course}';`
+            : `DELETE FROM organization_members WHERE user_id='${member}' AND organization_id='${org}';`;
+      const native = concurrentSql(
+        `BEGIN; SET LOCAL application_name='v2-capture-native-second'; ${mutation} COMMIT;`
+      );
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const blocked = sql(
+        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='v2-capture-native-second' AND wait_event_type='Lock');"
+      );
+      const results = await Promise.allSettled([activating, native]);
+      expect(results.map(result => result.status)).toEqual(['fulfilled', 'fulfilled']);
+      const events = rows().filter(row => row.contract_version === 2);
+      expect(
+        events.map(row => ({
+          type: row.event_type,
+          revision: row.revision,
+          reason: row.retraction_reason,
+        }))
+      ).toEqual([
+        { type: `${kind}_COMPLETED`, revision: 1, reason: null },
+        {
+          type: `${kind}_${change === 'title edit' ? 'UPDATED' : 'RETRACTED'}`,
+          revision: 2,
+          reason:
+            change === 'title edit'
+              ? null
+              : change === 'native delete'
+                ? 'deleted'
+                : 'visibility_restricted',
+        },
+      ]);
+      expect(blocked).toBe('t');
+      expect(rows().find(row => row.id === dormant.id)).toEqual(dormant);
+      if (change === 'title edit') {
+        expect(events[1].snapshot.title).toBe('After activation warm');
+        expect(manifest()[0].revision).toBe(2);
+      } else expect(manifest()).toEqual([]);
+    }
+  );
+
+  it('warms the final native state once when activation follows an uncommitted native edit', async () => {
+    complete('COURSE');
+    const dormant = rows()[0];
+    const native = concurrentSql(`BEGIN; SET LOCAL application_name='v2-capture-native-first';
+      UPDATE courses SET title='Before activation final' WHERE id='${course}'; SELECT pg_sleep(1.5); COMMIT;`);
+    await waitForSleepingSession('v2-capture-native-first');
+    const activating =
+      concurrentSql(`BEGIN; SET LOCAL application_name='v2-capture-activation-second';
+      SELECT set_helixa_knowledge_sync_v2_enabled(${tuple()},true); COMMIT;`);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const blocked = sql(
+      "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='v2-capture-activation-second' AND wait_event_type='Lock');"
+    );
+    const results = await Promise.allSettled([native, activating]);
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'fulfilled']);
+    const events = rows().filter(row => row.contract_version === 2);
+    expect(events).toHaveLength(1);
+    expect(events[0].snapshot.title).toBe('Before activation final');
+    expect(events[0].revision).toBe(1);
+    expect(blocked).toBe('t');
+    expect(rows().find(row => row.id === dormant.id)).toEqual(dormant);
+    expect(manifest()[0].revision).toBe(1);
+  });
 });

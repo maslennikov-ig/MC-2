@@ -89,6 +89,8 @@ verification:
   - Review protocol-switch controls: expected red, 7 failed and 1 delivered/scoped control passed
   - Review frozen-body activation control: expected red, 1 failed
   - Review disposable PG17 final focused controls: passed, 46 of 46, exit 0
+  - Activation/capture regression controls on d00672b: expected red, 4 failed
+  - Activation/capture final disposable PG17 controls: passed, 50 of 50, exit 0
   - Prettier test formatting: passed
 changed_files:
   - packages/course-gen-platform/supabase/migrations/20260930120000_helixa_knowledge_sync_v2.sql
@@ -138,6 +140,14 @@ Legacy claims hold a compatible binding lock through leasing and return no rows
 in v2 mode. Dormant unattempted v1 rows remain unchanged until flag-off; completed
 legacy delivery allows activation. Disabling succeeds for an exact existing
 disabled binding; enabling and claims still require an enabled binding.
+
+Both object and organization dirty-queue entrypoints first lock all enabled
+organization bindings in deterministic `binding_id` order with `FOR KEY SHARE`.
+The lock query does not filter by contract mode. Gate evaluation uses the rows
+returned after any activation wait. Thus a title edit, native deletion or final
+reader loss after warm-up waits for activation and captures final state; a
+preceding native edit holds the compatible lock until commit so activation warms
+that final state once. Binding locks precede deferred object/advisory capture.
 
 # Scope / Routing
 
@@ -262,6 +272,21 @@ history, current lesson selection, body/envelope distinction, exact markdown
 and disabled binding behavior. All disposable containers were removed.
 The model field uses root's recorded launch setting, correcting the earlier
 inference from the task's generic "Sol max" routing description.
+
+The final activation/capture correction began from clean commit
+`d00672b91337e6e7c194a47cf1fbbbbec8f9a603`. Four dual-connection controls first ran
+without changing that migration and failed on missing update/deletion/member-loss
+events and the reverse-order stale snapshot: **4 failed**, 15.28 seconds.
+The activation transaction had completed warm reconciliation and reached a
+transaction sleep checkpoint before mutation. Each control also checks that the
+second session waits for the binding lock; the reverse control checks one final
+completed revision and preservation of the dormant legacy row. Logs:
+`/tmp/mc2-1iwt9-database-activation-capture-red.log`,
+`/tmp/mc2-1iwt9-database-activation-capture-green.log`.
+The updated focused PostgreSQL suite ran once after the queue-lock correction:
+**50/50 passed**, exit 0, 75.54 seconds. All four new race controls and the prior
+46 controls passed. The disposable container was removed; no wire or acceptance
+scope changed.
 
 # Delivery / Cleanup
 

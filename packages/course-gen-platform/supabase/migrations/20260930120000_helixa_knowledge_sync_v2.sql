@@ -418,19 +418,30 @@ $$;
 
 CREATE FUNCTION queue_helixa_knowledge_sync_v2_object(p_kind TEXT,p_id UUID,p_org UUID) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE gate_enabled BOOLEAN;
 BEGIN
-  IF p_id IS NULL OR p_org IS NULL OR NOT EXISTS(SELECT 1 FROM helixa_knowledge_sync_bindings b
-    WHERE b.organization_id=p_org AND b.enabled AND b.contract_v2_enabled) THEN RETURN; END IF;
+  IF p_id IS NULL OR p_org IS NULL THEN RETURN; END IF;
+  -- Lock before testing the gate: an activation may have warmed this object
+  -- but not committed. After that wait, capture must see the current mode.
+  SELECT coalesce(bool_or(locked.contract_v2_enabled),false) INTO gate_enabled FROM (
+    SELECT b.contract_v2_enabled FROM helixa_knowledge_sync_bindings b
+    WHERE b.organization_id=p_org AND b.enabled ORDER BY b.binding_id FOR KEY SHARE
+  ) locked;
+  IF NOT gate_enabled THEN RETURN; END IF;
   INSERT INTO helixa_knowledge_sync_v2_dirty VALUES(txid_current(),p_kind,p_id,p_org)
     ON CONFLICT DO NOTHING;
 END;
 $$;
 CREATE FUNCTION queue_helixa_knowledge_sync_v2_organization(p_org UUID) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE object RECORD;
+DECLARE object RECORD; gate_enabled BOOLEAN;
 BEGIN
-  IF NOT EXISTS(SELECT 1 FROM helixa_knowledge_sync_bindings b
-    WHERE b.organization_id=p_org AND b.enabled AND b.contract_v2_enabled) THEN RETURN; END IF;
+  IF p_org IS NULL THEN RETURN; END IF;
+  SELECT coalesce(bool_or(locked.contract_v2_enabled),false) INTO gate_enabled FROM (
+    SELECT b.contract_v2_enabled FROM helixa_knowledge_sync_bindings b
+    WHERE b.organization_id=p_org AND b.enabled ORDER BY b.binding_id FOR KEY SHARE
+  ) locked;
+  IF NOT gate_enabled THEN RETURN; END IF;
   FOR object IN SELECT 'COURSE' kind,id FROM courses WHERE organization_id=p_org
     UNION ALL SELECT 'ROLE_GUIDE',id FROM career_playbooks WHERE organization_id=p_org
   LOOP PERFORM queue_helixa_knowledge_sync_v2_object(object.kind,object.id,p_org); END LOOP;
