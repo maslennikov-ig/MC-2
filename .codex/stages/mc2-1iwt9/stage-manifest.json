@@ -3,7 +3,7 @@
   "stage_id": "mc2-1iwt9",
   "goal_id": "mc2-1iwt9",
   "profile_at_creation": "balanced-v2.20",
-  "status": "in_progress",
+  "status": "accepted",
   "sequence": 1,
   "orchestration_level": "integration",
   "acceptance_boundary_id": "helixa-knowledge-contract-v2-default-off",

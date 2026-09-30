@@ -17,7 +17,7 @@ epic_id: mc2-1iwt9
 stage_id: mc2-1iwt9
 session_id: n/a
 milestone: completed-course-current-content-v2
-milestone_status: in_progress
+milestone_status: completed
 agent_type: worker
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -223,3 +223,9 @@ must establish one final v2 `UPDATED` for the logical edit. Existing nonfatal
 behavior; canonical course JSON and deletion are in the transaction. No in-scope
 defer remains. Full type-check/build is intentionally root-owned and requires
 the scheduler export and migration to be integrated first.
+
+# Root closeout
+
+Accepted in the integrated local branch on tested source `2048b6620`.
+Root acceptance, evidence reuse and publication/activation boundaries are in
+`../summary.md`; no remote delivery or live activation is claimed.

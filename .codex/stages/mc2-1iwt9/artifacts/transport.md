@@ -19,7 +19,7 @@ epic_id: n/a
 stage_id: mc2-1iwt9
 session_id: n/a
 milestone: optional knowledge-sync v2 delivery and maintenance
-milestone_status: in_progress
+milestone_status: completed
 agent_type: worker
 subagent_model: inherit_orchestrator
 reasoning_effort: inherit_orchestrator
@@ -292,3 +292,9 @@ No stream defer. Required integration: pair with the database migration (includi
 false-to-true initial capture and unlimited resend feedback), env forwarding,
 atomic edit stream, then root-owned final acceptance. Unit evidence alone does
 not claim durable PostgreSQL, build, deployment or production receiver acceptance.
+
+# Root closeout
+
+Accepted in the integrated local branch on tested source `2048b6620`.
+Root acceptance, evidence reuse and publication/activation boundaries are in
+`../summary.md`; no remote delivery or live activation is claimed.

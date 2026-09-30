@@ -17,7 +17,7 @@ epic_id: n/a
 stage_id: mc2-1iwt9
 session_id: n/a
 milestone: Durable v2 capture and scoped atomic course editing
-milestone_status: in_progress
+milestone_status: completed
 agent_type: worker
 subagent_model: gpt-6.1-sol
 reasoning_effort: max
@@ -305,3 +305,9 @@ and enablement require the owner's separate authority and Helixa readiness.
 The actual enrollment helper is called rather than replaced; its existing body
 is absent from versioned migrations, as the lifecycle audit recorded.
 No implementation debt is deferred from this worker's assigned scope.
+
+# Root closeout
+
+Accepted in the integrated local branch on tested source `2048b6620`.
+Root acceptance, evidence reuse and publication/activation boundaries are in
+`../summary.md`; no remote delivery or live activation is claimed.

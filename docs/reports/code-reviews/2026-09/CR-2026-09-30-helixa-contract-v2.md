@@ -7,7 +7,7 @@ and documentation diff. Wire authority: Helixa origin/main `3e0a62686`, section 
 Owner's explicit last-reader clarification is recorded in
 `docs/helixa/contract-v2-implementation.md`.
 
-Verdict: source corrections accepted; final integrated checks pending. Root reviewed risky code and history directly;
+Verdict: accepted locally; final integrated checks passed. Root reviewed risky code and history directly;
 independent read-only review supported the lifecycle, access and transport checks.
 
 ## Corrected findings
@@ -35,7 +35,7 @@ The correction locks both entrypoints in deterministic binding order without
 prefiltering the gate. Four two-session controls failed on unchanged `d00672b`
 and pass after the correction; the complete disposable PG suite passes 50/50.
 Root reviewed the actual correction and its lock order. No confirmed finding
-remains open; integrated type-check/build and acceptance below remain pending.
+remains open; integrated type-check/build and acceptance below passed.
 
 ## Contract and access checks
 
@@ -55,8 +55,18 @@ remains open; integrated type-check/build and acceptance below remain pending.
 
 ## Validation boundary
 
-Worker evidence is focused red/green development evidence. Root's single integrated
-acceptance remains pending in `.codex/stages/mc2-1iwt9/acceptance-commands.json`.
+Worker evidence is focused red/green development evidence. Root's selected
+acceptance passed 142 unique behavior controls (including 50 real PostgreSQL
+controls), the CI environment guard, combined production/test ESLint and full
+repository type-check/build. Matching unchanged passing checks were retained;
+affected tests and failed/unexecuted gates were rerun as recorded in
+`.codex/stages/mc2-1iwt9/unit-acceptance.md` and the command selections there.
+Root reproduced TS4023 for a local cascade response type missing from exports;
+exporting the existing interface fixed router declaration naming without runtime
+changes. Final source: `2048b6620e82da08b3e599dc2d44687d4b71890e`, with a clean
+source digest in `.codex/stages/mc2-1iwt9/acceptance-receipt.json`. Later commits
+only record closeout evidence and documentation. This is local acceptance;
+publication, live schema application and deployment were not performed.
 Disposable PostgreSQL tests exercise the checked-in outbox/v2 migrations against
 synthetic native fixtures; they do not replay the complete production migration
 history or establish a production receiver deployment. Production enablement
