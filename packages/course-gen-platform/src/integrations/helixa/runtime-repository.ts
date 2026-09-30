@@ -1,15 +1,23 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { getUploadStorageRootPath } from '@/stages/stage1-document-upload/storage-paths';
 
-import type { KnowledgeObjectKind } from './contract';
+import type {
+  KnowledgeObjectKind,
+  KnowledgeManifestObject,
+  KnowledgeManifestResendObject,
+  KnowledgeSyncV2IntentEventType,
+  KnowledgeRetractionReason,
+} from './contract';
 import type { KnowledgeSyncOutboxEntry, KnowledgeSyncOutboxRepository } from './outbox';
 import {
   bindAcceptedCourseSources,
   mapCompletedCourse,
   mapCompletedRoleGuide,
+  mapPinnedKnowledgeSnapshot,
   parseAcceptedCourseSourceManifest,
   type CourseJobInstructionSourceRow,
   type GenerationOriginRow,
+  type PinnedKnowledgeSnapshot,
 } from './snapshot-loader';
 import {
   createCourseSourceReader,
@@ -17,10 +25,14 @@ import {
   type CourseNativeSourceProofRow,
 } from './storage-reader';
 import type { CompletedObject, ReconcileRepository } from './reconciler';
+import { isKnowledgeSyncContractV2Enabled } from './scheduler';
+import { KnowledgeSyncPreparationError } from './errors';
+
+export { isKnowledgeSyncContractV2Enabled } from './scheduler';
 
 interface QueryResult<T> {
   data: T | null;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
   count?: number | null;
 }
 interface QueryBuilder<T = unknown> extends PromiseLike<QueryResult<T>> {
@@ -60,23 +72,43 @@ type OutboxRow = {
   attempts: number;
   lease_token: string;
   binding_id: string;
+  event_type?: KnowledgeSyncV2IntentEventType;
+  revision?: number;
+  retraction_reason?: KnowledgeRetractionReason | null;
+  content_hash?: string | null;
+  created_at?: string;
+  snapshot?: PinnedKnowledgeSnapshot | null;
 };
 
-export async function claimKnowledgeSyncOutbox(
-  binding: KnowledgeSyncRuntimeConfig,
-  batchSize = 10
-): Promise<KnowledgeSyncOutboxEntry[]> {
-  const rows = expectData(
-    await client().rpc<OutboxRow[]>('claim_helixa_knowledge_sync_outbox', {
-      p_binding_id: binding.bindingId,
-      p_organization_id: binding.organizationId,
-      p_environment: binding.environment,
-      p_destination_binding_id: binding.destinationBindingId,
-      p_batch_size: batchSize,
-    }),
-    'Failed to claim Helixa knowledge outbox'
-  );
-  return rows.map(row => ({
+function bindingParameters(binding: KnowledgeSyncBindingConfig): Record<string, unknown> {
+  return {
+    p_binding_id: binding.bindingId,
+    p_organization_id: binding.organizationId,
+    p_environment: binding.environment,
+    p_destination_binding_id: binding.destinationBindingId,
+  };
+}
+
+export async function synchronizeKnowledgeSyncCaptureGate(
+  binding: KnowledgeSyncBindingConfig
+): Promise<void> {
+  const result = await client().rpc<boolean>('set_helixa_knowledge_sync_v2_enabled', {
+    ...bindingParameters(binding),
+    p_enabled: binding.contractV2 === true,
+  });
+  // V1 must work during rollout before the new migration is installed. Only
+  // a missing RPC is compatible; an installed gate/authority failure stops claims.
+  if (
+    binding.contractV2 !== true &&
+    result.error &&
+    (result.error.code === 'PGRST202' || result.error.code === '42883')
+  )
+    return;
+  if (result.error) throw new Error('Failed to configure Helixa knowledge sync capture mode');
+}
+
+function mapOutboxRow(row: OutboxRow, contractVersion: 1 | 2): KnowledgeSyncOutboxEntry {
+  return {
     id: row.id,
     eventId: row.event_id,
     objectKind: row.object_kind,
@@ -87,7 +119,45 @@ export async function claimKnowledgeSyncOutbox(
     attempts: row.attempts,
     leaseToken: row.lease_token,
     bindingId: row.binding_id,
-  }));
+    contractVersion,
+    ...(contractVersion === 2
+      ? {
+          eventType: row.event_type,
+          revision: row.revision,
+          retractionReason: row.retraction_reason,
+          contentHash: row.content_hash,
+          createdAt: row.created_at,
+          snapshot: row.snapshot,
+        }
+      : {}),
+  };
+}
+
+export async function claimKnowledgeSyncOutbox(
+  binding: KnowledgeSyncRuntimeConfig,
+  batchSize = 10
+): Promise<KnowledgeSyncOutboxEntry[]> {
+  await synchronizeKnowledgeSyncCaptureGate(binding);
+  // Legacy backlog stays protocol-pinned and can drain after V2 is enabled.
+  const rows = expectData(
+    await client().rpc<OutboxRow[]>('claim_helixa_knowledge_sync_outbox', {
+      ...bindingParameters(binding),
+      p_batch_size: batchSize,
+    }),
+    'Failed to claim Helixa knowledge outbox'
+  );
+  const entries = rows.map(row => mapOutboxRow(row, 1));
+  if (binding.contractV2 === true && entries.length < batchSize) {
+    const v2Rows = expectData(
+      await client().rpc<OutboxRow[]>('claim_helixa_knowledge_sync_v2_outbox', {
+        ...bindingParameters(binding),
+        p_batch_size: batchSize - entries.length,
+      }),
+      'Failed to claim Helixa knowledge v2 outbox'
+    );
+    entries.push(...v2Rows.map(row => mapOutboxRow(row, 2)));
+  }
+  return entries;
 }
 
 export function createKnowledgeSyncOutboxRepository(): KnowledgeSyncOutboxRepository {
@@ -142,10 +212,36 @@ export async function loadKnowledgeSnapshot(
   entry: Pick<
     KnowledgeSyncOutboxEntry,
     'objectKind' | 'objectId' | 'organizationId' | 'completedAt' | 'bindingId'
-  >
+  > &
+    Partial<Pick<KnowledgeSyncOutboxEntry, 'contractVersion' | 'snapshot'>>
 ) {
-  const db = client();
   const readUploadBytes = createUploadStorageReader(getUploadStorageRootPath());
+  if (entry.contractVersion === 2) {
+    if (!entry.snapshot) throw new KnowledgeSyncPreparationError('contract', false);
+    const readBytes =
+      entry.objectKind === 'COURSE'
+        ? createCourseSourceReader({
+            courseId: entry.objectId,
+            organizationId: entry.organizationId,
+            jobInstructionSource: entry.snapshot._jobInstructionSource ?? null,
+            nativeSources: (entry.snapshot.sources ?? []).flatMap(source =>
+              source._nativeProof ? [source._nativeProof] : []
+            ),
+            readUploadBytes,
+          })
+        : readUploadBytes;
+    return mapPinnedKnowledgeSnapshot(
+      entry.snapshot,
+      {
+        kind: entry.objectKind,
+        id: entry.objectId,
+        organizationId: entry.organizationId,
+        bindingId: entry.bindingId,
+      },
+      readBytes
+    );
+  }
+  const db = client();
   const originResult = await db
     .from<GenerationOriginRow>('helixa_generation_commands')
     .select(
@@ -369,39 +465,30 @@ export function createSupabaseReconcileRepository(
   };
 }
 
-export interface KnowledgeSyncRuntimeConfig {
-  endpoint: string;
-  hmacKey: string;
-  externalSystemId: string;
+export interface KnowledgeSyncBindingConfig {
   environment: string;
-  externalProjectId: string | null;
   bindingId: string;
   organizationId: string;
   destinationBindingId: string;
+  contractV2?: boolean;
 }
 
-export function readKnowledgeSyncRuntimeConfig(
+export interface KnowledgeSyncRuntimeConfig extends KnowledgeSyncBindingConfig {
+  endpoint: string;
+  hmacKey: string;
+  externalSystemId: string;
+  externalProjectId: string | null;
+}
+
+export function readKnowledgeSyncBindingConfig(
   environment: NodeJS.ProcessEnv = process.env
-): KnowledgeSyncRuntimeConfig {
-  const endpoint = environment.HELIXA_KNOWLEDGE_SYNC_ENDPOINT;
-  const hmacKey = environment.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY;
-  const externalSystemId = environment.HELIXA_EXTERNAL_SYSTEM_ID;
+): KnowledgeSyncBindingConfig {
   const bindingId = environment.HELIXA_KNOWLEDGE_SYNC_BINDING_ID;
   const organizationId = environment.HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID;
   const destinationBindingId = environment.HELIXA_DESTINATION_BINDING_ID;
-  if (
-    !endpoint ||
-    !hmacKey ||
-    !externalSystemId ||
-    !bindingId ||
-    !organizationId ||
-    !destinationBindingId
-  )
-    throw new Error('Helixa knowledge sync configuration is incomplete');
+  if (!bindingId || !organizationId || !destinationBindingId)
+    throw new Error('Helixa knowledge sync binding configuration is incomplete');
   return {
-    endpoint,
-    hmacKey,
-    externalSystemId,
     bindingId,
     organizationId,
     destinationBindingId,
@@ -410,8 +497,70 @@ export function readKnowledgeSyncRuntimeConfig(
       environment.APP_ENV ??
       environment.NODE_ENV ??
       'development',
+    ...(isKnowledgeSyncContractV2Enabled(environment) ? { contractV2: true } : {}),
+  };
+}
+
+export function readKnowledgeSyncRuntimeConfig(
+  environment: NodeJS.ProcessEnv = process.env
+): KnowledgeSyncRuntimeConfig {
+  const endpoint = environment.HELIXA_KNOWLEDGE_SYNC_ENDPOINT;
+  const hmacKey = environment.HELIXA_KNOWLEDGE_SYNC_HMAC_KEY;
+  const externalSystemId = environment.HELIXA_EXTERNAL_SYSTEM_ID;
+  if (!endpoint || !hmacKey || !externalSystemId)
+    throw new Error('Helixa knowledge sync configuration is incomplete');
+  return {
+    endpoint,
+    hmacKey,
+    externalSystemId,
+    ...readKnowledgeSyncBindingConfig(environment),
     externalProjectId: environment.HELIXA_DESTINATION_PROJECT_ID ?? null,
   };
+}
+
+/** One JSON array from one SQL statement, unaffected by PostgREST's table row cap. */
+export async function loadKnowledgeSyncManifestInventory(
+  binding: KnowledgeSyncRuntimeConfig
+): Promise<KnowledgeManifestObject[]> {
+  return expectData(
+    await client().rpc<KnowledgeManifestObject[]>(
+      'get_helixa_knowledge_sync_manifest',
+      bindingParameters(binding)
+    ),
+    'Failed to load current Helixa knowledge manifest'
+  );
+}
+
+export async function enqueueKnowledgeSyncManifestResend(
+  binding: KnowledgeSyncRuntimeConfig,
+  objects: KnowledgeManifestResendObject[]
+): Promise<number> {
+  return expectData(
+    await client().rpc<number>('enqueue_helixa_knowledge_sync_v2_resend', {
+      ...bindingParameters(binding),
+      p_objects: objects,
+    }),
+    'Failed to enqueue current Helixa knowledge resend'
+  );
+}
+
+export interface KnowledgeSyncV2ReconcileResult {
+  missing: number;
+  inserted: number;
+  applied: boolean;
+}
+
+export async function runSupabaseKnowledgeSyncV2Reconciler(
+  binding: KnowledgeSyncRuntimeConfig,
+  apply = false
+): Promise<KnowledgeSyncV2ReconcileResult> {
+  return expectData(
+    await client().rpc<KnowledgeSyncV2ReconcileResult>('reconcile_helixa_knowledge_sync_v2', {
+      ...bindingParameters(binding),
+      p_apply: apply,
+    }),
+    'Failed to reconcile current Helixa v2 knowledge'
+  );
 }
 
 export async function resetKnowledgeSyncIntent(

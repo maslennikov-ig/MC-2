@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 
 import type { KnowledgeObjectKind } from './contract';
-import type { KnowledgeSyncPackage } from './contract';
+import type {
+  KnowledgeSyncWirePackage,
+  KnowledgeSyncV2IntentEventType,
+  KnowledgeRetractionReason,
+} from './contract';
+import type { PinnedKnowledgeSnapshot } from './snapshot-loader';
 import { serializeKnowledgeSyncPackage } from './package-builder';
 import {
   classifyDeliveryFailure,
@@ -24,6 +29,14 @@ export interface KnowledgeSyncOutboxEntry {
   attempts: number;
   leaseToken: string;
   bindingId: string;
+  /** Pinned protocol; existing V1 callers may omit this field. */
+  contractVersion?: 1 | 2;
+  eventType?: KnowledgeSyncV2IntentEventType;
+  revision?: number;
+  retractionReason?: KnowledgeRetractionReason | null;
+  contentHash?: string | null;
+  createdAt?: string;
+  snapshot?: PinnedKnowledgeSnapshot | null;
 }
 export interface KnowledgeSyncOutboxRepository {
   persistRawBodyOnce(
@@ -49,20 +62,23 @@ export function computeRetryDelayMs(attempt: number, eventId: string): number {
 
 export async function processKnowledgeSyncOutboxEntry(input: {
   entry: KnowledgeSyncOutboxEntry;
-  buildPackage(): Promise<KnowledgeSyncPackage>;
+  buildPackage(): Promise<KnowledgeSyncWirePackage>;
   repository: KnowledgeSyncOutboxRepository;
   delivery: DeliveryConfig;
   now?: Date;
 }): Promise<'delivered' | 'retryable' | 'terminal' | 'lost_lease'> {
   try {
     const packageValue = input.entry.rawBody ? null : await input.buildPackage();
+    const preparedBody = packageValue ? serializeKnowledgeSyncPackage(packageValue) : null;
     const rawBody =
       input.entry.rawBody ??
       (await input.repository.persistRawBodyOnce(
         input.entry.id,
         input.entry.leaseToken,
-        serializeKnowledgeSyncPackage(packageValue!),
-        packageValue!.hashes.payloadHash
+        preparedBody!,
+        'hashes' in packageValue!
+          ? packageValue!.hashes.payloadHash
+          : createHash('sha256').update(preparedBody!).digest('hex')
       ));
     if (rawBody == null) return 'lost_lease';
     await deliverClaimedKnowledgeSync(

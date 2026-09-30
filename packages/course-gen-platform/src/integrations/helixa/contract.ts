@@ -1,4 +1,5 @@
 export const KNOWLEDGE_SYNC_SCHEMA_VERSION = '2026-06-16.megacampus-knowledge-sync.v1' as const;
+export const KNOWLEDGE_SYNC_SCHEMA_VERSION_V2 = '2026-10-01.megacampus-knowledge-sync.v2' as const;
 
 export type JsonValue =
   | null
@@ -13,6 +14,13 @@ export type KnowledgeEventType =
   | 'COURSE_UPDATED'
   | 'ROLE_GUIDE_COMPLETED'
   | 'ROLE_GUIDE_UPDATED';
+export type KnowledgeRetractionEventType = 'COURSE_RETRACTED' | 'ROLE_GUIDE_RETRACTED';
+export type KnowledgeSyncV2IntentEventType = KnowledgeEventType | KnowledgeRetractionEventType;
+export type KnowledgeRetractionReason =
+  | 'deleted'
+  | 'unpublished'
+  | 'visibility_restricted'
+  | 'generation_reverted';
 export type ProcessingRoute =
   | 'docling'
   | 'local_text'
@@ -115,3 +123,54 @@ export interface KnowledgeSyncPackage {
   metadata?: Record<string, JsonValue>;
   originCommand?: GenerationOriginCommandV1;
 }
+
+export interface KnowledgeSyncV2Package
+  extends Omit<KnowledgeSyncPackage, 'schemaVersion' | 'object'> {
+  schemaVersion: typeof KNOWLEDGE_SYNC_SCHEMA_VERSION_V2;
+  object: KnowledgeSyncPackage['object'] & { revision: number };
+}
+
+export interface KnowledgeSyncTombstone {
+  schemaVersion: typeof KNOWLEDGE_SYNC_SCHEMA_VERSION_V2;
+  eventId: string;
+  eventType: KnowledgeRetractionEventType;
+  sentAt: string;
+  producer: KnowledgeSyncPackage['producer'];
+  object: {
+    kind: KnowledgeObjectKind;
+    id: string;
+    revision: number;
+    status: 'retracted';
+    reason: KnowledgeRetractionReason;
+  };
+}
+
+export interface KnowledgeManifestObject {
+  kind: KnowledgeObjectKind;
+  id: string;
+  revision: number;
+  contentHash: string;
+}
+export interface KnowledgeManifestResendObject {
+  kind: KnowledgeObjectKind;
+  id: string;
+}
+export interface KnowledgeSyncManifest {
+  schemaVersion: typeof KNOWLEDGE_SYNC_SCHEMA_VERSION_V2;
+  eventId: string;
+  eventType: 'KNOWLEDGE_MANIFEST';
+  sentAt: string;
+  producer: KnowledgeSyncPackage['producer'];
+  manifest: {
+    manifestId: string;
+    pageIndex: number;
+    pageCount: number;
+    objects: KnowledgeManifestObject[];
+  };
+}
+
+export type KnowledgeSyncWirePackage =
+  | KnowledgeSyncPackage
+  | KnowledgeSyncV2Package
+  | KnowledgeSyncTombstone
+  | KnowledgeSyncManifest;
