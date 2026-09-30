@@ -89,8 +89,9 @@ docs_review_notes: root owns contract and rollout docs; stream records internal 
 verification:
   - backend focused Vitest target before implementation: 6 failed, 2 passed
   - web focused Vitest target before implementation: 1 failed, 2 passed
-  - backend focused Vitest target after implementation: 11 passed, unchanged evidence reused after UI review correction
+  - backend focused Vitest target after lint/type review correction: 11 passed
   - web focused Vitest target after UI review correction: 3 passed
+  - scoped TypeScript and ESLint with integrated scheduler read-only compiler overlay: 0 errors, 0 warnings
   - git diff --check: passed
 changed_files:
   - packages/course-gen-platform/src/server/routers/generation/editing/field-update.router.ts
@@ -136,6 +137,15 @@ optional arguments. A nonempty patch must return `fieldApplied: true`.
 `integrations/helixa/scheduler.ts`; no Helixa module, SQL, environment, CI or
 shared-types file was modified here.
 
+The lint/type review found that a conditional Supabase select literal inferred a
+`ParserError` union and made `course.organization_id` error-typed. The v2
+transaction path now has a scoped helper with its own explicit full-column
+literal query; the legacy mutation retains its original literal authorization
+query. The snapshot cast is removed and the RPC expected state uses a
+`Pick<Database courses Row>` including the actual nullable `updated_at` type.
+The extracted helper also removes the mutation's complexity warning. Behavior
+and the v1 cascade path are unchanged.
+
 graph-reviewed: used. Borrowed the primary worktree's read-only graph via
 `graphify query "deleteDownstreamStages updateField useCascadeStageDelete"
 --graph /home/me/code/mc2/graphify-out/graph.json --budget 1200`. The truncated
@@ -168,12 +178,29 @@ Original UI baseline: 3 tests, 1 failed/2 passed (missing pending edit argument)
 Final green after the root review correction: 3/3, including no second save after
 v2 success, one legacy save, and failure retaining the modal. The unconditional
 in-flight confirmation guard and its standalone test were removed because they
-changed the flag-off behavior beyond the assigned v2 scope. Backend source/tests
-are unchanged, so matching 11/11 evidence is reused; they were not rerun.
+changed the flag-off behavior beyond the assigned v2 scope. Backend evidence was
+reused for that UI-only correction, then rerun after the subsequent type/query
+refactor: 11/11 again. Web source/tests are unchanged by the type/query correction;
+matching 3/3 web evidence is reused.
+
+After shared-types/shared-utils artifacts were built, focused ordinary ESLint on
+`field-update.router.ts` and `field-update-preparation.ts` confirmed the type and
+complexity findings were removed. This worker branch does not include the
+transport scheduler export, so ordinary ESLint retains one dependency-only
+unsafe-call warning (TypeScript TS2305). Scoped TypeScript and the same ESLint
+rules were also executed through a read-only compiler-host overlay using the
+actual integrated scheduler source from the root worktree: both targets have
+0 TypeScript errors, 0 ESLint errors and 0 warnings. The checker reports
+`course.organization_id` as `string` and a concrete full-column course row.
+No source file was replaced and no lint/type rule was suppressed. Scheduler
+source SHA256: `af4f05ccdf52653d33f4a437dde51d036ad22dc50b240695d71e34e7bba13f47`.
 
 Exact private output is in `/tmp/mc2-atomic-edit-backend-red.log`,
-`/tmp/mc2-atomic-edit-backend-green.log`, `/tmp/mc2-atomic-edit-web-red.log`, and
-`/tmp/mc2-atomic-edit-web-green-review.log`. Initial setup-only errors from missing
+`/tmp/mc2-atomic-edit-backend-green-lint-review.log`,
+`/tmp/mc2-atomic-edit-web-red.log`, `/tmp/mc2-atomic-edit-web-green-review.log`,
+`/tmp/mc2-atomic-edit-lint-review-red.log`,
+`/tmp/mc2-atomic-edit-lint-review-fixed.log` and
+`/tmp/mc2-atomic-edit-typed-review.log`. Initial setup-only errors from missing
 fake Supabase environment and unbuilt local shared packages were corrected
 before behavioral red; they are not red-control evidence. Offline dependency
 installation used `pnpm install --frozen-lockfile --offline --ignore-scripts`.

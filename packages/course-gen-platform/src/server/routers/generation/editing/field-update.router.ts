@@ -8,7 +8,7 @@ import {
   updateFieldInputSchema,
   type UpdateFieldResponse,
 } from '@megacampus/shared-types/regeneration-types';
-import type { CourseStructure } from '@megacampus/shared-types';
+import type { CourseStructure, Database } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
@@ -53,14 +53,119 @@ function atomicCascadeRpc(supabase: ReturnType<typeof getSupabaseAdmin>) {
       p_organization_id: string;
       p_from_stage: 4 | 5;
       p_course_patch?: Record<string, unknown>;
-      p_expected_course_state?: {
-        updated_at: string;
-        analysis_result: unknown;
-        course_structure: unknown;
-        generation_metadata: unknown;
-      };
+      p_expected_course_state?: Pick<
+        Database['public']['Tables']['courses']['Row'],
+        'updated_at' | 'analysis_result' | 'course_structure' | 'generation_metadata'
+      >;
     }
   ) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+}
+
+async function deleteDownstreamStagesAtomically(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  input: z.infer<typeof deleteDownstreamStagesInputSchema>,
+  user: Parameters<typeof buildAuthContext>[0],
+  requestId: string
+): Promise<DeleteDownstreamStagesResponse> {
+  const { courseId, fromStage, pendingEdit } = input;
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select(
+      'id, user_id, organization_id, analysis_result, course_structure, generation_metadata, updated_at'
+    )
+    .eq('id', courseId)
+    .single();
+
+  throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+  assertCourseAccess(buildAuthContext(user), course, 'delete downstream stages');
+
+  // Validate the entire final edit before any downstream data is removed.
+  const prepared = pendingEdit
+    ? await prepareCourseFieldUpdate(
+        supabase,
+        course,
+        {
+          courseId,
+          stageId: fromStage === 4 ? 'stage_4' : 'stage_5',
+          fieldPath: pendingEdit.fieldPath,
+          value: pendingEdit.value,
+        },
+        requestId
+      )
+    : undefined;
+  const patch = prepared
+    ? Object.fromEntries(
+        Object.entries(prepared.updatePayload).filter(([key]) => key !== 'updated_at')
+      )
+    : undefined;
+
+  // The scoped row lock, optimistic check, cascades and final patch share
+  // one transaction, so v2 captures only the final answerable package.
+  const { data, error } = await atomicCascadeRpc(supabase)('delete_helixa_course_downstream_v2', {
+    p_course_id: courseId,
+    p_organization_id: course.organization_id,
+    p_from_stage: fromStage,
+    ...(patch && {
+      p_course_patch: patch,
+      p_expected_course_state: {
+        updated_at: course.updated_at,
+        analysis_result: course.analysis_result,
+        course_structure: course.course_structure,
+        generation_metadata: course.generation_metadata,
+      },
+    }),
+  });
+
+  if (error) {
+    logger.error({ requestId, courseId, fromStage, error }, 'Atomic cascade edit failed');
+    throw new TRPCError({
+      code: error.code === '40001' ? 'CONFLICT' : 'INTERNAL_SERVER_ERROR',
+      message:
+        error.code === '40001'
+          ? 'Course changed while editing. Refresh and try again.'
+          : 'Failed to delete downstream stages',
+    });
+  }
+
+  const result = cascadeDeleteResultSchema.parse(data);
+  if (pendingEdit && !result.fieldApplied) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Atomic cascade edit did not confirm the field update',
+    });
+  }
+
+  if (fromStage === 5 && prepared) {
+    await writeCourseNodes(
+      courseId,
+      prepared.dataToPersist as CourseStructure,
+      supabase,
+      logger
+    ).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
+  } else if (fromStage === 4 && isDualWriteEnabled()) {
+    const { error: nodesError } = await supabase
+      .from('course_nodes')
+      .delete()
+      .eq('course_id', courseId);
+    if (nodesError) {
+      logger.warn(
+        { courseId, error: nodesError.message },
+        'course_nodes cleanup failed (non-fatal)'
+      );
+    }
+  }
+
+  return {
+    success: true,
+    ...result,
+    ...(prepared?.recalculated && { recalculated: prepared.recalculated }),
+  };
 }
 
 export const fieldUpdateRouter = {
@@ -260,10 +365,9 @@ export const fieldUpdateRouter = {
   deleteDownstreamStages: instructorProcedure
     .input(deleteDownstreamStagesInputSchema)
     .mutation(async ({ ctx, input }): Promise<DeleteDownstreamStagesResponse> => {
-      const { courseId, fromStage, pendingEdit } = input;
+      const { courseId, fromStage } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
-      const useAtomicCascade = isKnowledgeSyncContractV2Enabled();
 
       if (!ctx.user) {
         throw new TRPCError({
@@ -273,14 +377,14 @@ export const fieldUpdateRouter = {
       }
 
       try {
+        if (isKnowledgeSyncContractV2Enabled()) {
+          return await deleteDownstreamStagesAtomically(supabase, input, ctx.user, requestId);
+        }
+
         // Get course for authorization
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select(
-            useAtomicCascade
-              ? 'id, user_id, organization_id, analysis_result, course_structure, generation_metadata, updated_at'
-              : 'id, user_id, organization_id'
-          )
+          .select('id, user_id, organization_id')
           .eq('id', courseId)
           .single();
 
@@ -289,104 +393,6 @@ export const fieldUpdateRouter = {
 
         // Check authorization
         assertCourseAccess(buildAuthContext(ctx.user), course, 'delete downstream stages');
-
-        if (useAtomicCascade) {
-          const snapshot = course as typeof course & {
-            updated_at: string;
-            analysis_result: unknown;
-            course_structure: unknown;
-            generation_metadata: unknown;
-          };
-          // Validate the entire final edit before any downstream data is removed.
-          const prepared = pendingEdit
-            ? await prepareCourseFieldUpdate(
-                supabase,
-                snapshot,
-                {
-                  courseId,
-                  stageId: fromStage === 4 ? 'stage_4' : 'stage_5',
-                  fieldPath: pendingEdit.fieldPath,
-                  value: pendingEdit.value,
-                },
-                requestId
-              )
-            : undefined;
-          const patch = prepared
-            ? Object.fromEntries(
-                Object.entries(prepared.updatePayload).filter(([key]) => key !== 'updated_at')
-              )
-            : undefined;
-
-          // The scoped row lock, optimistic check, cascades and final patch share
-          // one transaction, so v2 captures only the final answerable package.
-          const { data, error } = await atomicCascadeRpc(supabase)(
-            'delete_helixa_course_downstream_v2',
-            {
-              p_course_id: courseId,
-              p_organization_id: course.organization_id,
-              p_from_stage: fromStage,
-              ...(patch && {
-                p_course_patch: patch,
-                p_expected_course_state: {
-                  updated_at: snapshot.updated_at,
-                  analysis_result: snapshot.analysis_result,
-                  course_structure: snapshot.course_structure,
-                  generation_metadata: snapshot.generation_metadata,
-                },
-              }),
-            }
-          );
-
-          if (error) {
-            logger.error({ requestId, courseId, fromStage, error }, 'Atomic cascade edit failed');
-            throw new TRPCError({
-              code: error.code === '40001' ? 'CONFLICT' : 'INTERNAL_SERVER_ERROR',
-              message:
-                error.code === '40001'
-                  ? 'Course changed while editing. Refresh and try again.'
-                  : 'Failed to delete downstream stages',
-            });
-          }
-
-          const result = cascadeDeleteResultSchema.parse(data);
-          if (pendingEdit && !result.fieldApplied) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Atomic cascade edit did not confirm the field update',
-            });
-          }
-
-          if (fromStage === 5 && prepared) {
-            await writeCourseNodes(
-              courseId,
-              prepared.dataToPersist as CourseStructure,
-              supabase,
-              logger
-            ).catch(err =>
-              logger.warn(
-                { courseId, error: err instanceof Error ? err.message : String(err) },
-                'course_nodes dual-write failed (non-fatal)'
-              )
-            );
-          } else if (fromStage === 4 && isDualWriteEnabled()) {
-            const { error: nodesError } = await supabase
-              .from('course_nodes')
-              .delete()
-              .eq('course_id', courseId);
-            if (nodesError) {
-              logger.warn(
-                { courseId, error: nodesError.message },
-                'course_nodes cleanup failed (non-fatal)'
-              );
-            }
-          }
-
-          return {
-            success: true,
-            ...result,
-            ...(prepared?.recalculated && { recalculated: prepared.recalculated }),
-          };
-        }
 
         const now = new Date().toISOString();
         let deletedLessonsCount = 0;
