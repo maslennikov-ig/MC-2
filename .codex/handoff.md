@@ -9,16 +9,10 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 ## Current stage
 
 Current stage id: `mc2-1iwt9`
-
-Active stage/task: `mc2-1iwt9`, integration, in progress (2026-09-30).
-Exact v2 wire contract from Helixa origin/main 3e0a62686; owner clarification:
-current manifests include every completed object readable by at least one actual
-org member. Publication/visibility retract only after LAST-member read access is
-lost; removing the public link alone does not retract an owner-readable object.
-The earlier contradiction is resolved by this explicit current user decision.
-Plan: `docs/helixa/contract-v2-implementation.md`; stage summary:
-`.codex/stages/mc2-1iwt9/summary.md`. Root and three writers use isolated worktrees.
-V2 flag stays off; no Helixa writes/live changes/activation are authorized.
+Stage/task: `mc2-1iwt9`, integration, source reviewed; root acceptance pending (2026-09-30).
+Wire: Helixa origin/main 3e0a62686 section C. Owner: every completed object readable by an actual org member stays current; publication/visibility retract only after LAST-member access is lost, not from public-link removal alone.
+Plan: `docs/helixa/contract-v2-implementation.md`; summary: `.codex/stages/mc2-1iwt9/summary.md`.
+Root and three writers are isolated. V2 stays off; no Helixa writes, live mutations or activation are authorized.
 
 ## Price sync repair (mc2-x9che)
 
