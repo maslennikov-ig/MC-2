@@ -64,7 +64,7 @@ status: accepted
 delivery_method: cherry-pick
 accepted_by_orchestrator: yes
 cleanup_status: blocked
-cleanup_notes: source accepted by cherry-pick and direct review; child branch/worktree retained until remote delivery is authorized; no ancestor-proof cleanup or force removal
+cleanup_notes: source accepted by cherry-pick and direct review; child branch/worktree retained until develop integration, with only root feature publication/PR authorized; no ancestor-proof cleanup or force removal
 risk_level: high
 risk_tags:
   - authorization

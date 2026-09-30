@@ -1,6 +1,6 @@
 # Stage mc2-1iwt9: Helixa knowledge-sync v2
 
-Status: accepted locally; remote delivery pending approval. Level: integration.
+Status: accepted locally; develop integration pending authorization. Level: integration.
 Acceptance owner: root. Tested source: 2048b6620e82da08b3e599dc2d44687d4b71890e.
 Base: origin/develop c7a000ec6cf387153f94b26d00b5db7c51237d03.
 
@@ -90,10 +90,12 @@ are outside the v2 changed files; they do not invalidate compilation or acceptan
 
 ## Delivery boundary
 
-Local branch: codex/helixa-contract-v2. Publishing/PR needs approval under
-orchestrator.toml delivery.push_after_closeout=ask; no push or merge occurred.
+Branch: codex/helixa-contract-v2. The owner authorized publishing this feature
+branch and opening a PR into develop on 2026-09-30, satisfying orchestrator.toml
+delivery.push_after_closeout=ask. This grants no develop merge or deployment.
+Use Beads mc2-1iwt9 / GitHub issue 336 for confirmed publication and PR state.
 Four task branches are explicitly parked in the stranded-commit allowlist and
-their worktrees remain preserved. The read-only stranded audit against
+their worktrees remain preserved pending develop integration. The read-only stranded audit against
 origin/develop exited 1 for one unrelated commit on codex/price-sync-35431236055;
 no cleanup or changes to that owner's branch were made. This is not a delivery claim.
 

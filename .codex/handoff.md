@@ -9,7 +9,7 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 ## Current stage
 
 Current stage id: `mc2-1iwt9`
-Stage/task: `mc2-1iwt9`, integration, accepted locally (2026-09-30); tested source `2048b6620`, 142 behavior controls + CI guard + lint/type-check/build pass. Remote delivery awaits approval.
+Stage/task: `mc2-1iwt9`, integration, accepted locally (2026-09-30); tested source `2048b6620`, 142 behavior controls + CI guard + lint/type-check/build pass. Feature publication/PR authorized; develop integration pending.
 Wire: Helixa origin/main 3e0a62686 section C. Owner: every completed object readable by an actual org member stays current; publication/visibility retract only after LAST-member access is lost, not from public-link removal alone.
 Plan: `docs/helixa/contract-v2-implementation.md`; summary: `.codex/stages/mc2-1iwt9/summary.md`; rollout: `docs/helixa/megacampus-side.md` section 11. Graph/docs updated; task worktrees retained. V2 stays off; no Helixa writes/live mutations/activation occurred.
 
@@ -277,7 +277,7 @@ delivered, so a report naming a branch again means something really was left beh
 
 Next stage id: `mc2-1iwt9`
 
-Recommended action: **review accepted mc2-1iwt9 for publication/PR approval; retain v2 off until owner receiver confirmation and authorized rollout.**
+Recommended action: **track the mc2-1iwt9 feature PR; retain v2 off until owner receiver confirmation and authorized rollout.**
 
 Already proven on 2026-09-05 after the deploy: production run `33961945370` green, all five
 containers report revision `726ddf1c2`, the Helixa route answers through nginx (503
