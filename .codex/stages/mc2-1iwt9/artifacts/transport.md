@@ -87,6 +87,8 @@ verification:
   - focused v2 plus existing v1 and scheduler unit tests: passed, 72 tests, exit 0
   - focused transport correction lint: passed, zero errors and warnings
   - focused transport correction tests: passed, 74 tests, exit 0
+  - focused normalization and protocol correction lint: passed, zero errors and warnings
+  - focused normalization and protocol correction tests: passed, 78 tests, exit 0
   - git diff --check: passed
 changed_files:
   - packages/course-gen-platform/src/integrations/helixa/contract.ts
@@ -109,7 +111,8 @@ Implemented optional exact v2 delivery, pinned semantic snapshots, content-free
 tombstones, paged consistent manifests and current-revision resend. The v2 flag
 requires exact `true` and remains separate from scheduler opt-in. Off mode
 preserves v1 serialization and frozen backlog; frozen v2 entries cannot be sent
-while off. No visibility filter exists in TS: the DB owns the actual any-member
+while off. V2 mode claims/sends only v2; legacy backlog remains durable and paused
+until flag-off. No visibility filter exists in TS: the DB owns the actual any-member
 read predicate under the owner's clarified rule, including readable private
 objects. Public-link removal alone is not a retraction.
 
@@ -119,8 +122,13 @@ Literal section C governs the wire. Tombstones have **six** top-level fields and
 five object fields, with exactly the four specified reasons and no hashes,
 content, scope, documents, relations or origin command. Tombstones never load a
 native snapshot. Full v2 packages compare the DB fingerprint against normalized
-serialized content. V1 content retains historical lesson/block processing data;
-v2 excludes it. Pinned source descriptors retain tenant/source/namespace/hash
+serialized content. V1 content retains historical lesson/block processing data.
+V2 retains answerable outer lesson `metadata.markdownContent` exactly when its
+string is nonempty under ECMAScript trim; it drops other outer metadata. Native
+LessonContent envelopes (object-valued `.content`) drop only their top-level
+`metadata`, `status`, `created_at`, and `updated_at`. Identity and all semantic
+body fields, including nested metadata/status/timestamps, remain. Pinned source
+descriptors retain tenant/source/namespace/hash
 and virtual-source proof checks. A valid native origin may belong to another
 delivery binding of the same org/object; the course-source relation still checks
 the originating binding and command.
@@ -132,9 +140,12 @@ Agreed internal RPCs (same tuple parameters: `p_binding_id`,
   claims, including disabled-scheduler general-worker boot with binding identity
   alone. Missing RPC codes `PGRST202`/`42883` are tolerated only in v1 before the
   migration exists; installed authority errors and v2 activation fail closed.
-- Legacy `claim_helixa_knowledge_sync_outbox` drains v1 backlog first;
-  `claim_helixa_knowledge_sync_v2_outbox(..., p_batch_size)` supplies the remaining
-  batch slots only when v2 is on. V2 rows add `event_type`, `revision`,
+- Exact mode selects **one** claim RPC after capture synchronization:
+  `claim_helixa_knowledge_sync_outbox` only while v1/off, and
+  `claim_helixa_knowledge_sync_v2_outbox(..., p_batch_size)` only while v2/on.
+  V1 is revisionless and never drains alongside v2. The service also fences
+  accidentally mixed/injected entries. Frozen v1 bytes remain unchanged for
+  flag-off delivery; no legacy row is deleted or reset. V2 rows add `event_type`, `revision`,
   `retraction_reason`, `content_hash`, `created_at` and pinned `snapshot`.
 - Existing `freeze_helixa_knowledge_sync_payload` and
   `transition_helixa_knowledge_sync_outbox` are reused. Tombstone wire bodies have
@@ -161,6 +172,40 @@ Root must forward `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2` through worker env paths;
 existing `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` is an independent flag.
 `isKnowledgeSyncContractV2Enabled` is exported from lightweight `scheduler.ts`
 and re-exported by `runtime-repository.ts` for consumers.
+
+## Native normalization and protocol transition correction
+
+The independent review identified nested native LessonContent service fields
+and mixed v1/v2 delivery. The TS correction matches the agreed SQL projection
+above and leaves v1 mapping/serialization untouched. Tests validate a real native
+fixture against `LessonContentSchema`, then prove that telemetry/status/time
+changes cannot change v2 bytes, answerable rendered markdown edits change the
+content hash, Unicode whitespace-only/non-string rendered metadata is omitted,
+and nested body semantic fields remain intact.
+
+Final protocol rule supersedes the initial backlog-draining approach: v2 mode
+claims and sends only v2. Five focused controls failed before correction:
+native envelope normalization, answerable outer markdown, paused v1 preservation,
+a delayed frozen v1 attempting to overwrite a materialized v2 object, and the
+real RPC off/on/off selector. A sixth control passed unchanged, proving the TS
+disabled-scheduler startup accepts an exact disabled binding's successful
+gate-false RPC without HMAC/endpoint configuration. DB owns the actual disabled
+tuple authorization correction and activation barrier.
+
+No receiver/wire response behavior changed. Root's read-only Helixa evidence
+establishes that successful same-event replay awaits completed projection.
+DB activation must hold its binding lock and refuse false-to-true while an
+ever-claimed/frozen legacy event has not reached delivered; resets cannot erase
+that durable fact. Legacy claims are refused while the DB gate is true. Root
+owns operator drain/activation documentation and final durable proof.
+
+Latest focused acceptance: **78/78 passed** (45 v2 + 28 v1 + 5 scheduler), exit 0,
+using the same three-file Vitest command below. Focused ESLint on package-builder,
+runtime-repository and service passes with zero errors/warnings. Exact logs:
+`/tmp/mc2-1iwt9-transport-normalization-protocol-red.log` (5 failed, 1 passed,
+39 skipped), `/tmp/mc2-1iwt9-transport-normalization-protocol-green.log` (78 green),
+and `/tmp/mc2-1iwt9-transport-normalization-protocol-lint.log` (empty successful
+output). No broad type-check/build, root-tree edit, push or external call.
 
 ## Integration lint correction
 

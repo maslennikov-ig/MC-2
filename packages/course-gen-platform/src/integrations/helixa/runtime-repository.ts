@@ -138,26 +138,21 @@ export async function claimKnowledgeSyncOutbox(
   batchSize = 10
 ): Promise<KnowledgeSyncOutboxEntry[]> {
   await synchronizeKnowledgeSyncCaptureGate(binding);
-  // Legacy backlog stays protocol-pinned and can drain after V2 is enabled.
+  // V1 is revisionless: keep its durable backlog paused throughout V2 mode.
+  // It can drain unchanged only after an explicit switch back to V1.
+  const contractVersion = binding.contractV2 === true ? 2 : 1;
   const rows = expectData(
-    await client().rpc<OutboxRow[]>('claim_helixa_knowledge_sync_outbox', {
-      ...bindingParameters(binding),
-      p_batch_size: batchSize,
-    }),
-    'Failed to claim Helixa knowledge outbox'
+    await client().rpc<OutboxRow[]>(
+      contractVersion === 2
+        ? 'claim_helixa_knowledge_sync_v2_outbox'
+        : 'claim_helixa_knowledge_sync_outbox',
+      { ...bindingParameters(binding), p_batch_size: batchSize }
+    ),
+    contractVersion === 2
+      ? 'Failed to claim Helixa knowledge v2 outbox'
+      : 'Failed to claim Helixa knowledge outbox'
   );
-  const entries = rows.map(row => mapOutboxRow(row, 1));
-  if (binding.contractV2 === true && entries.length < batchSize) {
-    const v2Rows = expectData(
-      await client().rpc<OutboxRow[]>('claim_helixa_knowledge_sync_v2_outbox', {
-        ...bindingParameters(binding),
-        p_batch_size: batchSize - entries.length,
-      }),
-      'Failed to claim Helixa knowledge v2 outbox'
-    );
-    entries.push(...v2Rows.map(row => mapOutboxRow(row, 2)));
-  }
-  return entries;
+  return rows.map(row => mapOutboxRow(row, contractVersion));
 }
 
 export function createKnowledgeSyncOutboxRepository(): KnowledgeSyncOutboxRepository {

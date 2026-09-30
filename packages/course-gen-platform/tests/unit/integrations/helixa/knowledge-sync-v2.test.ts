@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LessonContentSchema } from '@megacampus/shared-types';
 
 vi.mock('@/shared/supabase/admin', () => ({ getSupabaseAdmin: vi.fn() }));
 vi.mock('@/stages/stage1-document-upload/storage-paths', () => ({
@@ -70,6 +71,59 @@ function fingerprint(value = snapshot()): string {
       lessons: value.lessons,
     })
   );
+}
+function nativeLessonContent() {
+  return {
+    lesson_id: '00000000-0000-4000-8000-000000000001',
+    course_id: '00000000-0000-4000-8000-000000000002',
+    content: {
+      intro: 'Read and apply this operations checklist before making a production change.',
+      sections: [
+        {
+          title: 'Operations checklist',
+          content:
+            'Check the customer scope, confirm current state, and preserve source evidence before editing.',
+        },
+      ],
+      examples: [
+        {
+          title: 'Example change',
+          content: 'Change one scoped object and inspect the resulting behavior.',
+        },
+      ],
+      exercises: [
+        {
+          question: 'Which source evidence must be preserved?',
+          solution: 'Preserve the source identity and exact answerable body.',
+        },
+      ],
+      interactive_elements: [
+        {
+          type: 'quiz',
+          config: {
+            status: 'answerable status',
+            metadata: { explanation: 'Answerable body metadata' },
+            updated_at: 'semantic timestamp',
+          },
+        },
+      ],
+    },
+    metadata: {
+      total_words: 100,
+      total_tokens: 250,
+      cost_usd: 0.01,
+      quality_score: 0.9,
+      rag_chunks_used: 1,
+      generation_duration_ms: 300,
+      model_used: 'generation-model',
+      archetype_used: 'concept_explainer',
+      temperature_used: 0.5,
+      qa_signals: { version: 1, lesson_flags: ['service-only-flag'] },
+    },
+    status: 'completed',
+    created_at: completedAt,
+    updated_at: createdAt,
+  };
 }
 function entry(overrides: Partial<KnowledgeSyncOutboxEntry> = {}): KnowledgeSyncOutboxEntry {
   return {
@@ -221,6 +275,121 @@ describe('knowledge-sync v2 exact contract', () => {
     ).toBe(true);
     expect(before.schemaVersion).toBe('2026-06-16.megacampus-knowledge-sync.v1');
     expect(before.object).not.toHaveProperty('revision');
+  });
+
+  it('normalizes real native LessonContent telemetry while preserving identity, semantic body and v1 bytes', async () => {
+    const raw = nativeLessonContent();
+    expect(LessonContentSchema.safeParse(raw).success).toBe(true);
+    const markdown = '\uFEFF\u00A0# Answerable rendered lesson\n';
+    const value = snapshot({
+      id: raw.course_id,
+      lessons: [
+        {
+          lesson_id: raw.lesson_id,
+          content: raw,
+          metadata: { markdownContent: markdown, cost: 40, status: 'processing' },
+        },
+      ],
+    });
+    const normalized = {
+      ...value,
+      lessons: [
+        {
+          lesson_id: raw.lesson_id,
+          content: { lesson_id: raw.lesson_id, course_id: raw.course_id, content: raw.content },
+          metadata: { markdownContent: markdown },
+        },
+      ],
+    };
+    const intent = entry({
+      objectId: value.id,
+      eventId: `mc2:COURSE:org:${value.id}:UPDATED:4`,
+      contentHash: fingerprint(normalized),
+    });
+    const legacyBefore = builder.serializeKnowledgeSyncPackage(
+      await builder.buildKnowledgeSyncPackage(value, config)
+    );
+    const result = await builder.buildKnowledgeSyncV2Package(value, intent, config);
+    expect(result.content.lessons).toEqual(normalized.lessons);
+    const changedTelemetry = {
+      ...value,
+      lessons: [
+        {
+          lesson_id: raw.lesson_id,
+          content: {
+            ...raw,
+            metadata: { ...raw.metadata, cost_usd: 0.09, model_used: 'another-model' },
+            status: 'review_required',
+            created_at: createdAt,
+            updated_at: '2026-10-01T00:00:00.000Z',
+          },
+          metadata: { markdownContent: markdown, cost: 999, retryCount: 4 },
+        },
+      ],
+    };
+    const after = await builder.buildKnowledgeSyncV2Package(changedTelemetry, intent, config);
+    expect(
+      builder
+        .serializeKnowledgeSyncPackage(after)
+        .equals(builder.serializeKnowledgeSyncPackage(result))
+    ).toBe(true);
+    const legacyAfter = await builder.buildKnowledgeSyncPackage(value, config);
+    expect(legacyAfter.content.lessons[0].content).toEqual(raw);
+    expect(builder.serializeKnowledgeSyncPackage(legacyAfter).equals(legacyBefore)).toBe(true);
+    expect((result.content.lessons[0].content as typeof raw).content.interactive_elements).toEqual(
+      raw.content.interactive_elements
+    );
+  });
+
+  it('retains answerable outer markdown edits and excludes only unusable outer markdown', async () => {
+    const raw = nativeLessonContent();
+    const hashes: string[] = [];
+    const cases = [
+      {
+        markdown: '\uFEFF # Original rendered lesson\n',
+        retained: '\uFEFF # Original rendered lesson\n',
+      },
+      { markdown: '# Edited rendered lesson\n', retained: '# Edited rendered lesson\n' },
+      { markdown: '\uFEFF\u00A0\u2003\n', retained: undefined },
+      { markdown: 42, retained: undefined },
+    ];
+    for (const testCase of cases) {
+      const value = snapshot({
+        id: raw.course_id,
+        lessons: [
+          {
+            lesson_id: raw.lesson_id,
+            content: raw,
+            metadata: { markdownContent: testCase.markdown, modelUsed: 'service-only' },
+          },
+        ],
+      });
+      const normalized = {
+        ...value,
+        lessons: [
+          {
+            lesson_id: raw.lesson_id,
+            content: { lesson_id: raw.lesson_id, course_id: raw.course_id, content: raw.content },
+            ...(testCase.retained === undefined
+              ? {}
+              : { metadata: { markdownContent: testCase.retained } }),
+          },
+        ],
+      };
+      const result = await builder.buildKnowledgeSyncV2Package(
+        value,
+        entry({
+          objectId: value.id,
+          eventId: `mc2:COURSE:org:${value.id}:UPDATED:4`,
+          contentHash: fingerprint(normalized),
+        }),
+        config
+      );
+      expect(result.content.lessons).toEqual(normalized.lessons);
+      hashes.push(result.hashes.contentHash);
+    }
+    expect(hashes[0]).not.toBe(hashes[1]);
+    expect(hashes[2]).toBe(hashes[3]);
   });
 
   it.each(['deleted', 'unpublished', 'visibility_restricted', 'generation_reverted'] as const)(
@@ -496,7 +665,7 @@ describe('v2 protocol-pinned delivery', () => {
     );
   });
 
-  it('preserves frozen v1 bytes while v2 is enabled and skips frozen v2 when disabled', async () => {
+  it('pauses frozen v1 while v2 is enabled and preserves its exact bytes for flag-off delivery', async () => {
     const request = vi.fn().mockResolvedValue({ status: 202, body: '' });
     const legacyBody = Buffer.from('{"legacy":"frozen"}');
     const frozenV2 = Buffer.from('{"schemaVersion":"2026-10-01.megacampus-knowledge-sync.v2"}');
@@ -513,7 +682,21 @@ describe('v2 protocol-pinned delivery', () => {
         request,
       },
     });
-    expect(results).toEqual([{ id: 'legacy', result: 'delivered' }]);
+    expect(results).toEqual([]);
+    expect(request).not.toHaveBeenCalled();
+    expect(repo.persistRawBodyOnce).not.toHaveBeenCalled();
+    const restoredV1 = await service.runKnowledgeSyncDeliveryBatch({
+      dependencies: {
+        config: { ...config, contractV2: false },
+        claim: async () => [
+          entry({ id: 'legacy', contractVersion: 1, eventId: 'legacy-event', rawBody: legacyBody }),
+        ],
+        loadSnapshot,
+        repository: repo,
+        request,
+      },
+    });
+    expect(restoredV1).toEqual([{ id: 'legacy', result: 'delivered' }]);
     expect(request.mock.calls[0][0].body.equals(legacyBody)).toBe(true);
     request.mockClear();
     const disabled = await service.runKnowledgeSyncDeliveryBatch({
@@ -528,6 +711,34 @@ describe('v2 protocol-pinned delivery', () => {
     expect(disabled).toEqual([]);
     expect(request).not.toHaveBeenCalled();
     expect(loadSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('does not let a delayed frozen v1 overwrite an already-materialized v2 object', async () => {
+    const legacy = await builder.buildKnowledgeSyncPackage(
+      snapshot({ summaryMarkdown: '# Older v1 answer' }),
+      config
+    );
+    const frozenBody = builder.serializeKnowledgeSyncPackage(legacy);
+    let materialized = '# Current revision 4 answer';
+    const request = vi.fn(async input => {
+      const wire = JSON.parse(input.body.toString());
+      materialized = wire.content.summaryMarkdown;
+      return { status: 200, body: '{}' };
+    });
+    const result = await service.runKnowledgeSyncDeliveryBatch({
+      dependencies: {
+        config,
+        claim: async () => [
+          entry({ contractVersion: 1, eventId: legacy.eventId, rawBody: frozenBody }),
+        ],
+        repository: repository(),
+        request,
+      },
+    });
+    expect(result).toEqual([]);
+    expect(request).not.toHaveBeenCalled();
+    expect(materialized).toBe('# Current revision 4 answer');
+    expect(frozenBody.equals(builder.serializeKnowledgeSyncPackage(legacy))).toBe(true);
   });
 
   it('retries an already-frozen tombstone with exactly the original signed bytes', async () => {
@@ -863,15 +1074,15 @@ describe('v2 maintenance and durable capture mode', () => {
         name: 'set_helixa_knowledge_sync_v2_enabled',
         args: { ...bindingArgs, p_enabled: enabled },
       });
-      expect(calls.map(item => item.name).includes('claim_helixa_knowledge_sync_v2_outbox')).toBe(
-        enabled
-      );
-      expect(result[0].rawBody?.equals(legacyBytes)).toBe(true);
-      if (enabled)
-        expect(calls.at(-1)).toEqual({
-          name: 'claim_helixa_knowledge_sync_v2_outbox',
-          args: { ...bindingArgs, p_batch_size: 9 },
-        });
+      expect(calls).toHaveLength(2);
+      expect(calls[1]).toEqual({
+        name: enabled
+          ? 'claim_helixa_knowledge_sync_v2_outbox'
+          : 'claim_helixa_knowledge_sync_outbox',
+        args: { ...bindingArgs, p_batch_size: 10 },
+      });
+      if (enabled) expect(result).toEqual([]);
+      else expect(result[0].rawBody?.equals(legacyBytes)).toBe(true);
     }
   });
 
@@ -1045,6 +1256,33 @@ describe('v2 maintenance and durable capture mode', () => {
       })
     );
     expect(synchronizeCaptureGate.mock.calls[0][0].contractV2).not.toBe(true);
+  });
+
+  it('does not abort disabled-scheduler boot when the exact disabled binding accepts gate false', async () => {
+    const rpc = vi.fn(async (name, args) => ({
+      data: args.p_enabled === false ? true : null,
+      error: args.p_enabled === false ? null : { code: '42501', message: 'disabled binding' },
+    }));
+    const from = vi.fn();
+    vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc, from } as never);
+    const setInterval = vi.fn();
+    await expect(
+      service.startKnowledgeSyncDeliveryScheduler({
+        environment: {
+          HELIXA_KNOWLEDGE_SYNC_BINDING_ID: 'binding',
+          HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID: 'org',
+          HELIXA_DESTINATION_BINDING_ID: 'destination',
+          HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT: 'test',
+        },
+        dependencies: { timers: { setInterval, clearInterval: vi.fn() } },
+      })
+    ).resolves.toBeNull();
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('set_helixa_knowledge_sync_v2_enabled', {
+      ...bindingArgs,
+      p_enabled: false,
+    });
+    expect(from).not.toHaveBeenCalled();
+    expect(setInterval).not.toHaveBeenCalled();
   });
 
   it('wires awaited scheduler startup only into the general worker and stops it during shutdown', async () => {

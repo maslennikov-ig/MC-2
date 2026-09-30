@@ -65,7 +65,7 @@ export async function runKnowledgeSyncDeliveryBatch(
   }> = [];
   for (const entry of entries) {
     // SQL keeps the queues separate; this also fences injected/misrouted claims.
-    if (entry.contractVersion === 2 && config.contractV2 !== true) continue;
+    if ((entry.contractVersion ?? 1) !== (config.contractV2 === true ? 2 : 1)) continue;
     const result = await processKnowledgeSyncOutboxEntry({
       entry,
       repository,

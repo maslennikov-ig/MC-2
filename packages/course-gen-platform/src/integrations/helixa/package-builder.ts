@@ -449,7 +449,38 @@ export function normalizeKnowledgeSyncV2Snapshot(
 ): KnowledgeExportSnapshot {
   return {
     ...snapshot,
-    lessons: snapshot.lessons.map(({ metadata: _processing, ...lesson }) => lesson),
+    lessons: snapshot.lessons.map(({ metadata, ...lesson }) => {
+      const raw = lesson.content;
+      let normalized = lesson;
+      if (
+        raw !== null &&
+        typeof raw === 'object' &&
+        !Array.isArray(raw) &&
+        raw.content !== null &&
+        typeof raw.content === 'object' &&
+        !Array.isArray(raw.content)
+      ) {
+        // The native LessonContent envelope carries service data beside the
+        // semantic body. Preserve identities and every field inside the body.
+        const {
+          metadata: _telemetry,
+          status: _status,
+          created_at: _created,
+          updated_at: _updated,
+          ...answerable
+        } = raw;
+        normalized = { ...lesson, content: answerable };
+      }
+      const markdown =
+        metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? metadata.markdownContent
+          : undefined;
+      // Native readers prefer this rendered text. Preserve its exact bytes;
+      // String.trim only decides whether it is usable, never rewrites it.
+      return typeof markdown === 'string' && markdown.trim()
+        ? { ...normalized, metadata: { markdownContent: markdown } }
+        : normalized;
+    }),
     blocks: snapshot.blocks.map(block => {
       const value = block.value;
       if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
