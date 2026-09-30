@@ -37,6 +37,7 @@
     "test": "TMPDIR=${TMPDIR:-/tmp} vitest run --config vitest.config.unit.ts",
     "test:watch": "vitest --config vitest.config.unit.ts",
     "test:unit": "vitest run --config vitest.config.unit.ts",
+    "test:helixa:v2:pg17": "MC2_HELIXA_REAL_PG17=1 vitest run --config vitest.config.unit.ts tests/unit/integrations/helixa/knowledge-sync-v2-pg17.test.ts",
     "test:full": "vitest run",
     "test:contract": "vitest run --config vitest.config.contract.ts",
     "test:integration": "vitest run tests/integration",

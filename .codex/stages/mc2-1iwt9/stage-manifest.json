@@ -1,0 +1,111 @@
+{
+  "schema_version": "orchestration-stage/v1",
+  "stage_id": "mc2-1iwt9",
+  "goal_id": "mc2-1iwt9",
+  "profile_at_creation": "balanced-v2.20",
+  "status": "in_progress",
+  "sequence": 1,
+  "orchestration_level": "integration",
+  "acceptance_boundary_id": "helixa-knowledge-contract-v2-default-off",
+  "acceptance_owner": "root",
+  "stage_shape": "cohesive_vertical_slice",
+  "stage_boundary_reason": "shared_acceptance_boundary",
+  "boundary": {
+    "subsystems": [
+      "helixa-knowledge-sync",
+      "native-object-access-and-content-capture",
+      "worker-scheduler"
+    ],
+    "risk_models": [
+      "durable-revisions",
+      "tenancy-and-last-reader",
+      "public-wire-contract",
+      "logical-edit-atomicity",
+      "immutable-retry-and-rollout"
+    ],
+    "test_environments": [
+      "local-vitest",
+      "disposable-postgresql-17",
+      "local-typecheck-and-build"
+    ],
+    "rollback_boundary": "default-off-v2-runtime-gate-preserve-v1-and-durable-revisions",
+    "acceptance_proofs": [
+      "red-controls",
+      "focused-v2-unit-tests",
+      "real-db-revision-and-lifecycle-tests",
+      "repo-typecheck-and-build"
+    ]
+  },
+  "work_areas": [
+    "decision",
+    "contract",
+    "implementation",
+    "persistence_or_adapter",
+    "consumer_adoption",
+    "tests",
+    "proof",
+    "docs_and_graph_review"
+  ],
+  "scope_snapshot": {
+    "source_kind": "beads",
+    "source_id": "mc2-1iwt9",
+    "source_digest": "eccda5f16fabbee5cae5caad24735ace33d103094984758f9ed1d488900c2bee",
+    "criteria": [
+      {
+        "criterion_id": "AC-1",
+        "text": "Durable positive integer revisions strictly increase per (kind,id) for completed, updated and retracted events, including hard deletion and recreation.",
+        "text_digest": "aa25a68104f94cae6c7e1c4de4515bcad9331717f8489d0c63ebc2bb8a2214b1"
+      },
+      {
+        "criterion_id": "AC-2",
+        "text": "Answerable lessons, text, documents and title changes emit a full UPDATED package with one event per logical edit; service-only fields and deletion cascades do not create event storms.",
+        "text_digest": "77f1e2bdc61f2243fb07d29604326f6cd1e0ac2244c3765a9280d73a944b98d7"
+      },
+      {
+        "criterion_id": "AC-3",
+        "text": "Emit exact content-free v2 tombstones for deleted, unpublished, visibility_restricted and generation_reverted; publication or visibility withdrawal only when the last producer-organization member loses read access, as explicitly clarified by the owner.",
+        "text_digest": "279770434955b420d11c039826983abe5996f0fd0c8784ffe916cdc3d7917714"
+      },
+      {
+        "criterion_id": "AC-4",
+        "text": "Current manifests include every completed object readable by at least one producer-organization member under actual existing access rules, exactly once, in pages of at most 1000, hourly and after every reconciler run on the existing HMAC route.",
+        "text_digest": "3066539373e35ac0347ef3df0f29d80171a49e0dc3f7c1a1b79f9a7420f2b3e2"
+      },
+      {
+        "criterion_id": "AC-5",
+        "text": "Last-page resend requests enqueue only current objects with their current revision without allocating a new revision; scheduled reconciliation applies repairs with apply:true.",
+        "text_digest": "baf482712cbf3f8e3f21f6f4098eac60dc46de6d04c79752395d2c7c5b7fbac6"
+      },
+      {
+        "criterion_id": "AC-6",
+        "text": "Exact HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=true is required; disabled v2 preserves v1 behavior through off/on/off transitions and immutable protocol-pinned retries. Activation awaits owner confirmation that Helixa v2 is live.",
+        "text_digest": "1e3963934833ee6bf70626cb098dd2927a0d57667a8c5498ffab236632cd3386"
+      },
+      {
+        "criterion_id": "AC-7",
+        "text": "Every behavior change has a red control; root focused unit and disposable PostgreSQL proof, pnpm type-check and pnpm build pass; Russian outcome and activation report, no customer-data/secret output or source writes in Helixa.",
+        "text_digest": "0d601616408eac971776e23e33a1ca6544a334182f4b9f14342bb571f15b7646"
+      }
+    ]
+  },
+  "scope_anchor": ".codex/goals/mc2-1iwt9/scope-criterion-snapshot.json",
+  "scope_anchor_digest": "eccda5f16fabbee5cae5caad24735ace33d103094984758f9ed1d488900c2bee",
+  "scope_ledger": "none",
+  "stream_artifacts": [
+    {
+      "task_id": "mc2-1iwt9",
+      "stream_owner": "database_v2",
+      "artifact_path": ".codex/stages/mc2-1iwt9/artifacts/database.md"
+    },
+    {
+      "task_id": "transport",
+      "stream_owner": "transport_v2",
+      "artifact_path": ".codex/stages/mc2-1iwt9/artifacts/transport.md"
+    },
+    {
+      "task_id": "atomic-edit",
+      "stream_owner": "atomic_edit_v2",
+      "artifact_path": ".codex/stages/mc2-1iwt9/artifacts/atomic-edit.md"
+    }
+  ]
+}

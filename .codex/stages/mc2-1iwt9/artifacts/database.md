@@ -56,11 +56,11 @@ depends_on_streams:
   - transport RPC agreement
   - atomic edit RPC agreement
 parallel_decision: parallel
-status: returned
+status: accepted
 delivery_method: cherry-pick
-accepted_by_orchestrator: no
-cleanup_status: pending
-cleanup_notes: Isolated branch retained for root integration; disposable databases removed
+accepted_by_orchestrator: yes
+cleanup_status: blocked
+cleanup_notes: source accepted by cherry-pick and direct review; child branch/worktree retained until remote delivery is authorized; no ancestor-proof cleanup or force removal
 risk_level: high
 risk_tags:
   - migration

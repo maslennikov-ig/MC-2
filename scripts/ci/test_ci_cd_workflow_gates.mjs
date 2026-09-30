@@ -122,13 +122,11 @@ const deployChangeDetection = changesJob?.steps?.find(
   step => step?.name === 'Detect deploy-relevant changes'
 );
 assert(
-  changesJob?.permissions?.contents === 'read' &&
-    changesJob?.permissions?.deployments === 'read',
+  changesJob?.permissions?.contents === 'read' && changesJob?.permissions?.deployments === 'read',
   'change detection must have read-only access to development deployment history'
 );
 assert(
-  developmentDeployBase?.if ===
-    "github.event_name == 'push' && github.ref == 'refs/heads/develop'",
+  developmentDeployBase?.if === "github.event_name == 'push' && github.ref == 'refs/heads/develop'",
   'development deployment history must be read only for develop pushes'
 );
 assert(
@@ -168,9 +166,7 @@ const rollbackCommand = jobs.rollback?.steps?.find(step => step?.name === 'Execu
 const copyDevDeploymentFiles = jobs['deploy-dev']?.steps?.find(
   step => step?.name === 'Copy deployment files'
 )?.run;
-const createDevEnv = jobs['deploy-dev']?.steps?.find(
-  step => step?.name === 'Create .env.dev'
-)?.run;
+const createDevEnv = jobs['deploy-dev']?.steps?.find(step => step?.name === 'Create .env.dev')?.run;
 
 assert(copyDeploymentFiles, 'staging deploy must copy deployment files');
 for (const requiredPath of ['deploy/qdrant', 'deploy/systemd', 'ops/qdrant']) {
@@ -235,6 +231,7 @@ const helixaRequiredSecretLines = [
 const helixaSafeDefaultLines = [
   "HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}",
   "HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}",
+  "HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=${{ secrets.HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2 || 'false' }}",
 ];
 for (const [writerName, writer] of [
   ['.env.production', createProductionEnv],
@@ -631,7 +628,8 @@ for (const job of ['deploy', 'deploy-dev']) {
 for (const [job, expected] of Object.entries(jobs).flatMap(([name, job]) =>
   (job?.steps ?? []).some(step => step?.run?.includes('ssh-keyscan')) ? [[name, true]] : []
 )) {
-  const setup = (jobs[job]?.steps ?? []).find(step => step?.run?.includes('ssh-keyscan'))?.run ?? '';
+  const setup =
+    (jobs[job]?.steps ?? []).find(step => step?.run?.includes('ssh-keyscan'))?.run ?? '';
   assert(
     expected &&
       setup.includes('ServerAliveInterval 30') &&

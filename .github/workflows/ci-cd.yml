@@ -978,6 +978,7 @@ jobs:
           HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
           HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
           HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
+          HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=${{ secrets.HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2 || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
           CORS_ORIGIN=https://ai.megacampus.ru
@@ -1410,6 +1411,7 @@ jobs:
           HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT=${{ secrets.HELIXA_KNOWLEDGE_SYNC_ENVIRONMENT }}
           HELIXA_MEGACAMPUS_GENERATION_MODE=${{ secrets.HELIXA_MEGACAMPUS_GENERATION_MODE || 'disabled' }}
           HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=${{ secrets.HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED || 'false' }}
+          HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=${{ secrets.HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2 || 'false' }}
           NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
           NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru

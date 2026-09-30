@@ -1,10 +1,24 @@
 # Orchestrator Handoff
 
-Updated: 2026-09-16. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-09-30. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
+
+## Current stage
+
+Current stage id: `mc2-1iwt9`
+
+Active stage/task: `mc2-1iwt9`, integration, in progress (2026-09-30).
+Exact v2 wire contract from Helixa origin/main 3e0a62686; owner clarification:
+current manifests include every completed object readable by at least one actual
+org member. Publication/visibility retract only after LAST-member read access is
+lost; removing the public link alone does not retract an owner-readable object.
+The earlier contradiction is resolved by this explicit current user decision.
+Plan: `docs/helixa/contract-v2-implementation.md`; stage summary:
+`.codex/stages/mc2-1iwt9/summary.md`. Root and three writers use isolated worktrees.
+V2 flag stays off; no Helixa writes/live changes/activation are authorized.
 
 ## Price sync repair (mc2-x9che)
 
@@ -26,7 +40,7 @@ Security gate remains unchanged. Dependency documentation decision: patch
 versions only, no API/workflow migration; package manifests and lockfile are
 the canonical version records.
 
-## Current stage
+## Last accepted stage
 
 Accepted stage id: `mc2-sdjy8`
 
@@ -268,10 +282,9 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Next recommended
 
-Next stage id: none selected. Nothing in `mc2-sdjy8` blocks the queue.
+Active stage: `mc2-1iwt9`. The accepted `mc2-sdjy8` history remains unchanged.
 
-Recommended action: **wait for the owner's Helixa values, then follow §9 of
-`docs/helixa/megacampus-side.md` on dev first, then production.**
+Recommended action: **finish mc2-1iwt9, run its bounded acceptance, and retain the default-off v2 activation gate.**
 
 Already proven on 2026-09-05 after the deploy: production run `33961945370` green, all five
 containers report revision `726ddf1c2`, the Helixa route answers through nginx (503
