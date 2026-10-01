@@ -7,12 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.49] - 2026-10-01
+
+### Fixed
+
+- **deps**: clear high audit blockers (342f0381a)
+- **cost**: send price-sync notices without invalid markdown (208ba9186)
+
+### Other
+
+- **cost**: record price notice release verification (2362cf85d)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (67c71c999)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (c7a000ec6)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (9387054ea)
+- **cost**: sync MODEL_CATALOG with the published OpenRouter rates (8e0708a69)
+- record verified qdrant snapshot release v0.31.48 (ca84252f1)
+
 ## [0.31.48] - 2026-09-16
 
 ### Fixed
+
 - **qdrant**: retry failed scheduled snapshots within a bounded window (f2e1d1436)
 - **ci**: publish production env atomically (11a1c67c9)
-
 
 ## [0.31.47] - 2026-09-16
 

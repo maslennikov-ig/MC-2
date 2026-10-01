@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.31.48",
+  "version": "0.31.49",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
@@ -98,7 +98,7 @@
     "@trpc/server": "^11.9.0",
     "any-ascii": "^0.3",
     "archiver": "^7",
-    "axios": "^1.18.0",
+    "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
     "bullmq": "5.80.4",
     "commander": "^14.0.2",
