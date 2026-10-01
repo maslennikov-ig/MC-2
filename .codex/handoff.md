@@ -8,18 +8,9 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 
 ## Telegram price notice repair (mc2-v9c3k)
 
-Owner authorized delivery and deployment on 2026-10-01. The price notice used
-legacy Markdown with an unclosed underscore in max_price. Run 36848193232
-published 67c71c999 before its HTTP 400; run 36698595768 failed in the same phase.
-The fix sends plain text and logs failed-request descriptions without exposing
-successful chat responses. Local acceptance: 9 workflow tests passed, including
-literal identifiers and error diagnostics; Prettier and diff checks passed.
-Delivery uses a tagged patch release and the existing CI/CD gate. The scheduled
-workflow comes from master and the updater code from develop. Release and live
-notification verification are in progress; exact evidence goes in mc2-v9c3k.
-docs-reviewed: updated. graph-reviewed: no-change-needed — notification text and
-existing test coverage only; no architecture changes. The primary graph was
-queried for orientation; the truncated result was not used as proof.
+Owner authorized release/deploy on 2026-10-01. Plain-text notice/error diagnostics pass 9 tests.
+16 high findings cleared within existing majors; audit 0 high/critical, 11 moderate/1 low (mc2-5hqt3).
+Release/live proof pending; master workflow, develop source. Evidence: .codex/stages/mc2-v9c3k/. docs-reviewed: updated. graph-reviewed: blocked — no owned local graph; dirty primary graph is read-only.
 
 ## Price sync repair (mc2-x9che)
 

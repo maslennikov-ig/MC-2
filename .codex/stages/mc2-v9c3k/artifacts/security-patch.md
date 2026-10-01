@@ -7,11 +7,11 @@ branch: codex/price-notice-security
 base_branch: origin/develop
 base_commit: 67c71c999cdc7412d6c0fba778087c6f4c6c03e4
 worktree: /home/me/code/mc2/.worktrees/price-notice-security
-status: returned
-delivery_method: not accepted
-accepted_by_orchestrator: no
+status: accepted
+delivery_method: cherry-pick
+accepted_by_orchestrator: yes
 cleanup_status: pending
-cleanup_notes: committed on assigned branch; root owns final acceptance and integration
+cleanup_notes: accepted-content, not-git-merged; root verified exact manifest and lockfile equality after cherry-pick 342f0381a; cleanup pending
 risk_level: medium
 verification:
   - "pnpm install --frozen-lockfile: passed"
@@ -65,7 +65,7 @@ Advisory sources: [fast-uri GHSA-qw65-cvwx-89v3](https://github.com/advisories/G
 The frozen install accepted the generated lockfile. The unchanged high/critical audit gate passed.
 The machine-readable audit exits 1 because lower-severity findings remain; it reports zero high and
 critical findings. The dependency graph confirms direct Axios 1.20.0 and the patched transitive
-versions. The lockfile diff changes only the five target package versions, the Axios importer, and
+versions. The lockfile diff changes only the four target dependency families, the Axios importer, and
 the corresponding snapshots.
 
 Documentation decision: record patch/minor security updates in manifests and lockfile; no API
