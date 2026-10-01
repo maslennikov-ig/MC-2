@@ -10,8 +10,8 @@ worktree: /home/me/code/mc2/.worktrees/price-notice-security
 status: accepted
 delivery_method: cherry-pick
 accepted_by_orchestrator: yes
-cleanup_status: pending
-cleanup_notes: accepted-content, not-git-merged; root verified exact manifest and lockfile equality after cherry-pick 342f0381a; cleanup pending
+cleanup_status: cleaned
+cleanup_notes: clean task-owned worktree removed; source branch retained for recovery because delivery is cherry-pick 342f0381a, not ancestry merge; dependency patch-id equals ee399168a and 342f0381a is contained in origin/develop
 risk_level: medium
 verification:
   - "pnpm install --frozen-lockfile: passed"
