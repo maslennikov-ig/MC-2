@@ -97,7 +97,7 @@ describe('model catalogue coverage', () => {
       // beside it (mc2-rhyac).
       'deepseek/deepseek-v4-flash-0731': [0.0108, 1.28],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [1.1, 4.4],
+      'z-ai/glm-5.2': [0.41, 3.99],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
       'z-ai/glm-5.3-flash': [0.15, 0.5],

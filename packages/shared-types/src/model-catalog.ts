@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 1.1,
-    outputPricePerMillion: 4.4,
+    inputPricePerMillion: 0.41,
+    outputPricePerMillion: 3.99,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
