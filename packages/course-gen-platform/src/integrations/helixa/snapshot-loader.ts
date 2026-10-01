@@ -9,6 +9,7 @@ import type {
 } from './contract';
 import { KnowledgeSyncPreparationError } from './errors';
 import type { ExportSource, KnowledgeExportSnapshot } from './package-builder';
+import type { CourseNativeSourceProofRow } from './storage-reader';
 
 interface CompletedCourseRow {
   id: string;
@@ -85,6 +86,21 @@ export interface CourseJobInstructionSourceRow {
   source_content_hash: string;
   origin_binding_id: string;
   origin_command_id: string;
+}
+
+/** Semantic content and source descriptors frozen in the durable V2 intent. */
+export interface PinnedExportSource extends Omit<ExportSource, 'readOriginalBytes'> {
+  storagePath?: string;
+  fileId?: string;
+  originalText?: string;
+  _file?: Omit<FileRow, 'approved'> & { approved?: boolean };
+  _nativeProof?: CourseNativeSourceProofRow | null;
+}
+export interface PinnedKnowledgeSnapshot
+  extends Omit<KnowledgeExportSnapshot, 'sources' | 'originCommand' | 'relations'> {
+  sources?: PinnedExportSource[];
+  _generationOrigin?: GenerationOriginRow | null;
+  _jobInstructionSource?: CourseJobInstructionSourceRow | null;
 }
 
 type ReadBytes = (file: FileRow) => Promise<Buffer>;
@@ -175,6 +191,108 @@ function courseFromRoleGuideRelation(
     fromKey: `COURSE:${row.course_id}`,
     toKey: `ROLE_GUIDE:${row.job_instruction_id}`,
     metadata: { sourceVersion: row.source_version, contentHash: row.source_content_hash },
+  };
+}
+
+/** Uses only the pinned intent; later edits/deletion must not rewrite an older revision. */
+export function mapPinnedKnowledgeSnapshot(
+  snapshot: PinnedKnowledgeSnapshot,
+  expected: { kind: KnowledgeObjectKind; id: string; organizationId: string; bindingId: string },
+  readBytes: ReadBytes
+): KnowledgeExportSnapshot {
+  if (
+    snapshot.kind !== expected.kind ||
+    snapshot.id !== expected.id ||
+    snapshot.organizationId !== expected.organizationId ||
+    !snapshot.completedAt ||
+    !Number.isFinite(Date.parse(snapshot.completedAt)) ||
+    typeof snapshot.summaryMarkdown !== 'string' ||
+    !Array.isArray(snapshot.lessons) ||
+    !Array.isArray(snapshot.blocks)
+  ) {
+    throw new KnowledgeSyncPreparationError('event_identity', false);
+  }
+  const originRow = snapshot._generationOrigin;
+  // Native provenance is scoped to this org/object, independent of the valid
+  // binding delivering it. The course relation still fences its origin binding.
+  const originCommand = generationOrigin(originRow, expected);
+  const relation =
+    snapshot.kind === 'COURSE'
+      ? courseFromRoleGuideRelation(snapshot._jobInstructionSource, originRow, {
+          id: snapshot.id,
+          organization_id: snapshot.organizationId,
+          generation_status: 'completed',
+          generation_completed_at: snapshot.completedAt,
+          title: snapshot.title,
+          language: snapshot.language,
+          course_structure: snapshot.structure,
+        })
+      : undefined;
+  const sources = (snapshot.sources ?? []).map(source => {
+    if (
+      !source.approved ||
+      source.organizationId !== snapshot.organizationId ||
+      source.objectKind !== snapshot.kind ||
+      source.objectId !== snapshot.id
+    ) {
+      throw new KnowledgeSyncPreparationError('provenance', false);
+    }
+    let readOriginalBytes: () => Promise<Buffer>;
+    if (typeof source.originalText === 'string') {
+      const bytes = Buffer.from(source.originalText, 'utf8');
+      readOriginalBytes = () => Promise.resolve(bytes);
+    } else {
+      const file = source._file;
+      if (
+        !file ||
+        file.organization_id !== snapshot.organizationId ||
+        file.course_id !== (snapshot.kind === 'COURSE' ? snapshot.id : null) ||
+        file.id !== (source.underlyingFileId ?? source.fileId ?? source.id) ||
+        file.filename !== source.fileName ||
+        file.mime_type !== source.mediaType ||
+        file.storage_path !== source.storagePath ||
+        file.hash !== source.version ||
+        (source.sourceSha256 && file.hash !== source.sourceSha256)
+      ) {
+        throw new KnowledgeSyncPreparationError('provenance', false);
+      }
+      readOriginalBytes = () =>
+        readBytes({ ...file, approved: true, approvedVersion: source.version });
+    }
+    return {
+      id: source.id,
+      sourceType: source.sourceType,
+      organizationId: source.organizationId,
+      objectKind: source.objectKind,
+      objectId: source.objectId,
+      approved: source.approved,
+      version: source.version,
+      fileName: source.fileName,
+      mediaType: source.mediaType,
+      readOriginalBytes,
+      ...(source.sourceSha256 ? { sourceSha256: source.sourceSha256 } : {}),
+      ...(source.underlyingFileId ? { underlyingFileId: source.underlyingFileId } : {}),
+      ...(source.acceptedDoclingJson !== undefined
+        ? { acceptedDoclingJson: source.acceptedDoclingJson }
+        : {}),
+      ...(source.trustedMarkdown !== undefined ? { trustedMarkdown: source.trustedMarkdown } : {}),
+    } satisfies ExportSource;
+  });
+  return {
+    kind: snapshot.kind,
+    id: snapshot.id,
+    organizationId: snapshot.organizationId,
+    completedAt: snapshot.completedAt,
+    title: snapshot.title,
+    language: snapshot.language,
+    ...(snapshot.url ? { url: snapshot.url } : {}),
+    summaryMarkdown: snapshot.summaryMarkdown,
+    structure: snapshot.structure,
+    blocks: snapshot.blocks,
+    lessons: snapshot.lessons,
+    sources,
+    ...(originCommand ? { originCommand } : {}),
+    ...(relation ? { relations: [relation] } : {}),
   };
 }
 

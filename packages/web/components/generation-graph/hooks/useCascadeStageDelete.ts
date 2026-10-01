@@ -146,8 +146,9 @@ export function useCascadeStageDelete(
 
     setIsDeleting(true)
     try {
-      // Delete downstream stages
-      const result = await deleteDownstreamStagesAction(courseId, sourceStage)
+      // v2 applies the validated pending edit in the same transaction as deletion.
+      // The backend chooses the legacy path when its contract flag is disabled.
+      const result = await deleteDownstreamStagesAction(courseId, sourceStage, pendingChange)
 
       // Show appropriate toast based on source stage
       if (sourceStage === 4) {
@@ -167,8 +168,14 @@ export function useCascadeStageDelete(
       // Mark as deleted for this session so we don't ask again
       downstreamDeletedRef.current = true
 
-      // Now apply the pending change
-      performSave(pendingChange.fieldPath, pendingChange.value)
+      if (result.fieldApplied) {
+        // Refresh query state without emitting another semantic field write.
+        void utils.invalidate().catch((error: unknown) => {
+          console.error('Failed to refresh after cascade edit:', error)
+        })
+      } else {
+        performSave(pendingChange.fieldPath, pendingChange.value)
+      }
 
       // Close modal and clear state
       setCascadeModalOpen(false)
@@ -182,7 +189,7 @@ export function useCascadeStageDelete(
     } finally {
       setIsDeleting(false)
     }
-  }, [courseId, pendingChange, performSave, sourceStage, locale])
+  }, [courseId, pendingChange, performSave, sourceStage, locale, utils])
 
   // Sync wrapper for void callback (avoids @typescript-eslint/no-misused-promises)
   const handleCascadeConfirm = useCallback(() => {

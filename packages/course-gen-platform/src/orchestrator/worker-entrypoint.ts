@@ -353,9 +353,12 @@ async function main() {
     // This opt-in timer is isolated from BullMQ and is never attached to the
     // dedicated Stage 6/7 workers. Its runtime configuration is validated by
     // the integration before it can start.
-    activeKnowledgeSyncDeliveryScheduler = startKnowledgeSyncDeliveryScheduler({
+    activeKnowledgeSyncDeliveryScheduler = await startKnowledgeSyncDeliveryScheduler({
       onCounters: counters => {
         logger.info({ counters }, 'Helixa knowledge-sync delivery batch completed');
+      },
+      onMaintenanceFailure: () => {
+        logger.error('Helixa knowledge-sync maintenance failed; retry scheduled');
       },
     });
 

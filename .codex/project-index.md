@@ -86,6 +86,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 ## Integrations And Sources Of Truth
 
 - Beads (`bd`) is the task source of truth.
+- Helixa knowledge-sync contract, builders, outbox, reconciler and worker lifecycle: `packages/course-gen-platform/src/integrations/helixa/`; runtime and rollout notes: `docs/helixa/megacampus-side.md` (v2 in section 11).
+- Helixa v2 revision/capture/manifest RPCs: `packages/course-gen-platform/supabase/migrations/20260930120000_helixa_knowledge_sync_v2.sql`; contract authority and owner access clarification: `docs/helixa/contract-v2-implementation.md`.
 - Graphify is the local knowledge-graph source for repo orientation; use `graphify query`, `graphify path`, or `graphify explain` with `graphify-out/graph.json`.
 - Qdrant source-local snapshot/restore lives in `packages/course-gen-platform/tools/qdrant/` and `deploy/systemd/`; restricted second-host pull, bounded retention, and exact-version off-host restore live in `deploy/qdrant-offhost-backup/`.
 - Shared contracts must be imported from `@megacampus/shared-types`.
@@ -101,6 +103,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - CI/CD deploy change detector: `scripts/ci/detect_deploy_changes.sh`; local coverage: `scripts/ci/test_detect_deploy_changes.sh`.
 - Common code gates: `pnpm type-check` and `pnpm build`.
 - Backend targeted unit tests: `pnpm --filter @megacampus/course-gen-platform test -- <test-files>`.
+- Helixa v2 disposable PostgreSQL 17 acceptance (local Docker required): `pnpm --filter @megacampus/course-gen-platform test:helixa:v2:pg17`.
 - CI integration smoke: `QDRANT_URL=http://localhost:6333 QDRANT_API_KEY=test-qdrant-key pnpm test:integration:ci`; full integration remains `pnpm test:integration`.
 - Web targeted unit tests: `pnpm --filter @megacampus/web exec vitest run <test-files>`.
 - Web targeted e2e: `pnpm --filter @megacampus/web exec playwright test <spec> --project=chromium`.

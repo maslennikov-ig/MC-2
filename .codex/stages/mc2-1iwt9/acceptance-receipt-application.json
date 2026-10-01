@@ -1,0 +1,36 @@
+{
+  "command_results": [
+    {
+      "command": "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint src/server/routers/generation/editing/field-update.router.ts",
+      "duration_seconds": 4.638,
+      "result": "passed"
+    },
+    {
+      "command": "env NODE_OPTIONS=--max-old-space-size=8192 pnpm type-check",
+      "duration_seconds": 54.736,
+      "result": "passed"
+    },
+    {
+      "command": "env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-build-placeholder SUPABASE_SERVICE_ROLE_KEY=offline-build-placeholder SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-build-placeholder COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 NEXT_PUBLIC_COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=false HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=false pnpm build",
+      "duration_seconds": 149.093,
+      "result": "passed"
+    }
+  ],
+  "commands": [
+    "env NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @megacampus/course-gen-platform exec eslint src/server/routers/generation/editing/field-update.router.ts",
+    "env NODE_OPTIONS=--max-old-space-size=8192 pnpm type-check",
+    "env NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-build-placeholder SUPABASE_SERVICE_ROLE_KEY=offline-build-placeholder SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=offline-build-placeholder COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 NEXT_PUBLIC_COURSEGEN_BACKEND_URL=http://127.0.0.1:3456 HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=false HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=false pnpm build"
+  ],
+  "completed_at": "2026-09-30T15:49:03.441158+00:00",
+  "diff_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "environment_marker": "Linux-x86_64-python-3.14|node=v24.19.0,pnpm=10.34.5",
+  "git_head": "2048b6620e82da08b3e599dc2d44687d4b71890e",
+  "idempotency_key": "91e6e94f781d2259b35965c2bd1083324be41feb7cb551732393f3fde0f7464c",
+  "orchestration_level": "integration",
+  "process_check": "passed",
+  "result": "passed",
+  "schema_version": "acceptance-receipt/v1",
+  "stage_id": "mc2-1iwt9",
+  "started_at": "2026-09-30T15:45:34.982524+00:00",
+  "verification_fingerprint": "91e6e94f781d2259b35965c2bd1083324be41feb7cb551732393f3fde0f7464c"
+}

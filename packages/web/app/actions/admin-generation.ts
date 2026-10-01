@@ -381,12 +381,17 @@ export async function switchToManualMode(courseId: string) {
  * Used by CascadeStageDeleteModal after user confirms deletion
  * Calls generation.deleteDownstreamStages tRPC endpoint
  */
-export async function deleteDownstreamStagesAction(courseId: string, fromStage: 4 | 5) {
+export async function deleteDownstreamStagesAction(
+  courseId: string,
+  fromStage: 4 | 5,
+  pendingEdit?: { fieldPath: string; value: unknown }
+) {
   try {
     const client = await getServerTrpcClient()
     const result = await client.generation.deleteDownstreamStages.mutate({
       courseId,
       fromStage,
+      ...(pendingEdit && { pendingEdit }),
     })
 
     // Revalidate all course-related paths after cascade delete

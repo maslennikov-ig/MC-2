@@ -20,6 +20,12 @@ codex/checkpoint-2026-04-12	April checkpoint snapshot kept beside the `backup/` 
 codex/career-playbook-numeric-provenance	Numeric provenance was deliberately removed from the product on 2026-07-27 (mc2-jc275); this branch is the feature it removed.
 codex/career-playbook-numeric-review	Preservation commit for the abandoned numeric-review worktree, kept only so the 2026-06 exploration is not lost.
 
+# mc2-1iwt9: local implementation, remote delivery awaits explicit owner approval.
+codex/helixa-contract-v2	Default-off v2 accepted; feature publication/PR authorized, develop integration and cleanup pending. See mc2-1iwt9 summary and Beads. Not deployed or enabled.
+codex/helixa-v2-database	Task-owned source branch preserved after cherry-pick into codex/helixa-contract-v2; remote delivery/cleanup awaits approval, mc2-1iwt9.
+codex/helixa-v2-transport	Task-owned source branch preserved after cherry-pick into codex/helixa-contract-v2; remote delivery/cleanup awaits approval, mc2-1iwt9.
+codex/helixa-v2-atomic-edit	Task-owned source branch preserved after cherry-pick into codex/helixa-contract-v2; remote delivery/cleanup awaits approval, mc2-1iwt9.
+
 # The four entries that stood here for `codex/update-career-playbook-landing-e2e`,
 # `codex/docs-l1-l2-routing-20260609-mc2-140614`, `codex/vmy-7082-dev-qdrant-repair` and
 # `feature/nlm-enrichments` were removed on 2026-08-22 together with the branches themselves. Each

@@ -1,15 +1,22 @@
 import { canonicalJson, computePayloadHash, sha256 } from './canonical-json';
 import {
   KNOWLEDGE_SYNC_SCHEMA_VERSION,
+  KNOWLEDGE_SYNC_SCHEMA_VERSION_V2,
   type GenerationOriginCommandV1,
   type JsonValue,
   type KnowledgeObjectKind,
   type KnowledgeRelation,
   type KnowledgeSyncPackage,
+  type KnowledgeSyncV2Package,
+  type KnowledgeSyncTombstone,
+  type KnowledgeSyncManifest,
+  type KnowledgeSyncWirePackage,
+  type KnowledgeManifestObject,
   type ProcessingRoute,
   type SourceDocument,
 } from './contract';
 import { KnowledgeSyncPreparationError } from './errors';
+import type { KnowledgeSyncOutboxEntry } from './outbox';
 
 export interface ExportSource {
   id: string;
@@ -404,8 +411,209 @@ export async function buildKnowledgeSyncPackage(
   return base;
 }
 
-export function serializeKnowledgeSyncPackage(value: KnowledgeSyncPackage): Buffer {
-  if (computePayloadHash(value) !== value.hashes.payloadHash)
+type V2Intent = Pick<
+  KnowledgeSyncOutboxEntry,
+  | 'eventId'
+  | 'eventType'
+  | 'objectKind'
+  | 'objectId'
+  | 'organizationId'
+  | 'revision'
+  | 'retractionReason'
+  | 'contentHash'
+  | 'createdAt'
+>;
+
+function assertV2Intent(intent: V2Intent, retracted: boolean): void {
+  const suffix = retracted ? 'RETRACTED' : intent.eventType?.split('_').at(-1);
+  if (
+    !Number.isSafeInteger(intent.revision) ||
+    (intent.revision ?? 0) < 1 ||
+    !['COURSE', 'ROLE_GUIDE'].includes(intent.objectKind) ||
+    !intent.objectId ||
+    !intent.organizationId ||
+    intent.eventType !== `${intent.objectKind}_${suffix}` ||
+    (!retracted && suffix !== 'COMPLETED' && suffix !== 'UPDATED') ||
+    intent.eventId !==
+      `mc2:${intent.objectKind}:${intent.organizationId}:${intent.objectId}:${suffix}:${intent.revision}` ||
+    !intent.createdAt ||
+    !Number.isFinite(Date.parse(intent.createdAt))
+  ) {
+    throw new KnowledgeSyncPreparationError('event_identity', false);
+  }
+}
+
+/** V2 mirrors the DB semantic projection; V1 retains its historical metadata and bytes. */
+export function normalizeKnowledgeSyncV2Snapshot(
+  snapshot: KnowledgeExportSnapshot
+): KnowledgeExportSnapshot {
+  return {
+    ...snapshot,
+    lessons: snapshot.lessons.map(({ metadata, ...lesson }) => {
+      const raw = lesson.content;
+      let normalized = lesson;
+      if (
+        raw !== null &&
+        typeof raw === 'object' &&
+        !Array.isArray(raw) &&
+        raw.content !== null &&
+        typeof raw.content === 'object' &&
+        !Array.isArray(raw.content)
+      ) {
+        // The native LessonContent envelope carries service data beside the
+        // semantic body. Preserve identities and every field inside the body.
+        const {
+          metadata: _telemetry,
+          status: _status,
+          created_at: _created,
+          updated_at: _updated,
+          ...answerable
+        } = raw;
+        normalized = { ...lesson, content: answerable };
+      }
+      const markdown =
+        metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? metadata.markdownContent
+          : undefined;
+      // Native readers prefer this rendered text. Preserve its exact bytes;
+      // String.trim only decides whether it is usable, never rewrites it.
+      return typeof markdown === 'string' && markdown.trim()
+        ? { ...normalized, metadata: { markdownContent: markdown } }
+        : normalized;
+    }),
+    blocks: snapshot.blocks.map(block => {
+      const value = block.value;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Native generated blocks carry content plus status, timings, model and cost.
+        // Only their text is the DB's answerable block projection.
+        return { key: block.key, value: { content: value.content ?? null } };
+      }
+      const { metadata: _processing, ...answerable } = block;
+      return answerable;
+    }),
+  };
+}
+
+export async function buildKnowledgeSyncV2Package(
+  snapshot: KnowledgeExportSnapshot,
+  intent: V2Intent,
+  options: PackageBuildOptions
+): Promise<KnowledgeSyncV2Package> {
+  assertV2Intent(intent, false);
+  if (
+    snapshot.kind !== intent.objectKind ||
+    snapshot.id !== intent.objectId ||
+    snapshot.organizationId !== intent.organizationId
+  ) {
+    throw new KnowledgeSyncPreparationError('event_identity', false);
+  }
+  const legacy = await buildKnowledgeSyncPackage(
+    normalizeKnowledgeSyncV2Snapshot(snapshot),
+    options
+  );
+  // Check the pinned DB fingerprint rather than advertising a hash for different content.
+  if (intent.contentHash !== legacy.hashes.contentHash)
+    throw new KnowledgeSyncPreparationError('contract', false);
+  const value: KnowledgeSyncV2Package = {
+    ...legacy,
+    schemaVersion: KNOWLEDGE_SYNC_SCHEMA_VERSION_V2,
+    eventId: intent.eventId,
+    eventType: intent.eventType as KnowledgeSyncV2Package['eventType'],
+    sentAt: new Date(intent.createdAt!).toISOString(),
+    object: { ...legacy.object, revision: intent.revision! },
+    hashes: { ...legacy.hashes, payloadHash: '' },
+  };
+  value.hashes.payloadHash = computePayloadHash(value);
+  return value;
+}
+
+export function buildKnowledgeSyncTombstone(
+  intent: V2Intent,
+  options: Pick<PackageBuildOptions, 'environment'>
+): KnowledgeSyncTombstone {
+  assertV2Intent(intent, true);
+  if (
+    !intent.retractionReason ||
+    !['deleted', 'unpublished', 'visibility_restricted', 'generation_reverted'].includes(
+      intent.retractionReason
+    )
+  ) {
+    throw new KnowledgeSyncPreparationError('contract', false);
+  }
+  return {
+    schemaVersion: KNOWLEDGE_SYNC_SCHEMA_VERSION_V2,
+    eventId: intent.eventId,
+    eventType: intent.eventType as KnowledgeSyncTombstone['eventType'],
+    sentAt: new Date(intent.createdAt!).toISOString(),
+    producer: {
+      system: 'megacampus',
+      environment: options.environment,
+      organizationId: intent.organizationId,
+    },
+    object: {
+      kind: intent.objectKind,
+      id: intent.objectId,
+      revision: intent.revision!,
+      status: 'retracted',
+      reason: intent.retractionReason,
+    },
+  };
+}
+
+export function buildKnowledgeSyncManifestPages(
+  objects: readonly KnowledgeManifestObject[],
+  options: { organizationId: string; environment: string; manifestId: string; sentAt: string }
+): KnowledgeSyncManifest[] {
+  if (
+    !options.manifestId ||
+    !options.organizationId ||
+    !Number.isFinite(Date.parse(options.sentAt))
+  )
+    throw new KnowledgeSyncPreparationError('contract', false);
+  const seen = new Set<string>();
+  const snapshot = objects.map(object => {
+    const identity = `${object.kind}:${object.id}`;
+    if (
+      !['COURSE', 'ROLE_GUIDE'].includes(object.kind) ||
+      !object.id ||
+      !Number.isSafeInteger(object.revision) ||
+      object.revision < 1 ||
+      !/^[a-f0-9]{64}$/u.test(object.contentHash) ||
+      seen.has(identity)
+    ) {
+      throw new KnowledgeSyncPreparationError('contract', false);
+    }
+    seen.add(identity);
+    // Copy exactly the contract fields; caller mutations cannot alter later pages.
+    return {
+      kind: object.kind,
+      id: object.id,
+      revision: object.revision,
+      contentHash: object.contentHash,
+    };
+  });
+  const pageCount = Math.max(1, Math.ceil(snapshot.length / 1000));
+  return Array.from({ length: pageCount }, (_, pageIndex) => ({
+    schemaVersion: KNOWLEDGE_SYNC_SCHEMA_VERSION_V2,
+    eventId: `mc2:MANIFEST:${options.organizationId}:${options.manifestId}:${pageIndex}`,
+    eventType: 'KNOWLEDGE_MANIFEST',
+    sentAt: new Date(options.sentAt).toISOString(),
+    producer: {
+      system: 'megacampus',
+      environment: options.environment,
+      organizationId: options.organizationId,
+    },
+    manifest: {
+      manifestId: options.manifestId,
+      pageIndex,
+      pageCount,
+      objects: snapshot.slice(pageIndex * 1000, (pageIndex + 1) * 1000),
+    },
+  }));
+}
+
+export function serializeKnowledgeSyncPackage(value: KnowledgeSyncWirePackage): Buffer {
+  if ('hashes' in value && computePayloadHash(value) !== value.hashes.payloadHash)
     throw new KnowledgeSyncPreparationError('contract', false);
   const raw = Buffer.from(canonicalJson(value), 'utf8');
   if (raw.byteLength > MAX_RAW_PACKAGE_BYTES)

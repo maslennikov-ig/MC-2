@@ -6,6 +6,10 @@ tables. Written before any of them had been applied to any database.
 
 Issues: `mc2-gxese`, `mc2-sdjy8.6`. Branch: `codex/helixa-landing`.
 
+Contract-v2 extension: `mc2-1iwt9`, documented in section 11 and
+`docs/helixa/contract-v2-implementation.md`. V1 remains the default; the historical
+deployment observations below do not prove the v2 receiver is deployed.
+
 ## 1. Shape of the thing
 
 Two directions, and they are not symmetric.
@@ -500,17 +504,18 @@ Outbound delivery, all required together. `readKnowledgeSyncRuntimeConfig` in
 `startKnowledgeSyncDeliveryScheduler` validates before creating a timer, so a
 half-configured worker fails at startup rather than mid-batch.
 
-| Variable                                  | Meaning                                                                                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` | Must be exactly `true` to start the delivery timer. Anything else, including absent, returns null and starts nothing.                      |
-| `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`          | The Helixa URL packages are POSTed to.                                                                                                     |
-| `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`          | Secret for the `X-Megacampus-Signature` HMAC. **Also verifies the inbound `X-Helixa-Signature`.**                                          |
-| `HELIXA_EXTERNAL_SYSTEM_ID`               | Sent as `X-Helixa-External-System-Id`; identifies this MegaCampus to Helixa. **Also the value the inbound route requires in that header.** |
-| `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`        | Which binding row this worker claims for.                                                                                                  |
-| `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`   | Organization half of the binding key.                                                                                                      |
-| `HELIXA_DESTINATION_BINDING_ID`           | Destination half of the binding key.                                                                                                       |
-| `HELIXA_DESTINATION_PROJECT_ID`           | Optional. Becomes `scope.externalProjectId`; null when absent.                                                                             |
-| `APP_ENV` or `NODE_ENV`                   | Environment half of the binding key and the package producer field. Falls back to `development`.                                           |
+| Variable                                  | Meaning                                                                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED` | Must be exactly `true` to start the delivery timer. Anything else, including absent, returns null and starts nothing.                       |
+| `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2`       | Default `false`. Exactly `true` selects contract v2 after the owner confirms Helixa v2 is deployed. It does not replace the scheduler flag. |
+| `HELIXA_KNOWLEDGE_SYNC_ENDPOINT`          | The Helixa URL packages are POSTed to.                                                                                                      |
+| `HELIXA_KNOWLEDGE_SYNC_HMAC_KEY`          | Secret for the `X-Megacampus-Signature` HMAC. **Also verifies the inbound `X-Helixa-Signature`.**                                           |
+| `HELIXA_EXTERNAL_SYSTEM_ID`               | Sent as `X-Helixa-External-System-Id`; identifies this MegaCampus to Helixa. **Also the value the inbound route requires in that header.**  |
+| `HELIXA_KNOWLEDGE_SYNC_BINDING_ID`        | Which binding row this worker claims for.                                                                                                   |
+| `HELIXA_KNOWLEDGE_SYNC_ORGANIZATION_ID`   | Organization half of the binding key.                                                                                                       |
+| `HELIXA_DESTINATION_BINDING_ID`           | Destination half of the binding key.                                                                                                        |
+| `HELIXA_DESTINATION_PROJECT_ID`           | Optional. Becomes `scope.externalProjectId`; null when absent.                                                                              |
+| `APP_ENV` or `NODE_ENV`                   | Environment half of the binding key and the package producer field. Falls back to `development`.                                            |
 
 Inbound, both default to disabled:
 
@@ -649,6 +654,7 @@ sequence below, in this order, once the three joint values in
    `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect 202,
    then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned by
    the service principal. Watch `helixa_generation_commands` and the worker log.
+
 5. **Outbound second, on dev.** Set `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=true` on the dev
    worker. The completed playbook from step 4 must produce one `helixa_knowledge_sync_outbox`
    row that reaches `delivered`, and Helixa's receiver must answer 202 with `originCommand`
@@ -677,10 +683,10 @@ through the existing project-scoped Supabase MCP under the host-operation lock,
 in repository order, and independently checked through a TLS-verified read-only
 catalog/history connection:
 
-| Migration | Applied history version | SQL SHA-256 |
-| --- | --- | --- |
-| `helixa_create_course_generation` | `20260905162359` | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
-| `helixa_observation_binding_scope` | `20260905162619` | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
+| Migration                          | Applied history version | SQL SHA-256                                                        |
+| ---------------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| `helixa_create_course_generation`  | `20260905162359`        | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
+| `helixa_observation_binding_scope` | `20260905162619`        | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
 
 The verified repository watermark is
 `20260905160000_helixa_observation_binding_scope.sql`; there are no missing,
@@ -703,3 +709,88 @@ Separate source Helixa organizations, bindings and HMAC materials keep those
 contours distinct. Provisioning, application rollout and the three actual paid
 generation flows remain pending. A rollback preserves migration history and
 native objects: keep the bridge disabled or apply a reviewed forward correction.
+
+## 11. Knowledge-sync contract v2
+
+Authority is section C of Helixa's
+`docs/superpowers/specs/2026-09-30-sources-complete-and-current-spec.md` at
+`3e0a62686611eafaf0261e669c21a27bd2c18fb7`. The wire version is
+`2026-10-01.megacampus-knowledge-sync.v2`; the route and HMAC do not change.
+`HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2` defaults to `false` in the example and both
+GitHub Environment writers. V1 remains the default contract.
+
+The owner clarified current-object membership on 2026-09-30: include every
+completed object readable by at least one actual member of its producer
+organization under existing access rules. Public-link removal or a transition
+to private visibility only retracts after the LAST member loses access. Private
+objects readable by an owner, administrator, instructor or enrolled member
+remain current. Hard deletion and generation rollback retract independently.
+No per-user ACL fields are added to the wire contract.
+
+The v2 migration introduces durable revision state separate from native rows.
+Answerable-content changes compare normalized final transaction state and enqueue
+a full `*_UPDATED` package. Operational metadata does not cause revisions.
+Only the latest usable content version of each lesson participates. Native
+rendered `markdownContent` remains answerable text; nested lesson-generation
+costs, model metadata, status and timestamps are excluded from fingerprints.
+The course editor's cascade-confirm operation combines downstream removal and
+the pending validated field change in one v2 transaction. The legacy edit flow
+remains available when v2 is off.
+
+Each intent records its protocol, revision and semantic snapshot. Frozen retries
+reuse exact bytes. Retractions are built from the intent alone, so a deleted
+native row is not needed. The only tombstone reasons are `deleted`, `unpublished`,
+`visibility_restricted` and `generation_reverted`, and its body has exactly the
+six top-level fields required by section C.
+
+Manifest inventory is read as one consistent database JSON value. Pages contain
+at most 1000 objects, each current object occurs once, and an empty organization
+still has one empty page. The scheduled reconciler uses `apply:true`; a signed
+manifest follows every run and is also sent hourly. Valid last-page `resend`
+requests enqueue the requested current revision without incrementing it.
+
+Local database acceptance uses a disposable PostgreSQL 17 Docker container:
+`pnpm --filter @megacampus/course-gen-platform test:helixa:v2:pg17`. It does not
+read a production connection string. The opt-in variable is
+`MC2_HELIXA_REAL_PG17=1`; omitting it intentionally skips that database suite.
+
+The runtime version flag is mirrored to a default-off binding capture gate before
+v2 claims. Both the worker and API need the same intended flag setting for v2
+atomic edits. Turning v2 off preserves durable revisions and pending v2 intents;
+v1 delivery resumes through its original path. Do not delete revision state as a
+rollback step.
+
+While v2 is enabled, v1 intents remain durable but are not claimed or delivered.
+Activation refuses if this binding has any undelivered v1 intent that was ever
+claimed or frozen. This includes retryable and action-required entries, because
+a timed-out request can still finish at Helixa. Retry those entries under v1
+until the receiver acknowledges completed materialization. Resetting attempts
+is not proof of completion and does not bypass the activation barrier. New v1
+entries that were never claimed can remain paused. A configured disabled binding
+can mirror the off gate without preventing the general worker from starting.
+Activation also serializes with native dirty capture, so an overlapping edit,
+deletion or last-reader withdrawal cannot be lost during initial inventory capture.
+
+Activation is a separate authorized operation:
+
+1. Obtain the owner's confirmation that Helixa v2 is deployed on `helixa.ru` and
+   accepts both schema versions. This implementation does not establish that.
+2. Review and apply the MegaCampus v2 migration and ship the code through the
+   repository's dev/release/deploy flow with the new flag still `false`.
+3. With v2 still off, drain every previously claimed/frozen v1 intent for the
+   exact binding to a successful receiver acknowledgement. Resolve failed
+   deliveries through the existing v1 retry path. Stop previous API and worker
+   instances sharing the binding and let in-flight edits finish before switching
+   versions; do not reset or discard backlog to simulate a drained queue.
+4. After the owner's confirmation and deployment authorization, enable exactly
+   `HELIXA_KNOWLEDGE_SYNC_CONTRACT_V2=true` for the intended environment and
+   restart its configured API/worker with the same flag on every instance writing
+   to this binding's organization, including environments sharing Supabase. Keep
+   the existing endpoint, HMAC and binding tuple; outbound scheduling still
+   requires its existing scheduler flag.
+5. Verify the first complete manifest and its count, then check `resend` after
+   the next hour. Use a disposable test course for edit/retract/re-publish proof.
+   The withdrawal test must remove access of its last organization reader;
+   disabling only a public link is insufficient under the owner's clarification.
+
+No live migration, deployment or activation was performed by this implementation.
