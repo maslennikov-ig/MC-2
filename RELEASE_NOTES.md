@@ -2,6 +2,19 @@
 
 User-facing release notes for all versions.
 
+## v0.31.49
+
+_Released on 2026-10-01_
+
+### 🐛 Bug Fixes
+
+- **deps**: Clear high audit blockers
+- **cost**: Send price-sync notices without invalid markdown
+
+---
+
+_This release was automatically generated from 8 commits._
+
 ## v0.31.48
 
 _Released on 2026-09-16_

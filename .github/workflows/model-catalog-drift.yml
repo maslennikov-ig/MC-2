@@ -188,21 +188,29 @@ jobs:
         run: |
           set -euo pipefail
           moves=$(cat packages/course-gen-platform/drift-loud.txt)
+          # Send literal text, like the failure notice. Legacy Markdown treats
+          # the underscore in max_price as an unterminated italic entity.
           text=$(printf '%s\n' \
-            '*Цены моделей сильно сдвинулись*' \
+            'Цены моделей сильно сдвинулись' \
             '' \
-            'Ночная сверка с OpenRouter. Новые цены уже записаны в каталог и запушены в `develop` — делать ничего не нужно. Это к сведению.' \
+            'Ночная сверка с OpenRouter. Новые цены уже записаны в каталог и запушены в develop — делать ничего не нужно. Это к сведению.' \
             '' \
             'Порог уведомления — изменение в 1.5 раза. Потолок max_price использует актуальную цену; каталог служит запасным источником, если актуальная цена недоступна.' \
             '' \
-            '```' "$moves" '```' \
+            "$moves" \
             '' \
             "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
           curl -sS --fail-with-body -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg c "$TELEGRAM_CHAT_ID" --arg t "$text" \
-                  '{chat_id:$c, text:$t, parse_mode:"Markdown"}')" >/dev/null
+                  '{chat_id:$c, text:$t}')" >telegram-price-notice-response.json || {
+              status=$?
+              # Keep successful responses (which contain chat data) out of the
+              # log, but retain Telegram's explanation when a request fails.
+              jq -r '.description // "Telegram request failed"' telegram-price-notice-response.json >&2 || true
+              exit "$status"
+            }
 
       # Report the actual failed phase. A notification failure after a successful
       # push must never claim that the catalogue was not published.

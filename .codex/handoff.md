@@ -1,10 +1,16 @@
 # Orchestrator Handoff
 
-Updated: 2026-09-16. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-10-01. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
+
+## Telegram price notice repair (mc2-v9c3k)
+
+Owner authorized release/deploy on 2026-10-01. Plain-text notice/error diagnostics pass 9 tests.
+16 high findings cleared within existing majors; audit 0 high/critical, 11 moderate/1 low (mc2-5hqt3).
+Release/live proof pending; master workflow, develop source. Evidence: .codex/stages/mc2-v9c3k/. docs-reviewed: updated. graph-reviewed: blocked — no owned local graph; dirty primary graph is read-only.
 
 ## Price sync repair (mc2-x9che)
 

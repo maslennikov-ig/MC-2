@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
@@ -25,6 +25,7 @@ const workflow = load(
 };
 const steps = workflow.jobs.drift.steps;
 const drift = steps.find(step => step.id === 'drift')!;
+const priceNotice = steps.find(step => step.id === 'price_notice')!;
 const notification = steps.find(
   step => step.name === 'Say so in Telegram when the sync itself failed'
 )!;
@@ -38,7 +39,65 @@ function inTemp<T>(run: (dir: string) => T): T {
   }
 }
 
+function runPriceNotice(dir: string, response: string, status = 0) {
+  const platform = resolve(dir, 'packages/course-gen-platform');
+  mkdirSync(platform, { recursive: true });
+  writeFileSync(
+    resolve(platform, 'drift-loud.txt'),
+    'provider/model_v1 inputPricePerMillion: 1 → 2 (+100%)\n'
+  );
+  return spawnSync(
+    'bash',
+    [
+      '-c',
+      `curl() { printf '%s\\0' "$@" > "$CAPTURE"; printf '%s' "$RESPONSE"; return ${status}; }\n${priceNotice.run}`,
+    ],
+    {
+      cwd: dir,
+      env: {
+        ...process.env,
+        CAPTURE: resolve(dir, 'message'),
+        RESPONSE: response,
+        TELEGRAM_BOT_TOKEN: 'test',
+        TELEGRAM_CHAT_ID: 'test',
+        GITHUB_SERVER_URL: 'https://example.test',
+        GITHUB_REPOSITORY: 'test/repo',
+        GITHUB_RUN_ID: '123',
+      },
+      encoding: 'utf8',
+    }
+  );
+}
+
 describe('nightly price sync workflow', () => {
+  it('sends price identifiers literally without Telegram markup parsing', () => {
+    inTemp(dir => {
+      const result = runPriceNotice(dir, '{"ok":true}');
+      expect(result.status).toBe(0);
+      const args = readFileSync(resolve(dir, 'message'), 'utf8').split('\0');
+      const payload = JSON.parse(args[args.indexOf('-d') + 1]);
+      expect(payload.parse_mode).toBeUndefined();
+      expect(payload.text).toContain('Потолок max_price');
+      expect(payload.text).toContain('provider/model_v1 inputPricePerMillion: 1 → 2 (+100%)');
+      expect(payload.text).toContain('https://example.test/test/repo/actions/runs/123');
+      expect(payload.text).not.toContain('```');
+    });
+  });
+
+  it('logs the Telegram error description while preserving the failed request status', () => {
+    inTemp(dir => {
+      const result = runPriceNotice(
+        dir,
+        JSON.stringify({ ok: false, error_code: 400, description: 'Bad Request: invalid text' }),
+        22
+      );
+      expect(result.status).toBe(22);
+      expect(result.stderr).toContain('Bad Request: invalid text');
+      expect(result.stdout).toBe('');
+      expect(result.stderr).not.toContain('api.telegram.org/bottest');
+    });
+  });
+
   it.each([1, 2])('propagates updater exit %i instead of claiming success', status => {
     inTemp(dir => {
       const result = spawnSync('bash', ['-c', `pnpm() { return ${status}; }\n${drift.run}`], {
