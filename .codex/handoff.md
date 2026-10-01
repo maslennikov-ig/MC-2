@@ -8,9 +8,9 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 
 ## Telegram price notice repair (mc2-v9c3k)
 
-Owner authorized release/deploy on 2026-10-01. Plain-text notice/error diagnostics pass 9 tests.
-16 high findings cleared within existing majors; audit 0 high/critical, 11 moderate/1 low (mc2-5hqt3).
-Release/live proof pending; master workflow, develop source. Evidence: .codex/stages/mc2-v9c3k/. docs-reviewed: updated. graph-reviewed: blocked — no owned local graph; dirty primary graph is read-only.
+v0.31.49 accepted in production at 188e5abc3: matching API/web/3 workers, CI/CD 36870583394 passed, health 200. Develop contains the source.
+9 notice tests pass; live price-sync 36873944045 passed: prices published and Telegram notice sent. Audit: 0 high/critical; 11 moderate/1 low tracked in mc2-5hqt3.
+Evidence: .codex/stages/mc2-v9c3k/. docs-reviewed: updated. graph-reviewed: blocked — isolated checkout has no owned graph; dirty primary graph stays read-only.
 
 ## Price sync repair (mc2-x9che)
 
@@ -259,9 +259,9 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Explicit defers
 
-- `mc2-5hqt3` — four moderate tooling advisories remain outside the price-sync
-  repair: @humanfs/node, vitest/@vitest/mocker, baseline-browser-mapping.
-  The release-blocking high/critical findings are handled in `mc2-xyklh`.
+- `mc2-5hqt3` — 11 moderate/1 low dependency advisories remain; current audit has
+  0 high/critical after the price-notice release patch.
+- `mc2-uhh07` — release helper deletes rollback backups before commit; preserve them through commit/tag and test failed hooks.
 
 - `mc2-vlskb` — the Docling timeout wrapper stays until `docling-project/docling-mcp#135` is
   merged and released; then delete only the timeout half of `runtime.py`.

@@ -1,0 +1,103 @@
+{
+  "schema_version": "mc2-task-acceptance/v1",
+  "task_id": "mc2-v9c3k",
+  "status": "accepted",
+  "accepted_date": "2026-10-01",
+  "release": {
+    "version": "v0.31.49",
+    "tag_commit": "a44cb2399039457a18188291323a1217c6e7e4e5",
+    "production_commit": "188e5abc3fd785167f9015b60ee90c6f80bb57a0"
+  },
+  "source_fixes": {
+    "notification": "208ba9186008b8b32098d1fbdd950fc3f2d99e15",
+    "security_gate": "342f0381a593963b09e5855b6a04070e00d7595e"
+  },
+  "ci": {
+    "run_id": 36870583394,
+    "url": "https://github.com/maslennikov-ig/MC-2/actions/runs/36870583394",
+    "tested_commit": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+    "conclusion": "success",
+    "checks": {
+      "Setup Dependencies": "success",
+      "Detect Deploy-Relevant Changes": "success",
+      "Migration Drift Check": "success",
+      "Lint": "success",
+      "Unit Tests": "success",
+      "Integration Tests": "success",
+      "Security Audit": "success",
+      "Type Check": "success",
+      "NotebookLM Bridge Tests": "success",
+      "Build Packages": "success",
+      "CI Success": "success",
+      "Build Docker - api": "success",
+      "Build Docker - qdrant-operator": "success",
+      "Build Docker - web": "success",
+      "Contract Tests": "success",
+      "Deploy to Production": "success",
+      "Deploy to Dev": "skipped",
+      "Monitoring Config Drift": "success",
+      "Notify": "success",
+      "Rollback": "skipped"
+    }
+  },
+  "production": {
+    "verified_at_utc": "2026-10-01T14:07:35Z",
+    "active_color": "blue",
+    "deploy_state": "accepted",
+    "commit": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+    "container_revisions": {
+      "megacampus-api-blue": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+      "megacampus-web-blue": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+      "megacampus-worker": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+      "megacampus-worker-stage6": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+      "megacampus-worker-stage7": "188e5abc3fd785167f9015b60ee90c6f80bb57a0"
+    },
+    "web_health_http": 200,
+    "api_health_http": 200,
+    "unchanged_dev_web_health_http": 200
+  },
+  "develop_delivery": {
+    "promotion_commit": "acf42ce947a6cfd6c1decdd8e5a1a7bff7138991",
+    "tree_equals_accepted_production": true,
+    "normal_push_with_ancestry_guard": true,
+    "primary_dirty_checkout_preserved": true
+  },
+  "live_price_sync": {
+    "run_id": 36873944045,
+    "url": "https://github.com/maslennikov-ig/MC-2/actions/runs/36873944045",
+    "workflow_commit": "188e5abc3fd785167f9015b60ee90c6f80bb57a0",
+    "checked_out_source_commit": "acf42ce947a6cfd6c1decdd8e5a1a7bff7138991",
+    "published_tested_price_commit": "575872e4736fd0c85cc37dbdc7174762367fbd56",
+    "conclusion": "success",
+    "unit_test_files_passed": 531,
+    "unit_test_files_skipped": 29,
+    "unit_tests_passed": 7898,
+    "unit_tests_skipped": 807,
+    "real_telegram_price_notice": "success",
+    "failure_notice": "skipped"
+  },
+  "focused_notification_tests": {
+    "passed": 9,
+    "regression_tests_added": 2,
+    "red_baseline_failed": 2
+  },
+  "audit": {
+    "high": 0,
+    "critical": 0,
+    "moderate": 11,
+    "low": 1,
+    "unchanged_high_severity_gate": "passed"
+  },
+  "docs_reviewed": "updated",
+  "graph_reviewed": "blocked",
+  "graph_reason": "Isolated task checkout has no owned local graph; the dirty primary checkout and its graph remain read-only.",
+  "cleanup": {
+    "security_worktree": "removed after clean-state and equal dependency patch-id proof",
+    "security_source_branch": "retained for recovery of cherry-picked source commit ee399168abf1eedf9c64cac6e6c8f9c4a80c179c"
+  },
+  "explicit_defers": [
+    "mc2-5hqt3",
+    "mc2-uhh07"
+  ],
+  "acceptance_scope": "Task acceptance using exact CI/live-run revisions; current unrelated formal orchestration stage was not closed or changed."
+}
