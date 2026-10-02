@@ -385,7 +385,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.0108,
+    inputPricePerMillion: 0.0171,
     outputPricePerMillion: 1.28,
     contextLength: 1310720,
     maxOutputTokens: 384000,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.0108,
-    outputPricePerMillion: 1.28,
+    inputPricePerMillion: 0.012825,
+    outputPricePerMillion: 1.6,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
