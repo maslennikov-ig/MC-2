@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 0.41,
-    outputPricePerMillion: 3.99,
+    inputPricePerMillion: 0.38,
+    outputPricePerMillion: 3.49,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -385,7 +385,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.0188,
+    inputPricePerMillion: 0.0152,
     outputPricePerMillion: 1.28,
     contextLength: 1310720,
     maxOutputTokens: 384000,
@@ -410,7 +410,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.0188,
+    inputPricePerMillion: 0.0152,
     outputPricePerMillion: 1.28,
     contextLength: 1048576,
     maxOutputTokens: null,
@@ -443,8 +443,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.028,
-    outputPricePerMillion: 0.056,
+    inputPricePerMillion: 0.0224,
+    outputPricePerMillion: 1.28,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
