@@ -1,16 +1,16 @@
 # Orchestrator Handoff
 
-Updated: 2026-10-01. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-10-07. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
 
-## Telegram price notice repair (mc2-v9c3k)
+## Nightly price sync (mc2-uoyed, mc2-v9c3k)
 
-v0.31.49 accepted in production at 188e5abc3: matching API/web/3 workers, CI/CD 36870583394 passed, health 200. Develop contains the source.
-9 notice tests pass; live price-sync 36873944045 passed: prices published and Telegram notice sent. Audit: 0 high/critical; 11 moderate/1 low tracked in mc2-5hqt3.
-Evidence: .codex/stages/mc2-v9c3k/. docs-reviewed: updated. graph-reviewed: blocked — isolated checkout has no owned graph; dirty primary graph stays read-only.
+2026-10-07: mc2-uoyed repairs the pinned-endpoint cost fixture stranded since September 19. Runs 37297884912, 37450378405 and 37607159215 failed the same fixed $0.415 assertion after catalogue changes. The fixture now derives eligible endpoint rates and the expected charge from the catalogue; five current published rate changes are applied. Exact red/green reproduced; 8572 unit tests passed (133 skipped), type-check/build passed. Delivery targets develop; exact commit/PR receipt is in Beads. Master workflow is unchanged; a subsequent scheduled run is still needed for live price-sync proof.
+v0.31.49 remains accepted in production at 188e5abc3: matching API/web/3 workers, CI/CD 36870583394 passed, health 200. The separate October 1 Telegram repair passed 9 notice tests and live sync 36873944045 (rates published, notice sent). Audit then: 0 high/critical; 11 moderate/1 low tracked in mc2-5hqt3. Evidence: .codex/stages/mc2-v9c3k/.
+docs-reviewed: updated. graph-reviewed: blocked — isolated checkout has no owned graph; primary map was used read-only and exact current files verified. Numeric catalogue and fixture changes do not alter architecture; the dirty primary graph stays untouched.
 
 ## Price sync repair (mc2-x9che)
 
@@ -259,8 +259,8 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Explicit defers
 
-- `mc2-5hqt3` — 11 moderate/1 low dependency advisories remain; current audit has
-  0 high/critical after the price-notice release patch.
+- `mc2-bot88` — October 7 inherited dependency audit blocks full CI/deployment readiness: 4 high and 1 critical advisories (proxy-addr, source-map-js, sharp, MCP client, braces). Braces has no patched release; resolve scoped dependency fixes and assess its consumers/upstream separately. Price-sync PR345 changes no dependencies and its local nightly-equivalent acceptance passes. Keep the audit gate enforced; evidence and advisory links are in Beads.
+- `mc2-5hqt3` — remaining moderate/low advisory work stays separate; the October 7 audit reports 20 moderate/4 low, superseding the October 1 count of 11 moderate/1 low.
 - `mc2-uhh07` — release helper deletes rollback backups before commit; preserve them through commit/tag and test failed hooks.
 
 - `mc2-vlskb` — the Docling timeout wrapper stays until `docling-project/docling-mcp#135` is

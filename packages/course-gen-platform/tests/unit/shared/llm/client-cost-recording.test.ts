@@ -10,6 +10,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+import { getModelCapabilities } from '@megacampus/shared-types';
+
 const statedCost = vi.hoisted(() => ({ value: undefined as number | undefined }));
 const listModelEndpoints = vi.fn(() => Promise.resolve([] as unknown[]));
 vi.mock('@/shared/llm/openrouter-endpoints', async importOriginal => {
@@ -60,6 +62,22 @@ vi.mock('@/shared/trace-logger', () => ({ logTrace }));
 
 const COURSE_ID = '20000000-0000-4000-8000-000000000001';
 
+function eligiblePinnedRate(): {
+  promptPricePerMillion: number;
+  completionPricePerMillion: number;
+} {
+  const glm = getModelCapabilities('z-ai/glm-5.2');
+  if (!glm) throw new Error('z-ai/glm-5.2 is not in MODEL_CATALOG');
+
+  // Keep the mocked endpoint below the production 1.5x max_price ceiling even
+  // when the published catalogue rate moves. The test is about which rate is
+  // recorded, not about preserving an external provider's tariff in a fixture.
+  return {
+    promptPricePerMillion: glm.inputPricePerMillion / 2,
+    completionPricePerMillion: glm.outputPricePerMillion / 2,
+  };
+}
+
 describe('LLMClient cost recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,7 +109,6 @@ describe('LLMClient cost recording', () => {
     // again when the nightly sync rewrote it on 2026-09-03. A published rate is
     // somebody else's number, and freezing it here turns every one of those
     // moves into a red suite for a fact this test is not about.
-    const { getModelCapabilities } = await import('@megacampus/shared-types');
     const glm = getModelCapabilities('z-ai/glm-5.2');
     if (!glm) throw new Error('z-ai/glm-5.2 is not in MODEL_CATALOG');
     const fromCatalogue =
@@ -102,16 +119,12 @@ describe('LLMClient cost recording', () => {
   });
 
   it('prices a pinned attempt from the endpoint that will serve it', async () => {
-    // glm-5.2 is catalogued at 1.19/3.74 and its cheapest live endpoint is
-    // sail-research/fp8 at 0.50/3.15. 200k in + 100k out is $0.612 by the
-    // catalogue and $0.415 by the endpoint — and the endpoint is the one that
-    // sends the invoice.
+    const endpointRate = eligiblePinnedRate();
     listModelEndpoints.mockResolvedValueOnce([
       {
         tag: 'sail-research/fp8',
         providerName: 'Sail Research',
-        promptPricePerMillion: 0.5,
-        completionPricePerMillion: 3.15,
+        ...endpointRate,
         status: 0,
         tier: 'default',
       },
@@ -124,22 +137,24 @@ describe('LLMClient cost recording', () => {
     });
 
     const [entry] = logTrace.mock.calls[0] as unknown as [Record<string, unknown>];
-    expect(entry.costUsd).toBeCloseTo(0.415, 10);
+    const fromEndpoint =
+      (200_000 / 1_000_000) * endpointRate.promptPricePerMillion +
+      (100_000 / 1_000_000) * endpointRate.completionPricePerMillion;
+    expect(entry.costUsd).toBeCloseTo(fromEndpoint, 10);
   });
 
   it('records the charge OpenRouter stated in the body, over any estimate', async () => {
-    // The catalogue would say $0.612 and the pinned endpoint $0.415. The
-    // provider says $0.37, and the provider is the one sending the invoice.
+    const endpointRate = eligiblePinnedRate();
     listModelEndpoints.mockResolvedValueOnce([
       {
         tag: 'sail-research/fp8',
         providerName: 'Sail Research',
-        promptPricePerMillion: 0.5,
-        completionPricePerMillion: 3.15,
+        ...endpointRate,
         status: 0,
         tier: 'default',
       },
     ]);
+    // Whatever either estimate says, the provider's own charge is the invoice.
     statedCost.value = 0.37;
 
     const { LLMClient } = await import('@/shared/llm/client');
