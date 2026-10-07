@@ -259,8 +259,8 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Explicit defers
 
-- `mc2-5hqt3` — 11 moderate/1 low dependency advisories remain; current audit has
-  0 high/critical after the price-notice release patch.
+- `mc2-bot88` — October 7 inherited dependency audit blocks full CI/deployment readiness: 4 high and 1 critical advisories (proxy-addr, source-map-js, sharp, MCP client, braces). Braces has no patched release; resolve scoped dependency fixes and assess its consumers/upstream separately. Price-sync PR345 changes no dependencies and its local nightly-equivalent acceptance passes. Keep the audit gate enforced; evidence and advisory links are in Beads.
+- `mc2-5hqt3` — remaining moderate/low advisory work stays separate; the October 7 audit reports 20 moderate/4 low, superseding the October 1 count of 11 moderate/1 low.
 - `mc2-uhh07` — release helper deletes rollback backups before commit; preserve them through commit/tag and test failed hooks.
 
 - `mc2-vlskb` — the Docling timeout wrapper stays until `docling-project/docling-mcp#135` is
