@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 0.03,
-    outputPricePerMillion: 10,
+    inputPricePerMillion: 0.06,
+    outputPricePerMillion: 4.2,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -385,7 +385,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.006,
+    inputPricePerMillion: 0.0046,
     outputPricePerMillion: 1.28,
     contextLength: 1310720,
     maxOutputTokens: 384000,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.0048,
-    outputPricePerMillion: 0.351387,
+    inputPricePerMillion: 0.0046,
+    outputPricePerMillion: 1.28,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
