@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.5,
+    inputPricePerMillion: 0.0232,
+    outputPricePerMillion: 1.2,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -385,7 +385,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.0155,
+    inputPricePerMillion: 0.016,
     outputPricePerMillion: 0.64,
     contextLength: 1310720,
     maxOutputTokens: 384000,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.0155,
-    outputPricePerMillion: 0.64,
+    inputPricePerMillion: 0.0128,
+    outputPricePerMillion: 0.768,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
