@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.0232,
-    outputPricePerMillion: 1.2,
+    inputPricePerMillion: 0.0261,
+    outputPricePerMillion: 0.9,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.0128,
-    outputPricePerMillion: 0.768,
+    inputPricePerMillion: 0.0144,
+    outputPricePerMillion: 0.576,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -443,7 +443,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.03,
+    inputPricePerMillion: 0.0459,
     outputPricePerMillion: 1.28,
     contextLength: 1048576,
     maxOutputTokens: 384000,
