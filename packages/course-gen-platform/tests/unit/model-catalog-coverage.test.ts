@@ -100,7 +100,7 @@ describe('model catalogue coverage', () => {
       'z-ai/glm-5.2': [0.0341, 7],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.041191, 0.12],
+      'z-ai/glm-5.3-flash': [0.0067, 0.188],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
