@@ -95,12 +95,12 @@ describe('model catalogue coverage', () => {
       // hours on 2026-08-25. Dates are deliberately absent from the line below,
       // because the nightly sync rewrites the number and cannot rewrite a date
       // beside it (mc2-rhyac).
-      'deepseek/deepseek-v4-flash-0731': [0.44, 1.32],
+      'deepseek/deepseek-v4-flash-0731': [0.04444, 0.13332],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [0.0341, 7],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.0052, 0.1985],
+      'z-ai/glm-5.3-flash': [0.15, 0.5],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
@@ -194,7 +194,7 @@ describe('model catalogue coverage', () => {
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
       'deepseek/deepseek-v4-flash': [0.091, 0.182],
-      '~deepseek/deepseek-v4-flash-latest': [0.0475, 0.1568],
+      '~deepseek/deepseek-v4-flash-latest': [0.0422, 0.1694],
     };
 
     const actual = Object.fromEntries(
