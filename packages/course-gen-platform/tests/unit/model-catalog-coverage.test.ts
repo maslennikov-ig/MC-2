@@ -95,12 +95,12 @@ describe('model catalogue coverage', () => {
       // hours on 2026-08-25. Dates are deliberately absent from the line below,
       // because the nightly sync rewrites the number and cannot rewrite a date
       // beside it (mc2-rhyac).
-      'deepseek/deepseek-v4-flash-0731': [0.04444, 0.13332],
+      'deepseek/deepseek-v4-flash-0731': [0.0422, 0.1694],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [0.0341, 7],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.15, 0.5],
+      'z-ai/glm-5.3-flash': [0.0418, 0.077],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
