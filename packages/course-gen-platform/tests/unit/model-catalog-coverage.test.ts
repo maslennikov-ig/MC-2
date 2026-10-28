@@ -97,7 +97,7 @@ describe('model catalogue coverage', () => {
       // beside it (mc2-rhyac).
       'deepseek/deepseek-v4-flash-0731': [0.119, 0.238],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [0.0341, 7],
+      'z-ai/glm-5.2': [0.014, 7],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
       'z-ai/glm-5.3-flash': [0.15, 0.5],
@@ -193,7 +193,7 @@ describe('model catalogue coverage', () => {
       // calls rather than merely misreporting them. It has now been corrected
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
-      'deepseek/deepseek-v4-flash': [0.05, 0.45],
+      'deepseek/deepseek-v4-flash': [0.14, 0.28],
       '~deepseek/deepseek-v4-flash-latest': [0.0475, 0.1568],
     };
 
