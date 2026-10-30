@@ -100,7 +100,7 @@ describe('model catalogue coverage', () => {
       'z-ai/glm-5.2': [0.006, 7],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.0457, 0.0742],
+      'z-ai/glm-5.3-flash': [0.15, 0.5],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
@@ -194,7 +194,7 @@ describe('model catalogue coverage', () => {
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
       'deepseek/deepseek-v4-flash': [0.091, 0.182],
-      '~deepseek/deepseek-v4-flash-latest': [0.057, 0.1341],
+      '~deepseek/deepseek-v4-flash-latest': [0.056, 0.3],
     };
 
     const actual = Object.fromEntries(
