@@ -58,7 +58,7 @@ describe('model catalogue coverage', () => {
     // the real 0.375, which is a hard refusal of every call, not a cheaper route.
     const verifiedBatchRates: Record<string, [input: number, output: number, context: number]> = {
       'google/gemini-3.7-flash:batch': [0.375, 1.875, 1_048_576],
-      'minimax/minimax-m3:batch': [0.3, 1.2, 524_288],
+      'minimax/minimax-m3:batch': [0.224, 0.88, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
       'z-ai/glm-5.2:batch': [0.7, 2.2, 512_000],
     };
@@ -95,7 +95,7 @@ describe('model catalogue coverage', () => {
       // hours on 2026-08-25. Dates are deliberately absent from the line below,
       // because the nightly sync rewrites the number and cannot rewrite a date
       // beside it (mc2-rhyac).
-      'deepseek/deepseek-v4-flash-0731': [0.059, 0.3],
+      'deepseek/deepseek-v4-flash-0731': [0.05, 0.3],
       'openai/gpt-5.6-luna': [0.2, 1.2],
       'z-ai/glm-5.2': [0.006, 6.8],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
@@ -194,7 +194,7 @@ describe('model catalogue coverage', () => {
       // four times in four days, each time by somebody re-reading it, which is
       // the argument for the check running nightly (mc2-ts9i2, mc2-a6qxc).
       'deepseek/deepseek-v4-flash': [0.091, 0.182],
-      '~deepseek/deepseek-v4-flash-latest': [0.059, 0.3],
+      '~deepseek/deepseek-v4-flash-latest': [0.04972, 0.14916],
     };
 
     const actual = Object.fromEntries(

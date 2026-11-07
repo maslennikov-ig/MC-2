@@ -252,8 +252,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * tariff" premise as `z-ai/glm-5.2:batch` (mc2-hc91g).
    */
   'minimax/minimax-m3:batch': {
-    inputPricePerMillion: 0.3,
-    outputPricePerMillion: 1.2,
+    inputPricePerMillion: 0.224,
+    outputPricePerMillion: 0.88,
     contextLength: 524288,
     maxOutputTokens: null,
     supportsTemperature: true,
@@ -385,7 +385,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // published list live, and this figure is what it falls back on when it
     // cannot. Being high there costs an overstated estimate; being low refuses
     // the call.
-    inputPricePerMillion: 0.059,
+    inputPricePerMillion: 0.05,
     outputPricePerMillion: 0.3,
     contextLength: 1310720,
     maxOutputTokens: 384000,
@@ -410,8 +410,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // $0.13. The entry was 1.30x/1.38x over — an alias following its family to
     // a cheaper snapshot, which is the same mechanism that made it unsafe to
     // route on.
-    inputPricePerMillion: 0.059,
-    outputPricePerMillion: 0.3,
+    inputPricePerMillion: 0.04972,
+    outputPricePerMillion: 0.14916,
     contextLength: 1048576,
     maxOutputTokens: null,
     supportsTemperature: true,
