@@ -60,7 +60,7 @@ describe('model catalogue coverage', () => {
       'google/gemini-3.7-flash:batch': [0.375, 1.875, 1_048_576],
       'minimax/minimax-m3:batch': [0.224, 0.88, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
-      'z-ai/glm-5.2:batch': [0.37, 1.5, 512_000],
+      'z-ai/glm-5.2:batch': [0.623, 1.271, 512_000],
     };
 
     const actual = Object.fromEntries(

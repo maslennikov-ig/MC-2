@@ -356,8 +356,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'z-ai/glm-5.2:batch': {
-    inputPricePerMillion: 0.37,
-    outputPricePerMillion: 1.5,
+    inputPricePerMillion: 0.623,
+    outputPricePerMillion: 1.271,
     contextLength: 512000,
     maxOutputTokens: null,
     supportsTemperature: true,
