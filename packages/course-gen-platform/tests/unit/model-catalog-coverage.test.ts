@@ -60,7 +60,7 @@ describe('model catalogue coverage', () => {
       'google/gemini-3.7-flash:batch': [0.375, 1.875, 1_048_576],
       'minimax/minimax-m3:batch': [0.224, 0.88, 524_288],
       'openai/gpt-5.6-luna:batch': [0.1, 0.6, 1_050_000],
-      'z-ai/glm-5.2:batch': [0.623, 1.271, 512_000],
+      'z-ai/glm-5.2:batch': [0.527, 1.075, 512_000],
     };
 
     const actual = Object.fromEntries(
@@ -97,10 +97,10 @@ describe('model catalogue coverage', () => {
       // beside it (mc2-rhyac).
       'deepseek/deepseek-v4-flash-0731': [0.0434, 0.3],
       'openai/gpt-5.6-luna': [0.2, 1.2],
-      'z-ai/glm-5.2': [0.006, 6.8],
+      'z-ai/glm-5.2': [0.0071, 6.8],
       // Read 2026-08-26, the day it was published. Two endpoints only: z-ai at
       // exactly this rate and novita at twice it (mc2-r8shw).
-      'z-ai/glm-5.3-flash': [0.0335, 0.083],
+      'z-ai/glm-5.3-flash': [0.15, 0.5],
       'minimax/minimax-m3': [0.3, 1.2],
       'google/gemini-3.7-flash': [0.75, 3.75],
       'openai/gpt-5-image-mini': [2.5, 2],
