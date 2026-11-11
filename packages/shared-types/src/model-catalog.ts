@@ -309,7 +309,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 0.0071,
+    inputPricePerMillion: 0.007,
     outputPricePerMillion: 6.8,
     contextLength: 1048576,
     maxOutputTokens: 262144,
@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.5,
+    inputPricePerMillion: 0.0399,
+    outputPricePerMillion: 0.0784,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -443,8 +443,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
     // to this one entry; the value moves faster than anybody re-reads it, which
     // is why the frozen figure is only a fallback for when the live list cannot
     // be read, and why too high is the safe way to be wrong.
-    inputPricePerMillion: 0.091,
-    outputPricePerMillion: 0.182,
+    inputPricePerMillion: 0.09,
+    outputPricePerMillion: 0.18,
     contextLength: 1048576,
     maxOutputTokens: 384000,
     supportsTemperature: true,
