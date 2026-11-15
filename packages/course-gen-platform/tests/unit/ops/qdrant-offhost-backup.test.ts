@@ -170,7 +170,7 @@ describe('off-host Qdrant backup contract', () => {
       expect(unit).toContain('CPUQuota=25%');
     }
     expect(backupTimer).toContain('OnCalendar=*-*-* 04:20:00');
-    expect(restoreTimer).toMatch(/^OnCalendar=Sun \*-\*-\* 06:00:00$/mu);
+    expect(restoreTimer).toContain('OnCalendar=monthly');
     expect(backupTimer).toContain('Persistent=true');
     expect(restoreTimer).toContain('Persistent=true');
   });
@@ -191,19 +191,9 @@ describe('off-host Qdrant backup contract', () => {
     expect(runbook).toMatch(/sticky/iu);
   });
 
-  it('alerts independently on stale off-host copies and restore drills and documents rollback', () => {
-    const alerts = source('ops/qdrant/prometheus/alerts.yml');
-    const alertTests = source('ops/qdrant/prometheus/alert-tests.yml');
+  it('documents the paused off-host integration and its retention contract', () => {
     const runbook = source(`${BASE}/README.md`);
-
-    for (const name of ['QdrantOffHostSnapshotStale', 'QdrantOffHostRestoreDrillStale']) {
-      expect(alerts).toContain(`alert: ${name}`);
-      expect(alertTests).toContain(`alertname: ${name}`);
-    }
-    expect(alerts).toContain('megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds');
-    expect(alerts).toContain(
-      'megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds'
-    );
+    expect(runbook).toContain('**Status: paused.**');
     const retention = source(`${BASE}/source-command.sh`).match(
       /^readonly EXPECTED_RETENTION_DAYS=(\d+)$/mu
     )?.[1];

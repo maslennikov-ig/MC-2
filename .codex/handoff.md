@@ -6,16 +6,14 @@ Current state only. History lives in commits, `bd` close reasons, stage summarie
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
 
-## Off-host Qdrant restore (mc2-izofu)
+## Off-host Qdrant pause (mc2-2w0oe)
 
-Four daily pulls were missed October 29 through November 1. The November 1 drill failed during
-that gap. Its journal entry aged out. Daily copies resumed November 2.
-On November 15 at 15:42:36 UTC the checksum-verified copy restored 6,856 points in isolated
-Qdrant 1.18.2. The container was removed and Prometheus and Alertmanager cleared the alert.
-The verified weekly timer is installed and enabled on the backup host. The first scheduled run
-is November 22 after 08:00 Moscow time, with up to 30 minutes of jitter. The 12 focused tests,
-type-check and build passed. PR #363 carries the deployed timer and this handoff into delivery.
-docs-reviewed: updated. graph-reviewed: no-change-needed (systemd schedule and runbook).
+The owner paused second-host Qdrant backups before MegaCampus launch. Both off-host timers are
+disabled and both services are stopped. Seven existing generations are retained for a reversible
+pause. The dedicated source SSH authorization is withdrawn and the two exporter textfiles are
+archived. The live Prometheus rules exclude the two off-host checks. Promtool and the 12 focused
+tests passed. PR #363 now carries the pause and the default monitoring change.
+docs-reviewed: updated. graph-reviewed: no-change-needed (monitoring rules and runbook).
 
 ## Delivery and nightly price sync
 
@@ -180,8 +178,8 @@ through T5.
 ## Live operational facts
 
 - `course_embeddings_v1` holds **6856 points** after deduplication; a snapshot restoring 13712 is not
-  a fault, half are copies. Qdrant and uploads pull daily to `helixa-new`; on-host snapshots share
-  the docker volume with live data, so that pull is the only real mitigation.
+  a fault, half are copies. Uploads pull daily to `helixa-new`. Qdrant snapshots run on the
+  source host and share its Docker volume with live data.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
 - Nine source documents are accepted as lost and are **not** in the indexed set; do not reopen.
@@ -255,6 +253,8 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Explicit defers
 
+- `mc2-2w0oe` — second-host Qdrant backups are paused by owner decision. PR #363 carries the
+  monitoring and handoff changes through the existing CI gates.
 - `mc2-bot88` — October 7 inherited dependency audit blocks full CI/deployment readiness: 4 high and 1 critical advisories (proxy-addr, source-map-js, sharp, MCP client, braces). Braces has no patched release; resolve scoped dependency fixes and assess its consumers/upstream separately. Price-sync PR345 changes no dependencies and its local nightly-equivalent acceptance passes. Keep the audit gate enforced; evidence and advisory links are in Beads.
 - `mc2-5hqt3` — remaining moderate/low advisory work stays separate; the October 7 audit reports 20 moderate/4 low, superseding the October 1 count of 11 moderate/1 low.
 - `mc2-uhh07` — release helper deletes rollback backups before commit; preserve them through commit/tag and test failed hooks.

@@ -598,19 +598,14 @@ remote object or URI. No S3 credential is required, mounted, read, or copied in
 this mode. The local snapshot protects against collection/operator mistakes but
 not loss of the Docker volume or production host.
 
-Production closes that host-loss gap with the owner-selected pull described in
-[`deploy/qdrant-offhost-backup/README.md`](../../deploy/qdrant-offhost-backup/README.md).
-`helixa-new` receives no Qdrant API key; its restricted SSH key can only stream
-the latest manifest/snapshot or publish a success timestamp. A daily copy is
-made visible only after exact size and SHA-256 validation, retained for at most
-7 days and 7 generations, and restored weekly after the daily pull window into
-the exact digest-pinned Qdrant 1.18.2 image. This second copy covers loss of the
-source host.
+The optional second-host pull is paused. The launch procedure in
+[`deploy/qdrant-offhost-backup/README.md`](../../deploy/qdrant-offhost-backup/README.md)
+describes how verified copies and exact-version restores can cover the loss of
+the source host when the owner resumes the integration.
 
 `QDRANT_SNAPSHOT_STORAGE_MODE` remains mandatory and accepts only `local` or
 `s3`. This deployment deliberately keeps Qdrant and the recovery operator in
-`local`; the separate restricted pull copies the already verified bytes without
-giving production access to the backup host. The unused native S3 path still
+`local`. The unused native S3 path still
 requires its complete reviewed credential and object-prefix configuration and
 fails closed when incomplete.
 
@@ -777,14 +772,6 @@ share a nonblocking `flock`; a collision must fail visibly, not overlap.
   `content`, means the collection changed under the probe: regenerate it per
   Recovery probe lifecycle and rerun the drill. Any other error is about the
   snapshot, the transport, or cleanup, and the backup itself is suspect.
-- `QdrantOffHostSnapshotStale`: check the restricted SSH path, the newest
-  owner-only generation on `helixa-new`, its 10 GiB free-space floor, and the
-  backup service journal. A local production snapshot does not satisfy it.
-- `QdrantOffHostRestoreDrillStale`: inspect the restore service journal and the
-  latest verified generation on the backup host. A failed drill during a copy
-  outage needs a new successful run after copying recovers. Check the weekly
-  timer, the pinned 1.18.2 image digest, and temporary-container cleanup. Confirm
-  a fresh off-host restore gauge after the drill.
 - `QdrantHybridFallbackHigh`: group by application service/instance, inspect
   Qdrant errors and native BM25/Formula compatibility, and retain dense fallback
   for availability.
