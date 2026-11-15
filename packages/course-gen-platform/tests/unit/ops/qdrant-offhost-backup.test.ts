@@ -170,7 +170,7 @@ describe('off-host Qdrant backup contract', () => {
       expect(unit).toContain('CPUQuota=25%');
     }
     expect(backupTimer).toContain('OnCalendar=*-*-* 04:20:00');
-    expect(restoreTimer).toContain('OnCalendar=monthly');
+    expect(restoreTimer).toMatch(/^OnCalendar=Sun \*-\*-\* 06:00:00$/mu);
     expect(backupTimer).toContain('Persistent=true');
     expect(restoreTimer).toContain('Persistent=true');
   });

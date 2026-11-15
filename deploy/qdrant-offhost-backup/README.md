@@ -18,8 +18,11 @@ This is not full disaster recovery: losing both VPS providers can still lose thi
 - Free-space floor: 10 GiB after the incoming snapshot. Its exact manifest size is reserved before
   transfer and the floor is checked again before atomic promotion.
 - Retention: no more than 7 daily generations and no generation older than 7 days.
-- Restore: monthly, exact Qdrant 1.18.2 image digest, 0.5 CPU, 1.5 GiB memory, 256 processes,
-  and a loopback-only port. The temporary container is removed after the probe.
+- Restore: Sundays at 06:00 in the backup host's local timezone, with up to 30 minutes of jitter.
+  The daily pull window ends before the restore starts. The next weekly run can recover from a
+  missed drill once a fresh copy is available. The drill uses the exact Qdrant 1.18.2 image digest,
+  0.5 CPU, 1.5 GiB memory, 256 processes, and a loopback-only port. The probe removes its temporary
+  container on exit.
 
 The measured production snapshot on 2026-08-23 is 103,021,568 bytes. Seven copies consume about
 0.67 GiB, plus the pinned restore image, against 45 GiB currently free on `helixa-new`.
@@ -134,6 +137,7 @@ sudo megacampus-qdrant-offhost-backup list
 sudo megacampus-qdrant-offhost-backup verify
 sudo systemctl list-timers --all | grep megacampus-qdrant-offhost
 sudo journalctl -u megacampus-qdrant-offhost-backup.service -n 100 --no-pager
+sudo journalctl -u megacampus-qdrant-offhost-restore.service -n 100 --no-pager
 ```
 
 ## Alerts
@@ -148,6 +152,10 @@ root-owned so an application process cannot unlink or replace it.
 
 - `QdrantOffHostSnapshotStale`: no verified off-host copy for 36 hours, or metric absent;
 - `QdrantOffHostRestoreDrillStale`: no exact-version restore for 35 days, or metric absent.
+
+If the restore fails during a copy outage, check the journal and the latest verified generation.
+After copying recovers, start `megacampus-qdrant-offhost-restore.service` to verify recovery now,
+or check the next scheduled run. Confirm that the success timestamp advances in Prometheus.
 
 The source-local `QdrantSnapshotStale` and `QdrantRestoreDrillStale` remain separate. A successful
 local snapshot cannot silence the off-host alert.

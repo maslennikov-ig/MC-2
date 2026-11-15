@@ -603,9 +603,9 @@ Production closes that host-loss gap with the owner-selected pull described in
 `helixa-new` receives no Qdrant API key; its restricted SSH key can only stream
 the latest manifest/snapshot or publish a success timestamp. A daily copy is
 made visible only after exact size and SHA-256 validation, retained for at most
-14 days and 14 generations, and restored monthly into the exact digest-pinned
-Qdrant 1.18.2 image. This is an off-host second copy, not multi-provider
-disaster recovery.
+7 days and 7 generations, and restored weekly after the daily pull window into
+the exact digest-pinned Qdrant 1.18.2 image. This second copy covers loss of the
+source host.
 
 `QDRANT_SNAPSHOT_STORAGE_MODE` remains mandatory and accepts only `local` or
 `s3`. This deployment deliberately keeps Qdrant and the recovery operator in
@@ -780,8 +780,11 @@ share a nonblocking `flock`; a collision must fail visibly, not overlap.
 - `QdrantOffHostSnapshotStale`: check the restricted SSH path, the newest
   owner-only generation on `helixa-new`, its 10 GiB free-space floor, and the
   backup service journal. A local production snapshot does not satisfy it.
-- `QdrantOffHostRestoreDrillStale`: inspect the newest off-host restore evidence,
-  the pinned 1.18.2 image digest, and temporary-container cleanup before retrying.
+- `QdrantOffHostRestoreDrillStale`: inspect the restore service journal and the
+  latest verified generation on the backup host. A failed drill during a copy
+  outage needs a new successful run after copying recovers. Check the weekly
+  timer, the pinned 1.18.2 image digest, and temporary-container cleanup. Confirm
+  a fresh off-host restore gauge after the drill.
 - `QdrantHybridFallbackHigh`: group by application service/instance, inspect
   Qdrant errors and native BM25/Formula compatibility, and retain dense fallback
   for availability.
