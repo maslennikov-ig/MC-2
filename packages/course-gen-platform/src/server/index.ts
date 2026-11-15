@@ -1,3 +1,4 @@
+import { createHelixaRoleInterviewRouter } from './routes/helixa-role-interview';
 /**
  * Express Server Entrypoint
  * @module server/index
@@ -498,6 +499,7 @@ try {
  */
 try {
   app.use(createHelixaGenerationRouter());
+  app.use(createHelixaRoleInterviewRouter());
   logger.info({ basePath: HELIXA_GENERATION_BASE_PATH }, 'Helixa generation router mounted');
 } catch (error) {
   logger.error({ err: error }, 'Failed to setup Helixa generation router');

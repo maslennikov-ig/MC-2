@@ -649,6 +649,7 @@ sequence below, in this order, once the three joint values in
    `https://dev.ai.megacampus.ru/api/integrations/helixa/generation/dispatch`; expect 202,
    then `lookup` → `scheduled` → `native_completed`, and a `career_playbooks` row owned by
    the service principal. Watch `helixa_generation_commands` and the worker log.
+
 5. **Outbound second, on dev.** Set `HELIXA_KNOWLEDGE_SYNC_SCHEDULER_ENABLED=true` on the dev
    worker. The completed playbook from step 4 must produce one `helixa_knowledge_sync_outbox`
    row that reaches `delivered`, and Helixa's receiver must answer 202 with `originCommand`
@@ -677,10 +678,10 @@ through the existing project-scoped Supabase MCP under the host-operation lock,
 in repository order, and independently checked through a TLS-verified read-only
 catalog/history connection:
 
-| Migration | Applied history version | SQL SHA-256 |
-| --- | --- | --- |
-| `helixa_create_course_generation` | `20260905162359` | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
-| `helixa_observation_binding_scope` | `20260905162619` | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
+| Migration                          | Applied history version | SQL SHA-256                                                        |
+| ---------------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| `helixa_create_course_generation`  | `20260905162359`        | `7754a85928bfe36e9039b0797db18dbc1fbf066116c8f99bc7d1e87f586580ea` |
+| `helixa_observation_binding_scope` | `20260905162619`        | `93545f26416210be950a0c72c2df23572c97753f3a95d35889d4d00aba7faced` |
 
 The verified repository watermark is
 `20260905160000_helixa_observation_binding_scope.sql`; there are no missing,
@@ -703,3 +704,108 @@ Separate source Helixa organizations, bindings and HMAC materials keep those
 contours distinct. Provisioning, application rollout and the three actual paid
 generation flows remain pending. A rollback preserves migration history and
 native objects: keep the bridge disabled or apply a reviewed forward correction.
+
+## Native Role Guide interview facade (mc2-agpo8; Helixa helixa-2-lab-f0pdy)
+
+The additive facade lives under `/api/integrations/helixa/interview/`. It is disabled
+unless **`HELIXA_ROLE_INTERVIEW_MODE=live`** is explicitly configured. This change
+ships no environment activation, provisioning, deployment, or paid acceptance.
+Generation v1, including its signed completion import, is unchanged.
+
+All three endpoints are POST JSON, using the generation ingress headers and raw-body HMAC:
+`X-Helixa-External-System-Id` and `X-Helixa-Signature: sha256=<hex>`. Responses,
+including safe JSON errors, carry `X-Megacampus-Signature` over the exact response
+bytes with the same existing shared key. Verify this signature before parsing.
+Bodies are bounded at 2 MB; never log bodies, prompts, secrets, or model responses.
+Current binding/principal rights are revalidated on replay too. No caller user or
+organization identity is accepted. Only bindings permitting job-instruction
+creation and their non-interactive native service principal can use the facade.
+
+The canonical wire schemas are `RoleInterviewQuestionsRequestSchema`,
+`RoleInterviewQuestionsResultSchema`, `RoleInterviewFollowupsRequestSchema`, and
+`RoleInterviewFollowupsResultSchema` in
+`src/integrations/helixa/role-interview-schema.ts`.
+
+- `questions`: `{schemaVersion:"helixa.role-interview-questions.v1", binding:{bindingId}, uiLanguage:"ru"|"en"}`.
+  Returns schema `helixa.role-interview-questions-result.v1`, `methodologyHash`, the
+  native fixed questions, and `limits:{maxRounds:2,maxQuestions:7,readyScoreBps:7500,maxContextCharacters:12000}`.
+  The methodology hash covers both localized question catalogs and the effective
+  adaptive prompt/version. UI and content languages can differ.
+- `followups`: schema `helixa.role-interview-followups.v1`, `binding`, `interviewId`,
+  positive integer `revision`, `round:1|2`, `methodologyHash`,
+  `previousResultHash:null|hex64`, `contentLanguage:"ru"|"en"`,
+  `fixedAnswers:[{question_key,value}]`, `followupAnswers:[{question_id,value?,skipped}]`,
+  and `context:{text,source:{documentId,sourceRevisionHash,citationId}}`.
+  Context text is at most 12,000 characters; its raw UTF-8 SHA256 must equal
+  `sourceRevisionHash`. The descriptor identifies Helixa-owned bound text, not an
+  instruction to fetch an MC2 document. There is no MC2 source-id or playbook-id
+  input and no remote context lookup. Required fixed answers and options are
+  checked against the native question catalog. Content language is added as a
+  fixed answer when omitted. Round 1 has no follow-up answers and null previous
+  hash. Round 2 answers every server-owned round-1 question, or explicitly skips
+  it; the server supplies its stored question text/type. The base answers, context,
+  language and methodology must stay fixed within a revision.
+
+Follow-up responses use schema `helixa.role-interview-followups-result.v1` and echo
+`interviewId,revision,round,requestHash,methodologyHash`. State is `pending` (HTTP
+202), `completed`, `uncertain`, or `action_required` (HTTP 200). Completion adds
+`resultHash` and `result:{questions,completenessScoreBps,stopRecommendation,readyToGenerate}`.
+Questions have the existing native UUID/text/type/options/rationale shape. Public
+scores are integers in basis points; native fractional scores never enter the
+strict generation canonical JSON. Native readiness still requires score >=0.75,
+zero remaining questions and the ready recommendation. At most two paid rounds
+and seven returned questions are permitted per revision. `resultHash` hashes the
+canonical integer-only `result`; `requestHash` hashes the full strict parsed
+request. Both use `canonicalGenerationJsonV1` (UTF-8 key ordering).
+
+Before persisting completion, this facade additionally enforces Helixa's display
+contract: question/rationale <=3000 characters; option value/label <=1000, helper
+<=3000, at most 100 options; localized question plus option labels/values <=3000;
+and complete canonical UTF-8 response <=2 MiB. This leaves native career and fixed
+question schemas unchanged. Invalid model output stays `uncertain`, without a
+completed result or automatic paid retry. Incompatible historical completions are
+withheld as `uncertain` on lookup/replay without altering the stored bytes or
+permitting a second-round model dispatch.
+
+A durable PostgreSQL claim commits **before** the native adaptive generator may
+call a model. The exact prompt is frozen in that claim. The existing managed
+model routing, repair behavior and cost accounting are retained; call metadata
+and aborted-attempt/unknown-cost facts are stored in the interview ledger rather
+than being charged to a fictitious course. A concurrent or repeated POST reads
+the same claim; changed input for the same `(binding,interviewId,revision,round)`
+is HTTP 409. New methodology requires a new revision. Completed response bytes
+are immutable across replays and application restarts.
+
+The first caller may wait for native generation; a proxy timeout does not release
+its claim. Repeat the **exact** POST to read pending/completion. An in-progress
+claim older than 30 minutes is conservatively marked uncertain, never reclaimed
+for another model call. A late result from its original claim may still complete
+it. A lost result, failed call, or uncertain persistence does not authorize
+repayment. `uncertain` requires operator/owner review; the adapter must not create
+fresh revisions automatically to evade this protection.
+
+After the owner confirms answers, Helixa freezes the complete transcript as its
+own source and includes those exact contents in generation v1's
+`jobInstruction.context` (12,000-character bound), with its descriptor in
+`selectedSources`. MC2 validates and freezes the descriptors against its command
+ledger, but does not fetch them or turn them into MC2 source documents. The actual
+native mapping places business goal plus transcript in `qAData.freeform`, which
+enters the spec-builder prompt. Signed `originCommand` links the resulting
+ROLE_GUIDE back to Helixa's immutable approved payload. The descriptor is not a
+claim that MC2 independently certified a source document. Overlong transcripts
+must be reviewed/reduced before approval; never silently truncate them.
+
+Local evidence: focused service/HTTP/native-mapping tests use injected runtimes;
+`MC2_HELIXA_INTERVIEW_REAL_PG17=1` enables the new disposable PostgreSQL 17 suite.
+No owner preview database or live provider is needed. Live activation and paid
+semantic acceptance remain explicit owner actions.
+
+Reconciliation uses signed `POST /api/integrations/helixa/interview/lookup` with
+`{schemaVersion:"helixa.role-interview-lookup.v1",binding:{bindingId},interviewId,revision,round,requestHash,methodologyHash}`.
+This endpoint only reads an existing claim and never creates or pays for one.
+Missing claims return `action_required` / `interview_request_not_found` in the
+normal signed result envelope, echoing the expected methodology hash. After a
+lost first-dispatch response, use lookup rather than replaying followups: the
+original request might never have reached MC2. Exact POST replay remains
+idempotent when a claim exists; it is not proof that a previously absent claim
+may be created during reconciliation.

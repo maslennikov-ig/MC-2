@@ -1,8 +1,8 @@
+import { loadCareerPlaybookFixedQuestions } from '@/shared/career-playbook/fixed-questions';
 import { TRPCError } from '@trpc/server';
 import {
   CareerPlaybookBusinessContextSchema,
   CareerPlaybookGenerationProgressSchema,
-  CareerPlaybookFixedQuestionSchema,
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
   CareerPlaybookQADataSchema,
@@ -567,16 +567,7 @@ export async function getCareerPlaybookFixedQuestions(
   input: { uiLanguage: 'ru' | 'en' }
 ): Promise<CareerPlaybookFixedQuestion[]> {
   requireUser(ctx);
-  const supabase = getCareerPlaybookSupabase();
-  const { data, error } = await supabase
-    .from('career_playbook_fixed_questions')
-    .select('*')
-    .eq('language', input.uiLanguage)
-    .order('position', { ascending: true });
-
-  if (error) throwOnDbError(error, 'Failed to load Career Playbook fixed questions');
-
-  return CareerPlaybookFixedQuestionSchema.array().parse(data ?? []);
+  return loadCareerPlaybookFixedQuestions(input.uiLanguage);
 }
 
 export async function requestCareerPlaybookFollowups(

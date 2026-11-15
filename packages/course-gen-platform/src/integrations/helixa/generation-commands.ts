@@ -200,7 +200,7 @@ function assertBinding(
   if (!enabled) throw new Error('MegaCampus generation binding unavailable');
 }
 
-function assertPrincipalBinding(
+export function assertPrincipalBinding(
   binding: ResolvedHelixaGenerationBinding | null
 ): asserts binding is ResolvedHelixaGenerationBinding {
   if (!binding) throw new Error('MegaCampus generation binding unavailable');
