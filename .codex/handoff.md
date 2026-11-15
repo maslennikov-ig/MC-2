@@ -12,9 +12,9 @@ Four daily pulls were missed October 29 through November 1. The November 1 drill
 that gap. Its journal entry aged out. Daily copies resumed November 2.
 On November 15 at 15:42:36 UTC the checksum-verified copy restored 6,856 points in isolated
 Qdrant 1.18.2. The container was removed and Prometheus and Alertmanager cleared the alert.
-The verified weekly timer is installed and enabled on the backup host. Its first scheduled run
-is November 22 at 08:28 Moscow time. 12 focused tests, type-check and build passed.
-Retain the timer change in the delivery branch so a future reinstall preserves the schedule.
+The verified weekly timer is installed and enabled on the backup host. The first scheduled run
+is November 22 after 08:00 Moscow time, with up to 30 minutes of jitter. The 12 focused tests,
+type-check and build passed. PR #363 carries the deployed timer and this handoff into delivery.
 docs-reviewed: updated. graph-reviewed: no-change-needed (systemd schedule and runbook).
 
 ## Delivery and nightly price sync
