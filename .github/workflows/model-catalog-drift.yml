@@ -47,7 +47,7 @@ env:
 jobs:
   drift:
     name: Apply the published rates to MODEL_CATALOG
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The unit suite alone takes ~5 minutes on this runner, plus install, three
     # workspace builds and a Chromium download. At 10 the 2026-09-04 run was
     # cancelled mid-suite and, because a cancelled job is not a failed one,
