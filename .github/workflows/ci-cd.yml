@@ -296,7 +296,7 @@ jobs:
   # ============================================
   test-unit:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: setup
     if: ${{ !inputs.skip_tests }}
     timeout-minutes: 15
