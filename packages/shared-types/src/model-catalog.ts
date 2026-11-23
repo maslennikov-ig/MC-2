@@ -309,8 +309,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.2': {
     // Re-read live 2026-08-25: 0.966/3.036 had drifted to 1.19/3.74 (0.81x).
-    inputPricePerMillion: 0.007,
-    outputPricePerMillion: 6.8,
+    inputPricePerMillion: 0.62,
+    outputPricePerMillion: 2.42,
     contextLength: 1048576,
     maxOutputTokens: 262144,
     supportsTemperature: true,
@@ -341,7 +341,7 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    */
   'z-ai/glm-5.3-flash': {
     inputPricePerMillion: 0.0399,
-    outputPricePerMillion: 0.0784,
+    outputPricePerMillion: 0.074,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
@@ -356,8 +356,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * (mc2-hc91g).
    */
   'z-ai/glm-5.2:batch': {
-    inputPricePerMillion: 0.527,
-    outputPricePerMillion: 1.075,
+    inputPricePerMillion: 0.322,
+    outputPricePerMillion: 0.989,
     contextLength: 512000,
     maxOutputTokens: null,
     supportsTemperature: true,
