@@ -340,8 +340,8 @@ export const MODEL_CATALOG: Record<string, ModelCapabilities> = {
    * oversight.
    */
   'z-ai/glm-5.3-flash': {
-    inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.5,
+    inputPricePerMillion: 0.12,
+    outputPricePerMillion: 0.38,
     contextLength: 1048576,
     maxOutputTokens: 131072,
     supportsTemperature: true,
