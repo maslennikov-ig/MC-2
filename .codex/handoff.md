@@ -1,36 +1,30 @@
 # Orchestrator Handoff
 
-Updated: 2026-10-07. Effective kernel: `shared-orchestration/v1`.
+Updated: 2026-11-15. Effective kernel: `shared-orchestration/v1`.
 
 Current state only. History lives in commits, `bd` close reasons, stage summaries and
 `docs/career-playbook/2026-09-02-handoff-history-archive.md`. Durable traps live in
 `.codex/repository-failure-modes.md`; this file says what still binds work.
 
-## Nightly price sync (mc2-uoyed, mc2-v9c3k)
+## Off-host Qdrant pause (mc2-2w0oe)
 
-2026-10-07: mc2-uoyed repairs the pinned-endpoint cost fixture stranded since September 19. Runs 37297884912, 37450378405 and 37607159215 failed the same fixed $0.415 assertion after catalogue changes. The fixture now derives eligible endpoint rates and the expected charge from the catalogue; five current published rate changes are applied. Exact red/green reproduced; 8572 unit tests passed (133 skipped), type-check/build passed. Delivery targets develop; exact commit/PR receipt is in Beads. Master workflow is unchanged; a subsequent scheduled run is still needed for live price-sync proof.
-v0.31.49 remains accepted in production at 188e5abc3: matching API/web/3 workers, CI/CD 36870583394 passed, health 200. The separate October 1 Telegram repair passed 9 notice tests and live sync 36873944045 (rates published, notice sent). Audit then: 0 high/critical; 11 moderate/1 low tracked in mc2-5hqt3. Evidence: .codex/stages/mc2-v9c3k/.
-docs-reviewed: updated. graph-reviewed: blocked — isolated checkout has no owned graph; primary map was used read-only and exact current files verified. Numeric catalogue and fixture changes do not alter architecture; the dirty primary graph stays untouched.
+The owner paused second-host Qdrant backups before MegaCampus launch. Both off-host timers are
+disabled and both services are stopped. Seven existing generations are retained for a reversible
+pause. The dedicated source SSH authorization is withdrawn and the two exporter textfiles are
+archived. The live Prometheus rules exclude the two off-host checks. Promtool and the 12 focused
+tests passed. PR #363 now carries the pause and the default monitoring change.
+docs-reviewed: updated. graph-reviewed: no-change-needed (monitoring rules and runbook).
 
-## Price sync repair (mc2-x9che)
+## Delivery and nightly price sync
 
-Owner authorized fix, delivery and deployment on 2026-09-16. Work is isolated
-from the dirty primary worktree. Eight scheduled failures (September 9-16)
-came from the snapshot updater accepting pairs but not Batch triples. The
-repair preserves context length and rejects unsupported existing snapshots;
-workflow failures retain their exit status and report the actual failed phase
-and publication state. Unchanged prices skip the suite and commit.
-The full unit-suite gate remains for changed prices. Publish to develop and
-master: scheduled workflow definitions come from master, source from develop.
-Acceptance: 33 focused tests passed; type-check/build passed, shared-types
-rebuilt after 10 live rate updates. docs-reviewed: updated. Deployment
-identifiers and graph refresh result are recorded in `bd show mc2-x9che`.
-The master price-sync run `35081600425` passed on 2026-09-16. The first
-release candidate was stopped before deployment by dependency security audit;
-`mc2-xyklh` patches Next.js 15.5.24, Sharp 0.35.4 and js-yaml 4.3.2.
-Security gate remains unchanged. Dependency documentation decision: patch
-versions only, no API/workflow migration; package manifests and lockfile are
-the canonical version records.
+v0.31.49 runs at `188e5abc3` (API, web, three workers). November 15 audit at `ab50ed29f` reports
+3 critical and 19 high dependency advisories (`mc2-bot88`). The last full develop CI is red.
+PR #341 conflicts with develop. The two role-interview branches and the local task-sync changes
+are still pending. Three merged local branch refs were removed after checking both remote bases.
+Pinned-endpoint fixture repair `mc2-uoyed` merged in PR #345. September price sync and notice
+receipts remain in `mc2-x9che` and `.codex/stages/mc2-v9c3k/`.
+Price changes require Chromium and the full unit suite. Ubuntu 26.04 broke the Chromium step
+November 12–14 (`mc2-2wmg8`). Run 43707903298 passed November 15 with the Chromium step skipped.
 
 ## Current stage
 
@@ -184,8 +178,8 @@ through T5.
 ## Live operational facts
 
 - `course_embeddings_v1` holds **6856 points** after deduplication; a snapshot restoring 13712 is not
-  a fault, half are copies. Qdrant and uploads pull daily to `helixa-new`; on-host snapshots share
-  the docker volume with live data, so that pull is the only real mitigation.
+  a fault, half are copies. Uploads pull daily to `helixa-new`. Qdrant snapshots run on the
+  source host and share its Docker volume with live data.
 - Dev and staging share one Supabase project; CI does not auto-apply migrations. Dev has its own
   Qdrant (host port 6333) and a full `-dev` worker set, but shares Redis with production.
 - Nine source documents are accepted as lost and are **not** in the indexed set; do not reopen.
@@ -259,6 +253,8 @@ delivered, so a report naming a branch again means something really was left beh
 
 ## Explicit defers
 
+- `mc2-2w0oe` — second-host Qdrant backups are paused by owner decision. PR #363 carries the
+  monitoring and handoff changes through the existing CI gates.
 - `mc2-bot88` — October 7 inherited dependency audit blocks full CI/deployment readiness: 4 high and 1 critical advisories (proxy-addr, source-map-js, sharp, MCP client, braces). Braces has no patched release; resolve scoped dependency fixes and assess its consumers/upstream separately. Price-sync PR345 changes no dependencies and its local nightly-equivalent acceptance passes. Keep the audit gate enforced; evidence and advisory links are in Beads.
 - `mc2-5hqt3` — remaining moderate/low advisory work stays separate; the October 7 audit reports 20 moderate/4 low, superseding the October 1 count of 11 moderate/1 low.
 - `mc2-uhh07` — release helper deletes rollback backups before commit; preserve them through commit/tag and test failed hooks.

@@ -1,8 +1,12 @@
 # Off-host Qdrant snapshots
 
-`helixa-new` pulls one already verified production Qdrant snapshot each day. Production never gets
-a credential for the backup host. The backup host gets one root-owned SSH key that can only export
-the latest snapshot or publish a success timestamp; it gets no Qdrant API key.
+**Status: paused.** Scheduled copies and restore drills are disabled pending a decision to resume.
+The default Prometheus rules cover source-local recovery. The procedures below support a future
+installation.
+
+When enabled, `helixa-new` pulls one already verified Qdrant snapshot each day. The backup host uses
+a dedicated root-owned SSH key scoped to exporting the latest snapshot and publishing success
+timestamps.
 
 This replaces the earlier S3 transport assumption after the owner chose the existing second host.
 It preserves the original checksum, retention, exact-version restore, alerting, and rollback gates.
@@ -18,11 +22,12 @@ This is not full disaster recovery: losing both VPS providers can still lose thi
 - Free-space floor: 10 GiB after the incoming snapshot. Its exact manifest size is reserved before
   transfer and the floor is checked again before atomic promotion.
 - Retention: no more than 7 daily generations and no generation older than 7 days.
-- Restore: monthly, exact Qdrant 1.18.2 image digest, 0.5 CPU, 1.5 GiB memory, 256 processes,
-  and a loopback-only port. The temporary container is removed after the probe.
+- The checked-in restore timer runs monthly at midnight on the first day with up to 30 minutes of
+  jitter. The drill uses the exact Qdrant 1.18.2 image digest, 0.5 CPU, 1.5 GiB memory, 256 processes,
+  and a loopback-only port. The probe removes its temporary container on exit.
 
-The measured production snapshot on 2026-08-23 is 103,021,568 bytes. Seven copies consume about
-0.67 GiB, plus the pinned restore image, against 45 GiB currently free on `helixa-new`.
+The production snapshot measured on 2026-08-23 was 103,021,568 bytes. Seven copies of that size
+consume about 0.67 GiB. The pinned restore image needs additional space.
 
 Retention moved from 14 to 7 on 2026-08-23, on the owner's decision. It is one number in two
 programs: `EXPECTED_RETENTION_DAYS` in the production forced command, and `RETENTION_DAYS`/`KEEP`
@@ -134,23 +139,21 @@ sudo megacampus-qdrant-offhost-backup list
 sudo megacampus-qdrant-offhost-backup verify
 sudo systemctl list-timers --all | grep megacampus-qdrant-offhost
 sudo journalctl -u megacampus-qdrant-offhost-backup.service -n 100 --no-pager
+sudo journalctl -u megacampus-qdrant-offhost-restore.service -n 100 --no-pager
 ```
 
-## Alerts
+## Monitoring when enabled
 
 After a verified backup or restore, the restricted key writes a success-only textfile metric into
-production's existing node exporter directory. Prometheus routes these through the existing
-Alertmanager Telegram receiver:
+production's existing node exporter directory.
 
 The directory is root-owned, group-writable, setgid, and sticky (`root:megacampus-metrics`, mode
 `3775`). Application writers retain their own metric files, while the off-host evidence remains
 root-owned so an application process cannot unlink or replace it.
 
-- `QdrantOffHostSnapshotStale`: no verified off-host copy for 36 hours, or metric absent;
-- `QdrantOffHostRestoreDrillStale`: no exact-version restore for 35 days, or metric absent.
-
-The source-local `QdrantSnapshotStale` and `QdrantRestoreDrillStale` remain separate. A successful
-local snapshot cannot silence the off-host alert.
+When enabling the integration again, restore the two off-host freshness rules and their
+Prometheus test cases together. Verify that Prometheus scrapes both success timestamps before
+enabling the timers.
 
 ## Rollback
 
@@ -170,5 +173,5 @@ Then remove only the authorized-key line carrying the
 scripts may be removed from `helixa-new` after the data owner confirms the stored generations are no
 longer needed. Do not delete `/opt/backups/megacampus-qdrant` as part of routine rollback.
 
-Removing the alert rules is a separate reviewed monitoring configuration change. Otherwise stale
-metrics will correctly alert that the off-host protection has been disabled.
+Remove the off-host alert rules and archive the two off-host textfiles from the exporter directory.
+Verify the remaining Prometheus rules and check that both timers are disabled.

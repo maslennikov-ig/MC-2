@@ -75,7 +75,7 @@ groups:
           summary: Qdrant snapshot is stale or missing
           description: >-
             No successful verified source-local Qdrant snapshot has been recorded within eight
-            hours. Off-host freshness is monitored by QdrantOffHostSnapshotStale.
+            hours.
 
       - alert: QdrantRestoreDrillStale
         expr: |
@@ -100,28 +100,6 @@ groups:
             /var/lib/megacampus-qdrant-recovery/restore-evidence/ on the deploy host. An identity
             mismatch whose field list omits content means the recovery probe is stale, not the
             backup; regenerate it with deploy/qdrant/generate-recovery-probe.py and rerun the drill.
-
-      - alert: QdrantOffHostSnapshotStale
-        expr: |
-          (time() - megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds > 36 * 60 * 60)
-          or absent(megacampus_qdrant_offhost_last_successful_snapshot_unixtime_seconds)
-        for: 0m
-        labels:
-          severity: critical
-        annotations:
-          summary: Off-host Qdrant snapshot is stale or missing
-          description: No checksum-verified Qdrant copy has reached the second host within 36 hours.
-
-      - alert: QdrantOffHostRestoreDrillStale
-        expr: |
-          (time() - megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds > 35 * 24 * 60 * 60)
-          or absent(megacampus_qdrant_offhost_last_successful_restore_drill_unixtime_seconds)
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Off-host Qdrant restore drill is stale or missing
-          description: No exact-version restore from the second-host copy has succeeded within 35 days.
 
       - alert: QdrantHybridFallbackHigh
         expr: |
